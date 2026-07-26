@@ -10,6 +10,7 @@ import type { AcceptedGameUpdate, ActionRejection } from "@/hooks/use-game-ws";
 import { useCardDatabase } from "@/hooks/use-card-database";
 import { useRemoteGameStatus } from "@/hooks/use-remote-game-status";
 import { useGameFinalizer } from "@/hooks/use-game-finalizer";
+import { toast } from "sonner";
 import type {
   CardDb,
   GameAction,
@@ -345,29 +346,27 @@ export function useGameSession(
     (requestedPlayerIndex === undefined || requestedPlayerIndex === 0);
   const noopNavigationHandler = useCallback(async () => {}, []);
   const [spectatorLeaving, setSpectatorLeaving] = useState(false);
-  const [spectatorLeaveError, setSpectatorLeaveError] = useState<string | null>(
-    null
-  );
+  const spectatorLeaveInFlightRef = useRef(false);
   const handleSpectatorBackToLobbies = useCallback(async () => {
     await leaveGame().catch(() => {});
     window.location.href = "/lobbies";
   }, [leaveGame]);
   const handleStopSpectating = useCallback(async () => {
+    if (spectatorLeaveInFlightRef.current) return;
+    spectatorLeaveInFlightRef.current = true;
     setSpectatorLeaving(true);
-    setSpectatorLeaveError(null);
     try {
-      await leaveGame();
       await apiDelete(
         `/api/lobbies/${spectatorLobbyId}/spectators`,
         LobbyActionResponseSchema
       );
+      // Membership deletion is authoritative. If local close fails, the route's
+      // revocation push closes the socket; token lease expiry is the backstop.
+      await leaveGame().catch(() => {});
       window.location.href = "/lobbies";
-    } catch (error) {
-      setSpectatorLeaveError(
-        error instanceof Error
-          ? error.message
-          : "Failed to stop spectating cleanly"
-      );
+    } catch {
+      toast.error("Couldn’t stop spectating. You’re still watching.");
+      spectatorLeaveInFlightRef.current = false;
       setSpectatorLeaving(false);
     }
   }, [leaveGame, spectatorLobbyId]);
@@ -394,7 +393,7 @@ export function useGameSession(
     : viewerRole === "spectator"
       ? {
           leavingGame: spectatorLeaving,
-          leaveError: spectatorLeaveError,
+          leaveError: null,
           fallbackSubmitting: false,
           fallbackError: null,
           handleBackToLobbies: handleSpectatorBackToLobbies,

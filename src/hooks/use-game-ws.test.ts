@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameState } from "@shared/game-types";
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +13,7 @@ vi.mock("react", async (importActual) => {
   return {
     ...actual,
     useCallback: (callback: unknown) => callback,
+    useEffect: (effect: () => void | (() => void)) => effect(),
     useMemo: (factory: () => unknown) => factory(),
     useRef: (initial: unknown) => ({ current: initial }),
     useState: (initial: unknown) => {
@@ -45,13 +46,18 @@ import { useGameWs } from "@/hooks/use-game-ws";
 
 describe("useGameWs prompt identity", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     mocks.onMessage = null;
     mocks.send.mockReset();
     mocks.toastInfo.mockReset();
     mocks.stateSetters.length = 0;
   });
 
-  it("toasts each validated spectator lifecycle event with truthful copy", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps join, departure, and ejection outcomes distinct", () => {
     useGameWs("game-1", "https://worker.test", async () => "token");
 
     mocks.onMessage?.({
@@ -69,10 +75,64 @@ describe("useGameWs prompt identity", () => {
       cause: "EJECTED",
     });
 
+    vi.advanceTimersByTime(500);
+
     expect(mocks.toastInfo.mock.calls).toEqual([
       ["Vivi started spectating"],
       ["Spectator stopped spectating"],
       ["Usopp was removed from spectating"],
+    ]);
+  });
+
+  it("coalesces a burst of spectator joins into one announcement", () => {
+    useGameWs("game-1", "https://worker.test", async () => "token");
+
+    for (const [id, displayName] of [
+      ["watcher-1", "Vivi"],
+      ["watcher-2", "Usopp"],
+      ["watcher-3", "Chopper"],
+    ]) {
+      mocks.onMessage?.({
+        type: "game:spectator_joined",
+        spectator: { id, displayName },
+      });
+    }
+
+    expect(mocks.toastInfo).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(500);
+    expect(mocks.toastInfo).toHaveBeenCalledOnce();
+    expect(mocks.toastInfo).toHaveBeenCalledWith(
+      "3 spectators started spectating"
+    );
+  });
+
+  it("bounds repeated departure and reconnect churn for one spectator", () => {
+    useGameWs("game-1", "https://worker.test", async () => "token");
+    const spectator = { id: "watcher-1", displayName: "Vivi" };
+
+    mocks.onMessage?.({ type: "game:spectator_joined", spectator });
+    vi.advanceTimersByTime(500);
+    mocks.onMessage?.({
+      type: "game:spectator_left",
+      spectator,
+      cause: "DEPARTED",
+    });
+    vi.advanceTimersByTime(500);
+    mocks.onMessage?.({ type: "game:spectator_joined", spectator });
+
+    for (let flap = 0; flap < 5; flap += 1) {
+      mocks.onMessage?.({
+        type: "game:spectator_left",
+        spectator,
+        cause: "DEPARTED",
+      });
+      mocks.onMessage?.({ type: "game:spectator_joined", spectator });
+      vi.advanceTimersByTime(500);
+    }
+
+    expect(mocks.toastInfo.mock.calls).toEqual([
+      ["Vivi started spectating"],
+      ["Vivi stopped spectating"],
     ]);
   });
 

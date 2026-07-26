@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   sendAction: vi.fn(),
   backToLobbies: vi.fn(),
   stopSpectating: vi.fn(),
+  leavingGame: false,
   viewerRole: "player" as "pending" | "player" | "spectator",
   bottomPlayerIndex: ((value: 0 | 1) => value)(0),
   bottomPlayer: null as GameState["players"][number] | null,
@@ -85,7 +86,7 @@ vi.mock("@/hooks/use-game-session", () => ({
         fallbackSubmitting: false,
         fallbackError: null,
         handleFallbackConcede: vi.fn(),
-        leavingGame: false,
+        leavingGame: mocks.leavingGame,
         leaveError: null,
         handleLeaveGame: mocks.stopSpectating,
         handleBackToLobbies: mocks.backToLobbies,
@@ -151,6 +152,7 @@ beforeEach(() => {
   mocks.sendAction.mockReset();
   mocks.backToLobbies.mockReset();
   mocks.stopSpectating.mockReset();
+  mocks.leavingGame = false;
   mocks.viewerRole = "player";
   mocks.bottomPlayerIndex = 0;
   mocks.bottomPlayer = null;
@@ -201,6 +203,7 @@ describe("LiveGameShell dispatch wiring", () => {
 
   it("maps spectator identity to OPT-562's read-only board mode", () => {
     mocks.viewerRole = "spectator";
+    mocks.leavingGame = true;
     mocks.bottomPlayerIndex = 1;
     mocks.bottomPlayer = {
       playerId: "player-1",
@@ -232,6 +235,7 @@ describe("LiveGameShell dispatch wiring", () => {
     expect(state?.bottomPlayerIndex).toBe(1);
     expect(state?.me?.playerId).toBe("player-0");
     expect(state?.opp?.playerId).toBe("player-1");
+    expect(state?.leavingGame).toBe(true);
     act(() => mocks.leaveRefs.at(-1)?.());
     expect(mocks.stopSpectating).toHaveBeenCalledOnce();
     expect(mocks.backToLobbies).not.toHaveBeenCalled();

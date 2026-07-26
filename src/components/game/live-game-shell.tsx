@@ -394,6 +394,7 @@ function GameSessionView({
     activePrompt,
     activePromptId,
     matchClosed: game.matchClosed,
+    leavingGame: navigation.leavingGame,
     canUndo: game.canUndo,
     actionRejection: game.actionRejection,
     acceptedUpdate: game.acceptedUpdate,
@@ -503,15 +504,6 @@ function GameSessionView({
             Reconnecting to the live match…
           </div>
         )}
-
-      {navigation.leaveError && (
-        <div
-          role="alert"
-          className="border-gb-accent-red/30 bg-gb-surface text-gb-accent-red fixed inset-x-0 bottom-0 z-[60] border-t px-4 py-2 text-center text-xs font-semibold"
-        >
-          {navigation.leaveError}
-        </div>
-      )}
 
       <ScaledBoard designWidth={1920} designHeight={1080}>
         <Board state={state} dispatch={dispatch} />

@@ -269,6 +269,8 @@ describe("GameOverlayGate spectator policy", () => {
     expect(output).toContain("Match complete");
     expect(output).toContain("Robin wins");
     expect(output).toContain("Conceded");
+    const announcement = root.findByProps({ role: "status" });
+    expect(announcement.findAllByType("button")).toHaveLength(0);
     const exit = root
       .findAllByType("button")
       .find((button) => button.children.includes("Back to Party"));

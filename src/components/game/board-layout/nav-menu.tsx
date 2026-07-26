@@ -22,11 +22,13 @@ export function NavMenu({
   onConcede,
   matchClosed,
   spectator = false,
+  leaving = false,
 }: {
   onLeave: () => void;
   onConcede?: () => void;
   matchClosed: boolean;
   spectator?: boolean;
+  leaving?: boolean;
 }) {
   const [concedeOpen, setConcedeOpen] = useState(false);
 
@@ -77,9 +79,14 @@ export function NavMenu({
       >
         <DropdownMenuItem
           onClick={onLeave}
+          disabled={leaving}
           className="text-gb-text focus:bg-gb-surface-raised text-xs"
         >
-          {spectator ? "Stop spectating" : "← Back to Lobbies"}
+          {spectator
+            ? leaving
+              ? "Stopping…"
+              : "Stop spectating"
+            : "← Back to Lobbies"}
         </DropdownMenuItem>
         {!matchClosed && onConcede && (
           <DropdownMenuItem

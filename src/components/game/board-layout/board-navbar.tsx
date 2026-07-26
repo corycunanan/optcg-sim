@@ -15,6 +15,7 @@ export interface BoardNavbarProps {
   onLeave: () => void;
   onConcede: () => void;
   matchClosed: boolean;
+  leavingGame?: boolean;
 }
 
 export function getBoardStatusAnnouncement({
@@ -49,6 +50,7 @@ export function BoardNavbar({
   onLeave,
   onConcede,
   matchClosed,
+  leavingGame = false,
 }: BoardNavbarProps) {
   const statusDot =
     connectionStatus === "connected"
@@ -159,6 +161,7 @@ export function BoardNavbar({
           onConcede={interactionMode === "full" ? onConcede : undefined}
           matchClosed={matchClosed}
           spectator={interactionMode === "spectator"}
+          leaving={leavingGame}
         />
       </div>
 

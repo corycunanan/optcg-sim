@@ -66,6 +66,20 @@ describe("NavMenu spectator-safe actions", () => {
     expect(buttonText).not.toContain("← Back to Lobbies");
   });
 
+  it("disables Stop spectating while the leave is in flight", () => {
+    const onLeave = vi.fn();
+    act(() => {
+      renderer = create(
+        <NavMenu onLeave={onLeave} matchClosed={false} spectator leaving />
+      );
+    });
+
+    const action = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.join("") === "Stopping…");
+    expect(action?.props.disabled).toBe(true);
+  });
+
   it("mounts the concede dialog policy only when concession is available", () => {
     act(() => {
       renderer = create(

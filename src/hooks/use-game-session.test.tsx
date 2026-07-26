@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   remoteStatusCalls: [] as Array<[string, boolean]>,
   retryFetchCards: vi.fn(),
   fetch: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock("react", async (importActual) => {
@@ -45,6 +46,8 @@ vi.mock("react", async (importActual) => {
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { user: { id: "user-a" } } }),
 }));
+
+vi.mock("sonner", () => ({ toast: { error: mocks.toastError } }));
 
 vi.mock("@/hooks/use-game-ws", () => ({
   useGameWs: vi.fn(() => {
@@ -139,6 +142,7 @@ beforeEach(() => {
   mocks.remoteStatusCalls = [];
   mocks.retryFetchCards.mockReset();
   mocks.fetch.mockReset();
+  mocks.toastError.mockReset();
   mocks.fetch.mockResolvedValue({
     ok: true,
     json: vi.fn().mockResolvedValue({ success: true }),
@@ -368,6 +372,56 @@ describe("useGameSession multi-instance composition", () => {
 
     expect(leaveGame).toHaveBeenCalledOnce();
     expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(window.location.href).toBe("/lobbies");
+  });
+
+  it("keeps the socket open and board connected without a departure when spectator DELETE fails", async () => {
+    let rejectDelete: ((error: Error) => void) | undefined;
+    mocks.fetch.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectDelete = reject;
+      })
+    );
+    const leaveGame = vi.fn().mockResolvedValue(undefined);
+    mocks.wsReturns = [createWsReturn({ leaveGame })];
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
+
+    const firstLeave = spectator.navigation.handleLeaveGame();
+    const duplicateLeave = spectator.navigation.handleLeaveGame();
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+    expect(leaveGame).not.toHaveBeenCalled();
+
+    rejectDelete?.(new Error("rate limited"));
+    await Promise.all([firstLeave, duplicateLeave]);
+
+    expect(leaveGame).not.toHaveBeenCalled();
+    expect(spectator.game.connectionStatus).toBe("connected");
+    expect(window.location.href).toBe("");
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Couldn’t stop spectating. You’re still watching."
+    );
+  });
+
+  it("navigates after successful DELETE even when local socket close fails", async () => {
+    const leaveGame = vi.fn().mockRejectedValue(new Error("close failed"));
+    mocks.wsReturns = [createWsReturn({ leaveGame })];
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
+
+    await spectator.navigation.handleLeaveGame();
+
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/spectators",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(leaveGame).toHaveBeenCalledOnce();
+    expect(mocks.toastError).not.toHaveBeenCalled();
     expect(window.location.href).toBe("/lobbies");
   });
 
