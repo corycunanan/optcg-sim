@@ -66,6 +66,7 @@ const params = {
 function lobbySnapshot(overrides: Record<string, unknown> = {}) {
   return {
     status: "IN_GAME",
+    revision: 7,
     hostUserId: "host-user",
     guest: { userId: "guest-user" },
     spectators: [{ userId: "other-spectator" }, { userId: "target-user" }],
@@ -138,6 +139,7 @@ describe("DELETE /api/lobbies/[id]/spectators/[userId]", () => {
       where: { id: "lobby-1" },
       select: {
         status: true,
+        revision: true,
         hostUserId: true,
         guest: { select: { userId: true } },
         spectators: {
@@ -175,9 +177,11 @@ describe("DELETE /api/lobbies/[id]/spectators/[userId]", () => {
       reason: "REMOVED_BY_HOST",
       removedSpectatorUserIds: ["target-user"],
     });
-    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith("lobby-1", [
-      "target-user",
-    ]);
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
+      "lobby-1",
+      8,
+      ["target-user"],
+    );
   });
 
   it("still sends the directed ejection event when state rebuilding fails", async () => {

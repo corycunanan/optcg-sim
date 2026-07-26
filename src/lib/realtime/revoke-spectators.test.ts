@@ -10,6 +10,7 @@ describe("revokeSpectatorSocketsForLobby", () => {
 
     await revokeSpectatorSocketsForLobby(
       "lobby-1",
+      8,
       ["spectator-a", "spectator-b", "spectator-a"],
       {
         workerUrl: "https://worker.example",
@@ -29,6 +30,8 @@ describe("revokeSpectatorSocketsForLobby", () => {
       "Bearer worker-secret"
     );
     expect(JSON.parse(init.body)).toEqual({
+      lobbyId: "lobby-1",
+      revision: 8,
       userIds: ["spectator-a", "spectator-b"],
     });
   });
@@ -36,7 +39,7 @@ describe("revokeSpectatorSocketsForLobby", () => {
   it("does not resolve lobby membership when worker auth is unconfigured", async () => {
     const findGameId = vi.fn();
     const logger = vi.fn();
-    await revokeSpectatorSocketsForLobby("lobby-1", ["spectator-a"], {
+    await revokeSpectatorSocketsForLobby("lobby-1", 8, ["spectator-a"], {
       findGameId,
       logger,
       workerUrl: "",
@@ -51,7 +54,7 @@ describe("revokeSpectatorSocketsForLobby", () => {
 
   it("does not contact a Durable Object when the lobby has no game", async () => {
     const fetchMock = vi.fn();
-    await revokeSpectatorSocketsForLobby("lobby-1", ["spectator-a"], {
+    await revokeSpectatorSocketsForLobby("lobby-1", 8, ["spectator-a"], {
       workerUrl: "https://worker.example",
       workerSecret: "worker-secret",
       fetch: fetchMock,

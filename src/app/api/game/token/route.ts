@@ -11,8 +11,9 @@
  * The worker has no database access, so a signed spectator role is its
  * authoritative authorization. Established spectator sockets carry exp as a
  * hibernation-stable lease, so server-side delivery is bounded by the 5-minute
- * token TTL even if a membership-change push is missed. Lobby mutations also
- * push prompt socket revocation to the game Durable Object.
+ * token TTL even if a membership-change push is missed. An alarm also requests
+ * physical socket close, whose timing is not numerically bounded. Lobby
+ * mutations push prompt, revision-protected revocation to the game DO.
  */
 
 import { NextRequest } from "next/server";

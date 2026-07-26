@@ -122,6 +122,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         where: { id },
         select: {
           status: true,
+          revision: true,
           hostUserId: true,
           guest: { select: { userId: true } },
           spectators: {
@@ -160,13 +161,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         data: { revision: { increment: 1 } },
       });
 
-      return { changed: true };
+      return { changed: true, revision: lobby.revision + 1 };
     });
 
     if (!result.changed) return apiAction();
 
     after(async () => {
-      const socketRevocation = revokeSpectatorSocketsForLobby(id, [userId]);
+      const socketRevocation = revokeSpectatorSocketsForLobby(
+        id,
+        result.revision!,
+        [userId]
+      );
       const state = await buildLobbyRoomState(id);
       if (state) await notifyLobby(state, { actorUserId: userId });
       await socketRevocation;

@@ -15,6 +15,7 @@ export interface RevokeSpectatorDeps extends GameWorkerClientDeps {
 /** Best-effort fast path; the token-expiry lease remains the correctness bound. */
 export async function revokeSpectatorSocketsForLobby(
   lobbyId: string,
+  revision: number,
   removedSpectatorUserIds: readonly string[],
   deps: RevokeSpectatorDeps = {}
 ): Promise<void> {
@@ -48,7 +49,7 @@ export async function revokeSpectatorSocketsForLobby(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userIds }),
+        body: JSON.stringify({ lobbyId, revision, userIds }),
         timeoutMs: REVOCATION_TIMEOUT_MS,
       },
       deps

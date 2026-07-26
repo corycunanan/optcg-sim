@@ -123,6 +123,7 @@ beforeEach(() => {
   queryRawMock.mockResolvedValue([{ id: "lobby-1" }]);
   lobbyFindUniqueMock.mockResolvedValue({
     status: "IN_GAME",
+    revision: 7,
     hostUserId: "host-user",
     guest: { userId: "guest-user" },
     spectators: [{ userId: "spectator-user" }],
@@ -289,9 +290,11 @@ describe("DELETE /api/lobbies/[id]/spectators", () => {
       where: { id: "lobby-1" },
       data: { revision: { increment: 1 } },
     });
-    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith("lobby-1", [
-      "spectator-user",
-    ]);
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
+      "lobby-1",
+      8,
+      ["spectator-user"],
+    );
   });
 
   it("fans out the decremented spectator count without a directed self-ejection event", async () => {

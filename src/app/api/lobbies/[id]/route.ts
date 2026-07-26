@@ -363,7 +363,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       });
     }
 
-    return { failure: null, removedSpectatorUserIds };
+    return {
+      failure: null,
+      revision: lobby.revision + 1,
+      removedSpectatorUserIds,
+    };
   });
 
   if (result.failure === "NOT_FOUND") {
@@ -391,6 +395,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       : Promise.resolve();
     const socketRevocation = revokeSpectatorSocketsForLobby(
       id,
+      result.revision!,
       result.removedSpectatorUserIds
     );
     const stateFanout = buildLobbyRoomState(id).then(async (state) => {
@@ -444,6 +449,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           hostUserId: true,
           mode: true,
           status: true,
+          revision: true,
           spectators: {
             select: { userId: true },
             orderBy: { userId: "asc" },
@@ -479,13 +485,18 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           hostUserId: userId,
           mode: "PVP",
           status: { in: ["WAITING", "READY"] },
+          revision: lobby.revision,
         },
         data: { status: "CLOSED", revision: { increment: 1 } },
       });
 
       if (closed.count === 1) {
         await releaseActiveLobbyMembers(tx, id);
-        return { failure: null, removedSpectatorUserIds };
+        return {
+          failure: null,
+          revision: lobby.revision + 1,
+          removedSpectatorUserIds,
+        };
       }
       return {
         failure: "NOT_FOUND" as const,
@@ -512,6 +523,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         : Promise.resolve();
       const socketRevocation = revokeSpectatorSocketsForLobby(
         id,
+        result.revision,
         result.removedSpectatorUserIds
       );
       const guestTerminalFanout = buildLobbyRoomState(id).then((state) => {

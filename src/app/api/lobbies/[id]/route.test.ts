@@ -460,6 +460,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
     expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
       "lobby-1",
+      8,
       preMutationSpectatorUserIds,
     );
     expect(userUpdateManyMock).toHaveBeenCalledTimes(2);
@@ -523,6 +524,7 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
     expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
       "lobby-1",
+      8,
       removedSpectatorUserIds,
     );
     for (const spectatorUserId of removedSpectatorUserIds) {
@@ -1052,6 +1054,7 @@ describe("DELETE /api/lobbies/[id]", () => {
         hostUserId: "host-user",
         mode: "PVP",
         status: { in: ["WAITING", "READY"] },
+        revision: 7,
       },
       data: { status: "CLOSED", revision: { increment: 1 } },
     });
@@ -1129,10 +1132,11 @@ describe("DELETE /api/lobbies/[id]", () => {
       reason: "LOBBY_CLOSED",
       removedSpectatorUserIds: ["spectator-1", "spectator-2"],
     });
-    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith("lobby-1", [
-      "spectator-1",
-      "spectator-2",
-    ]);
+    expect(revokeSpectatorSocketsMock).toHaveBeenCalledWith(
+      "lobby-1",
+      8,
+      ["spectator-1", "spectator-2"],
+    );
     expect(notifyUserMock).toHaveBeenCalledWith(
       "spectator-1",
       {
