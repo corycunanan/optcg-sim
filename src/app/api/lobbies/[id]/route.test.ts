@@ -15,6 +15,7 @@ const lobbySpectatorDeleteManyMock = vi.fn();
 const userUpdateManyMock = vi.fn();
 const deckFindFirstMock = vi.fn();
 const transactionMock = vi.fn();
+const queryRawMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
 const notifyLobbyMock = vi.fn();
 const notifySpectatorsRemovedAudienceMock = vi.fn();
@@ -148,6 +149,7 @@ function baseLobby(overrides: Record<string, unknown> = {}) {
 
 function createTransactionClient() {
   return {
+    $queryRaw: queryRawMock,
     lobby: {
       updateMany: lobbyUpdateManyMock,
       findUnique: lobbyFindUniqueMock,
@@ -180,6 +182,7 @@ beforeEach(() => {
   userUpdateManyMock.mockReset();
   deckFindFirstMock.mockReset();
   transactionMock.mockReset();
+  queryRawMock.mockReset();
   buildLobbyRoomStateMock.mockReset();
   notifyLobbyMock.mockReset();
   notifySpectatorsRemovedAudienceMock.mockReset();
@@ -208,6 +211,7 @@ beforeEach(() => {
     if (typeof operation !== "function") return [];
     return operation(createTransactionClient());
   });
+  queryRawMock.mockResolvedValue([{ id: "lobby-1" }]);
   buildLobbyRoomStateMock.mockResolvedValue({
     id: "lobby-1",
     status: "READY",
@@ -1057,6 +1061,97 @@ describe("DELETE /api/lobbies/[id]", () => {
       type: "lobby:state_changed",
       lobby: expect.objectContaining({ status: "CLOSED" }),
     });
+  });
+
+  it("captures spectators before CLOSED and directs a terminal event to all of them", async () => {
+    const capturedSpectators = [
+      { userId: "spectator-1" },
+      { userId: "spectator-2" },
+    ];
+    let lobbyClosed = false;
+    lobbyFindUniqueMock.mockImplementationOnce(async () => ({
+      ...baseLobby(),
+      spectators: capturedSpectators,
+    }));
+    lobbyUpdateManyMock.mockImplementationOnce(async () => {
+      lobbyClosed = true;
+      return { count: 1 };
+    });
+    notifySpectatorsRemovedAudienceMock.mockImplementationOnce(() => {
+      expect(lobbyClosed).toBe(true);
+    });
+
+    const response = await DELETE(
+      new NextRequest("http://localhost/api/lobbies/lobby-1", {
+        method: "DELETE",
+      }),
+      params,
+    );
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(queryRawMock.mock.invocationCallOrder[0]).toBeLessThan(
+      lobbyFindUniqueMock.mock.invocationCallOrder[0],
+    );
+    expect(lobbyFindUniqueMock.mock.invocationCallOrder[0]).toBeLessThan(
+      lobbyUpdateManyMock.mock.invocationCallOrder[0],
+    );
+    expect(notifySpectatorsRemovedAudienceMock).toHaveBeenCalledWith({
+      lobbyId: "lobby-1",
+      reason: "LOBBY_CLOSED",
+      removedSpectatorUserIds: ["spectator-1", "spectator-2"],
+    });
+    expect(notifyUserMock).toHaveBeenCalledWith(
+      "spectator-1",
+      {
+        type: "lobby:spectator_removed",
+        lobbyId: "lobby-1",
+        reason: "LOBBY_CLOSED",
+      },
+      undefined,
+    );
+    expect(notifyUserMock).toHaveBeenCalledWith(
+      "spectator-2",
+      {
+        type: "lobby:spectator_removed",
+        lobbyId: "lobby-1",
+        reason: "LOBBY_CLOSED",
+      },
+      undefined,
+    );
+  });
+
+  it("still notifies spectators if rebuilding CLOSED state fails", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    lobbyFindUniqueMock.mockResolvedValueOnce({
+      ...baseLobby(),
+      spectators: [{ userId: "spectator-1" }],
+    });
+    buildLobbyRoomStateMock.mockRejectedValueOnce(
+      new Error("state unavailable"),
+    );
+
+    const response = await DELETE(
+      new NextRequest("http://localhost/api/lobbies/lobby-1", {
+        method: "DELETE",
+      }),
+      params,
+    );
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(notifyUserMock).toHaveBeenCalledWith(
+      "spectator-1",
+      {
+        type: "lobby:spectator_removed",
+        lobbyId: "lobby-1",
+        reason: "LOBBY_CLOSED",
+      },
+      undefined,
+    );
+    consoleError.mockRestore();
   });
 
   it("still notifies the guest if invite cancellation fails", async () => {

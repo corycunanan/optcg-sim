@@ -107,6 +107,10 @@ export const JoinLobbySchema = z.object({
   confirmDisbandLobbyId: z.string().min(1).optional(),
 });
 
+export const JoinSpectatorSchema = z.object({
+  confirmDisbandLobbyId: z.string().min(1).optional(),
+});
+
 export const UpdateLobbyDeckSchema = z.object({
   deckId: z.string().min(1, "deckId is required"),
 });
