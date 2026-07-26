@@ -308,13 +308,13 @@ export function validateRevokeSpectatorsPayload(raw: unknown): {
     throw new Error("Body must be an object");
   }
   const body = raw as Record<string, unknown>;
+  const revision = body.revision;
   const userIds = body.userIds;
   if (
     typeof body.lobbyId !== "string" ||
     body.lobbyId.length === 0 ||
-    typeof body.revision !== "number" ||
-    !Number.isSafeInteger(body.revision) ||
-    body.revision < 0 ||
+    !Number.isSafeInteger(revision) ||
+    (revision as number) < 0 ||
     !Array.isArray(userIds) ||
     userIds.length === 0 ||
     userIds.length > 20 ||
@@ -330,7 +330,7 @@ export function validateRevokeSpectatorsPayload(raw: unknown): {
   }
   return {
     lobbyId: body.lobbyId,
-    revision: body.revision,
+    revision: revision as number,
     userIds: Array.from(new Set(userIds)),
   };
 }

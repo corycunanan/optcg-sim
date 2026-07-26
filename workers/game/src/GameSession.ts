@@ -129,10 +129,8 @@ export class GameSession implements DurableObject {
     }
     if (request.method === "POST" && url.pathname.endsWith("/revoke-spectators")) {
       return handleSpectatorRevocationRequest(
-        request,
-        this.env.GAME_WORKER_SECRET,
-        this.state.storage,
-        this.transport,
+        request, this.env.GAME_WORKER_SECRET,
+        this.state.storage, this.transport,
         () => this.syncAlarm()
       );
     }
