@@ -145,6 +145,10 @@ const GameActionSchema = z.custom<GameAction>(
   (value) => isRecord(value) && typeof value.type === "string"
 );
 const PromptOptionsSchema = z.custom<PromptOptions>(isRecord);
+const SpectatorDisplayIdentitySchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+});
 
 export const GameServerMessageSchema: z.ZodType<ServerMessage> =
   z.discriminatedUnion("type", [
@@ -187,5 +191,13 @@ export const GameServerMessageSchema: z.ZodType<ServerMessage> =
     z.object({
       type: z.literal("game:player_reconnected"),
       playerIndex: z.union([z.literal(0), z.literal(1)]),
+    }),
+    z.object({
+      type: z.literal("game:spectator_joined"),
+      spectator: SpectatorDisplayIdentitySchema,
+    }),
+    z.object({
+      type: z.literal("game:spectator_left"),
+      spectator: SpectatorDisplayIdentitySchema,
     }),
   ]);

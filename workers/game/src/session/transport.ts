@@ -25,6 +25,8 @@ export const SPECTATOR_CAPACITY_CLOSE_REASON = "spectator capacity reached";
 export const SPECTATOR_REVOKED_CLOSE_CODE = 1008;
 export const SPECTATOR_REVOKED_CLOSE_REASON = "spectator access revoked";
 export const SPECTATOR_LEASE_EXPIRED_CLOSE_REASON = "spectator token expired";
+export const SPECTATOR_GAME_ENDED_CLOSE_CODE = 1000;
+export const SPECTATOR_GAME_ENDED_CLOSE_REASON = "game ended";
 const SPECTATOR_CAPACITY_REJECTED_TAG = "spectator-capacity-rejected";
 export const DISCONNECT_BROADCAST_DEBOUNCE_MS = 500;
 
@@ -42,11 +44,19 @@ const SPECTATOR_VISIBLE_SERVER_MESSAGES = {
   "game:over": { broadcast: true, filteredState: false },
   "game:player_disconnected": { broadcast: true, filteredState: false },
   "game:player_reconnected": { broadcast: true, filteredState: false },
+  "game:spectator_joined": { broadcast: false, filteredState: false },
+  "game:spectator_left": { broadcast: false, filteredState: false },
   "game:undo": { broadcast: false, filteredState: false },
 } as const satisfies Record<
   ServerMessage["type"],
   { broadcast: boolean; filteredState: boolean }
 >;
+
+export function spectatorMessageVisibility(
+  messageType: ServerMessage["type"]
+): { broadcast: boolean; filteredState: boolean } {
+  return SPECTATOR_VISIBLE_SERVER_MESSAGES[messageType];
+}
 
 export interface PlayerSocketAttachment {
   type: "game-session-player-socket";
@@ -60,6 +70,7 @@ export interface SpectatorSocketAttachment {
   userId: string;
   connectionId: string;
   acceptedAt: number;
+  displayName?: string;
   expiresAt?: number;
   messageBudget?: TokenBucket;
 }
@@ -116,7 +127,8 @@ export class SessionTransport {
   acceptSpectator(
     userId: string,
     ws: WebSocket,
-    expiresAt = Number.MAX_SAFE_INTEGER
+    expiresAt = Number.MAX_SAFE_INTEGER,
+    displayName = userId
   ): boolean {
     const existing = this.spectatorSocket(userId);
     const spectatorCount = this.spectatorCount();
@@ -145,6 +157,7 @@ export class SessionTransport {
       userId,
       connectionId: `${acceptedAt}-${this.nextWebSocketSequence++}`,
       acceptedAt,
+      displayName,
       expiresAt,
       messageBudget: {
         tokens: SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
@@ -173,6 +186,23 @@ export class SessionTransport {
       if (attachment.expiresAt !== undefined && attachment.expiresAt > now)
         continue;
       if (this.closeSpectator(ws, SPECTATOR_LEASE_EXPIRED_CLOSE_REASON)) closed++;
+    }
+    return closed;
+  }
+
+  closeSpectatorsAtGameEnd(): number {
+    let closed = 0;
+    for (const ws of this.state.getWebSockets()) {
+      if (!getSpectatorSocketAttachment(ws)) continue;
+      try {
+        ws.close(
+          SPECTATOR_GAME_ENDED_CLOSE_CODE,
+          SPECTATOR_GAME_ENDED_CLOSE_REASON
+        );
+        closed++;
+      } catch {
+        // Already closed.
+      }
     }
     return closed;
   }
@@ -207,6 +237,10 @@ export class SessionTransport {
 
   spectatorAttachmentFor(ws: WebSocket): SpectatorSocketAttachment | null {
     return getSpectatorSocketAttachment(ws);
+  }
+
+  isAuthoritativeSpectator(ws: WebSocket, userId: string): boolean {
+    return this.spectatorSocket(userId) === ws;
   }
 
   updateSpectatorMessageBudget(
@@ -350,7 +384,7 @@ export class SessionTransport {
             null,
             build
           );
-          spectatorPayload = SPECTATOR_VISIBLE_SERVER_MESSAGES[message.type]
+          spectatorPayload = spectatorMessageVisibility(message.type)
             .filteredState
             ? { status: "ready", payload: JSON.stringify(message) }
             : { status: "denied" };
@@ -497,7 +531,7 @@ export class SessionTransport {
       return (
         this.spectatorIdFor(ws) !== null &&
         this.spectatorLeaseAllowsSend(ws) &&
-        SPECTATOR_VISIBLE_SERVER_MESSAGES[messageType].broadcast
+        spectatorMessageVisibility(messageType).broadcast
       );
     }
     const attachment = getPlayerSocketAttachment(ws);

@@ -52,6 +52,7 @@ import {
   getClientMessageByteLength,
 } from "./session/rate-limiter.js";
 import { SpectatorPolicy } from "./session/spectator-policy.js";
+import { SpectatorLifecycle } from "./session/spectator-lifecycle.js";
 import { handleSpectatorRevocationRequest } from "./session/spectator-revocation.js";
 import {
   type FilteredStateMessage,
@@ -90,6 +91,7 @@ export class GameSession implements DurableObject {
   private readonly repository: SessionRepository;
   private readonly rateLimiter = new SessionRateLimiter();
   private readonly spectatorPolicy: SpectatorPolicy;
+  private readonly spectatorLifecycle: SpectatorLifecycle;
   private readonly transport: SessionTransport;
 
   constructor(public state: DurableObjectState, public env: Env) {
@@ -112,6 +114,7 @@ export class GameSession implements DurableObject {
       storage,
       () => this.gameState?.id
     );
+    this.spectatorLifecycle = new SpectatorLifecycle(this.spectatorPolicy, this.transport, () => this.gameState!, () => this.cardDb!);
     configureLogger(env.LOG_URL);
   }
 
@@ -252,8 +255,8 @@ export class GameSession implements DurableObject {
     };
     await this.persist();
 
-    this.broadcast({ type: "game:over", winner: winnerIndex as 0 | 1, reason });
     this.broadcastFilteredState((s) => ({ type: "game:state", state: s }));
+    this.spectatorLifecycle.broadcastGameOver({ type: "game:over", winner: winnerIndex as 0 | 1, reason });
     await this.writeResultToDb();
 
     return new Response(JSON.stringify({ ok: true }), {
@@ -317,9 +320,7 @@ export class GameSession implements DurableObject {
       return new Response("Unauthorized", { status: 401 });
     }
     if (identity.role === "spectator") {
-      // Keep admission closed while wiring expiry into the eventual path.
-      const response = await this.spectatorPolicy.handleUpgrade(identity.userId,
-        identity.expiresAt, false);
+      const response = await this.spectatorLifecycle.handleUpgrade(identity, false);
       await this.syncAlarm();
       return response;
     }
@@ -535,12 +536,11 @@ export class GameSession implements DurableObject {
     code: number,
     reason: string
   ): Promise<void> {
-    void code;
-    void reason;
-
     if (!this.gameState) {
       await this.loadFromStorage();
     }
+
+    if (this.spectatorLifecycle.handleClose(ws, code, reason)) return;
 
     const playerIndex = this.transport.playerIndexFor(ws);
     if (playerIndex === null || !this.gameState) return;
@@ -607,7 +607,7 @@ export class GameSession implements DurableObject {
 
     await this.persist();
     await this.writeResultToDb();
-    this.broadcast({ type: "game:over", winner, reason });
+    this.spectatorLifecycle.broadcastGameOver({ type: "game:over", winner, reason });
     await this.syncAlarm();
   }
 
@@ -677,7 +677,7 @@ export class GameSession implements DurableObject {
       this.undoHistory = [];
       await this.writeResultToDb();
       this.broadcastGameUpdate(action, playerIndex, false);
-      this.broadcast({
+      this.spectatorLifecycle.broadcastGameOver({
         type: "game:over",
         winner: result.gameOver.winner,
         reason: result.gameOver.reason,
@@ -745,7 +745,7 @@ export class GameSession implements DurableObject {
       this.undoHistory = [];
       await this.writeResultToDb();
       this.broadcastGameUpdate(action, playerIndex, false);
-      this.broadcast({
+      this.spectatorLifecycle.broadcastGameOver({
         type: "game:over",
         winner: result.gameOver.winner,
         reason: result.gameOver.reason,
@@ -987,7 +987,7 @@ export class GameSession implements DurableObject {
       state: s,
       canUndo: false,
     }));
-    this.broadcast({ type: "game:over", winner, reason });
+    this.spectatorLifecycle.broadcastGameOver({ type: "game:over", winner, reason });
   }
 
   private async syncAlarm(): Promise<void> {

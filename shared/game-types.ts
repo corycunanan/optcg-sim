@@ -659,7 +659,14 @@ export type ServerMessage =
   | { type: "game:over"; winner: 0 | 1 | null; reason: string }
   | { type: "game:player_disconnected"; playerIndex: 0 | 1 }
   | { type: "game:player_reconnected"; playerIndex: 0 | 1 }
+  | { type: "game:spectator_joined"; spectator: SpectatorDisplayIdentity }
+  | { type: "game:spectator_left"; spectator: SpectatorDisplayIdentity }
   | { type: "game:undo"; playerIndex: 0 | 1; canUndo: boolean };
+
+export interface SpectatorDisplayIdentity {
+  id: string;
+  displayName: string;
+}
 
 // Client → Server
 export type ClientMessage =
