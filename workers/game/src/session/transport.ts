@@ -8,6 +8,10 @@ import type {
 } from "../types.js";
 import { filterPromptOptionsForPlayer } from "../engine/visibility.js";
 import { log } from "../lib/log.js";
+import {
+  SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
+  type TokenBucket,
+} from "./rate-limiter.js";
 import { visibleStateForPlayer } from "./visibility.js";
 
 export const SUPERSEDED_SOCKET_CLOSE_CODE = 1000;
@@ -30,6 +34,7 @@ export interface SpectatorSocketAttachment {
   userId: string;
   connectionId: string;
   acceptedAt: number;
+  messageBudget?: TokenBucket;
 }
 
 export type SessionSocketAttachment =
@@ -97,6 +102,10 @@ export class SessionTransport {
       userId,
       connectionId: `${acceptedAt}-${this.nextWebSocketSequence++}`,
       acceptedAt,
+      messageBudget: {
+        tokens: SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
+        updatedAt: acceptedAt,
+      },
     } satisfies SpectatorSocketAttachment);
     this.closeStaleSpectatorSockets(userId, ws);
     return true;
@@ -122,6 +131,19 @@ export class SessionTransport {
 
   spectatorAttachmentFor(ws: WebSocket): SpectatorSocketAttachment | null {
     return getSpectatorSocketAttachment(ws);
+  }
+
+  updateSpectatorMessageBudget(
+    ws: WebSocket,
+    attachment: SpectatorSocketAttachment,
+    messageBudget: TokenBucket
+  ): boolean {
+    try {
+      ws.serializeAttachment({ ...attachment, messageBudget });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   isAuthoritative(ws: WebSocket, playerIndex: 0 | 1): boolean {
@@ -343,13 +365,6 @@ export class SessionTransport {
   }
 
   private shouldSend(ws: WebSocket): boolean {
-    if (
-      getSpectatorSocketAttachment(ws) !== null ||
-      this.spectatorIdFor(ws) !== null ||
-      this.state.getTags(ws).includes(SPECTATOR_CAPACITY_REJECTED_TAG)
-    ) {
-      return false;
-    }
     const playerIndex = this.playerIndexFor(ws);
     if (playerIndex === null) return false;
     const attachment = getPlayerSocketAttachment(ws);
@@ -387,7 +402,21 @@ export function isSpectatorSocketAttachment(
     "connectionId" in value &&
     typeof value.connectionId === "string" &&
     "acceptedAt" in value &&
-    typeof value.acceptedAt === "number"
+    typeof value.acceptedAt === "number" &&
+    (!("messageBudget" in value) || isTokenBucket(value.messageBudget))
+  );
+}
+
+function isTokenBucket(value: unknown): value is TokenBucket {
+  if (value === null || typeof value !== "object") return false;
+  return (
+    "tokens" in value &&
+    typeof value.tokens === "number" &&
+    Number.isFinite(value.tokens) &&
+    value.tokens >= 0 &&
+    "updatedAt" in value &&
+    typeof value.updatedAt === "number" &&
+    Number.isFinite(value.updatedAt)
   );
 }
 

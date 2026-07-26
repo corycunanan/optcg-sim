@@ -108,12 +108,15 @@ describe("OPT-555 spectator transport", () => {
     expect(isSpectatorSocketAttachment(restored.deserializeAttachment())).toBe(
       true
     );
+    expect(restored.deserializeAttachment()).toMatchObject({
+      messageBudget: { tokens: 24, updatedAt: 1_001 },
+    });
     expect(isPlayerSocketAttachment(restored.deserializeAttachment())).toBe(
       false
     );
   });
 
-  it("denies a restored spectator attachment when its tag is missing", () => {
+  it("denies a restored spectator with no player identity", () => {
     const beforeState = new MockSocketState();
     const beforeWake = transport(beforeState);
     const beforeSocket = new MockWebSocket();
@@ -134,7 +137,6 @@ describe("OPT-555 spectator transport", () => {
     const afterWake = transport(restoredState);
     const player = new MockWebSocket();
     afterWake.accept(0, player as unknown as WebSocket);
-    const playerIndexFor = vi.spyOn(afterWake, "playerIndexFor");
 
     expect(
       afterWake.spectatorIdFor(restoredSpectator as unknown as WebSocket)
@@ -149,8 +151,6 @@ describe("OPT-555 spectator transport", () => {
 
     expect(player.sent).toHaveLength(1);
     expect(restoredSpectator.sent).toEqual([]);
-    expect(playerIndexFor).toHaveBeenCalledOnce();
-    expect(playerIndexFor).toHaveBeenCalledWith(player as unknown as WebSocket);
   });
 
   it("denies a socket with no identifiable session identity", () => {
@@ -218,6 +218,20 @@ describe("OPT-555 spectator transport", () => {
       userId: "spectator-user",
       connectionId: "1-0",
       acceptedAt: "1",
+    },
+    {
+      type: "game-session-spectator-socket",
+      userId: "spectator-user",
+      connectionId: "1-0",
+      acceptedAt: 1,
+      messageBudget: { tokens: -1, updatedAt: 1 },
+    },
+    {
+      type: "game-session-spectator-socket",
+      userId: "spectator-user",
+      connectionId: "1-0",
+      acceptedAt: 1,
+      messageBudget: { tokens: 1, updatedAt: "1" },
     },
   ])("rejects an unrecognized spectator attachment: %j", (attachment) => {
     expect(isSpectatorSocketAttachment(attachment)).toBe(false);

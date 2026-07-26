@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GameSession,
+  MAX_CLIENT_MESSAGE_BYTES,
   RATE_LIMIT_CLOSE_CODE,
   SPECTATOR_INVALID_SOCKET_CLOSE_REASON,
   SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
   SPECTATOR_MESSAGE_RATE_LIMIT_CLOSE_REASON,
-  SPECTATOR_UPGRADE_RATE_LIMIT_RESPONSE_BODY,
   UPGRADE_RATE_LIMIT_BURST,
 } from "../GameSession.js";
 import { SessionCoordinator } from "../session/coordinator.js";
@@ -25,6 +25,7 @@ vi.mock("../lib/log.js", () => ({ configureLogger: vi.fn(), log: logMock }));
 class MockWebSocket {
   readonly sent: string[] = [];
   readonly closed: Array<{ code?: number; reason?: string }> = [];
+  serializationFails = false;
   private attachment: unknown;
 
   send(payload: string): void {
@@ -36,6 +37,7 @@ class MockWebSocket {
   }
 
   serializeAttachment(value: unknown): void {
+    if (this.serializationFails) throw new Error("attachment write failed");
     this.attachment = value;
   }
 
@@ -44,32 +46,28 @@ class MockWebSocket {
   }
 }
 
-class PermissiveResponse {
-  readonly status: number;
-  readonly webSocket: unknown;
-  readonly headers: Headers;
-
-  constructor(
-    private readonly body: BodyInit | null = null,
-    init: ResponseInit & { webSocket?: unknown } = {}
-  ) {
-    this.status = init.status ?? 200;
-    this.webSocket = init.webSocket;
-    this.headers = new Headers(init.headers ?? {});
-  }
-
-  async text(): Promise<string> {
-    return this.body ? String(this.body) : "";
-  }
-}
-
 class MockDurableObjectState {
+  private readonly data = new Map<string, unknown>();
   private readonly sockets: MockWebSocket[] = [];
   private readonly tags = new Map<MockWebSocket, string[]>();
+  readonly putCalls: string[] = [];
 
   storage = {
-    get: async () => undefined,
-    put: async () => undefined,
+    get: async <T>(key: string): Promise<T | undefined> =>
+      this.data.get(key) as T | undefined,
+    put: async (
+      keyOrEntries: string | Record<string, unknown>,
+      value?: unknown
+    ): Promise<void> => {
+      if (typeof keyOrEntries === "string") {
+        this.putCalls.push(keyOrEntries);
+        this.data.set(keyOrEntries, value);
+        return;
+      }
+      for (const [key, entry] of Object.entries(keyOrEntries)) {
+        this.data.set(key, entry);
+      }
+    },
     setAlarm: async () => undefined,
     deleteAlarm: async () => undefined,
   };
@@ -89,6 +87,24 @@ class MockDurableObjectState {
 
   getTags(ws: WebSocket): string[] {
     return this.tags.get(ws as unknown as MockWebSocket) ?? [];
+  }
+
+  hibernate(): MockDurableObjectState {
+    const restored = new MockDurableObjectState();
+    for (const [key, value] of this.data) {
+      restored.data.set(key, structuredClone(value));
+    }
+    for (const socket of this.sockets) {
+      const restoredSocket = new MockWebSocket();
+      restoredSocket.serializeAttachment(
+        structuredClone(socket.deserializeAttachment())
+      );
+      restored.acceptWebSocket(
+        restoredSocket as unknown as WebSocket,
+        [...(this.tags.get(socket) ?? [])]
+      );
+    }
+    return restored;
   }
 }
 
@@ -111,11 +127,12 @@ type GameSessionTestAccess = {
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void>;
 };
 
-function createSession(): {
+function createSession(
+  state = new MockDurableObjectState()
+): {
   session: GameSessionTestAccess;
   state: MockDurableObjectState;
 } {
-  const state = new MockDurableObjectState();
   const session = new GameSession(
     state as unknown as DurableObjectState,
     {
@@ -224,6 +241,26 @@ describe("OPT-556 receive-only spectator enforcement", () => {
     }
   );
 
+  it("rejects an oversized spectator frame before identity or budget processing", async () => {
+    const { session } = createSession();
+    const spectator = acceptSpectator(session);
+    const attachmentBefore = structuredClone(spectator.deserializeAttachment());
+    const classify = vi.spyOn(session.spectatorPolicy, "playerIndexForInbound");
+    const run = vi.spyOn(session.coordinator, "run");
+
+    await session.webSocketMessage(
+      spectator as unknown as WebSocket,
+      "x".repeat(MAX_CLIENT_MESSAGE_BYTES + 1)
+    );
+
+    expect(classify).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(spectator.closed).toEqual([
+      { code: 1009, reason: "message too big" },
+    ]);
+    expect(spectator.deserializeAttachment()).toEqual(attachmentBefore);
+  });
+
   it("closes and logs a spectator socket that exceeds its own frame budget", async () => {
     const { session } = createSession();
     const spectator = acceptSpectator(session);
@@ -281,6 +318,56 @@ describe("OPT-556 receive-only spectator enforcement", () => {
       reason: SPECTATOR_MESSAGE_RATE_LIMIT_CLOSE_REASON,
     });
     expect(second.closed).toEqual([]);
+  });
+
+  it("keeps an exhausted socket frame budget across session reconstruction", async () => {
+    const { session: beforeWake, state } = createSession();
+    const spectator = acceptSpectator(beforeWake);
+
+    for (let index = 0; index < SPECTATOR_MESSAGE_RATE_LIMIT_BURST; index += 1) {
+      await beforeWake.webSocketMessage(
+        spectator as unknown as WebSocket,
+        spectatorFrames[index % spectatorFrames.length]!
+      );
+    }
+    expect(spectator.closed).toEqual([]);
+
+    const restoredState = state.hibernate();
+    const restoredSpectator = restoredState.getWebSockets(
+      "spectator:spectator-user"
+    )[0] as unknown as MockWebSocket;
+    const { session: afterWake } = createSession(restoredState);
+    await afterWake.webSocketMessage(
+      restoredSpectator as unknown as WebSocket,
+      spectatorFrames[0]!
+    );
+
+    expect(restoredSpectator.closed).toEqual([
+      {
+        code: RATE_LIMIT_CLOSE_CODE,
+        reason: SPECTATOR_MESSAGE_RATE_LIMIT_CLOSE_REASON,
+      },
+    ]);
+  });
+
+  it("closes before the coordinator when attachment budget persistence fails", async () => {
+    const { session } = createSession();
+    const spectator = acceptSpectator(session);
+    spectator.serializationFails = true;
+    const run = vi.spyOn(session.coordinator, "run");
+
+    await session.webSocketMessage(
+      spectator as unknown as WebSocket,
+      spectatorFrames[0]!
+    );
+
+    expect(run).not.toHaveBeenCalled();
+    expect(spectator.closed).toEqual([
+      {
+        code: RATE_LIMIT_CLOSE_CODE,
+        reason: SPECTATOR_INVALID_SOCKET_CLOSE_REASON,
+      },
+    ]);
   });
 
   it("drops unidentified sockets before the coordinator", async () => {
@@ -367,89 +454,38 @@ describe("OPT-556 spectator connection budgets", () => {
     logMock.mockReset();
   });
 
-  it("charges every same-user upgrade and rejects the first over-budget replacement", async () => {
-    const { session } = createSession();
-    vi.spyOn(session, "validateToken").mockResolvedValue({
-      role: "spectator",
-      userId: "spectator-user",
-    });
+  it("keeps same-user upgrade exhaustion across session reconstruction", async () => {
+    const { session: beforeEviction, state } = createSession();
     const consumePlayerUpgrade = vi.spyOn(
-      session.rateLimiter,
+      beforeEviction.rateLimiter,
       "consumeUpgrade"
     );
-    const servers: MockWebSocket[] = [];
-    const originalWebSocketPair = (globalThis as Record<string, unknown>)
-      .WebSocketPair;
-    const originalResponse = globalThis.Response;
-    const pairConstructor = vi.fn(function MockWebSocketPair(
-      this: Record<number, MockWebSocket>
-    ) {
-      this[0] = new MockWebSocket();
-      this[1] = new MockWebSocket();
-      servers.push(this[1]);
-    });
-    (globalThis as Record<string, unknown>).WebSocketPair = pairConstructor;
-    globalThis.Response = PermissiveResponse as unknown as typeof Response;
 
-    try {
-      for (let index = 0; index < UPGRADE_RATE_LIMIT_BURST; index += 1) {
-        const response = await session.handleWebSocket(
-          new Request(
-            `https://worker.example.test/ws?token=replacement-${index}`
-          )
-        );
-        expect(response.status).toBe(101);
-      }
-
-      const rejected = await session.handleWebSocket(
-        new Request("https://worker.example.test/ws?token=over-budget")
-      );
-
-      expect(rejected.status).toBe(429);
-      expect(await rejected.text()).toBe(
-        SPECTATOR_UPGRADE_RATE_LIMIT_RESPONSE_BODY
-      );
-      expect(rejected.headers.get("Retry-After")).toBe("5");
-      expect(pairConstructor).toHaveBeenCalledTimes(UPGRADE_RATE_LIMIT_BURST);
-      expect(servers.at(-1)?.closed).toEqual([]);
-      expect(
-        servers.slice(0, -1).every((socket) => socket.closed.length >= 1)
-      ).toBe(true);
-      expect(consumePlayerUpgrade).not.toHaveBeenCalled();
-      expect(logMock).toHaveBeenCalledWith(
-        "ws.spectator_upgrade_rate_limited",
-        {
-          gameId: session.gameState.id,
-          userId: "spectator-user",
-          retryAfterSeconds: 5,
-        }
-      );
-    } finally {
-      if (originalWebSocketPair === undefined) {
-        delete (globalThis as Record<string, unknown>).WebSocketPair;
-      } else {
-        (globalThis as Record<string, unknown>).WebSocketPair =
-          originalWebSocketPair;
-      }
-      globalThis.Response = originalResponse;
+    for (let index = 0; index < UPGRADE_RATE_LIMIT_BURST; index += 1) {
+      await expect(
+        beforeEviction.spectatorPolicy.consumeUpgrade("spectator-user")
+      ).resolves.toMatchObject({ allowed: true });
     }
-  });
+    await expect(
+      beforeEviction.spectatorPolicy.consumeUpgrade("spectator-user")
+    ).resolves.toMatchObject({ allowed: false, retryAfterSeconds: 5 });
 
-  it("keeps spectator upgrade identities isolated from each other and players", () => {
-    const { session } = createSession();
-
-    for (let index = 0; index <= UPGRADE_RATE_LIMIT_BURST; index += 1) {
-      session.spectatorPolicy.consumeUpgrade("spectator-one");
-    }
-
+    const restoredState = state.hibernate();
+    const { session: afterEviction } = createSession(restoredState);
+    await expect(
+      afterEviction.spectatorPolicy.consumeUpgrade("spectator-user")
+    ).resolves.toMatchObject({ allowed: false, retryAfterSeconds: 5 });
+    await expect(
+      afterEviction.spectatorPolicy.consumeUpgrade("spectator-two")
+    ).resolves.toMatchObject({ allowed: true });
     expect(
-      session.spectatorPolicy.consumeUpgrade("spectator-one").allowed
-    ).toBe(false);
-    expect(
-      session.spectatorPolicy.consumeUpgrade("spectator-two").allowed
+      afterEviction.rateLimiter.consumeUpgrade(
+        afterEviction.gameState.id,
+        0
+      ).allowed
     ).toBe(true);
-    expect(
-      session.rateLimiter.consumeUpgrade(session.gameState.id, 0).allowed
-    ).toBe(true);
+    expect(consumePlayerUpgrade).not.toHaveBeenCalled();
+    expect(state.putCalls).toHaveLength(UPGRADE_RATE_LIMIT_BURST + 1);
+    expect(restoredState.putCalls).toHaveLength(2);
   });
 });

@@ -116,6 +116,7 @@ export class GameSession implements DurableObject {
     this.spectatorPolicy = new SpectatorPolicy(
       this.transport,
       this.rateLimiter,
+      storage,
       () => this.gameState?.id
     );
     configureLogger(env.LOG_URL);
@@ -311,12 +312,13 @@ export class GameSession implements DurableObject {
     if (!token) {
       return new Response("Missing token", { status: 401 });
     }
+    // Fail closed pending acceptance of spectator frame byte limiting and
+    // hibernation-persistent connection/message budget proofs.
+    // OPT-552/557 must also land before spectator payload delivery.
     const identity = await this.validateToken(token);
-    if (identity === null) {
+    if (identity === null || identity.role === "spectator") {
       return new Response("Unauthorized", { status: 401 });
     }
-    if (identity.role === "spectator")
-      return this.spectatorPolicy.handleUpgrade(identity.userId);
     const { playerIndex } = identity;
 
     const upgradeBudget = this.consumeUpgradeBudget(playerIndex);
@@ -369,6 +371,15 @@ export class GameSession implements DurableObject {
     ws: WebSocket,
     message: string | ArrayBuffer
   ): Promise<void> {
+    if (getClientMessageByteLength(message) > MAX_CLIENT_MESSAGE_BYTES) {
+      log("ws.message_too_large", { maxBytes: MAX_CLIENT_MESSAGE_BYTES });
+      try {
+        ws.close(1009, "message too big");
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
     const playerIndex = this.spectatorPolicy.playerIndexForInbound(ws);
     if (playerIndex === null) return;
     await this.coordinator.run(() =>
@@ -381,16 +392,6 @@ export class GameSession implements DurableObject {
     message: string | ArrayBuffer,
     playerIndex: 0 | 1
   ): Promise<void> {
-    if (getClientMessageByteLength(message) > MAX_CLIENT_MESSAGE_BYTES) {
-      log("ws.message_too_large", { maxBytes: MAX_CLIENT_MESSAGE_BYTES });
-      try {
-        ws.close(1009, "message too big");
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-
     if (!this.gameState || !this.cardDb) {
       await this.loadFromStorage();
     }

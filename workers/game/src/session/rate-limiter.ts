@@ -23,6 +23,10 @@ export interface RateLimitDecision {
   retryAfterSeconds: number;
 }
 
+export interface StatefulRateLimitDecision extends RateLimitDecision {
+  bucket: TokenBucket;
+}
+
 export function getClientMessageByteLength(
   message: string | ArrayBuffer
 ): number {
@@ -70,8 +74,6 @@ export class SessionRateLimiter {
   private readonly actionBuckets = new Map<string, TokenBucket>();
   private readonly invalidMessageBuckets = new Map<string, TokenBucket>();
   private readonly upgradeBuckets = new Map<string, TokenBucket>();
-  private readonly spectatorUpgradeBuckets = new Map<string, TokenBucket>();
-  private readonly spectatorMessageBuckets = new Map<string, TokenBucket>();
 
   constructor(private readonly now: () => number = Date.now) {}
 
@@ -115,24 +117,20 @@ export class SessionRateLimiter {
   }
 
   consumeSpectatorUpgrade(
-    gameId: string | undefined,
-    userId: string
-  ): RateLimitDecision {
-    return this.consumeForKey(
-      this.spectatorUpgradeBuckets,
-      `${gameId ?? "unknown"}:spectator:${userId}`,
+    bucket: TokenBucket | undefined
+  ): StatefulRateLimitDecision {
+    return this.consumeBucket(
+      bucket,
       UPGRADE_RATE_LIMIT_BURST,
       UPGRADE_RATE_LIMIT_REFILL_PER_SECOND
     );
   }
 
   consumeSpectatorMessage(
-    gameId: string | undefined,
-    connectionId: string
-  ): RateLimitDecision {
-    return this.consumeForKey(
-      this.spectatorMessageBuckets,
-      `${gameId ?? "unknown"}:spectator-socket:${connectionId}`,
+    bucket: TokenBucket | undefined
+  ): StatefulRateLimitDecision {
+    return this.consumeBucket(
+      bucket,
       SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
       SPECTATOR_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND
     );
@@ -162,6 +160,31 @@ export class SessionRateLimiter {
       refillPerSecond
     );
     buckets.set(key, result.bucket);
+    return this.toDecision(result, capacity, refillPerSecond);
+  }
+
+  private consumeBucket(
+    bucket: TokenBucket | undefined,
+    capacity: number,
+    refillPerSecond: number
+  ): StatefulRateLimitDecision {
+    const result = consumeTokenBucket(
+      bucket,
+      this.now(),
+      capacity,
+      refillPerSecond
+    );
+    return {
+      ...this.toDecision(result, capacity, refillPerSecond),
+      bucket: result.bucket,
+    };
+  }
+
+  private toDecision(
+    result: { allowed: boolean; bucket: TokenBucket },
+    capacity: number,
+    refillPerSecond: number
+  ): RateLimitDecision {
     return {
       allowed: result.allowed,
       retryAfterSeconds: result.allowed
