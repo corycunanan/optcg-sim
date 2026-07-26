@@ -6,6 +6,13 @@ const rateLimitMock = vi.fn();
 const joinLobbyAsSpectatorMock = vi.fn();
 const publishSpectatorJoinMock = vi.fn();
 const buildLobbyRoomStateMock = vi.fn();
+const transactionMock = vi.fn();
+const queryRawMock = vi.fn();
+const lobbyFindUniqueMock = vi.fn();
+const lobbySpectatorDeleteManyMock = vi.fn();
+const lobbyUpdateMock = vi.fn();
+const userUpdateManyMock = vi.fn();
+const notifyLobbyMock = vi.fn();
 
 const afterCalls = vi.hoisted(() => ({ pending: [] as Promise<void>[] }));
 
@@ -28,6 +35,11 @@ vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: { check: rateLimitMock },
 }));
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $transaction: (...args: unknown[]) => transactionMock(...args),
+  },
+}));
 vi.mock("@/lib/lobbies/join-spectator", () => ({
   joinLobbyAsSpectator: (...args: unknown[]) =>
     joinLobbyAsSpectatorMock(...args),
@@ -48,8 +60,11 @@ vi.mock("@/lib/lobbies/join-spectator", () => ({
 vi.mock("@/lib/lobbies/build-state", () => ({
   buildLobbyRoomState: (...args: unknown[]) => buildLobbyRoomStateMock(...args),
 }));
+vi.mock("@/lib/realtime/fanout-lobby", () => ({
+  notifyLobby: (...args: unknown[]) => notifyLobbyMock(...args),
+}));
 
-const { POST } = await import("./route");
+const { DELETE, POST } = await import("./route");
 
 const params = { params: Promise.resolve({ id: "lobby-1" }) };
 const joinedResult = {
@@ -84,6 +99,13 @@ beforeEach(() => {
     joinLobbyAsSpectatorMock,
     publishSpectatorJoinMock,
     buildLobbyRoomStateMock,
+    transactionMock,
+    queryRawMock,
+    lobbyFindUniqueMock,
+    lobbySpectatorDeleteManyMock,
+    lobbyUpdateMock,
+    userUpdateManyMock,
+    notifyLobbyMock,
   ]) {
     mock.mockReset();
   }
@@ -92,6 +114,29 @@ beforeEach(() => {
   joinLobbyAsSpectatorMock.mockResolvedValue(joinedResult);
   publishSpectatorJoinMock.mockResolvedValue(undefined);
   buildLobbyRoomStateMock.mockResolvedValue(roomState);
+  queryRawMock.mockResolvedValue([{ id: "lobby-1" }]);
+  lobbyFindUniqueMock.mockResolvedValue({
+    status: "IN_GAME",
+    hostUserId: "host-user",
+    guest: { userId: "guest-user" },
+    spectators: [{ userId: "spectator-user" }],
+  });
+  lobbySpectatorDeleteManyMock.mockResolvedValue({ count: 1 });
+  lobbyUpdateMock.mockResolvedValue({ id: "lobby-1" });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
+  notifyLobbyMock.mockResolvedValue(undefined);
+  transactionMock.mockImplementation(
+    async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: queryRawMock,
+        lobby: {
+          findUnique: lobbyFindUniqueMock,
+          update: lobbyUpdateMock,
+        },
+        lobbySpectator: { deleteMany: lobbySpectatorDeleteManyMock },
+        user: { updateMany: userUpdateManyMock },
+      })
+  );
   afterCalls.pending.length = 0;
 });
 
@@ -209,5 +254,178 @@ describe("POST /api/lobbies/[id]/spectators", () => {
       expect.objectContaining({ membership: "existing" }),
       "spectator-user"
     );
+  });
+});
+
+describe("DELETE /api/lobbies/[id]/spectators", () => {
+  it("removes the caller's spectator row, releases membership, and bumps revision once", async () => {
+    const response = await DELETE(request(), params);
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(rateLimitMock).toHaveBeenCalledWith("lobby-leave:spectator-user");
+    expect(queryRawMock.mock.invocationCallOrder[0]).toBeLessThan(
+      lobbyFindUniqueMock.mock.invocationCallOrder[0]
+    );
+    expect(lobbyFindUniqueMock.mock.invocationCallOrder[0]).toBeLessThan(
+      lobbySpectatorDeleteManyMock.mock.invocationCallOrder[0]
+    );
+    expect(lobbySpectatorDeleteManyMock).toHaveBeenCalledWith({
+      where: { lobbyId: "lobby-1", userId: "spectator-user" },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "spectator-user", activeLobbyId: "lobby-1" },
+      data: { activeLobbyId: null },
+    });
+    expect(lobbyUpdateMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1" },
+      data: { revision: { increment: 1 } },
+    });
+  });
+
+  it("fans out the decremented spectator count without a directed self-ejection event", async () => {
+    buildLobbyRoomStateMock.mockResolvedValueOnce({
+      ...roomState,
+      spectators: [],
+    });
+
+    const response = await DELETE(request(), params);
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(notifyLobbyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ spectators: [] }),
+      { actorUserId: "spectator-user" }
+    );
+  });
+
+  it("returns 200 without a revision bump or fanout when already removed", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce({
+      status: "IN_GAME",
+      hostUserId: "host-user",
+      guest: { userId: "guest-user" },
+      spectators: [],
+    });
+
+    const response = await DELETE(request(), params);
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: "host",
+      userId: "host-user",
+    },
+    {
+      name: "guest",
+      userId: "guest-user",
+    },
+  ])(
+    "returns the same 200 no-op when the $name attempts self-leave",
+    async ({ userId }) => {
+      authMock.mockResolvedValueOnce({ user: { id: userId } });
+
+      const response = await DELETE(request(), params);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true });
+      expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+      expect(userUpdateManyMock).not.toHaveBeenCalled();
+      expect(lobbyUpdateMock).not.toHaveBeenCalled();
+      expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("returns the same 200 no-op for a stranger without revealing lobby existence", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "stranger-user" } });
+    lobbyFindUniqueMock.mockResolvedValueOnce({
+      status: "IN_GAME",
+      hostUserId: "host-user",
+      guest: { userId: "guest-user" },
+      spectators: [],
+    });
+
+    const response = await DELETE(request(), params);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 before rate limiting or mutation when unauthenticated", async () => {
+    authMock.mockResolvedValueOnce(null);
+
+    const response = await DELETE(request(), params);
+
+    expect(response.status).toBe(401);
+    expect(rateLimitMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 before mutation when rate limited", async () => {
+    rateLimitMock.mockResolvedValueOnce({ limited: true });
+
+    const response = await DELETE(request(), params);
+
+    expect(response.status).toBe(429);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the same 200 no-op when the lobby does not exist", async () => {
+    queryRawMock.mockResolvedValueOnce([]);
+
+    const response = await DELETE(request(), params);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(lobbyFindUniqueMock).not.toHaveBeenCalled();
+    expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the same 200 no-op for a closed lobby", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce({
+      status: "CLOSED",
+      hostUserId: "host-user",
+      guest: null,
+      spectators: [{ userId: "spectator-user" }],
+    });
+
+    const response = await DELETE(request(), params);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 and relies on transaction rollback when the row changes after capture", async () => {
+    lobbySpectatorDeleteManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const response = await DELETE(request(), params);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "Spectator membership changed before it could be released",
+      code: "LOBBY_STATE_CHANGED",
+    });
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateMock).not.toHaveBeenCalled();
+    expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
   });
 });
