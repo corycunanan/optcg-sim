@@ -1,11 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GameSession } from "../GameSession.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  DISCONNECT_BROADCAST_DEBOUNCE_MS,
+  GameSession,
+  MAX_CLIENT_MESSAGE_BYTES,
+  SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
+  UPGRADE_RATE_LIMIT_BURST,
+} from "../GameSession.js";
 import {
   SessionAuthorizer,
   type SessionParticipantIdentity,
 } from "../session/authorization.js";
-import { SessionTransport } from "../session/transport.js";
-import type { CardData, Env, GameState } from "../types.js";
+import {
+  MAX_SPECTATOR_SOCKETS,
+  SPECTATOR_CAPACITY_CLOSE_CODE,
+  SPECTATOR_CAPACITY_CLOSE_REASON,
+  SPECTATOR_LEASE_EXPIRED_CLOSE_REASON,
+  SPECTATOR_REVOKED_CLOSE_CODE,
+  SPECTATOR_REVOKED_CLOSE_REASON,
+  SessionTransport,
+} from "../session/transport.js";
+import type { CardData, Env, GameState, ServerMessage } from "../types.js";
 import { setupGame } from "./factories.js";
 
 const logMock = vi.hoisted(() => vi.fn());
@@ -66,8 +80,8 @@ class MockDurableObjectState {
         this.data.set(key, entry);
       }
     },
-    setAlarm: async (): Promise<void> => undefined,
-    deleteAlarm: async (): Promise<void> => undefined,
+    setAlarm: vi.fn(async (): Promise<void> => undefined),
+    deleteAlarm: vi.fn(async (): Promise<void> => undefined),
   };
 
   acceptWebSocket(ws: WebSocket, tags?: string[]): void {
@@ -93,6 +107,7 @@ type GameSessionTestAccess = {
   fetch(request: Request): Promise<Response>;
   persist(): Promise<void>;
   alarm(): Promise<void>;
+  webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
   webSocketMessage(ws: WebSocket, message: string): Promise<void>;
 };
 
@@ -103,7 +118,7 @@ type TokenClaims = {
   exp?: number;
   playerIndex?: 0 | 1;
   role?: string;
-  spectatorName?: string;
+  spectatorName?: unknown;
 };
 
 async function mintToken(
@@ -148,6 +163,95 @@ function b64url(input: string | ArrayBuffer): string {
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=/g, "");
+}
+
+class PermissiveResponse {
+  readonly status: number;
+  readonly webSocket: unknown;
+  private readonly body: BodyInit | null;
+
+  constructor(
+    body: BodyInit | null = null,
+    init: ResponseInit & { webSocket?: unknown } = {}
+  ) {
+    this.body = body;
+    this.status = init.status ?? 200;
+    this.webSocket = init.webSocket;
+  }
+
+  async text(): Promise<string> {
+    return this.body === null ? "" : String(this.body);
+  }
+
+  async json(): Promise<unknown> {
+    return JSON.parse(await this.text()) as unknown;
+  }
+}
+
+const originalResponse = globalThis.Response;
+const originalWebSocketPair = (globalThis as Record<string, unknown>)
+  .WebSocketPair;
+let latestPair: [MockWebSocket, MockWebSocket] | undefined;
+
+function createProductionSession(): {
+  session: GameSessionTestAccess;
+  durableState: MockDurableObjectState;
+} {
+  const durableState = new MockDurableObjectState();
+  const session = new GameSession(
+    durableState as unknown as DurableObjectState,
+    {
+      GAME_WORKER_SECRET: "test-secret",
+      NEXTJS_URL: "https://app.example.test",
+    } as Env
+  ) as unknown as GameSessionTestAccess;
+  const { state, cardDb } = setupGame();
+  session.gameState = {
+    ...state,
+    players: [
+      {
+        ...state.players[0],
+        connected: true,
+        awayReason: null,
+        rejoinDeadlineAt: null,
+      },
+      {
+        ...state.players[1],
+        connected: true,
+        awayReason: null,
+        rejoinDeadlineAt: null,
+      },
+    ],
+  };
+  session.cardDb = cardDb;
+  return { session, durableState };
+}
+
+async function productionUpgrade(
+  session: GameSessionTestAccess,
+  claims: TokenClaims = {},
+  expectedStatus = 101
+): Promise<{ response: Response; socket: MockWebSocket }> {
+  latestPair = undefined;
+  const token = await mintToken(session.gameState, {
+    spectatorName: "Nami",
+    ...claims,
+  });
+  const response = await session.fetch(
+    new Request(
+      `https://worker.example.test/game/${session.gameState.id}/ws?token=${encodeURIComponent(token)}`,
+      { headers: { Upgrade: "websocket" } }
+    )
+  );
+  expect(response.status).toBe(expectedStatus);
+  return {
+    response,
+    socket: latestPair?.[1] as unknown as MockWebSocket,
+  };
+}
+
+function messages(ws: MockWebSocket): ServerMessage[] {
+  return ws.sent.map((payload) => JSON.parse(payload) as ServerMessage);
 }
 
 describe("OPT-554 spectator session authorization", () => {
@@ -197,7 +301,7 @@ describe("OPT-554 spectator session authorization", () => {
     });
   });
 
-  it("rejects spectator WebSocket upgrades before pair construction or socket acceptance", async () => {
+  it("admits a valid spectator token through the production WebSocket path", async () => {
     const durableState = new MockDurableObjectState();
     const env = {
       GAME_WORKER_SECRET: "test-secret",
@@ -207,13 +311,19 @@ describe("OPT-554 spectator session authorization", () => {
       durableState as unknown as DurableObjectState,
       env
     ) as unknown as GameSessionTestAccess;
-    const { state } = setupGame();
+    const { state, cardDb } = setupGame();
     session.gameState = state;
+    session.cardDb = cardDb;
     const token = await mintToken(state, { jti: "spectator-upgrade" });
-    const originalWebSocketPair = (globalThis as Record<string, unknown>)
-      .WebSocketPair;
-    const pairConstructor = vi.fn(function MockWebSocketPair() {});
-    (globalThis as Record<string, unknown>).WebSocketPair = pairConstructor;
+    const spectator = new MockWebSocket();
+    const client = new MockWebSocket();
+    globalThis.Response = PermissiveResponse as unknown as typeof Response;
+    (globalThis as Record<string, unknown>).WebSocketPair = function Pair(
+      this: Record<number, MockWebSocket>
+    ) {
+      this[0] = client;
+      this[1] = spectator;
+    };
 
     try {
       const response = await session.fetch(
@@ -223,11 +333,14 @@ describe("OPT-554 spectator session authorization", () => {
         )
       );
 
-      expect(response.status).toBe(401);
-      expect(await response.text()).toBe("Unauthorized");
-      expect(pairConstructor).not.toHaveBeenCalled();
-      expect(durableState.acceptedSockets).toEqual([]);
+      expect(response.status).toBe(101);
+      expect(
+        (response as unknown as { webSocket: unknown }).webSocket
+      ).toBe(client);
+      expect(durableState.acceptedSockets).toEqual([spectator]);
+      expect(messages(spectator)[0]).toMatchObject({ type: "game:state" });
     } finally {
+      globalThis.Response = originalResponse;
       if (originalWebSocketPair === undefined) {
         delete (globalThis as Record<string, unknown>).WebSocketPair;
       } else {
@@ -515,5 +628,276 @@ describe("OPT-554 spectator session authorization", () => {
     expect(player.playerIndex).toBe(1);
     // @ts-expect-error Spectator identities must never expose playerIndex.
     expect(spectator.playerIndex).toBeUndefined();
+  });
+});
+
+describe("OPT-578 production spectator admission protections", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new originalResponse(null, { status: 200 }))
+    );
+    globalThis.Response = PermissiveResponse as unknown as typeof Response;
+    (globalThis as Record<string, unknown>).WebSocketPair = function Pair(
+      this: Record<number, MockWebSocket>
+    ) {
+      latestPair = [new MockWebSocket(), new MockWebSocket()];
+      this[0] = latestPair[0];
+      this[1] = latestPair[1];
+    };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    globalThis.Response = originalResponse;
+    if (originalWebSocketPair === undefined) {
+      delete (globalThis as Record<string, unknown>).WebSocketPair;
+    } else {
+      (globalThis as Record<string, unknown>).WebSocketPair =
+        originalWebSocketPair;
+    }
+  });
+
+  it.each([
+    ["no token", null],
+    ["malformed token", "malformed"],
+  ])("keeps production admission at 401 for %s", async (_label, token) => {
+    const { session } = createProductionSession();
+    const query = token === null ? "" : `?token=${token}`;
+    const response = await session.fetch(
+      new Request(
+        `https://worker.example.test/game/${session.gameState.id}/ws${query}`,
+        { headers: { Upgrade: "websocket" } }
+      )
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it.each([
+    ["bad signature", {}, "wrong-secret"],
+    ["expired token", { exp: 1, jti: "expired" }, "test-secret"],
+    ["wrong game", { gameId: "other-game", jti: "wrong-game" }, "test-secret"],
+    ["player index", { playerIndex: 0, jti: "player-index" }, "test-secret"],
+    ["blank spectator name", { spectatorName: " ", jti: "blank-name" }, "test-secret"],
+    ["untrimmed spectator name", { spectatorName: " Nami", jti: "untrimmed-name" }, "test-secret"],
+    ["overlong spectator name", { spectatorName: "x".repeat(81), jti: "long-name" }, "test-secret"],
+    ["non-string spectator name", { spectatorName: 7, jti: "numeric-name" }, "test-secret"],
+  ] as const)(
+    "keeps production admission at 401 for %s",
+    async (_label, claims, secret) => {
+      const { session } = createProductionSession();
+      const token = await mintToken(session.gameState, claims, secret);
+      const response = await session.fetch(
+        new Request(
+          `https://worker.example.test/game/${session.gameState.id}/ws?token=${encodeURIComponent(token)}`,
+          { headers: { Upgrade: "websocket" } }
+        )
+      );
+
+      expect(response.status).toBe(401);
+    }
+  );
+
+  it("rate-limits production spectator upgrades by admitted user", async () => {
+    const { session } = createProductionSession();
+    for (let index = 0; index < UPGRADE_RATE_LIMIT_BURST; index++) {
+      const { response } = await productionUpgrade(session, {
+        jti: `upgrade-${index}`,
+      });
+      expect(response.status).toBe(101);
+    }
+
+    const { response } = await productionUpgrade(
+      session,
+      { jti: "upgrade-over-budget" },
+      429
+    );
+    expect(response.status).toBe(429);
+    expect(await response.text()).toBe("Too many spectator connection attempts");
+  });
+
+  it("enforces capacity for production-admitted spectators", async () => {
+    const { session } = createProductionSession();
+    for (let index = 0; index < MAX_SPECTATOR_SOCKETS; index++) {
+      const { response } = await productionUpgrade(session, {
+        sub: `spectator-${index}`,
+        jti: `capacity-${index}`,
+      });
+      expect(response.status).toBe(101);
+    }
+
+    const { response, socket } = await productionUpgrade(session, {
+      sub: "over-capacity",
+      jti: "capacity-rejected",
+    });
+    expect(response.status).toBe(101);
+    expect(socket.sent).toEqual([]);
+    expect(socket.closed).toEqual([
+      {
+        code: SPECTATOR_CAPACITY_CLOSE_CODE,
+        reason: SPECTATOR_CAPACITY_CLOSE_REASON,
+      },
+    ]);
+  });
+
+  it("blocks each send after a production-admitted spectator lease expires", async () => {
+    const { session } = createProductionSession();
+    const now = Math.floor(Date.now() / 1000);
+    const { socket } = await productionUpgrade(session, {
+      exp: now + 1,
+      jti: "send-lease",
+    });
+    socket.sent.length = 0;
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    session.transport.broadcast({ type: "game:over", winner: 0, reason: "done" });
+
+    expect(socket.sent).toEqual([]);
+    expect(socket.closed).toEqual([
+      { code: SPECTATOR_REVOKED_CLOSE_CODE, reason: SPECTATOR_LEASE_EXPIRED_CLOSE_REASON },
+    ]);
+  });
+
+  it("alarm-closes a production-admitted spectator at lease expiry", async () => {
+    const { session } = createProductionSession();
+    const now = Math.floor(Date.now() / 1000);
+    const { socket } = await productionUpgrade(session, {
+      exp: now + 1,
+      jti: "alarm-lease",
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    await session.alarm();
+
+    expect(socket.closed).toEqual([
+      { code: SPECTATOR_REVOKED_CLOSE_CODE, reason: SPECTATOR_LEASE_EXPIRED_CLOSE_REASON },
+    ]);
+  });
+
+  it("targets production-admitted revocation and rejects its replay", async () => {
+    const { session } = createProductionSession();
+    const target = await productionUpgrade(session, {
+      sub: "target-spectator",
+      jti: "target-first",
+    });
+    const other = await productionUpgrade(session, {
+      sub: "other-spectator",
+      jti: "other-first",
+    });
+    const revoke = () =>
+      session.fetch(
+        new Request(
+          `https://worker.example.test/game/${session.gameState.id}/revoke-spectators`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer test-secret",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              lobbyId: "lobby-1",
+              revision: 7,
+              userIds: ["target-spectator"],
+            }),
+          }
+        )
+      );
+
+    const response = await revoke();
+    expect(response.status).toBe(200);
+    expect(target.socket.closed).toEqual([
+      { code: SPECTATOR_REVOKED_CLOSE_CODE, reason: SPECTATOR_REVOKED_CLOSE_REASON },
+    ]);
+    expect(other.socket.closed).toEqual([]);
+
+    const rejoined = await productionUpgrade(session, {
+      sub: "target-spectator",
+      jti: "target-rejoined",
+    });
+    const replay = await revoke();
+    expect(replay.status).toBe(409);
+    expect(rejoined.socket.closed).toEqual([]);
+  });
+
+  it("rate-limits inbound frames from a production-admitted spectator", async () => {
+    const { session } = createProductionSession();
+    const { socket } = await productionUpgrade(session, { jti: "message-rate" });
+
+    for (let index = 0; index <= SPECTATOR_MESSAGE_RATE_LIMIT_BURST; index++) {
+      await session.webSocketMessage(
+        socket as unknown as WebSocket,
+        JSON.stringify({ type: "game:action", action: { type: "END_TURN" } })
+      );
+    }
+
+    expect(socket.closed).toEqual([
+      { code: 1008, reason: "spectator message rate limit exceeded" },
+    ]);
+  });
+
+  it("rejects an oversized frame from a production-admitted spectator", async () => {
+    const { session } = createProductionSession();
+    const { socket } = await productionUpgrade(session, { jti: "frame-size" });
+
+    await session.webSocketMessage(
+      socket as unknown as WebSocket,
+      "x".repeat(MAX_CLIENT_MESSAGE_BYTES + 1)
+    );
+
+    expect(socket.closed).toEqual([{ code: 1009, reason: "message too big" }]);
+  });
+
+  it("keeps denied messages off a production-admitted spectator socket", async () => {
+    const { session } = createProductionSession();
+    const { socket } = await productionUpgrade(session, { jti: "allowlist" });
+    socket.sent.length = 0;
+
+    session.transport.broadcast({
+      type: "game:undo",
+      playerIndex: 0,
+      canUndo: false,
+    });
+
+    expect(socket.sent).toEqual([]);
+  });
+
+  it("isolates production spectator reconnects from presence, debounce, and forfeit", async () => {
+    const { session } = createProductionSession();
+    const deadline = Date.now() + 60_000;
+    session.gameState = {
+      ...session.gameState,
+      players: [
+        {
+          ...session.gameState.players[0],
+          connected: false,
+          awayReason: "DISCONNECTED",
+          rejoinDeadlineAt: deadline,
+        },
+        session.gameState.players[1],
+      ],
+    };
+    const presenceBefore = structuredClone(session.gameState.players);
+    const scheduleDisconnect = vi.spyOn(session.transport, "scheduleDisconnect");
+    const first = await productionUpgrade(session, { jti: "presence-first" });
+    await session.webSocketClose(
+      first.socket as unknown as WebSocket,
+      1006,
+      "spectator network lost"
+    );
+    await productionUpgrade(session, { jti: "presence-reconnect" });
+
+    expect(session.gameState.players).toEqual(presenceBefore);
+    expect(scheduleDisconnect).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(DISCONNECT_BROADCAST_DEBOUNCE_MS);
+    expect(session.gameState.players).toEqual(presenceBefore);
+    vi.setSystemTime(deadline);
+    await session.alarm();
+    expect(session.gameState.status).toBe("FINISHED");
+    expect(session.gameState.winner).toBe(1);
   });
 });

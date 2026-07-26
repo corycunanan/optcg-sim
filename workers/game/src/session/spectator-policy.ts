@@ -25,7 +25,7 @@ export interface SpectatorBudgetStorage {
   put(key: string, value: unknown): Promise<void>;
 }
 
-/** Owns spectator admission and receive-only enforcement ahead of player work. */
+/** Owns spectator admission; every caller must opt in explicitly. */
 export class SpectatorPolicy {
   private upgradeTail: Promise<void> = Promise.resolve();
 
