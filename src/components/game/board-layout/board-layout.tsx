@@ -166,6 +166,7 @@ function BoardLayoutInner({
 }: BoardLayoutProps & { interactionMode?: InteractionMode }) {
   const boardInputEnabled = interactionMode === "full";
   const spectatorMode = interactionMode === "spectator";
+  const interactiveBoardOverlaysEnabled = !spectatorMode;
   const dndDisabled = !boardInputEnabled;
   const zoneRegistry = useZonePosition();
   const viewport = viewportSize;
@@ -192,7 +193,8 @@ function BoardLayoutInner({
   );
   const modalRouting = useBoardModalRouting({
     activePrompt,
-    promptBlocked: spectatorMode || spotlight.isBlockingPrompt,
+    promptBlocked:
+      !interactiveBoardOverlaysEnabled || spotlight.isBlockingPrompt,
     me,
     opp,
     cardDb,
@@ -602,41 +604,45 @@ function BoardLayoutInner({
         </div>
       </div>
 
-      <SpotlightOverlay
-        presentation={spotlight.presentation}
-        cardDb={cardDb}
-        myIndex={myIndex}
-        isWaiting={spotlight.isWaiting}
-        view={spotlight.view}
-        onDismiss={spotlight.dismiss}
-        onToggleView={spotlight.toggleView}
-      />
+      {interactiveBoardOverlaysEnabled && (
+        <>
+          <SpotlightOverlay
+            presentation={spotlight.presentation}
+            cardDb={cardDb}
+            myIndex={myIndex}
+            isWaiting={spotlight.isWaiting}
+            view={spotlight.view}
+            onDismiss={spotlight.dismiss}
+            onToggleView={spotlight.toggleView}
+          />
 
-      <BoardModals
-        activePrompt={boardPrompt}
-        activePromptId={activePromptId}
-        isPromptHidden={modalRouting.isPromptHidden}
-        onHide={modalRouting.hidePrompt}
-        cardDb={cardDb}
-        onAction={dispatchBoardAction}
-        zonePreview={modalRouting.zonePreview}
-        onCloseZonePreview={modalRouting.closeZonePreview}
-        me={me}
-        opp={opp}
-        redistributeTransfers={redistribution.transfers}
-        onRedistributeUndo={redistribution.undo}
-        selectTargetInPlace={modalRouting.targetSelectionActive}
-      />
+          <BoardModals
+            activePrompt={boardPrompt}
+            activePromptId={activePromptId}
+            isPromptHidden={modalRouting.isPromptHidden}
+            onHide={modalRouting.hidePrompt}
+            cardDb={cardDb}
+            onAction={dispatchBoardAction}
+            zonePreview={modalRouting.zonePreview}
+            onCloseZonePreview={modalRouting.closeZonePreview}
+            me={me}
+            opp={opp}
+            redistributeTransfers={redistribution.transfers}
+            onRedistributeUndo={redistribution.undo}
+            selectTargetInPlace={modalRouting.targetSelectionActive}
+          />
+
+          <BoardDragOverlay
+            activeDrag={drag.activeDrag}
+            cardDb={cardDb}
+            donArtUrl={me?.donArtUrl}
+            overlayScale={drag.overlayScale}
+            tiltX={drag.tiltX}
+            tiltY={drag.tiltY}
+          />
+        </>
+      )}
     </div>
-
-    <BoardDragOverlay
-      activeDrag={drag.activeDrag}
-      cardDb={cardDb}
-      donArtUrl={me?.donArtUrl}
-      overlayScale={drag.overlayScale}
-      tiltX={drag.tiltX}
-      tiltY={drag.tiltY}
-    />
 
     <CardAnimationLayer
       transitions={cardAnimations}

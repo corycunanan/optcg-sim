@@ -2,7 +2,7 @@
 
 // Live game shell. Mirrors `<SandboxShell>`'s contract: composes the shared
 // scaled-board primitives and renders live-only chrome (opponent-away banner,
-// EventLog, dev modal-test panel, match-end Dialog, connectivity/loading
+// EventLog, dev overlay-test panel, gated game overlays, connectivity/loading
 // states) as siblings of `<ScaledBoard>`, outside the scaled subtree.
 //
 // Per the OPT-321 shell contract, this shell may inject only `state` and
@@ -24,18 +24,11 @@ import {
   PortalRoot,
   ScaledBoard,
 } from "@/components/game/scaled-board";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui";
 import { Spinner } from "@/components/ui/spinner";
 import { GameButton } from "./game-button";
 import { GameErrorBoundary } from "./game-error-boundary";
 import { EventLog } from "./event-log";
 import { formatCountdown } from "./game-ui";
-import { PregameOverlay } from "./pregame/pregame-overlay";
 import { GameOverlayGate } from "./pregame/game-overlay-gate";
 import type { GameAction, PromptOptions } from "@shared/game-types";
 import type { SolitairePerspective } from "@/hooks/use-solitaire-session";
@@ -501,22 +494,20 @@ function GameSessionView({
         pendingPrompt={game.gameState.pendingPrompt}
         promptRespondingPlayer={game.gameState.promptRespondingPlayer ?? null}
         playerDisplayNames={playerDisplayNames}
-      >
-        {game.gameState.pregame && (
-          <PregameOverlay
-            pregame={game.gameState.pregame}
-            myIndex={game.myIndex}
-            myHand={game.me?.hand ?? []}
-            cardDb={game.cardDb}
-            activePrompt={activePrompt}
-            promptRespondingPlayer={
-              game.gameState.pendingPrompt?.respondingPlayer ??
-              (activePrompt ? game.myIndex : null)
-            }
-            onAction={dispatch.onAction}
-          />
-        )}
-      </GameOverlayGate>
+        matchClosed={game.matchClosed}
+        winner={game.gameState.winner}
+        endState={{
+          title: endState.endTitle,
+          colorClass: endState.endColorClass,
+          reason: endState.endReason,
+        }}
+        myIndex={game.myIndex}
+        myHand={game.me?.hand ?? []}
+        cardDb={game.cardDb}
+        activePrompt={activePrompt}
+        onAction={dispatch.onAction}
+        onBackToLobbies={navigation.handleBackToLobbies}
+      />
 
       {process.env.NODE_ENV === "development" && game.me && (
         <div className="fixed right-4 bottom-4 z-[300] flex items-center gap-2">
@@ -630,34 +621,6 @@ function GameSessionView({
         cardDb={game.cardDb}
         myIndex={game.myIndex}
       />
-
-      <Dialog open={game.matchClosed}>
-        <DialogContent
-          showCloseButton={false}
-          className="bg-gb-surface border-gb-border-strong text-gb-text text-center sm:max-w-[400px]"
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <DialogHeader className="items-center">
-            <DialogTitle className="text-gb-text-subtle text-xs font-semibold tracking-widest">
-              MATCH COMPLETE
-            </DialogTitle>
-          </DialogHeader>
-          <p className={cn("text-3xl font-extrabold", endState.endColorClass)}>
-            {endState.endTitle}
-          </p>
-          <p className="text-gb-text text-sm leading-relaxed">
-            {endState.endReason}
-          </p>
-          <GameButton
-            variant="primary"
-            size="lg"
-            onClick={navigation.handleBackToLobbies}
-            className="w-full"
-          >
-            Back to Lobbies
-          </GameButton>
-        </DialogContent>
-      </Dialog>
     </GameErrorBoundary>
   );
 }

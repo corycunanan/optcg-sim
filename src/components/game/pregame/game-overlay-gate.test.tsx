@@ -1,7 +1,48 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { afterEach, describe, expect, it } from "vitest";
-import type { GameState, PendingPromptState } from "@shared/game-types";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+  GameState,
+  PendingPromptState,
+  PromptOptions,
+} from "@shared/game-types";
+
+vi.mock("@/components/ui", () => ({
+  Dialog: ({ children }: { children: React.ReactNode }) => (
+    <div role="dialog">{children}</div>
+  ),
+  DialogContent: ({ children }: { children: React.ReactNode }) => children,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => children,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock("../game-button", () => ({
+  GameButton: ({ children }: { children: React.ReactNode }) => (
+    <button>{children}</button>
+  ),
+}));
+vi.mock("./pregame-overlay", () => ({
+  PregameOverlay: ({
+    pregame,
+  }: {
+    pregame: NonNullable<GameState["pregame"]>;
+  }) => (
+    <div data-testid="interactive-pregame">
+      {pregame.phase === "MULLIGAN_DECISIONS" && (
+        <div role="dialog">
+          <button>Keep hand</button>
+          <button>Redraw</button>
+        </div>
+      )}
+      {pregame.phase === "PRIORITY_CHOICE" && (
+        <>
+          <span>You won the roll</span>
+          <span>Choose first or second</span>
+        </>
+      )}
+      {pregame.phase === "START_OF_GAME_FX" && <span>Preparing the game</span>}
+    </div>
+  ),
+}));
 import { GameOverlayGate } from "./game-overlay-gate";
 
 const playerDisplayNames = ["Nami", "Robin"] as const;
@@ -17,13 +58,17 @@ function renderGate({
   pendingPrompt = null,
   promptRespondingPlayer = null,
   viewerRole = "spectator",
-  children = <div role="dialog">Interactive player overlay</div>,
+  matchClosed = false,
+  winner = null,
+  activePrompt = null,
 }: {
   pregame?: GameState["pregame"];
   pendingPrompt?: PendingPromptState | null;
   promptRespondingPlayer?: 0 | 1 | null;
   viewerRole?: "player" | "spectator";
-  children?: React.ReactNode;
+  matchClosed?: boolean;
+  winner?: 0 | 1 | null;
+  activePrompt?: PromptOptions | null;
 }) {
   act(() => {
     renderer = create(
@@ -33,9 +78,20 @@ function renderGate({
         pendingPrompt={pendingPrompt}
         promptRespondingPlayer={promptRespondingPlayer}
         playerDisplayNames={playerDisplayNames}
-      >
-        {children}
-      </GameOverlayGate>
+        matchClosed={matchClosed}
+        winner={winner}
+        endState={{
+          title: "VICTORY",
+          colorClass: "text-gb-accent-green",
+          reason: "Conceded",
+        }}
+        myIndex={0}
+        myHand={[]}
+        cardDb={{}}
+        activePrompt={activePrompt}
+        onAction={vi.fn()}
+        onBackToLobbies={vi.fn()}
+      />
     );
   });
   return renderer!;
@@ -64,12 +120,6 @@ describe("GameOverlayGate spectator policy", () => {
         mulliganDecisions: [false, null],
       }),
       promptRespondingPlayer: 1,
-      children: (
-        <div role="dialog">
-          <button>Keep hand</button>
-          <button>Redraw</button>
-        </div>
-      ),
     });
     const root = rendered.root;
     const output = JSON.stringify(rendered.toJSON());
@@ -91,12 +141,6 @@ describe("GameOverlayGate spectator policy", () => {
         priorityDeciderIndex: 1,
       }),
       promptRespondingPlayer: 1,
-      children: (
-        <div>
-          <span>You won the roll</span>
-          <span>Choose first or second</span>
-        </div>
-      ),
     });
     const output = JSON.stringify(rendered.toJSON());
 
@@ -159,22 +203,76 @@ describe("GameOverlayGate spectator policy", () => {
           pendingPrompt={null}
           promptRespondingPlayer={null}
           playerDisplayNames={playerDisplayNames}
-        >
-          <div role="dialog">Interactive player overlay</div>
-        </GameOverlayGate>
+          matchClosed={false}
+          winner={null}
+          endState={{
+            title: "",
+            colorClass: "",
+            reason: "",
+          }}
+          myIndex={null}
+          myHand={[]}
+          cardDb={{}}
+          activePrompt={null}
+          onAction={vi.fn()}
+          onBackToLobbies={vi.fn()}
+        />
       );
     });
 
     expect(rendered.toJSON()).toBeNull();
   });
 
-  it("passes interactive overlays through for a player", () => {
-    const rendered = renderGate({ viewerRole: "player" });
+  it("renders start-of-game prompts alongside passive pregame context", () => {
+    const rendered = renderGate({
+      pregame: pregame({
+        phase: "START_OF_GAME_FX",
+        firstPlayerIndex: 0,
+      }),
+      pendingPrompt: {
+        respondingPlayer: 0,
+        resumeContext: null,
+        options: {
+          promptType: "ARRANGE_TOP_CARDS",
+          cards: [],
+          effectDescription: "Arrange the top cards",
+          canSendToBottom: true,
+        },
+      },
+      promptRespondingPlayer: 0,
+    });
+    const output = JSON.stringify(rendered.toJSON());
+
+    expect(output).toContain("Start-of-game effects are resolving");
+    expect(output).toContain("Nami");
+    expect(output).toContain("arranging cards");
+  });
+
+  it("renders match completion passively without a dialog or routing control", () => {
+    const rendered = renderGate({
+      matchClosed: true,
+      winner: 1,
+      pregame: pregame({ phase: "MULLIGAN_DECISIONS" }),
+    });
+    const root = rendered.root;
+    const output = JSON.stringify(rendered.toJSON());
+
+    expect(root.findAllByProps({ role: "dialog" })).toHaveLength(0);
+    expect(output).toContain("Match complete");
+    expect(output).toContain("Robin wins");
+    expect(output).toContain("Conceded");
+    expect(output).not.toContain("Back to Lobbies");
+    expect(output).not.toContain("Keep hand");
+  });
+
+  it("renders the interactive pregame overlay for a player", () => {
+    const rendered = renderGate({
+      viewerRole: "player",
+      pregame: pregame({ phase: "MULLIGAN_DECISIONS" }),
+    });
     const root = rendered.root;
 
     expect(root.findAllByProps({ role: "dialog" })).toHaveLength(1);
-    expect(JSON.stringify(rendered.toJSON())).toContain(
-      "Interactive player overlay"
-    );
+    expect(JSON.stringify(rendered.toJSON())).toContain("Keep hand");
   });
 });

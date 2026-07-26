@@ -183,9 +183,15 @@ vi.mock("./board-modals", () => ({
       "data-active-prompt": activePrompt?.promptType ?? "none",
     }),
 }));
-vi.mock("./board-drag-overlay", () => ({ BoardDragOverlay: () => null }));
+vi.mock("./board-drag-overlay", () => ({
+  BoardDragOverlay: () =>
+    React.createElement("div", { "data-testid": "board-drag-overlay" }),
+}));
 vi.mock("./card-animation-layer", () => ({ CardAnimationLayer: () => null }));
-vi.mock("../spotlight-overlay", () => ({ SpotlightOverlay: () => null }));
+vi.mock("../spotlight-overlay", () => ({
+  SpotlightOverlay: () =>
+    React.createElement("div", { "data-testid": "spotlight-overlay" }),
+}));
 
 function makeCard(playerIndex: 0 | 1, role: "leader" | "character"): CardInstance {
   return {
@@ -517,10 +523,14 @@ describe("BoardLayout bottom-player perspective", () => {
       "data-can-undo": "false",
     });
     expect(
-      renderer!.root.findByProps({ "data-testid": "board-modals" }).props[
-        "data-active-prompt"
-      ],
-    ).toBe("none");
+      renderer!.root.findAllByProps({ "data-testid": "board-modals" }),
+    ).toHaveLength(0);
+    expect(
+      renderer!.root.findAllByProps({ "data-testid": "spotlight-overlay" }),
+    ).toHaveLength(0);
+    expect(
+      renderer!.root.findAllByProps({ "data-testid": "board-drag-overlay" }),
+    ).toHaveLength(0);
 
     act(() => {
       renderer!.root.findByProps({ "data-testid": "mid-zone" }).props.onClick();
@@ -551,6 +561,12 @@ describe("BoardLayout bottom-player perspective", () => {
         "data-active-prompt"
       ],
     ).toBe("OPTIONAL_EFFECT");
+    expect(
+      renderer!.root.findAllByProps({ "data-testid": "spotlight-overlay" }),
+    ).toHaveLength(1);
+    expect(
+      renderer!.root.findAllByProps({ "data-testid": "board-drag-overlay" }),
+    ).toHaveLength(1);
 
     act(() => {
       renderer!.root.findByProps({ "data-testid": "mid-zone" }).props.onClick();
