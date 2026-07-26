@@ -71,7 +71,6 @@ interface LobbyRoomShellProps {
 
 export function LobbyRoomShell({
   lobbyId,
-  currentUserId,
   joinError,
   initialJoinCode,
 }: LobbyRoomShellProps) {
@@ -85,8 +84,10 @@ export function LobbyRoomShell({
     leaving,
     closing,
     kicking,
+    spectatorToggling,
     removedByHost,
     patchLobby,
+    setAllowSpectators,
     startLobby,
     leaveLobby,
     closeLobby,
@@ -137,8 +138,8 @@ export function LobbyRoomShell({
     router.push(recovery.route);
   }, [lobbyId, recovery, router]);
 
-  const isHost = lobby?.hostUserId === currentUserId;
-  const isGuest = lobby?.guest?.user.id === currentUserId && !isHost;
+  const isHost = lobby?.viewerRole === "host";
+  const isGuest = lobby?.viewerRole === "guest";
   const isSpectator = lobby?.viewerRole === "spectator";
   const isInGame = lobby?.status === "IN_GAME";
   const activeGameId = lobby ? rejoinGameId(lobby) : null;
@@ -268,6 +269,22 @@ export function LobbyRoomShell({
         err instanceof ApiError ? err.message : "Could not kick player"
       );
     }
+  };
+
+  const handleSpectatorToggle = async (allowSpectators: boolean) => {
+    try {
+      await setAllowSpectators(allowSpectators);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : "Could not update spectator access"
+      );
+    }
+  };
+
+  const handleOpenSpectators = () => {
+    // TODO(OPT-545): Open the Spectators (N) modal.
   };
 
   if (recovery) {
@@ -583,14 +600,16 @@ export function LobbyRoomShell({
         <div className="border-border bg-surface-1 sticky bottom-0 z-20 border-t shadow-[var(--shadow-lg)]">
           <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
             <div className="flex items-center gap-3">
-              <Tooltip content="Spectator mode is coming in a future update">
-                <span>
-                  <Button variant="secondary" disabled>
-                    <Eye data-icon="inline-start" />
-                    Spectators
-                  </Button>
-                </span>
-              </Tooltip>
+              <SpectatorPill
+                allowSpectators={lobby.allowSpectators}
+                spectatorCount={lobby.spectatorCount}
+                viewerRole={lobby.viewerRole}
+                toggling={spectatorToggling}
+                onToggle={(allowSpectators) =>
+                  void handleSpectatorToggle(allowSpectators)
+                }
+                onOpenSpectators={handleOpenSpectators}
+              />
               <p className="text-content-tertiary text-xs">{startHint}</p>
             </div>
 
@@ -660,6 +679,75 @@ export function LobbyRoomShell({
         />
       </div>
     </TooltipProvider>
+  );
+}
+
+function SpectatorPill({
+  allowSpectators,
+  spectatorCount,
+  viewerRole,
+  toggling,
+  onToggle,
+  onOpenSpectators,
+}: {
+  allowSpectators: boolean;
+  spectatorCount: number;
+  viewerRole: LobbyRoomState["viewerRole"];
+  toggling: boolean;
+  onToggle: (allowSpectators: boolean) => void;
+  onOpenSpectators: () => void;
+}) {
+  const isHost = viewerRole === "host";
+  const watchingLabel = `${spectatorCount} watching`;
+
+  return (
+    <div className="border-border bg-surface-3 flex min-h-10 items-center gap-3 rounded-full border p-1 pl-3">
+      {isHost ? (
+        <>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={allowSpectators}
+            aria-label="Allow spectators"
+            disabled={toggling}
+            onClick={() => onToggle(!allowSpectators)}
+            className={cn(
+              "focus-visible:ring-border-focus relative h-6 w-10 shrink-0 rounded-full p-1 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-wait",
+              allowSpectators ? "bg-navy-700" : "bg-content-tertiary"
+            )}
+          >
+            <span
+              className={cn(
+                "bg-surface-1 block size-4 rounded-full transition-transform",
+                allowSpectators && "translate-x-4"
+              )}
+            />
+          </button>
+          <span className="text-content-primary text-xs font-semibold tracking-widest uppercase">
+            Spectators
+          </span>
+          <span className="sr-only">
+            {allowSpectators ? "Spectators on" : "Spectators off"},{" "}
+            {watchingLabel}
+          </span>
+        </>
+      ) : (
+        <span className="text-content-primary flex items-center gap-2 text-xs font-semibold">
+          <Eye className="text-gold-600 size-4" aria-hidden="true" />
+          Spectators {allowSpectators ? "on" : "off"} · {watchingLabel}
+        </span>
+      )}
+
+      <button
+        type="button"
+        aria-label={`View spectators (${spectatorCount})`}
+        disabled={spectatorCount === 0}
+        onClick={onOpenSpectators}
+        className="border-border bg-surface-1 text-content-primary hover:border-border-strong focus-visible:ring-border-focus inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-default disabled:opacity-50"
+      >
+        {spectatorCount}
+      </button>
+    </div>
   );
 }
 

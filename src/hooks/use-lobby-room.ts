@@ -40,8 +40,13 @@ export function useLobbyRoom(
   const [leaving, setLeaving] = useState(false);
   const [closing, setClosing] = useState(false);
   const [kicking, setKicking] = useState(false);
+  const [spectatorToggling, setSpectatorToggling] = useState(false);
   const [removedByHost, setRemovedByHost] = useState<string | null>(null);
   const cancelledRef = useRef(false);
+  const authoritativeLobbyRef = useRef<LobbyRoomState | null>(initialLobby);
+  const spectatorToggleRef = useRef<{
+    desired: boolean;
+  } | null>(null);
   const refreshInFlightRef = useRef(false);
   const queuedRefreshRef = useRef(false);
   const latestVersionRef = useRef<{
@@ -75,6 +80,17 @@ export function useLobbyRoom(
         };
       }
 
+      authoritativeLobbyRef.current = snapshot;
+      const pendingToggle = spectatorToggleRef.current;
+      if (pendingToggle && snapshot.allowSpectators !== pendingToggle.desired) {
+        setLobby({ ...snapshot, allowSpectators: pendingToggle.desired });
+        return true;
+      }
+
+      if (pendingToggle) {
+        spectatorToggleRef.current = null;
+        setSpectatorToggling(false);
+      }
       setLobby(snapshot);
       return true;
     },
@@ -209,13 +225,51 @@ export function useLobbyRoom(
       setMutating(true);
       try {
         const suffix = options.force ? "?force=true" : "";
-        await apiPatch(`/api/lobbies/${lobbyId}${suffix}`, body);
+        await apiPatch(
+          `/api/lobbies/${lobbyId}${suffix}`,
+          body,
+          LobbyActionResponseSchema
+        );
         return await refresh();
       } finally {
         setMutating(false);
       }
     },
     [lobbyId, refresh]
+  );
+
+  const setAllowSpectators = useCallback(
+    async (allowSpectators: boolean) => {
+      const currentLobby = authoritativeLobbyRef.current;
+      if (
+        !currentLobby ||
+        currentLobby.viewerRole !== "host" ||
+        spectatorToggleRef.current ||
+        currentLobby.allowSpectators === allowSpectators
+      ) {
+        return;
+      }
+
+      spectatorToggleRef.current = { desired: allowSpectators };
+      setSpectatorToggling(true);
+      setLobby((current) =>
+        current ? { ...current, allowSpectators } : current
+      );
+
+      try {
+        await apiPatch(
+          `/api/lobbies/${lobbyId}`,
+          { allowSpectators },
+          LobbyActionResponseSchema
+        );
+      } catch (error) {
+        spectatorToggleRef.current = null;
+        setSpectatorToggling(false);
+        setLobby(authoritativeLobbyRef.current);
+        throw error;
+      }
+    },
+    [lobbyId]
   );
 
   const startLobby = useCallback(async () => {
@@ -276,9 +330,11 @@ export function useLobbyRoom(
     leaving,
     closing,
     kicking,
+    spectatorToggling,
     removedByHost,
     refresh,
     patchLobby,
+    setAllowSpectators,
     startLobby,
     leaveLobby,
     closeLobby,

@@ -42,8 +42,12 @@ type LobbyRoomResult = ReturnType<typeof useLobbyRoom>;
 let latestRoom: LobbyRoomResult | null = null;
 let renderer: ReactTestRenderer | null = null;
 
-function LobbyRoomProbe({ initialLobby }: { initialLobby: LobbyRoomState }) {
-  const room = useLobbyRoom(initialLobby.id, initialLobby);
+function LobbyRoomProbe({
+  initialLobby,
+}: {
+  initialLobby: LobbyRoomState | null;
+}) {
+  const room = useLobbyRoom(initialLobby?.id ?? "lobby-1", initialLobby);
   useEffect(() => {
     latestRoom = room;
   }, [room]);
@@ -86,7 +90,7 @@ function guest(userId: string) {
   };
 }
 
-async function mount(initialLobby: LobbyRoomState) {
+async function mount(initialLobby: LobbyRoomState | null) {
   await act(async () => {
     renderer = create(<LobbyRoomProbe initialLobby={initialLobby} />);
     await Promise.resolve();
@@ -144,6 +148,170 @@ describe("useLobbyRoom degraded delivery recovery", () => {
     await mount(initial);
 
     expect(room().lobby).toEqual(refreshed);
+  });
+
+  it("optimistically toggles spectators and reconciles without a success refresh", async () => {
+    const initial = lobbyState({
+      version: 4,
+      allowSpectators: false,
+      viewerRole: "host",
+    });
+    let resolvePatch!: (value: { success: true }) => void;
+    mocks.apiGet.mockResolvedValue({ data: initial });
+    mocks.apiPatch.mockReturnValue(
+      new Promise<{ success: true }>((resolve) => {
+        resolvePatch = resolve;
+      })
+    );
+    await mount(initial);
+    const readsAfterMount = mocks.apiGet.mock.calls.length;
+
+    let togglePromise!: Promise<void>;
+    await act(async () => {
+      togglePromise = room().setAllowSpectators(true);
+      await Promise.resolve();
+    });
+
+    expect(room().lobby?.allowSpectators).toBe(true);
+    expect(room().spectatorToggling).toBe(true);
+
+    await act(async () => {
+      resolvePatch({ success: true });
+      await togglePromise;
+    });
+
+    expect(mocks.apiGet).toHaveBeenCalledTimes(readsAfterMount);
+    expect(room().spectatorToggling).toBe(true);
+
+    await act(async () => {
+      mocks.subscribeHandler?.({
+        type: "lobby:state_changed",
+        lobby: lobbyState({
+          version: 5,
+          allowSpectators: true,
+          viewerRole: "host",
+        }),
+      });
+    });
+
+    expect(room().lobby?.allowSpectators).toBe(true);
+    expect(room().spectatorToggling).toBe(false);
+  });
+
+  it("preserves optimism across unrelated events then rolls back to the latest snapshot", async () => {
+    const initial = lobbyState({
+      version: 4,
+      format: "Standard",
+      allowSpectators: false,
+      viewerRole: "host",
+    });
+    let rejectPatch!: (error: Error) => void;
+    mocks.apiGet.mockResolvedValue({ data: initial });
+    mocks.apiPatch.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectPatch = reject;
+      })
+    );
+    await mount(initial);
+
+    let togglePromise!: Promise<void>;
+    await act(async () => {
+      togglePromise = room().setAllowSpectators(true);
+      await Promise.resolve();
+      mocks.subscribeHandler?.({
+        type: "lobby:state_changed",
+        lobby: lobbyState({
+          version: 5,
+          format: "Eternal",
+          allowSpectators: false,
+          viewerRole: "host",
+        }),
+      });
+    });
+
+    expect(room().lobby).toMatchObject({
+      format: "Eternal",
+      allowSpectators: true,
+    });
+
+    await act(async () => {
+      rejectPatch(new Error("offline"));
+      await expect(togglePromise).rejects.toThrow("offline");
+    });
+
+    expect(room().lobby).toMatchObject({
+      version: 5,
+      format: "Eternal",
+      allowSpectators: false,
+    });
+
+    await act(async () => {
+      mocks.subscribeHandler?.({
+        type: "lobby:state_changed",
+        lobby: lobbyState({
+          version: 4,
+          allowSpectators: true,
+          viewerRole: "host",
+        }),
+      });
+    });
+    expect(room().lobby?.allowSpectators).toBe(false);
+  });
+
+  it("guards spectator toggles by loaded host state, same value, and one in-flight request", async () => {
+    let resolvePatch!: (value: { success: true }) => void;
+    const initial = lobbyState({
+      allowSpectators: false,
+      viewerRole: "host",
+    });
+    mocks.apiGet.mockResolvedValue({ data: initial });
+    mocks.apiPatch.mockReturnValue(
+      new Promise<{ success: true }>((resolve) => {
+        resolvePatch = resolve;
+      })
+    );
+    await mount(initial);
+
+    await act(async () => {
+      await room().setAllowSpectators(false);
+    });
+    expect(mocks.apiPatch).not.toHaveBeenCalled();
+
+    let firstToggle!: Promise<void>;
+    await act(async () => {
+      firstToggle = room().setAllowSpectators(true);
+      await room().setAllowSpectators(true);
+      await Promise.resolve();
+    });
+    expect(mocks.apiPatch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolvePatch({ success: true });
+      await firstToggle;
+    });
+
+    const guestState = lobbyState({ viewerRole: "guest" });
+    mocks.apiGet.mockResolvedValue({ data: guestState });
+    await act(async () => {
+      renderer?.unmount();
+      renderer = null;
+    });
+    await mount(guestState);
+    await act(async () => {
+      await room().setAllowSpectators(true);
+    });
+    expect(mocks.apiPatch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      renderer?.unmount();
+      renderer = null;
+    });
+    mocks.apiGet.mockReturnValue(new Promise(() => {}));
+    await mount(null);
+    await act(async () => {
+      await room().setAllowSpectators(true);
+    });
+    expect(mocks.apiPatch).toHaveBeenCalledTimes(1);
   });
 
   it("applies a legacy snapshot without a version", async () => {
