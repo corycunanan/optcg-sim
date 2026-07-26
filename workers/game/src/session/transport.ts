@@ -12,7 +12,10 @@ import {
   SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
   type TokenBucket,
 } from "./rate-limiter.js";
-import { visibleStateForPlayer } from "./visibility.js";
+import {
+  visibleStateForPlayer,
+  visibleStateForSpectator,
+} from "./visibility.js";
 
 export const SUPERSEDED_SOCKET_CLOSE_CODE = 1000;
 export const SUPERSEDED_SOCKET_CLOSE_REASON = "superseded";
@@ -23,22 +26,24 @@ const SPECTATOR_CAPACITY_REJECTED_TAG = "spectator-capacity-rejected";
 export const DISCONNECT_BROADCAST_DEBOUNCE_MS = 500;
 
 /**
- * Spectator delivery is default-deny: every ServerMessage type must be
- * classified here before it can reach a spectator socket via plain broadcast.
- * State-bearing messages stay on broadcastFilteredState so recipient-specific
- * visibility filtering cannot be bypassed.
+ * Spectator delivery is default-deny on both transport channels. Every
+ * ServerMessage type must be classified before it can reach a spectator via
+ * plain broadcast or recipient-filtered state fan-out.
  */
 const SPECTATOR_VISIBLE_SERVER_MESSAGES = {
-  "game:state": false,
-  "game:update": false,
-  "game:prompt": false,
-  "action:rejected": false,
-  "game:error": false,
-  "game:over": true,
-  "game:player_disconnected": true,
-  "game:player_reconnected": true,
-  "game:undo": false,
-} as const satisfies Record<ServerMessage["type"], boolean>;
+  "game:state": { broadcast: false, filteredState: true },
+  "game:update": { broadcast: false, filteredState: true },
+  "game:prompt": { broadcast: false, filteredState: false },
+  "action:rejected": { broadcast: false, filteredState: false },
+  "game:error": { broadcast: false, filteredState: false },
+  "game:over": { broadcast: true, filteredState: false },
+  "game:player_disconnected": { broadcast: true, filteredState: false },
+  "game:player_reconnected": { broadcast: true, filteredState: false },
+  "game:undo": { broadcast: false, filteredState: false },
+} as const satisfies Record<
+  ServerMessage["type"],
+  { broadcast: boolean; filteredState: boolean }
+>;
 
 export interface PlayerSocketAttachment {
   type: "game-session-player-socket";
@@ -64,6 +69,18 @@ export interface SessionSocketState {
   getWebSockets(tag?: string): WebSocket[];
   getTags(ws: WebSocket): string[];
 }
+
+export type FilteredStateRecipient = 0 | 1 | null;
+
+export type FilteredStateMessage = Extract<
+  ServerMessage,
+  { type: "game:state" | "game:update" }
+>;
+
+export type FilteredStateMessageBuilder = (
+  filteredState: GameState,
+  recipientPlayerIndex: FilteredStateRecipient
+) => FilteredStateMessage;
 
 /** WebSocket authority, fan-out, prompt presentation, and disconnect debounce. */
 export class SessionTransport {
@@ -259,10 +276,7 @@ export class SessionTransport {
   broadcastFilteredState(
     state: GameState,
     cardDb: Map<string, CardData>,
-    build: (
-      filteredState: GameState,
-      recipientPlayerIndex: 0 | 1
-    ) => ServerMessage,
+    build: FilteredStateMessageBuilder,
     exclude?: WebSocket
   ): void {
     for (const playerIndex of [0, 1] as const) {
@@ -270,9 +284,59 @@ export class SessionTransport {
       if (!ws || ws === exclude) continue;
       this.send(
         ws,
-        build(visibleStateForPlayer(state, cardDb, playerIndex), playerIndex)
+        this.buildFilteredStateForRecipient(state, cardDb, playerIndex, build)
       );
     }
+
+    let spectatorPayload:
+      | { status: "unbuilt" }
+      | { status: "ready"; payload: string }
+      | { status: "denied" }
+      | { status: "failed" } = { status: "unbuilt" };
+
+    for (const ws of this.state.getWebSockets()) {
+      if (ws === exclude) continue;
+      const spectatorId = this.spectatorIdFor(ws);
+      if (spectatorId === null) continue;
+      if (this.spectatorSocket(spectatorId) !== ws) continue;
+
+      if (spectatorPayload.status === "unbuilt") {
+        try {
+          const message = this.buildFilteredStateForRecipient(
+            state,
+            cardDb,
+            null,
+            build
+          );
+          spectatorPayload = SPECTATOR_VISIBLE_SERVER_MESSAGES[message.type]
+            .filteredState
+            ? { status: "ready", payload: JSON.stringify(message) }
+            : { status: "denied" };
+        } catch (error) {
+          spectatorPayload = { status: "failed" };
+          log("ws.spectator_state_build_failed", {
+            gameId: state.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      if (spectatorPayload.status !== "ready") continue;
+      this.sendPayload(ws, spectatorPayload.payload);
+    }
+  }
+
+  /** Shared builder for steady-state fan-out and OPT-558 connect snapshots. */
+  buildFilteredStateForRecipient(
+    state: GameState,
+    cardDb: Map<string, CardData>,
+    recipientPlayerIndex: FilteredStateRecipient,
+    build: FilteredStateMessageBuilder
+  ): FilteredStateMessage {
+    const filteredState =
+      recipientPlayerIndex === null
+        ? visibleStateForSpectator(state, cardDb)
+        : visibleStateForPlayer(state, cardDb, recipientPlayerIndex);
+    return build(filteredState, recipientPlayerIndex);
   }
 
   sendEffectPrompt(prompt: PendingPromptState): void {
@@ -390,12 +454,21 @@ export class SessionTransport {
     if (playerIndex === null) {
       return (
         this.spectatorIdFor(ws) !== null &&
-        SPECTATOR_VISIBLE_SERVER_MESSAGES[messageType]
+        SPECTATOR_VISIBLE_SERVER_MESSAGES[messageType].broadcast
       );
     }
     const attachment = getPlayerSocketAttachment(ws);
     if (!attachment || attachment.playerIndex !== playerIndex) return false;
     return this.isAuthoritative(ws, playerIndex);
+  }
+
+  private sendPayload(ws: WebSocket, payload: string): void {
+    try {
+      ws.send(payload);
+    } catch {
+      // Delivery has no acknowledgement; one synchronously closed recipient
+      // must not interrupt the remaining best-effort fan-out.
+    }
   }
 }
 

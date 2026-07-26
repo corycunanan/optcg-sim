@@ -53,6 +53,8 @@ import {
 } from "./session/rate-limiter.js";
 import { SpectatorPolicy } from "./session/spectator-policy.js";
 import {
+  type FilteredStateMessage,
+  type FilteredStateRecipient,
   SUPERSEDED_SOCKET_CLOSE_CODE,
   SUPERSEDED_SOCKET_CLOSE_REASON,
   SessionTransport,
@@ -850,15 +852,14 @@ export class GameSession implements DurableObject {
   }
 
   /**
-   * Send a state-bearing message to each player with their secret zones filtered.
-   * Each player receives their own zones in full; the opponent's hand, deck, and
-   * face-down life cards are obfuscated (§8-4-5).
+   * Send a state-bearing message with one filtered build per player and one
+   * lazily shared spectator build. The transport owns recipient isolation.
    */
   private broadcastFilteredState(
     build: (
       filteredState: GameState,
-      recipientPlayerIndex: 0 | 1
-    ) => ServerMessage,
+      recipientPlayerIndex: FilteredStateRecipient
+    ) => FilteredStateMessage,
     exclude?: WebSocket
   ): void {
     if (!this.gameState || !this.cardDb) return;
@@ -871,9 +872,9 @@ export class GameSession implements DurableObject {
       (filteredState, recipientPlayerIndex) =>
         build(
           {
-            ...filteredState, // OPT-550: spectators merge both controllers because availability derives only from already-visible zones and adds no information.
+            ...filteredState,
             effectAvailability: effectAvailabilityForRecipient(
-              state, // OPT-552: catch null-recipient failures per recipient; a spectator-first/between throw otherwise skips later player delivery.
+              state,
               availability,
               recipientPlayerIndex
             ),
