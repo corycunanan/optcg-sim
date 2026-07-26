@@ -22,6 +22,7 @@ import { prepareDecksAndLeaders } from "./engine/setup.js";
 import { advancePregame, startPregame } from "./engine/pregame.js";
 import { createProductionExecutionContext } from "./engine/execution-context.js";
 import {
+  readDiscriminant,
   validateGameInitPayload,
   validateClientMessage,
   validateNotifyEndPayload,
@@ -34,6 +35,7 @@ import {
   SessionRepository,
 } from "./session/persistence.js";
 import { createResultCallbackFetch } from "./session/result-callback.js";
+import { consumePlayerUpgradeBudget } from "./session/player-rate-limit-policy.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
 import { handleGameStatusRequest } from "./session/status.js";
 import {
@@ -49,6 +51,7 @@ import {
   UPGRADE_RATE_LIMIT_RESPONSE_BODY,
   getClientMessageByteLength,
 } from "./session/rate-limiter.js";
+import { SpectatorPolicy } from "./session/spectator-policy.js";
 import {
   SUPERSEDED_SOCKET_CLOSE_CODE,
   SUPERSEDED_SOCKET_CLOSE_REASON,
@@ -64,6 +67,8 @@ export {
   INVALID_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND,
   MAX_CLIENT_MESSAGE_BYTES,
   RATE_LIMIT_CLOSE_CODE,
+  SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
+  SPECTATOR_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND,
   UPGRADE_RATE_LIMIT_BURST,
   UPGRADE_RATE_LIMIT_REFILL_PER_SECOND,
   UPGRADE_RATE_LIMIT_RESPONSE_BODY,
@@ -72,19 +77,14 @@ export {
   getTokenBucketRetryAfterSeconds,
 } from "./session/rate-limiter.js";
 export { DISCONNECT_BROADCAST_DEBOUNCE_MS } from "./session/transport.js";
+export {
+  SPECTATOR_INVALID_SOCKET_CLOSE_REASON,
+  SPECTATOR_MESSAGE_RATE_LIMIT_CLOSE_REASON,
+  SPECTATOR_UPGRADE_RATE_LIMIT_RESPONSE_BODY,
+} from "./session/spectator-policy.js";
 
 const REJOIN_WINDOW_MS = 5 * 60 * 1000;
-
-function readDiscriminant(value: unknown, key: "type"): unknown {
-  if (typeof value !== "object" || value === null) return undefined;
-  return Reflect.get(value, key);
-}
-
 export class GameSession implements DurableObject {
-  state: DurableObjectState;
-  env: Env;
-
-  // In-memory cache (rebuilt from storage on wake)
   private gameState: GameState | null = null;
   private gameMode: LobbyMode = "PVP";
   private pregameMode: PregameMode = "PRIORITY_ROLL";
@@ -96,11 +96,10 @@ export class GameSession implements DurableObject {
   private readonly coordinator = new SessionCoordinator();
   private readonly repository: SessionRepository;
   private readonly rateLimiter = new SessionRateLimiter();
+  private readonly spectatorPolicy: SpectatorPolicy;
   private readonly transport: SessionTransport;
 
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state;
-    this.env = env;
+  constructor(public state: DurableObjectState, public env: Env) {
     const storage = new DurableObjectSessionStorage(state.storage);
     this.authorizer = new SessionAuthorizer(storage, env.GAME_WORKER_SECRET);
     this.repository = new SessionRepository(
@@ -113,6 +112,11 @@ export class GameSession implements DurableObject {
     );
     this.transport = new SessionTransport(state, (playerIndex) =>
       this.handlePlayerAway(playerIndex, "DISCONNECTED")
+    );
+    this.spectatorPolicy = new SpectatorPolicy(
+      this.transport,
+      this.rateLimiter,
+      () => this.gameState?.id
     );
     configureLogger(env.LOG_URL);
   }
@@ -307,11 +311,12 @@ export class GameSession implements DurableObject {
     if (!token) {
       return new Response("Missing token", { status: 401 });
     }
-    // Fail closed until OPT-556 rejects spectator frames before the coordinator and adds budgets; OPT-552/557 must land before spectator payload delivery.
     const identity = await this.validateToken(token);
-    if (identity === null || identity.role === "spectator") {
+    if (identity === null) {
       return new Response("Unauthorized", { status: 401 });
     }
+    if (identity.role === "spectator")
+      return this.spectatorPolicy.handleUpgrade(identity.userId);
     const { playerIndex } = identity;
 
     const upgradeBudget = this.consumeUpgradeBudget(playerIndex);
@@ -328,7 +333,7 @@ export class GameSession implements DurableObject {
     this.acceptAuthoritativePlayerSocket(playerIndex, server);
 
     // Mark player as connected
-    this.gameState = this.setPlayerPresence(
+    this.gameState = this.coordinator.setPlayerPresence(
       this.gameState!,
       playerIndex,
       {
@@ -364,12 +369,17 @@ export class GameSession implements DurableObject {
     ws: WebSocket,
     message: string | ArrayBuffer
   ): Promise<void> {
-    await this.coordinator.run(() => this.handleWebSocketMessage(ws, message));
+    const playerIndex = this.spectatorPolicy.playerIndexForInbound(ws);
+    if (playerIndex === null) return;
+    await this.coordinator.run(() =>
+      this.handleWebSocketMessage(ws, message, playerIndex)
+    );
   }
 
   private async handleWebSocketMessage(
     ws: WebSocket,
-    message: string | ArrayBuffer
+    message: string | ArrayBuffer,
+    playerIndex: 0 | 1
   ): Promise<void> {
     if (getClientMessageByteLength(message) > MAX_CLIENT_MESSAGE_BYTES) {
       log("ws.message_too_large", { maxBytes: MAX_CLIENT_MESSAGE_BYTES });
@@ -385,8 +395,6 @@ export class GameSession implements DurableObject {
       await this.loadFromStorage();
     }
 
-    const playerIndex = this.transport.playerIndexFor(ws);
-    if (playerIndex === null) return;
     if (!this.isAuthoritativePlayerSocket(ws, playerIndex)) {
       try {
         ws.close(SUPERSEDED_SOCKET_CLOSE_CODE, SUPERSEDED_SOCKET_CLOSE_REASON);
@@ -510,17 +518,11 @@ export class GameSession implements DurableObject {
     allowed: boolean;
     retryAfterSeconds: number;
   } {
-    const result = this.rateLimiter.consumeUpgrade(
+    return consumePlayerUpgradeBudget(
+      this.rateLimiter,
       this.gameState?.id,
       playerIndex
     );
-    if (result.allowed) return { allowed: true, retryAfterSeconds: 0 };
-    log("ws.upgrade_rate_limited", {
-      gameId: this.gameState?.id,
-      playerIndex,
-      retryAfterSeconds: result.retryAfterSeconds,
-    });
-    return result;
   }
 
   async webSocketClose(
@@ -925,18 +927,6 @@ export class GameSession implements DurableObject {
     return this.transport.isAuthoritative(ws, playerIndex);
   }
 
-  private setPlayerPresence(
-    state: GameState,
-    playerIndex: 0 | 1,
-    updates: {
-      connected: boolean;
-      awayReason: "LEFT" | "DISCONNECTED" | null;
-      rejoinDeadlineAt: number | null;
-    }
-  ): GameState {
-    return this.coordinator.setPlayerPresence(state, playerIndex, updates);
-  }
-
   private async handlePlayerAway(
     playerIndex: 0 | 1,
     reason: "LEFT" | "DISCONNECTED",
@@ -944,11 +934,15 @@ export class GameSession implements DurableObject {
   ): Promise<void> {
     if (!this.gameState) return;
 
-    this.gameState = this.setPlayerPresence(this.gameState, playerIndex, {
-      connected: false,
-      awayReason: reason,
-      rejoinDeadlineAt: Date.now() + REJOIN_WINDOW_MS,
-    });
+    this.gameState = this.coordinator.setPlayerPresence(
+      this.gameState,
+      playerIndex,
+      {
+        connected: false,
+        awayReason: reason,
+        rejoinDeadlineAt: Date.now() + REJOIN_WINDOW_MS,
+      }
+    );
     await this.persist();
     await this.syncAlarm();
 

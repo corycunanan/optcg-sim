@@ -120,6 +120,10 @@ export class SessionTransport {
     return userId.length > 0 ? userId : null;
   }
 
+  spectatorAttachmentFor(ws: WebSocket): SpectatorSocketAttachment | null {
+    return getSpectatorSocketAttachment(ws);
+  }
+
   isAuthoritative(ws: WebSocket, playerIndex: 0 | 1): boolean {
     return this.playerSocket(playerIndex) === ws;
   }

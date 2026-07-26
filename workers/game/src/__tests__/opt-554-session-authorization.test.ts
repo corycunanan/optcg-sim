@@ -46,6 +46,25 @@ class MockWebSocket {
   }
 }
 
+class PermissiveResponse {
+  readonly status: number;
+  readonly webSocket: unknown;
+  readonly headers: Headers;
+
+  constructor(
+    private readonly body: BodyInit | null = null,
+    init: ResponseInit & { webSocket?: unknown } = {}
+  ) {
+    this.status = init.status ?? 200;
+    this.webSocket = init.webSocket;
+    this.headers = new Headers(init.headers ?? {});
+  }
+
+  async text(): Promise<string> {
+    return this.body ? String(this.body) : "";
+  }
+}
+
 class MockDurableObjectState {
   private readonly data = new Map<string, unknown>();
   readonly acceptedSockets: WebSocket[] = [];
@@ -162,7 +181,7 @@ describe("OPT-554 spectator session authorization", () => {
     });
   });
 
-  it("rejects spectator WebSocket upgrades before pair construction or socket acceptance", async () => {
+  it("admits a budgeted spectator without delivering an initial payload", async () => {
     const durableState = new MockDurableObjectState();
     const env = {
       GAME_WORKER_SECRET: "test-secret",
@@ -177,8 +196,17 @@ describe("OPT-554 spectator session authorization", () => {
     const token = await mintToken(state, { jti: "spectator-upgrade" });
     const originalWebSocketPair = (globalThis as Record<string, unknown>)
       .WebSocketPair;
-    const pairConstructor = vi.fn(function MockWebSocketPair() {});
+    const originalResponse = globalThis.Response;
+    const client = new MockWebSocket();
+    const server = new MockWebSocket();
+    const pairConstructor = vi.fn(function MockWebSocketPair(
+      this: Record<number, MockWebSocket>
+    ) {
+      this[0] = client;
+      this[1] = server;
+    });
     (globalThis as Record<string, unknown>).WebSocketPair = pairConstructor;
+    globalThis.Response = PermissiveResponse as unknown as typeof Response;
 
     try {
       const response = await session.fetch(
@@ -188,10 +216,16 @@ describe("OPT-554 spectator session authorization", () => {
         )
       );
 
-      expect(response.status).toBe(401);
-      expect(await response.text()).toBe("Unauthorized");
-      expect(pairConstructor).not.toHaveBeenCalled();
-      expect(durableState.acceptedSockets).toEqual([]);
+      expect(response.status).toBe(101);
+      expect(pairConstructor).toHaveBeenCalledOnce();
+      expect(durableState.acceptedSockets).toEqual([
+        server as unknown as WebSocket,
+      ]);
+      expect(durableState.getTags(server as unknown as WebSocket)).toEqual([
+        "spectator:spectator-user",
+      ]);
+      expect(client.sent).toEqual([]);
+      expect(server.sent).toEqual([]);
     } finally {
       if (originalWebSocketPair === undefined) {
         delete (globalThis as Record<string, unknown>).WebSocketPair;
@@ -199,6 +233,7 @@ describe("OPT-554 spectator session authorization", () => {
         (globalThis as Record<string, unknown>).WebSocketPair =
           originalWebSocketPair;
       }
+      globalThis.Response = originalResponse;
     }
   });
 

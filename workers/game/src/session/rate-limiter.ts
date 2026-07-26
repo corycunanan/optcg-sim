@@ -5,6 +5,8 @@ export const INVALID_MESSAGE_RATE_LIMIT_BURST = 6;
 export const INVALID_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND = 1;
 export const UPGRADE_RATE_LIMIT_BURST = 6;
 export const UPGRADE_RATE_LIMIT_REFILL_PER_SECOND = 0.2;
+export const SPECTATOR_MESSAGE_RATE_LIMIT_BURST = 24;
+export const SPECTATOR_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND = 2;
 export const RATE_LIMIT_CLOSE_CODE = 1008;
 export const ACTION_RATE_LIMIT_CLOSE_REASON = "action rate limit exceeded";
 export const INVALID_MESSAGE_RATE_LIMIT_CLOSE_REASON =
@@ -60,7 +62,7 @@ export function getTokenBucketRetryAfterSeconds(
 }
 
 /**
- * Owns the three independent abuse-control buckets for a game session.
+ * Owns independent player and spectator abuse-control buckets for a game session.
  * Transport code decides how to report a rejected decision; this adapter only
  * tracks budgets and retry timing.
  */
@@ -68,6 +70,8 @@ export class SessionRateLimiter {
   private readonly actionBuckets = new Map<string, TokenBucket>();
   private readonly invalidMessageBuckets = new Map<string, TokenBucket>();
   private readonly upgradeBuckets = new Map<string, TokenBucket>();
+  private readonly spectatorUpgradeBuckets = new Map<string, TokenBucket>();
+  private readonly spectatorMessageBuckets = new Map<string, TokenBucket>();
 
   constructor(private readonly now: () => number = Date.now) {}
 
@@ -110,6 +114,30 @@ export class SessionRateLimiter {
     );
   }
 
+  consumeSpectatorUpgrade(
+    gameId: string | undefined,
+    userId: string
+  ): RateLimitDecision {
+    return this.consumeForKey(
+      this.spectatorUpgradeBuckets,
+      `${gameId ?? "unknown"}:spectator:${userId}`,
+      UPGRADE_RATE_LIMIT_BURST,
+      UPGRADE_RATE_LIMIT_REFILL_PER_SECOND
+    );
+  }
+
+  consumeSpectatorMessage(
+    gameId: string | undefined,
+    connectionId: string
+  ): RateLimitDecision {
+    return this.consumeForKey(
+      this.spectatorMessageBuckets,
+      `${gameId ?? "unknown"}:spectator-socket:${connectionId}`,
+      SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
+      SPECTATOR_MESSAGE_RATE_LIMIT_REFILL_PER_SECOND
+    );
+  }
+
   private consume(
     buckets: Map<string, TokenBucket>,
     gameId: string | undefined,
@@ -118,6 +146,15 @@ export class SessionRateLimiter {
     refillPerSecond: number
   ): RateLimitDecision {
     const key = `${gameId ?? "unknown"}:${playerIndex}`;
+    return this.consumeForKey(buckets, key, capacity, refillPerSecond);
+  }
+
+  private consumeForKey(
+    buckets: Map<string, TokenBucket>,
+    key: string,
+    capacity: number,
+    refillPerSecond: number
+  ): RateLimitDecision {
     const result = consumeTokenBucket(
       buckets.get(key),
       this.now(),
