@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
+import type { SessionParticipantIdentity } from "../session/authorization.js";
 import type { CardData, Env, GameState, LobbyMode } from "../types.js";
 import { setupGame } from "./factories.js";
 
@@ -33,7 +34,7 @@ type GameSessionTestAccess = {
   gameState: GameState;
   gameMode: LobbyMode;
   cardDb: Map<string, CardData>;
-  validateToken(token: string): Promise<0 | 1 | null>;
+  validateToken(token: string): Promise<SessionParticipantIdentity | null>;
 };
 
 function createSession(mode: LobbyMode): GameSessionTestAccess {
@@ -121,8 +122,14 @@ describe("OPT-343 Solitaire playerIndex trust gate", () => {
       1
     );
 
-    await expect(session.validateToken(sideA)).resolves.toBe(0);
-    await expect(session.validateToken(sideB)).resolves.toBe(1);
+    await expect(session.validateToken(sideA)).resolves.toEqual({
+      role: "player",
+      playerIndex: 0,
+    });
+    await expect(session.validateToken(sideB)).resolves.toEqual({
+      role: "player",
+      playerIndex: 1,
+    });
   });
 
   it("rejects explicit playerIndex for same-user PVP games", async () => {
@@ -154,6 +161,9 @@ describe("OPT-343 Solitaire playerIndex trust gate", () => {
       0
     );
 
-    await expect(session.validateToken(token)).resolves.toBe(1);
+    await expect(session.validateToken(token)).resolves.toEqual({
+      role: "player",
+      playerIndex: 1,
+    });
   });
 });

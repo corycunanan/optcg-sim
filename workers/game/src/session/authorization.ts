@@ -8,6 +8,10 @@ export interface SessionAuthorizationContext {
   mode: LobbyMode;
 }
 
+export type SessionParticipantIdentity =
+  | { role: "player"; playerIndex: 0 | 1 }
+  | { role: "spectator"; userId: string };
+
 /**
  * Verifies and consumes single-use game tokens without coupling authorization
  * policy to WebSocket or Durable Object request routing.
@@ -21,19 +25,50 @@ export class SessionAuthorizer {
   async validate(
     token: string,
     context: SessionAuthorizationContext
-  ): Promise<0 | 1 | null> {
+  ): Promise<SessionParticipantIdentity | null> {
     const gameState = context.state;
     const payload = await verifyGameToken(token, this.secret, gameState?.id);
     if (!payload) {
       log("auth.failure", { reason: "invalid_token", gameId: gameState?.id });
       return null;
     }
+    if (payload.role === "spectator" && payload.playerIndex !== undefined) {
+      log("auth.failure", {
+        reason: "spectator_player_index_forbidden",
+        gameId: gameState?.id,
+        userId: payload.sub,
+      });
+      return null;
+    }
     if (!gameState) {
-      log("auth.failure", { reason: "no_game_state" });
+      log("auth.failure", {
+        reason:
+          payload.role === "spectator"
+            ? "spectator_no_game_state"
+            : "no_game_state",
+      });
       return null;
     }
 
     const userId = payload.sub;
+    if (payload.role === "spectator") {
+      const consumed = await consumeTokenJti(
+        this.storage,
+        payload.jti,
+        payload.exp
+      );
+      if (!consumed) {
+        log("auth.failure", {
+          reason: "spectator_token_replay",
+          gameId: gameState.id,
+          userId,
+        });
+        return null;
+      }
+
+      return { role: "spectator", userId };
+    }
+
     const matchesPlayer1 = gameState.players[0].playerId === userId;
     const matchesPlayer2 = gameState.players[1].playerId === userId;
     let playerIndex: 0 | 1 | null = null;
@@ -82,6 +117,6 @@ export class SessionAuthorizer {
       return null;
     }
 
-    return playerIndex;
+    return { role: "player", playerIndex };
   }
 }

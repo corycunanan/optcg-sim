@@ -27,7 +27,7 @@ import {
   validateNotifyEndPayload,
 } from "./util/validate.js";
 import { configureLogger, log } from "./lib/log.js";
-import { SessionAuthorizer } from "./session/authorization.js";
+import { SessionAuthorizer, type SessionParticipantIdentity } from "./session/authorization.js";
 import { SessionCoordinator } from "./session/coordinator.js";
 import {
   DurableObjectSessionStorage,
@@ -278,8 +278,8 @@ export class GameSession implements DurableObject {
         status: 401,
         headers: corsHeaders,
       });
-    const playerIndex = await this.validateToken(token);
-    if (playerIndex === null)
+    const identity = await this.validateToken(token);
+    if (identity === null)
       return new Response("Unauthorized", {
         status: 401,
         headers: corsHeaders,
@@ -308,11 +308,11 @@ export class GameSession implements DurableObject {
       return new Response("Missing token", { status: 401 });
     }
 
-    // Validate JWT — verify the token belongs to one of the two players
-    const playerIndex = await this.validateToken(token);
-    if (playerIndex === null) {
+    const identity = await this.validateToken(token);
+    if (identity === null || identity.role === "spectator") {
       return new Response("Unauthorized", { status: 401 });
     }
+    const { playerIndex } = identity;
 
     const upgradeBudget = this.consumeUpgradeBudget(playerIndex);
     if (!upgradeBudget.allowed) {
@@ -325,12 +325,12 @@ export class GameSession implements DurableObject {
     }
 
     const { 0: client, 1: server } = new WebSocketPair();
-    this.acceptAuthoritativePlayerSocket(playerIndex as 0 | 1, server);
+    this.acceptAuthoritativePlayerSocket(playerIndex, server);
 
     // Mark player as connected
     this.gameState = this.setPlayerPresence(
       this.gameState!,
-      playerIndex as 0 | 1,
+      playerIndex,
       {
         connected: true,
         awayReason: null,
@@ -801,7 +801,7 @@ export class GameSession implements DurableObject {
 
   // ─── Token validation ──────────────────────────────────────────────────────
 
-  private async validateToken(token: string): Promise<0 | 1 | null> {
+  private async validateToken(token: string): Promise<SessionParticipantIdentity | null> {
     return this.authorizer.validate(token, {
       state: this.gameState,
       mode: this.gameMode,
