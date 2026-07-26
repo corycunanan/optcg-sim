@@ -7,6 +7,12 @@
  * produces encrypted JWEs (A256CBC-HS512), which are non-trivial to verify in
  * a Cloudflare Worker. Instead we mint a simple HS256 token signed with
  * GAME_WORKER_SECRET — a shared secret both sides already have.
+ *
+ * The worker has no database access, so a signed spectator role is its
+ * authoritative authorization, and the app cannot revoke a minted token.
+ * The worker checks exp only during the WebSocket upgrade; it does not recheck
+ * expiry or close an established socket, whose access is therefore not bounded
+ * by the 5-minute token TTL. OPT-574 owns server-side spectator revocation.
  */
 
 import { NextRequest } from "next/server";
@@ -40,20 +46,48 @@ export async function GET(request: NextRequest) {
   }
 
   const game = await prisma.gameSession.findFirst({
+    // Deliberately omit a status filter to match OPT-560: an admitted
+    // spectator may keep viewing a FINISHED or ABANDONED game.
     where: {
       id: gameId,
-      OR: [{ player1Id: userId }, { player2Id: userId }],
     },
     select: {
       id: true,
       mode: true,
       player1Id: true,
       player2Id: true,
+      lobby: {
+        select: {
+          allowSpectators: true,
+          spectators: {
+            where: { userId },
+            select: { id: true },
+          },
+        },
+      },
     },
   });
 
   if (!game) {
     return apiError("Game not found", 404);
+  }
+
+  const isPlayer = game.player1Id === userId || game.player2Id === userId;
+
+  if (!isPlayer && game.lobby.spectators.length === 0) {
+    return apiError("Game not found", 404);
+  }
+
+  if (!isPlayer && !game.lobby.allowSpectators) {
+    return apiError("Spectating is disabled", 403);
+  }
+
+  if (!isPlayer) {
+    const token = await mintGameToken(userId, GAME_WORKER_SECRET, {
+      gameId: game.id,
+      role: "spectator",
+    });
+    return apiSuccess({ token });
   }
 
   const isOnlyUserOnGame =
