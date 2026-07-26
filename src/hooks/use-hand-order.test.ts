@@ -4,6 +4,7 @@ import {
   computeReorderedCustomOrder,
   mergeHandOrder,
   mergeHiddenHandOrder,
+  orderHandFromReceivedState,
 } from "./use-hand-order";
 
 function makeCard(instanceId: string, cardId = "OP01-001"): CardInstance {
@@ -104,5 +105,43 @@ describe("mergeHiddenHandOrder", () => {
       .map((card) => card.instanceId);
 
     expect(result).toEqual(["C", "A"]);
+  });
+});
+
+describe("orderHandFromReceivedState", () => {
+  it("preserves received order when cards carry real identities", () => {
+    const hand = [makeCard("A"), makeCard("B"), makeCard("C")];
+
+    expect(
+      orderHandFromReceivedState(["C", "A", "B"], hand).map(
+        (card) => card.instanceId,
+      ),
+    ).toEqual(["C", "A", "B"]);
+  });
+
+  it("uses privacy-safe visual ordering only when received cards are hidden", () => {
+    const hand = [
+      makeCard("A", "hidden"),
+      makeCard("B", "hidden"),
+      makeCard("C", "hidden"),
+    ];
+
+    expect(
+      orderHandFromReceivedState(["C", "B", "A"], hand).map(
+        (card) => card.instanceId,
+      ),
+    ).not.toEqual(["C", "B", "A"]);
+  });
+
+  it("keeps a mixed defensive hand in authoritative order", () => {
+    const hand = [
+      makeCard("A", "OP01-001"),
+      makeCard("B", "hidden"),
+      makeCard("C", "OP01-003"),
+    ];
+
+    expect(
+      orderHandFromReceivedState([], hand).map((card) => card.instanceId),
+    ).toEqual(["A", "B", "C"]);
   });
 });

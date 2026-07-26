@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { GameEvent } from "@shared/game-types";
+import type { CardInstance, GameEvent } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 import type { SpotlightPresentation } from "@/lib/game/spotlight";
 import {
   applyBatchStagger,
   eventToTransitions,
+  receivedHandsByPlayerIndex,
   type CardTransition,
 } from "./use-card-transitions";
 
@@ -31,6 +32,21 @@ function mkTransition(partial: Partial<CardTransition> = {}): CardTransition {
     startedAt: 0,
     ...partial,
   };
+}
+
+function handCard(
+  instanceId: string,
+  cardId: string,
+  owner: 0 | 1,
+): CardInstance {
+  return {
+    instanceId,
+    cardId,
+    owner,
+    controller: owner,
+    zone: "HAND",
+    attachedDon: [],
+  } as unknown as CardInstance;
 }
 
 describe("applyBatchStagger", () => {
@@ -182,6 +198,104 @@ describe("eventToTransitions — CARD_DRAWN (deck→hand flight)", () => {
       toZoneKey: "o-hand",
     });
   });
+
+  it.each([0, 1] as const)(
+    "uses player %i's received visible hand identity for draw art",
+    (playerIndex) => {
+      const instanceId = `p${playerIndex}-drawn`;
+      const ev = {
+        type: "CARD_DRAWN",
+        playerIndex,
+        timestamp: 1,
+        payload: { cardId: "hidden", cardInstanceId: instanceId },
+      } as unknown as GameEvent;
+      const hands: [CardInstance[], CardInstance[]] = [[], []];
+      hands[playerIndex] = [handCard(instanceId, `OP0${playerIndex + 1}-001`, playerIndex)];
+
+      const [transition] = eventToTransitions(ev, 0, registry, null, hands);
+
+      expect(transition.cardId).toBe(`OP0${playerIndex + 1}-001`);
+      expect(transition.toZoneKey).toBe(
+        playerIndex === 0 ? "p-hand" : "o-hand",
+      );
+    },
+  );
+
+  it("keeps a received hidden draw face-down defensively", () => {
+    const ev = {
+      type: "CARD_DRAWN",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: { cardId: "OP02-001", cardInstanceId: "p1-drawn" },
+    } as unknown as GameEvent;
+    const hands: [CardInstance[], CardInstance[]] = [
+      [],
+      [handCard("p1-drawn", "hidden", 1)],
+    ];
+
+    const [transition] = eventToTransitions(ev, 0, registry, null, hands);
+
+    expect(transition.cardId).toBe("hidden");
+  });
+
+  it("uses the sole visible received card when a redacted draw omits its instance id", () => {
+    const ev = {
+      type: "CARD_DRAWN",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: { cardId: "hidden" },
+    } as unknown as GameEvent;
+    const hands: [CardInstance[], CardInstance[]] = [
+      [],
+      [handCard("p1-visible-draw", "OP02-002", 1)],
+    ];
+
+    const [transition] = eventToTransitions(ev, 0, registry, null, hands);
+
+    expect(transition.cardId).toBe("OP02-002");
+  });
+
+  it("degrades face-down when a revealed draw instance is absent from received state", () => {
+    const ev = {
+      type: "CARD_DRAWN",
+      playerIndex: 1,
+      timestamp: 1,
+      payload: {
+        cardId: "OP02-003",
+        cardInstanceId: "event-only-instance",
+      },
+    } as unknown as GameEvent;
+    const hands: [CardInstance[], CardInstance[]] = [
+      [],
+      [handCard("received-hidden-instance", "hidden", 1)],
+    ];
+
+    const [transition] = eventToTransitions(ev, 0, registry, null, hands);
+
+    expect(transition.cardId).toBeNull();
+  });
+});
+
+describe("receivedHandsByPlayerIndex", () => {
+  const player0Hand = [handCard("p0-hand", "OP01-001", 0)];
+  const player1Hand = [handCard("p1-hand", "OP02-001", 1)];
+
+  it.each([0, 1] as const)(
+    "maps visual hands back to engine player indexes with player %i on bottom",
+    (bottomPlayerIndex) => {
+      const bottomHand = bottomPlayerIndex === 0 ? player0Hand : player1Hand;
+      const topHand = bottomPlayerIndex === 0 ? player1Hand : player0Hand;
+
+      const receivedHands = receivedHandsByPlayerIndex(
+        bottomHand,
+        topHand,
+        bottomPlayerIndex,
+      );
+
+      expect(receivedHands[0]).toBe(player0Hand);
+      expect(receivedHands[1]).toBe(player1Hand);
+    },
+  );
 });
 
 describe("eventToTransitions — travel vs transform", () => {

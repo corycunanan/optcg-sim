@@ -76,7 +76,7 @@ export function useHandOrder(hand: CardInstance[]) {
   const [customOrder, setCustomOrder] = useState<string[]>([]);
 
   const orderedHand = useMemo(
-    () => mergeHandOrder(customOrder, hand),
+    () => orderHandFromReceivedState(customOrder, hand),
     [hand, customOrder]
   );
 
@@ -129,17 +129,36 @@ function hiddenVisualScore(instanceId: string): number {
   return hash >>> 0;
 }
 
+function orderFullyHiddenHand(hand: readonly CardInstance[]): CardInstance[] {
+  let cardIndex = 0;
+  return mergeHiddenHandOrder([], hand, () => {
+    const card = hand[cardIndex++];
+    return card ? hiddenVisualScore(card.instanceId) / 0x1_0000_0000 : 0;
+  });
+}
+
+/**
+ * Selects the visual ordering policy from the received identities themselves.
+ * A fully redacted hand gets privacy-safe placeholder ordering. Any real card
+ * identity keeps authoritative/custom ordering, including spectator hands and
+ * defensive mixed projections.
+ */
+export function orderHandFromReceivedState(
+  customOrder: readonly string[],
+  hand: readonly CardInstance[],
+): CardInstance[] {
+  const fullyHidden =
+    hand.length > 0 && hand.every((card) => card.cardId === "hidden");
+  return fullyHidden
+    ? orderFullyHiddenHand(hand)
+    : mergeHandOrder(customOrder, hand);
+}
+
 /**
  * Client-only visual order for an opponent's fully hidden hand. Sorting by a
  * hash of zone-local placeholder IDs gives each new card a stable,
  * non-authoritative insertion point without retaining secret engine order.
  */
 export function useHiddenHandOrder(hand: CardInstance[]) {
-  return useMemo(() => {
-    let cardIndex = 0;
-    return mergeHiddenHandOrder([], hand, () => {
-      const card = hand[cardIndex++];
-      return card ? hiddenVisualScore(card.instanceId) / 0x1_0000_0000 : 0;
-    });
-  }, [hand]);
+  return useMemo(() => orderFullyHiddenHand(hand), [hand]);
 }

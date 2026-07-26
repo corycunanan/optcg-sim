@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GameEvent } from "@shared/game-types";
+import type { CardInstance, GameEvent } from "@shared/game-types";
 import type { ZonePositionRegistry } from "@/contexts/zone-position-context";
 import {
   findLatestSpotlight,
@@ -45,6 +45,21 @@ export interface CardTransition {
   spotlightSourceSize?: "modal" | "preview";
 }
 
+export type ReceivedHands = readonly [
+  readonly CardInstance[],
+  readonly CardInstance[],
+];
+
+export function receivedHandsByPlayerIndex(
+  bottomHand: readonly CardInstance[],
+  topHand: readonly CardInstance[],
+  bottomPlayerIndex: 0 | 1,
+): ReceivedHands {
+  return bottomPlayerIndex === 0
+    ? [bottomHand, topHand]
+    : [topHand, bottomHand];
+}
+
 const MAX_CONCURRENT = 8;
 // Covers the worst case: `MAX_CONCURRENT * STAGGER_MS` of start-time offset +
 // the longest flight path (arc + bouncy landing) before `onAnimationComplete`
@@ -72,13 +87,15 @@ export function eventToTransitions(
   event: GameEvent,
   bottomPlayerIndex: 0 | 1,
   zoneRegistry: ZonePositionRegistry | null,
-  spotlight: SpotlightPresentation | null = null
+  spotlight: SpotlightPresentation | null = null,
+  receivedHands?: ReceivedHands,
 ): CardTransition[] {
   const single = eventToTransition(
     event,
     bottomPlayerIndex,
     zoneRegistry,
     spotlight,
+    receivedHands,
   );
   if (single) return [single];
 
@@ -246,7 +263,8 @@ function eventToTransition(
   event: GameEvent,
   bottomPlayerIndex: 0 | 1,
   zoneRegistry: ZonePositionRegistry | null,
-  spotlight: SpotlightPresentation | null
+  spotlight: SpotlightPresentation | null,
+  receivedHands?: ReceivedHands,
 ): CardTransition | null {
   const { type, playerIndex } = event;
   const prefix = boardZonePrefix(playerIndex, bottomPlayerIndex);
@@ -380,6 +398,19 @@ function eventToTransition(
 
   if (!from || !to) return null;
 
+  if (to.endsWith("-hand") && receivedHands) {
+    const receivedHand = receivedHands[playerIndex];
+    const receivedCard = cardInstanceId
+      ? receivedHand.find((card) => card.instanceId === cardInstanceId)
+      : receivedHand.length === 1
+        ? receivedHand[0]
+        : undefined;
+    // The destination projection is the sole art authority. If it cannot
+    // identify this transition unambiguously, render a face-down ghost rather
+    // than trusting an event payload whose redaction may differ.
+    cardId = receivedCard?.cardId ?? null;
+  }
+
   const allowSpotlightCardIdFallback =
     type === "CARD_DRAWN" ||
     type === "CARD_RETURNED_TO_HAND" ||
@@ -442,7 +473,8 @@ export function useCardTransitions(
   bottomPlayerIndex: 0 | 1,
   isDragging: boolean,
   zoneRegistry?: ZonePositionRegistry | null,
-  activeSpotlight: SpotlightPresentation | null = null
+  activeSpotlight: SpotlightPresentation | null = null,
+  receivedHands?: ReceivedHands,
 ) {
   const [transitions, setTransitions] = useState<CardTransition[]>([]);
   // Track the highest timestamp we've processed. Using timestamps (instead of
@@ -523,7 +555,8 @@ export function useCardTransitions(
         event,
         bottomPlayerIndex,
         zoneRegistry ?? null,
-        batchSpotlight
+        batchSpotlight,
+        receivedHands,
       );
       for (const transition of produced) {
         newTransitions.push(
@@ -565,7 +598,14 @@ export function useCardTransitions(
         return combined.slice(-MAX_CONCURRENT);
       });
     });
-  }, [eventLog, bottomPlayerIndex, isDragging, zoneRegistry, activeSpotlight]);
+  }, [
+    eventLog,
+    bottomPlayerIndex,
+    isDragging,
+    zoneRegistry,
+    activeSpotlight,
+    receivedHands,
+  ]);
 
   // Auto-expire old transitions
   useEffect(() => {

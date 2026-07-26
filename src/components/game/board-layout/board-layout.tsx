@@ -26,7 +26,7 @@ import {
   resolveBoardComposition,
 } from "./board-geometry";
 import { boardCollisionDetection } from "./board-collision";
-import { useHandOrder, useHiddenHandOrder } from "@/hooks/use-hand-order";
+import { useHandOrder } from "@/hooks/use-hand-order";
 import { useBattleState } from "./use-battle-state";
 import { BoardModals } from "./board-modals";
 import { HandLayer } from "./hand-layer";
@@ -42,7 +42,10 @@ import {
   InteractionModeProvider,
   type InteractionMode,
 } from "./interaction-mode";
-import { useCardTransitions } from "@/hooks/use-card-transitions";
+import {
+  receivedHandsByPlayerIndex,
+  useCardTransitions,
+} from "@/hooks/use-card-transitions";
 import { useCounterPulse } from "@/hooks/use-counter-pulse";
 import { useCombatVictoryPulse } from "@/hooks/use-combat-victory-pulse";
 import { useTriggerActivatedPulse } from "@/hooks/use-trigger-activated-pulse";
@@ -208,7 +211,7 @@ function BoardLayoutInner({
   const { orderedHand: playerOrderedHand, reorder: reorderPlayerHand } = useHandOrder(
     me?.hand ?? [],
   );
-  const opponentOrderedHand = useHiddenHandOrder(opp?.hand ?? []);
+  const { orderedHand: opponentOrderedHand } = useHandOrder(opp?.hand ?? []);
 
   const drag = useBoardDragState({
     cardDb,
@@ -228,12 +231,19 @@ function BoardLayoutInner({
 
   /* ── Card flight animations ──────────────────────────────────── */
 
+  const receivedHands = receivedHandsByPlayerIndex(
+    bottomPlayer?.hand ?? [],
+    topPlayer?.hand ?? [],
+    bottomPlayerIndex,
+  );
+
   const { transitions: cardAnimations, removeTransition } = useCardTransitions(
     eventLog,
     bottomPlayerIndex,
     drag.activeDrag !== null,
     zoneRegistry,
     spotlight.presentation,
+    receivedHands,
   );
 
   const counterPulseIds = useCounterPulse(eventLog, bs.battle);
@@ -401,7 +411,7 @@ function BoardLayoutInner({
             zoom: boardScale,
           }}
         >
-          <HandLayer cards={topOrderedHand} faceDown cardDb={cardDb} zoneKey={boardZoneKey(topPlayerIndex, bottomPlayerIndex, "hand")} inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={topPlayer?.sleeveUrl} />
+          <HandLayer cards={topOrderedHand} cardDb={cardDb} zoneKey={boardZoneKey(topPlayerIndex, bottomPlayerIndex, "hand")} inFlightInstanceIds={oppHandAnim.inFlightInstanceIds} sleeveUrl={topPlayer?.sleeveUrl} />
         </div>
       </div>
 
