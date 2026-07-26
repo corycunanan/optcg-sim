@@ -432,3 +432,49 @@ export function handleArrangeReorderLife(
 
   return { ...state, players: newPlayers };
 }
+
+export function handleArrangeLifeScry(
+  state: GameState,
+  action: GameAction,
+  pausedAction: Action | null,
+  controller: 0 | 1,
+  validTargets: string[],
+  events: PendingEvent[],
+): GameState | null {
+  if (
+    action.type !== "ARRANGE_TOP_CARDS" ||
+    !pausedAction ||
+    pausedAction.type !== "LIFE_SCRY"
+  ) {
+    return null;
+  }
+
+  const selectedId = validTargets[0];
+  if (!selectedId) return state;
+  const owner = state.players[0].life.some((card) => card.instanceId === selectedId)
+    ? 0
+    : state.players[1].life.some((card) => card.instanceId === selectedId)
+      ? 1
+      : null;
+  if (owner === null) return state;
+
+  const player = state.players[owner];
+  const selectedCard = player.life.find((card) => card.instanceId === selectedId);
+  if (!selectedCard) return state;
+  const remaining = player.life.filter((card) => card.instanceId !== selectedId);
+  const life = action.destination === "bottom"
+    ? [...remaining, selectedCard]
+    : [selectedCard, ...remaining];
+  const players = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+  players[owner] = { ...player, life };
+
+  // The mechanical reorder is private to the chooser. In particular, when
+  // the chooser inspected the opponent's Life, this event cannot disclose the
+  // selected identity to that Life's owner or to observers.
+  events.push({
+    type: "LIFE_REORDERED",
+    playerIndex: controller,
+    payload: { orderedInstanceIds: [selectedId] },
+  });
+  return { ...state, players };
+}

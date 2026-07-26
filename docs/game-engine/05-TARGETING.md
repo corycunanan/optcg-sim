@@ -50,6 +50,7 @@ type TargetType =
   | "CHARACTER"
   | "STAGE"
   | "LEADER_OR_CHARACTER"
+  | "FIELD_CARD"
   | "ALL_YOUR_CHARACTERS"
   | "ALL_OPPONENT_CHARACTERS"
 
@@ -71,8 +72,11 @@ type TargetType =
   // --- Player ---
   | "PLAYER"
 
-  // --- Multi-select from revealed/searched ---
-  | "SELECTED_CARDS";
+  // --- Fixed/reference targets ---
+  | "SELECTED_CARDS"
+  | "OPPONENT_LIFE"
+  | "TRIGGERING_CARD"
+  | "TRIGGERING_CARD_IN_TRASH";
 ```
 
 ### Quick Reference
@@ -124,6 +128,28 @@ type Controller = "SELF" | "OPPONENT" | "EITHER";
 | `SELF` | Your own cards | "up to 1 of your Characters" |
 | `OPPONENT` | Opponent's cards | "up to 1 of your opponent's Characters" |
 | `EITHER` | Either player's cards | "K.O. all Characters" (OP01-094 Kaido) |
+
+`ANY` remains part of the shared `Controller` type for non-targeting filters and
+conditions, but it is invalid on `Target.controller` and dual-target slots.
+Targeting schemas use `EITHER` for a candidate pool spanning both players.
+
+### Controller support by target type
+
+The schema registry enforces this table exhaustively and rejects unsupported
+controller modes. An omitted controller retains the resolver's existing default.
+
+| Target types | Supported explicit controllers |
+|---|---|
+| `CHARACTER`, `LEADER_OR_CHARACTER`, `FIELD_CARD`, `STAGE`, `LIFE_CARD` | `SELF`, `OPPONENT`, `EITHER` |
+| `CHARACTER_CARD`, `STAGE_CARD`, `EVENT_CARD`, `CARD_IN_HAND`, `CARD_IN_TRASH`, `CARD_ON_TOP_OF_DECK`, `CARD_IN_DECK`, `DON_IN_COST_AREA`, `PLAYER` | `SELF`, `OPPONENT` |
+| `SELF`, `YOUR_LEADER`, `ALL_YOUR_CHARACTERS`, `ALL_OPPONENT_CHARACTERS`, `TRIGGERING_CARD_IN_TRASH` | `SELF` (redundant on fixed-scope types, tolerated for authored-schema compatibility) |
+| `OPPONENT_LEADER`, `OPPONENT_LIFE` | `OPPONENT` (redundant on fixed-scope types) |
+| `DON_ATTACHED`, `DON_IN_DON_DECK`, `SELECTED_CARDS`, `TRIGGERING_CARD` | none; scope is fixed by the target type |
+
+For `STAGE` and `LIFE_CARD`, `EITHER` returns candidates belonging to both
+players. A Life selection is blind until the chooser selects a candidate; only
+the chooser then receives the selected identity and the top-or-bottom placement
+prompt. The other player and observers receive neither prompt nor identity.
 
 ### Defaults
 

@@ -144,7 +144,7 @@ export function returnToHand(
   instanceId: string,
 ): CardMutationResult | null {
   const moved = transitionCard(state, instanceId, "HAND", { preserveSourceTriggers: true });
-  if (!moved || !["CHARACTER", "TRASH"].includes(moved.fact.source)) return null;
+  if (!moved || !["CHARACTER", "STAGE", "TRASH"].includes(moved.fact.source)) return null;
   return {
     state: moved.state,
     transition: moved.fact,
