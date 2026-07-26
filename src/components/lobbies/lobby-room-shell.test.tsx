@@ -231,6 +231,182 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Start Match");
   });
 
+  it("renders an interactive host spectator toggle and disables an empty count", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              allowSpectators: false,
+              spectatorCount: 0,
+              viewerRole: "host",
+            }),
+          }
+    );
+    mocks.apiPatch.mockResolvedValue({ success: true });
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="someone-else" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const toggle = renderer?.root.findByProps({
+      role: "switch",
+      "aria-label": "Allow spectators",
+    });
+    const count = renderer?.root.findByProps({
+      "aria-label": "View spectators (0)",
+    });
+
+    expect(toggle?.props["aria-checked"]).toBe(false);
+    expect(count?.props.disabled).toBe(true);
+
+    await act(async () => {
+      toggle?.props.onClick();
+      await Promise.resolve();
+    });
+
+    expect(mocks.apiPatch).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1",
+      { allowSpectators: true },
+      expect.anything()
+    );
+    expect(
+      renderer?.root.findByProps({ "aria-label": "Allow spectators" }).props[
+        "aria-checked"
+      ]
+    ).toBe(true);
+  });
+
+  it("gives the guest a clear spectator consent state before readying", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              allowSpectators: true,
+              spectatorCount: 3,
+              viewerRole: "guest",
+              guest: {
+                guestReady: false,
+                user: {
+                  id: "guest-user",
+                  username: "zoro",
+                  name: "Zoro",
+                  image: null,
+                },
+                deck: null,
+              },
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      renderer?.root
+        .findAllByType("span")
+        .some(
+          (span) =>
+            span.children
+              .filter((child): child is string => typeof child === "string")
+              .join("") === "Spectators on · 3 watching"
+        )
+    ).toBe(true);
+    expect(
+      renderer?.root.findAllByProps({ "aria-label": "Allow spectators" })
+    ).toHaveLength(0);
+
+    const guestSeat = renderer?.root.findByProps({
+      "aria-label": "Guest seat — zoro",
+    });
+    const guestTraversal = guestSeat?.findAll(() => true) ?? [];
+    const consentIndex = guestTraversal.findIndex(
+      (node) => node.props["data-spectator-consent"] !== undefined
+    );
+    const readyIndex = guestTraversal.findIndex(
+      (node) => node.type === "button" && node.props["aria-pressed"] === false
+    );
+    expect(consentIndex).toBeGreaterThanOrEqual(0);
+    expect(readyIndex).toBeGreaterThan(consentIndex);
+  });
+
+  it("warns hosts that turning spectators off removes current watchers", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              allowSpectators: true,
+              spectatorCount: 3,
+              viewerRole: "host",
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      renderer?.root.findByProps({
+        role: "switch",
+        "aria-label":
+          "Allow spectators. Turning this off removes 3 watchers.",
+      })
+    ).toBeDefined();
+  });
+
+  it("rolls back a failed spectator toggle with one error toast", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              allowSpectators: false,
+              viewerRole: "host",
+            }),
+          }
+    );
+    mocks.apiPatch.mockRejectedValue(new Error("offline"));
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      renderer?.root
+        .findByProps({ "aria-label": "Allow spectators" })
+        .props.onClick();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledTimes(1);
+    expect(
+      renderer?.root.findByProps({ "aria-label": "Allow spectators" }).props[
+        "aria-checked"
+      ]
+    ).toBe(false);
+  });
+
   it("renders the viewer-scoped invited seat and expiry countdown", async () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
@@ -271,6 +447,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
   });
 
   it("renders occupied host and guest seats with self-scoped controls", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : { data: lobbyState({ viewerRole: "guest" }) }
+    );
+
     await act(async () => {
       renderer = create(
         <LobbyRoomShell lobbyId="lobby-1" currentUserId="guest-user" />
@@ -405,6 +587,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
               status: "IN_GAME",
               gameId: "game-1",
               gameStatus: "IN_PROGRESS",
+              viewerRole: "guest",
             }),
           }
     );
@@ -469,6 +652,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
               status: "IN_GAME",
               gameId: "game-1",
               gameStatus: "IN_PROGRESS",
+              viewerRole: "guest",
             }),
           }
     );

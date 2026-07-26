@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 // Mock React's hooks to run synchronously and capture per-`useState` setter
 // calls in declaration order. The hook declares state in this order:
 //   0: lobby, 1: loading, 2: error, 3: mutating, 4: starting, 5: leaving,
-//   6: closing, 7: kicking, 8: removedByHost
+//   6: closing, 7: kicking, 8: spectatorToggling, 9: removedByHost
 // Tests assert on the lobby setter (index 0) and the error setter (index 2).
 vi.mock("react", async (importActual) => {
   const actual = await importActual<typeof import("react")>();
@@ -185,7 +185,7 @@ describe("useLobbyRoom subscribe behavior", () => {
       hostName: "strawhat",
     });
 
-    expect(mocks.setterCalls[8]).toContain("strawhat");
+    expect(mocks.setterCalls[9]).toContain("strawhat");
   });
 
   it("ignores a directed removal event for another lobby", () => {
@@ -197,7 +197,7 @@ describe("useLobbyRoom subscribe behavior", () => {
       hostName: "strawhat",
     });
 
-    expect(mocks.setterCalls[8]).toEqual([]);
+    expect(mocks.setterCalls[9]).toEqual([]);
   });
 
   it("clears stale error state when a matching event arrives", () => {
