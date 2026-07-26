@@ -47,8 +47,8 @@ export class SpectatorPolicy {
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.transport.acceptSpectator(userId, server);
-    // OPT-552/557 own spectator delivery. Until both land, transport remains
-    // deny-by-default and admission sends no initial payload.
+    // OPT-558 owns the connect snapshot and spectator lifecycle. Until then,
+    // admission sends no initial payload.
     return new Response(null, { status: 101, webSocket: client });
   }
 
