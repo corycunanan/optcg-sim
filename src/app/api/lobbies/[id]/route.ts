@@ -114,6 +114,20 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     return apiError("Forbidden", 403);
   }
 
+  const spectatorSettingChanged =
+    parsed.allowSpectators !== undefined &&
+    parsed.allowSpectators !== lobby.allowSpectators;
+  const hasNonSpectatorPatchField = Object.keys(parsed).some(
+    (field) => field !== "allowSpectators",
+  );
+  if (
+    parsed.allowSpectators !== undefined &&
+    !spectatorSettingChanged &&
+    !hasNonSpectatorPatchField
+  ) {
+    return apiAction();
+  }
+
   const targetMode = parsed.mode ?? lobby.mode;
   if (targetMode === "PVCOMPUTER") {
     return apiError("PVComputer mode is not yet implemented", 501);
@@ -216,7 +230,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
   if (parsed.format !== undefined) lobbyData.format = parsed.format;
   if (parsed.hostDeckId !== undefined) lobbyData.hostDeckId = parsed.hostDeckId;
-  if (parsed.allowSpectators !== undefined) {
+  if (spectatorSettingChanged) {
     lobbyData.allowSpectators = parsed.allowSpectators;
   }
   if (hasReadinessAffectingHostChange) lobbyData.hostReady = false;
@@ -244,8 +258,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         id,
         status: lobby.status,
         mode: lobby.mode,
-        ...((switchingToSolitaire && realGuest) ||
-        parsed.allowSpectators !== undefined
+        ...((switchingToSolitaire && realGuest) || spectatorSettingChanged
           ? { revision: lobby.revision }
           : {}),
       },
@@ -272,7 +285,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     let removedSpectatorUserIds: string[] = [];
-    if (parsed.allowSpectators === false) {
+    if (spectatorSettingChanged && parsed.allowSpectators === false) {
       // Capture the terminal-event audience before deleting it. Removed
       // spectators cannot be recovered from the post-mutation room state.
       const spectators = await tx.lobbySpectator.findMany({
@@ -357,10 +370,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     switchingToSolitaire && realGuest ? realGuest.userId : null;
 
   after(async () => {
-    const state = await buildLobbyRoomState(id);
-    const stateFanout = state
-      ? notifyLobby(state, { actorUserId: userId })
-      : Promise.resolve();
     const spectatorEjectionFanout = result.removedSpectatorUserIds.length
       ? notifySpectatorsRemoved({
           lobbyId: id,
@@ -368,15 +377,19 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
           removedSpectatorUserIds: result.removedSpectatorUserIds,
         })
       : Promise.resolve();
+    const stateFanout = buildLobbyRoomState(id).then(async (state) => {
+      if (!state) return;
 
-    await Promise.all([stateFanout, spectatorEjectionFanout]);
+      await notifyLobby(state, { actorUserId: userId });
+      if (ejectedGuestUserId) {
+        await notifyUser(ejectedGuestUserId, {
+          type: "lobby:state_changed",
+          lobby: { ...state, status: "EVICTED" },
+        });
+      }
+    });
 
-    if (state && ejectedGuestUserId) {
-      await notifyUser(ejectedGuestUserId, {
-        type: "lobby:state_changed",
-        lobby: { ...state, status: "EVICTED" },
-      });
-    }
+    await Promise.allSettled([spectatorEjectionFanout, stateFanout]);
   });
 
   return apiAction();

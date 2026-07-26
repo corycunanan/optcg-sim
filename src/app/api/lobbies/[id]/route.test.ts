@@ -146,6 +146,25 @@ function baseLobby(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function createTransactionClient() {
+  return {
+    lobby: {
+      updateMany: lobbyUpdateManyMock,
+      findUnique: lobbyFindUniqueMock,
+    },
+    lobbyGuest: {
+      deleteMany: lobbyGuestDeleteManyMock,
+      update: lobbyGuestUpdateMock,
+      upsert: lobbyGuestUpsertMock,
+    },
+    lobbySpectator: {
+      findMany: lobbySpectatorFindManyMock,
+      deleteMany: lobbySpectatorDeleteManyMock,
+    },
+    user: { updateMany: userUpdateManyMock },
+  };
+}
+
 beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
@@ -187,22 +206,7 @@ beforeEach(() => {
   deckFindFirstMock.mockResolvedValue({ id: "deck-1" });
   transactionMock.mockImplementation(async (operation) => {
     if (typeof operation !== "function") return [];
-    return operation({
-      lobby: {
-        updateMany: lobbyUpdateManyMock,
-        findUnique: lobbyFindUniqueMock,
-      },
-      lobbyGuest: {
-        deleteMany: lobbyGuestDeleteManyMock,
-        update: lobbyGuestUpdateMock,
-        upsert: lobbyGuestUpsertMock,
-      },
-      lobbySpectator: {
-        findMany: lobbySpectatorFindManyMock,
-        deleteMany: lobbySpectatorDeleteManyMock,
-      },
-      user: { updateMany: userUpdateManyMock },
-    });
+    return operation(createTransactionClient());
   });
   buildLobbyRoomStateMock.mockResolvedValue({
     id: "lobby-1",
@@ -253,6 +257,55 @@ describe("GET /api/lobbies/[id]", () => {
 });
 
 describe("PATCH /api/lobbies/[id]", () => {
+  it.each([false, true])(
+    "treats a same-value allowSpectators=%s request as a pure no-op",
+    async (allowSpectators) => {
+      lobbyFindUniqueMock.mockResolvedValueOnce(
+        baseLobby({ allowSpectators }),
+      );
+
+      const res = await PATCH(buildRequest({ allowSpectators }), params);
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true });
+      expect(transactionMock).not.toHaveBeenCalled();
+      expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+      expect(lobbySpectatorFindManyMock).not.toHaveBeenCalled();
+      expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+      expect(buildLobbyRoomStateMock).not.toHaveBeenCalled();
+      expect(notifyLobbyMock).not.toHaveBeenCalled();
+      expect(notifySpectatorsRemovedAudienceMock).not.toHaveBeenCalled();
+      expect(afterCalls.pending).toHaveLength(0);
+    },
+  );
+
+  it("ignores a same spectator value while applying other PATCH fields", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ allowSpectators: true }),
+    );
+
+    const res = await PATCH(
+      buildRequest({ allowSpectators: true, format: "Unlimited" }),
+      params,
+    );
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(lobbyUpdateManyMock).toHaveBeenCalledOnce();
+    expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "lobby-1", status: "READY", mode: "PVP" },
+      data: {
+        format: "Unlimited",
+        hostReady: false,
+        revision: { increment: 1 },
+      },
+    });
+    expect(lobbySpectatorFindManyMock).not.toHaveBeenCalled();
+    expect(lobbySpectatorDeleteManyMock).not.toHaveBeenCalled();
+    expect(notifyLobbyMock).toHaveBeenCalledOnce();
+    expect(notifySpectatorsRemovedAudienceMock).not.toHaveBeenCalled();
+  });
+
   it("lets the host enable spectating with one revision bump and realtime fanout", async () => {
     const res = await PATCH(buildRequest({ allowSpectators: true }), params);
     await flushAfter();
@@ -417,6 +470,68 @@ describe("PATCH /api/lobbies/[id]", () => {
       expect.objectContaining({ id: "lobby-1", spectators: [] }),
       { actorUserId: "host-user" },
     );
+  });
+
+  it("delivers directed ejections when the post-commit state rebuild fails", async () => {
+    const removedSpectatorUserIds = ["spectator-1", "spectator-2"];
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ allowSpectators: true }),
+    );
+    lobbySpectatorFindManyMock.mockResolvedValueOnce(
+      removedSpectatorUserIds.map((userId) => ({ userId })),
+    );
+    buildLobbyRoomStateMock.mockRejectedValueOnce(
+      new Error("state rebuild unavailable"),
+    );
+
+    const res = await PATCH(buildRequest({ allowSpectators: false }), params);
+    await flushAfter();
+
+    expect(res.status).toBe(200);
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
+    expect(notifySpectatorsRemovedAudienceMock).toHaveBeenCalledWith({
+      lobbyId: "lobby-1",
+      reason: "SPECTATING_DISABLED",
+      removedSpectatorUserIds,
+    });
+    for (const spectatorUserId of removedSpectatorUserIds) {
+      expect(notifyUserMock).toHaveBeenCalledWith(
+        spectatorUserId,
+        {
+          type: "lobby:spectator_removed",
+          lobbyId: "lobby-1",
+          reason: "SPECTATING_DISABLED",
+        },
+        undefined,
+      );
+    }
+    expect(notifyUserMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("schedules no ejection fanout when the transaction rejects after deletion", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ allowSpectators: true }),
+    );
+    lobbySpectatorFindManyMock.mockResolvedValueOnce([
+      { userId: "spectator-1" },
+    ]);
+    transactionMock.mockImplementationOnce(async (operation) => {
+      if (typeof operation !== "function") return [];
+      await operation(createTransactionClient());
+      throw new Error("commit rejected");
+    });
+
+    await expect(
+      PATCH(buildRequest({ allowSpectators: false }), params),
+    ).rejects.toThrow("commit rejected");
+
+    expect(lobbySpectatorFindManyMock).toHaveBeenCalledOnce();
+    expect(lobbySpectatorDeleteManyMock).toHaveBeenCalledOnce();
+    expect(afterCalls.pending).toHaveLength(0);
+    await flushAfter();
+    expect(notifySpectatorsRemovedAudienceMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
+    expect(notifyLobbyMock).not.toHaveBeenCalled();
   });
 
   it("rejects a spectator toggle when the observed revision is stale", async () => {
