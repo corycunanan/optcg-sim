@@ -672,14 +672,11 @@ export function LobbyRoomShell({
             </div>
 
             {activeGameId ? (
-              <Button
-                variant="gold"
-                size="lg"
-                onClick={() => router.push(`/game/${activeGameId}`)}
-              >
-                <Play data-icon="inline-start" />
-                {isSpectator ? "Spectate Match" : "Rejoin Game"}
-              </Button>
+              <ActiveMatchAction
+                gameId={activeGameId}
+                viewerRole={lobby.viewerRole}
+                onOpen={(gameId) => router.push(`/game/${gameId}`)}
+              />
             ) : (
               <Button
                 variant="gold"
@@ -825,18 +822,32 @@ function SpectatorRoom({
             {stopping ? "Stopping..." : "Stop spectating"}
           </Button>
           {activeGameId && (
-            <Button
-              variant="gold"
-              size="lg"
-              onClick={() => onSpectate(activeGameId)}
-            >
-              <Play data-icon="inline-start" />
-              Spectate Match
-            </Button>
+            <ActiveMatchAction
+              gameId={activeGameId}
+              viewerRole={lobby.viewerRole}
+              onOpen={onSpectate}
+            />
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function ActiveMatchAction({
+  gameId,
+  viewerRole,
+  onOpen,
+}: {
+  gameId: string;
+  viewerRole: LobbyRoomState["viewerRole"];
+  onOpen: (gameId: string) => void;
+}) {
+  return (
+    <Button variant="gold" size="lg" onClick={() => onOpen(gameId)}>
+      <Play data-icon="inline-start" />
+      {viewerRole === "spectator" ? "Spectate Match" : "Rejoin Game"}
+    </Button>
   );
 }
 
