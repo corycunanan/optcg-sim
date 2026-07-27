@@ -88,6 +88,9 @@
   --amber-600: oklch(80% 0.13 85);
   --amber-100: oklch(28% 0.04 85);
 
+  /* Chrome dimensions */
+  --chrome-navbar-actions-width: 7rem;
+
   /* Overlay values */
   --overlay-strong-value: oklch(5% 0.004 260 / 0.76);
   --overlay-light-value: oklch(8% 0.004 260 / 0.52);
@@ -148,6 +151,13 @@
   --destructive-fg: var(--surface-step-ink);
   --error: var(--red-600);
   --error-soft: var(--red-100);
+
+  /* Current-location indicators */
+  --nav-current-indicator: var(--text-step-primary);
+  --nav-current-indicator-on-accent: var(--surface-step-ink);
+
+  /* Component dimensions */
+  --navbar-actions-width: var(--chrome-navbar-actions-width);
 
   /* Overlays */
   --overlay: var(--overlay-strong-value);
@@ -314,6 +324,13 @@
   --color-border:        var(--border-subtle);
   --color-border-strong: var(--border-strong);
   --color-border-focus:  var(--border-focus);
+
+  /* Navigation state */
+  --color-nav-current-indicator: var(--nav-current-indicator);
+  --color-nav-current-indicator-on-accent: var(--nav-current-indicator-on-accent);
+
+  /* Component dimensions */
+  --spacing-navbar-actions: var(--navbar-actions-width);
 
   /* Semantic */
   --color-success:      var(--success);
