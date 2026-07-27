@@ -1,4 +1,18 @@
 import { z } from "zod";
+import { SerializedNotificationSchema } from "@/lib/validators/realtime";
+
+export const NotificationsResponseSchema = z.object({
+  data: z.object({
+    notifications: z.array(SerializedNotificationSchema),
+    unreadCount: z.number().int().nonnegative(),
+    pagination: z.object({
+      total: z.number().int().nonnegative(),
+      page: z.number().int().positive(),
+      limit: z.number().int().positive(),
+      totalPages: z.number().int().nonnegative(),
+    }),
+  }),
+});
 
 export const ListNotificationsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

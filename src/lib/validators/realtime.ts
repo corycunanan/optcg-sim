@@ -6,6 +6,7 @@ import type {
   ServerMessage,
 } from "@shared/game-types";
 import { LobbyRoomStateSchema } from "@/lib/validators/lobbies";
+import type { SerializedNotification } from "@/types/realtime";
 
 const SerializedUserSchema = z.object({
   id: z.string(),
@@ -13,6 +14,19 @@ const SerializedUserSchema = z.object({
   name: z.string().nullable(),
   image: z.string().nullable(),
 });
+
+export const SerializedNotificationSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  type: z.literal("FRIEND_REQUEST"),
+  status: z.enum(["PENDING", "ACCEPTED", "DECLINED", "READ", "DISMISSED"]),
+  actorUserId: z.string().nullable(),
+  referenceId: z.string().nullable(),
+  payload: z.json(),
+  createdAt: z.iso.datetime({ offset: true }),
+  updatedAt: z.iso.datetime({ offset: true }),
+  actor: SerializedUserSchema.nullable(),
+}) satisfies z.ZodType<SerializedNotification>;
 
 export const SerializedMessageSchema = z.object({
   id: z.string(),
@@ -62,6 +76,25 @@ export const RealtimeServerEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("message:new"),
     message: SerializedMessageSchema,
+  }),
+  z.object({
+    type: z.literal("notification:created"),
+    notification: SerializedNotificationSchema,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("notification:resolved"),
+    notification: SerializedNotificationSchema,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("notification:updated"),
+    notification: SerializedNotificationSchema,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("notification:read_all"),
+    unreadCount: z.number().int().nonnegative(),
   }),
   z.object({
     type: z.literal("friend:request_received"),

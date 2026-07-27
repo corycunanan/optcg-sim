@@ -16,6 +16,7 @@ import {
 } from "@/lib/notifications";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { serializeFriendRequestForEvent } from "@/lib/realtime/serialize-friend";
+import { serializeNotificationForEvent } from "@/lib/realtime/serialize-notification";
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       return apiError("Request already pending", 409);
     }
 
-    const req = await prisma.$transaction(async (tx) => {
+    const { req, notification, unreadCount } = await prisma.$transaction(async (tx) => {
       const createdRequest = await tx.friendRequest.create({
         data: { fromUserId: userId, toUserId },
         include: {
@@ -104,18 +105,29 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      await createFriendRequestNotification(tx, {
+      const notificationResult = await createFriendRequestNotification(tx, {
         requestId: createdRequest.id,
         recipientUserId: toUserId,
         actorUserId: userId,
       });
 
-      return createdRequest;
+      return {
+        req: createdRequest,
+        ...notificationResult,
+      };
     });
 
     // Retention is deliberately best-effort and post-commit: pruning must
     // never lengthen or roll back an otherwise valid friend request.
     after(() => pruneResolvedNotifications(toUserId));
+
+    after(() =>
+      notifyUser(toUserId, {
+        type: "notification:created",
+        notification: serializeNotificationForEvent(notification),
+        unreadCount,
+      }),
+    );
 
     after(() =>
       notifyUser(toUserId, {

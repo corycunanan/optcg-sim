@@ -9,6 +9,7 @@ const friendshipFindFirstMock = vi.fn();
 const friendRequestFindFirstMock = vi.fn();
 const friendRequestCreateMock = vi.fn();
 const notificationCreateMock = vi.fn();
+const notificationCountMock = vi.fn();
 const notificationFindManyMock = vi.fn();
 const notificationDeleteManyMock = vi.fn();
 const transactionMock = vi.fn();
@@ -74,6 +75,7 @@ beforeEach(() => {
   friendRequestFindFirstMock.mockReset();
   friendRequestCreateMock.mockReset();
   notificationCreateMock.mockReset();
+  notificationCountMock.mockReset();
   notificationFindManyMock.mockReset();
   notificationDeleteManyMock.mockReset();
   transactionMock.mockReset();
@@ -103,15 +105,33 @@ beforeEach(() => {
       image: null,
     },
   });
-  notificationCreateMock.mockResolvedValue({ id: "notification-1" });
+  notificationCreateMock.mockResolvedValue({
+    id: "notification-1",
+    userId: "user-recipient",
+    type: "FRIEND_REQUEST",
+    status: "PENDING",
+    actorUserId: "user-sender",
+    referenceId: "req-1",
+    payload: null,
+    createdAt: new Date("2026-05-02T12:00:00.000Z"),
+    updatedAt: new Date("2026-05-02T12:00:00.000Z"),
+    actor: {
+      id: "user-sender",
+      username: "ace",
+      name: "Ace",
+      image: null,
+    },
+  });
+  notificationCountMock.mockResolvedValue(4);
   notificationFindManyMock.mockResolvedValue([]);
   transactionMock.mockImplementation(async (callback) =>
     callback({
       friendRequest: { create: friendRequestCreateMock },
       notification: {
         create: notificationCreateMock,
+        count: notificationCountMock,
       },
-    }),
+    })
   );
   notifyUserMock.mockResolvedValue(undefined);
 });
@@ -129,6 +149,14 @@ describe("POST /api/friends/requests", () => {
         actorUserId: "user-sender",
         referenceId: "req-1",
       },
+      include: {
+        actor: {
+          select: { id: true, username: true, name: true, image: true },
+        },
+      },
+    });
+    expect(notificationCountMock).toHaveBeenCalledWith({
+      where: { userId: "user-recipient", status: "PENDING" },
     });
   });
 
@@ -166,7 +194,9 @@ describe("POST /api/friends/requests", () => {
 
   it("keeps a valid friend request when best-effort retention fails", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    notificationFindManyMock.mockRejectedValueOnce(new Error("retention unavailable"));
+    notificationFindManyMock.mockRejectedValueOnce(
+      new Error("retention unavailable")
+    );
 
     const res = await POST(buildRequest());
 
@@ -178,33 +208,91 @@ describe("POST /api/friends/requests", () => {
 
     expect(errorSpy).toHaveBeenCalledWith(
       "[notifications:retention] failed",
-      expect.any(Error),
+      expect.any(Error)
     );
     errorSpy.mockRestore();
   });
 
-  it("calls notifyUser on the recipient with friend:request_received", async () => {
+  it("fans out one notification:created event for the committed row", async () => {
     const res = await POST(buildRequest());
     expect(res.status).toBe(201);
 
     await flushAfter();
 
-    expect(notifyUserMock).toHaveBeenCalledTimes(1);
-    expect(notifyUserMock).toHaveBeenCalledWith("user-recipient", {
-      type: "friend:request_received",
-      request: {
-        id: "req-1",
-        fromUserId: "user-sender",
-        toUserId: "user-recipient",
-        createdAt: "2026-05-02T12:00:00.000Z",
-        fromUser: {
-          id: "user-sender",
-          username: "ace",
-          name: "Ace",
-          image: null,
+    const notificationCalls = notifyUserMock.mock.calls.filter(
+      ([, event]) => event.type === "notification:created"
+    );
+    expect(notificationCalls).toEqual([
+      [
+        "user-recipient",
+        {
+          type: "notification:created",
+          notification: {
+            id: "notification-1",
+            userId: "user-recipient",
+            type: "FRIEND_REQUEST",
+            status: "PENDING",
+            actorUserId: "user-sender",
+            referenceId: "req-1",
+            payload: null,
+            createdAt: "2026-05-02T12:00:00.000Z",
+            updatedAt: "2026-05-02T12:00:00.000Z",
+            actor: {
+              id: "user-sender",
+              username: "ace",
+              name: "Ace",
+              image: null,
+            },
+          },
+          unreadCount: 4,
         },
-      },
+      ],
+    ]);
+  });
+
+  it("keeps the existing friend:request_received fan-out unchanged", async () => {
+    const res = await POST(buildRequest());
+    expect(res.status).toBe(201);
+
+    await flushAfter();
+
+    const friendCalls = notifyUserMock.mock.calls.filter(
+      ([, event]) => event.type === "friend:request_received"
+    );
+    expect(friendCalls).toEqual([
+      [
+        "user-recipient",
+        {
+          type: "friend:request_received",
+          request: {
+            id: "req-1",
+            fromUserId: "user-sender",
+            toUserId: "user-recipient",
+            createdAt: "2026-05-02T12:00:00.000Z",
+            fromUser: {
+              id: "user-sender",
+              username: "ace",
+              name: "Ace",
+              image: null,
+            },
+          },
+        },
+      ],
+    ]);
+  });
+
+  it("commits even when best-effort notification fan-out later fails", async () => {
+    notifyUserMock.mockImplementation(async (_userId, event) => {
+      if (event.type === "notification:created") {
+        throw new Error("realtime unavailable");
+      }
     });
+
+    const res = await POST(buildRequest());
+
+    expect(res.status).toBe(201);
+    expect(friendRequestCreateMock).toHaveBeenCalledTimes(1);
+    await expect(flushAfter()).rejects.toThrow("realtime unavailable");
   });
 
   it("does not fan out when rate limited", async () => {

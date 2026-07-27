@@ -16,6 +16,25 @@ import {
   serializeFriendRequestForEvent,
   serializeFriendshipForEvent,
 } from "@/lib/realtime/serialize-friend";
+import {
+  serializeNotificationForEvent,
+  type NotificationRow,
+} from "@/lib/realtime/serialize-notification";
+
+function fanOutResolvedNotification(
+  userId: string,
+  result: { notification: NotificationRow | null; unreadCount: number }
+) {
+  const notification = result.notification;
+  if (!notification) return;
+  after(() =>
+    notifyUser(userId, {
+      type: "notification:resolved",
+      notification: serializeNotificationForEvent(notification),
+      unreadCount: result.unreadCount,
+    })
+  );
+}
 
 export async function PUT(
   request: NextRequest,
@@ -91,13 +110,17 @@ export async function PUT(
             },
           });
 
-          await resolveFriendRequestNotification(tx, {
+          const notificationResult = await resolveFriendRequestNotification(tx, {
             requestId: id,
             recipientUserId: userId,
             status: "ACCEPTED",
           });
 
-          return { kind: "accepted" as const, friendship: createdFriendship };
+          return {
+            kind: "accepted" as const,
+            friendship: createdFriendship,
+            notificationResult,
+          };
         });
       } catch (error) {
         if (
@@ -107,7 +130,7 @@ export async function PUT(
           // Another acceptance already created the canonical friendship. The
           // caller still gets a successful, idempotent response; only the
           // winning transaction may emit the acceptance event.
-          await prisma.$transaction(async (tx) => {
+          const notificationResult = await prisma.$transaction(async (tx) => {
             await tx.friendRequest.deleteMany({
               where: {
                 status: "PENDING",
@@ -117,12 +140,13 @@ export async function PUT(
                 ],
               },
             });
-            await resolveFriendRequestNotification(tx, {
+            return resolveFriendRequestNotification(tx, {
               requestId: id,
               recipientUserId: userId,
               status: "ACCEPTED",
             });
           });
+          fanOutResolvedNotification(userId, notificationResult);
           return apiAction();
         }
         throw error;
@@ -131,7 +155,9 @@ export async function PUT(
       if (result.kind === "missing") {
         return apiError("Request not found", 404);
       }
-      const { friendship } = result;
+      const { friendship, notificationResult } = result;
+
+      fanOutResolvedNotification(userId, notificationResult);
 
       // The accepter's user info, sent to the original sender so their
       // sidebar can append the new friend without a refetch.
@@ -159,16 +185,18 @@ export async function PUT(
         });
         if (removedRequest.count !== 1) return { kind: "missing" as const };
 
-        await resolveFriendRequestNotification(tx, {
+        const notificationResult = await resolveFriendRequestNotification(tx, {
           requestId: id,
           recipientUserId: userId,
           status: "DECLINED",
         });
-        return { kind: "declined" as const };
+        return { kind: "declined" as const, notificationResult };
       });
       if (result.kind === "missing") {
         return apiError("Request not found", 404);
       }
+
+      fanOutResolvedNotification(userId, result.notificationResult);
 
       after(() =>
         notifyUser(req.fromUserId, {

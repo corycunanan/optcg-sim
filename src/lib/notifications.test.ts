@@ -21,7 +21,14 @@ describe("resolveFriendRequestNotification", () => {
         return { count: 0 };
       });
       const tx = {
-        notification: { updateMany },
+        notification: {
+          updateMany,
+          findFirst: vi.fn().mockResolvedValue({
+            id: "notification-1",
+            status: initialStatus,
+          }),
+          count: vi.fn().mockResolvedValue(0),
+        },
       } as unknown as Prisma.TransactionClient;
 
       await resolveFriendRequestNotification(tx, {
@@ -31,6 +38,6 @@ describe("resolveFriendRequestNotification", () => {
       });
 
       expect(storedStatus).toBe(initialStatus);
-    },
+    }
   );
 });

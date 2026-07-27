@@ -3,8 +3,13 @@
  * PUT /api/notifications — Bulk notification actions.
  */
 
-import { NextRequest } from "next/server";
-import { apiAction, apiError, apiSuccess, requireAuth } from "@/lib/api-response";
+import { after, NextRequest } from "next/server";
+import {
+  apiAction,
+  apiError,
+  apiSuccess,
+  requireAuth,
+} from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { apiLimiter, searchLimiter } from "@/lib/rate-limit";
 import {
@@ -12,6 +17,7 @@ import {
   NotificationBulkActionSchema,
 } from "@/lib/validators/notifications";
 import { isErrorResponse, parseBody } from "@/lib/validators/helpers";
+import { publishNotificationsReadAll } from "@/lib/realtime/publish-notification";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth();
@@ -24,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
 
   const parsedQuery = ListNotificationsQuerySchema.safeParse(
-    Object.fromEntries(request.nextUrl.searchParams),
+    Object.fromEntries(request.nextUrl.searchParams)
   );
   if (!parsedQuery.success) {
     return apiError("Invalid pagination parameters", 400);
@@ -61,7 +67,7 @@ export async function GET(request: NextRequest) {
         // PostgreSQL's default READ COMMITTED takes a new snapshot per
         // statement. REPEATABLE READ keeps rows and both counts coherent.
         isolationLevel: "RepeatableRead",
-      },
+      }
     );
 
     return apiSuccess(
@@ -76,7 +82,7 @@ export async function GET(request: NextRequest) {
         },
       },
       200,
-      { "Cache-Control": "private, no-store" },
+      { "Cache-Control": "private, no-store" }
     );
   } catch (error) {
     console.error("[notifications:list] failed", error);
@@ -98,10 +104,14 @@ export async function PUT(request: NextRequest) {
     const parsed = await parseBody(request, NotificationBulkActionSchema);
     if (isErrorResponse(parsed)) return parsed;
 
-    await prisma.notification.updateMany({
+    const result = await prisma.notification.updateMany({
       where: { userId, status: "PENDING" },
       data: { status: "READ" },
     });
+
+    if (result.count > 0) {
+      after(() => publishNotificationsReadAll(userId));
+    }
 
     return apiAction();
   } catch (error) {

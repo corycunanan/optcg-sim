@@ -9,6 +9,8 @@ const friendRequestFindFirstMock = vi.fn();
 const friendRequestDeleteManyMock = vi.fn();
 const friendshipCreateMock = vi.fn();
 const notificationUpdateManyMock = vi.fn();
+const notificationFindFirstMock = vi.fn();
+const notificationCountMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
 
@@ -17,7 +19,7 @@ vi.mock("next/server", async (importActual) => {
   return {
     ...actual,
     after: (cb: () => void | Promise<void>) => {
-      void cb();
+      void Promise.resolve(cb()).catch(() => undefined);
     },
   };
 });
@@ -34,6 +36,8 @@ vi.mock("@/lib/db", () => ({
     },
     notification: {
       updateMany: (...args: unknown[]) => notificationUpdateManyMock(...args),
+      findFirst: (...args: unknown[]) => notificationFindFirstMock(...args),
+      count: (...args: unknown[]) => notificationCountMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
@@ -58,6 +62,30 @@ function buildRequest(body: { action: "accept" | "decline" }) {
   };
 }
 
+function resolvedNotificationEvent(status: "ACCEPTED" | "DECLINED") {
+  return {
+    type: "notification:resolved",
+    notification: {
+      id: "notification-1",
+      userId: "user-accepter",
+      type: "FRIEND_REQUEST",
+      status,
+      actorUserId: "user-sender",
+      referenceId: "req-1",
+      payload: null,
+      createdAt: "2026-05-02T11:00:00.000Z",
+      updatedAt: "2026-05-02T12:00:00.000Z",
+      actor: {
+        id: "user-sender",
+        username: "ace",
+        name: "Ace",
+        image: null,
+      },
+    },
+    unreadCount: 0,
+  };
+}
+
 beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
@@ -65,6 +93,8 @@ beforeEach(() => {
   friendRequestDeleteManyMock.mockReset();
   friendshipCreateMock.mockReset();
   notificationUpdateManyMock.mockReset();
+  notificationFindFirstMock.mockReset();
+  notificationCountMock.mockReset();
   transactionMock.mockReset();
   notifyUserMock.mockReset();
 
@@ -97,6 +127,26 @@ beforeEach(() => {
     createdAt: new Date("2026-05-02T12:00:00.000Z"),
   });
   friendRequestDeleteManyMock.mockResolvedValue({ count: 1 });
+  notificationFindFirstMock.mockImplementation(async () => ({
+    id: "notification-1",
+    userId: "user-accepter",
+    type: "FRIEND_REQUEST",
+    status:
+      notificationUpdateManyMock.mock.calls.at(-1)?.[0].data.status ??
+      "PENDING",
+    actorUserId: "user-sender",
+    referenceId: "req-1",
+    payload: null,
+    createdAt: new Date("2026-05-02T11:00:00.000Z"),
+    updatedAt: new Date("2026-05-02T12:00:00.000Z"),
+    actor: {
+      id: "user-sender",
+      username: "ace",
+      name: "Ace",
+      image: null,
+    },
+  }));
+  notificationCountMock.mockResolvedValue(0);
   transactionMock.mockImplementation(async (callback) => {
     if (typeof callback !== "function")
       throw new Error("Expected transaction callback");
@@ -105,7 +155,11 @@ beforeEach(() => {
       friendRequest: {
         deleteMany: friendRequestDeleteManyMock,
       },
-      notification: { updateMany: notificationUpdateManyMock },
+      notification: {
+        updateMany: notificationUpdateManyMock,
+        findFirst: notificationFindFirstMock,
+        count: notificationCountMock,
+      },
     });
   });
   notifyUserMock.mockResolvedValue(undefined);
@@ -129,7 +183,7 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(200);
-    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+    expect(notifyUserMock).toHaveBeenCalledTimes(2);
     expect(notifyUserMock).toHaveBeenCalledWith("user-sender", {
       type: "friend:request_accepted",
       request: {
@@ -155,6 +209,10 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
         },
       },
     });
+    expect(notifyUserMock).toHaveBeenCalledWith(
+      "user-accepter",
+      resolvedNotificationEvent("ACCEPTED")
+    );
     expect(notificationUpdateManyMock).toHaveBeenCalledWith({
       where: {
         userId: "user-accepter",
@@ -227,7 +285,16 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
         ],
       },
     });
-    expect(notifyUserMock).not.toHaveBeenCalled();
+    expect(
+      notifyUserMock.mock.calls.filter(
+        ([, event]) => event.type === "friend:request_accepted"
+      )
+    ).toHaveLength(0);
+    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+    expect(notifyUserMock).toHaveBeenCalledWith(
+      "user-accepter",
+      resolvedNotificationEvent("ACCEPTED")
+    );
   });
 });
 
@@ -246,12 +313,16 @@ describe("PUT /api/friends/requests/[id] — decline", () => {
         status: "PENDING",
       },
     });
-    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+    expect(notifyUserMock).toHaveBeenCalledTimes(2);
     expect(notifyUserMock).toHaveBeenCalledWith("user-sender", {
       type: "friend:request_declined",
       requestId: "req-1",
       toUserId: "user-accepter",
     });
+    expect(notifyUserMock).toHaveBeenCalledWith(
+      "user-accepter",
+      resolvedNotificationEvent("DECLINED")
+    );
     expect(notificationUpdateManyMock).toHaveBeenCalledWith({
       where: {
         userId: "user-accepter",
@@ -260,6 +331,31 @@ describe("PUT /api/friends/requests/[id] — decline", () => {
         status: { in: ["PENDING", "READ", "DISMISSED"] },
       },
       data: { status: "DECLINED" },
+    });
+  });
+
+  it("keeps the decline committed when best-effort fan-out fails", async () => {
+    notifyUserMock.mockRejectedValue(new Error("realtime unavailable"));
+    const { request, params } = buildRequest({ action: "decline" });
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(notificationUpdateManyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a legacy request resolvable when its notification row is missing", async () => {
+    notificationFindFirstMock.mockResolvedValueOnce(null);
+    const { request, params } = buildRequest({ action: "decline" });
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(notifyUserMock).toHaveBeenCalledTimes(1);
+    expect(notifyUserMock).toHaveBeenCalledWith("user-sender", {
+      type: "friend:request_declined",
+      requestId: "req-1",
+      toUserId: "user-accepter",
     });
   });
 
