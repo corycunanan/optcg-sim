@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  CardInstance,
   GameEvent,
   GameState,
   PendingPromptState,
@@ -8,6 +9,7 @@ import {
   filterStateForPlayer,
   PLAYER_VIEW_REWRITTEN_FIELDS,
 } from "../engine/state.js";
+import { filterEventForRecipient } from "../engine/visibility.js";
 import {
   mergePlayerViewsForSpectator,
   SPECTATOR_PLAYER_VIEW_FIELDS,
@@ -105,18 +107,33 @@ function secretEventLog(): GameEvent[] {
 
 function stateWithEveryViewerDivergence(state: GameState): GameState {
   const lifeCard = state.players[1].life[0]!;
+  const privatePromptCards: CardInstance[] = [0, 1].map((index) => ({
+    instanceId: `private-prompt-instance-${index}`,
+    cardId: `PRIVATE-PROMPT-CARD-${index}`,
+    zone: "LIFE",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: null,
+    controller: 1,
+    owner: 1,
+  }));
   const pendingPrompt: PendingPromptState = {
     promptId: "spectator-prompt",
     options: {
       promptType: "SELECT_TARGET",
-      validTargets: state.players[1].hand
-        .slice(0, 2)
-        .map((card) => card.instanceId),
+      validTargets: privatePromptCards.map((card) => card.instanceId),
       countMin: 1,
       countMax: 1,
       effectDescription: "Choose a card from your hand",
       ctaLabel: "Choose",
-      cards: state.players[1].hand.slice(0, 2),
+      cards: privatePromptCards,
+      dualTargets: {
+        slots: [{
+          validIds: privatePromptCards.map((card) => card.instanceId),
+          countMin: 1,
+          countMax: 1,
+        }],
+      },
     },
     respondingPlayer: 1,
     resumeContext: "engine-private-resume",
@@ -155,6 +172,15 @@ function stateWithEveryViewerDivergence(state: GameState): GameState {
       },
     },
   };
+}
+
+function collectStringLeaves(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(collectStringLeaves);
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).flatMap(collectStringLeaves);
+  }
+  return [];
 }
 
 function filteredViews(state: GameState) {
@@ -270,7 +296,7 @@ describe("OPT-549 spectator per-viewer merge", () => {
     const divergentFields = PLAYER_VIEW_REWRITTEN_FIELDS.filter(
       (field) =>
         JSON.stringify(playerZeroView[field]) !==
-        JSON.stringify(playerOneView[field]),
+        JSON.stringify(playerOneView[field])
     );
     expect(divergentFields).toEqual([
       "players",
@@ -279,21 +305,88 @@ describe("OPT-549 spectator per-viewer merge", () => {
       "pendingPrompt",
     ]);
 
-    expect(spectator.pendingPrompt).toEqual(playerOneView.pendingPrompt);
-    expect(spectator.pendingPrompt?.resumeContext).toBeNull();
+    const sourcePrompt = source.pendingPrompt!;
+    if (sourcePrompt.options.promptType !== "SELECT_TARGET") {
+      throw new Error("Fixture must use SELECT_TARGET");
+    }
+    expect(spectator.pendingPrompt).toEqual({
+      ...sourcePrompt,
+      options: {
+        ...sourcePrompt.options,
+        cards: sourcePrompt.options.cards.map((card) => ({
+          ...card,
+          cardId: "hidden",
+          instanceId: "hidden",
+          attachedDon: [],
+        })),
+        validTargets: [],
+        dualTargets: {
+          slots: sourcePrompt.options.dualTargets!.slots.map((slot) => ({
+            ...slot,
+            validIds: [],
+          })),
+        },
+      },
+      resumeContext: null,
+    });
     expect(spectator.promptRespondingPlayer).toBe(1);
 
-    expect(spectator.eventLog).toEqual(source.eventLog);
-    expect(spectator.eventLog).toHaveLength(source.eventLog.length);
-    expect(spectator.eventLog.map((event) => event.type))
-      .toEqual(source.eventLog.map((event) => event.type));
+    const spectatorStrings = collectStringLeaves(spectator);
+    for (const card of sourcePrompt.options.cards) {
+      expect(spectatorStrings).not.toContain(card.cardId);
+      expect(spectatorStrings).not.toContain(card.instanceId);
+    }
 
-    expect(spectator.turn.battle?.pendingTriggerLifeCard)
-      .toEqual(source.turn.battle?.pendingTriggerLifeCard);
-    expect(spectator.turn.pendingTriggerFromEffect)
-      .toEqual(source.turn.pendingTriggerFromEffect);
-    expect(spectator.turn.pendingBattleDamageContinuation)
-      .toEqual(source.turn.pendingBattleDamageContinuation);
+    expect(spectator.eventLog).toEqual(source.eventLog.map((event) =>
+      filterEventForRecipient(event, { kind: "OBSERVER" })
+    ));
+    for (const secret of [
+      "DRAW-SECRET",
+      "draw-instance",
+      "HAND-SECRET",
+      "hand-instance",
+      "new-hand-instance",
+      "LIFE-HAND-SECRET",
+      "life-hand-instance",
+      "TRIGGER-SECRET",
+      "DECK-SECRET",
+      "deck-instance",
+      "new-deck-instance",
+      "REVEAL-SECRET",
+      "reveal-instance",
+      "SCRY-SECRET",
+      "scry-instance",
+      "life-2",
+      "life-1",
+      "removed-life-instance",
+      "new-removed-life-instance",
+    ]) {
+      expect(JSON.stringify(spectator.eventLog)).not.toContain(secret);
+    }
+
+    expect(spectator.turn.battle).toEqual({
+      ...source.turn.battle,
+      pendingTriggerLifeCard: {
+        ...source.turn.battle!.pendingTriggerLifeCard!,
+        cardId: "hidden",
+        instanceId: "hidden",
+      },
+    });
+    expect(spectator.turn.pendingTriggerFromEffect).toEqual({
+      ...source.turn.pendingTriggerFromEffect,
+      lifeCard: {
+        ...source.turn.pendingTriggerFromEffect!.lifeCard,
+        cardId: "hidden",
+        instanceId: "hidden",
+      },
+    });
+    expect(spectator.turn.pendingBattleDamageContinuation).toEqual({
+      ...source.turn.pendingBattleDamageContinuation,
+      lifeCardInstanceId: "hidden",
+    });
+    expect(spectatorStrings).not.toContain(
+      source.turn.pendingTriggerFromEffect!.lifeCard.instanceId
+    );
   });
 
   it("preserves blind-selection redaction in the unioned prompt", () => {
@@ -320,7 +413,11 @@ describe("OPT-549 spectator per-viewer merge", () => {
     if (spectator.pendingPrompt?.options.promptType === "SELECT_TARGET") {
       for (const card of spectator.pendingPrompt.options.cards) {
         expect(card.cardId).toBe("hidden");
+        expect(card.instanceId).toBe("hidden");
       }
+      expect(spectator.pendingPrompt.options.validTargets).toEqual([]);
+      expect(spectator.pendingPrompt.options.dualTargets?.slots[0]?.validIds)
+        .toEqual([]);
     }
   });
 
