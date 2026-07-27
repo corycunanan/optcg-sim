@@ -26,10 +26,18 @@ const promptCard: CardInstance = {
   owner: 1,
 };
 
+const redactedPromptCard: CardInstance = {
+  ...promptCard,
+  instanceId: "hidden",
+  cardId: "hidden",
+  attachedDon: [],
+};
+
 const faceBearingPrompts: Array<{
   promptType: string;
   effectDescription: string;
   options: PromptOptions;
+  expectedOptions: PromptOptions;
 }> = [
   {
     promptType: "REVEAL_TRIGGER",
@@ -37,6 +45,13 @@ const faceBearingPrompts: Array<{
     options: {
       promptType: "REVEAL_TRIGGER",
       cards: [promptCard],
+      effectDescription: "Reveal the Trigger?",
+      optional: true,
+      timeoutMs: 30_000,
+    },
+    expectedOptions: {
+      promptType: "REVEAL_TRIGGER",
+      cards: [redactedPromptCard],
       effectDescription: "Reveal the Trigger?",
       optional: true,
       timeoutMs: 30_000,
@@ -52,6 +67,13 @@ const faceBearingPrompts: Array<{
       canSendToBottom: true,
       validTargets: [promptCard.instanceId],
     },
+    expectedOptions: {
+      promptType: "ARRANGE_TOP_CARDS",
+      cards: [redactedPromptCard],
+      effectDescription: "Place the card at the top or bottom.",
+      canSendToBottom: true,
+      validTargets: [],
+    },
   },
   {
     promptType: "SELECT_TARGET",
@@ -64,6 +86,25 @@ const faceBearingPrompts: Array<{
       countMin: 1,
       countMax: 1,
       ctaLabel: "Choose",
+      dualTargets: {
+        slots: [{
+          validIds: [promptCard.instanceId],
+          countMin: 1,
+          countMax: 1,
+        }],
+      },
+    },
+    expectedOptions: {
+      promptType: "SELECT_TARGET",
+      cards: [redactedPromptCard],
+      validTargets: [],
+      effectDescription: "Choose a target.",
+      countMin: 1,
+      countMax: 1,
+      ctaLabel: "Choose",
+      dualTargets: {
+        slots: [{ validIds: [], countMin: 1, countMax: 1 }],
+      },
     },
   },
   {
@@ -74,8 +115,22 @@ const faceBearingPrompts: Array<{
       effectDescription: "Use this effect?",
       cards: [promptCard],
     },
+    expectedOptions: {
+      promptType: "OPTIONAL_EFFECT",
+      effectDescription: "Use this effect?",
+      cards: [redactedPromptCard],
+    },
   },
 ];
+
+function collectStringLeaves(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(collectStringLeaves);
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).flatMap(collectStringLeaves);
+  }
+  return [];
+}
 
 function withPrompt(state: GameState, options: PromptOptions): GameState {
   return {
@@ -92,21 +147,24 @@ function withPrompt(state: GameState, options: PromptOptions): GameState {
 describe("OPT-577 spectator prompt visibility", () => {
   it.each(faceBearingPrompts)(
     "redacts $promptType card faces through visibleStateForSpectator",
-    ({ effectDescription, options }) => {
+    ({ effectDescription, expectedOptions, options }) => {
       const { state, cardDb } = setupGame();
       const spectator = visibleStateForSpectator(
         withPrompt(state, options),
         cardDb
       );
-      const serialized = JSON.stringify(spectator);
-
-      expect(spectator.pendingPrompt?.options.promptType).toBe(
-        options.promptType
+      expect(spectator.pendingPrompt).toEqual({
+        promptId: `prompt-${options.promptType}`,
+        options: expectedOptions,
+        respondingPlayer: 0,
+        resumeContext: null,
+      });
+      expect(collectStringLeaves(spectator)).not.toContain(promptCard.cardId);
+      expect(collectStringLeaves(spectator)).not.toContain(promptCard.instanceId);
+      expect(collectStringLeaves(spectator)).not.toContain(
+        `private-resume-${promptCard.cardId}`
       );
-      expect(spectator.pendingPrompt?.resumeContext).toBeNull();
-      expect(serialized).not.toContain(promptCard.cardId);
-      expect(serialized).not.toContain("private-resume");
-      expect(serialized).toContain(effectDescription);
+      expect(collectStringLeaves(spectator)).toContain(effectDescription);
     }
   );
 
@@ -179,10 +237,15 @@ describe("OPT-577 spectator prompt visibility", () => {
     );
     if (!result.pendingPrompt)
       throw new Error("Life scry must pause for placement");
+    const lifeScryOptions = result.pendingPrompt.options;
+    if (lifeScryOptions.promptType !== "ARRANGE_TOP_CARDS") {
+      throw new Error("Life scry must produce an arrange prompt");
+    }
+    const lifeScryPrompt = result.pendingPrompt;
 
     const prompted = result.events.reduce<GameState>(
       (current, event) => emitPendingEvent(current, event, 0),
-      { ...result.state, pendingPrompt: result.pendingPrompt } as GameState
+      { ...result.state, pendingPrompt: lifeScryPrompt } as GameState
     );
     const responder = visibleStateForPlayer(prompted, cardDb, 0);
     const spectator = visibleStateForSpectator(prompted, cardDb);
@@ -191,10 +254,23 @@ describe("OPT-577 spectator prompt visibility", () => {
       opponentLife.cardId
     );
     expect(JSON.stringify(responder.eventLog)).toContain(opponentLife.cardId);
-    expect(JSON.stringify(spectator)).not.toContain(opponentLife.cardId);
-    expect(spectator.pendingPrompt?.options.promptType).toBe(
-      "ARRANGE_TOP_CARDS"
-    );
+    const spectatorStrings = collectStringLeaves(spectator);
+    expect(spectatorStrings).not.toContain(opponentLife.cardId);
+    expect(spectatorStrings).not.toContain(opponentLife.instanceId);
+    expect(spectator.pendingPrompt).toEqual({
+      ...lifeScryPrompt,
+      options: {
+        ...lifeScryOptions,
+        cards: [{
+          ...lifeScryOptions.cards[0],
+          cardId: "hidden",
+          instanceId: "hidden",
+          attachedDon: [],
+        }],
+        validTargets: [],
+      },
+      resumeContext: null,
+    });
   });
 
   it("fails closed for an unknown future prompt type", () => {
@@ -216,6 +292,8 @@ describe("OPT-577 spectator prompt visibility", () => {
       cardDb
     );
     expect(spectator.pendingPrompt).toBeNull();
-    expect(JSON.stringify(spectator)).not.toContain(promptCard.cardId);
+    const spectatorStrings = collectStringLeaves(spectator);
+    expect(spectatorStrings).not.toContain(promptCard.cardId);
+    expect(spectatorStrings).not.toContain(promptCard.instanceId);
   });
 });

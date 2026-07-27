@@ -125,13 +125,20 @@ export const PROMPT_VISIBILITY = {
   },
 } satisfies Record<PromptType, PromptVisibilityPolicy>;
 
-const HIDDEN_IDENTITY = "hidden";
+export const HIDDEN_IDENTITY = "hidden";
 
-function redactCard(card: CardInstance): CardInstance {
+function redactCardFace(card: CardInstance): CardInstance {
   return {
     ...card,
     cardId: HIDDEN_IDENTITY,
     attachedDon: [],
+  };
+}
+
+function redactCardIdentity(card: CardInstance): CardInstance {
+  return {
+    ...redactCardFace(card),
+    instanceId: HIDDEN_IDENTITY,
   };
 }
 
@@ -235,15 +242,59 @@ function filterPromptOptionsForRecipient(
     options.promptType === "SELECT_TARGET" &&
     options.blindSelection
   ) {
-    return { ...options, cards: options.cards.map(redactCard) };
+    return { ...options, cards: options.cards.map(redactCardFace) };
   }
 
   if (
     recipient.kind === "OBSERVER" &&
     policy.observerIdentities === "REDACT_CARDS"
   ) {
-    if (!("cards" in options) || !options.cards) return options;
-    return { ...options, cards: options.cards.map(redactCard) };
+    switch (options.promptType) {
+      case "REVEAL_TRIGGER":
+        return {
+          ...options,
+          cards: options.cards.map(redactCardIdentity),
+        };
+      case "ARRANGE_TOP_CARDS":
+        return {
+          ...options,
+          cards: options.cards.map(redactCardIdentity),
+          ...(options.validTargets !== undefined ? { validTargets: [] } : {}),
+        };
+      case "SELECT_TARGET":
+        return {
+          ...options,
+          cards: options.cards.map(redactCardIdentity),
+          validTargets: [],
+          ...(options.dualTargets
+            ? {
+                dualTargets: {
+                  slots: options.dualTargets.slots.map((slot) => ({
+                    ...slot,
+                    validIds: [],
+                  })),
+                },
+              }
+            : {}),
+        };
+      case "OPTIONAL_EFFECT":
+        return {
+          ...options,
+          ...(options.cards
+            ? { cards: options.cards.map(redactCardIdentity) }
+            : {}),
+        };
+      case "SELECT_BLOCKER":
+      case "REDISTRIBUTE_DON":
+      case "PLAYER_CHOICE":
+        throw new Error(
+          `Prompt policy incorrectly classifies ${options.promptType} as identity-bearing`,
+        );
+      default: {
+        const exhaustivePrompt: never = options;
+        return exhaustivePrompt;
+      }
+    }
   }
 
   return options;

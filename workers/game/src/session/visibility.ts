@@ -3,6 +3,7 @@ import type {
   CardData,
   GameEvent,
   GameState,
+  LifeCard,
   PendingPromptState,
   TurnState,
 } from "../types.js";
@@ -15,6 +16,7 @@ import {
   filterEventForRecipient,
   filterPromptForRecipient,
   GAME_EVENT_VISIBILITY,
+  HIDDEN_IDENTITY,
 } from "../engine/visibility.js";
 
 function assertSameSpectatorField(
@@ -30,6 +32,26 @@ function assertSameSpectatorField(
     );
   }
 }
+
+type RedactedGameEventType = {
+  [Type in keyof typeof GAME_EVENT_VISIBILITY]:
+    (typeof GAME_EVENT_VISIBILITY)[Type] extends { redactor: string }
+      ? Type
+      : never;
+}[keyof typeof GAME_EVENT_VISIBILITY];
+
+/** Every private event remains in spectator history with identities hidden. */
+const SPECTATOR_REDACTED_EVENT_RULES = {
+  CARD_DRAWN: "Preserve the draw event with identities hidden.",
+  CARD_RETURNED_TO_HAND: "Preserve the hand-return event with identities hidden.",
+  CARD_ADDED_TO_HAND_FROM_LIFE: "Preserve the Life-to-hand event with identities hidden.",
+  TRIGGER_ACTIVATED: "Preserve an unaccepted Trigger offer with identity hidden.",
+  CARD_RETURNED_TO_DECK: "Preserve the deck-return event with identities hidden.",
+  CARDS_REVEALED: "Preserve controller-only peek history with identities hidden.",
+  LIFE_SCRIED: "Preserve Life-scry history with identities hidden.",
+  LIFE_REORDERED: "Preserve Life-reorder history with identities hidden.",
+  CARD_REMOVED_FROM_LIFE: "Preserve the Life-removal event with identities hidden.",
+} satisfies Record<RedactedGameEventType, string>;
 
 /**
  * Every top-level field rewritten by filterStateForPlayer has a spectator rule.
@@ -70,8 +92,21 @@ function assertNoUnhandledPlayerViewDivergence(
   }
 }
 
+function hiddenIdentityCount(value: unknown): number {
+  if (value === HIDDEN_IDENTITY) return 1;
+  if (Array.isArray(value)) {
+    return value.reduce((count, item) => count + hiddenIdentityCount(item), 0);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).reduce(
+      (count, item) => count + hiddenIdentityCount(item),
+      0,
+    );
+  }
+  return 0;
+}
+
 function mergeSpectatorEventLog(
-  authoritativeEvents: readonly GameEvent[],
   playerZeroEvents: readonly GameEvent[],
   playerOneEvents: readonly GameEvent[],
 ): GameEvent[] {
@@ -82,7 +117,6 @@ function mergeSpectatorEventLog(
   }
 
   return playerZeroEvents.map((playerZeroEvent, index) => {
-    const authoritativeEvent = authoritativeEvents[index];
     const playerOneEvent = playerOneEvents[index];
     if (
       playerZeroEvent.type !== playerOneEvent.type ||
@@ -94,47 +128,27 @@ function mergeSpectatorEventLog(
       );
     }
 
-    if (
-      authoritativeEvent &&
-      authoritativeEvent.type === playerZeroEvent.type &&
-      authoritativeEvent.playerIndex === playerZeroEvent.playerIndex &&
-      authoritativeEvent.timestamp === playerZeroEvent.timestamp
-    ) {
-      const expectedPlayerZeroEvent = filterEventForRecipient(
-        authoritativeEvent,
-        { kind: "PLAYER", playerIndex: 0 },
-      );
-      const expectedPlayerOneEvent = filterEventForRecipient(
-        authoritativeEvent,
-        { kind: "PLAYER", playerIndex: 1 },
-      );
-      if (!isStructurallyEqual(playerZeroEvent, expectedPlayerZeroEvent)) {
-        throw new Error(
-          `Spectator visibility invariant violated: eventLog[${index}] differs from player zero projection`,
-        );
-      }
-      if (!isStructurallyEqual(playerOneEvent, expectedPlayerOneEvent)) {
-        throw new Error(
-          `Spectator visibility invariant violated: eventLog[${index}] differs from player one projection`,
-        );
-      }
-      return filterEventForRecipient(authoritativeEvent, { kind: "OBSERVER" });
-    }
-
     if (isStructurallyEqual(playerZeroEvent, playerOneEvent)) {
       return filterEventForRecipient(playerZeroEvent, { kind: "OBSERVER" });
     }
 
-    const policy = GAME_EVENT_VISIBILITY[playerZeroEvent.type];
-    if (!policy || !("redactor" in policy)) {
+    if (!(playerZeroEvent.type in SPECTATOR_REDACTED_EVENT_RULES)) {
       throw new Error(
         `Spectator visibility invariant violated: public eventLog[${index}] differs between player views`,
       );
     }
 
-    throw new Error(
-      `Spectator visibility invariant violated: eventLog[${index}] has ambiguous redaction`,
-    );
+    const playerZeroHiddenCount = hiddenIdentityCount(playerZeroEvent);
+    const playerOneHiddenCount = hiddenIdentityCount(playerOneEvent);
+    if (playerZeroHiddenCount === playerOneHiddenCount) {
+      throw new Error(
+        `Spectator visibility invariant violated: eventLog[${index}] has ambiguous redaction`,
+      );
+    }
+    const unionedEvent = playerZeroHiddenCount < playerOneHiddenCount
+      ? playerZeroEvent
+      : playerOneEvent;
+    return filterEventForRecipient(unionedEvent, { kind: "OBSERVER" });
   });
 }
 
@@ -165,6 +179,14 @@ function unionViewerField<Value>(
   return playerZeroValue ?? playerOneValue;
 }
 
+function redactLifeCardIdentity(card: LifeCard): LifeCard {
+  return {
+    ...card,
+    cardId: HIDDEN_IDENTITY,
+    instanceId: HIDDEN_IDENTITY,
+  };
+}
+
 function mergeSpectatorBattle(
   playerZeroBattle: BattleContext | null,
   playerOneBattle: BattleContext | null,
@@ -188,14 +210,17 @@ function mergeSpectatorBattle(
     playerOnePublicBattle,
   );
 
-  // Validate the player projections, but do not union a private Trigger-Life
-  // identity into the observer projection before activation makes it public.
-  unionViewerField(
+  const pendingTriggerLifeCard = unionViewerField(
     "turn.battle.pendingTriggerLifeCard",
     playerZeroPendingTrigger,
     playerOnePendingTrigger,
   );
-  return playerZeroPublicBattle;
+  return pendingTriggerLifeCard
+    ? {
+        ...playerZeroPublicBattle,
+        pendingTriggerLifeCard: redactLifeCardIdentity(pendingTriggerLifeCard),
+      }
+    : playerZeroPublicBattle;
 }
 
 function mergeSpectatorTurn(
@@ -225,12 +250,12 @@ function mergeSpectatorTurn(
     playerOneInvariantTurn,
   );
 
-  unionViewerField(
+  const pendingTriggerFromEffect = unionViewerField(
     "turn.pendingTriggerFromEffect",
     playerZeroPendingTriggerFromEffect,
     playerOnePendingTriggerFromEffect,
   );
-  unionViewerField(
+  const pendingBattleDamageContinuation = unionViewerField(
     "turn.pendingBattleDamageContinuation",
     playerZeroPendingBattleDamageContinuation,
     playerOnePendingBattleDamageContinuation,
@@ -239,8 +264,18 @@ function mergeSpectatorTurn(
   return {
     ...playerZeroInvariantTurn,
     battle: mergeSpectatorBattle(playerZeroBattle, playerOneBattle),
-    pendingTriggerFromEffect: null,
-    pendingBattleDamageContinuation: null,
+    pendingTriggerFromEffect: pendingTriggerFromEffect
+      ? {
+          ...pendingTriggerFromEffect,
+          lifeCard: redactLifeCardIdentity(pendingTriggerFromEffect.lifeCard),
+        }
+      : pendingTriggerFromEffect,
+    pendingBattleDamageContinuation: pendingBattleDamageContinuation
+      ? {
+          ...pendingBattleDamageContinuation,
+          lifeCardInstanceId: HIDDEN_IDENTITY,
+        }
+      : pendingBattleDamageContinuation,
   };
 }
 
@@ -355,7 +390,6 @@ export function mergePlayerViewsForSpectator(
     playerOneView.turn,
   );
   const eventLog = mergeSpectatorEventLog(
-    stripped.eventLog,
     playerZeroView.eventLog,
     playerOneView.eventLog,
   );

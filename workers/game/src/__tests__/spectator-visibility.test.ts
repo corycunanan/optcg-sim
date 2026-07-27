@@ -448,7 +448,7 @@ const INVARIANTS = [
   },
   {
     id: 6,
-    invariant: "6. private peek history persists with identities and order hidden",
+    invariant: "6. private peek history persists for observers with identities hidden",
     assert: (scenario: Scenario) => {
       if (!scenario.peek) return;
       const spectator = spectatorFor(scenario);
@@ -458,10 +458,12 @@ const INVARIANTS = [
           ? event.payload.cards
           : []
       );
-      expect(privatePeekCards).toHaveLength(scenario.peek.cardIds.length);
-      expect(privatePeekCards.every((card) =>
-        card.cardId === "hidden" && card.instanceId === "hidden"
-      )).toBe(true);
+      expect(privatePeekCards).toEqual(
+        scenario.peek.cardIds.map(() => ({
+          cardId: "hidden",
+          instanceId: "hidden",
+        }))
+      );
       // The observer retains the historical event and its public metadata, but
       // never inherits the peeker's private identity entitlement.
       for (const identity of scenario.peek.cardIds) {
