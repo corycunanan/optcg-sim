@@ -552,7 +552,7 @@ export function executeLifeScry(
   // Legacy target-less LIFE_SCRY remains scoped to the acting player's top
   // Life cards. Authored Katakuri-family schemas use LIFE_CARD + EITHER and
   // take the private select -> reveal -> place flow below.
-  if (!action.target) {
+  if (!action.target && preselectedTargets === undefined) {
     const lifeCards = state.players[controller].life.slice(0, lookAt);
     if (lifeCards.length === 0) return { state, events, succeeded: false };
     events.push({
@@ -569,14 +569,16 @@ export function executeLifeScry(
     return { state, events, succeeded: true };
   }
 
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(
-    state,
-    action.target,
-    controller,
-    cardDb,
-    sourceCardInstanceId,
-    resultRefs,
-  );
+  const allValidIds = preselectedTargets ?? (action.target
+    ? computeAllValidTargets(
+        state,
+        action.target,
+        controller,
+        cardDb,
+        sourceCardInstanceId,
+        resultRefs,
+      )
+    : []);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(
       state,
@@ -594,10 +596,21 @@ export function executeLifeScry(
   // continue normally.
   if (selectedIds.length === 0) return { state, events, succeeded: true };
 
-  const selectedId = selectedIds[0];
-  const owner = state.players[0].life.some((card) => card.instanceId === selectedId)
+  // Pool computation is defense in depth. References and preselected targets
+  // bypass it, so enforce the printed top-of-Life invariant at the action
+  // boundary after every target source has resolved. Match neighboring
+  // removal actions by dropping ineligible ids; fail if none remain rather
+  // than silently substituting a different top card.
+  const eligibleSelectedIds = selectedIds.filter((id) =>
+    state.players.some((player) => player.life[0]?.instanceId === id));
+  if (eligibleSelectedIds.length === 0) {
+    return { state, events, succeeded: false };
+  }
+
+  const selectedId = eligibleSelectedIds[0];
+  const owner = state.players[0].life[0]?.instanceId === selectedId
     ? 0
-    : state.players[1].life.some((card) => card.instanceId === selectedId)
+    : state.players[1].life[0]?.instanceId === selectedId
       ? 1
       : null;
   if (owner === null) return { state, events, succeeded: false };

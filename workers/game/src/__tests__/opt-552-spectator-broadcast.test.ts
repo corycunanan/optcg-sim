@@ -490,11 +490,26 @@ describe("OPT-552 spectator filtered-state broadcast", () => {
       trace: { gameId: fixture.state.id, traceId: "redacted" },
     });
 
-    // 6. Reveal history persists without exposing the current deck order.
+    // 6. Private reveal history persists without exposing identities or order.
     const revealedCards = delivered.eventLog.flatMap((event) =>
       event.type === "CARDS_REVEALED" ? event.payload.cards : []
     );
-    expect(revealedCards).toContainEqual(fixture.revealed);
+    const sourceReveal = fixture.state.eventLog.find(
+      (event) => event.type === "CARDS_REVEALED"
+    );
+    expect(sourceReveal?.type).toBe("CARDS_REVEALED");
+    const deliveredReveal = delivered.eventLog.find(
+      (event) => event.type === "CARDS_REVEALED"
+    );
+    expect(deliveredReveal).toEqual({
+      ...sourceReveal,
+      payload: {
+        ...(sourceReveal?.type === "CARDS_REVEALED" ? sourceReveal.payload : {}),
+        cards: [{ cardId: "hidden", instanceId: "hidden" }],
+      },
+    });
+    expect(revealedCards).toEqual([{ cardId: "hidden", instanceId: "hidden" }]);
+    expect(revealedCards).not.toContainEqual(fixture.revealed);
     expect(
       delivered.players[0].deck.map((card) => card.instanceId)
     ).not.toContain(fixture.revealed.instanceId);
