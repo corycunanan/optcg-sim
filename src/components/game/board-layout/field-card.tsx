@@ -19,7 +19,7 @@ import { SQUARE, type AttackerDrag, type RedistributeDonDrag } from "./constants
 import { CardActionMenuContent } from "../card-action-menu";
 import { DropOverlay } from "./drop-zones";
 import { DonCard } from "./don-zone";
-import { useInteractionMode } from "./interaction-mode";
+import { isReadOnlyViewer, useInteractionMode } from "./interaction-mode";
 import { useCardRejection } from "./action-feedback";
 import {
   canOpenActivateMainMenu,
@@ -134,6 +134,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
   const interactionMode = useInteractionMode();
+  const readOnlyViewer = isReadOnlyViewer(interactionMode);
   const inputSuppressed = interactionMode !== "full";
   const rejectionSequence = useCardRejection(card.instanceId);
   const { hasUsableEffect } = useEffectAvailability();
@@ -288,7 +289,8 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   // usable-effect availability.
   const selectionSelected = !!selected || !!targetSelection?.selected;
   const selectionEligible = !!blockerSelectable || !!targetSelection?.eligible;
-  const selectionControl = !!blockerSelectable || !!targetSelection;
+  const selectionControl =
+    !readOnlyViewer && (!!blockerSelectable || !!targetSelection);
   const disabledReason = targetSelection?.disabledReason ?? null;
   const cardName = cardDb[card.cardId]?.name ?? card.cardId;
   const activeHighlightRing = winnerPulse
@@ -344,12 +346,16 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.key === "Enter" || event.key === " ") {
-        if (targetSelection && !targetSelection.disabledReason) {
+        if (
+          selectionControl &&
+          targetSelection &&
+          !targetSelection.disabledReason
+        ) {
           event.preventDefault();
           onTargetToggle?.();
           return;
         }
-        if (!targetSelection && blockerSelectable) {
+        if (selectionControl && !targetSelection && blockerSelectable) {
           event.preventDefault();
           onSelect?.();
           return;
@@ -367,13 +373,14 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
       menuTriggerEnabled,
       onSelect,
       onTargetToggle,
+      selectionControl,
       targetSelection,
     ],
   );
 
   const ariaDescriptionIds = [
     canAttack ? attributes["aria-describedby"] : null,
-    disabledReason ? descriptionId : null,
+    selectionControl && disabledReason ? descriptionId : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -381,12 +388,12 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
     cardName,
     card.state === "RESTED" ? "rested" : "active",
     donCount > 0 ? `${donCount} DON attached` : null,
-    selectionSelected
+    selectionControl && selectionSelected
       ? "selected"
-      : selectionEligible
+      : selectionControl && selectionEligible
         ? "eligible for selection"
         : null,
-    disabledReason,
+    selectionControl ? disabledReason : null,
     canAttack ? "draggable attacker" : null,
     menuTriggerEnabled ? "actions available" : null,
   ]
@@ -411,15 +418,17 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
                 ? attributes["aria-pressed"]
                 : undefined
           }
-          aria-disabled={disabledReason ? true : undefined}
+          aria-disabled={selectionControl && disabledReason ? true : undefined}
           aria-roledescription={canAttack ? attributes["aria-roledescription"] : undefined}
           aria-describedby={ariaDescriptionIds || undefined}
           onClick={
-            targetSelection && !targetSelection.disabledReason
-              ? onTargetToggle
-              : targetSelection
-                ? undefined
-                : onSelect
+            selectionControl
+              ? targetSelection && !targetSelection.disabledReason
+                ? onTargetToggle
+                : targetSelection
+                  ? undefined
+                  : onSelect
+              : undefined
           }
           data-blocker-selection={blockerSelectable ? "" : undefined}
           data-effect-menu-trigger={activation ? card.instanceId : undefined}
@@ -437,7 +446,7 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
           }}
           className={cn(
             "relative flex touch-none items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
-            targetSelection
+            selectionControl && targetSelection
               ? targetSelection.disabledReason
                 ? "cursor-default"
                 : "cursor-pointer"

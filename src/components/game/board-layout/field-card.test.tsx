@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardInstance } from "@shared/game-types";
 import { cardWinnerPulse } from "@/lib/motion";
 import type { CardOverlays } from "../card";
-import { OpponentFieldCard } from "./field-card";
+import type { TargetCardSelectionState } from "@/lib/game/target-selection";
+import { DroppableStageZone } from "./drop-zones";
+import { OpponentFieldCard, PlayerFieldCard } from "./field-card";
+import {
+  InteractionModeProvider,
+  type InteractionMode,
+} from "./interaction-mode";
 
 const motionState = vi.hoisted(() => ({ reduced: false }));
 
@@ -55,7 +61,8 @@ vi.mock("../card-action-menu", () => ({
   CardActionMenuContent: () => null,
 }));
 
-vi.mock("./drop-zones", () => ({
+vi.mock("./drop-zones", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./drop-zones")>()),
   DropOverlay: () => null,
 }));
 
@@ -178,4 +185,184 @@ describe("OpponentFieldCard winner recoil", () => {
     expect(wrapper.props.animate.x).toBe(0);
     expect(wrapper.props.transition).toEqual({ duration: 0 });
   });
+});
+
+const eligibleTarget: TargetCardSelectionState = {
+  selected: false,
+  eligible: true,
+  disabledReason: null,
+};
+
+function renderTargetSelection(
+  kind: "field" | "stage",
+  interactionMode: InteractionMode,
+  onTargetToggle: () => void,
+) {
+  const component =
+    kind === "field" ? (
+      <PlayerFieldCard
+        card={card}
+        cardDb={{}}
+        activeDragType={null}
+        canAttack={false}
+        targetSelection={eligibleTarget}
+        onTargetToggle={onTargetToggle}
+        style={{ position: "absolute", left: 0, top: 0 }}
+      />
+    ) : (
+      <DroppableStageZone
+        card={card}
+        cardDb={{}}
+        activeDragType={null}
+        targetSelection={eligibleTarget}
+        onTargetToggle={onTargetToggle}
+        zoneKey="player-stage"
+        style={{ position: "absolute", left: 0, top: 0 }}
+      />
+    );
+
+  act(() => {
+    renderer = create(
+      <InteractionModeProvider value={interactionMode}>
+        {component}
+      </InteractionModeProvider>,
+    );
+  });
+
+  if (!renderer) throw new Error("Target-selection renderer did not mount");
+  return renderer.root.findByProps({ "data-target-selection": "" });
+}
+
+function renderBlockerSelection(
+  interactionMode: InteractionMode,
+  onSelect: () => void,
+) {
+  act(() => {
+    renderer = create(
+      <InteractionModeProvider value={interactionMode}>
+        <PlayerFieldCard
+          card={card}
+          cardDb={{}}
+          activeDragType={null}
+          canAttack={false}
+          blockerSelectable
+          onSelect={onSelect}
+          style={{ position: "absolute", left: 0, top: 0 }}
+        />
+      </InteractionModeProvider>,
+    );
+  });
+
+  if (!renderer) throw new Error("Blocker-selection renderer did not mount");
+  return renderer.root.findByProps({ "data-blocker-selection": "" });
+}
+
+describe("target-selection response-only keyboard contract", () => {
+  it.each(["Enter", " "])(
+    "keeps field-card target activation usable with %j",
+    (key) => {
+      const onTargetToggle = vi.fn();
+      const target = renderTargetSelection(
+        "field",
+        "responseOnly",
+        onTargetToggle,
+      );
+
+      act(() => target.props.onKeyDown({ key, preventDefault: vi.fn() }));
+
+      expect(onTargetToggle).toHaveBeenCalledOnce();
+      expect(target.props.role).toBe("button");
+    },
+  );
+
+  it.each(["Enter", " "])(
+    "keeps stage target activation usable with %j",
+    (key) => {
+      const onTargetToggle = vi.fn();
+      const target = renderTargetSelection(
+        "stage",
+        "responseOnly",
+        onTargetToggle,
+      );
+
+      act(() => target.props.onKeyDown({ key, preventDefault: vi.fn() }));
+
+      expect(onTargetToggle).toHaveBeenCalledOnce();
+      expect(target.props.role).toBe("button");
+    },
+  );
+
+  it.each(["Enter", " "])(
+    "keeps blocker response activation usable with %j",
+    (key) => {
+      const onSelect = vi.fn();
+      const target = renderBlockerSelection("responseOnly", onSelect);
+
+      act(() => target.props.onKeyDown({ key, preventDefault: vi.fn() }));
+
+      expect(onSelect).toHaveBeenCalledOnce();
+      expect(target.props.role).toBe("button");
+    },
+  );
+});
+
+describe("read-only viewer target-selection boundary", () => {
+  it.each(["Enter", " "])(
+    "blocks field-card target activation with %j and removes action semantics",
+    (key) => {
+      const onTargetToggle = vi.fn();
+      const target = renderTargetSelection(
+        "field",
+        "spectator",
+        onTargetToggle,
+      );
+
+      act(() => target.props.onKeyDown({ key, preventDefault: vi.fn() }));
+
+      expect(onTargetToggle).not.toHaveBeenCalled();
+      expect(target.props.role).toBe("img");
+      expect(target.props["aria-pressed"]).toBeUndefined();
+      expect(target.props["aria-label"]).not.toContain(
+        "eligible for selection",
+      );
+      expect(target.props.onClick).toBeUndefined();
+    },
+  );
+
+  it.each(["Enter", " "])(
+    "blocks blocker activation with %j and removes action semantics",
+    (key) => {
+      const onSelect = vi.fn();
+      const target = renderBlockerSelection("spectator", onSelect);
+
+      act(() => target.props.onKeyDown({ key, preventDefault: vi.fn() }));
+
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(target.props.role).toBe("img");
+      expect(target.props["aria-pressed"]).toBeUndefined();
+      expect(target.props.onClick).toBeUndefined();
+    },
+  );
+
+  it.each(["Enter", " "])(
+    "blocks stage target activation with %j and removes action semantics",
+    (key) => {
+      const onTargetToggle = vi.fn();
+      const target = renderTargetSelection(
+        "stage",
+        "spectator",
+        onTargetToggle,
+      );
+
+      act(() => target.props.onKeyDown({ key, preventDefault: vi.fn() }));
+
+      expect(onTargetToggle).not.toHaveBeenCalled();
+      expect(target.props.role).toBe("img");
+      expect(target.props["aria-pressed"]).toBeUndefined();
+      expect(target.props["aria-label"]).not.toContain(
+        "eligible for selection",
+      );
+      expect(target.props.onClick).toBeUndefined();
+    },
+  );
 });
