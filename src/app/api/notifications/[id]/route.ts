@@ -18,11 +18,6 @@ export async function PUT(
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;
 
-  const { limited } = await apiLimiter.check(`notifications:action:${userId}`);
-  if (limited) {
-    return apiError("Too many requests. Try again later.", 429);
-  }
-
   const { id } = await params;
 
   try {
@@ -38,6 +33,15 @@ export async function PUT(
     }
 
     if (parsed.action === "read" || parsed.action === "dismiss") {
+      // Inbox-only mutations use the general API budget. Accept/decline skips
+      // this limiter because the proxied friend route charges socialLimiter.
+      const { limited } = await apiLimiter.check(
+        `notifications:action:${userId}`,
+      );
+      if (limited) {
+        return apiError("Too many requests. Try again later.", 429);
+      }
+
       await prisma.notification.updateMany({
         where: {
           id,

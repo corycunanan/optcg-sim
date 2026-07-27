@@ -2,8 +2,14 @@ import type {
   NotificationStatus,
   Prisma,
 } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 export const MAX_NOTIFICATIONS_PER_USER = 100;
+const RETENTION_PRUNE_BATCH_SIZE = 25;
+const RESOLVED_NOTIFICATION_STATUSES = [
+  "ACCEPTED",
+  "DECLINED",
+] satisfies NotificationStatus[];
 
 type FriendRequestNotificationInput = {
   requestId: string;
@@ -23,18 +29,37 @@ export async function createFriendRequestNotification(
       referenceId: input.requestId,
     },
   });
+}
 
-  const overflow = await tx.notification.findMany({
-    where: { userId: input.recipientUserId },
-    select: { id: true },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    skip: MAX_NOTIFICATIONS_PER_USER,
-  });
-
-  if (overflow.length > 0) {
-    await tx.notification.deleteMany({
-      where: { id: { in: overflow.map(({ id }) => id) } },
+/**
+ * Best-effort, bounded retention after the durable notification commits.
+ * PENDING, READ, and DISMISSED friend-request notifications may still point at
+ * a live request, so only terminal outcomes are eligible for pruning.
+ */
+export async function pruneResolvedNotifications(userId: string) {
+  try {
+    const overflow = await prisma.notification.findMany({
+      where: {
+        userId,
+        status: { in: RESOLVED_NOTIFICATION_STATUSES },
+      },
+      select: { id: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: MAX_NOTIFICATIONS_PER_USER,
+      take: RETENTION_PRUNE_BATCH_SIZE,
     });
+
+    if (overflow.length > 0) {
+      await prisma.notification.deleteMany({
+        where: {
+          userId,
+          status: { in: RESOLVED_NOTIFICATION_STATUSES },
+          id: { in: overflow.map(({ id }) => id) },
+        },
+      });
+    }
+  } catch (error) {
+    console.error("[notifications:retention] failed", error);
   }
 }
 

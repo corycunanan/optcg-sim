@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const friendRequestFindFirstMock = vi.fn();
-const friendRequestDeleteMock = vi.fn();
 const friendRequestDeleteManyMock = vi.fn();
 const friendshipCreateMock = vi.fn();
 const notificationUpdateManyMock = vi.fn();
@@ -27,7 +26,6 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     friendRequest: {
       findFirst: (...args: unknown[]) => friendRequestFindFirstMock(...args),
-      delete: (...args: unknown[]) => friendRequestDeleteMock(...args),
       deleteMany: (...args: unknown[]) => friendRequestDeleteManyMock(...args),
     },
     friendship: {
@@ -63,7 +61,6 @@ beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
   friendRequestFindFirstMock.mockReset();
-  friendRequestDeleteMock.mockReset();
   friendRequestDeleteManyMock.mockReset();
   friendshipCreateMock.mockReset();
   notificationUpdateManyMock.mockReset();
@@ -105,7 +102,6 @@ beforeEach(() => {
     return callback({
       friendship: { create: friendshipCreateMock },
       friendRequest: {
-        delete: friendRequestDeleteMock,
         deleteMany: friendRequestDeleteManyMock,
       },
       notification: { updateMany: notificationUpdateManyMock },
@@ -224,13 +220,19 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
 
 describe("PUT /api/friends/requests/[id] — decline", () => {
   it("notifies the original sender with friend:request_declined including the decliner's id", async () => {
-    friendRequestDeleteMock.mockResolvedValueOnce({});
     const { request, params } = buildRequest({ action: "decline" });
 
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(200);
     expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(friendRequestDeleteManyMock).toHaveBeenCalledWith({
+      where: {
+        id: "req-1",
+        toUserId: "user-accepter",
+        status: "PENDING",
+      },
+    });
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     expect(notifyUserMock).toHaveBeenCalledWith("user-sender", {
       type: "friend:request_declined",
@@ -246,5 +248,17 @@ describe("PUT /api/friends/requests/[id] — decline", () => {
       },
       data: { status: "DECLINED" },
     });
+  });
+
+  it("returns 404 when a concurrent legacy decline already removed the request", async () => {
+    friendRequestDeleteManyMock.mockResolvedValueOnce({ count: 0 });
+    const { request, params } = buildRequest({ action: "decline" });
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Request not found" });
+    expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
   });
 });

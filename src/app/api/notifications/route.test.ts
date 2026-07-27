@@ -7,6 +7,7 @@ const apiRateLimitMock = vi.fn();
 const notificationFindManyMock = vi.fn();
 const notificationCountMock = vi.fn();
 const notificationUpdateManyMock = vi.fn();
+const transactionMock = vi.fn();
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
@@ -16,6 +17,7 @@ vi.mock("@/lib/db", () => ({
       count: (...args: unknown[]) => notificationCountMock(...args),
       updateMany: (...args: unknown[]) => notificationUpdateManyMock(...args),
     },
+    $transaction: (...args: unknown[]) => transactionMock(...args),
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -43,6 +45,7 @@ beforeEach(() => {
   notificationFindManyMock.mockReset();
   notificationCountMock.mockReset();
   notificationUpdateManyMock.mockReset();
+  transactionMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-1" } });
   searchRateLimitMock.mockResolvedValue({ limited: false, remaining: 59 });
@@ -50,6 +53,14 @@ beforeEach(() => {
   notificationFindManyMock.mockResolvedValue([]);
   notificationCountMock.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
   notificationUpdateManyMock.mockResolvedValue({ count: 0 });
+  transactionMock.mockImplementation(async (callback) =>
+    callback({
+      notification: {
+        findMany: notificationFindManyMock,
+        count: notificationCountMock,
+      },
+    }),
+  );
 });
 
 describe("GET /api/notifications", () => {
@@ -104,6 +115,38 @@ describe("GET /api/notifications", () => {
         pagination: { total: 5, page: 2, limit: 2, totalPages: 3 },
       },
     });
+    expect(transactionMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: "RepeatableRead" },
+    );
+  });
+
+  it("excludes another user's rows from the list and both counts", async () => {
+    const stored = [
+      { id: "owned", userId: "user-1", status: "PENDING" },
+      { id: "foreign", userId: "user-2", status: "PENDING" },
+    ];
+    notificationFindManyMock.mockImplementation(async ({ where }) =>
+      stored.filter((row) => !where.userId || row.userId === where.userId),
+    );
+    notificationCountMock.mockReset();
+    notificationCountMock.mockImplementation(async ({ where }) =>
+      stored.filter(
+        (row) =>
+          (!where.userId || row.userId === where.userId) &&
+          (!where.status || row.status === where.status),
+      ).length,
+    );
+
+    const res = await GET(buildRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.notifications.map(({ id }: { id: string }) => id)).toEqual([
+      "owned",
+    ]);
+    expect(body.data.pagination.total).toBe(1);
+    expect(body.data.unreadCount).toBe(1);
   });
 });
 
@@ -142,5 +185,35 @@ describe("PUT /api/notifications", () => {
 
     expect(res.status).toBe(429);
     expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not mark another user's unread notifications as read", async () => {
+    const stored = [
+      { id: "owned", userId: "user-1", status: "PENDING" },
+      { id: "foreign", userId: "user-2", status: "PENDING" },
+    ];
+    notificationUpdateManyMock.mockImplementation(async ({ where, data }) => {
+      let count = 0;
+      for (const row of stored) {
+        if (
+          (!where.userId || row.userId === where.userId) &&
+          (!where.status || row.status === where.status)
+        ) {
+          row.status = data.status;
+          count += 1;
+        }
+      }
+      return { count };
+    });
+
+    const res = await PUT(buildRequest("/api/notifications", {
+      action: "mark-all-read",
+    }));
+
+    expect(res.status).toBe(200);
+    expect(stored).toEqual([
+      { id: "owned", userId: "user-1", status: "READ" },
+      { id: "foreign", userId: "user-2", status: "PENDING" },
+    ]);
   });
 });

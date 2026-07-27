@@ -33,21 +33,36 @@ export async function GET(request: NextRequest) {
   const { page, limit } = parsedQuery.data;
 
   try {
-    const [notifications, total, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where: { userId },
-        include: {
-          actor: {
-            select: { id: true, username: true, name: true, image: true },
-          },
-        },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.notification.count({ where: { userId } }),
-      prisma.notification.count({ where: { userId, status: "PENDING" } }),
-    ]);
+    const { notifications, total, unreadCount } = await prisma.$transaction(
+      async (tx) => {
+        const [rows, rowCount, pendingCount] = await Promise.all([
+          tx.notification.findMany({
+            where: { userId },
+            include: {
+              actor: {
+                select: { id: true, username: true, name: true, image: true },
+              },
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            skip: (page - 1) * limit,
+            take: limit,
+          }),
+          tx.notification.count({ where: { userId } }),
+          tx.notification.count({ where: { userId, status: "PENDING" } }),
+        ]);
+
+        return {
+          notifications: rows,
+          total: rowCount,
+          unreadCount: pendingCount,
+        };
+      },
+      {
+        // PostgreSQL's default READ COMMITTED takes a new snapshot per
+        // statement. REPEATABLE READ keeps rows and both counts coherent.
+        isolationLevel: "RepeatableRead",
+      },
+    );
 
     return apiSuccess(
       {

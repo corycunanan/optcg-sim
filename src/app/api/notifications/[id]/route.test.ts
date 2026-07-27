@@ -74,21 +74,59 @@ describe("PUT /api/notifications/[id]", () => {
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(429);
-    expect(notificationFindFirstMock).not.toHaveBeenCalled();
+    expect(notificationFindFirstMock).toHaveBeenCalledTimes(1);
+    expect(notificationUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("does not reveal or update another user's notification", async () => {
-    notificationFindFirstMock.mockResolvedValueOnce(null);
+    const foreign = {
+      id: "notification-1",
+      userId: "user-2",
+      type: "FRIEND_REQUEST",
+      status: "PENDING",
+      referenceId: "request-1",
+    };
+    notificationFindFirstMock.mockImplementationOnce(async ({ where }) =>
+      !where.userId || where.userId === foreign.userId ? foreign : null,
+    );
     const { request, params } = buildRequest("dismiss");
 
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(404);
-    expect(notificationFindFirstMock).toHaveBeenCalledWith({
-      where: { id: "notification-1", userId: "user-1" },
-      select: { type: true, status: true, referenceId: true },
-    });
+    expect(await res.json()).toEqual({ error: "Notification not found" });
     expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not mutate a notification that is no longer owned at write time", async () => {
+    const stored = {
+      id: "notification-1",
+      userId: "user-1",
+      type: "FRIEND_REQUEST",
+      status: "PENDING",
+      referenceId: "request-1",
+    };
+    notificationFindFirstMock.mockImplementationOnce(async () => {
+      const snapshot = { ...stored };
+      stored.userId = "user-2";
+      return snapshot;
+    });
+    notificationUpdateManyMock.mockImplementationOnce(async ({ where, data }) => {
+      if (
+        (!where.userId || where.userId === stored.userId) &&
+        (!where.status || where.status.in.includes(stored.status))
+      ) {
+        stored.status = data.status;
+        return { count: 1 };
+      }
+      return { count: 0 };
+    });
+    const { request, params } = buildRequest("read");
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(stored.status).toBe("PENDING");
   });
 
   it("marks an owned notification read", async () => {
@@ -107,6 +145,33 @@ describe("PUT /api/notifications/[id]", () => {
     });
   });
 
+  it.each(["read", "dismiss"] as const)(
+    "does not let %s overwrite a terminal notification",
+    async (action) => {
+      const stored = { status: "ACCEPTED" };
+      notificationFindFirstMock.mockResolvedValueOnce({
+        type: "FRIEND_REQUEST",
+        status: stored.status,
+        referenceId: "request-1",
+      });
+      notificationUpdateManyMock.mockImplementationOnce(
+        async ({ where, data }) => {
+          if (!where.status || where.status.in.includes(stored.status)) {
+            stored.status = data.status;
+            return { count: 1 };
+          }
+          return { count: 0 };
+        },
+      );
+      const { request, params } = buildRequest(action);
+
+      const res = await PUT(request, { params });
+
+      expect(res.status).toBe(200);
+      expect(stored.status).toBe("ACCEPTED");
+    },
+  );
+
   it.each(["accept", "decline"] as const)(
     "proxies %s to the referenced friend request",
     async (action) => {
@@ -116,6 +181,7 @@ describe("PUT /api/notifications/[id]", () => {
 
       expect(res.status).toBe(200);
       expect(resolveFriendRequestMock).toHaveBeenCalledTimes(1);
+      expect(rateLimitMock).not.toHaveBeenCalled();
       const [proxiedRequest, context] = resolveFriendRequestMock.mock.calls[0];
       expect(proxiedRequest.nextUrl.pathname).toBe(
         "/api/friends/requests/request-1",
@@ -140,6 +206,29 @@ describe("PUT /api/notifications/[id]", () => {
     expect(resolveFriendRequestMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["ACCEPTED", "decline"],
+    ["DECLINED", "accept"],
+  ] as const)(
+    "rejects %s notification resolved with conflicting %s action",
+    async (status, action) => {
+      notificationFindFirstMock.mockResolvedValueOnce({
+        type: "FRIEND_REQUEST",
+        status,
+        referenceId: "request-1",
+      });
+      const { request, params } = buildRequest(action);
+
+      const res = await PUT(request, { params });
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({
+        error: `Notification already ${status.toLowerCase()}`,
+      });
+      expect(resolveFriendRequestMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("handles a concurrent legacy acceptance idempotently", async () => {
     resolveFriendRequestMock.mockResolvedValueOnce(
       NextResponse.json({ error: "Request not found" }, { status: 404 }),
@@ -152,6 +241,25 @@ describe("PUT /api/notifications/[id]", () => {
       })
       .mockResolvedValueOnce({ status: "ACCEPTED" });
     const { request, params } = buildRequest("accept");
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+  });
+
+  it("handles a concurrent legacy decline idempotently", async () => {
+    resolveFriendRequestMock.mockResolvedValueOnce(
+      NextResponse.json({ error: "Request not found" }, { status: 404 }),
+    );
+    notificationFindFirstMock
+      .mockResolvedValueOnce({
+        type: "FRIEND_REQUEST",
+        status: "PENDING",
+        referenceId: "request-1",
+      })
+      .mockResolvedValueOnce({ status: "DECLINED" });
+    const { request, params } = buildRequest("decline");
 
     const res = await PUT(request, { params });
 

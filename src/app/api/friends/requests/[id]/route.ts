@@ -141,14 +141,22 @@ export async function PUT(
       return apiAction();
     } else {
       // Decline — delete the request and resolve its notification atomically.
-      await prisma.$transaction(async (tx) => {
-        await tx.friendRequest.delete({ where: { id } });
+      const result = await prisma.$transaction(async (tx) => {
+        const removedRequest = await tx.friendRequest.deleteMany({
+          where: { id, toUserId: userId, status: "PENDING" },
+        });
+        if (removedRequest.count !== 1) return { kind: "missing" as const };
+
         await resolveFriendRequestNotification(tx, {
           requestId: id,
           recipientUserId: userId,
           status: "DECLINED",
         });
+        return { kind: "declined" as const };
       });
+      if (result.kind === "missing") {
+        return apiError("Request not found", 404);
+      }
 
       after(() =>
         notifyUser(req.fromUserId, {

@@ -13,16 +13,13 @@ const notificationFindManyMock = vi.fn();
 const notificationDeleteManyMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
+const afterCallbacks: Array<() => void | Promise<void>> = [];
 
-// Run `after()` callbacks synchronously so the route's fanout is observable
-// in unit tests.
 vi.mock("next/server", async (importActual) => {
   const actual = await importActual<typeof import("next/server")>();
   return {
     ...actual,
-    after: (cb: () => void | Promise<void>) => {
-      void cb();
-    },
+    after: (cb: () => void | Promise<void>) => afterCallbacks.push(cb),
   };
 });
 
@@ -38,6 +35,10 @@ vi.mock("@/lib/db", () => ({
     friendRequest: {
       findFirst: (...args: unknown[]) => friendRequestFindFirstMock(...args),
     },
+    notification: {
+      findMany: (...args: unknown[]) => notificationFindManyMock(...args),
+      deleteMany: (...args: unknown[]) => notificationDeleteManyMock(...args),
+    },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
 }));
@@ -50,6 +51,12 @@ vi.mock("@/lib/realtime/fan-out", () => ({
 
 const { POST } = await import("./route");
 
+async function flushAfter() {
+  while (afterCallbacks.length > 0) {
+    await afterCallbacks.shift()?.();
+  }
+}
+
 function buildRequest(body: unknown = { toUserId: "user-recipient" }) {
   return new NextRequest("http://localhost/api/friends/requests", {
     method: "POST",
@@ -59,6 +66,7 @@ function buildRequest(body: unknown = { toUserId: "user-recipient" }) {
 }
 
 beforeEach(() => {
+  afterCallbacks.length = 0;
   authMock.mockReset();
   rateLimitMock.mockReset();
   userFindUniqueMock.mockReset();
@@ -102,8 +110,6 @@ beforeEach(() => {
       friendRequest: { create: friendRequestCreateMock },
       notification: {
         create: notificationCreateMock,
-        findMany: notificationFindManyMock,
-        deleteMany: notificationDeleteManyMock,
       },
     }),
   );
@@ -126,7 +132,7 @@ describe("POST /api/friends/requests", () => {
     });
   });
 
-  it("prunes inbox rows beyond the per-user retention cap", async () => {
+  it("prunes only a bounded batch of resolved rows after the request commits", async () => {
     notificationFindManyMock.mockResolvedValueOnce([
       { id: "notification-old-1" },
       { id: "notification-old-2" },
@@ -135,22 +141,53 @@ describe("POST /api/friends/requests", () => {
     const res = await POST(buildRequest());
 
     expect(res.status).toBe(201);
+    expect(notificationFindManyMock).not.toHaveBeenCalled();
+
+    await flushAfter();
+
     expect(notificationFindManyMock).toHaveBeenCalledWith({
-      where: { userId: "user-recipient" },
+      where: {
+        userId: "user-recipient",
+        status: { in: ["ACCEPTED", "DECLINED"] },
+      },
       select: { id: true },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: 100,
+      take: 25,
     });
     expect(notificationDeleteManyMock).toHaveBeenCalledWith({
       where: {
+        userId: "user-recipient",
+        status: { in: ["ACCEPTED", "DECLINED"] },
         id: { in: ["notification-old-1", "notification-old-2"] },
       },
     });
   });
 
+  it("keeps a valid friend request when best-effort retention fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    notificationFindManyMock.mockRejectedValueOnce(new Error("retention unavailable"));
+
+    const res = await POST(buildRequest());
+
+    expect(res.status).toBe(201);
+    expect(friendRequestCreateMock).toHaveBeenCalledTimes(1);
+    expect(notificationCreateMock).toHaveBeenCalledTimes(1);
+
+    await flushAfter();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[notifications:retention] failed",
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
+  });
+
   it("calls notifyUser on the recipient with friend:request_received", async () => {
     const res = await POST(buildRequest());
     expect(res.status).toBe(201);
+
+    await flushAfter();
 
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     expect(notifyUserMock).toHaveBeenCalledWith("user-recipient", {
