@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  type RenderResult,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   CardData,
@@ -115,13 +120,101 @@ type SpectatorWatch = {
   currentState: GameState | null;
 };
 
-function parseWatchMessages(socket: WatchThroughSocket): ServerMessage[] {
-  return socket.sent.map((payload) => JSON.parse(payload) as ServerMessage);
+function parseWatchMessages(
+  socket: WatchThroughSocket,
+  from = 0
+): ServerMessage[] {
+  return socket.sent
+    .slice(from)
+    .map((payload) => JSON.parse(payload) as ServerMessage);
 }
+
+function createSpectatorAffordanceHarness(cardDb: Map<string, CardData>): {
+  assertState(state: GameState): void;
+  auditMenu(): void;
+} {
+  const onAction = vi.fn();
+  const cardDbRecord = Object.fromEntries(cardDb);
+  let view: RenderResult | null = null;
+
+  const board = (state: GameState) => (
+    <BoardLayout
+      me={state.players[0]}
+      opp={state.players[1]}
+      myIndex={null}
+      bottomPlayerIndex={0}
+      turn={state.turn}
+      cardDb={cardDbRecord}
+      isMyTurn={false}
+      battlePhase={state.turn.battleSubPhase}
+      connectionStatus="connected"
+      eventLog={state.eventLog}
+      activeEffects={state.activeEffects}
+      effectAvailability={state.effectAvailability}
+      activePrompt={state.pendingPrompt?.options ?? null}
+      activePromptId={state.pendingPrompt?.promptId ?? null}
+      promptRespondingPlayer={
+        state.promptRespondingPlayer ??
+        state.pendingPrompt?.respondingPlayer ??
+        null
+      }
+      onAction={onAction}
+      onLeave={() => undefined}
+      matchClosed={state.status !== "IN_PROGRESS"}
+      canUndo
+      interactionMode="spectator"
+      viewportSize={{ width: 1920, height: 1080 }}
+      outerScale={1}
+    />
+  );
+
+  return {
+    assertState(state) {
+      if (view === null) view = render(board(state));
+      else view.rerender(board(state));
+
+      expect(view.getByLabelText("Spectator mode: viewing only")).toBeTruthy();
+      expect(view.queryByRole("dialog")).toBeNull();
+      const reachableButtons = view.queryAllByRole("button");
+      expect(
+        reachableButtons
+          .map(
+            (button) => button.getAttribute("aria-label") ?? button.textContent
+          )
+          .filter(
+            (label) =>
+              !/^(Game menu|Inspect deck|Inspect trash|Opponent's life area|Your life area)/.test(
+                label ?? ""
+              )
+          )
+      ).toEqual([]);
+      expect(view.queryByRole("link")).toBeNull();
+      expect(view.container.querySelector('[draggable="true"]')).toBeNull();
+      expect(onAction).not.toHaveBeenCalled();
+    },
+
+    auditMenu() {
+      if (view === null) throw new Error("Spectator board has not rendered");
+      fireEvent.pointerDown(view.getByRole("button", { name: "Game menu" }), {
+        button: 0,
+        ctrlKey: false,
+      });
+      expect(view.getByText("Stop spectating")).toBeTruthy();
+      expect(view.queryByText("Concede")).toBeNull();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(view.queryByText("Stop spectating")).toBeNull();
+      expect(onAction).not.toHaveBeenCalled();
+    },
+  };
+}
+
+type SpectatorAffordanceHarness = ReturnType<
+  typeof createSpectatorAffordanceHarness
+>;
 
 function assertSpectatorInformationAndAffordanceInvariants(
   state: GameState,
-  cardDb: Map<string, CardData>
+  affordances: SpectatorAffordanceHarness
 ): void {
   for (const [playerIndex, player] of state.players.entries()) {
     expect(player.hand.every((card) => card.cardId !== "hidden")).toBe(true);
@@ -146,72 +239,17 @@ function assertSpectatorInformationAndAffordanceInvariants(
   );
   expect(new Set(deckIds).size).toBe(deckIds.length);
 
-  const onAction = vi.fn();
-  const view = render(
-    <BoardLayout
-      me={state.players[0]}
-      opp={state.players[1]}
-      myIndex={null}
-      bottomPlayerIndex={0}
-      turn={state.turn}
-      cardDb={Object.fromEntries(cardDb)}
-      isMyTurn={false}
-      battlePhase={state.turn.battleSubPhase}
-      connectionStatus="connected"
-      eventLog={state.eventLog}
-      activeEffects={state.activeEffects}
-      effectAvailability={state.effectAvailability}
-      activePrompt={state.pendingPrompt?.options ?? null}
-      activePromptId={state.pendingPrompt?.promptId ?? null}
-      promptRespondingPlayer={
-        state.promptRespondingPlayer ??
-        state.pendingPrompt?.respondingPlayer ??
-        null
-      }
-      onAction={onAction}
-      onLeave={() => undefined}
-      matchClosed={state.status !== "IN_PROGRESS"}
-      canUndo
-      interactionMode="spectator"
-      viewportSize={{ width: 1920, height: 1080 }}
-      outerScale={1}
-    />
-  );
-
-  expect(view.getByLabelText("Spectator mode: viewing only")).toBeTruthy();
-  expect(view.queryByRole("dialog")).toBeNull();
-  const reachableButtons = view.queryAllByRole("button");
-  expect(
-    reachableButtons
-      .map((button) => button.getAttribute("aria-label") ?? button.textContent)
-      .filter(
-        (label) =>
-          !/^(Game menu|Inspect deck|Inspect trash|Opponent's life area|Your life area)/.test(
-            label ?? ""
-          )
-      )
-  ).toEqual([]);
-  fireEvent.pointerDown(view.getByRole("button", { name: "Game menu" }), {
-    button: 0,
-    ctrlKey: false,
-  });
-  expect(view.getByText("Stop spectating")).toBeTruthy();
-  expect(view.queryByText("Concede")).toBeNull();
-  expect(view.queryByRole("link")).toBeNull();
-  expect(view.container.querySelector('[draggable="true"]')).toBeNull();
-  expect(onAction).not.toHaveBeenCalled();
-
   // OPT-575 deliberately tracks target-selection keyboard handlers and ARIA
   // semantics that bypass today's suppression contract; do not assert them here.
-  view.unmount();
+  affordances.assertState(state);
 }
 
 function consumeAndAssertSpectatorStates(
   watch: SpectatorWatch,
-  cardDb: Map<string, CardData>,
+  affordances: SpectatorAffordanceHarness,
   expectState = true
 ): GameState | null {
-  const messages = parseWatchMessages(watch.socket).slice(watch.cursor);
+  const messages = parseWatchMessages(watch.socket, watch.cursor);
   watch.cursor += messages.length;
   const states = messages.flatMap((message) =>
     message.type === "game:state" || message.type === "game:update"
@@ -220,7 +258,7 @@ function consumeAndAssertSpectatorStates(
   );
   if (expectState) expect(states.length).toBeGreaterThan(0);
   for (const state of states) {
-    assertSpectatorInformationAndAffordanceInvariants(state, cardDb);
+    assertSpectatorInformationAndAffordanceInvariants(state, affordances);
     watch.currentState = state;
   }
   return watch.currentState;
@@ -233,6 +271,8 @@ afterEach(() => {
 });
 
 describe("OPT-566 full spectated-game watch-through", () => {
+  // Full-stack worker session, production WebSocket upgrade, and real UI
+  // rendering need explicit headroom on cold, resource-constrained CI runners.
   it("watches pregame through game over with production admission, exact bootstrap parity, and invariant-safe real UI states", async () => {
     const sessionPath = "../../workers/game/src/GameSession.ts";
     const transportPath = "../../workers/game/src/session/transport.ts";
@@ -289,6 +329,7 @@ describe("OPT-566 full spectated-game watch-through", () => {
     );
     expect(initResponse.status).toBe(200);
     expect(session.gameState.pregame?.phase).toBe("PRIORITY_CHOICE");
+    const affordances = createSpectatorAffordanceHarness(session.cardDb);
 
     const playerSockets = [
       new WatchThroughSocket(),
@@ -325,7 +366,8 @@ describe("OPT-566 full spectated-game watch-through", () => {
       cursor: 0,
       currentState: null,
     };
-    consumeAndAssertSpectatorStates(firstWatch, session.cardDb);
+    consumeAndAssertSpectatorStates(firstWatch, affordances);
+    affordances.auditMenu();
 
     const activeWatches: SpectatorWatch[] = [firstWatch];
     const drive = async (
@@ -338,8 +380,9 @@ describe("OPT-566 full spectated-game watch-through", () => {
         JSON.stringify({ type: "game:action", action })
       );
       const playerReplies = parseWatchMessages(
-        playerSockets[playerIndex]
-      ).slice(playerCursor);
+        playerSockets[playerIndex],
+        playerCursor
+      );
       expect(
         playerReplies.some(
           (message) =>
@@ -347,7 +390,7 @@ describe("OPT-566 full spectated-game watch-through", () => {
         )
       ).toBe(false);
       for (const watch of activeWatches) {
-        consumeAndAssertSpectatorStates(watch, session.cardDb);
+        consumeAndAssertSpectatorStates(watch, affordances);
       }
       const currentSpectatorState = activeWatches[0].currentState;
       expect(currentSpectatorState).not.toBeNull();
@@ -397,7 +440,7 @@ describe("OPT-566 full spectated-game watch-through", () => {
       cursor: 0,
       currentState: null,
     };
-    consumeAndAssertSpectatorStates(secondWatch, session.cardDb);
+    consumeAndAssertSpectatorStates(secondWatch, affordances);
     expect(secondWatch.currentState).toEqual(firstWatch.currentState);
     activeWatches.push(secondWatch);
 
@@ -417,7 +460,7 @@ describe("OPT-566 full spectated-game watch-through", () => {
       cursor: 0,
       currentState: null,
     };
-    consumeAndAssertSpectatorStates(reconnectedFirstWatch, session.cardDb);
+    consumeAndAssertSpectatorStates(reconnectedFirstWatch, affordances);
     expect(reconnectedFirstWatch.currentState).toEqual(
       secondWatch.currentState
     );
@@ -469,6 +512,7 @@ describe("OPT-566 full spectated-game watch-through", () => {
     expect(session.gameState.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(
       CARDS.TRIGGER.id
     );
+    affordances.auditMenu();
 
     spectatorState = await drive(1, {
       type: "REVEAL_TRIGGER",
@@ -500,5 +544,5 @@ describe("OPT-566 full spectated-game watch-through", () => {
         reason: SPECTATOR_GAME_ENDED_CLOSE_REASON,
       });
     }
-  });
+  }, 15_000);
 });
