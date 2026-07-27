@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
@@ -111,6 +112,18 @@ beforeEach(() => {
 });
 
 describe("PUT /api/friends/requests/[id] — accept", () => {
+  it("does not double-charge a notification action that was already limited", async () => {
+    const { request, params } = buildRequest({ action: "accept" });
+
+    const res = await PUT(request, {
+      params,
+      rateLimitCharge: NOTIFICATION_ACTION_RATE_LIMIT_CHARGED,
+    });
+
+    expect(res.status).toBe(200);
+    expect(rateLimitMock).not.toHaveBeenCalled();
+  });
+
   it("notifies the original sender with friend:request_accepted", async () => {
     const { request, params } = buildRequest({ action: "accept" });
     const res = await PUT(request, { params });

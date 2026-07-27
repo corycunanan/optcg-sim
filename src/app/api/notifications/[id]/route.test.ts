@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn();
@@ -74,7 +75,7 @@ describe("PUT /api/notifications/[id]", () => {
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(429);
-    expect(notificationFindFirstMock).toHaveBeenCalledTimes(1);
+    expect(notificationFindFirstMock).not.toHaveBeenCalled();
     expect(notificationUpdateManyMock).not.toHaveBeenCalled();
   });
 
@@ -95,6 +96,7 @@ describe("PUT /api/notifications/[id]", () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "Notification not found" });
+    expect(rateLimitMock).toHaveBeenCalledTimes(1);
     expect(notificationUpdateManyMock).not.toHaveBeenCalled();
   });
 
@@ -181,13 +183,16 @@ describe("PUT /api/notifications/[id]", () => {
 
       expect(res.status).toBe(200);
       expect(resolveFriendRequestMock).toHaveBeenCalledTimes(1);
-      expect(rateLimitMock).not.toHaveBeenCalled();
+      expect(rateLimitMock).toHaveBeenCalledTimes(1);
       const [proxiedRequest, context] = resolveFriendRequestMock.mock.calls[0];
       expect(proxiedRequest.nextUrl.pathname).toBe(
         "/api/friends/requests/request-1",
       );
       expect(await proxiedRequest.json()).toEqual({ action });
       await expect(context.params).resolves.toEqual({ id: "request-1" });
+      expect(context.rateLimitCharge).toBe(
+        NOTIFICATION_ACTION_RATE_LIMIT_CHARGED,
+      );
     },
   );
 
@@ -203,6 +208,7 @@ describe("PUT /api/notifications/[id]", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
+    expect(rateLimitMock).toHaveBeenCalledTimes(1);
     expect(resolveFriendRequestMock).not.toHaveBeenCalled();
   });
 
@@ -225,9 +231,28 @@ describe("PUT /api/notifications/[id]", () => {
       expect(await res.json()).toEqual({
         error: `Notification already ${status.toLowerCase()}`,
       });
+      expect(rateLimitMock).toHaveBeenCalledTimes(1);
       expect(resolveFriendRequestMock).not.toHaveBeenCalled();
     },
   );
+
+  it("charges the limiter before returning 422 for a non-actionable notification", async () => {
+    notificationFindFirstMock.mockResolvedValueOnce({
+      type: "FRIEND_REQUEST",
+      status: "PENDING",
+      referenceId: null,
+    });
+    const { request, params } = buildRequest("accept");
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({
+      error: "Notification action unavailable",
+    });
+    expect(rateLimitMock).toHaveBeenCalledTimes(1);
+    expect(resolveFriendRequestMock).not.toHaveBeenCalled();
+  });
 
   it("handles a concurrent legacy acceptance idempotently", async () => {
     resolveFriendRequestMock.mockResolvedValueOnce(

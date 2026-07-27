@@ -10,6 +10,7 @@ import { FriendRequestActionSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
 import { resolveFriendRequestNotification } from "@/lib/notifications";
+import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import {
   serializeFriendRequestForEvent,
@@ -18,15 +19,26 @@ import {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  {
+    params,
+    rateLimitCharge,
+  }: {
+    params: Promise<{ id: string }>;
+    rateLimitCharge?: typeof NOTIFICATION_ACTION_RATE_LIMIT_CHARGED;
+  },
 ) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
   const { session, userId } = authResult;
 
-  const { limited } = await socialLimiter.check(`friend-action:${userId}`);
-  if (limited) {
-    return apiError("Too many requests. Try again later.", 429);
+  // Direct friend actions charge socialLimiter. The notification proxy passes
+  // an unforgeable marker after charging apiLimiter, preserving exactly one
+  // limiter charge without exposing a client-controlled bypass.
+  if (rateLimitCharge !== NOTIFICATION_ACTION_RATE_LIMIT_CHARGED) {
+    const { limited } = await socialLimiter.check(`friend-action:${userId}`);
+    if (limited) {
+      return apiError("Too many requests. Try again later.", 429);
+    }
   }
 
   const { id } = await params;

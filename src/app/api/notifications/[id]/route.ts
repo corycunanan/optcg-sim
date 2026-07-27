@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { apiLimiter } from "@/lib/rate-limit";
 import { isErrorResponse, parseBody } from "@/lib/validators/helpers";
 import { NotificationActionSchema } from "@/lib/validators/notifications";
+import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
 
 export async function PUT(
   request: NextRequest,
@@ -17,6 +18,14 @@ export async function PUT(
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
   const { userId } = authResult;
+
+  // Single-charge invariant: every authenticated path is charged here exactly
+  // once. Proxied friend actions carry an unforgeable marker so the inner route
+  // does not also charge socialLimiter.
+  const { limited } = await apiLimiter.check(`notifications:action:${userId}`);
+  if (limited) {
+    return apiError("Too many requests. Try again later.", 429);
+  }
 
   const { id } = await params;
 
@@ -33,15 +42,6 @@ export async function PUT(
     }
 
     if (parsed.action === "read" || parsed.action === "dismiss") {
-      // Inbox-only mutations use the general API budget. Accept/decline skips
-      // this limiter because the proxied friend route charges socialLimiter.
-      const { limited } = await apiLimiter.check(
-        `notifications:action:${userId}`,
-      );
-      if (limited) {
-        return apiError("Too many requests. Try again later.", 429);
-      }
-
       await prisma.notification.updateMany({
         where: {
           id,
@@ -80,6 +80,7 @@ export async function PUT(
     );
     const response = await resolveFriendRequest(friendRequest, {
       params: Promise.resolve({ id: notification.referenceId }),
+      rateLimitCharge: NOTIFICATION_ACTION_RATE_LIMIT_CHARGED,
     });
 
     if (response.status !== 404) return response;
