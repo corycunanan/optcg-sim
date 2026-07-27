@@ -24,6 +24,11 @@ import {
   type PresenceMap,
 } from "./presence-state";
 import { z } from "zod";
+import { useSession } from "next-auth/react";
+import {
+  useNotificationState,
+  type NotificationInboxState,
+} from "@/hooks/use-notification-state";
 
 export type { PresenceEntry, PresenceMap } from "./presence-state";
 
@@ -40,6 +45,8 @@ interface UserChannelContextValue {
    * that renders user presence.
    */
   trackPresence: (ids: readonly string[]) => void;
+  /** Realtime-first state consumed by the notification bell and panel. */
+  notificationInbox: NotificationInboxState;
 }
 
 const UserChannelContext = createContext<UserChannelContextValue | null>(null);
@@ -51,9 +58,14 @@ const UserChannelContext = createContext<UserChannelContextValue | null>(null);
  * would each open a socket, breaking single-socket-per-tab.
  */
 export function UserChannelProvider({ children }: { children: ReactNode }) {
+  const { status: sessionStatus } = useSession();
   const { subscribe, send, connectionStatus } = useUserChannel();
   const [presence, setPresence] = useState<PresenceMap>(EMPTY_PRESENCE);
   const trackedRef = useRef<Set<string>>(new Set());
+  const notificationInbox = useNotificationState(
+    subscribe,
+    sessionStatus === "authenticated"
+  );
 
   const trackPresence = useCallback((ids: readonly string[]) => {
     const tracked = trackedRef.current;
@@ -86,8 +98,22 @@ export function UserChannelProvider({ children }: { children: ReactNode }) {
   }, [subscribe]);
 
   const value = useMemo<UserChannelContextValue>(
-    () => ({ subscribe, send, connectionStatus, presence, trackPresence }),
-    [subscribe, send, connectionStatus, presence, trackPresence]
+    () => ({
+      subscribe,
+      send,
+      connectionStatus,
+      presence,
+      trackPresence,
+      notificationInbox,
+    }),
+    [
+      subscribe,
+      send,
+      connectionStatus,
+      presence,
+      trackPresence,
+      notificationInbox,
+    ]
   );
 
   return (

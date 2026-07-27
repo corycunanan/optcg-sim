@@ -22,6 +22,16 @@ export type ConnectionStatus =
  */
 export type RealtimeServerEvent =
   | { type: "message:new"; message: SerializedMessage }
+  | {
+      type: "notification:created";
+      notification: SerializedNotification;
+      unreadCount: number;
+    }
+  | {
+      type: "notification:resolved";
+      notification: SerializedNotification;
+      unreadCount: number;
+    }
   | { type: "friend:request_received"; request: SerializedFriendRequest }
   | {
       type: "friend:request_accepted";
@@ -112,6 +122,27 @@ export interface SerializedMessage {
   /** Set when the recipient has marked this message read; null otherwise. */
   readAt: string | null;
   fromUser: SerializedUser;
+}
+
+export type SerializedJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | SerializedJsonValue[]
+  | { [key: string]: SerializedJsonValue };
+
+export interface SerializedNotification {
+  id: string;
+  userId: string;
+  type: "FRIEND_REQUEST";
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "READ" | "DISMISSED";
+  actorUserId: string | null;
+  referenceId: string | null;
+  payload: SerializedJsonValue;
+  createdAt: string;
+  updatedAt: string;
+  actor: SerializedUser | null;
 }
 
 export interface SerializedFriendRequest {

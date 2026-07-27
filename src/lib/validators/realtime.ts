@@ -14,6 +14,19 @@ const SerializedUserSchema = z.object({
   image: z.string().nullable(),
 });
 
+export const SerializedNotificationSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  type: z.literal("FRIEND_REQUEST"),
+  status: z.enum(["PENDING", "ACCEPTED", "DECLINED", "READ", "DISMISSED"]),
+  actorUserId: z.string().nullable(),
+  referenceId: z.string().nullable(),
+  payload: z.json(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  actor: SerializedUserSchema.nullable(),
+});
+
 export const SerializedMessageSchema = z.object({
   id: z.string(),
   fromUserId: z.string(),
@@ -62,6 +75,16 @@ export const RealtimeServerEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("message:new"),
     message: SerializedMessageSchema,
+  }),
+  z.object({
+    type: z.literal("notification:created"),
+    notification: SerializedNotificationSchema,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("notification:resolved"),
+    notification: SerializedNotificationSchema,
+    unreadCount: z.number().int().nonnegative(),
   }),
   z.object({
     type: z.literal("friend:request_received"),
