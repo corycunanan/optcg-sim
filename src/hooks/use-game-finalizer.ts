@@ -15,6 +15,7 @@ export interface UseGameFinalizerArgs {
   gameState: GameState | null;
   gameOver: { winner: 0 | 1 | null; reason: string } | null;
   matchClosed: boolean;
+  enabled?: boolean;
   leaveGame: () => Promise<void>;
   setRemoteGameStatus: Dispatch<SetStateAction<RemoteGameStatus | null>>;
 }
@@ -34,6 +35,7 @@ export function useGameFinalizer({
   gameState,
   gameOver,
   matchClosed,
+  enabled = true,
   leaveGame,
   setRemoteGameStatus,
 }: UseGameFinalizerArgs): UseGameFinalizerReturn {
@@ -45,6 +47,7 @@ export function useGameFinalizer({
   const finalizeSucceededRef = useRef(false);
   const finalizeInFlightRef = useRef<Promise<boolean> | null>(null);
   const finalizeGame = useCallback(async (): Promise<boolean> => {
+    if (!enabled) return false;
     if (finalizeSucceededRef.current) return true;
     if (finalizeInFlightRef.current) return finalizeInFlightRef.current;
 
@@ -80,22 +83,24 @@ export function useGameFinalizer({
         finalizeInFlightRef.current = null;
       }
     }
-  }, [gameId, gameOver, gameState]);
+  }, [enabled, gameId, gameOver, gameState]);
 
   useEffect(() => {
     if (matchClosed) void finalizeGame();
   }, [matchClosed, finalizeGame]);
 
   const handleBackToLobbies = useCallback(async () => {
+    if (!enabled) return;
     if (matchClosed) {
       await finalizeGame();
     } else {
       await leaveGame().catch(() => {});
     }
     window.location.href = "/lobbies";
-  }, [matchClosed, finalizeGame, leaveGame]);
+  }, [enabled, matchClosed, finalizeGame, leaveGame]);
 
   const handleLeaveGame = useCallback(async () => {
+    if (!enabled) return;
     setLeavingGame(true);
     setLeaveError(null);
     try {
@@ -105,9 +110,10 @@ export function useGameFinalizer({
       setLeaveError("Failed to leave the game cleanly");
       setLeavingGame(false);
     }
-  }, [leaveGame]);
+  }, [enabled, leaveGame]);
 
   const handleFallbackConcede = useCallback(async () => {
+    if (!enabled) return;
     setFallbackSubmitting(true);
     setFallbackError(null);
     try {
@@ -127,7 +133,7 @@ export function useGameFinalizer({
       );
       setFallbackSubmitting(false);
     }
-  }, [gameId, setRemoteGameStatus]);
+  }, [enabled, gameId, setRemoteGameStatus]);
 
   return {
     leavingGame,

@@ -34,6 +34,7 @@ export interface BoardState {
   activePrompt: PromptOptions | null;
   activePromptId: string | null;
   matchClosed: boolean;
+  leavingGame?: boolean;
   canUndo: boolean;
   actionRejection?: ActionRejection | null;
   acceptedUpdate?: AcceptedGameUpdate | null;

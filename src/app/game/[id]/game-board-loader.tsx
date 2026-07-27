@@ -16,6 +16,7 @@ export function GameBoardLoader({
   playerIndex,
   gameMode,
   viewerRole,
+  lobbyId,
   bottomPlayerIndex,
   playerDisplayNames,
 }: {
@@ -24,6 +25,7 @@ export function GameBoardLoader({
   playerIndex?: 0 | 1;
   gameMode?: "PVP" | "SOLITAIRE" | "PVCOMPUTER";
   viewerRole: "player" | "spectator";
+  lobbyId: string;
   bottomPlayerIndex?: 0 | 1;
   playerDisplayNames: readonly [string, string];
 }) {
@@ -34,6 +36,7 @@ export function GameBoardLoader({
       playerIndex={playerIndex}
       gameMode={gameMode}
       viewerRole={viewerRole}
+      lobbyId={lobbyId}
       bottomPlayerIndex={bottomPlayerIndex}
       playerDisplayNames={playerDisplayNames}
     />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   GameState,
   GameAction,
@@ -9,6 +9,7 @@ import type {
 } from "@shared/game-types";
 import { useAuthedWebSocket } from "@/hooks/use-authed-websocket";
 import { GameServerMessageSchema } from "@/lib/validators/realtime";
+import { toast } from "sonner";
 
 export interface ActionRejection {
   action: GameAction;
@@ -29,6 +30,121 @@ const PROMPT_RESPONSE_TYPES = new Set<GameAction["type"]>([
   "SELECT_TARGET",
   "PASS",
 ]);
+
+const SPECTATOR_TOAST_BATCH_MS = 500;
+const SPECTATOR_RECONNECT_WINDOW_MS = 5_000;
+const SPECTATOR_CHURN_COOLDOWN_MS = 30_000;
+
+type SpectatorLifecycleEvent = Extract<
+  ServerMessage,
+  { type: "game:spectator_joined" | "game:spectator_left" }
+>;
+
+class SpectatorLifecycleToasts {
+  private batch = this.createBatch();
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private readonly recentDepartures = new Map<string, number>();
+  private readonly churnCooldowns = new Map<string, number>();
+
+  queue(event: SpectatorLifecycleEvent): void {
+    const now = Date.now();
+    const { id, displayName } = event.spectator;
+    this.prune(now);
+
+    if (event.type === "game:spectator_left" && event.cause === "EJECTED") {
+      this.batch.joined.delete(id);
+      this.batch.departed.delete(id);
+      this.batch.ejected.set(id, displayName);
+      this.recentDepartures.delete(id);
+      this.churnCooldowns.delete(id);
+      this.schedule();
+      return;
+    }
+
+    if ((this.churnCooldowns.get(id) ?? 0) > now) return;
+
+    if (event.type === "game:spectator_joined") {
+      const departedAt = this.recentDepartures.get(id);
+      if (
+        departedAt !== undefined &&
+        now - departedAt <= SPECTATOR_RECONNECT_WINDOW_MS
+      ) {
+        this.batch.departed.delete(id);
+        this.recentDepartures.delete(id);
+        this.churnCooldowns.set(id, now + SPECTATOR_CHURN_COOLDOWN_MS);
+        return;
+      }
+      this.batch.joined.set(id, displayName);
+    } else {
+      this.recentDepartures.set(id, now);
+      this.batch.departed.set(id, displayName);
+    }
+    this.schedule();
+  }
+
+  dispose(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  private schedule(): void {
+    if (this.timer !== null) return;
+    this.timer = setTimeout(() => this.flush(), SPECTATOR_TOAST_BATCH_MS);
+  }
+
+  private flush(): void {
+    const batch = this.batch;
+    this.batch = this.createBatch();
+    this.timer = null;
+    this.toastBatch(
+      batch.joined,
+      (name) => `${name} started spectating`,
+      (count) => `${count} spectators started spectating`
+    );
+    this.toastBatch(
+      batch.departed,
+      (name) => `${name} stopped spectating`,
+      (count) => `${count} spectators stopped spectating`
+    );
+    this.toastBatch(
+      batch.ejected,
+      (name) => `${name} was removed from spectating`,
+      (count) => `${count} spectators were removed from spectating`
+    );
+  }
+
+  private toastBatch(
+    spectators: Map<string, string>,
+    singular: (name: string) => string,
+    plural: (count: number) => string
+  ): void {
+    if (spectators.size === 0) return;
+    toast.info(
+      spectators.size === 1
+        ? singular(spectators.values().next().value ?? "Spectator")
+        : plural(spectators.size)
+    );
+  }
+
+  private prune(now: number): void {
+    for (const [id, departedAt] of this.recentDepartures) {
+      if (now - departedAt > SPECTATOR_RECONNECT_WINDOW_MS) {
+        this.recentDepartures.delete(id);
+      }
+    }
+    for (const [id, suppressedUntil] of this.churnCooldowns) {
+      if (suppressedUntil <= now) this.churnCooldowns.delete(id);
+    }
+  }
+
+  private createBatch() {
+    return {
+      joined: new Map<string, string>(),
+      departed: new Map<string, string>(),
+      ejected: new Map<string, string>(),
+    };
+  }
+}
 
 function preserveUnchangedPlayerReferences(
   previousState: GameState | null,
@@ -86,6 +202,14 @@ export function useGameWs(
   const [acceptedUpdate, setAcceptedUpdate] =
     useState<AcceptedGameUpdate | null>(null);
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
+  const spectatorToastsRef = useRef<SpectatorLifecycleToasts | null>(null);
+  if (spectatorToastsRef.current === null) {
+    spectatorToastsRef.current = new SpectatorLifecycleToasts();
+  }
+
+  useEffect(() => {
+    return () => spectatorToastsRef.current?.dispose();
+  }, []);
 
   const url = useMemo(
     () => (gameId && workerUrl ? `${workerUrl}/game/${gameId}/ws` : null),
@@ -173,6 +297,12 @@ export function useGameWs(
       case "game:player_disconnected":
       case "game:player_reconnected":
         // Game state update (connected flag) will arrive via next broadcast
+        break;
+      case "game:spectator_joined":
+        spectatorToastsRef.current?.queue(msg);
+        break;
+      case "game:spectator_left":
+        spectatorToastsRef.current?.queue(msg);
         break;
     }
   }, []);

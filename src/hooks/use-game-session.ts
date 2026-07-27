@@ -1,14 +1,16 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { ApiError, apiGet } from "@/lib/api-client";
+import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
 import { GameTokenResponseSchema } from "@/lib/validators/game";
+import { LobbyActionResponseSchema } from "@/lib/validators/lobbies";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameWs } from "@/hooks/use-game-ws";
 import type { AcceptedGameUpdate, ActionRejection } from "@/hooks/use-game-ws";
 import { useCardDatabase } from "@/hooks/use-card-database";
 import { useRemoteGameStatus } from "@/hooks/use-remote-game-status";
 import { useGameFinalizer } from "@/hooks/use-game-finalizer";
+import { toast } from "sonner";
 import type {
   CardDb,
   GameAction,
@@ -121,6 +123,7 @@ export type GameSessionPerspective =
   | {
       viewerRole: "spectator";
       bottomPlayerIndex?: 0 | 1;
+      lobbyId: string;
     };
 
 /**
@@ -153,6 +156,8 @@ export function useGameSession(
     perspective.viewerRole === "spectator"
       ? undefined
       : perspective.requestedPlayerIndex;
+  const spectatorLobbyId =
+    perspective.viewerRole === "spectator" ? perspective.lobbyId : "";
 
   /* ── Remote game status polling ───────────────────────────────────── */
 
@@ -340,15 +345,38 @@ export function useGameSession(
     viewerRole === "player" &&
     (requestedPlayerIndex === undefined || requestedPlayerIndex === 0);
   const noopNavigationHandler = useCallback(async () => {}, []);
+  const [spectatorLeaving, setSpectatorLeaving] = useState(false);
+  const spectatorLeaveInFlightRef = useRef(false);
   const handleSpectatorBackToLobbies = useCallback(async () => {
+    await leaveGame().catch(() => {});
     window.location.href = "/lobbies";
-  }, []);
+  }, [leaveGame]);
+  const handleStopSpectating = useCallback(async () => {
+    if (spectatorLeaveInFlightRef.current) return;
+    spectatorLeaveInFlightRef.current = true;
+    setSpectatorLeaving(true);
+    try {
+      await apiDelete(
+        `/api/lobbies/${spectatorLobbyId}/spectators`,
+        LobbyActionResponseSchema
+      );
+      // Membership deletion is authoritative. If local close fails, the route's
+      // revocation push closes the socket; token lease expiry is the backstop.
+      await leaveGame().catch(() => {});
+      window.location.href = "/lobbies";
+    } catch {
+      toast.error("Couldn’t stop spectating. You’re still watching.");
+      spectatorLeaveInFlightRef.current = false;
+      setSpectatorLeaving(false);
+    }
+  }, [leaveGame, spectatorLobbyId]);
 
   const finalizerNavigation = useGameFinalizer({
     gameId,
     gameState,
     gameOver,
-    matchClosed: finalizerEnabled && matchClosed,
+    matchClosed,
+    enabled: finalizerEnabled,
     leaveGame,
     setRemoteGameStatus,
   });
@@ -364,12 +392,12 @@ export function useGameSession(
     ? finalizerNavigation
     : viewerRole === "spectator"
       ? {
-          leavingGame: false,
+          leavingGame: spectatorLeaving,
           leaveError: null,
           fallbackSubmitting: false,
           fallbackError: null,
           handleBackToLobbies: handleSpectatorBackToLobbies,
-          handleLeaveGame: handleSpectatorBackToLobbies,
+          handleLeaveGame: handleStopSpectating,
           handleFallbackConcede: noopNavigationHandler,
         }
       : {

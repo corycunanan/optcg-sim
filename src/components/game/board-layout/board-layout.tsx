@@ -100,6 +100,7 @@ export interface BoardLayoutProps {
   onAction: (action: GameAction) => void;
   onLeave: () => void;
   matchClosed: boolean;
+  leavingGame?: boolean;
   canUndo: boolean;
   actionRejection?: ActionRejection | null;
   acceptedUpdate?: AcceptedGameUpdate | null;
@@ -159,6 +160,7 @@ function BoardLayoutInner({
   onAction,
   onLeave,
   matchClosed,
+  leavingGame,
   canUndo,
   interactionMode = "full",
   viewportSize,
@@ -397,6 +399,7 @@ function BoardLayoutInner({
         onLeave={onLeave}
         onConcede={() => dispatchBoardAction({ type: "CONCEDE" })}
         matchClosed={matchClosed}
+        leavingGame={leavingGame}
       />
 
       {/* ── Opponent Hand Layer ─────────────────────────────────────── */}

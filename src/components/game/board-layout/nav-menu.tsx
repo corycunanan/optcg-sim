@@ -21,10 +21,14 @@ export function NavMenu({
   onLeave,
   onConcede,
   matchClosed,
+  spectator = false,
+  leaving = false,
 }: {
   onLeave: () => void;
   onConcede?: () => void;
   matchClosed: boolean;
+  spectator?: boolean;
+  leaving?: boolean;
 }) {
   const [concedeOpen, setConcedeOpen] = useState(false);
 
@@ -32,7 +36,7 @@ export function NavMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="text-gb-text-subtle hover:text-gb-text-bright data-[state=open]:bg-gb-surface-raised data-[state=open]:text-gb-text-bright flex h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors"
+          className="text-gb-text-subtle hover:text-gb-text-bright data-[state=open]:bg-gb-surface-raised data-[state=open]:text-gb-text-bright focus-visible:ring-gb-accent-blue flex h-8 w-8 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
           aria-label="Game menu"
         >
           <svg
@@ -75,9 +79,14 @@ export function NavMenu({
       >
         <DropdownMenuItem
           onClick={onLeave}
+          disabled={leaving}
           className="text-gb-text focus:bg-gb-surface-raised text-xs"
         >
-          &larr; Back to Lobbies
+          {spectator
+            ? leaving
+              ? "Stopping…"
+              : "Stop spectating"
+            : "← Back to Lobbies"}
         </DropdownMenuItem>
         {!matchClosed && onConcede && (
           <DropdownMenuItem

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   remoteStatusCalls: [] as Array<[string, boolean]>,
   retryFetchCards: vi.fn(),
   fetch: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock("react", async (importActual) => {
@@ -45,6 +46,8 @@ vi.mock("react", async (importActual) => {
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { user: { id: "user-a" } } }),
 }));
+
+vi.mock("sonner", () => ({ toast: { error: mocks.toastError } }));
 
 vi.mock("@/hooks/use-game-ws", () => ({
   useGameWs: vi.fn(() => {
@@ -139,9 +142,10 @@ beforeEach(() => {
   mocks.remoteStatusCalls = [];
   mocks.retryFetchCards.mockReset();
   mocks.fetch.mockReset();
+  mocks.toastError.mockReset();
   mocks.fetch.mockResolvedValue({
     ok: true,
-    json: vi.fn().mockResolvedValue({ data: {} }),
+    json: vi.fn().mockResolvedValue({ success: true }),
   });
   vi.stubGlobal("fetch", mocks.fetch);
   vi.stubGlobal("window", { location: { href: "" } });
@@ -263,6 +267,7 @@ describe("useGameSession multi-instance composition", () => {
     const spectator = useRenderedSession({
       viewerRole: "spectator",
       bottomPlayerIndex: 1,
+      lobbyId: "lobby-1",
     });
 
     if (spectator.game.viewerRole !== "spectator") {
@@ -304,7 +309,10 @@ describe("useGameSession multi-instance composition", () => {
     const rawSendAction = vi.fn();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.wsReturns = [createWsReturn({ sendAction: rawSendAction })];
-    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
     const action = { type: "END_TURN" } as unknown as GameAction;
 
     spectator.game.sendAction(action);
@@ -317,7 +325,7 @@ describe("useGameSession multi-instance composition", () => {
     warn.mockRestore();
   });
 
-  it("keeps finalization, leave, and fallback-concede mutations inert for spectators", async () => {
+  it("keeps finalization and fallback concede inert while stop-spectating uses only its endpoint", async () => {
     const finishedState = createGameState(["user-a", "opponent-b"], "FINISHED");
     const leaveGame = vi.fn().mockResolvedValue(undefined);
     mocks.remoteGameStatus = {
@@ -333,14 +341,87 @@ describe("useGameSession multi-instance composition", () => {
       }),
     ];
 
-    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
     await flushAsync();
     await spectator.navigation.handleFallbackConcede();
     await spectator.navigation.handleLeaveGame();
 
-    expect(mocks.fetch).not.toHaveBeenCalled();
-    expect(leaveGame).not.toHaveBeenCalled();
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/spectators",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(leaveGame).toHaveBeenCalledOnce();
     expect(spectator.navigation.fallbackConcedeAvailable).toBe(false);
+    expect(window.location.href).toBe("/lobbies");
+  });
+
+  it("returns a completed spectator to the party without deleting membership", async () => {
+    const finishedState = createGameState(["user-a", "opponent-b"], "FINISHED");
+    const leaveGame = vi.fn().mockResolvedValue(undefined);
+    mocks.wsReturns = [createWsReturn({ gameState: finishedState, leaveGame })];
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
+
+    await spectator.navigation.handleBackToLobbies();
+
+    expect(leaveGame).toHaveBeenCalledOnce();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(window.location.href).toBe("/lobbies");
+  });
+
+  it("keeps the socket open and board connected without a departure when spectator DELETE fails", async () => {
+    let rejectDelete: ((error: Error) => void) | undefined;
+    mocks.fetch.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectDelete = reject;
+      })
+    );
+    const leaveGame = vi.fn().mockResolvedValue(undefined);
+    mocks.wsReturns = [createWsReturn({ leaveGame })];
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
+
+    const firstLeave = spectator.navigation.handleLeaveGame();
+    const duplicateLeave = spectator.navigation.handleLeaveGame();
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+    expect(leaveGame).not.toHaveBeenCalled();
+
+    rejectDelete?.(new Error("rate limited"));
+    await Promise.all([firstLeave, duplicateLeave]);
+
+    expect(leaveGame).not.toHaveBeenCalled();
+    expect(spectator.game.connectionStatus).toBe("connected");
+    expect(window.location.href).toBe("");
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Couldn’t stop spectating. You’re still watching."
+    );
+  });
+
+  it("navigates after successful DELETE even when local socket close fails", async () => {
+    const leaveGame = vi.fn().mockRejectedValue(new Error("close failed"));
+    mocks.wsReturns = [createWsReturn({ leaveGame })];
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
+
+    await spectator.navigation.handleLeaveGame();
+
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/spectators",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(leaveGame).toHaveBeenCalledOnce();
+    expect(mocks.toastError).not.toHaveBeenCalled();
     expect(window.location.href).toBe("/lobbies");
   });
 
@@ -357,7 +438,10 @@ describe("useGameSession multi-instance composition", () => {
       }),
     ];
 
-    const spectator = useRenderedSession({ viewerRole: "spectator" });
+    const spectator = useRenderedSession({
+      viewerRole: "spectator",
+      lobbyId: "lobby-1",
+    });
 
     expect(spectator.game.viewerRole).toBe("spectator");
     expect(spectator.game.gameState).toBeNull();
