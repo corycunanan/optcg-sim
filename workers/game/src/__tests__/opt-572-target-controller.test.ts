@@ -9,6 +9,8 @@ import {
   resolveEffect,
   resumeFromStack,
 } from "../engine/effect-resolver/index.js";
+import { executeActionChain } from "../engine/effect-resolver/resolver.js";
+import { executeLifeScry } from "../engine/effect-resolver/actions/life.js";
 import { computeAllValidTargets } from "../engine/effect-resolver/target-resolver.js";
 import {
   getEffectSchema,
@@ -207,6 +209,66 @@ describe("OPT-572 LIFE_CARD + EITHER", () => {
         .toBe(false);
     },
   );
+
+  it("drops a non-top Life card supplied through target_ref preselection", () => {
+    const cardDb = createTestCardDb();
+    const state = withDistinctLifeAndStages(createBattleReadyState(cardDb), cardDb);
+    const nonTop = state.players[1].life.at(-1)!;
+    const top = state.players[1].life[0];
+    const resultRefs = new Map([
+      ["opponent_life_pick", {
+        targetInstanceIds: [nonTop.instanceId, top.instanceId],
+        count: 2,
+      }],
+    ]);
+    const result = executeActionChain(
+      state,
+      [{
+        type: "LIFE_SCRY",
+        target_ref: "opponent_life_pick",
+        params: { look_at: 1 },
+      }],
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+      resultRefs,
+    );
+
+    expect(result.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    const scried = result.events.find((event) => event.type === "LIFE_SCRIED");
+    expect(scried?.payload).toMatchObject({
+      cards: [{
+        instanceId: top.instanceId,
+        cardId: top.cardId,
+      }],
+    });
+    expect(JSON.stringify(result.events)).not.toContain(nonTop.cardId);
+  });
+
+  it("rejects a non-top Life card resolved through SELECTED_CARDS", () => {
+    const cardDb = createTestCardDb();
+    const state = withDistinctLifeAndStages(createBattleReadyState(cardDb), cardDb);
+    const nonTop = state.players[1].life.at(-1)!;
+    const result = executeLifeScry(
+      state,
+      {
+        type: "LIFE_SCRY",
+        target: { type: "SELECTED_CARDS", ref: "selected_life" },
+        params: { look_at: 1 },
+      },
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+      new Map([
+        ["selected_life", { targetInstanceIds: [nonTop.instanceId], count: 1 }],
+      ]),
+    );
+
+    expect(result.succeeded).toBe(false);
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.events.some((event) => event.type === "LIFE_SCRIED")).toBe(false);
+    expect(JSON.stringify(result.events)).not.toContain(nonTop.cardId);
+  });
 });
 
 describe("OPT-572 STAGE + EITHER", () => {
