@@ -349,12 +349,12 @@ describe("OPT-566 full spectated-game watch-through", () => {
       for (const watch of activeWatches) {
         consumeAndAssertSpectatorStates(watch, session.cardDb);
       }
-      const current = activeWatches[0].currentState;
-      expect(current).not.toBeNull();
+      const currentSpectatorState = activeWatches[0].currentState;
+      expect(currentSpectatorState).not.toBeNull();
       for (const watch of activeWatches.slice(1)) {
-        expect(watch.currentState).toEqual(current);
+        expect(watch.currentState).toEqual(currentSpectatorState);
       }
-      return current!;
+      return currentSpectatorState!;
     };
 
     await drive(0, {
@@ -367,26 +367,26 @@ describe("OPT-566 full spectated-game watch-through", () => {
       choiceId: "REDRAW",
       promptId: session.gameState.pendingPrompt?.promptId,
     });
-    let current = await drive(1, {
+    let spectatorState = await drive(1, {
       type: "PLAYER_CHOICE",
       choiceId: "KEEP",
       promptId: session.gameState.pendingPrompt?.promptId,
     });
-    expect(current.pregame).toBeNull();
-    expect(current.turn).toMatchObject({
+    expect(spectatorState.pregame).toBeNull();
+    expect(spectatorState.turn).toMatchObject({
       number: 1,
       activePlayerIndex: 0,
       phase: "MAIN",
     });
 
-    current = await drive(0, { type: "ADVANCE_PHASE" });
-    expect(current.turn).toMatchObject({
+    spectatorState = await drive(0, { type: "ADVANCE_PHASE" });
+    expect(spectatorState.turn).toMatchObject({
       number: 1,
       activePlayerIndex: 1,
       phase: "MAIN",
     });
-    current = await drive(1, { type: "ADVANCE_PHASE" });
-    expect(current.turn).toMatchObject({
+    spectatorState = await drive(1, { type: "ADVANCE_PHASE" });
+    expect(spectatorState.turn).toMatchObject({
       number: 2,
       activePlayerIndex: 0,
       phase: "MAIN",
@@ -451,32 +451,41 @@ describe("OPT-566 full spectated-game watch-through", () => {
       deniedMessageCounts
     );
 
-    current = await drive(0, {
+    spectatorState = await drive(0, {
       type: "DECLARE_ATTACK",
       attackerInstanceId: session.gameState.players[0].leader.instanceId,
       targetInstanceId: session.gameState.players[1].leader.instanceId,
     });
-    expect(current.turn.battleSubPhase).toBe("BLOCK_STEP");
-    current = await drive(1, { type: "PASS" });
-    expect(current.turn.battleSubPhase).toBe("COUNTER_STEP");
-    current = await drive(1, { type: "PASS" });
-    expect(current.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
-    expect(current.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(
+    expect(spectatorState.turn.battleSubPhase).toBe("BLOCK_STEP");
+    spectatorState = await drive(1, { type: "PASS" });
+    expect(spectatorState.turn.battleSubPhase).toBe("COUNTER_STEP");
+    spectatorState = await drive(1, { type: "PASS" });
+    expect(spectatorState.pendingPrompt?.options.promptType).toBe(
+      "REVEAL_TRIGGER"
+    );
+    expect(spectatorState.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(
+      "hidden"
+    );
+    expect(session.gameState.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(
       CARDS.TRIGGER.id
     );
-    current = await drive(1, {
+
+    spectatorState = await drive(1, {
       type: "REVEAL_TRIGGER",
       reveal: true,
       promptId: session.gameState.pendingPrompt?.promptId,
     });
-    expect(current.turn.battle).toBeNull();
-    expect(
-      current.eventLog.some(
-        (event) =>
-          event.type === "TRIGGER_ACTIVATED" &&
-          event.payload.cardId === CARDS.TRIGGER.id
-      )
-    ).toBe(true);
+    expect(spectatorState.turn.battle).toBeNull();
+    const revealedTriggerEvent = spectatorState.eventLog.find(
+      (event) =>
+        event.type === "TRIGGER_ACTIVATED" && event.payload.activated === true
+    );
+    expect(revealedTriggerEvent?.type).toBe("TRIGGER_ACTIVATED");
+    if (revealedTriggerEvent?.type !== "TRIGGER_ACTIVATED") {
+      throw new Error("Spectator did not receive the activated Trigger event");
+    }
+    expect(revealedTriggerEvent.payload.activated).toBe(true);
+    expect(revealedTriggerEvent.payload.cardId).toBe(CARDS.TRIGGER.id);
 
     await drive(1, { type: "CONCEDE" });
     for (const watch of activeWatches) {
