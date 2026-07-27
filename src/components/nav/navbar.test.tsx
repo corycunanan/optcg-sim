@@ -2,7 +2,6 @@
 
 import type { ComponentProps, ReactNode } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -107,7 +106,7 @@ describe("Navbar", () => {
     render(<Navbar />);
 
     expect(
-      screen.getByRole("button", {
+      screen.getByRole("status", {
         name: "Notifications, No unread notifications",
       })
     ).toBeDefined();
@@ -137,17 +136,28 @@ describe("Navbar", () => {
     expect(screen.getByRole("button", { name: "Decks" })).toBeDefined();
   });
 
-  it("uses a non-gold active-route treatment beside emphasized PLAY", () => {
-    mocks.pathname = "/";
-    render(<Navbar />);
-    const play = screen.getByRole("link", { name: "Play" });
-    const home = screen.getByRole("link", { name: "Home" });
+  it.each([
+    ["/lobbies", "link", "Play", "play"],
+    ["/", "link", "Home", "standard"],
+    ["/cards", "button", "Cards", "standard"],
+    ["/decks", "button", "Decks", "standard"],
+  ])(
+    "renders the distinct current-route indicator for %s",
+    (pathname, role, accessibleName, indicatorVariant) => {
+      mocks.pathname = pathname;
+      render(<Navbar />);
 
-    expect(play.className).toContain("bg-gold-500");
-    expect(home.className).toContain("border-b-2");
-    expect(home.className).toContain("border-border-strong");
-    expect(home.className).not.toContain("text-accent");
-  });
+      const activeControl = screen.getByRole(role, { name: accessibleName });
+      const indicator = activeControl.querySelector(
+        '[data-slot="navbar-current-indicator"]'
+      );
+
+      expect(indicator?.getAttribute("data-variant")).toBe(indicatorVariant);
+      expect(
+        document.querySelectorAll('[data-slot="navbar-current-indicator"]')
+      ).toHaveLength(1);
+    }
+  );
 
   it("reflects realtime unread counts, caps at 9+, and omits a zero badge", () => {
     mocks.unreadCount = 4;
@@ -173,30 +183,32 @@ describe("Navbar", () => {
     expect(screen.getByRole("button", { name: "Sign Out" })).toBeDefined();
   });
 
-  it("operates the notification trigger from the keyboard", async () => {
-    const user = userEvent.setup();
+  it("renders the production bell as a non-interactive count status", () => {
     render(<Navbar />);
-    const bell = screen.getByRole("button", {
+    const indicator = screen.getByRole("status", {
       name: "Notifications, No unread notifications",
     });
 
-    bell.focus();
-    await user.keyboard("{Enter}");
-
-    expect(document.activeElement).toBe(bell);
-    expect(bell.hasAttribute("aria-haspopup")).toBe(false);
-    expect(bell.hasAttribute("aria-expanded")).toBe(false);
+    expect(indicator.tabIndex).toBe(-1);
+    expect(screen.queryByRole("button", { name: /notifications/i })).toBeNull();
   });
 
-  it("reserves the account cluster width while the session loads", () => {
+  it("keeps the same reserved action slot across auth resolution", () => {
     mocks.sessionStatus = "loading";
-    render(<Navbar />);
+    const { rerender } = render(<Navbar />);
+    const loadingSlot = document.querySelector('[data-slot="navbar-actions"]');
 
-    const placeholder = document.querySelector(
-      '[data-slot="navbar-actions-placeholder"]'
-    );
-    expect(placeholder?.className).toContain("w-28");
-    expect(document.querySelector('[data-slot="navbar-actions"]')).toBeNull();
+    expect(loadingSlot?.getAttribute("data-state")).toBe("loading");
+
+    mocks.sessionStatus = "authenticated";
+    rerender(<Navbar />);
+    const readySlot = document.querySelector('[data-slot="navbar-actions"]');
+
+    expect(readySlot).toBe(loadingSlot);
+    expect(readySlot?.getAttribute("data-state")).toBe("ready");
+    expect(
+      screen.getByRole("button", { name: "Account menu for luffy" })
+    ).toBeDefined();
   });
 
   it("handles partial authenticated user data with a default theme", () => {
@@ -217,23 +229,22 @@ describe("Navbar", () => {
 
     mocks.sessionStatus = "loading";
     rerender(<Navbar />);
-    expect(document.querySelector('[data-slot="navbar-actions"]')).toBeNull();
     expect(
-      document.querySelector('[data-slot="navbar-actions-placeholder"]')
-    ).not.toBeNull();
+      document
+        .querySelector('[data-slot="navbar-actions"]')
+        ?.getAttribute("data-state")
+    ).toBe("loading");
 
     mocks.sessionStatus = "unauthenticated";
     rerender(<Navbar />);
-    expect(
-      document.querySelector('[data-slot="navbar-actions-placeholder"]')
-    ).toBeNull();
+    expect(document.querySelector('[data-slot="navbar-actions"]')).toBeNull();
   });
 
   it("does not render account actions before authentication", () => {
     mocks.sessionStatus = "unauthenticated";
     render(<Navbar />);
 
-    expect(screen.queryByRole("button", { name: "Notifications" })).toBeNull();
+    expect(screen.queryByRole("status", { name: /notifications/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /account menu/i })).toBeNull();
   });
 });

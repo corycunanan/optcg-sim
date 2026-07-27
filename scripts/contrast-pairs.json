@@ -125,6 +125,30 @@
       "foreground": "--border-focus",
       "background": "--surface-inset",
       "minimum": 3
+    },
+    {
+      "name": "nav-current-indicator/chrome",
+      "foreground": "--nav-current-indicator",
+      "background": "--surface-nav",
+      "minimum": 3
+    },
+    {
+      "name": "nav-current-indicator/chrome-hover",
+      "foreground": "--nav-current-indicator",
+      "background": "--surface-raised",
+      "minimum": 3
+    },
+    {
+      "name": "nav-current-indicator/play",
+      "foreground": "--nav-current-indicator-on-accent",
+      "background": "--accent",
+      "minimum": 3
+    },
+    {
+      "name": "nav-current-indicator/play-hover",
+      "foreground": "--nav-current-indicator-on-accent",
+      "background": "--accent-hover",
+      "minimum": 3
     }
   ]
 }

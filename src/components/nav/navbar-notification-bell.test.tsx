@@ -8,6 +8,16 @@ import { NavbarNotificationBell } from "./navbar-notification-bell";
 afterEach(() => cleanup());
 
 describe("NavbarNotificationBell", () => {
+  it("is a non-interactive count indicator without an activation handler", () => {
+    render(<NavbarNotificationBell unreadCount={3} />);
+
+    const indicator = screen.getByRole("status", {
+      name: "Notifications, 3 unread notifications",
+    });
+    expect(indicator.tabIndex).toBe(-1);
+    expect(screen.queryByRole("button", { name: /notifications/i })).toBeNull();
+  });
+
   it("is keyboard operable through the OPT-528 activation seam", async () => {
     const user = userEvent.setup();
     const onActivate = vi.fn();
@@ -36,7 +46,7 @@ describe("NavbarNotificationBell", () => {
       document.querySelector('[data-slot="notification-unread-badge"]')
     ).toBeNull();
     expect(
-      screen.getByRole("button", {
+      screen.getByRole("status", {
         name: "Notifications, No unread notifications",
       })
     ).toBeDefined();

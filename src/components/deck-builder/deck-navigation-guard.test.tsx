@@ -787,7 +787,7 @@ describe("deck builder navigation guard", () => {
       const item = [
         ...renderer!.root.findAllByType("a"),
         ...renderer!.root.findAllByType("button"),
-      ].find((candidate) => candidate.props.children === label);
+      ].find((candidate) => candidate.children.includes(label));
 
       expect(item?.props[activeProp]).toBeTruthy();
     }

@@ -27,19 +27,9 @@ export function NavbarNotificationBell({
       : `${normalizedUnreadCount} unread ${
           normalizedUnreadCount === 1 ? "notification" : "notifications"
         }`;
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      aria-label={`Notifications, ${unreadAnnouncement}`}
-      onClick={onActivate}
-      className={cn(
-        "text-content-secondary hover:bg-surface-2 hover:text-content-primary relative rounded-full",
-        "focus-visible:ring-border-focus focus-visible:ring-2 focus-visible:outline-none"
-      )}
-    >
+  const accessibleName = `Notifications, ${unreadAnnouncement}`;
+  const content = (
+    <>
       <Bell data-icon="icon-only" aria-hidden="true" />
       {normalizedUnreadCount > 0 && (
         <Badge
@@ -50,6 +40,34 @@ export function NavbarNotificationBell({
           {badgeLabel}
         </Badge>
       )}
+    </>
+  );
+
+  if (!onActivate) {
+    return (
+      <span
+        role="status"
+        aria-label={accessibleName}
+        className="text-content-secondary relative flex size-10 items-center justify-center rounded-full"
+      >
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label={accessibleName}
+      onClick={onActivate}
+      className={cn(
+        "text-content-secondary hover:bg-surface-2 hover:text-content-primary relative rounded-full",
+        "focus-visible:ring-border-focus focus-visible:ring-2 focus-visible:outline-none"
+      )}
+    >
+      {content}
     </Button>
   );
 }

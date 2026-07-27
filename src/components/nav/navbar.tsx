@@ -34,9 +34,7 @@ export function Navbar() {
   const playActive = isRouteWithin("/lobbies") || isRouteWithin("/game");
 
   const triggerStyles =
-    "font-nav bg-transparent px-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse sm:px-3";
-  const activeTriggerStyles =
-    "border-border-strong border-b-2 text-content-primary";
+    "font-nav relative bg-transparent px-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse sm:px-3";
   const playTriggerStyles =
     "bg-gold-500 text-navy-900 hover:bg-gold-400 hover:text-navy-900 focus:bg-gold-400 focus:text-navy-900";
 
@@ -62,6 +60,7 @@ export function Navbar() {
                 )}
               >
                 Play
+                {playActive && <NavbarCurrentIndicator variant="play" />}
               </DeckNavigationGuardLink>
             </NavigationMenuLink>
           </NavigationMenuItem>
@@ -71,13 +70,10 @@ export function Navbar() {
               <DeckNavigationGuardLink
                 href="/"
                 aria-current={pathname === "/" ? "page" : undefined}
-                className={cn(
-                  navigationMenuTriggerStyle(),
-                  triggerStyles,
-                  pathname === "/" && activeTriggerStyles
-                )}
+                className={cn(navigationMenuTriggerStyle(), triggerStyles)}
               >
                 Home
+                {pathname === "/" && <NavbarCurrentIndicator />}
               </DeckNavigationGuardLink>
             </NavigationMenuLink>
           </NavigationMenuItem>
@@ -85,9 +81,10 @@ export function Navbar() {
           <NavigationMenuItem>
             <NavigationMenuTrigger
               data-active={cardsActive || undefined}
-              className={cn(triggerStyles, cardsActive && activeTriggerStyles)}
+              className={cn(triggerStyles)}
             >
               Cards
+              {cardsActive && <NavbarCurrentIndicator />}
             </NavigationMenuTrigger>
             <NavigationMenuContent className="border-border bg-popover border ring-0">
               <ul className="flex w-48 flex-col gap-1 p-1">
@@ -118,9 +115,10 @@ export function Navbar() {
           <NavigationMenuItem>
             <NavigationMenuTrigger
               data-active={decksActive || undefined}
-              className={cn(triggerStyles, decksActive && activeTriggerStyles)}
+              className={cn(triggerStyles)}
             >
               Decks
+              {decksActive && <NavbarCurrentIndicator />}
             </NavigationMenuTrigger>
             <NavigationMenuContent className="border-border bg-popover border ring-0">
               <ul className="flex w-48 flex-col gap-1 p-1">
@@ -150,15 +148,18 @@ export function Navbar() {
         </NavigationMenuList>
       </NavigationMenu>
 
-      {sessionStatus === "loading" ? (
+      {sessionStatus !== "unauthenticated" && (
         <div
-          data-slot="navbar-actions-placeholder"
-          aria-hidden="true"
-          className="ml-2 h-10 w-28 shrink-0"
-        />
-      ) : sessionStatus === "authenticated" && session?.user ? (
-        <NavbarActions user={session.user} />
-      ) : null}
+          data-slot="navbar-actions"
+          data-state={sessionStatus === "loading" ? "loading" : "ready"}
+          aria-hidden={sessionStatus === "loading" || undefined}
+          className="w-navbar-actions ml-2 flex h-10 shrink-0 items-center justify-end gap-2"
+        >
+          {sessionStatus === "authenticated" && session?.user && (
+            <NavbarActions user={session.user} />
+          )}
+        </div>
+      )}
     </nav>
   );
 }
@@ -171,12 +172,29 @@ function NavbarActions({
   const { notificationInbox } = useUserChannelEvents();
 
   return (
-    <div
-      data-slot="navbar-actions"
-      className="ml-2 flex w-28 shrink-0 items-center justify-end gap-2"
-    >
+    <>
       <NavbarNotificationBell unreadCount={notificationInbox.unreadCount} />
       <NavbarAccountMenu user={user} theme={user.theme} />
-    </div>
+    </>
+  );
+}
+
+function NavbarCurrentIndicator({
+  variant = "standard",
+}: {
+  variant?: "standard" | "play";
+}) {
+  return (
+    <span
+      data-slot="navbar-current-indicator"
+      data-variant={variant}
+      aria-hidden="true"
+      className={cn(
+        "pointer-events-none absolute",
+        variant === "play"
+          ? "bg-nav-current-indicator-on-accent top-1 right-1 size-2 rounded-full"
+          : "bg-nav-current-indicator inset-x-2 bottom-0 h-1 rounded-full"
+      )}
+    />
   );
 }
