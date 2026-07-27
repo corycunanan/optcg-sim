@@ -24,6 +24,24 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
 }));
 
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({
+    status: "authenticated",
+    data: {
+      user: {
+        id: "user-1",
+        username: "luffy",
+        name: "Luffy",
+        email: "luffy@example.com",
+        image: null,
+        isAdmin: false,
+        theme: "default",
+      },
+    },
+  }),
+  signOut: vi.fn(),
+}));
+
 vi.mock("next/link", () => ({
   default: ({ children, ...props }: React.ComponentProps<"a">) => (
     <a {...props}>{children}</a>
@@ -46,7 +64,15 @@ vi.mock("@/lib/api-client", () => ({
 }));
 
 vi.mock("@/components/realtime/user-channel-provider", () => ({
-  useUserChannelEvents: () => ({ subscribe: mocks.subscribe }),
+  useUserChannelEvents: () => ({
+    subscribe: mocks.subscribe,
+    notificationInbox: {
+      notifications: [],
+      unreadCount: 0,
+      loadState: "success",
+      refresh: vi.fn(),
+    },
+  }),
 }));
 
 vi.mock("@/components/social/user-avatar", () => ({
@@ -704,12 +730,13 @@ describe("deck builder navigation guard", () => {
 
     const links = renderer!.root.findAllByType("a");
     expect(links.map((link) => link.props.href)).toEqual([
+      "/lobbies",
       "/",
       "/cards",
       "/sets",
-      "/lobbies",
       "/decks",
       "/decks/new",
+      "/onboarding",
     ]);
 
     for (const link of links) {
@@ -732,12 +759,13 @@ describe("deck builder navigation guard", () => {
 
     const links = renderer!.root.findAllByType("a");
     expect(links.map((link) => link.props.href)).toEqual([
+      "/lobbies",
       "/",
       "/cards",
       "/sets",
-      "/lobbies",
       "/decks",
       "/decks/new",
+      "/onboarding",
     ]);
   });
 
