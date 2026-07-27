@@ -190,6 +190,18 @@ function createSpectatorAffordanceHarness(cardDb: Map<string, CardData>): {
       ).toEqual([]);
       expect(view.queryByRole("link")).toBeNull();
       expect(view.container.querySelector('[draggable="true"]')).toBeNull();
+
+      const readOnlyCards = Array.from(
+        view.container.querySelectorAll<HTMLElement>(
+          '[role="img"][tabindex="0"]'
+        )
+      );
+      expect(readOnlyCards.length).toBeGreaterThan(0);
+      for (const card of readOnlyCards) {
+        expect(card.getAttribute("aria-pressed")).toBeNull();
+        fireEvent.keyDown(card, { key: "Enter" });
+        fireEvent.keyDown(card, { key: " " });
+      }
       expect(onAction).not.toHaveBeenCalled();
     },
 
@@ -239,8 +251,6 @@ function assertSpectatorInformationAndAffordanceInvariants(
   );
   expect(new Set(deckIds).size).toBe(deckIds.length);
 
-  // OPT-575 deliberately tracks target-selection keyboard handlers and ARIA
-  // semantics that bypass today's suppression contract; do not assert them here.
   affordances.assertState(state);
 }
 

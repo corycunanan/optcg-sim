@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui";
 import { Card } from "../card";
 import { SQUARE } from "./constants";
 import { CardActionMenuContent } from "../card-action-menu";
-import { useInteractionMode } from "./interaction-mode";
+import { isReadOnlyViewer, useInteractionMode } from "./interaction-mode";
 import { motion, useReducedMotion } from "motion/react";
 import { cardReject, cardRejectReduced } from "@/lib/motion";
 import { useCardRejection } from "./action-feedback";
@@ -179,7 +179,9 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
   const descriptionId = useId();
   const zonePos = useZonePosition();
   const interactionMode = useInteractionMode();
+  const readOnlyViewer = isReadOnlyViewer(interactionMode);
   const inputSuppressed = interactionMode !== "full";
+  const targetSelectionControl = !readOnlyViewer && !!targetSelection;
   const reducedMotion = useReducedMotion();
   const rejectionSequence = useCardRejection(card?.instanceId ?? "");
   const { hasUsableEffect } = useEffectAvailability();
@@ -232,6 +234,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (
         (event.key === "Enter" || event.key === " ") &&
+        targetSelectionControl &&
         targetSelection &&
         !targetSelection.disabledReason
       ) {
@@ -239,7 +242,7 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
         onTargetToggle?.();
       }
     },
-    [onTargetToggle, targetSelection],
+    [onTargetToggle, targetSelection, targetSelectionControl],
   );
   const cardName = card ? cardDb[card.cardId]?.name ?? card.cardId : "Stage";
   const disabledReason = targetSelection?.disabledReason ?? null;
@@ -271,30 +274,44 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
               onContextMenu={handleContextMenu}
               data-effect-menu-trigger={activation ? card.instanceId : undefined}
               onClick={
-                targetSelection && !targetSelection.disabledReason
+                targetSelectionControl &&
+                targetSelection &&
+                !targetSelection.disabledReason
                   ? onTargetToggle
                   : undefined
               }
               data-target-selection={targetSelection ? "" : undefined}
               data-target-instance-id={targetSelection ? card.instanceId : undefined}
-              role={menuTriggerEnabled || targetSelection ? "button" : "img"}
+              role={
+                menuTriggerEnabled || targetSelectionControl ? "button" : "img"
+              }
               tabIndex={0}
               aria-label={[
                 cardName,
                 card.state === "RESTED" ? "rested" : "active",
-                targetSelection?.selected
+                targetSelectionControl && targetSelection?.selected
                   ? "selected"
-                  : targetSelection?.eligible
+                  : targetSelectionControl && targetSelection?.eligible
                     ? "eligible for selection"
                     : null,
-                disabledReason,
+                targetSelectionControl ? disabledReason : null,
                 menuTriggerEnabled ? "actions available" : null,
               ]
                 .filter(Boolean)
                 .join(". ")}
-              aria-pressed={targetSelection ? !!targetSelection.selected : undefined}
-              aria-disabled={disabledReason ? true : undefined}
-              aria-describedby={disabledReason ? descriptionId : undefined}
+              aria-pressed={
+                targetSelectionControl && targetSelection
+                  ? !!targetSelection.selected
+                  : undefined
+              }
+              aria-disabled={
+                targetSelectionControl && disabledReason ? true : undefined
+              }
+              aria-describedby={
+                targetSelectionControl && disabledReason
+                  ? descriptionId
+                  : undefined
+              }
               onKeyDown={handleKeyDown}
               animate={
                 rejectionSequence
@@ -305,7 +322,9 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
               className={cn(
                 "relative z-[1] rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
                 (menuTriggerEnabled ||
-                  (targetSelection && !targetSelection.disabledReason)) &&
+                  (targetSelectionControl &&
+                    targetSelection &&
+                    !targetSelection.disabledReason)) &&
                   "cursor-pointer",
               )}
             >
