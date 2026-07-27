@@ -10,6 +10,10 @@ import { SendFriendRequestSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
+import {
+  createFriendRequestNotification,
+  pruneResolvedNotifications,
+} from "@/lib/notifications";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import { serializeFriendRequestForEvent } from "@/lib/realtime/serialize-friend";
 
@@ -91,13 +95,27 @@ export async function POST(request: NextRequest) {
       return apiError("Request already pending", 409);
     }
 
-    const req = await prisma.friendRequest.create({
-      data: { fromUserId: userId, toUserId },
-      include: {
-        fromUser: { select: { id: true, username: true, name: true, image: true } },
-        toUser: { select: { id: true, username: true, name: true, image: true } },
-      },
+    const req = await prisma.$transaction(async (tx) => {
+      const createdRequest = await tx.friendRequest.create({
+        data: { fromUserId: userId, toUserId },
+        include: {
+          fromUser: { select: { id: true, username: true, name: true, image: true } },
+          toUser: { select: { id: true, username: true, name: true, image: true } },
+        },
+      });
+
+      await createFriendRequestNotification(tx, {
+        requestId: createdRequest.id,
+        recipientUserId: toUserId,
+        actorUserId: userId,
+      });
+
+      return createdRequest;
     });
+
+    // Retention is deliberately best-effort and post-commit: pruning must
+    // never lengthen or roll back an otherwise valid friend request.
+    after(() => pruneResolvedNotifications(toUserId));
 
     after(() =>
       notifyUser(toUserId, {

@@ -61,6 +61,8 @@ model User {
   activeLobby       Lobby?          @relation("ActiveLobbyMembers", fields: [activeLobbyId], references: [id], onDelete: SetNull)
   sentLobbyInvites      LobbyInvite[] @relation("SentLobbyInvites")
   receivedLobbyInvites  LobbyInvite[] @relation("ReceivedLobbyInvites")
+  notifications         Notification[] @relation("NotificationRecipient")
+  actedNotifications    Notification[] @relation("NotificationActor")
 
   // Game
   gamesAsPlayer1    GameSession[]   @relation("GamesAsPlayer1")
@@ -254,6 +256,18 @@ enum FriendRequestStatus {
   DECLINED
 }
 
+enum NotificationType {
+  FRIEND_REQUEST
+}
+
+enum NotificationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  READ
+  DISMISSED
+}
+
 enum LobbyStatus {
   WAITING
   READY
@@ -291,6 +305,26 @@ model FriendRequest {
   @@unique([fromUserId, toUserId])
   @@index([toUserId, status])
   @@map("friend_requests")
+}
+
+model Notification {
+  id          String             @id @default(uuid())
+  userId      String             @map("user_id")
+  type        NotificationType
+  status      NotificationStatus @default(PENDING)
+  actorUserId String?            @map("actor_user_id")
+  referenceId String?            @map("reference_id")
+  payload     Json?
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  user  User  @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("NotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([type, referenceId])
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([userId, status])
+  @@map("notifications")
 }
 
 model Friendship {

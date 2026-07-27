@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
 
 const authMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const friendRequestFindFirstMock = vi.fn();
-const friendRequestDeleteMock = vi.fn();
 const friendRequestDeleteManyMock = vi.fn();
 const friendshipCreateMock = vi.fn();
+const notificationUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
 
@@ -26,11 +27,13 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     friendRequest: {
       findFirst: (...args: unknown[]) => friendRequestFindFirstMock(...args),
-      delete: (...args: unknown[]) => friendRequestDeleteMock(...args),
       deleteMany: (...args: unknown[]) => friendRequestDeleteManyMock(...args),
     },
     friendship: {
       create: (...args: unknown[]) => friendshipCreateMock(...args),
+    },
+    notification: {
+      updateMany: (...args: unknown[]) => notificationUpdateManyMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
@@ -59,9 +62,9 @@ beforeEach(() => {
   authMock.mockReset();
   rateLimitMock.mockReset();
   friendRequestFindFirstMock.mockReset();
-  friendRequestDeleteMock.mockReset();
   friendRequestDeleteManyMock.mockReset();
   friendshipCreateMock.mockReset();
+  notificationUpdateManyMock.mockReset();
   transactionMock.mockReset();
   notifyUserMock.mockReset();
 
@@ -99,13 +102,28 @@ beforeEach(() => {
       throw new Error("Expected transaction callback");
     return callback({
       friendship: { create: friendshipCreateMock },
-      friendRequest: { deleteMany: friendRequestDeleteManyMock },
+      friendRequest: {
+        deleteMany: friendRequestDeleteManyMock,
+      },
+      notification: { updateMany: notificationUpdateManyMock },
     });
   });
   notifyUserMock.mockResolvedValue(undefined);
 });
 
 describe("PUT /api/friends/requests/[id] — accept", () => {
+  it("does not double-charge a notification action that was already limited", async () => {
+    const { request, params } = buildRequest({ action: "accept" });
+
+    const res = await PUT(request, {
+      params,
+      rateLimitCharge: NOTIFICATION_ACTION_RATE_LIMIT_CHARGED,
+    });
+
+    expect(res.status).toBe(200);
+    expect(rateLimitMock).not.toHaveBeenCalled();
+  });
+
   it("notifies the original sender with friend:request_accepted", async () => {
     const { request, params } = buildRequest({ action: "accept" });
     const res = await PUT(request, { params });
@@ -136,6 +154,15 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
           image: null,
         },
       },
+    });
+    expect(notificationUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "user-accepter",
+        type: "FRIEND_REQUEST",
+        referenceId: "req-1",
+        status: { in: ["PENDING", "READ", "DISMISSED"] },
+      },
+      data: { status: "ACCEPTED" },
     });
   });
 
@@ -206,18 +233,45 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
 
 describe("PUT /api/friends/requests/[id] — decline", () => {
   it("notifies the original sender with friend:request_declined including the decliner's id", async () => {
-    friendRequestDeleteMock.mockResolvedValueOnce({});
     const { request, params } = buildRequest({ action: "decline" });
 
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(200);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(friendRequestDeleteManyMock).toHaveBeenCalledWith({
+      where: {
+        id: "req-1",
+        toUserId: "user-accepter",
+        status: "PENDING",
+      },
+    });
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     expect(notifyUserMock).toHaveBeenCalledWith("user-sender", {
       type: "friend:request_declined",
       requestId: "req-1",
       toUserId: "user-accepter",
     });
+    expect(notificationUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "user-accepter",
+        type: "FRIEND_REQUEST",
+        referenceId: "req-1",
+        status: { in: ["PENDING", "READ", "DISMISSED"] },
+      },
+      data: { status: "DECLINED" },
+    });
+  });
+
+  it("returns 404 when a concurrent legacy decline already removed the request", async () => {
+    friendRequestDeleteManyMock.mockResolvedValueOnce({ count: 0 });
+    const { request, params } = buildRequest({ action: "decline" });
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Request not found" });
+    expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+    expect(notifyUserMock).not.toHaveBeenCalled();
   });
 });
