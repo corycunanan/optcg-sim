@@ -8,6 +8,10 @@ const userFindUniqueMock = vi.fn();
 const friendshipFindFirstMock = vi.fn();
 const friendRequestFindFirstMock = vi.fn();
 const friendRequestCreateMock = vi.fn();
+const notificationCreateMock = vi.fn();
+const notificationFindManyMock = vi.fn();
+const notificationDeleteManyMock = vi.fn();
+const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
 
 // Run `after()` callbacks synchronously so the route's fanout is observable
@@ -33,8 +37,8 @@ vi.mock("@/lib/db", () => ({
     },
     friendRequest: {
       findFirst: (...args: unknown[]) => friendRequestFindFirstMock(...args),
-      create: (...args: unknown[]) => friendRequestCreateMock(...args),
     },
+    $transaction: (...args: unknown[]) => transactionMock(...args),
   },
 }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -61,6 +65,10 @@ beforeEach(() => {
   friendshipFindFirstMock.mockReset();
   friendRequestFindFirstMock.mockReset();
   friendRequestCreateMock.mockReset();
+  notificationCreateMock.mockReset();
+  notificationFindManyMock.mockReset();
+  notificationDeleteManyMock.mockReset();
+  transactionMock.mockReset();
   notifyUserMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-sender" } });
@@ -87,10 +95,59 @@ beforeEach(() => {
       image: null,
     },
   });
+  notificationCreateMock.mockResolvedValue({ id: "notification-1" });
+  notificationFindManyMock.mockResolvedValue([]);
+  transactionMock.mockImplementation(async (callback) =>
+    callback({
+      friendRequest: { create: friendRequestCreateMock },
+      notification: {
+        create: notificationCreateMock,
+        findMany: notificationFindManyMock,
+        deleteMany: notificationDeleteManyMock,
+      },
+    }),
+  );
   notifyUserMock.mockResolvedValue(undefined);
 });
 
 describe("POST /api/friends/requests", () => {
+  it("creates the recipient notification in the friend-request transaction", async () => {
+    const res = await POST(buildRequest());
+
+    expect(res.status).toBe(201);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(notificationCreateMock).toHaveBeenCalledWith({
+      data: {
+        userId: "user-recipient",
+        type: "FRIEND_REQUEST",
+        actorUserId: "user-sender",
+        referenceId: "req-1",
+      },
+    });
+  });
+
+  it("prunes inbox rows beyond the per-user retention cap", async () => {
+    notificationFindManyMock.mockResolvedValueOnce([
+      { id: "notification-old-1" },
+      { id: "notification-old-2" },
+    ]);
+
+    const res = await POST(buildRequest());
+
+    expect(res.status).toBe(201);
+    expect(notificationFindManyMock).toHaveBeenCalledWith({
+      where: { userId: "user-recipient" },
+      select: { id: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: 100,
+    });
+    expect(notificationDeleteManyMock).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["notification-old-1", "notification-old-2"] },
+      },
+    });
+  });
+
   it("calls notifyUser on the recipient with friend:request_received", async () => {
     const res = await POST(buildRequest());
     expect(res.status).toBe(201);

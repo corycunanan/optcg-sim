@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { FriendRequestActionSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
+import { resolveFriendRequestNotification } from "@/lib/notifications";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import {
   serializeFriendRequestForEvent,
@@ -78,6 +79,12 @@ export async function PUT(
             },
           });
 
+          await resolveFriendRequestNotification(tx, {
+            requestId: id,
+            recipientUserId: userId,
+            status: "ACCEPTED",
+          });
+
           return { kind: "accepted" as const, friendship: createdFriendship };
         });
       } catch (error) {
@@ -88,14 +95,21 @@ export async function PUT(
           // Another acceptance already created the canonical friendship. The
           // caller still gets a successful, idempotent response; only the
           // winning transaction may emit the acceptance event.
-          await prisma.friendRequest.deleteMany({
-            where: {
-              status: "PENDING",
-              OR: [
-                { fromUserId: userAId, toUserId: userBId },
-                { fromUserId: userBId, toUserId: userAId },
-              ],
-            },
+          await prisma.$transaction(async (tx) => {
+            await tx.friendRequest.deleteMany({
+              where: {
+                status: "PENDING",
+                OR: [
+                  { fromUserId: userAId, toUserId: userBId },
+                  { fromUserId: userBId, toUserId: userAId },
+                ],
+              },
+            });
+            await resolveFriendRequestNotification(tx, {
+              requestId: id,
+              recipientUserId: userId,
+              status: "ACCEPTED",
+            });
           });
           return apiAction();
         }
@@ -126,8 +140,15 @@ export async function PUT(
 
       return apiAction();
     } else {
-      // Decline — delete the request
-      await prisma.friendRequest.delete({ where: { id } });
+      // Decline — delete the request and resolve its notification atomically.
+      await prisma.$transaction(async (tx) => {
+        await tx.friendRequest.delete({ where: { id } });
+        await resolveFriendRequestNotification(tx, {
+          requestId: id,
+          recipientUserId: userId,
+          status: "DECLINED",
+        });
+      });
 
       after(() =>
         notifyUser(req.fromUserId, {

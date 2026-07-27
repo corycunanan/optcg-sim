@@ -1,6 +1,6 @@
 # API route map
 
-`src/app/api/` currently has 13 top-level domains and 36 `route.ts` files.
+`src/app/api/` currently has 14 top-level domains and 43 `route.ts` files.
 Routes use Next.js App Router named method exports; the table includes every
 exported endpoint, including the temporary deprecated deck `PUT` alias.
 
@@ -15,6 +15,7 @@ exported endpoint, including the temporary deprecated deck `PUT` alias.
 | Lobbies       | `POST /api/lobbies`; `POST /api/lobbies/join`; `GET, PATCH, DELETE /api/lobbies/[id]`; `POST /api/lobbies/[id]/invite`; `POST /api/lobbies/[id]/leave`; `POST /api/lobbies/[id]/start` | Lobby creation, membership, settings, invites, close/leave, and start transitions.                                             |
 | Lobby invites | `GET /api/lobby-invites/pending`; `POST /api/lobby-invites/[id]/accept`; `POST /api/lobby-invites/[id]/decline`                                                                        | Recipient invite inbox and decisions.                                                                                          |
 | Messages      | `GET /api/messages/conversations`; `GET, POST /api/messages/[userId]`; `POST /api/messages/[userId]/read`; `PUT /api/messages/read`                                                    | Conversation summaries, thread history/send, and bulk or single-message read updates.                                          |
+| Notifications | `GET, PUT /api/notifications`; `PUT /api/notifications/[id]`                                                                                                                          | Paginated notification inbox, read/dismiss actions, and friend-request decision proxying.                                      |
 | Realtime      | `GET /api/realtime/friends-of/[userId]`; `POST /api/realtime/token`; `POST /api/realtime/users/[userId]/last-seen`                                                                     | Worker-authenticated friend/last-seen callbacks and session-authenticated user-channel tokens.                                 |
 | Sets          | `GET /api/sets`                                                                                                                                                                        | Public card-set listing.                                                                                                       |
 | User          | `POST /api/user/username`                                                                                                                                                              | Authenticated username setup/update.                                                                                           |

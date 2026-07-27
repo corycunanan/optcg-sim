@@ -8,6 +8,7 @@ const friendRequestFindFirstMock = vi.fn();
 const friendRequestDeleteMock = vi.fn();
 const friendRequestDeleteManyMock = vi.fn();
 const friendshipCreateMock = vi.fn();
+const notificationUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
 
@@ -31,6 +32,9 @@ vi.mock("@/lib/db", () => ({
     },
     friendship: {
       create: (...args: unknown[]) => friendshipCreateMock(...args),
+    },
+    notification: {
+      updateMany: (...args: unknown[]) => notificationUpdateManyMock(...args),
     },
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
@@ -62,6 +66,7 @@ beforeEach(() => {
   friendRequestDeleteMock.mockReset();
   friendRequestDeleteManyMock.mockReset();
   friendshipCreateMock.mockReset();
+  notificationUpdateManyMock.mockReset();
   transactionMock.mockReset();
   notifyUserMock.mockReset();
 
@@ -99,7 +104,11 @@ beforeEach(() => {
       throw new Error("Expected transaction callback");
     return callback({
       friendship: { create: friendshipCreateMock },
-      friendRequest: { deleteMany: friendRequestDeleteManyMock },
+      friendRequest: {
+        delete: friendRequestDeleteMock,
+        deleteMany: friendRequestDeleteManyMock,
+      },
+      notification: { updateMany: notificationUpdateManyMock },
     });
   });
   notifyUserMock.mockResolvedValue(undefined);
@@ -136,6 +145,15 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
           image: null,
         },
       },
+    });
+    expect(notificationUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "user-accepter",
+        type: "FRIEND_REQUEST",
+        referenceId: "req-1",
+        status: { in: ["PENDING", "READ", "DISMISSED"] },
+      },
+      data: { status: "ACCEPTED" },
     });
   });
 
@@ -212,12 +230,21 @@ describe("PUT /api/friends/requests/[id] — decline", () => {
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(200);
-    expect(transactionMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(notifyUserMock).toHaveBeenCalledTimes(1);
     expect(notifyUserMock).toHaveBeenCalledWith("user-sender", {
       type: "friend:request_declined",
       requestId: "req-1",
       toUserId: "user-accepter",
+    });
+    expect(notificationUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "user-accepter",
+        type: "FRIEND_REQUEST",
+        referenceId: "req-1",
+        status: { in: ["PENDING", "READ", "DISMISSED"] },
+      },
+      data: { status: "DECLINED" },
     });
   });
 });
