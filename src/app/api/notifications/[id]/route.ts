@@ -2,7 +2,7 @@
  * PUT /api/notifications/[id] — Read, dismiss, or act on a notification.
  */
 
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { PUT as resolveFriendRequest } from "@/app/api/friends/requests/[id]/route";
 import { apiAction, apiError, requireAuth } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
@@ -10,10 +10,11 @@ import { apiLimiter } from "@/lib/rate-limit";
 import { isErrorResponse, parseBody } from "@/lib/validators/helpers";
 import { NotificationActionSchema } from "@/lib/validators/notifications";
 import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
+import { publishNotificationUpdated } from "@/lib/realtime/publish-notification";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth();
   if (authResult instanceof Response) return authResult;
@@ -42,7 +43,7 @@ export async function PUT(
     }
 
     if (parsed.action === "read" || parsed.action === "dismiss") {
-      await prisma.notification.updateMany({
+      const result = await prisma.notification.updateMany({
         where: {
           id,
           userId,
@@ -50,6 +51,9 @@ export async function PUT(
         },
         data: { status: parsed.action === "read" ? "READ" : "DISMISSED" },
       });
+      if (result.count > 0) {
+        after(() => publishNotificationUpdated(userId, id));
+      }
       return apiAction();
     }
 
@@ -61,7 +65,10 @@ export async function PUT(
       notification.status === "ACCEPTED" ||
       notification.status === "DECLINED"
     ) {
-      return apiError(`Notification already ${notification.status.toLowerCase()}`, 409);
+      return apiError(
+        `Notification already ${notification.status.toLowerCase()}`,
+        409
+      );
     }
     if (notification.type !== "FRIEND_REQUEST" || !notification.referenceId) {
       return apiError("Notification action unavailable", 422);
@@ -70,13 +77,13 @@ export async function PUT(
     const friendRequest = new NextRequest(
       new URL(
         `/api/friends/requests/${notification.referenceId}`,
-        request.nextUrl,
+        request.nextUrl
       ),
       {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: parsed.action }),
-      },
+      }
     );
     const response = await resolveFriendRequest(friendRequest, {
       params: Promise.resolve({ id: notification.referenceId }),

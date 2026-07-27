@@ -64,7 +64,8 @@ export function UserChannelProvider({ children }: { children: ReactNode }) {
   const trackedRef = useRef<Set<string>>(new Set());
   const notificationInbox = useNotificationState(
     subscribe,
-    sessionStatus === "authenticated"
+    sessionStatus === "authenticated",
+    connectionStatus
   );
 
   const trackPresence = useCallback((ids: readonly string[]) => {

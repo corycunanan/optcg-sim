@@ -5,6 +5,7 @@ import { apiGet } from "@/lib/api-client";
 import type { EventDispatcher } from "@/lib/realtime/event-dispatcher";
 import { NotificationsResponseSchema } from "@/lib/validators/notifications";
 import type {
+  ConnectionStatus,
   RealtimeServerEvent,
   SerializedNotification,
 } from "@/types/realtime";
@@ -14,7 +15,13 @@ const NOTIFICATIONS_URL = `/api/notifications?page=1&limit=${NOTIFICATION_PAGE_S
 
 type NotificationEvent = Extract<
   RealtimeServerEvent,
-  { type: "notification:created" | "notification:resolved" }
+  {
+    type:
+      | "notification:created"
+      | "notification:resolved"
+      | "notification:updated"
+      | "notification:read_all";
+  }
 >;
 
 export type NotificationLoadState = "idle" | "loading" | "success" | "error";
@@ -41,6 +48,17 @@ export function applyNotificationEvent(
   snapshot: NotificationSnapshot,
   event: NotificationEvent
 ): NotificationSnapshot {
+  if (event.type === "notification:read_all") {
+    return {
+      notifications: snapshot.notifications.map((notification) =>
+        notification.status === "PENDING"
+          ? { ...notification, status: "READ" }
+          : notification
+      ),
+      unreadCount: event.unreadCount,
+    };
+  }
+
   const existingIndex = snapshot.notifications.findIndex(
     ({ id }) => id === event.notification.id
   );
@@ -77,7 +95,8 @@ export function applyNotificationEvent(
  */
 export function useNotificationState(
   subscribe: EventDispatcher["subscribe"],
-  enabled: boolean
+  enabled: boolean,
+  connectionStatus: ConnectionStatus
 ): NotificationInboxState {
   const [snapshot, setSnapshot] =
     useState<NotificationSnapshot>(EMPTY_SNAPSHOT);
@@ -87,8 +106,10 @@ export function useNotificationState(
   const eventJournalRef = useRef<
     Array<{ sequence: number; event: NotificationEvent }>
   >([]);
+  const activeRequestsRef = useRef<Set<AbortController>>(new Set());
+  const wasConnectedRef = useRef(connectionStatus === "connected");
 
-  const applyRealtimeEvent = useCallback((event: NotificationEvent) => {
+  const recordRealtimeEvent = useCallback((event: NotificationEvent) => {
     const sequence = ++eventSequenceRef.current;
     eventJournalRef.current.push({ sequence, event });
     setSnapshot((current) => applyNotificationEvent(current, event));
@@ -99,14 +120,18 @@ export function useNotificationState(
 
     const requestId = ++requestIdRef.current;
     const startSequence = eventSequenceRef.current;
+    const controller = new AbortController();
+    activeRequestsRef.current.add(controller);
     setLoadState("loading");
 
     try {
       const response = await apiGet(
         NOTIFICATIONS_URL,
-        NotificationsResponseSchema
+        NotificationsResponseSchema,
+        { signal: controller.signal }
       );
-      if (requestId !== requestIdRef.current) return;
+      if (controller.signal.aborted || requestId !== requestIdRef.current)
+        return;
 
       let reconciled: NotificationSnapshot = {
         notifications: response.data.notifications,
@@ -124,23 +149,50 @@ export function useNotificationState(
       setSnapshot(reconciled);
       setLoadState("success");
     } catch {
-      if (requestId === requestIdRef.current) setLoadState("error");
+      if (!controller.signal.aborted && requestId === requestIdRef.current) {
+        setLoadState("error");
+      }
+    } finally {
+      activeRequestsRef.current.delete(controller);
     }
   }, [enabled]);
+
+  const applyRealtimeEvent = useCallback(
+    (event: NotificationEvent) => {
+      recordRealtimeEvent(event);
+      // Event counts are immediate hints. A post-commit authoritative read
+      // guarantees convergence if concurrent transactions publish stale
+      // last-write-wins counts.
+      void refresh();
+    },
+    [recordRealtimeEvent, refresh]
+  );
+
+  useEffect(
+    () => () => {
+      requestIdRef.current += 1;
+      for (const controller of activeRequestsRef.current) controller.abort();
+      activeRequestsRef.current.clear();
+    },
+    []
+  );
 
   useEffect(() => {
     if (!enabled) {
       requestIdRef.current += 1;
       eventSequenceRef.current = 0;
       eventJournalRef.current = [];
+      const resetRequestId = requestIdRef.current;
       queueMicrotask(() => {
+        if (resetRequestId !== requestIdRef.current) return;
         setSnapshot(EMPTY_SNAPSHOT);
         setLoadState("idle");
       });
       return;
     }
-
+    const mountRequestId = requestIdRef.current;
     queueMicrotask(() => {
+      if (mountRequestId !== requestIdRef.current) return;
       void refresh();
     });
   }, [enabled, refresh]);
@@ -155,9 +207,19 @@ export function useNotificationState(
       "notification:resolved",
       applyRealtimeEvent
     );
+    const unsubscribeUpdated = subscribe(
+      "notification:updated",
+      applyRealtimeEvent
+    );
+    const unsubscribeReadAll = subscribe(
+      "notification:read_all",
+      applyRealtimeEvent
+    );
     return () => {
       unsubscribeCreated();
       unsubscribeResolved();
+      unsubscribeUpdated();
+      unsubscribeReadAll();
     };
   }, [applyRealtimeEvent, enabled, subscribe]);
 
@@ -171,6 +233,14 @@ export function useNotificationState(
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [enabled, refresh]);
+
+  useEffect(() => {
+    const wasConnected = wasConnectedRef.current;
+    const isConnected = connectionStatus === "connected";
+    wasConnectedRef.current = isConnected;
+    if (!enabled || !isConnected || wasConnected) return;
+    void refresh();
+  }, [connectionStatus, enabled, refresh]);
 
   return { ...snapshot, loadState, refresh };
 }

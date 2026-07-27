@@ -32,6 +32,12 @@ export type RealtimeServerEvent =
       notification: SerializedNotification;
       unreadCount: number;
     }
+  | {
+      type: "notification:updated";
+      notification: SerializedNotification;
+      unreadCount: number;
+    }
+  | { type: "notification:read_all"; unreadCount: number }
   | { type: "friend:request_received"; request: SerializedFriendRequest }
   | {
       type: "friend:request_accepted";

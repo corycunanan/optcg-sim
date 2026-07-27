@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ConnectionStatus,
   RealtimeServerEvent,
   SerializedNotification,
 } from "@/types/realtime";
@@ -14,13 +15,27 @@ type NotificationResolvedEvent = Extract<
   RealtimeServerEvent,
   { type: "notification:resolved" }
 >;
+type NotificationUpdatedEvent = Extract<
+  RealtimeServerEvent,
+  { type: "notification:updated" }
+>;
+type NotificationReadAllEvent = Extract<
+  RealtimeServerEvent,
+  { type: "notification:read_all" }
+>;
 
 const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
   subscribe: vi.fn(),
   createdHandler: null as ((event: NotificationCreatedEvent) => void) | null,
   resolvedHandler: null as ((event: NotificationResolvedEvent) => void) | null,
+  updatedHandler: null as ((event: NotificationUpdatedEvent) => void) | null,
+  readAllHandler: null as ((event: NotificationReadAllEvent) => void) | null,
   visibilityHandler: null as (() => void) | null,
+  unsubscribeCreated: vi.fn(),
+  unsubscribeResolved: vi.fn(),
+  unsubscribeUpdated: vi.fn(),
+  unsubscribeReadAll: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", () => ({
@@ -35,6 +50,7 @@ import {
 
 let latest: NotificationInboxState | null = null;
 let renderer: ReactTestRenderer | null = null;
+let stateEffectCalls = 0;
 
 function notification(
   status: SerializedNotification["status"] = "PENDING",
@@ -77,18 +93,41 @@ function response(
   };
 }
 
-function Probe({ enabled = true }: { enabled?: boolean }) {
-  const state = useNotificationState(mocks.subscribe, enabled);
+function Probe({
+  enabled = true,
+  connectionStatus = "connected",
+}: {
+  enabled?: boolean;
+  connectionStatus?: ConnectionStatus;
+}) {
+  const state = useNotificationState(
+    mocks.subscribe,
+    enabled,
+    connectionStatus
+  );
   useEffect(() => {
     latest = state;
+    stateEffectCalls += 1;
   }, [state]);
   return null;
 }
 
-async function mount(enabled = true) {
+async function mount(
+  enabled = true,
+  connectionStatus: ConnectionStatus = "connected"
+) {
   await act(async () => {
-    renderer = create(<Probe enabled={enabled} />);
+    renderer = create(
+      <Probe enabled={enabled} connectionStatus={connectionStatus} />
+    );
     await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function rerender(connectionStatus: ConnectionStatus) {
+  await act(async () => {
+    renderer?.update(<Probe connectionStatus={connectionStatus} />);
     await Promise.resolve();
   });
 }
@@ -106,14 +145,26 @@ beforeEach(() => {
   mocks.subscribe.mockReset();
   mocks.createdHandler = null;
   mocks.resolvedHandler = null;
+  mocks.updatedHandler = null;
+  mocks.readAllHandler = null;
   mocks.visibilityHandler = null;
+  mocks.unsubscribeCreated.mockReset();
+  mocks.unsubscribeResolved.mockReset();
+  mocks.unsubscribeUpdated.mockReset();
+  mocks.unsubscribeReadAll.mockReset();
   mocks.subscribe.mockImplementation((type: string, handler: never) => {
     if (type === "notification:created") mocks.createdHandler = handler;
     if (type === "notification:resolved") mocks.resolvedHandler = handler;
-    return vi.fn();
+    if (type === "notification:updated") mocks.updatedHandler = handler;
+    if (type === "notification:read_all") mocks.readAllHandler = handler;
+    if (type === "notification:created") return mocks.unsubscribeCreated;
+    if (type === "notification:resolved") return mocks.unsubscribeResolved;
+    if (type === "notification:updated") return mocks.unsubscribeUpdated;
+    return mocks.unsubscribeReadAll;
   });
   latest = null;
   renderer = null;
+  stateEffectCalls = 0;
 });
 
 afterEach(async () => {
@@ -138,6 +189,7 @@ describe("useNotificationState", () => {
     mocks.apiGet.mockResolvedValue(response([], 0));
     await mount();
 
+    mocks.apiGet.mockResolvedValueOnce(response([notification()], 1));
     await act(async () => {
       mocks.createdHandler?.({
         type: "notification:created",
@@ -148,6 +200,7 @@ describe("useNotificationState", () => {
     expect(latest?.unreadCount).toBe(1);
     expect(latest?.notifications).toEqual([notification()]);
 
+    mocks.apiGet.mockResolvedValueOnce(response([notification("ACCEPTED")], 0));
     await act(async () => {
       mocks.resolvedHandler?.({
         type: "notification:resolved",
@@ -157,6 +210,64 @@ describe("useNotificationState", () => {
     });
     expect(latest?.unreadCount).toBe(0);
     expect(latest?.notifications[0].status).toBe("ACCEPTED");
+  });
+
+  it("applies read/dismiss and mark-all-read changes across tabs", async () => {
+    const pending = [notification(), notification("PENDING", "notification-2")];
+    mocks.apiGet.mockResolvedValueOnce(response(pending, 2));
+    await mount();
+
+    const dismissed = [
+      notification("DISMISSED"),
+      notification("PENDING", "notification-2"),
+    ];
+    mocks.apiGet.mockResolvedValueOnce(response(dismissed, 1));
+    await act(async () => {
+      mocks.updatedHandler?.({
+        type: "notification:updated",
+        notification: notification("DISMISSED"),
+        unreadCount: 1,
+      });
+      await Promise.resolve();
+    });
+    expect(latest?.notifications[0].status).toBe("DISMISSED");
+    expect(latest?.unreadCount).toBe(1);
+
+    const allRead = [
+      notification("DISMISSED"),
+      notification("READ", "notification-2"),
+    ];
+    mocks.apiGet.mockResolvedValueOnce(response(allRead, 0));
+    await act(async () => {
+      mocks.readAllHandler?.({
+        type: "notification:read_all",
+        unreadCount: 0,
+      });
+      await Promise.resolve();
+    });
+    expect(latest?.notifications.map(({ status }) => status)).toEqual([
+      "DISMISSED",
+      "READ",
+    ]);
+    expect(latest?.unreadCount).toBe(0);
+  });
+
+  it("reconciles once when a disconnected channel reconnects", async () => {
+    mocks.apiGet
+      .mockResolvedValueOnce(response([notification()], 1))
+      .mockResolvedValueOnce(response([notification("ACCEPTED")], 0));
+    await mount(true, "connected");
+
+    await rerender("disconnected");
+    expect(mocks.apiGet).toHaveBeenCalledTimes(1);
+
+    await rerender("connected");
+    expect(mocks.apiGet).toHaveBeenCalledTimes(2);
+    expect(latest?.notifications[0].status).toBe("ACCEPTED");
+    expect(latest?.unreadCount).toBe(0);
+
+    await rerender("connected");
+    expect(mocks.apiGet).toHaveBeenCalledTimes(2);
   });
 
   it("reconciles a missed resolution when the document becomes visible", async () => {
@@ -180,11 +291,13 @@ describe("useNotificationState", () => {
 
   it("replays an event that arrives while reconciliation is in flight", async () => {
     let resolveFetch!: (value: ReturnType<typeof response>) => void;
-    mocks.apiGet.mockReturnValue(
-      new Promise((resolve) => {
-        resolveFetch = resolve;
-      })
-    );
+    mocks.apiGet
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        })
+      )
+      .mockResolvedValueOnce(response([notification()], 1));
 
     await mount();
     await act(async () => {
@@ -193,12 +306,68 @@ describe("useNotificationState", () => {
         notification: notification(),
         unreadCount: 1,
       });
+      await Promise.resolve();
+    });
+    await act(async () => {
       resolveFetch(response([], 0));
       await Promise.resolve();
     });
 
     expect(latest?.notifications).toEqual([notification()]);
     expect(latest?.unreadCount).toBe(1);
+  });
+
+  it("converges after concurrent stale counts are delivered", async () => {
+    const pending = [notification(), notification("PENDING", "notification-2")];
+    mocks.apiGet.mockResolvedValueOnce(response(pending, 2));
+    await mount();
+
+    let resolveFirst!: (value: ReturnType<typeof response>) => void;
+    let resolveSecond!: (value: ReturnType<typeof response>) => void;
+    mocks.apiGet
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        })
+      );
+
+    await act(async () => {
+      mocks.resolvedHandler?.({
+        type: "notification:resolved",
+        notification: notification("ACCEPTED"),
+        unreadCount: 1,
+      });
+      mocks.resolvedHandler?.({
+        type: "notification:resolved",
+        notification: notification("ACCEPTED", "notification-2"),
+        unreadCount: 1,
+      });
+    });
+    expect(latest?.unreadCount).toBe(1);
+
+    const committed = [
+      notification("ACCEPTED"),
+      notification("ACCEPTED", "notification-2"),
+    ];
+    await act(async () => {
+      resolveSecond(response(committed, 0));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      resolveFirst(response([notification("ACCEPTED"), pending[1]], 1));
+      await Promise.resolve();
+    });
+
+    expect(latest?.unreadCount).toBe(0);
+    expect(latest?.notifications.map(({ status }) => status)).toEqual([
+      "ACCEPTED",
+      "ACCEPTED",
+    ]);
   });
 
   it("does not let an older reconciliation overwrite a newer one", async () => {
@@ -245,6 +414,47 @@ describe("useNotificationState", () => {
     });
 
     expect(mocks.apiGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("unsubscribes every notification event and visibility listener on unmount", async () => {
+    mocks.apiGet.mockResolvedValue(response([], 0));
+    await mount();
+    const visibilityHandler = mocks.visibilityHandler;
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+
+    expect(mocks.unsubscribeCreated).toHaveBeenCalledTimes(1);
+    expect(mocks.unsubscribeResolved).toHaveBeenCalledTimes(1);
+    expect(mocks.unsubscribeUpdated).toHaveBeenCalledTimes(1);
+    expect(mocks.unsubscribeReadAll).toHaveBeenCalledTimes(1);
+    expect(document.removeEventListener).toHaveBeenCalledWith(
+      "visibilitychange",
+      visibilityHandler
+    );
+  });
+
+  it("aborts reconciliation and does not publish state after unmount", async () => {
+    let resolveFetch!: (value: ReturnType<typeof response>) => void;
+    mocks.apiGet.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+    await mount();
+    const signal = mocks.apiGet.mock.calls[0][2].signal as AbortSignal;
+
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    const callsAfterUnmount = stateEffectCalls;
+    expect(signal.aborted).toBe(true);
+
+    await act(async () => {
+      resolveFetch(response([notification()], 1));
+      await Promise.resolve();
+    });
+
+    expect(stateEffectCalls).toBe(callsAfterUnmount);
   });
 });
 

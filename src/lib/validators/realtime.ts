@@ -6,6 +6,7 @@ import type {
   ServerMessage,
 } from "@shared/game-types";
 import { LobbyRoomStateSchema } from "@/lib/validators/lobbies";
+import type { SerializedNotification } from "@/types/realtime";
 
 const SerializedUserSchema = z.object({
   id: z.string(),
@@ -22,10 +23,10 @@ export const SerializedNotificationSchema = z.object({
   actorUserId: z.string().nullable(),
   referenceId: z.string().nullable(),
   payload: z.json(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.iso.datetime({ offset: true }),
+  updatedAt: z.iso.datetime({ offset: true }),
   actor: SerializedUserSchema.nullable(),
-});
+}) satisfies z.ZodType<SerializedNotification>;
 
 export const SerializedMessageSchema = z.object({
   id: z.string(),
@@ -84,6 +85,15 @@ export const RealtimeServerEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("notification:resolved"),
     notification: SerializedNotificationSchema,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("notification:updated"),
+    notification: SerializedNotificationSchema,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("notification:read_all"),
     unreadCount: z.number().int().nonnegative(),
   }),
   z.object({
