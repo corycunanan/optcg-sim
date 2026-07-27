@@ -8,6 +8,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   pathname: "/decks",
   unreadCount: 0,
+  sessionUser: {
+    id: "user-1",
+    username: "luffy",
+    name: "Luffy",
+    email: "luffy@example.com",
+    image: null,
+    isAdmin: false,
+    theme: "default",
+  } as Record<string, unknown>,
   sessionStatus: "authenticated" as
     | "authenticated"
     | "loading"
@@ -24,15 +33,7 @@ vi.mock("next-auth/react", () => ({
     data:
       mocks.sessionStatus === "authenticated"
         ? {
-            user: {
-              id: "user-1",
-              username: "luffy",
-              name: "Luffy",
-              email: "luffy@example.com",
-              image: null,
-              isAdmin: false,
-              theme: "default",
-            },
+            user: mocks.sessionUser,
           }
         : null,
   }),
@@ -87,6 +88,15 @@ import { Navbar } from "./navbar";
 beforeEach(() => {
   mocks.pathname = "/decks";
   mocks.unreadCount = 0;
+  mocks.sessionUser = {
+    id: "user-1",
+    username: "luffy",
+    name: "Luffy",
+    email: "luffy@example.com",
+    image: null,
+    isAdmin: false,
+    theme: "default",
+  };
   mocks.sessionStatus = "authenticated";
 });
 
@@ -96,7 +106,11 @@ describe("Navbar", () => {
   it("renders the authed account cluster on a non-game route", () => {
     render(<Navbar />);
 
-    expect(screen.getByRole("button", { name: "Notifications" })).toBeDefined();
+    expect(
+      screen.getByRole("button", {
+        name: "Notifications, No unread notifications",
+      })
+    ).toBeDefined();
     expect(
       screen.getByRole("button", { name: "Account menu for luffy" })
     ).toBeDefined();
@@ -121,6 +135,18 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Home" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Cards" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Decks" })).toBeDefined();
+  });
+
+  it("uses a non-gold active-route treatment beside emphasized PLAY", () => {
+    mocks.pathname = "/";
+    render(<Navbar />);
+    const play = screen.getByRole("link", { name: "Play" });
+    const home = screen.getByRole("link", { name: "Home" });
+
+    expect(play.className).toContain("bg-gold-500");
+    expect(home.className).toContain("border-b-2");
+    expect(home.className).toContain("border-border-strong");
+    expect(home.className).not.toContain("text-accent");
   });
 
   it("reflects realtime unread counts, caps at 9+, and omits a zero badge", () => {
@@ -150,13 +176,57 @@ describe("Navbar", () => {
   it("operates the notification trigger from the keyboard", async () => {
     const user = userEvent.setup();
     render(<Navbar />);
-    const bell = screen.getByRole("button", { name: "Notifications" });
+    const bell = screen.getByRole("button", {
+      name: "Notifications, No unread notifications",
+    });
 
     bell.focus();
     await user.keyboard("{Enter}");
 
     expect(document.activeElement).toBe(bell);
-    expect(bell.getAttribute("aria-expanded")).toBe("true");
+    expect(bell.hasAttribute("aria-haspopup")).toBe(false);
+    expect(bell.hasAttribute("aria-expanded")).toBe(false);
+  });
+
+  it("reserves the account cluster width while the session loads", () => {
+    mocks.sessionStatus = "loading";
+    render(<Navbar />);
+
+    const placeholder = document.querySelector(
+      '[data-slot="navbar-actions-placeholder"]'
+    );
+    expect(placeholder?.className).toContain("w-28");
+    expect(document.querySelector('[data-slot="navbar-actions"]')).toBeNull();
+  });
+
+  it("handles partial authenticated user data with a default theme", () => {
+    mocks.sessionUser = { id: "user-1", isAdmin: false };
+    render(<Navbar />);
+
+    expect(
+      screen.getByRole("button", { name: "Account menu for Pirate" })
+    ).toBeDefined();
+    expect(screen.getByLabelText("Theme: Default")).toBeDefined();
+  });
+
+  it("removes actions safely when an authenticated session expires", () => {
+    const { rerender } = render(<Navbar />);
+    expect(
+      document.querySelector('[data-slot="navbar-actions"]')
+    ).not.toBeNull();
+
+    mocks.sessionStatus = "loading";
+    rerender(<Navbar />);
+    expect(document.querySelector('[data-slot="navbar-actions"]')).toBeNull();
+    expect(
+      document.querySelector('[data-slot="navbar-actions-placeholder"]')
+    ).not.toBeNull();
+
+    mocks.sessionStatus = "unauthenticated";
+    rerender(<Navbar />);
+    expect(
+      document.querySelector('[data-slot="navbar-actions-placeholder"]')
+    ).toBeNull();
   });
 
   it("does not render account actions before authentication", () => {

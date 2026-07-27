@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -35,9 +34,9 @@ export function Navbar() {
   const playActive = isRouteWithin("/lobbies") || isRouteWithin("/game");
 
   const triggerStyles =
-    "font-nav bg-transparent px-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse data-[active]:text-accent sm:px-3";
+    "font-nav bg-transparent px-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse sm:px-3";
   const activeTriggerStyles =
-    "text-accent hover:text-gold-400 focus:text-gold-400";
+    "border-border-strong border-b-2 text-content-primary";
   const playTriggerStyles =
     "bg-gold-500 text-navy-900 hover:bg-gold-400 hover:text-navy-900 focus:bg-gold-400 focus:text-navy-900";
 
@@ -151,9 +150,15 @@ export function Navbar() {
         </NavigationMenuList>
       </NavigationMenu>
 
-      {sessionStatus === "authenticated" && session?.user && (
+      {sessionStatus === "loading" ? (
+        <div
+          data-slot="navbar-actions-placeholder"
+          aria-hidden="true"
+          className="ml-2 h-10 w-28 shrink-0"
+        />
+      ) : sessionStatus === "authenticated" && session?.user ? (
         <NavbarActions user={session.user} />
-      )}
+      ) : null}
     </nav>
   );
 }
@@ -163,19 +168,14 @@ function NavbarActions({
 }: {
   user: NonNullable<ReturnType<typeof useSession>["data"]>["user"];
 }) {
-  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const { notificationInbox } = useUserChannelEvents();
 
   return (
     <div
       data-slot="navbar-actions"
-      className="ml-2 flex shrink-0 items-center gap-2"
+      className="ml-2 flex w-28 shrink-0 items-center justify-end gap-2"
     >
-      <NavbarNotificationBell
-        unreadCount={notificationInbox.unreadCount}
-        open={notificationPanelOpen}
-        onOpenChange={setNotificationPanelOpen}
-      />
+      <NavbarNotificationBell unreadCount={notificationInbox.unreadCount} />
       <NavbarAccountMenu user={user} theme={user.theme} />
     </div>
   );

@@ -8,49 +8,37 @@ import { NavbarNotificationBell } from "./navbar-notification-bell";
 afterEach(() => cleanup());
 
 describe("NavbarNotificationBell", () => {
-  it("is keyboard operable through its controlled panel seam", async () => {
+  it("is keyboard operable through the OPT-528 activation seam", async () => {
     const user = userEvent.setup();
-    const onOpenChange = vi.fn();
-    render(
-      <NavbarNotificationBell
-        unreadCount={3}
-        open={false}
-        onOpenChange={onOpenChange}
-      />
-    );
+    const onActivate = vi.fn();
+    render(<NavbarNotificationBell unreadCount={3} onActivate={onActivate} />);
 
-    const bell = screen.getByRole("button", { name: /notifications/i });
+    const bell = screen.getByRole("button", {
+      name: "Notifications, 3 unread notifications",
+    });
     bell.focus();
     await user.keyboard(" ");
 
     expect(document.activeElement).toBe(bell);
-    expect(onOpenChange).toHaveBeenCalledWith(true);
-    expect(bell.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.getByText("3 unread notifications")).toBeDefined();
+    expect(onActivate).toHaveBeenCalledOnce();
+    expect(bell.hasAttribute("aria-haspopup")).toBe(false);
+    expect(bell.hasAttribute("aria-expanded")).toBe(false);
   });
 
   it("caps the visible badge at 9+ and omits it at zero", () => {
-    const { rerender } = render(
-      <NavbarNotificationBell
-        unreadCount={12}
-        open={false}
-        onOpenChange={() => undefined}
-      />
-    );
+    const { rerender } = render(<NavbarNotificationBell unreadCount={12} />);
 
     expect(screen.getByText("9+")).toBeDefined();
 
-    rerender(
-      <NavbarNotificationBell
-        unreadCount={0}
-        open={false}
-        onOpenChange={() => undefined}
-      />
-    );
+    rerender(<NavbarNotificationBell unreadCount={0} />);
 
     expect(
       document.querySelector('[data-slot="notification-unread-badge"]')
     ).toBeNull();
-    expect(screen.getByText("No unread notifications")).toBeDefined();
+    expect(
+      screen.getByRole("button", {
+        name: "Notifications, No unread notifications",
+      })
+    ).toBeDefined();
   });
 });

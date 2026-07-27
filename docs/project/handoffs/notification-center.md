@@ -46,8 +46,8 @@ Tickets are ordered by dependencies; OPT-535 was a parallel visual track.
 
 **From:** session on 2026-07-26 · **Commit:** `0a65558` · **PR:** [#448](https://github.com/corycunanan/optcg-sim/pull/448)
 
-- **Primer:** The authenticated navbar now consumes the shared realtime unread count and owns a controlled bell trigger plus account menu; notification rows and actions remain untouched.
+- **Primer:** The authenticated navbar now consumes the shared realtime unread count and owns a count-announcing bell plus account menu; notification rows and actions remain untouched.
 - **Read first:** `src/components/nav/navbar-notification-bell.tsx`, `src/components/nav/navbar.tsx`, `src/components/realtime/user-channel-provider.tsx`, `src/hooks/use-notification-state.ts`
-- **Gotchas / do NOT touch:** Attach the panel through the bell's `open` / `onOpenChange` seam; do not reimplement fetching, unread counting, subscriptions, or sidebar cleanup owned by OPT-529.
-- **Unresolved:** Manual authenticated visual smoke testing remains; the execution environment could start the local app but could not initialize browser control.
-- **Pointer:** Review commit `0a65558` or PR #448 for the component and test contracts.
+- **Gotchas / do NOT touch:** Attach the panel through the bell's optional `onActivate` seam, then add truthful popup ARIA with the real panel; do not reimplement fetching, unread counting, subscriptions, or sidebar cleanup owned by OPT-529.
+- **Unresolved:** None; authenticated preview VQA was completed during OPT-527 review.
+- **Pointer:** PR #448 is the canonical source for the component and test contracts.

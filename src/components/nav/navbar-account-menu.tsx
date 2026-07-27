@@ -12,7 +12,7 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
-import type { ThemeName } from "@/lib/theme";
+import { resolveThemeName, type ThemeName } from "@/lib/theme";
 
 interface NavbarAccountMenuProps {
   user: {
@@ -20,7 +20,7 @@ interface NavbarAccountMenuProps {
     name?: string | null;
     image?: string | null;
   };
-  theme: ThemeName;
+  theme?: ThemeName | null;
 }
 
 const accountItemStyles =
@@ -28,7 +28,9 @@ const accountItemStyles =
 
 export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
   const displayName = user.username || user.name || "Pirate";
-  const themeLabel = theme.charAt(0).toUpperCase() + theme.slice(1);
+  const resolvedTheme = resolveThemeName(theme);
+  const themeLabel =
+    resolvedTheme.charAt(0).toUpperCase() + resolvedTheme.slice(1);
 
   return (
     <NavigationMenu viewport={false} className="flex-none">

@@ -7,19 +7,16 @@ import { cn } from "@/lib/utils";
 
 interface NavbarNotificationBellProps {
   unreadCount: number;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onActivate?: () => void;
 }
 
 /**
- * Controlled trigger seam for the notification panel owned by OPT-528.
- * Keeping panel state outside the button lets that panel attach without
- * changing the realtime badge or trigger contract.
+ * Activation seam for the notification panel owned by OPT-528. That ticket
+ * will supply the handler and add popup ARIA only when a real panel exists.
  */
 export function NavbarNotificationBell({
   unreadCount,
-  open,
-  onOpenChange,
+  onActivate,
 }: NavbarNotificationBellProps) {
   const normalizedUnreadCount = Math.max(0, unreadCount);
   const badgeLabel =
@@ -36,19 +33,14 @@ export function NavbarNotificationBell({
       type="button"
       variant="ghost"
       size="icon"
-      aria-label="Notifications"
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      onClick={() => onOpenChange(!open)}
+      aria-label={`Notifications, ${unreadAnnouncement}`}
+      onClick={onActivate}
       className={cn(
         "text-content-secondary hover:bg-surface-2 hover:text-content-primary relative rounded-full",
         "focus-visible:ring-border-focus focus-visible:ring-2 focus-visible:outline-none"
       )}
     >
       <Bell data-icon="icon-only" aria-hidden="true" />
-      <span className="sr-only" aria-live="polite">
-        {unreadAnnouncement}
-      </span>
       {normalizedUnreadCount > 0 && (
         <Badge
           data-slot="notification-unread-badge"

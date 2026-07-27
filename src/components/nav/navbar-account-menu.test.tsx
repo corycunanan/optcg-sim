@@ -54,4 +54,17 @@ describe("NavbarAccountMenu", () => {
     await user.click(screen.getByRole("button", { name: "Sign Out" }));
     expect(mocks.signOut).toHaveBeenCalledWith({ callbackUrl: "/" });
   });
+
+  it("defaults partial user and theme data without crashing", async () => {
+    const user = userEvent.setup();
+    render(<NavbarAccountMenu user={{}} />);
+
+    const trigger = screen.getByRole("button", {
+      name: "Account menu for Pirate",
+    });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByLabelText("Theme: Default")).toBeDefined();
+  });
 });
