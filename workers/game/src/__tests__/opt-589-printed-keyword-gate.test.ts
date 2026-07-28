@@ -3,6 +3,7 @@ import type { CardData } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { derivePrintedKeywords } from "../engine/printed-keywords.js";
 import {
+  getAllAuthoredSchemas,
   getEffectSchema,
   injectSchemasIntoCardDb,
 } from "../engine/schema-registry.js";
@@ -49,8 +50,11 @@ describe("OPT-589 recursive printed-keyword consistency gate", () => {
     };
     const expected = {
       "OP01-025": { ...none, rush: true },
+      "EB01-003": { ...none, rush: true },
       "OP07-032": { ...none, rushCharacter: true },
-      "EB02-019": { ...none, rushCharacter: true },
+      // Conditional on the opponent controlling 2+ Characters. This is not an
+      // intrinsic keyword; the schema still needs a future runtime grant.
+      "EB02-019": none,
       "OP01-121": { ...none, doubleAttack: true, banish: true },
       "ST23-001": { ...none, blocker: true },
       "OP07-023": { ...none, blocker: true },
@@ -74,6 +78,46 @@ describe("OPT-589 recursive printed-keyword consistency gate", () => {
       expect(derivePrintedKeywords(cardData(), schema), cardId).toEqual(
         keywords,
       );
+    }
+  });
+
+  it("enforces keyword derivation for every permanent authored effect", () => {
+    const keywordFields = {
+      RUSH: "rush",
+      RUSH_CHARACTER: "rushCharacter",
+      DOUBLE_ATTACK: "doubleAttack",
+      BANISH: "banish",
+      BLOCKER: "blocker",
+      UNBLOCKABLE: "unblockable",
+    } as const;
+
+    for (const schema of Object.values(getAllAuthoredSchemas())) {
+      for (const effect of schema.effects) {
+        if (effect.category !== "permanent") continue;
+        const flaggedKeywords = effect.flags?.keywords ?? [];
+        if (flaggedKeywords.length === 0) continue;
+
+        const gated =
+          effect.conditions !== undefined ||
+          effect.post_cost_conditions !== undefined ||
+          effect.costs !== undefined ||
+          effect.trigger !== undefined ||
+          effect.duration !== undefined;
+        const isolatedSchema: EffectSchema = {
+          ...schema,
+          effects: [effect],
+        };
+        const derived = derivePrintedKeywords(cardData(), isolatedSchema);
+
+        for (const keyword of flaggedKeywords) {
+          const field = keywordFields[keyword as keyof typeof keywordFields];
+          if (!field) continue;
+          expect(
+            derived[field],
+            `${schema.card_id}/${effect.id}/${keyword}`,
+          ).toBe(!gated);
+        }
+      }
     }
   });
 

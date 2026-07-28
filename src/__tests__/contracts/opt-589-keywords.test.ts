@@ -322,6 +322,24 @@ describe("OPT-589 app payload to worker keyword legality", () => {
     ).toBe("This card does not have [Blocker]");
   });
 
+  it("does not make EB02-019's conditional attack ability intrinsic", () => {
+    const zoro = makeCard("EB02-019", {
+      name: "Roronoa Zoro",
+      effectText:
+        "If your opponent has 2 or more Characters, this Character can attack Characters on the turn in which it is played.",
+    });
+    const boundary = buildBoundary(zoro);
+
+    expect(
+      canAttackThisTurn(
+        boundary.character,
+        boundary.cardData,
+        boundary.state,
+        boundary.cardDb,
+      ),
+    ).toBe(false);
+  });
+
   it("deals one damage when OP07-009 only grants Double Attack to another card", () => {
     const dogura = makeCard("OP07-009", {
       name: "Dogura & Magura",

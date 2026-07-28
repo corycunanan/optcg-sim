@@ -23,10 +23,25 @@ function hasTriggerKeyword(value: unknown): boolean {
   return Object.values(node).some(hasTriggerKeyword);
 }
 
+function isGatedPermanentKeywordEffect(
+  effect: EffectSchema["effects"][number],
+): boolean {
+  return (
+    effect.conditions !== undefined ||
+    effect.post_cost_conditions !== undefined ||
+    effect.costs !== undefined ||
+    effect.trigger !== undefined ||
+    effect.duration !== undefined
+  );
+}
+
 function deriveFromSchema(schema: EffectSchema): KeywordSet {
   const keywords = { ...EMPTY_KEYWORDS };
   for (const effect of schema.effects) {
-    if (effect.category === "permanent") {
+    if (
+      effect.category === "permanent" &&
+      !isGatedPermanentKeywordEffect(effect)
+    ) {
       for (const keyword of effect.flags?.keywords ?? []) {
         const field = KEYWORD_FIELDS[keyword];
         if (field) keywords[field] = true;
@@ -40,10 +55,10 @@ function deriveFromSchema(schema: EffectSchema): KeywordSet {
 /**
  * Worker-owned printed keyword derivation.
  *
- * Authored schemas are authoritative: permanent keyword flags are intrinsic,
- * structured Trigger blocks represent printed Trigger abilities, and
- * GRANT_KEYWORD nodes remain runtime-only regardless of their nesting.
- * Schema-less cards use only exact standalone tags at the start of a text line.
+ * Authored schemas are authoritative: ungated permanent keyword flags are
+ * intrinsic, structured Trigger blocks represent printed Trigger abilities,
+ * and gated flags / GRANT_KEYWORD nodes remain runtime-only. Schema-less cards
+ * use only exact standalone tags at the start of a text line.
  */
 export function derivePrintedKeywords(
   cardData: CardData,
