@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { CardData } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { derivePrintedKeywords } from "../engine/printed-keywords.js";
-import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
+import {
+  getEffectSchema,
+  injectSchemasIntoCardDb,
+} from "../engine/schema-registry.js";
+import { CARDS, createTestCardDb } from "./helpers.js";
 
 function cardData(effectText = "", triggerText: string | null = null): CardData {
   return {
@@ -33,26 +37,52 @@ function cardData(effectText = "", triggerText: string | null = null): CardData 
 }
 
 describe("OPT-589 recursive printed-keyword consistency gate", () => {
-  it("derives every authored card only from permanent flags and structured Trigger blocks", () => {
-    for (const schema of Object.values(getAllAuthoredSchemas())) {
-      const derived = derivePrintedKeywords(cardData(), schema);
-      const flagged = new Set(
-        schema.effects
-          .filter((effect) => effect.category === "permanent")
-          .flatMap((effect) => effect.flags?.keywords ?? []),
+  it("matches the human-reviewed printed-keyword inventory", () => {
+    const none = {
+      rush: false,
+      rushCharacter: false,
+      doubleAttack: false,
+      banish: false,
+      blocker: false,
+      trigger: false,
+      unblockable: false,
+    };
+    const expected = {
+      "OP01-025": { ...none, rush: true },
+      "OP07-032": { ...none, rushCharacter: true },
+      "EB02-019": { ...none, rushCharacter: true },
+      "OP01-121": { ...none, doubleAttack: true, banish: true },
+      "ST23-001": { ...none, blocker: true },
+      "OP07-023": { ...none, blocker: true },
+      "OP01-075": { ...none, blocker: true },
+      "OP02-050": { ...none, blocker: true },
+      "OP16-033": { ...none, unblockable: true },
+      "OP01-009": { ...none, trigger: true },
+      "ST01-004": none,
+      "EB02-012": none,
+      "OP02-074": none,
+      "OP07-009": none,
+      "EB04-024": none,
+      "OP06-101": { ...none, trigger: true },
+      "OP15-070": { ...none, unblockable: true },
+      "OP15-071": { ...none, doubleAttack: true },
+    } as const;
+
+    for (const [cardId, keywords] of Object.entries(expected)) {
+      const schema = getEffectSchema(cardId);
+      expect(schema, `${cardId} must have an authored schema`).not.toBeNull();
+      expect(derivePrintedKeywords(cardData(), schema), cardId).toEqual(
+        keywords,
       );
-      expect(derived.rush, schema.card_id).toBe(flagged.has("RUSH"));
-      expect(derived.rushCharacter, schema.card_id).toBe(
-        flagged.has("RUSH_CHARACTER"),
-      );
-      expect(derived.doubleAttack, schema.card_id).toBe(
-        flagged.has("DOUBLE_ATTACK"),
-      );
-      expect(derived.banish, schema.card_id).toBe(flagged.has("BANISH"));
-      expect(derived.blocker, schema.card_id).toBe(flagged.has("BLOCKER"));
-      expect(derived.unblockable, schema.card_id).toBe(
-        flagged.has("UNBLOCKABLE"),
-      );
+    }
+  });
+
+  it("keeps structured authored Trigger derivation alive", () => {
+    for (const cardId of ["OP01-009", "EB01-010", "ST29-003"]) {
+      expect(
+        derivePrintedKeywords(cardData(), getEffectSchema(cardId)).trigger,
+        cardId,
+      ).toBe(true);
     }
   });
 
@@ -124,6 +154,33 @@ describe("OPT-589 recursive printed-keyword consistency gate", () => {
         null,
       ).rush,
     ).toBe(false);
+    for (const effectText of [
+      "[DON!! x1] [Blocker]",
+      "[Your Turn] [Double Attack]",
+      "[Opponent's Turn] [Unblockable]",
+    ]) {
+      expect(derivePrintedKeywords(cardData(effectText), null), effectText).toEqual({
+        rush: false,
+        rushCharacter: false,
+        doubleAttack: false,
+        banish: false,
+        blocker: false,
+        trigger: false,
+        unblockable: false,
+      });
+    }
+  });
+
+  it("recomputes every shared keyword fixture through schema injection", () => {
+    const cardDb = createTestCardDb();
+    injectSchemasIntoCardDb(cardDb);
+
+    expect(cardDb.get(CARDS.RUSH.id)?.keywords.rush).toBe(true);
+    expect(cardDb.get(CARDS.RUSH_CHAR.id)?.keywords.rushCharacter).toBe(true);
+    expect(cardDb.get(CARDS.DOUBLE_ATK.id)?.keywords.doubleAttack).toBe(true);
+    expect(cardDb.get(CARDS.BLOCKER.id)?.keywords.blocker).toBe(true);
+    expect(cardDb.get(CARDS.BANISH.id)?.keywords.banish).toBe(true);
+    expect(cardDb.get(CARDS.TRIGGER.id)?.keywords.trigger).toBe(true);
+    expect(cardDb.get(CARDS.UNBLOCKABLE.id)?.keywords.unblockable).toBe(true);
   });
 });
-

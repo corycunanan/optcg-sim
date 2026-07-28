@@ -22,7 +22,9 @@ const PRINTED_TAG_FIELDS: Record<string, keyof KeywordSet> = {
 
 /**
  * Parse only exact bracketed keyword tags in the leading tag run of each line.
- * This deliberately rejects prose that merely grants or mentions a keyword.
+ * Keywords count only until the first non-keyword tag. A condition/timing tag
+ * such as [DON!! x1], [Your Turn], or [Opponent's Turn] therefore prevents a
+ * later keyword in that same leading run from becoming unconditional.
  */
 export function extractStandalonePrintedKeywords(
   effectText: string,
@@ -34,9 +36,9 @@ export function extractStandalonePrintedKeywords(
     const tagPrefix = line.match(/^\s*(?:\[[^\]]+\]\s*)+/)?.[0] ?? "";
     for (const match of tagPrefix.matchAll(/\[([^\]]+)\]/g)) {
       const field = PRINTED_TAG_FIELDS[match[1].trim().toLowerCase()];
-      if (field) keywords[field] = true;
+      if (!field) break;
+      keywords[field] = true;
     }
   }
   return keywords;
 }
-

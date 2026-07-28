@@ -12,6 +12,14 @@ import type {
 } from "@engine/types.js";
 import type { RuntimeActiveEffect } from "@engine/engine/effect-types.js";
 
+type GrantableKeyword =
+  | "RUSH"
+  | "RUSH_CHARACTER"
+  | "DOUBLE_ATTACK"
+  | "BANISH"
+  | "BLOCKER"
+  | "UNBLOCKABLE";
+
 function makeCard(id: string, overrides: Partial<Card> = {}): Card {
   return {
     id,
@@ -131,6 +139,93 @@ function negate(
     timestamp: 1,
   };
   return { ...state, activeEffects: [...state.activeEffects, effect] };
+}
+
+function grantKeyword(
+  state: GameState,
+  target: CardInstance,
+  keyword: GrantableKeyword,
+): GameState {
+  const effect: RuntimeActiveEffect = {
+    id: `grant-${keyword}-${target.instanceId}`,
+    sourceCardInstanceId: `external-${keyword}`,
+    sourceEffectBlockId: "grant",
+    category: "auto",
+    modifiers: [
+      {
+        type: "GRANT_KEYWORD",
+        target: { type: "SELF" },
+        params: { keyword },
+      },
+    ],
+    duration: { type: "THIS_TURN" },
+    expiresAt: { wave: "END_OF_TURN", turn: state.turn.number },
+    controller: target.controller,
+    appliesTo: [target.instanceId],
+    timestamp: 2,
+  };
+  return { ...state, activeEffects: [...state.activeEffects, effect] };
+}
+
+function placeDeckCharacter(
+  state: GameState,
+  controller: 0 | 1,
+): { state: GameState; character: CardInstance } {
+  const source = state.players[controller].deck[0];
+  const character: CardInstance = {
+    ...source,
+    zone: "CHARACTER",
+    state: "ACTIVE",
+    turnPlayed: null,
+  };
+  return {
+    state: {
+      ...state,
+      players: state.players.map((player, index) =>
+        index === controller
+          ? {
+              ...player,
+              deck: player.deck.slice(1),
+              characters: [character, ...player.characters.slice(1)],
+            }
+          : player,
+      ) as GameState["players"],
+    },
+    character,
+  };
+}
+
+function withLeaderDamageBattle(
+  state: GameState,
+  attacker: CardInstance,
+  lifeCount: number,
+): GameState {
+  const life = Array.from({ length: lifeCount }, (_, index) => ({
+    instanceId: `keyword-life-${index}`,
+    cardId: "BOUNDARY-FILLER-1",
+    face: "DOWN" as const,
+  }));
+  return {
+    ...state,
+    players: [
+      state.players[0],
+      { ...state.players[1], life, hand: [], trash: [] },
+    ],
+    turn: {
+      ...state.turn,
+      activePlayerIndex: 0,
+      battleSubPhase: "COUNTER_STEP",
+      battle: {
+        battleId: `keyword-battle-${attacker.instanceId}`,
+        attackerInstanceId: attacker.instanceId,
+        targetInstanceId: state.players[1].leader.instanceId,
+        attackerPower: 6000,
+        defenderPower: 5000,
+        counterPowerAdded: 0,
+        blockerActivated: false,
+      },
+    },
+  };
 }
 
 describe("OPT-589 app payload to worker keyword legality", () => {
@@ -266,7 +361,7 @@ describe("OPT-589 app payload to worker keyword legality", () => {
     expect(result.state.players[1].life).toHaveLength(2);
   });
 
-  it("preserves printed-negation and external-grant semantics from OPT-253", () => {
+  it("preserves Rush negation and external-grant semantics from OPT-253", () => {
     const zoro = makeCard("OP01-025", {
       name: "Roronoa Zoro",
       effectText: "[Rush] (This card can attack on the turn in which it is played.)",
@@ -288,41 +383,188 @@ describe("OPT-589 app payload to worker keyword legality", () => {
         printed.cardDb,
       ),
     ).toBe(false);
-
-    const vanilla = makeCard("BOUNDARY-EXTERNAL-RUSH");
-    const granted = buildBoundary(vanilla);
-    const externallyGranted: RuntimeActiveEffect = {
-      id: "external-rush",
-      sourceCardInstanceId: "grant-source",
-      sourceEffectBlockId: "grant",
-      category: "auto",
-      modifiers: [
-        {
-          type: "GRANT_KEYWORD",
-          target: { type: "SELF" },
-          params: { keyword: "RUSH" },
-        },
-      ],
-      duration: { type: "THIS_TURN" },
-      expiresAt: { wave: "END_OF_TURN", turn: 2 },
-      controller: 0,
-      appliesTo: [granted.character.instanceId],
-      timestamp: 2,
-    };
-    const negatedAndGranted = negate(
-      {
-        ...granted.state,
-        activeEffects: [...granted.state.activeEffects, externallyGranted],
-      },
-      granted.character,
+    const negatedAndGranted = grantKeyword(
+      negate(printed.state, printed.character),
+      printed.character,
+      "RUSH",
     );
     expect(
       canAttackThisTurn(
-        granted.character,
-        granted.cardData,
+        printed.character,
+        printed.cardData,
         negatedAndGranted,
-        granted.cardDb,
+        printed.cardDb,
       ),
     ).toBe(true);
+  });
+
+  it("preserves Rush: Character negation and external-grant semantics", () => {
+    const fisherTiger = makeCard("OP07-032", {
+      name: "Fisher Tiger",
+      effectText:
+        "This Character can attack Characters on the turn in which it is played.",
+    });
+    const printed = buildBoundary(fisherTiger);
+    const negated = negate(printed.state, printed.character);
+
+    expect(
+      canAttackThisTurn(
+        printed.character,
+        printed.cardData,
+        negated,
+        printed.cardDb,
+      ),
+    ).toBe(false);
+    expect(
+      canAttackThisTurn(
+        printed.character,
+        printed.cardData,
+        grantKeyword(negated, printed.character, "RUSH_CHARACTER"),
+        printed.cardDb,
+      ),
+    ).toBe(true);
+  });
+
+  it("preserves Blocker negation and external-grant semantics", () => {
+    const blocker = makeCard("ST23-001", {
+      name: "Uta",
+      effectText: "[Blocker]",
+    });
+    const printed = buildBoundary(blocker);
+    const battle: GameState = {
+      ...printed.state,
+      turn: {
+        ...printed.state.turn,
+        activePlayerIndex: 1,
+        battleSubPhase: "BLOCK_STEP",
+        battle: {
+          battleId: "keyword-blocker",
+          attackerInstanceId: printed.state.players[1].leader.instanceId,
+          targetInstanceId: printed.state.players[0].leader.instanceId,
+          attackerPower: 5000,
+          defenderPower: 5000,
+          counterPowerAdded: 0,
+          blockerActivated: false,
+        },
+      },
+    };
+    const action = {
+      type: "DECLARE_BLOCKER" as const,
+      blockerInstanceId: printed.character.instanceId,
+    };
+    const negated = negate(battle, printed.character);
+
+    expect(validate(negated, action, printed.cardDb, 0)).toBe(
+      "This card does not have [Blocker]",
+    );
+    expect(
+      validate(
+        grantKeyword(negated, printed.character, "BLOCKER"),
+        action,
+        printed.cardDb,
+        0,
+      ),
+    ).toBeNull();
+  });
+
+  it("preserves Unblockable negation and external-grant semantics", () => {
+    const morley = makeCard("OP16-033", {
+      name: "Morley",
+      power: 6000,
+      effectText: "[Unblockable]",
+    });
+    const printed = buildBoundary(morley);
+    const defender = placeDeckCharacter(printed.state, 1);
+    const defenderCanBlock = grantKeyword(
+      defender.state,
+      defender.character,
+      "BLOCKER",
+    );
+    const battle: GameState = {
+      ...defenderCanBlock,
+      turn: {
+        ...defenderCanBlock.turn,
+        activePlayerIndex: 0,
+        battleSubPhase: "BLOCK_STEP",
+        battle: {
+          battleId: "keyword-unblockable",
+          attackerInstanceId: printed.character.instanceId,
+          targetInstanceId: defenderCanBlock.players[1].leader.instanceId,
+          attackerPower: 6000,
+          defenderPower: 5000,
+          counterPowerAdded: 0,
+          blockerActivated: false,
+        },
+      },
+    };
+    const action = {
+      type: "DECLARE_BLOCKER" as const,
+      blockerInstanceId: defender.character.instanceId,
+    };
+    const negated = negate(battle, printed.character);
+
+    expect(validate(negated, action, printed.cardDb, 1)).toBeNull();
+    expect(
+      validate(
+        grantKeyword(negated, printed.character, "UNBLOCKABLE"),
+        action,
+        printed.cardDb,
+        1,
+      ),
+    ).toBe("Attacker has [Unblockable]");
+  });
+
+  it("preserves Double Attack negation and external-grant semantics", () => {
+    const newgate = makeCard("ST22-003", {
+      name: "Edward.Newgate",
+      power: 6000,
+      effectText: "[Double Attack]",
+    });
+    const printed = buildBoundary(newgate);
+    const battle = withLeaderDamageBattle(
+      printed.state,
+      printed.character,
+      3,
+    );
+    const negated = negate(battle, printed.character);
+
+    expect(executePass(negated, printed.cardDb).state.players[1].life).toHaveLength(2);
+    expect(
+      executePass(
+        grantKeyword(negated, printed.character, "DOUBLE_ATTACK"),
+        printed.cardDb,
+      ).state.players[1].life,
+    ).toHaveLength(1);
+  });
+
+  it("preserves Banish negation and external-grant semantics", () => {
+    const luffy = makeCard("OP04-014", {
+      name: "Monkey.D.Luffy",
+      power: 6000,
+      effectText: "[Banish]",
+    });
+    const printed = buildBoundary(luffy);
+    const battle = withLeaderDamageBattle(
+      printed.state,
+      printed.character,
+      1,
+    );
+    const negatedResult = executePass(
+      negate(battle, printed.character),
+      printed.cardDb,
+    ).state;
+    expect(negatedResult.players[1].hand).toHaveLength(1);
+    expect(negatedResult.players[1].trash).toHaveLength(0);
+
+    const grantedResult = executePass(
+      grantKeyword(
+        negate(battle, printed.character),
+        printed.character,
+        "BANISH",
+      ),
+      printed.cardDb,
+    ).state;
+    expect(grantedResult.players[1].hand).toHaveLength(0);
+    expect(grantedResult.players[1].trash).toHaveLength(1);
   });
 });
