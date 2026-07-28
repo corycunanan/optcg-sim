@@ -3993,8 +3993,19 @@ export const OP09_105_SANJI: EffectSchema = {
       },
       actions: [
         {
-          type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          type: "PLAYER_CHOICE",
+          params: {
+            options: [
+              [
+                {
+                  type: "ADD_TO_LIFE_FROM_DECK",
+                  params: { amount: 1, position: "TOP", face: "DOWN" },
+                },
+              ],
+              [],
+            ],
+            labels: ["Add the top card of your deck to Life", "Add no cards"],
+          },
         },
         { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
@@ -4061,12 +4072,8 @@ export const OP09_111_BROOK: EffectSchema = {
           params: {
             mandatory: true,
             action: {
-              type: "TRASH_CARD",
-              target: {
-                type: "CARD_IN_HAND",
-                controller: "OPPONENT",
-                count: { exact: 2 },
-              },
+              type: "TRASH_FROM_HAND",
+              params: { amount: 2 },
             },
           },
         },

@@ -252,7 +252,7 @@
   "OP01-006": {"hasRealEffectText":true,"hasTriggerText":false},
   "OP01-007": {"hasRealEffectText":true,"hasTriggerText":false},
   "OP01-008": {"hasRealEffectText":true,"hasTriggerText":false},
-  "OP01-009": {"hasRealEffectText":true,"hasTriggerText":false},
+  "OP01-009": {"hasRealEffectText":true,"hasTriggerText":true},
   "OP01-010": {"hasRealEffectText":false,"hasTriggerText":false},
   "OP01-011": {"hasRealEffectText":true,"hasTriggerText":false},
   "OP01-012": {"hasRealEffectText":false,"hasTriggerText":false},

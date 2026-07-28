@@ -1,24 +1,130 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { EffectSchema } from "../engine/effect-types.js";
 import type { CardTextManifest } from "../engine/trigger-schema-coverage.js";
-import { findMissingTriggerSchemas } from "../engine/trigger-schema-coverage.js";
+import {
+  findMissingTriggerSchemas,
+  findSchemasWithMultipleTriggerBlocks,
+} from "../engine/trigger-schema-coverage.js";
 import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 
 const manifestPath = resolve(
   import.meta.dirname,
   "../engine/card-text-manifest.generated.json"
 );
+const manifest = JSON.parse(
+  readFileSync(manifestPath, "utf8")
+) as CardTextManifest;
 
 describe("OPT-590 canonical Trigger schema coverage", () => {
   it("requires every canonical Trigger card to have a TRIGGER block", () => {
-    const manifest = JSON.parse(
-      readFileSync(manifestPath, "utf8")
-    ) as CardTextManifest;
-
     expect(
       findMissingTriggerSchemas(manifest, getAllAuthoredSchemas())
     ).toEqual([]);
+  });
+
+  it("reports a canonical Trigger card whose schema is missing", () => {
+    const incompleteManifest: CardTextManifest = {
+      "TEST-TRIGGER": {
+        hasRealEffectText: false,
+        hasTriggerText: true,
+      },
+      "TEST-VANILLA": {
+        hasRealEffectText: false,
+        hasTriggerText: false,
+      },
+    };
+
+    expect(findMissingTriggerSchemas(incompleteManifest, {})).toEqual([
+      "TEST-TRIGGER",
+    ]);
+  });
+
+  it("includes anchored effect-field Trigger text without false-flagging references", () => {
+    const triggerCardIds = Object.entries(manifest)
+      .filter(([, facts]) => facts.hasTriggerText)
+      .map(([cardId]) => cardId);
+    const referencedTriggerCardIds = [
+      "OP03-105",
+      "OP03-115",
+      "OP04-105",
+      "OP05-109",
+      "OP11-102",
+      "OP13-110",
+      "ST29-014",
+      "OP03-022",
+      "OP05-002",
+      "OP09-062",
+      "OP13-100",
+      "OP16-080",
+    ];
+
+    expect(triggerCardIds).toHaveLength(486);
+    expect(manifest["OP01-009"].hasTriggerText).toBe(true);
+    expect(
+      referencedTriggerCardIds.filter(
+        (cardId) => manifest[cardId].hasTriggerText
+      )
+    ).toEqual([]);
+  });
+
+  it("rejects multiple direct TRIGGER blocks through schema lint", () => {
+    const duplicateTriggerSchema: EffectSchema = {
+      card_id: "TEST-DUPLICATE-TRIGGER",
+      effects: [
+        {
+          id: "first_trigger",
+          category: "auto",
+          trigger: { keyword: "TRIGGER" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        },
+        {
+          id: "second_trigger",
+          category: "auto",
+          trigger: { keyword: "TRIGGER" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        },
+      ],
+    };
+    expect(
+      findSchemasWithMultipleTriggerBlocks({
+        "TEST-DUPLICATE-TRIGGER": duplicateTriggerSchema,
+      })
+    ).toEqual(["TEST-DUPLICATE-TRIGGER"]);
+
+    const fixtureDirectory = mkdtempSync(join(tmpdir(), "opt590-lint-"));
+    try {
+      const fixturePath = join(fixtureDirectory, "duplicate-trigger.ts");
+      writeFileSync(
+        fixturePath,
+        `export const DUPLICATE_TRIGGER = ${JSON.stringify(duplicateTriggerSchema)};\n`
+      );
+      const linter = resolve(
+        import.meta.dirname,
+        "../engine/schemas/lint-schemas.sh"
+      );
+      let output = "";
+      try {
+        output = execFileSync("node", [linter, fixturePath], {
+          encoding: "utf8",
+        });
+      } catch (error) {
+        output = (error as { stdout?: string }).stdout ?? "";
+      }
+      expect(output).toContain(
+        "TEST-DUPLICATE-TRIGGER: multiple TRIGGER blocks are unsupported"
+      );
+    } finally {
+      rmSync(fixtureDirectory, { recursive: true, force: true });
+    }
   });
 
   it("encodes the representative cost, life, play, and prohibition capabilities", () => {
@@ -49,8 +155,18 @@ describe("OPT-590 canonical Trigger schema coverage", () => {
       },
       actions: [
         {
-          type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          type: "PLAYER_CHOICE",
+          params: {
+            options: [
+              [
+                {
+                  type: "ADD_TO_LIFE_FROM_DECK",
+                  params: { amount: 1, position: "TOP" },
+                },
+              ],
+              [],
+            ],
+          },
         },
         { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],

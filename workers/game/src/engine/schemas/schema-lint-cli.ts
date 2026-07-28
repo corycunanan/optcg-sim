@@ -10,6 +10,7 @@ import {
   getAllAuthoredSchemas,
   validateEffectSchema,
 } from "../schema-registry.js";
+import { findSchemasWithMultipleTriggerBlocks } from "../trigger-schema-coverage.js";
 
 async function discoverSchemaSources(): Promise<SchemaSourceModule[]> {
   const directory = __dirname;
@@ -48,6 +49,10 @@ async function main(): Promise<void> {
   const diagnostics = [
     ...Object.entries(schemas).flatMap(([cardId, schema]) =>
       validateEffectSchema(schema, cardId),
+    ),
+    ...findSchemasWithMultipleTriggerBlocks(schemas).map(
+      (cardId) =>
+        `${cardId}: multiple TRIGGER blocks are unsupported; combine them into one block`,
     ),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
   ];

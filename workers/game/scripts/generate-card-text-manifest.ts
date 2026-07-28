@@ -36,6 +36,15 @@ function hasRealText(value: unknown): boolean {
   );
 }
 
+function hasLeadingTriggerTag(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+
+  return value.split(/\r?\n/).some((line) => {
+    const leadingTagRun = line.match(/^\s*((?:\[[^\]\r\n]+\]\s*)+)/)?.[1];
+    return leadingTagRun ? /\[Trigger\]/i.test(leadingTagRun) : false;
+  });
+}
+
 function buildManifest(): CardTextManifest {
   const manifest = new Map<string, CanonicalCardTextFacts>();
   const files = readdirSync(canonicalDataDirectory)
@@ -55,7 +64,10 @@ function buildManifest(): CardTextManifest {
       manifest.set(cardId, {
         hasRealEffectText:
           previous.hasRealEffectText || hasRealText(card.effect),
-        hasTriggerText: previous.hasTriggerText || hasRealText(card.trigger),
+        hasTriggerText:
+          previous.hasTriggerText ||
+          hasRealText(card.trigger) ||
+          hasLeadingTriggerTag(card.effect),
       });
     }
   }

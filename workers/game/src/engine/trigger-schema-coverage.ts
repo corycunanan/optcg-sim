@@ -7,6 +7,16 @@ export interface CanonicalCardTextFacts {
 
 export type CardTextManifest = Record<string, CanonicalCardTextFacts>;
 
+function isDirectTriggerBlock(
+  block: EffectSchema["effects"][number]
+): boolean {
+  return (
+    block.trigger !== undefined &&
+    "keyword" in block.trigger &&
+    block.trigger.keyword === "TRIGGER"
+  );
+}
+
 export function findMissingTriggerSchemas(
   manifest: Readonly<CardTextManifest>,
   schemas: Readonly<Record<string, EffectSchema>>
@@ -16,12 +26,18 @@ export function findMissingTriggerSchemas(
     .map(([cardId]) => cardId)
     .filter((cardId) => {
       const schema = schemas[cardId];
-      return !schema?.effects.some(
-        (block) =>
-          block.trigger &&
-          "keyword" in block.trigger &&
-          block.trigger.keyword === "TRIGGER"
-      );
+      return !schema?.effects.some(isDirectTriggerBlock);
     })
+    .sort();
+}
+
+export function findSchemasWithMultipleTriggerBlocks(
+  schemas: Readonly<Record<string, EffectSchema>>
+): string[] {
+  return Object.entries(schemas)
+    .filter(
+      ([, schema]) => schema.effects.filter(isDirectTriggerBlock).length > 1
+    )
+    .map(([cardId]) => cardId)
     .sort();
 }
