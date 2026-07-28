@@ -87,6 +87,15 @@ function makeTriggerDrawCard(id: string): CardData {
   };
 }
 
+function makeSchemaLessTriggerCard(id: string): CardData {
+  return {
+    ...CARDS.TRIGGER,
+    id,
+    name: id,
+    effectSchema: null,
+  };
+}
+
 function setupTriggerLifeState(
   cardDb: Map<string, CardData>,
   triggerCardId: string,
@@ -180,6 +189,23 @@ describe("OPT-259 F6 — battle damage correctly opens the Trigger window", () =
     // Went straight to hand.
     expect(after.players[1].hand.length).toBe(p1HandBefore + 1);
     expect(after.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
+  });
+
+  it("adds a schema-less Trigger card to hand without offering or trashing it", () => {
+    const cardDb = createTestCardDb();
+    const trigger = makeSchemaLessTriggerCard("OPT590-BATTLE-SCHEMA-LESS");
+    cardDb.set(trigger.id, trigger);
+    const top: LifeCard = { instanceId: "opt590-battle-life", cardId: trigger.id, face: "DOWN" };
+    const { state, attackerId, targetId } = setupBattleWithDefenderLife(cardDb, [top]);
+    const handBefore = state.players[1].hand.length;
+
+    const resolved = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
+
+    expect(resolved.turn.battle).toBeNull();
+    expect(resolved.players[1].life).toHaveLength(0);
+    expect(resolved.players[1].hand).toHaveLength(handBefore + 1);
+    expect(resolved.players[1].hand.some((card) => card.cardId === trigger.id)).toBe(true);
+    expect(resolved.players[1].trash.some((card) => card.cardId === trigger.id)).toBe(false);
   });
 });
 
@@ -346,6 +372,31 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
 // ─── 3. DEAL_DAMAGE — Trigger window DOES open (bug fix) ────────────────────
 
 describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () => {
+  it("adds a schema-less Trigger card to hand without offering or trashing it", () => {
+    const cardDb = createTestCardDb();
+    const trigger = makeSchemaLessTriggerCard("OPT590-EFFECT-SCHEMA-LESS");
+    cardDb.set(trigger.id, trigger);
+    const { state } = setupTriggerLifeState(cardDb, trigger.id, 1);
+    const handBefore = state.players[1].hand.length;
+
+    const result = executeDealDamage(
+      state,
+      { type: "DEAL_DAMAGE", params: { amount: 1 } } as ActionOf<"DEAL_DAMAGE">,
+      "src-dummy",
+      0,
+      cardDb,
+      emptyRefs(),
+    );
+
+    expect(result.succeeded).toBe(true);
+    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(result.events.some((event) => event.type === "TRIGGER_ACTIVATED")).toBe(false);
+    expect(result.state.players[1].life).toHaveLength(0);
+    expect(result.state.players[1].hand).toHaveLength(handBefore + 1);
+    expect(result.state.players[1].hand.some((card) => card.cardId === trigger.id)).toBe(true);
+    expect(result.state.players[1].trash.some((card) => card.cardId === trigger.id)).toBe(false);
+  });
+
   it("DEAL_DAMAGE amount=1 on opp Life w/ [Trigger] pauses, fires TRIGGER_ACTIVATED, and does not yet put the card in hand", () => {
     const cardDb = createTestCardDb();
     const trigger = makeTriggerDrawCard("OPT259-DEAL-TRIG");

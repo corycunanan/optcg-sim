@@ -4225,7 +4225,58 @@ export const OP12_119_BARTHOLOMEW_KUMA: EffectSchema = {
 // SCHEMA REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP12_104_SENTOMARU: EffectSchema = {
+  card_id: "OP12-104",
+  card_name: "Sentomaru",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_ko",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 4 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP12_109_PACIFISTA: EffectSchema = {
+  card_id: "OP12-109",
+  card_name: "Pacifista",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_ko_then_hand",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 1 },
+          },
+        },
+        { type: "RETURN_TO_HAND", target: { type: "SELF" }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
 export const OP12_SCHEMAS: Record<string, EffectSchema> = {
+  "OP12-104": OP12_104_SENTOMARU,
+  "OP12-109": OP12_109_PACIFISTA,
   // Red
   "OP12-001": OP12_001_SILVERS_RAYLEIGH,
   "OP12-003": OP12_003_CROCUS,

@@ -527,7 +527,57 @@ export const ST29_017_IAI_DEATH_LION_SONG: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const ST29_005_JINBE: EffectSchema = {
+  card_id: "ST29-005",
+  card_name: "Jinbe",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { name: "Monkey.D.Luffy" },
+      },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+export const ST29_013_ROB_LUCCI: EffectSchema = {
+  card_id: "ST29-013",
+  card_name: "Rob Lucci",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_ko",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: {
+              cost_max: {
+                type: "GAME_STATE",
+                source: "COMBINED_LIFE_COUNT",
+              },
+            },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 export const ST29_SCHEMAS: Record<string, EffectSchema> = {
+  "ST29-005": ST29_005_JINBE,
+  "ST29-013": ST29_013_ROB_LUCCI,
   "ST29-001": ST29_001_MONKEY_D_LUFFY,
   "ST29-002": ST29_002_USOPP,
   "ST29-003": ST29_003_KAKU,

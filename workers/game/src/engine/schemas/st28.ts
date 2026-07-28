@@ -200,7 +200,37 @@ export const ST28_005_YAMATO: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const ST28_003_KINEMON: EffectSchema = {
+  card_id: "ST28-003",
+  card_name: "Kin'emon",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        all_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Land of Wano" },
+          },
+          {
+            type: "LIFE_COUNT",
+            controller: "OPPONENT",
+            operator: "<=",
+            value: 3,
+          },
+        ],
+      },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 export const ST28_SCHEMAS: Record<string, EffectSchema> = {
+  "ST28-003": ST28_003_KINEMON,
   "ST28-001": ST28_001_ASHURA_DOJI,
   "ST28-002": ST28_002_IZO,
   "ST28-004": ST28_004_KOUZUKI_MOMONOSUKE,

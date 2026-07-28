@@ -4852,7 +4852,37 @@ export const OP14_120_CROCODILE: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP14_102_KUMACY: EffectSchema = {
+  card_id: "OP14-102",
+  card_name: "Kumacy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_from_trash_rested",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { traits: ["Thriller Bark Pirates"], cost_max: 4 },
+          },
+          params: {
+            source_zone: "TRASH",
+            cost_override: "FREE",
+            entry_state: "RESTED",
+          },
+        },
+      ],
+    },
+  ],
+};
+
 export const OP14_SCHEMAS: Record<string, EffectSchema> = {
+  "OP14-102": OP14_102_KUMACY,
   // Red
   "OP14-001": OP14_001_TRAFALGAR_LAW,
   "OP14-002": OP14_002_UROUGE,

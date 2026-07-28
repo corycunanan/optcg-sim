@@ -3651,7 +3651,38 @@ export const OP02_100_JANGO: EffectSchema = {
 
 // ─── Card Schema Registry ───────────────────────────────────────────────────
 
+export const OP02_075_SHIKI: EffectSchema = {
+  card_id: "OP02-075",
+  card_name: "Shiki",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_don_minus_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+export const OP02_104_SENTOMARU: EffectSchema = {
+  card_id: "OP02-104",
+  card_name: "Sentomaru",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 export const OP02_SCHEMAS: Record<string, EffectSchema> = {
+  "OP02-075": OP02_075_SHIKI,
+  "OP02-104": OP02_104_SENTOMARU,
   "OP02-001": OP02_001_EDWARD_NEWGATE,
   "OP02-002": OP02_002_MONKEY_D_GARP,
   "OP02-004": OP02_004_EDWARD_NEWGATE,

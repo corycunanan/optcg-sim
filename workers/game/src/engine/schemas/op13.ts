@@ -4418,7 +4418,34 @@ export const OP13_120_SABO: EffectSchema = {
 // SCHEMA REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP13_014_PORTGAS_D_ROUGE: EffectSchema = {
+  card_id: "OP13-014",
+  card_name: "Portgas.D.Rouge",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_power",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { name: "Portgas.D.Ace" },
+          },
+          params: { amount: 3000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
 export const OP13_SCHEMAS: Record<string, EffectSchema> = {
+  "OP13-014": OP13_014_PORTGAS_D_ROUGE,
   // Red
   "OP13-001": OP13_001_MONKEY_D_LUFFY,
   "OP13-002": OP13_002_PORTGAS_D_ACE,

@@ -4238,7 +4238,48 @@ export const OP04_119_DONQUIXOTE_ROSINANTE: EffectSchema = {
 // Export Map — keyed by card ID
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP04_100_CAPONE_GANG_BEGE: EffectSchema = {
+  card_id: "OP04-100",
+  card_name: 'Capone "Gang" Bege',
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_cannot_attack",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "APPLY_PROHIBITION",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+          },
+          params: { prohibition_type: "CANNOT_ATTACK" },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP04_113_RABIYAN: EffectSchema = {
+  card_id: "OP04-113",
+  card_name: "Rabiyan",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 export const OP04_SCHEMAS: Record<string, EffectSchema> = {
+  "OP04-100": OP04_100_CAPONE_GANG_BEGE,
+  "OP04-113": OP04_113_RABIYAN,
   // Red
   "OP04-001": OP04_001_NEFELTARI_VIVI,
   "OP04-002": OP04_002_IGARAM,

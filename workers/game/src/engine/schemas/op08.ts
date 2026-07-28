@@ -4307,7 +4307,62 @@ export const OP08_119_KAIDO_AND_LINLIN: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP08_104_CHARLOTTE_POIRE: EffectSchema = {
+  card_id: "OP08-104",
+  card_name: "Charlotte Poire",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_trash_play_draw",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        { type: "PLAY_SELF" },
+        { type: "DRAW", params: { amount: 1 }, chain: "THEN" },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+export const OP08_113_S_BEAR: EffectSchema = {
+  card_id: "OP08-113",
+  card_name: "S-Bear",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_trash_play_ko",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      post_cost_conditions: {
+        type: "LIFE_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 2,
+      },
+      actions: [
+        { type: "PLAY_SELF" },
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 3 },
+          },
+          chain: "THEN",
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
 export const OP08_SCHEMAS: Record<string, EffectSchema> = {
+  "OP08-104": OP08_104_CHARLOTTE_POIRE,
+  "OP08-113": OP08_113_S_BEAR,
   // Red — Drum Kingdom / Animal
   "OP08-001": OP08_001_TONY_TONY_CHOPPER,
   "OP08-002": OP08_002_MARCO,

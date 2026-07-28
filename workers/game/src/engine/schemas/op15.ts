@@ -4849,7 +4849,66 @@ export const OP15_119_MONKEY_D_LUFFY: EffectSchema = {
 // OP15 Schema Registry
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP15_103_GENBO: EffectSchema = {
+  card_id: "OP15-103",
+  card_name: "Genbo",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_draw_then_play",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "PLAY_SELF",
+          chain: "THEN",
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 2,
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP15_106_OCTOBALLOON: EffectSchema = {
+  card_id: "OP15-106",
+  card_name: "Octoballoon",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_draw_then_play",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: {
+              color: "YELLOW",
+              card_type: ["CHARACTER", "STAGE"],
+              cost_max: 2,
+            },
+          },
+          params: { source_zone: "HAND", cost_override: "FREE" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
 export const OP15_SCHEMAS: Record<string, EffectSchema> = {
+  "OP15-103": OP15_103_GENBO,
+  "OP15-106": OP15_106_OCTOBALLOON,
   // Red
   "OP15-001": OP15_001_KRIEG,
   "OP15-002": OP15_002_LUCY,

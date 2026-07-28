@@ -3977,7 +3977,108 @@ export const OP09_119_MONKEY_D_LUFFY: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP09_105_SANJI: EffectSchema = {
+  card_id: "OP09-105",
+  card_name: "Sanji",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_add_life_then_trash",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Egghead" },
+      },
+      actions: [
+        {
+          type: "ADD_TO_LIFE_FROM_DECK",
+          params: { amount: 1, position: "TOP", face: "DOWN" },
+        },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
+export const OP09_108_BARTHOLOMEW_KUMA: EffectSchema = {
+  card_id: "OP09-108",
+  card_name: "Bartholomew Kuma",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        all_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Revolutionary Army" },
+          },
+          {
+            type: "COMBINED_TOTAL",
+            metric: "LIFE_COUNT",
+            operator: "<=",
+            value: 5,
+          },
+        ],
+      },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+export const OP09_111_BROOK: EffectSchema = {
+  card_id: "OP09-111",
+  card_name: "Brook",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_opponent_trash",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        all_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Egghead" },
+          },
+          {
+            type: "HAND_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 6,
+          },
+        ],
+      },
+      actions: [
+        {
+          type: "OPPONENT_ACTION",
+          params: {
+            mandatory: true,
+            action: {
+              type: "TRASH_CARD",
+              target: {
+                type: "CARD_IN_HAND",
+                controller: "OPPONENT",
+                count: { exact: 2 },
+              },
+            },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 export const OP09_SCHEMAS: Record<string, EffectSchema> = {
+  "OP09-105": OP09_105_SANJI,
+  "OP09-108": OP09_108_BARTHOLOMEW_KUMA,
+  "OP09-111": OP09_111_BROOK,
   // Red
   "OP09-001": OP09_001_SHANKS,
   "OP09-002": OP09_002_UTA,

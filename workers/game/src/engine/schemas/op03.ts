@@ -4145,7 +4145,46 @@ export const OP03_123_CHARLOTTE_KATAKURI_CHARACTER: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP03_033_HATCHAN: EffectSchema = {
+  card_id: "OP03-033",
+  card_name: "Hatchan",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "East Blue" },
+      },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+export const OP03_100_KINGBAUM: EffectSchema = {
+  card_id: "OP03-100",
+  card_name: "Kingbaum",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_trash_life_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      costs: [
+        { type: "TRASH_FROM_LIFE", amount: 1, position: "TOP_OR_BOTTOM" },
+      ],
+      actions: [{ type: "PLAY_SELF" }],
+      flags: { optional: true },
+    },
+  ],
+};
+
 export const OP03_SCHEMAS: Record<string, EffectSchema> = {
+  "OP03-033": OP03_033_HATCHAN,
+  "OP03-100": OP03_100_KINGBAUM,
   // Red
   "OP03-001": OP03_001_PORTGAS_D_ACE,
   "OP03-002": OP03_002_ADIO,

@@ -4467,7 +4467,60 @@ export const OP06_119_SANJI: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP06_031_HATCHAN: EffectSchema = {
+  card_id: "OP06-031",
+  card_name: "Hatchan",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_fish_man_or_merfolk",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            source_zone: "HAND",
+            count: { up_to: 1 },
+            filter: { traits_any_of: ["Fish-Man", "Merfolk"], cost_max: 3 },
+          },
+          params: { source_zone: "HAND", cost_override: "FREE" },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP06_108_TENGUYAMA_HITETSU: EffectSchema = {
+  card_id: "OP06-108",
+  card_name: "Tenguyama Hitetsu",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_power",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { traits: ["Land of Wano"] },
+          },
+          params: { amount: 2000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
 export const OP06_SCHEMAS: Record<string, EffectSchema> = {
+  "OP06-031": OP06_031_HATCHAN,
+  "OP06-108": OP06_108_TENGUYAMA_HITETSU,
   // Red (FILM)
   "OP06-001": OP06_001_UTA,
   "OP06-002": OP06_002_INAZUMA,
