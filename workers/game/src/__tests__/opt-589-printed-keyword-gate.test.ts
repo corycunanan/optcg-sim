@@ -130,6 +130,55 @@ describe("OPT-589 recursive printed-keyword consistency gate", () => {
     }
   });
 
+  it("does not derive Trigger from prose references on the 12 affected cards", () => {
+    const referencedTriggerText = {
+      "OP03-105":
+        "[DON!! x1] [When Attacking] You may trash 1 card with a [Trigger] from your hand: This Character gains +3000 power during this battle.",
+      "OP03-115":
+        "[On Play] You may trash 1 card with a [Trigger] from your hand: K.O. up to 1 of your opponent's Characters with a cost of 1 or less.",
+      "OP04-105":
+        "[Activate: Main] [Once Per Turn] You may trash 1 card with a [Trigger] from your hand: Rest up to 1 of your opponent's Characters with a cost of 2 or less.",
+      "OP05-109":
+        "[Once Per Turn] When a [Trigger] activates, draw 2 cards and trash 2 cards from your hand.",
+      "OP11-102":
+        "[Your Turn] [Once Per Turn] This effect can be activated when your opponent activates an Event or [Trigger]. If your opponent has 2 or more Life cards, trash 1 card from the top of each of your and your opponent's Life cards.",
+      "OP13-110":
+        "[Blocker]\n[On Play] If your Leader has the {Egghead} type, play up to 1 Character card with a cost of 5 or less and a [Trigger] from your hand.",
+      "ST29-014":
+        "[Rush: Character] (This card can attack Characters on the turn in which it is played.)\n[Activate: Main] [Once Per Turn] You may trash 1 card with a [Trigger] from your hand: Draw 1 card and give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "OP03-022":
+        "[DON!! x2] [When Attacking] ① (You may rest the specified number of DON!! cards in your cost area.): Play up to 1 Character card with a cost of 4 or less and a [Trigger] from your hand.",
+      "OP05-002":
+        "[Activate: Main] [Once Per Turn] You may trash 1 {Revolutionary Army} type card from your hand: Up to 3 of your {Revolutionary Army} type Characters or Characters with a [Trigger] gain +3000 power during this turn.",
+      "OP09-062":
+        "[Banish] (When this card deals damage, the target card is trashed without activating its Trigger.)\n[When Attacking] You may trash 1 card with a [Trigger] from your hand: Add up to 1 DON!! card from your DON!! deck and rest it.",
+      "OP13-100":
+        "[Your Turn] [Once Per Turn] This effect can be activated when you play a Character with a [Trigger]. Give up to 2 rested DON!! cards to 1 of your Leader or Character cards.",
+      "OP16-080":
+        "[Opponent's Turn] All of your Characters gain +1 cost.\n[On Your Opponent's Attack] [Once Per Turn] You may trash 1 card with a [Trigger] from your hand: Change the target of that attack to this Leader or to one of your {Blackbeard Pirates} type Character cards.",
+    } as const;
+
+    for (const [cardId, effectText] of Object.entries(referencedTriggerText)) {
+      expect(
+        derivePrintedKeywords(
+          cardData(effectText),
+          getEffectSchema(cardId),
+        ).trigger,
+        cardId,
+      ).toBe(false);
+    }
+
+    // Carrot is genuine: its canonical [Trigger] text lives in the effect
+    // field rather than the trigger field, so schema authority must preserve it.
+    expect(
+      derivePrintedKeywords(
+        cardData("[Trigger] Play this card."),
+        getEffectSchema("OP01-009"),
+      ).trigger,
+      "OP01-009",
+    ).toBe(true);
+  });
+
   it("ignores GRANT_KEYWORD recursively through conditions, durations, and nested choices", () => {
     const schema = {
       card_id: "OPT-589-GATE",

@@ -2087,7 +2087,7 @@ export const OP09_061_MONKEY_D_LUFFY: EffectSchema = {
   ],
 };
 
-// ─── OP09-062 Nico Robin (Character) ───────────────────────────────────────────
+// ─── OP09-062 Nico Robin (Leader) ──────────────────────────────────────────────
 // [Banish]
 // [When Attacking] You may trash 1 card with a [Trigger] from your hand: Add
 // up to 1 DON!! card from your DON!! deck and rest it.
@@ -2095,7 +2095,7 @@ export const OP09_061_MONKEY_D_LUFFY: EffectSchema = {
 export const OP09_062_NICO_ROBIN: EffectSchema = {
   card_id: "OP09-062",
   card_name: "Nico Robin",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "banish",
