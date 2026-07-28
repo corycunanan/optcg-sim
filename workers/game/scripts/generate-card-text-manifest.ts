@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 interface CanonicalCardTextFacts {
   hasRealEffectText: boolean;
@@ -36,10 +37,11 @@ function hasRealText(value: unknown): boolean {
   );
 }
 
-function hasLeadingTriggerTag(value: unknown): boolean {
+export function hasLeadingTriggerTag(value: unknown): boolean {
   if (typeof value !== "string") return false;
 
-  return value.split(/\r?\n/).some((line) => {
+  const normalized = value.replace(/<br\s*\/?>/gi, "\n");
+  return normalized.split(/\r?\n/).some((line) => {
     const leadingTagRun = line.match(/^\s*((?:\[[^\]\r\n]+\]\s*)+)/)?.[1];
     return leadingTagRun ? /\[Trigger\]/i.test(leadingTagRun) : false;
   });
@@ -110,4 +112,9 @@ function main(): void {
   console.log(`Generated ${outputPath}.`);
 }
 
-main();
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
+  main();
+}

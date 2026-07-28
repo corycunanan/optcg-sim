@@ -15,6 +15,7 @@ import {
   findSchemasWithMultipleTriggerBlocks,
 } from "../engine/trigger-schema-coverage.js";
 import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
+import { hasLeadingTriggerTag } from "../../scripts/generate-card-text-manifest.js";
 
 const manifestPath = resolve(
   import.meta.dirname,
@@ -25,6 +26,27 @@ const manifest = JSON.parse(
 ) as CardTextManifest;
 
 describe("OPT-590 canonical Trigger schema coverage", () => {
+  it("classifies raw canonical effect text using sanitized line boundaries", () => {
+    expect(hasLeadingTriggerTag("[Trigger] Play this card.")).toBe(true);
+    for (const separator of ["<br>", "<br/>", "<br />", "<BR   />"]) {
+      expect(
+        hasLeadingTriggerTag(
+          `[On Play] Draw 1 card.${separator}[Trigger] Play this card.`
+        )
+      ).toBe(true);
+    }
+    expect(
+      hasLeadingTriggerTag(
+        "You may trash 1 card with a [Trigger] from your hand: draw 1 card."
+      )
+    ).toBe(false);
+    expect(
+      hasLeadingTriggerTag(
+        "[On Play] Draw 1 card.<br />You may trash 1 card with a [Trigger] from your hand."
+      )
+    ).toBe(false);
+  });
+
   it("requires every canonical Trigger card to have a TRIGGER block", () => {
     expect(
       findMissingTriggerSchemas(manifest, getAllAuthoredSchemas())
