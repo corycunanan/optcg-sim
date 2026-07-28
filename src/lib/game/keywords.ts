@@ -6,20 +6,11 @@
  */
 
 import type { KeywordSet } from "@shared/game-types";
+import { extractStandalonePrintedKeywords } from "@shared/printed-keywords";
 
 export function extractKeywords(
   effectText: string,
   triggerText: string | null,
 ): KeywordSet {
-  const text = (effectText + " " + (triggerText ?? "")).toLowerCase();
-
-  return {
-    rush: /\brush\b/.test(text) && !/rush:\s*character/i.test(text),
-    rushCharacter: /rush:\s*character/i.test(text),
-    doubleAttack: /double attack/i.test(text),
-    banish: /\bbanish\b/i.test(text),
-    blocker: /\bblocker\b/i.test(text),
-    trigger: /\[trigger\]/i.test(text),
-    unblockable: /\bunblockable\b/i.test(text),
-  };
+  return extractStandalonePrintedKeywords(effectText, triggerText);
 }
