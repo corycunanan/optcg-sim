@@ -2558,7 +2558,61 @@ export const OP16_119_MARSHALL_D_TEACH: EffectSchema = {
   ],
 };
 
+export const OP16_105_GECKO_MORIA: EffectSchema = {
+  card_id: "OP16-105",
+  card_name: "Gecko Moria",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_named_from_trash",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        type: "LIFE_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 1,
+      },
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { name: "Absalom", cost_max: 4 },
+          },
+          params: { source_zone: "TRASH", cost_override: "FREE" },
+        },
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { name: "Dr. Hogback", cost_max: 4 },
+          },
+          params: { source_zone: "TRASH", cost_override: "FREE" },
+          chain: "THEN",
+        },
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { name: "Perona", cost_max: 4 },
+          },
+          params: { source_zone: "TRASH", cost_override: "FREE" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
 export const OP16_SCHEMAS: Record<string, EffectSchema> = {
+  "OP16-105": OP16_105_GECKO_MORIA,
   "OP16-001": OP16_001_PORTGAS_D_ACE,
   "OP16-002": OP16_002_IZO,
   "OP16-003": OP16_003_EDWARD_NEWGATE,

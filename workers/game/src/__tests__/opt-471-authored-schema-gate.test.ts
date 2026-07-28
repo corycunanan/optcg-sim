@@ -167,6 +167,18 @@ describe("OPT-471 schema source and disposition gates", () => {
           ).map((card) => card.id)
         )
     );
+    const cardTextManifest = JSON.parse(
+      readFileSync(
+        resolve(
+          repoRoot,
+          "workers/game/src/engine/card-text-manifest.generated.json"
+        ),
+        "utf8"
+      )
+    ) as Record<string, unknown>;
+    for (const cardId of Object.keys(cardTextManifest)) {
+      cardIds.add(cardId);
+    }
     const dispositions = readFileSync(
       resolve(repoRoot, "docs/game-engine/SCHEMA-QA-DISPOSITIONS.md"),
       "utf8"

@@ -2344,7 +2344,41 @@ export const EB02_061_MONKEY_D_LUFFY: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const EB02_055_JINBE: EffectSchema = {
+  card_id: "EB02-055",
+  card_name: "Jinbe",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        all_of: [
+          {
+            any_of: [
+              {
+                type: "LEADER_PROPERTY",
+                controller: "SELF",
+                property: { trait: "Fish-Man" },
+              },
+              {
+                type: "LEADER_PROPERTY",
+                controller: "SELF",
+                property: { trait: "Merfolk" },
+              },
+            ],
+          },
+          { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 2 },
+        ],
+      },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 export const EB02_SCHEMAS: Record<string, EffectSchema> = {
+  "EB02-055": EB02_055_JINBE,
   // Red
   "EB02-002": EB02_002_SABO,
   "EB02-003": EB02_003_TONY_TONY_CHOPPER,

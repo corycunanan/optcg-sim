@@ -383,7 +383,22 @@ export const ST05_017_UNION_ARMADA: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const ST05_009_SCARLET: EffectSchema = {
+  card_id: "ST05-009",
+  card_name: "Scarlet",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 export const ST05_SCHEMAS: Record<string, EffectSchema> = {
+  "ST05-009": ST05_009_SCARLET,
   "ST05-001": ST05_001_SHANKS,
   "ST05-002": ST05_002_AIN,
   "ST05-003": ST05_003_ANN,

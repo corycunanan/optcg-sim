@@ -350,7 +350,59 @@ export const ST09_015_THUNDER_BAGUA: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const ST09_002_UZUKI_TEMPURA: EffectSchema = {
+  card_id: "ST09-002",
+  card_name: "Uzuki Tempura",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_rest_then_hand",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "SET_REST",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 2 },
+          },
+        },
+        { type: "RETURN_TO_HAND", target: { type: "SELF" }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
+export const ST09_009_FUGETSU_OMUSUBI: EffectSchema = {
+  card_id: "ST09-009",
+  card_name: "Fugetsu Omusubi",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_ko_then_hand",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 1 },
+          },
+        },
+        { type: "RETURN_TO_HAND", target: { type: "SELF" }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
 export const ST09_SCHEMAS: Record<string, EffectSchema> = {
+  "ST09-002": ST09_002_UZUKI_TEMPURA,
+  "ST09-009": ST09_009_FUGETSU_OMUSUBI,
   "ST09-001": ST09_001_YAMATO,
   "ST09-004": ST09_004_KAIDO,
   "ST09-005": ST09_005_KOUZUKI_ODEN,

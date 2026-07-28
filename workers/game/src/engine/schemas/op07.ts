@@ -4246,7 +4246,164 @@ export const OP07_119_PORTGAS_D_ACE: EffectSchema = {
 // OP07 SCHEMAS REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP07_099_USOPP: EffectSchema = {
+  card_id: "OP07-099",
+  card_name: "Usopp",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_power",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { traits: ["Egghead"] },
+          },
+          params: { amount: 2000 },
+          duration: { type: "UNTIL_END_OF_YOUR_NEXT_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP07_102_JINBE: EffectSchema = {
+  card_id: "OP07-102",
+  card_name: "Jinbe",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_bounce_then_hand",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "RETURN_TO_HAND",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 4 },
+          },
+        },
+        { type: "RETURN_TO_HAND", target: { type: "SELF" }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
+export const OP07_103_TONY_TONY_CHOPPER: EffectSchema = {
+  card_id: "OP07-103",
+  card_name: "Tony Tony.Chopper",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_blocker_then_hand",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "GRANT_KEYWORD",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+            filter: { traits: ["Egghead"] },
+          },
+          params: { keyword: "BLOCKER" },
+          duration: { type: "THIS_TURN" },
+        },
+        { type: "RETURN_TO_HAND", target: { type: "SELF" }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
+export const OP07_104_NICO_ROBIN: EffectSchema = {
+  card_id: "OP07-104",
+  card_name: "Nico Robin",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_draw",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Egghead" },
+      },
+      actions: [{ type: "DRAW", params: { amount: 2 } }],
+    },
+  ],
+};
+
+export const OP07_107_FRANKY: EffectSchema = {
+  card_id: "OP07-107",
+  card_name: "Franky",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_draw_then_play",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "PLAY_SELF",
+          chain: "THEN",
+          conditions: {
+            type: "LIFE_COUNT",
+            controller: "SELF",
+            operator: "<=",
+            value: 1,
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const OP07_113_RORONOA_ZORO: EffectSchema = {
+  card_id: "OP07-113",
+  card_name: "Roronoa Zoro",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_rest",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Egghead" },
+      },
+      actions: [
+        {
+          type: "SET_REST",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 export const OP07_SCHEMAS: Record<string, EffectSchema> = {
+  "OP07-099": OP07_099_USOPP,
+  "OP07-102": OP07_102_JINBE,
+  "OP07-103": OP07_103_TONY_TONY_CHOPPER,
+  "OP07-104": OP07_104_NICO_ROBIN,
+  "OP07-107": OP07_107_FRANKY,
+  "OP07-113": OP07_113_RORONOA_ZORO,
   // Red
   "OP07-001": OP07_001_MONKEY_D_DRAGON,
   "OP07-002": OP07_002_AIN,

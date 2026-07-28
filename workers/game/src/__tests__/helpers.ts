@@ -6,6 +6,7 @@
  */
 
 import type { CardData, CardInstance, DonInstance, GameState, KeywordSet, GameInitPayload, PlayerState } from "../types.js";
+import type { EffectSchema } from "../engine/effect-types.js";
 import { buildInitialState } from "../engine/setup.js";
 import { runPipeline } from "../engine/pipeline.js";
 
@@ -34,6 +35,17 @@ function makeCard(id: string, overrides: Partial<CardData> = {}): CardData {
   };
 }
 
+const TEST_TRIGGER_SCHEMA: EffectSchema = {
+  effects: [
+    {
+      id: "test_trigger",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "DRAW", params: { amount: 0 } }],
+    },
+  ],
+};
+
 // ─── Test card catalog ───────────────────────────────────────────────────────
 
 export const CARDS = {
@@ -44,7 +56,14 @@ export const CARDS = {
   DOUBLE_ATK: makeCard("CHAR-DATK", { cost: 4, power: 5000, effectText: "[Double Attack]", keywords: { ...noKeywords(), doubleAttack: true } }),
   BLOCKER: makeCard("CHAR-BLOCKER", { cost: 3, power: 4000, effectText: "[Blocker]", keywords: { ...noKeywords(), blocker: true } }),
   BANISH: makeCard("CHAR-BANISH", { cost: 2, power: 3000, effectText: "[Banish]", keywords: { ...noKeywords(), banish: true } }),
-  TRIGGER: makeCard("CHAR-TRIGGER", { cost: 1, power: 2000, counter: 1000, triggerText: "[Trigger] Play this card.", keywords: { ...noKeywords(), trigger: true } }),
+  TRIGGER: makeCard("CHAR-TRIGGER", {
+    cost: 1,
+    power: 2000,
+    counter: 1000,
+    triggerText: "[Trigger] Play this card.",
+    keywords: { ...noKeywords(), trigger: true },
+    effectSchema: TEST_TRIGGER_SCHEMA,
+  }),
   UNBLOCKABLE: makeCard("CHAR-UNBLK", { cost: 4, power: 5000, effectText: "[Unblockable]", keywords: { ...noKeywords(), unblockable: true } }),
   COUNTER: makeCard("CHAR-COUNTER", { cost: 2, power: 3000, counter: 2000 }),
   EVENT_COUNTER: makeCard("EVENT-CTR", { type: "Event", cost: 1, power: null, counter: null }),

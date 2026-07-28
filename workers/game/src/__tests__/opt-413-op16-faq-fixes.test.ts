@@ -180,11 +180,21 @@ describe("OPT-413: costed [Trigger] not offered when unpayable (OP16-107 Burgess
     expect(canOfferTrigger(emptyHand, card.id, cardDb, 0)).toBe(false);
   });
 
-  it("costless triggers and schema-less trigger cards are always offered", () => {
+  it("offers authored costless triggers and fails closed for schema-less trigger cards", () => {
     const cardDb = createTestCardDb();
     const state = withPlayer(createBattleReadyState(cardDb), 0, { hand: [] });
-    // CHAR-TRIGGER has the trigger keyword and no effectSchema.
-    expect(canOfferTrigger(state, CARDS.TRIGGER.id, cardDb, 0)).toBe(true);
+    const costless = burgessLike(cardDb);
+    costless.effectSchema!.effects[0].costs = undefined;
+    expect(canOfferTrigger(state, costless.id, cardDb, 0)).toBe(true);
+    const schemaLessTrigger = {
+      ...CARDS.TRIGGER,
+      id: "SCHEMA-LESS-TRIGGER",
+      effectSchema: null,
+    };
+    cardDb.set(schemaLessTrigger.id, schemaLessTrigger);
+    // A Trigger-keyword card with no authored block fails closed. Mitigation chooses
+    // the normal add-to-hand outcome instead of offering a destructive no-op.
+    expect(canOfferTrigger(state, schemaLessTrigger.id, cardDb, 0)).toBe(false);
     // Non-trigger cards are never offered.
     expect(canOfferTrigger(state, CARDS.VANILLA.id, cardDb, 0)).toBe(false);
   });

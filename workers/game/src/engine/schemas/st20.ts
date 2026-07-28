@@ -183,7 +183,33 @@ export const ST20_005_CHARLOTTE_LINLIN: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const ST20_003_CHARLOTTE_BRULEE: EffectSchema = {
+  card_id: "ST20-003",
+  card_name: "Charlotte Brulee",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_life_scry_then_hand",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "LIFE_SCRY",
+          target: {
+            type: "LIFE_CARD",
+            controller: "EITHER",
+            count: { up_to: 1 },
+          },
+          params: { look_at: 1 },
+        },
+        { type: "RETURN_TO_HAND", target: { type: "SELF" }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
 export const ST20_SCHEMAS: Record<string, EffectSchema> = {
+  "ST20-003": ST20_003_CHARLOTTE_BRULEE,
   "ST20-001": ST20_001_CHARLOTTE_KATAKURI,
   "ST20-002": ST20_002_CHARLOTTE_CRACKER,
   "ST20-004": ST20_004_CHARLOTTE_PUDDING,

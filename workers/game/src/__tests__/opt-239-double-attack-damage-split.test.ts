@@ -179,8 +179,8 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     expect(done.state.players[1].life.length).toBe(0);
   });
 
-  it("accept 1st [Trigger] (no effect schema): 2nd damage still resolves", () => {
-    // CARDS.TRIGGER has no effectSchema, so activating just sends it to trash.
+  it("accept 1st authored [Trigger]: 2nd damage still resolves", () => {
+    // The shared Trigger fixture has an authored, side-effect-free Trigger block.
     const cardDb = createTestCardDb();
     const top: LifeCard = { instanceId: "life-top-trig-acc", cardId: CARDS.TRIGGER.id, face: "DOWN" };
     const bot: LifeCard = { instanceId: "life-bot-v-acc", cardId: CARDS.VANILLA.id, face: "DOWN" };

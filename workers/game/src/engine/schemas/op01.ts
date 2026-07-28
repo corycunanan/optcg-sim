@@ -3147,7 +3147,52 @@ export const OP01_121_YAMATO: EffectSchema = {
 // Export Map — keyed by card ID
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP01_037_KAWAMATSU: EffectSchema = {
+  card_id: "OP01-037",
+  card_name: "Kawamatsu",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+export const OP01_082_MONET: EffectSchema = {
+  card_id: "OP01-082",
+  card_name: "Monet",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+export const OP01_104_SPEED: EffectSchema = {
+  card_id: "OP01-104",
+  card_name: "Speed",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 export const OP01_SCHEMAS: Record<string, EffectSchema> = {
+  "OP01-037": OP01_037_KAWAMATSU,
+  "OP01-082": OP01_082_MONET,
+  "OP01-104": OP01_104_SPEED,
   // Red
   "OP01-001": OP01_001_RORONOA_ZORO,
   "OP01-002": OP01_002_TRAFALGAR_LAW,

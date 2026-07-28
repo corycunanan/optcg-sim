@@ -88,7 +88,11 @@ export function canOfferTrigger(
       "keyword" in effect.trigger &&
       effect.trigger.keyword === "TRIGGER"
   );
-  if (!block?.costs?.length) return true;
+  // Fail closed when canonical Trigger text has no authored block. Offering
+  // such a card would let the player accept, trash it from Life, and resolve
+  // nothing. Until its schema is authored, use the normal add-to-hand outcome.
+  if (!block) return false;
+  if (!block.costs?.length) return true;
   return block.costs.every((cost) =>
     isCostPayable(state, cost, ownerIndex, cardDb, sourceCardInstanceId)
   );

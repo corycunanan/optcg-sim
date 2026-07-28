@@ -4539,7 +4539,24 @@ export const OP05_119_MONKEY_D_LUFFY: EffectSchema = {
 // Combined OP05 Schemas Export
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const OP05_105_SATORI: EffectSchema = {
+  card_id: "OP05-105",
+  card_name: "Satori",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_trash_hand_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [{ type: "PLAY_SELF" }],
+      flags: { optional: true },
+    },
+  ],
+};
+
 export const OP05_SCHEMAS: Record<string, EffectSchema> = {
+  "OP05-105": OP05_105_SATORI,
   [OP05_001_SABO.card_id!]: OP05_001_SABO,
   [OP05_002_BELO_BETTY.card_id!]: OP05_002_BELO_BETTY,
   [OP05_003_INAZUMA.card_id!]: OP05_003_INAZUMA,

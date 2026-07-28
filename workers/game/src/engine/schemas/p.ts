@@ -3027,7 +3027,62 @@ export const P_135_MONKEY_D_LUFFY: EffectSchema = {
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const P_042_RORONOA_ZORO: EffectSchema = {
+  card_id: "P-042",
+  card_name: "Roronoa Zoro",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_ko",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 4 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+export const P_088_TRAFALGAR_LAW: EffectSchema = {
+  card_id: "P-088",
+  card_name: "Trafalgar Law",
+  card_type: "Character",
+  effects: [
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      conditions: {
+        all_of: [
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Supernovas" },
+          },
+          {
+            type: "COMBINED_TOTAL",
+            metric: "LIFE_COUNT",
+            operator: "<=",
+            value: 5,
+          },
+        ],
+      },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 export const P_SCHEMAS: Record<string, EffectSchema> = {
+  "P-042": P_042_RORONOA_ZORO,
+  "P-088": P_088_TRAFALGAR_LAW,
   "P-001": P_001_MONKEY_D_LUFFY,
   "P-002": P_002_I_SMELL_ADVENTURE,
   "P-003": P_003_EUSTASS_CAPTAIN_KID,
