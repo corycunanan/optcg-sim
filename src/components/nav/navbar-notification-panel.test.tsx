@@ -218,6 +218,73 @@ describe("NavbarNotificationPanel", () => {
     ).toBeDefined();
   });
 
+  it("enables mark all when only off-page notifications are unread", async () => {
+    mocks.notifications = Array.from({ length: 20 }, (_, index) =>
+      notification(String(index), "2026-01-01T00:00:00.000Z")
+    );
+    mocks.unreadCount = 1;
+    render(<NavbarNotificationPanel />);
+
+    await openPanel();
+
+    expect(
+      screen
+        .getByRole("button", { name: "Mark all read" })
+        .hasAttribute("disabled")
+    ).toBe(false);
+  });
+
+  it("optimistically clears off-page unread from the badge on mark all", async () => {
+    const readRequest = deferred<unknown>();
+    const bulkRequest = deferred<unknown>();
+    mocks.notifications = Array.from({ length: 20 }, (_, index) =>
+      notification(String(index), "2026-01-01T00:00:00.000Z", {
+        status: "PENDING",
+      })
+    );
+    mocks.unreadCount = 30;
+    mocks.apiPut.mockImplementation((url: string) =>
+      url === "/api/notifications" ? bulkRequest.promise : readRequest.promise
+    );
+    render(<NavbarNotificationPanel />);
+
+    const { user, bell } = await openPanel();
+    expect(bell.getAttribute("aria-label")).toBe(
+      "Notifications, 10 unread notifications"
+    );
+    await user.click(screen.getByRole("button", { name: "Mark all read" }));
+
+    expect(bell.getAttribute("aria-label")).toBe(
+      "Notifications, No unread notifications"
+    );
+    bulkRequest.resolve({ success: true });
+    readRequest.resolve({ success: true });
+  });
+
+  it("restores the authoritative off-page unread count when mark all fails", async () => {
+    const bulkRequest = deferred<unknown>();
+    mocks.notifications = Array.from({ length: 20 }, (_, index) =>
+      notification(String(index), "2026-01-01T00:00:00.000Z")
+    );
+    mocks.unreadCount = 10;
+    mocks.apiPut.mockReturnValue(bulkRequest.promise);
+    render(<NavbarNotificationPanel />);
+
+    const { user, bell } = await openPanel();
+    await user.click(screen.getByRole("button", { name: "Mark all read" }));
+    expect(bell.getAttribute("aria-label")).toBe(
+      "Notifications, No unread notifications"
+    );
+    bulkRequest.reject(new TypeError("bulk failed"));
+
+    await waitFor(() =>
+      expect(bell.getAttribute("aria-label")).toBe(
+        "Notifications, 10 unread notifications"
+      )
+    );
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ["accept", "You're now friends with player-1"],
     ["decline", "Friend request from player-1 declined"],
@@ -516,6 +583,11 @@ describe("NavbarNotificationPanel", () => {
 
     expect(screen.getByText("A player")).toBeDefined();
     expect(screen.getByText("Friend request unavailable")).toBeDefined();
+    expect(
+      screen.getByRole("listitem", {
+        name: /Friend request from A player unavailable/,
+      })
+    ).toBeDefined();
     expect(screen.queryByRole("button", { name: /^Accept/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Decline/ })).toBeNull();
   });

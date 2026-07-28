@@ -91,10 +91,14 @@ export function NavbarNotificationPanel() {
     new Map<string, FriendRequestAction>()
   );
   const openRef = useRef(false);
+  const bulkReadSnapshotIdsRef = useRef(new Set<string>());
+  // Encodes the one-attempt-per-ID-per-session policy inside markVisibleRead
+  // so future call sites cannot accidentally re-arm failed background reads.
   const readAttemptedThisOpenRef = useRef(new Set<string>());
   const readRequestsRef = useRef(new Set<string>());
   const actionRequestsRef = useRef(new Set<string>());
   const [open, setOpen] = useState(false);
+  const [bulkReadSuppressed, setBulkReadSuppressed] = useState(false);
   const [badgeSuppressedIds, setBadgeSuppressedIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -200,6 +204,8 @@ export function NavbarNotificationPanel() {
         readAttemptedThisOpenRef.current.clear();
         return;
       }
+      // Radix is controlled, but duplicate open requests can arrive before
+      // React commits the new value; only the closed-to-open edge owns a snapshot.
       if (wasOpen) return;
 
       const visibleUnreadIds = visibleNotifications
@@ -221,6 +227,8 @@ export function NavbarNotificationPanel() {
     const allPendingIds = notifications
       .filter(({ status }) => status === "PENDING")
       .map(({ id }) => id);
+    bulkReadSnapshotIdsRef.current = new Set(notifications.map(({ id }) => id));
+    setBulkReadSuppressed(true);
     for (const id of allPendingIds) locallyReadIdsRef.current.add(id);
     setLocallyReadIds((current) => new Set([...current, ...allPendingIds]));
     try {
@@ -230,6 +238,8 @@ export function NavbarNotificationPanel() {
       void refresh();
     } catch (error) {
       if (!mountedRef.current) return;
+      setBulkReadSuppressed(false);
+      bulkReadSnapshotIdsRef.current.clear();
       setLocallyReadIds((current) => {
         const next = new Set(current);
         for (const id of allPendingIds) {
@@ -354,11 +364,16 @@ export function NavbarNotificationPanel() {
       status === "PENDING" &&
       (locallyReadIds.has(id) || badgeSuppressedIds.has(id))
   ).length;
-  const visibleUnreadCount = Math.max(
-    0,
-    unreadCount - locallyHiddenUnreadCount
-  );
-  const hasUnread = notifications.some(({ status }) => status === "PENDING");
+  const postBulkUnreadCount = notifications.filter(
+    ({ id, status }) =>
+      status === "PENDING" && !bulkReadSnapshotIdsRef.current.has(id)
+  ).length;
+  const visibleUnreadCount = bulkReadSuppressed
+    ? postBulkUnreadCount
+    : Math.max(0, unreadCount - locallyHiddenUnreadCount);
+  const hasUnread = bulkReadSuppressed
+    ? postBulkUnreadCount > 0
+    : unreadCount > 0;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange} modal>
@@ -429,7 +444,9 @@ export function NavbarNotificationPanel() {
               );
               const rowDescription = reconciling
                 ? `Friend request from ${name} was already resolved. Updating status.`
-                : description;
+                : !resolved && notification.referenceId === null
+                  ? `Friend request from ${name} unavailable`
+                  : description;
 
               return (
                 <li
