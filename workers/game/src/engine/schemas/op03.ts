@@ -786,7 +786,7 @@ export const OP03_021_KURO: EffectSchema = {
 export const OP03_022_ARLONG: EffectSchema = {
   card_id: "OP03-022",
   card_name: "Arlong",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "when_attacking_play_trigger_card",

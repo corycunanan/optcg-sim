@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import type { EffectSchema } from "../engine/effect-types.js";
 import type { CardTextManifest } from "../engine/trigger-schema-coverage.js";
 import {
+  findDerivedTriggersWithoutSchemaBlocks,
   findMissingTriggerSchemas,
   findSchemasWithMultipleTriggerBlocks,
 } from "../engine/trigger-schema-coverage.js";
@@ -51,6 +52,46 @@ describe("OPT-590 canonical Trigger schema coverage", () => {
     expect(
       findMissingTriggerSchemas(manifest, getAllAuthoredSchemas())
     ).toEqual([]);
+  });
+
+  it("forbids derived Trigger keywords without a TRIGGER block", () => {
+    expect(
+      findDerivedTriggersWithoutSchemaBlocks(
+        manifest,
+        getAllAuthoredSchemas()
+      )
+    ).toEqual([]);
+  });
+
+  it("reports a derived Trigger keyword without a TRIGGER block", () => {
+    const syntheticManifest: CardTextManifest = {
+      "TEST-FALSE-TRIGGER": {
+        hasRealEffectText: true,
+        hasTriggerText: false,
+      },
+    };
+    const nestedTriggerSchema: EffectSchema = {
+      card_id: "TEST-FALSE-TRIGGER",
+      effects: [
+        {
+          id: "nested_trigger",
+          category: "auto",
+          trigger: {
+            any_of: [
+              { keyword: "WHEN_ATTACKING" },
+              { keyword: "TRIGGER" },
+            ],
+          },
+          actions: [],
+        },
+      ],
+    };
+
+    expect(
+      findDerivedTriggersWithoutSchemaBlocks(syntheticManifest, {
+        "TEST-FALSE-TRIGGER": nestedTriggerSchema,
+      })
+    ).toEqual(["TEST-FALSE-TRIGGER"]);
   });
 
   it("reports a canonical Trigger card whose schema is missing", () => {
