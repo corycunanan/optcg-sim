@@ -8,7 +8,7 @@
     "bundle:check": "node scripts/check-bundle-capacity.mjs",
     "type-check": "tsc --noEmit",
     "schema:generate": "node --import tsx scripts/generate-schema-registry.ts && node --import tsx scripts/generate-card-text-manifest.ts",
-    "schema:check": "node --import tsx scripts/generate-schema-registry.ts --check && node --import tsx scripts/generate-card-text-manifest.ts --check && node src/engine/schemas/lint-schemas.sh && node src/engine/schemas/check-doc-drift.sh && node --import tsx src/engine/action-inventory-cli.ts && vitest run src/__tests__/opt-471-authored-schema-gate.test.ts src/__tests__/opt-590-trigger-schema-coverage.test.ts",
+    "schema:check": "node --import tsx scripts/generate-schema-registry.ts --check && node --import tsx scripts/generate-card-text-manifest.ts --check && node src/engine/schemas/lint-schemas.sh && node src/engine/schemas/check-doc-drift.sh && node --import tsx src/engine/action-inventory-cli.ts && vitest run src/__tests__/opt-471-authored-schema-gate.test.ts src/__tests__/opt-589-printed-keyword-gate.test.ts src/__tests__/opt-590-trigger-schema-coverage.test.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

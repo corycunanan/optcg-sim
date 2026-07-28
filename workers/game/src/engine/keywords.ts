@@ -28,9 +28,7 @@ function hasEffectiveRush(
   state: GameState,
   cardDb?: Map<string, CardData>
 ): boolean {
-  const negated = isCardNegated(card, state, cardDb);
-  const printed = cardData.keywords.rush && !negated;
-  return printed || hasGrantedKeyword(card, "RUSH", state, cardDb);
+  return hasEffectiveKeyword(card, cardData, "RUSH", state, cardDb);
 }
 
 function hasEffectiveRushCharacter(
@@ -39,9 +37,7 @@ function hasEffectiveRushCharacter(
   state: GameState,
   cardDb?: Map<string, CardData>
 ): boolean {
-  const negated = isCardNegated(card, state, cardDb);
-  const printed = cardData.keywords.rushCharacter && !negated;
-  return printed || hasGrantedKeyword(card, "RUSH_CHARACTER", state, cardDb);
+  return hasEffectiveKeyword(card, cardData, "RUSH_CHARACTER", state, cardDb);
 }
 
 export function hasDoubleAttack(cardData: CardData): boolean {

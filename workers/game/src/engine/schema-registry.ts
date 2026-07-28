@@ -29,6 +29,7 @@ import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
 import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
+import { derivePrintedKeywords } from "./printed-keywords.js";
 
 /**
  * Get the effect schema for a card by ID.
@@ -66,13 +67,15 @@ export function injectSchemasIntoCardDb(
     throw new SchemaBootValidationError(diagnostics);
   }
 
-  for (const [cardId, schema] of Object.entries(AUTHORED_SCHEMAS)) {
-    const data = cardDb.get(cardId);
-    if (data) {
+  for (const [cardId, data] of cardDb) {
+    const schema = AUTHORED_SCHEMAS[cardId] ?? data.effectSchema;
+    cardDb.set(cardId, {
+      ...data,
       // Always prefer authored schemas over DB-stored schemas — they are the
       // most up-to-date and thoroughly tested versions.
-      cardDb.set(cardId, { ...data, effectSchema: schema });
-    }
+      effectSchema: schema,
+      keywords: derivePrintedKeywords(data, schema),
+    });
   }
 }
 

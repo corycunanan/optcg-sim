@@ -2740,6 +2740,7 @@ export const OP15_070_FUZA: EffectSchema = {
       id: "OP15-070_unblockable",
       category: "permanent",
       source_text: "All of your [Shura] cards and this Character gain [Unblockable].",
+      flags: { keywords: ["UNBLOCKABLE"] },
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -2749,11 +2750,6 @@ export const OP15_070_FUZA: EffectSchema = {
             count: { all: true },
             filter: { name: "Shura" },
           },
-          params: { keyword: "UNBLOCKABLE" },
-        },
-        {
-          type: "GRANT_KEYWORD",
-          target: { type: "SELF" },
           params: { keyword: "UNBLOCKABLE" },
         },
       ],
@@ -2798,6 +2794,7 @@ export const OP15_071_HOLLY: EffectSchema = {
       id: "OP15-071_double_attack",
       category: "permanent",
       source_text: "All of your [Ohm] cards and this Character gain [Double Attack].",
+      flags: { keywords: ["DOUBLE_ATTACK"] },
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -2807,11 +2804,6 @@ export const OP15_071_HOLLY: EffectSchema = {
             count: { all: true },
             filter: { name: "Ohm" },
           },
-          params: { keyword: "DOUBLE_ATTACK" },
-        },
-        {
-          type: "GRANT_KEYWORD",
-          target: { type: "SELF" },
           params: { keyword: "DOUBLE_ATTACK" },
         },
       ],
