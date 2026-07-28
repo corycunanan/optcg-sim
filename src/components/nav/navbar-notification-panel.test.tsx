@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -171,6 +173,18 @@ describe("NavbarNotificationPanel", () => {
     expect(
       screen.queryByRole("listitem", { name: /Unread\. player-read/ })
     ).toBeNull();
+    const unreadRow = screen.getByRole("listitem", {
+      name: /Unread\. player-unread sent you a friend request/,
+    });
+    const readRow = screen.getByRole("listitem", {
+      name: /^player-read sent you a friend request/,
+    });
+    expect(
+      unreadRow.querySelector('[data-slot="notification-unread-indicator"]')
+    ).not.toBeNull();
+    expect(
+      readRow.querySelector('[data-slot="notification-unread-indicator"]')
+    ).toBeNull();
     expect(bell.getAttribute("aria-label")).toBe(
       "Notifications, No unread notifications"
     );
@@ -276,31 +290,285 @@ describe("NavbarNotificationPanel", () => {
     expect(mocks.toastError).toHaveBeenCalledOnce();
   });
 
-  it.each([409, 410])(
-    "keeps an idempotently resolved row resolved after a %s response",
-    async (status) => {
+  it.each([
+    ["decline", "accepted", "You're now friends with player-1"],
+    ["accept", "declined", "Friend request from player-1 declined"],
+  ] as const)(
+    "renders and announces the authoritative %s conflict outcome",
+    async (action, actualOutcome, description) => {
       mocks.notifications = [
         notification("1", "2026-01-01T00:00:00.000Z", { status: "READ" }),
       ];
-      mocks.apiPut.mockRejectedValue(new ApiError("Already resolved", status));
+      mocks.apiPut.mockRejectedValue(
+        new ApiError(`Notification already ${actualOutcome}`, 409, {
+          error: `Notification already ${actualOutcome}`,
+        })
+      );
       render(<NavbarNotificationPanel />);
 
       const { user } = await openPanel();
       await user.click(
         screen.getByRole("button", {
-          name: "Accept friend request from player-1",
+          name: new RegExp(`^${action}`, "i"),
         })
       );
 
       expect(
         await screen.findByRole("listitem", {
-          name: /You're now friends with player-1/,
+          name: new RegExp(description),
         })
+      ).toBeDefined();
+      expect(
+        screen.getByText(`${description}. Request already resolved.`)
       ).toBeDefined();
       expect(mocks.toastError).not.toHaveBeenCalled();
       expect(mocks.refresh).toHaveBeenCalled();
     }
   );
+
+  it("removes actions while an untyped conflict reconciles", async () => {
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "READ" }),
+    ];
+    mocks.apiPut.mockRejectedValue(new ApiError("Already resolved", 410));
+    render(<NavbarNotificationPanel />);
+
+    const { user } = await openPanel();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Accept friend request from player-1",
+      })
+    );
+
+    expect(
+      await screen.findByRole("listitem", {
+        name: /already resolved\. Updating status/,
+      })
+    ).toBeDefined();
+    expect(screen.queryByRole("button", { name: /^Accept/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Decline/ })).toBeNull();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it("does not mark a realtime notification that arrives after opening", async () => {
+    const view = render(<NavbarNotificationPanel />);
+
+    const { bell } = await openPanel();
+    mocks.notifications = [
+      notification("late", "2026-01-01T00:00:00.000Z", {
+        status: "PENDING",
+      }),
+    ];
+    mocks.unreadCount = 1;
+    view.rerender(<NavbarNotificationPanel />);
+
+    expect(
+      await screen.findByRole("listitem", {
+        name: /Unread\. player-late sent you a friend request/,
+      })
+    ).toBeDefined();
+    expect(mocks.apiPut).not.toHaveBeenCalledWith("/api/notifications/late", {
+      action: "read",
+    });
+    expect(bell.getAttribute("aria-label")).toBe(
+      "Notifications, 1 unread notification"
+    );
+  });
+
+  it("reconciles one failed read without retrying or toasting in the open session", async () => {
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "PENDING" }),
+    ];
+    mocks.unreadCount = 1;
+    mocks.apiPut.mockRejectedValue(new TypeError("network down"));
+    const view = render(<NavbarNotificationPanel />);
+
+    const { bell } = await openPanel();
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "PENDING" }),
+    ];
+    view.rerender(<NavbarNotificationPanel />);
+
+    await act(async () => undefined);
+    expect(mocks.apiPut).toHaveBeenCalledTimes(1);
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(bell.getAttribute("aria-label")).toBe(
+      "Notifications, 1 unread notification"
+    );
+  });
+
+  it("does not reread a successfully handled item when the panel reopens", async () => {
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "PENDING" }),
+    ];
+    mocks.unreadCount = 1;
+    render(<NavbarNotificationPanel />);
+
+    const { user, bell } = await openPanel();
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
+    await user.keyboard("{Escape}");
+    await user.click(bell);
+    await screen.findByRole("dialog", { name: "Notifications" });
+
+    expect(mocks.apiPut).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks duplicate read requests while a close and reopen overlaps", async () => {
+    const readRequest = deferred<unknown>();
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "PENDING" }),
+    ];
+    mocks.unreadCount = 1;
+    mocks.apiPut.mockReturnValue(readRequest.promise);
+    render(<NavbarNotificationPanel />);
+
+    const { user, bell } = await openPanel();
+    await user.keyboard("{Escape}");
+    await user.click(bell);
+    await screen.findByRole("dialog", { name: "Notifications" });
+
+    expect(mocks.apiPut).toHaveBeenCalledTimes(1);
+    readRequest.resolve({ success: true });
+  });
+
+  it("locks rapid duplicate actions before React disables the controls", async () => {
+    const actionRequest = deferred<unknown>();
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "READ" }),
+    ];
+    mocks.apiPut.mockReturnValue(actionRequest.promise);
+    render(<NavbarNotificationPanel />);
+
+    await openPanel();
+    const accept = screen.getByRole("button", {
+      name: "Accept friend request from player-1",
+    });
+    act(() => {
+      fireEvent.click(accept);
+      fireEvent.click(accept);
+    });
+
+    expect(mocks.apiPut).toHaveBeenCalledTimes(1);
+    actionRequest.resolve({ success: true });
+  });
+
+  it("connects aria-controls to the mounted dialog", async () => {
+    render(<NavbarNotificationPanel />);
+
+    const { bell } = await openPanel();
+    const dialog = screen.getByRole("dialog", { name: "Notifications" });
+
+    expect(bell.getAttribute("aria-controls")).toBe(dialog.id);
+    expect(document.getElementById(dialog.id)).toBe(dialog);
+  });
+
+  it("restores the exact pending unread state when action and read fail", async () => {
+    const readRequest = deferred<unknown>();
+    const actionRequest = deferred<unknown>();
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "PENDING" }),
+    ];
+    mocks.unreadCount = 1;
+    mocks.apiPut.mockImplementation((_url: string, body: { action: string }) =>
+      body.action === "read" ? readRequest.promise : actionRequest.promise
+    );
+    render(<NavbarNotificationPanel />);
+
+    const { user, bell } = await openPanel();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Accept friend request from player-1",
+      })
+    );
+    actionRequest.reject(new TypeError("action failed"));
+    readRequest.reject(new TypeError("read failed"));
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Accept friend request from player-1",
+      })
+    ).toBeDefined();
+    expect(
+      screen.getByRole("listitem", {
+        name: /Unread\. player-1 sent you a friend request/,
+      })
+    ).toBeDefined();
+    await waitFor(() =>
+      expect(bell.getAttribute("aria-label")).toBe(
+        "Notifications, 1 unread notification"
+      )
+    );
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+  });
+
+  it("uses the actor fallback and disables a request without a reference", async () => {
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", {
+        actor: null,
+        actorUserId: null,
+        referenceId: null,
+      }),
+    ];
+    render(<NavbarNotificationPanel />);
+
+    await openPanel();
+
+    expect(screen.getByText("A player")).toBeDefined();
+    expect(screen.getByText("Friend request unavailable")).toBeDefined();
+    expect(screen.queryByRole("button", { name: /^Accept/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Decline/ })).toBeNull();
+  });
+
+  it("rolls back an action that fails after the panel closes", async () => {
+    const actionRequest = deferred<unknown>();
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "READ" }),
+    ];
+    mocks.apiPut.mockReturnValue(actionRequest.promise);
+    render(<NavbarNotificationPanel />);
+
+    const { user, bell } = await openPanel();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Accept friend request from player-1",
+      })
+    );
+    await user.keyboard("{Escape}");
+    actionRequest.reject(new TypeError("late failure"));
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledOnce());
+    await user.click(bell);
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Accept friend request from player-1",
+      })
+    ).toBeDefined();
+  });
+
+  it("ignores an action result after the panel unmounts", async () => {
+    const actionRequest = deferred<unknown>();
+    mocks.notifications = [
+      notification("1", "2026-01-01T00:00:00.000Z", { status: "READ" }),
+    ];
+    mocks.apiPut.mockReturnValue(actionRequest.promise);
+    const view = render(<NavbarNotificationPanel />);
+
+    const { user } = await openPanel();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Accept friend request from player-1",
+      })
+    );
+    view.unmount();
+    await act(async () => {
+      actionRequest.reject(new TypeError("late failure"));
+      await actionRequest.promise.catch(() => undefined);
+    });
+
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
 
   it("does not roll back when realtime resolves the row during the request", async () => {
     const actionRequest = deferred<unknown>();

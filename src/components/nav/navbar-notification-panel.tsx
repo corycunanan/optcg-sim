@@ -69,17 +69,33 @@ function outcomeDescription(
   return `${name} sent you a friend request`;
 }
 
+function conflictOutcome(error: unknown): FriendRequestAction | undefined {
+  if (!(error instanceof ApiError) || error.status !== 409) return undefined;
+  const serverMessage =
+    typeof error.body.error === "string" ? error.body.error : error.message;
+
+  if (/already accepted/i.test(serverMessage)) return "accept";
+  if (/already declined/i.test(serverMessage)) return "decline";
+  return undefined;
+}
+
 export function NavbarNotificationPanel() {
   const { notificationInbox } = useUserChannelEvents();
   const { notifications, unreadCount, loadState, refresh } = notificationInbox;
   const panelId = useId();
   const titleId = `${panelId}-title`;
   const panelRef = useRef<HTMLDivElement>(null);
-  const authoritativeResolvedRef = useRef(new Set<string>());
+  const mountedRef = useRef(true);
+  const locallyReadIdsRef = useRef(new Set<string>());
+  const authoritativeOutcomesRef = useRef(
+    new Map<string, FriendRequestAction>()
+  );
   const readRequestsRef = useRef(new Set<string>());
   const actionRequestsRef = useRef(new Set<string>());
   const [open, setOpen] = useState(false);
-  const [badgeSuppressed, setBadgeSuppressed] = useState(false);
+  const [badgeSuppressedIds, setBadgeSuppressedIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [locallyReadIds, setLocallyReadIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -87,6 +103,9 @@ export function NavbarNotificationPanel() {
     Map<string, FriendRequestAction>
   >(() => new Map());
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [reconcilingIds, setReconcilingIds] = useState<Set<string>>(
     () => new Set()
   );
   const [announcement, setAnnouncement] = useState("");
@@ -97,17 +116,34 @@ export function NavbarNotificationPanel() {
   );
 
   useEffect(() => {
-    authoritativeResolvedRef.current = new Set(
-      notifications.filter(isResolved).map(({ id }) => id)
-    );
+    locallyReadIdsRef.current = locallyReadIds;
+  }, [locallyReadIds]);
+
+  useEffect(() => {
+    const outcomes = new Map<string, FriendRequestAction>();
+    for (const notification of notifications) {
+      if (notification.status === "ACCEPTED") {
+        outcomes.set(notification.id, "accept");
+      } else if (notification.status === "DECLINED") {
+        outcomes.set(notification.id, "decline");
+      }
+    }
+    authoritativeOutcomesRef.current = outcomes;
   }, [notifications]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const markVisibleRead = useCallback(
     async (items: SerializedNotification[]) => {
       const pending = items.filter(
         ({ id, status }) =>
           status === "PENDING" &&
-          !locallyReadIds.has(id) &&
+          !locallyReadIdsRef.current.has(id) &&
           !readRequestsRef.current.has(id)
       );
       if (pending.length === 0) return;
@@ -127,7 +163,10 @@ export function NavbarNotificationPanel() {
         .map(({ id }) => id);
       for (const { id } of pending) readRequestsRef.current.delete(id);
 
+      if (!mountedRef.current) return;
+
       if (succeededIds.length > 0) {
+        for (const id of succeededIds) locallyReadIdsRef.current.add(id);
         setLocallyReadIds((current) => {
           const next = new Set(current);
           for (const id of succeededIds) next.add(id);
@@ -135,37 +174,32 @@ export function NavbarNotificationPanel() {
         });
       }
       if (failedIds.length > 0) {
-        setBadgeSuppressed(false);
-        toast.error("Some notifications could not be marked read.");
+        setBadgeSuppressedIds((current) => {
+          const next = new Set(current);
+          for (const id of failedIds) next.delete(id);
+          return next;
+        });
       }
       void refresh();
     },
-    [locallyReadIds, refresh]
+    [refresh]
   );
-
-  useEffect(() => {
-    if (!open) return;
-    void markVisibleRead(visibleNotifications);
-  }, [markVisibleRead, open, visibleNotifications]);
-
-  useEffect(() => {
-    if (
-      !open &&
-      visibleNotifications.some(
-        ({ id, status }) => status === "PENDING" && !locallyReadIds.has(id)
-      )
-    ) {
-      setBadgeSuppressed(false);
-    }
-  }, [locallyReadIds, open, visibleNotifications]);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
-      if (nextOpen) {
-        setBadgeSuppressed(true);
-        void markVisibleRead(visibleNotifications);
-      }
+      if (!nextOpen) return;
+
+      const visibleUnreadIds = visibleNotifications
+        .filter(
+          ({ id, status }) =>
+            status === "PENDING" && !locallyReadIdsRef.current.has(id)
+        )
+        .map(({ id }) => id);
+      setBadgeSuppressedIds(
+        (current) => new Set([...current, ...visibleUnreadIds])
+      );
+      void markVisibleRead(visibleNotifications);
     },
     [markVisibleRead, visibleNotifications]
   );
@@ -175,21 +209,25 @@ export function NavbarNotificationPanel() {
     const allPendingIds = notifications
       .filter(({ status }) => status === "PENDING")
       .map(({ id }) => id);
+    for (const id of allPendingIds) locallyReadIdsRef.current.add(id);
     setLocallyReadIds((current) => new Set([...current, ...allPendingIds]));
-    setBadgeSuppressed(true);
     try {
       await apiPut("/api/notifications", { action: "mark-all-read" });
+      if (!mountedRef.current) return;
       setAnnouncement("All notifications marked read");
       void refresh();
     } catch (error) {
+      if (!mountedRef.current) return;
       setLocallyReadIds((current) => {
         const next = new Set(current);
         for (const id of allPendingIds) {
-          if (!previous.has(id)) next.delete(id);
+          if (!previous.has(id)) {
+            next.delete(id);
+            locallyReadIdsRef.current.delete(id);
+          }
         }
         return next;
       });
-      setBadgeSuppressed(false);
       toast.error(
         error instanceof ApiError && error.status === 429
           ? "Too many requests. Try marking notifications read again shortly."
@@ -219,15 +257,37 @@ export function NavbarNotificationPanel() {
 
       try {
         await apiPut(`/api/notifications/${notification.id}`, { action });
-        void refresh();
+        if (mountedRef.current) void refresh();
       } catch (error) {
-        const convergedElsewhere =
-          authoritativeResolvedRef.current.has(notification.id) ||
-          (error instanceof ApiError &&
-            (error.status === 409 || error.status === 410));
+        if (!mountedRef.current) return;
 
-        if (convergedElsewhere) {
-          setAnnouncement(`${optimisticMessage}. Request already resolved.`);
+        const authoritativeOutcome =
+          authoritativeOutcomesRef.current.get(notification.id) ??
+          conflictOutcome(error);
+        const needsReconciliation =
+          error instanceof ApiError &&
+          (error.status === 409 || error.status === 410);
+
+        if (authoritativeOutcome) {
+          const actualMessage = outcomeDescription(
+            notification,
+            authoritativeOutcome
+          );
+          setOptimisticActions((current) =>
+            new Map(current).set(notification.id, authoritativeOutcome)
+          );
+          setAnnouncement(`${actualMessage}. Request already resolved.`);
+          void refresh();
+        } else if (needsReconciliation) {
+          setOptimisticActions((current) => {
+            const next = new Map(current);
+            next.delete(notification.id);
+            return next;
+          });
+          setReconcilingIds((current) => new Set(current).add(notification.id));
+          setAnnouncement(
+            `Friend request from ${name} was already resolved. Updating status.`
+          );
           void refresh();
         } else {
           setOptimisticActions((current) => {
@@ -246,6 +306,7 @@ export function NavbarNotificationPanel() {
         }
       } finally {
         actionRequestsRef.current.delete(notification.id);
+        if (!mountedRef.current) return;
         setResolvingIds((current) => {
           const next = new Set(current);
           next.delete(notification.id);
@@ -276,21 +337,23 @@ export function NavbarNotificationPanel() {
     rows[nextIndex]?.focus();
   };
 
-  const hasUnread =
-    unreadCount > 0 ||
-    visibleNotifications.some(
-      ({ id, status }) => status === "PENDING" && !locallyReadIds.has(id)
-    );
-  const visibleUnreadCount = badgeSuppressed ? 0 : unreadCount;
+  const locallyHiddenUnreadCount = notifications.filter(
+    ({ id, status }) =>
+      status === "PENDING" &&
+      (locallyReadIds.has(id) || badgeSuppressedIds.has(id))
+  ).length;
+  const visibleUnreadCount = Math.max(
+    0,
+    unreadCount - locallyHiddenUnreadCount
+  );
+  const hasUnread = notifications.some(({ status }) => status === "PENDING");
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange} modal>
       <PopoverTrigger asChild>
         <NavbarNotificationBell
           unreadCount={visibleUnreadCount}
-          onActivate={() => {
-            if (!open) setBadgeSuppressed(true);
-          }}
+          onActivate={() => undefined}
           popupOpen={open}
           popupControls={panelId}
         />
@@ -340,6 +403,10 @@ export function NavbarNotificationPanel() {
                 : optimisticActions.get(notification.id);
               const resolved =
                 isResolved(notification) || optimisticAction !== undefined;
+              const reconciling =
+                !resolved && reconcilingIds.has(notification.id);
+              const actionable =
+                !resolved && !reconciling && notification.referenceId !== null;
               const unread =
                 notification.status === "PENDING" &&
                 !locallyReadIds.has(notification.id);
@@ -348,16 +415,18 @@ export function NavbarNotificationPanel() {
                 notification,
                 optimisticAction
               );
+              const rowDescription = reconciling
+                ? `Friend request from ${name} was already resolved. Updating status.`
+                : description;
 
               return (
                 <li
                   key={notification.id}
                   data-notification-row
                   tabIndex={0}
-                  aria-label={`${unread ? "Unread. " : ""}${description}, ${formatRelativeTime(notification.createdAt)}`}
+                  aria-label={`${unread ? "Unread. " : ""}${rowDescription}, ${formatRelativeTime(notification.createdAt)}`}
                   className={cn(
-                    "border-border focus-visible:ring-border-focus flex gap-3 border-b px-4 py-3 outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-inset",
-                    unread ? "bg-surface-raised" : "bg-popover"
+                    "border-border bg-popover focus-visible:ring-border-focus flex gap-3 border-b px-4 py-3 outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-inset"
                   )}
                 >
                   <UserAvatar
@@ -370,23 +439,34 @@ export function NavbarNotificationPanel() {
                     variant="dark"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-content-primary text-sm leading-5">
-                      {resolved ? (
-                        description
-                      ) : (
-                        <>
-                          <strong className="font-semibold">{name}</strong> sent
-                          you a friend request
-                        </>
+                    <div className="flex gap-2">
+                      {unread && (
+                        <span
+                          data-slot="notification-unread-indicator"
+                          aria-hidden="true"
+                          className="bg-accent mt-2 size-2 shrink-0 rounded-full"
+                        />
                       )}
-                    </p>
+                      <p className="text-content-primary text-sm leading-5">
+                        {resolved ? (
+                          description
+                        ) : reconciling ? (
+                          rowDescription
+                        ) : (
+                          <>
+                            <strong className="font-semibold">{name}</strong>{" "}
+                            sent you a friend request
+                          </>
+                        )}
+                      </p>
+                    </div>
                     <time
                       dateTime={notification.createdAt}
                       className="text-content-tertiary mt-1 block text-xs"
                     >
                       {formatRelativeTime(notification.createdAt)}
                     </time>
-                    {!resolved && (
+                    {actionable && (
                       <div className="mt-3 flex gap-2">
                         <Button
                           type="button"
@@ -413,6 +493,11 @@ export function NavbarNotificationPanel() {
                           Decline
                         </Button>
                       </div>
+                    )}
+                    {!resolved && !reconciling && !notification.referenceId && (
+                      <p className="text-content-secondary mt-3 text-xs">
+                        Friend request unavailable
+                      </p>
                     )}
                   </div>
                 </li>
