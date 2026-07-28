@@ -90,6 +90,8 @@ export function NavbarNotificationPanel() {
   const authoritativeOutcomesRef = useRef(
     new Map<string, FriendRequestAction>()
   );
+  const openRef = useRef(false);
+  const readAttemptedThisOpenRef = useRef(new Set<string>());
   const readRequestsRef = useRef(new Set<string>());
   const actionRequestsRef = useRef(new Set<string>());
   const [open, setOpen] = useState(false);
@@ -144,11 +146,15 @@ export function NavbarNotificationPanel() {
         ({ id, status }) =>
           status === "PENDING" &&
           !locallyReadIdsRef.current.has(id) &&
+          !readAttemptedThisOpenRef.current.has(id) &&
           !readRequestsRef.current.has(id)
       );
       if (pending.length === 0) return;
 
-      for (const { id } of pending) readRequestsRef.current.add(id);
+      for (const { id } of pending) {
+        readAttemptedThisOpenRef.current.add(id);
+        readRequestsRef.current.add(id);
+      }
 
       const results = await Promise.allSettled(
         pending.map(({ id }) =>
@@ -187,8 +193,14 @@ export function NavbarNotificationPanel() {
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
+      const wasOpen = openRef.current;
+      openRef.current = nextOpen;
       setOpen(nextOpen);
-      if (!nextOpen) return;
+      if (!nextOpen) {
+        readAttemptedThisOpenRef.current.clear();
+        return;
+      }
+      if (wasOpen) return;
 
       const visibleUnreadIds = visibleNotifications
         .filter(
