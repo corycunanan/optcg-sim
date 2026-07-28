@@ -106,7 +106,7 @@ describe("Navbar", () => {
     render(<Navbar />);
 
     expect(
-      screen.getByRole("status", {
+      screen.getByRole("button", {
         name: "Notifications, No unread notifications",
       })
     ).toBeDefined();
@@ -183,14 +183,15 @@ describe("Navbar", () => {
     expect(screen.getByRole("button", { name: "Sign Out" })).toBeDefined();
   });
 
-  it("renders the production bell as a non-interactive count status", () => {
+  it("renders the production bell as a popup trigger", () => {
     render(<Navbar />);
-    const indicator = screen.getByRole("status", {
+    const bell = screen.getByRole("button", {
       name: "Notifications, No unread notifications",
     });
 
-    expect(indicator.tabIndex).toBe(-1);
-    expect(screen.queryByRole("button", { name: /notifications/i })).toBeNull();
+    expect(bell.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(bell.getAttribute("aria-expanded")).toBe("false");
+    expect(bell.hasAttribute("aria-controls")).toBe(true);
   });
 
   it("keeps the same reserved action slot across auth resolution", () => {
@@ -244,7 +245,7 @@ describe("Navbar", () => {
     mocks.sessionStatus = "unauthenticated";
     render(<Navbar />);
 
-    expect(screen.queryByRole("status", { name: /notifications/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /notifications/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /account menu/i })).toBeNull();
   });
 });

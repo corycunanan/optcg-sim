@@ -1,23 +1,37 @@
 "use client";
 
 import { Bell } from "lucide-react";
+import { forwardRef, type ComponentProps, type MouseEventHandler } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface NavbarNotificationBellProps {
+interface NavbarNotificationBellProps extends Omit<
+  ComponentProps<"button">,
+  "onClick"
+> {
   unreadCount: number;
   onActivate?: () => void;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  popupOpen?: boolean;
+  popupControls?: string;
 }
 
-/**
- * Activation seam for the notification panel owned by OPT-528. That ticket
- * will supply the handler and add popup ARIA only when a real panel exists.
- */
-export function NavbarNotificationBell({
-  unreadCount,
-  onActivate,
-}: NavbarNotificationBellProps) {
+/** Notification status indicator that becomes a popup trigger when activated. */
+export const NavbarNotificationBell = forwardRef<
+  HTMLButtonElement,
+  NavbarNotificationBellProps
+>(function NavbarNotificationBell(
+  {
+    unreadCount,
+    onActivate,
+    onClick,
+    popupOpen = false,
+    popupControls,
+    ...triggerProps
+  },
+  ref
+) {
   const normalizedUnreadCount = Math.max(0, unreadCount);
   const badgeLabel =
     normalizedUnreadCount > 9 ? "9+" : String(normalizedUnreadCount);
@@ -57,11 +71,19 @@ export function NavbarNotificationBell({
 
   return (
     <Button
+      {...triggerProps}
+      ref={ref}
       type="button"
       variant="ghost"
       size="icon"
       aria-label={accessibleName}
-      onClick={onActivate}
+      aria-haspopup="dialog"
+      aria-expanded={popupOpen}
+      aria-controls={popupControls}
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) onActivate();
+      }}
       className={cn(
         "text-content-secondary hover:bg-surface-2 hover:text-content-primary relative rounded-full",
         "focus-visible:ring-border-focus focus-visible:ring-2 focus-visible:outline-none"
@@ -70,4 +92,4 @@ export function NavbarNotificationBell({
       {content}
     </Button>
   );
-}
+});

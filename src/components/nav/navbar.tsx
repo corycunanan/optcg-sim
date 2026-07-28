@@ -4,9 +4,8 @@ import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
-import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import { NavbarAccountMenu } from "@/components/nav/navbar-account-menu";
-import { NavbarNotificationBell } from "@/components/nav/navbar-notification-bell";
+import { NavbarNotificationPanel } from "@/components/nav/navbar-notification-panel";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -169,11 +168,9 @@ function NavbarActions({
 }: {
   user: NonNullable<ReturnType<typeof useSession>["data"]>["user"];
 }) {
-  const { notificationInbox } = useUserChannelEvents();
-
   return (
     <>
-      <NavbarNotificationBell unreadCount={notificationInbox.unreadCount} />
+      <NavbarNotificationPanel />
       <NavbarAccountMenu user={user} theme={user.theme} />
     </>
   );

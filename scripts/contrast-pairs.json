@@ -149,6 +149,90 @@
       "foreground": "--nav-current-indicator-on-accent",
       "background": "--accent-hover",
       "minimum": 3
+    },
+    {
+      "name": "notification-primary/overlay",
+      "foreground": "--text-primary",
+      "background": "--surface-overlay",
+      "minimum": 4.5
+    },
+    {
+      "name": "notification-secondary/overlay",
+      "foreground": "--text-secondary",
+      "background": "--surface-overlay",
+      "minimum": 4.5
+    },
+    {
+      "name": "notification-tertiary/overlay",
+      "foreground": "--text-tertiary",
+      "background": "--surface-overlay",
+      "minimum": 4.5
+    },
+    {
+      "name": "notification-accent-text/overlay",
+      "foreground": "--accent-text",
+      "background": "--surface-overlay",
+      "minimum": 4.5
+    },
+    {
+      "name": "notification-action-foreground/accent-hover",
+      "foreground": "--accent-fg",
+      "background": "--accent-hover",
+      "minimum": 4.5
+    },
+    {
+      "name": "notification-avatar-fallback/navy",
+      "foreground": "--text-inverse",
+      "background": "--navy-700",
+      "minimum": 4.5
+    },
+    {
+      "name": "notification-focus/overlay",
+      "foreground": "--border-focus",
+      "background": "--surface-overlay",
+      "minimum": 3
+    },
+    {
+      "name": "notification-unread-indicator/overlay",
+      "foreground": "--accent",
+      "background": "--surface-overlay",
+      "minimum": 3
+    },
+    {
+      "name": "notification-action-fill/overlay",
+      "foreground": "--accent",
+      "background": "--surface-overlay",
+      "minimum": 3
+    },
+    {
+      "name": "notification-action-hover-fill/overlay",
+      "foreground": "--accent-hover",
+      "background": "--surface-overlay",
+      "minimum": 3
+    },
+    {
+      "name": "notification-bell-icon/nav",
+      "foreground": "--text-secondary",
+      "background": "--surface-nav",
+      "minimum": 3
+    },
+    {
+      "name": "notification-bell-focus/nav",
+      "foreground": "--border-focus",
+      "background": "--surface-nav",
+      "minimum": 3
+    },
+    {
+      "name": "notification-badge-text/error",
+      "foreground": "--navy-900",
+      "background": "--error",
+      "minimum": 4.5
+    },
+    {
+      "name": "notification-badge-indicator/nav",
+      "foreground": "--error",
+      "background": "--surface-nav",
+      "minimum": 3
     }
   ]
 }

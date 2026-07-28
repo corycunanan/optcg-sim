@@ -21,7 +21,14 @@ describe("NavbarNotificationBell", () => {
   it("is keyboard operable through the OPT-528 activation seam", async () => {
     const user = userEvent.setup();
     const onActivate = vi.fn();
-    render(<NavbarNotificationBell unreadCount={3} onActivate={onActivate} />);
+    render(
+      <NavbarNotificationBell
+        unreadCount={3}
+        onActivate={onActivate}
+        popupOpen
+        popupControls="notifications-panel"
+      />
+    );
 
     const bell = screen.getByRole("button", {
       name: "Notifications, 3 unread notifications",
@@ -31,8 +38,9 @@ describe("NavbarNotificationBell", () => {
 
     expect(document.activeElement).toBe(bell);
     expect(onActivate).toHaveBeenCalledOnce();
-    expect(bell.hasAttribute("aria-haspopup")).toBe(false);
-    expect(bell.hasAttribute("aria-expanded")).toBe(false);
+    expect(bell.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(bell.getAttribute("aria-expanded")).toBe("true");
+    expect(bell.getAttribute("aria-controls")).toBe("notifications-panel");
   });
 
   it("caps the visible badge at 9+ and omits it at zero", () => {
