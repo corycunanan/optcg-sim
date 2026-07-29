@@ -55,6 +55,27 @@ function buildRequest(path = "/api/notifications", body?: unknown) {
   });
 }
 
+function notificationRow(
+  id: string,
+  createdAt: string,
+  overrides: Partial<{
+    userId: string;
+    type: string;
+    status: string;
+    referenceId: string | null;
+  }> = {}
+) {
+  return {
+    id,
+    userId: "user-1",
+    type: "FRIEND_REQUEST",
+    status: "PENDING",
+    referenceId: `request-${id}`,
+    createdAt: new Date(createdAt),
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   afterCallbacks.length = 0;
   authMock.mockReset();
@@ -102,11 +123,19 @@ describe("GET /api/notifications", () => {
     expect(notificationFindManyMock).not.toHaveBeenCalled();
   });
 
-  it("paginates newest first and returns the full unread count", async () => {
-    const rows = [{ id: "notification-3", status: "PENDING" }];
+  it("paginates actionable rows first and newest first within each group", async () => {
+    const rows = [
+      notificationRow("resolved-old", "2026-01-01", { status: "ACCEPTED" }),
+      notificationRow("actionable-old", "2026-01-02"),
+      notificationRow("resolved-new", "2026-01-05", { status: "DECLINED" }),
+      notificationRow("actionable-new", "2026-01-04"),
+      notificationRow("resolved-middle", "2026-01-03", {
+        status: "DECLINED",
+      }),
+    ];
     notificationFindManyMock.mockResolvedValueOnce(rows);
     notificationCountMock.mockReset();
-    notificationCountMock.mockResolvedValueOnce(5).mockResolvedValueOnce(3);
+    notificationCountMock.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
 
     const res = await GET(buildRequest("/api/notifications?page=2&limit=2"));
 
@@ -119,8 +148,6 @@ describe("GET /api/notifications", () => {
         },
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      skip: 2,
-      take: 2,
     });
     expect(notificationCountMock).toHaveBeenNthCalledWith(1, {
       where: { userId: "user-1" },
@@ -130,14 +157,48 @@ describe("GET /api/notifications", () => {
     });
     expect(await res.json()).toEqual({
       data: {
-        notifications: rows,
-        unreadCount: 3,
+        notifications: [rows[2], rows[4]].map((row) => ({
+          ...row,
+          createdAt: row.createdAt.toISOString(),
+        })),
+        unreadCount: 2,
         pagination: { total: 5, page: 2, limit: 2, totalPages: 3 },
       },
     });
     expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: "RepeatableRead",
     });
+  });
+
+  it("keeps an old actionable request on page one past 20 newer resolved rows", async () => {
+    const oldActionable = notificationRow(
+      "old-actionable",
+      "2026-01-01T00:00:00.000Z"
+    );
+    const newerResolved = Array.from({ length: 21 }, (_, index) =>
+      notificationRow(
+        `resolved-${index}`,
+        new Date(Date.UTC(2026, 0, index + 2)).toISOString(),
+        { status: index % 2 === 0 ? "DECLINED" : "ACCEPTED" }
+      )
+    );
+    notificationFindManyMock.mockResolvedValueOnce([
+      ...newerResolved,
+      oldActionable,
+    ]);
+    notificationCountMock.mockReset();
+    notificationCountMock.mockResolvedValueOnce(22).mockResolvedValueOnce(1);
+
+    const res = await GET(buildRequest());
+    const body = await res.json();
+
+    expect(body.data.notifications).toHaveLength(20);
+    expect(body.data.notifications[0].id).toBe("old-actionable");
+    expect(
+      body.data.notifications.filter(
+        ({ status }: { status: string }) => status === "PENDING"
+      )
+    ).toHaveLength(body.data.unreadCount);
   });
 
   it("excludes another user's rows from the list and both counts", async () => {

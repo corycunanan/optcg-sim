@@ -19,28 +19,19 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ApiError, apiPut } from "@/lib/api-client";
+import {
+  isActionableNotification,
+  limitNotificationInbox,
+} from "@/lib/notification-order";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 import type { SerializedNotification } from "@/types/realtime";
 import { NavbarNotificationBell } from "./navbar-notification-bell";
 
-const NOTIFICATION_LIMIT = 20;
 type FriendRequestAction = "accept" | "decline";
 
 function displayName(notification: SerializedNotification): string {
   return notification.actor?.username || notification.actor?.name || "A player";
-}
-
-function sortNewestFirst(
-  notifications: SerializedNotification[]
-): SerializedNotification[] {
-  return [...notifications]
-    .sort(
-      (left, right) =>
-        Date.parse(right.createdAt) - Date.parse(left.createdAt) ||
-        right.id.localeCompare(left.id)
-    )
-    .slice(0, NOTIFICATION_LIMIT);
 }
 
 function isResolved(notification: SerializedNotification): boolean {
@@ -117,7 +108,7 @@ export function NavbarNotificationPanel() {
   const [announcement, setAnnouncement] = useState("");
 
   const visibleNotifications = useMemo(
-    () => sortNewestFirst(notifications),
+    () => limitNotificationInbox(notifications),
     [notifications]
   );
 
@@ -433,7 +424,9 @@ export function NavbarNotificationPanel() {
               const reconciling =
                 !resolved && reconcilingIds.has(notification.id);
               const actionable =
-                !resolved && !reconciling && notification.referenceId !== null;
+                !resolved &&
+                !reconciling &&
+                isActionableNotification(notification);
               const unread =
                 notification.status === "PENDING" &&
                 !locallyReadIds.has(notification.id);

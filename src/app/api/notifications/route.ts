@@ -11,6 +11,10 @@ import {
   requireAuth,
 } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
+import {
+  isActionableNotification,
+  orderNotifications,
+} from "@/lib/notification-order";
 import { apiLimiter, searchLimiter } from "@/lib/rate-limit";
 import {
   ListNotificationsQuerySchema,
@@ -39,36 +43,49 @@ export async function GET(request: NextRequest) {
   const { page, limit } = parsedQuery.data;
 
   try {
-    const { notifications, total, unreadCount } = await prisma.$transaction(
-      async (tx) => {
-        const [rows, rowCount, pendingCount] = await Promise.all([
-          tx.notification.findMany({
-            where: { userId },
-            include: {
-              actor: {
-                select: { id: true, username: true, name: true, image: true },
+    const { notifications, total, unreadCount, totalPages } =
+      await prisma.$transaction(
+        async (tx) => {
+          const [rows, rowCount, pendingCount] = await Promise.all([
+            tx.notification.findMany({
+              where: { userId },
+              include: {
+                actor: {
+                  select: { id: true, username: true, name: true, image: true },
+                },
               },
-            },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            skip: (page - 1) * limit,
-            take: limit,
-          }),
-          tx.notification.count({ where: { userId } }),
-          tx.notification.count({ where: { userId, status: "PENDING" } }),
-        ]);
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            }),
+            tx.notification.count({ where: { userId } }),
+            tx.notification.count({ where: { userId, status: "PENDING" } }),
+          ]);
 
-        return {
-          notifications: rows,
-          total: rowCount,
-          unreadCount: pendingCount,
-        };
-      },
-      {
-        // PostgreSQL's default READ COMMITTED takes a new snapshot per
-        // statement. REPEATABLE READ keeps rows and both counts coherent.
-        isolationLevel: "RepeatableRead",
-      }
-    );
+          const orderedRows = orderNotifications(rows);
+          const actionableCount = orderedRows.filter(
+            isActionableNotification
+          ).length;
+          const firstPageSize = Math.max(limit, actionableCount);
+          const offset = page === 1 ? 0 : firstPageSize + (page - 2) * limit;
+
+          return {
+            notifications: orderedRows.slice(
+              offset,
+              offset + (page === 1 ? firstPageSize : limit)
+            ),
+            total: rowCount,
+            unreadCount: pendingCount,
+            totalPages:
+              rowCount === 0
+                ? 0
+                : 1 + Math.ceil(Math.max(0, rowCount - firstPageSize) / limit),
+          };
+        },
+        {
+          // PostgreSQL's default READ COMMITTED takes a new snapshot per
+          // statement. REPEATABLE READ keeps rows and both counts coherent.
+          isolationLevel: "RepeatableRead",
+        }
+      );
 
     return apiSuccess(
       {
@@ -78,7 +95,7 @@ export async function GET(request: NextRequest) {
           total,
           page,
           limit,
-          totalPages: Math.ceil(total / limit),
+          totalPages,
         },
       },
       200,
