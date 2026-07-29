@@ -4,25 +4,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type StoredNotification = {
   id: string;
   userId: string;
-  type: "FRIEND_REQUEST";
   status: NotificationStatus;
   referenceId: string | null;
   createdAt: Date;
 };
 
 const mocks = vi.hoisted(() => ({
-  friendRequestFindMany: vi.fn(),
-  notificationFindMany: vi.fn(),
-  notificationDeleteMany: vi.fn(),
+  executeRaw: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
-    friendRequest: { findMany: mocks.friendRequestFindMany },
-    notification: {
-      findMany: mocks.notificationFindMany,
-      deleteMany: mocks.notificationDeleteMany,
-    },
+    $executeRaw: (
+      strings: TemplateStringsArray,
+      ...values: unknown[]
+    ) => mocks.executeRaw(strings, ...values),
   },
 }));
 
@@ -34,14 +30,15 @@ const {
 
 let notifications: StoredNotification[];
 let liveRequestIds: Set<string>;
+let executedSql: string;
+let executedValues: unknown[];
 
 function notification(index: number, status: NotificationStatus) {
   return {
-    id: `notification-${index.toString().padStart(3, "0")}`,
+    id: `notification-${index.toString().padStart(6, "0")}`,
     userId: "user-1",
-    type: "FRIEND_REQUEST" as const,
     status,
-    referenceId: `request-${index.toString().padStart(3, "0")}`,
+    referenceId: `request-${index.toString().padStart(6, "0")}`,
     createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)),
   };
 }
@@ -49,46 +46,45 @@ function notification(index: number, status: NotificationStatus) {
 beforeEach(() => {
   notifications = [];
   liveRequestIds = new Set();
-  mocks.friendRequestFindMany.mockReset();
-  mocks.notificationFindMany.mockReset();
-  mocks.notificationDeleteMany.mockReset();
-
-  mocks.friendRequestFindMany.mockImplementation(async ({ where }) => {
-    const ids = where.id?.in as string[] | undefined;
-    return [...liveRequestIds]
-      .filter((id) => !ids || ids.includes(id))
-      .map((id) => ({ id }));
-  });
-  mocks.notificationFindMany.mockImplementation(async ({ where, skip }) => {
-    const excludedLiveIds = new Set(
-      (where.OR[2].referenceId.notIn ?? []) as string[]
-    );
-    return notifications
-      .filter(
+  executedSql = "";
+  executedValues = [];
+  mocks.executeRaw.mockReset();
+  mocks.executeRaw.mockImplementation(
+    async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      executedSql = strings.join("?");
+      executedValues = values;
+      const userId = values.find((value) => typeof value === "string") as string;
+      const retentionLimit = values.find(
+        (value) => typeof value === "number"
+      ) as number;
+      const eligible = notifications
+        .filter(
+          (row) =>
+            row.userId === userId &&
+            (!row.referenceId || !liveRequestIds.has(row.referenceId))
+        )
+        .sort(
+          (left, right) =>
+            right.createdAt.getTime() - left.createdAt.getTime() ||
+            right.id.localeCompare(left.id)
+        );
+      const overflowIds = new Set(
+        eligible.slice(retentionLimit).map(({ id }) => id)
+      );
+      const before = notifications.length;
+      notifications = notifications.filter(
         (row) =>
-          row.userId === where.userId &&
-          (row.referenceId === null || !excludedLiveIds.has(row.referenceId))
-      )
-      .sort(
-        (left, right) =>
-          right.createdAt.getTime() - left.createdAt.getTime() ||
-          right.id.localeCompare(left.id)
-      )
-      .slice(skip)
-      .map(({ id, type, referenceId }) => ({ id, type, referenceId }));
-  });
-  mocks.notificationDeleteMany.mockImplementation(async ({ where }) => {
-    const ids = new Set(where.id.in as string[]);
-    const before = notifications.length;
-    notifications = notifications.filter(
-      (row) => row.userId !== where.userId || !ids.has(row.id)
-    );
-    return { count: before - notifications.length };
-  });
+          row.userId !== userId ||
+          !overflowIds.has(row.id) ||
+          (row.referenceId !== null && liveRequestIds.has(row.referenceId))
+      );
+      return before - notifications.length;
+    }
+  );
 });
 
 describe("pruneNotifications", () => {
-  it("bounds non-live rows without another friend request arriving", async () => {
+  it("bounds a large non-live backlog with constant application parameters", async () => {
     const statuses: NotificationStatus[] = [
       "PENDING",
       "READ",
@@ -96,7 +92,7 @@ describe("pruneNotifications", () => {
       "ACCEPTED",
       "DECLINED",
     ];
-    notifications = Array.from({ length: 140 }, (_, index) =>
+    notifications = Array.from({ length: 100_100 }, (_, index) =>
       notification(index, statuses[index % statuses.length])
     );
 
@@ -104,10 +100,18 @@ describe("pruneNotifications", () => {
 
     expect(notifications).toHaveLength(MAX_NOTIFICATIONS_PER_USER);
     expect(notifications.some((row) => row.status === "PENDING")).toBe(true);
-    expect(mocks.notificationDeleteMany).toHaveBeenCalledTimes(1);
+    expect(executedValues).toEqual([
+      "user-1",
+      "user-1",
+      MAX_NOTIFICATIONS_PER_USER,
+      "user-1",
+      "user-1",
+    ]);
+    expect(executedValues.every((value) => !Array.isArray(value))).toBe(true);
+    expect(executedSql).not.toMatch(/\bIN\s*\(/);
   });
 
-  it("never prunes a live request notification even far over the cap", async () => {
+  it("guards live request notifications in selection and deletion", async () => {
     notifications = Array.from({ length: 235 }, (_, index) =>
       notification(index, index % 2 === 0 ? "READ" : "DISMISSED")
     );
@@ -127,24 +131,10 @@ describe("pruneNotifications", () => {
     expect(
       notifications.filter((row) => !liveRequestIds.has(row.referenceId!))
     ).toHaveLength(MAX_NOTIFICATIONS_PER_USER);
-  });
-
-  it("re-checks live requests before deleting an overflow candidate", async () => {
-    notifications = Array.from({ length: 101 }, (_, index) =>
-      notification(index, "DISMISSED")
+    expect(executedSql.match(/NOT EXISTS/g)).toHaveLength(2);
+    expect(executedSql.match(/live_request\.status = 'PENDING'/g)).toHaveLength(
+      2
     );
-    mocks.friendRequestFindMany
-      .mockResolvedValueOnce([])
-      .mockImplementationOnce(async ({ where }) => {
-        const requestId = where.id.in[0] as string;
-        liveRequestIds.add(requestId);
-        return [{ id: requestId }];
-      });
-
-    await pruneNotifications("user-1");
-
-    expect(notifications).toHaveLength(101);
-    expect(mocks.notificationDeleteMany).not.toHaveBeenCalled();
   });
 
   it("is idempotent when pruning invocations overlap", async () => {
@@ -162,9 +152,7 @@ describe("pruneNotifications", () => {
 
   it("absorbs retention failures", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mocks.friendRequestFindMany.mockRejectedValueOnce(
-      new Error("retention unavailable")
-    );
+    mocks.executeRaw.mockRejectedValueOnce(new Error("retention unavailable"));
 
     await expect(pruneNotifications("user-1")).resolves.toBeUndefined();
     expect(errorSpy).toHaveBeenCalledWith(

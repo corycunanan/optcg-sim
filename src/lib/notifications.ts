@@ -41,68 +41,38 @@ export async function createFriendRequestNotification(
  */
 export async function pruneNotifications(userId: string) {
   try {
-    const liveRequests = await prisma.friendRequest.findMany({
-      where: { toUserId: userId, status: "PENDING" },
-      select: { id: true },
-    });
-    const liveRequestIds = liveRequests.map(({ id }) => id);
-    const isNotLive: Prisma.NotificationWhereInput[] = [
-      { type: { not: "FRIEND_REQUEST" } },
-      { referenceId: null },
-      { referenceId: { notIn: liveRequestIds } },
-    ];
-
-    const overflow = await prisma.notification.findMany({
-      where: {
-        userId,
-        OR: isNotLive,
-      },
-      select: { id: true, type: true, referenceId: true },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      skip: MAX_NOTIFICATIONS_PER_USER,
-    });
-
-    if (overflow.length > 0) {
-      // Re-check candidate references immediately before deletion. Request
-      // creation and notification creation commit atomically, and request IDs
-      // are immutable, so a row absent from this second live set cannot become
-      // actionable after this point through an application path.
-      const candidateRequestIds = overflow.flatMap((notification) =>
-        notification.type === "FRIEND_REQUEST" && notification.referenceId
-          ? [notification.referenceId]
-          : []
-      );
-      const stillLiveRequests =
-        candidateRequestIds.length === 0
-          ? []
-          : await prisma.friendRequest.findMany({
-              where: {
-                id: { in: candidateRequestIds },
-                toUserId: userId,
-                status: "PENDING",
-              },
-              select: { id: true },
-            });
-      const stillLiveRequestIds = new Set(
-        stillLiveRequests.map(({ id }) => id)
-      );
-      const prunableIds = overflow.flatMap((notification) =>
-        notification.type === "FRIEND_REQUEST" &&
-        notification.referenceId &&
-        stillLiveRequestIds.has(notification.referenceId)
-          ? []
-          : [notification.id]
-      );
-
-      if (prunableIds.length === 0) return;
-
-      await prisma.notification.deleteMany({
-        where: {
-          userId,
-          id: { in: prunableIds },
-        },
-      });
-    }
+    // Keep row IDs and pending-request exclusions inside PostgreSQL. This is
+    // one constant-parameter statement even for a large legacy inbox, and the
+    // delete predicate repeats the live-request guard at the mutation site.
+    await prisma.$executeRaw`
+      WITH overflow AS (
+        SELECT candidate.id
+        FROM notifications AS candidate
+        WHERE candidate.user_id = ${userId}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM friend_requests AS live_request
+            WHERE candidate.type = 'FRIEND_REQUEST'
+              AND live_request.id = candidate.reference_id
+              AND live_request."toUserId" = ${userId}
+              AND live_request.status = 'PENDING'
+          )
+        ORDER BY candidate.created_at DESC, candidate.id DESC
+        OFFSET ${MAX_NOTIFICATIONS_PER_USER}
+      )
+      DELETE FROM notifications AS doomed
+      USING overflow
+      WHERE doomed.id = overflow.id
+        AND doomed.user_id = ${userId}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM friend_requests AS live_request
+          WHERE doomed.type = 'FRIEND_REQUEST'
+            AND live_request.id = doomed.reference_id
+            AND live_request."toUserId" = ${userId}
+            AND live_request.status = 'PENDING'
+        )
+    `;
   } catch (error) {
     console.error("[notifications:retention] failed", error);
   }

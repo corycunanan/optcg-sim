@@ -7,15 +7,15 @@ const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const userFindUniqueMock = vi.fn();
 const friendshipFindFirstMock = vi.fn();
 const friendRequestFindFirstMock = vi.fn();
-const friendRequestFindManyMock = vi.fn();
 const friendRequestCreateMock = vi.fn();
 const notificationCreateMock = vi.fn();
 const notificationCountMock = vi.fn();
-const notificationFindManyMock = vi.fn();
-const notificationDeleteManyMock = vi.fn();
+const executeRawMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
 const afterCallbacks: Array<() => void | Promise<void>> = [];
+const retentionPhases: string[] = [];
+let transactionPhase = "idle";
 
 vi.mock("next/server", async (importActual) => {
   const actual = await importActual<typeof import("next/server")>();
@@ -36,12 +36,9 @@ vi.mock("@/lib/db", () => ({
     },
     friendRequest: {
       findFirst: (...args: unknown[]) => friendRequestFindFirstMock(...args),
-      findMany: (...args: unknown[]) => friendRequestFindManyMock(...args),
     },
-    notification: {
-      findMany: (...args: unknown[]) => notificationFindManyMock(...args),
-      deleteMany: (...args: unknown[]) => notificationDeleteManyMock(...args),
-    },
+    $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
+      executeRawMock(strings, ...values),
     $transaction: (...args: unknown[]) => transactionMock(...args),
   },
 }));
@@ -75,21 +72,20 @@ beforeEach(() => {
   userFindUniqueMock.mockReset();
   friendshipFindFirstMock.mockReset();
   friendRequestFindFirstMock.mockReset();
-  friendRequestFindManyMock.mockReset();
   friendRequestCreateMock.mockReset();
   notificationCreateMock.mockReset();
   notificationCountMock.mockReset();
-  notificationFindManyMock.mockReset();
-  notificationDeleteManyMock.mockReset();
+  executeRawMock.mockReset();
   transactionMock.mockReset();
   notifyUserMock.mockReset();
+  retentionPhases.length = 0;
+  transactionPhase = "idle";
 
   authMock.mockResolvedValue({ user: { id: "user-sender" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 99 });
   userFindUniqueMock.mockResolvedValue({ id: "user-recipient" });
   friendshipFindFirstMock.mockResolvedValue(null);
   friendRequestFindFirstMock.mockResolvedValue(null);
-  friendRequestFindManyMock.mockResolvedValue([]);
   friendRequestCreateMock.mockResolvedValue({
     id: "req-1",
     fromUserId: "user-sender",
@@ -127,16 +123,22 @@ beforeEach(() => {
     },
   });
   notificationCountMock.mockResolvedValue(4);
-  notificationFindManyMock.mockResolvedValue([]);
-  transactionMock.mockImplementation(async (callback) =>
-    callback({
+  executeRawMock.mockImplementation(async () => {
+    retentionPhases.push(transactionPhase);
+    return 0;
+  });
+  transactionMock.mockImplementation(async (callback) => {
+    transactionPhase = "running";
+    const result = await callback({
       friendRequest: { create: friendRequestCreateMock },
       notification: {
         create: notificationCreateMock,
         count: notificationCountMock,
       },
-    })
-  );
+    });
+    transactionPhase = "committed";
+    return result;
+  });
   notifyUserMock.mockResolvedValue(undefined);
 });
 
@@ -164,53 +166,21 @@ describe("POST /api/friends/requests", () => {
     });
   });
 
-  it("prunes the full non-live overflow after the request commits", async () => {
-    notificationFindManyMock.mockResolvedValueOnce([
-      {
-        id: "notification-old-1",
-        type: "FRIEND_REQUEST",
-        referenceId: "request-old-1",
-      },
-      {
-        id: "notification-old-2",
-        type: "FRIEND_REQUEST",
-        referenceId: "request-old-2",
-      },
-    ]);
-
+  it("starts retention only after the friend-request transaction commits", async () => {
     const res = await POST(buildRequest());
 
     expect(res.status).toBe(201);
-    expect(notificationFindManyMock).not.toHaveBeenCalled();
+    expect(retentionPhases).toEqual([]);
 
     await flushAfter();
 
-    expect(notificationFindManyMock).toHaveBeenCalledWith({
-      where: {
-        userId: "user-recipient",
-        OR: [
-          { type: { not: "FRIEND_REQUEST" } },
-          { referenceId: null },
-          { referenceId: { notIn: [] } },
-        ],
-      },
-      select: { id: true, type: true, referenceId: true },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      skip: 100,
-    });
-    expect(notificationDeleteManyMock).toHaveBeenCalledWith({
-      where: {
-        userId: "user-recipient",
-        id: { in: ["notification-old-1", "notification-old-2"] },
-      },
-    });
+    expect(retentionPhases).toEqual(["committed"]);
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a valid friend request when best-effort retention fails", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    notificationFindManyMock.mockRejectedValueOnce(
-      new Error("retention unavailable")
-    );
+    executeRawMock.mockRejectedValueOnce(new Error("retention unavailable"));
 
     const res = await POST(buildRequest());
 
