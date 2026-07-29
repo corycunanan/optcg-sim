@@ -693,7 +693,13 @@ export const EB02_019_RORONOA_ZORO: EffectSchema = {
         filter: { card_type: "CHARACTER" },
         count: { operator: ">=", value: 2 },
       },
-      flags: { keywords: ["RUSH_CHARACTER"] },
+      modifiers: [
+        {
+          type: "GRANT_KEYWORD",
+          target: { type: "SELF" },
+          params: { keyword: "RUSH_CHARACTER" },
+        },
+      ],
     },
     {
       id: "on_play_rest_opponent",
