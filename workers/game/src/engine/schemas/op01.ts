@@ -2438,7 +2438,7 @@ export const OP01_091_KING: EffectSchema = {
       modifiers: [
         {
           type: "MODIFY_POWER",
-          target: { type: "ALL_OPPONENT_CHARACTERS", controller: "SELF" },
+          target: { type: "ALL_OPPONENT_CHARACTERS" },
           params: { amount: -1000 },
           duration: {
             type: "WHILE_CONDITION",
