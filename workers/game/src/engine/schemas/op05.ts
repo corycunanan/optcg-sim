@@ -2599,12 +2599,22 @@ export const OP05_070_FRA_NOSUKE: EffectSchema = {
     {
       id: "conditional_rush",
       category: "permanent",
-      // _comment: "[DON!! x1] requirement — 1 DON must be attached to this Character
       conditions: {
-        type: "DON_FIELD_COUNT",
-        controller: "SELF",
-        operator: ">=",
-        value: 8,
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          {
+            type: "DON_FIELD_COUNT",
+            controller: "SELF",
+            operator: ">=",
+            value: 8,
+          },
+        ],
       },
       modifiers: [
         {

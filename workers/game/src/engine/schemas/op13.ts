@@ -113,8 +113,9 @@ export const OP13_002_PORTGAS_D_ACE: EffectSchema = {
         ],
       },
       conditions: {
-        type: "DON_FIELD_COUNT",
+        type: "DON_GIVEN",
         controller: "SELF",
+        mode: "SPECIFIC_CARD",
         operator: ">=",
         value: 1,
       },
@@ -226,8 +227,9 @@ export const OP13_004_SABO: EffectSchema = {
       conditions: {
         all_of: [
           {
-            type: "DON_FIELD_COUNT",
+            type: "DON_GIVEN",
             controller: "SELF",
+            mode: "SPECIFIC_CARD",
             operator: ">=",
             value: 1,
           },

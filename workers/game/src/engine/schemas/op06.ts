@@ -3120,8 +3120,9 @@ export const OP06_085_KUMACY: EffectSchema = {
       id: "OP06-085_effect_1",
       category: "permanent",
       conditions: {
-        type: "DON_FIELD_COUNT",
+        type: "DON_GIVEN",
         controller: "SELF",
+        mode: "SPECIFIC_CARD",
         operator: ">=",
         value: 2,
       },
@@ -4039,8 +4040,9 @@ export const OP06_110_NEKOMAMUSHI: EffectSchema = {
       id: "OP06-110_effect_1",
       category: "permanent",
       conditions: {
-        type: "DON_FIELD_COUNT",
+        type: "DON_GIVEN",
         controller: "SELF",
+        mode: "SPECIFIC_CARD",
         operator: ">=",
         value: 2,
       },
