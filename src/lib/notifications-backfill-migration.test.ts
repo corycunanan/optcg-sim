@@ -19,14 +19,20 @@ describeWithDatabase(
   () => {
     let prisma: PrismaClient;
 
-    const requestTimes = {
-      pendingCreated: new Date("2026-07-20T10:00:00.000Z"),
-      pendingUpdated: new Date("2026-07-21T11:00:00.000Z"),
-      existingCreated: new Date("2026-07-22T12:00:00.000Z"),
-      existingUpdated: new Date("2026-07-23T13:00:00.000Z"),
-      notificationCreated: new Date("2026-07-24T14:00:00.000Z"),
-      notificationUpdated: new Date("2026-07-25T15:00:00.000Z"),
-    };
+    const notificationCreated = new Date("2026-07-24T14:00:00.000Z");
+    const notificationUpdated = new Date("2026-07-25T15:00:00.000Z");
+    const pendingRequests = Array.from({ length: 5 }, (_, index) => ({
+      id: `backfill-pending-${index + 1}`,
+      fromUserId: `backfill-sender-pending-${index + 1}`,
+      toUserId: "backfill-recipient",
+      status: "PENDING" as const,
+      createdAt: new Date(
+        Date.parse("2026-07-20T10:00:00.000Z") + index * 60_000
+      ),
+      updatedAt: new Date(
+        Date.parse("2026-07-21T11:00:00.000Z") + index * 60_000
+      ),
+    }));
 
     beforeAll(async () => {
       prisma = createTestPrisma();
@@ -34,10 +40,10 @@ describeWithDatabase(
       await prisma.user.createMany({
         data: [
           "backfill-recipient",
-          "backfill-sender-pending",
           "backfill-sender-existing",
           "backfill-sender-accepted",
           "backfill-sender-declined",
+          ...pendingRequests.map(({ fromUserId }) => fromUserId),
         ].map((id) => ({
           id,
           email: `${id}@example.test`,
@@ -49,21 +55,14 @@ describeWithDatabase(
       await prisma.friendRequest.createMany({
         data: [
           {
-            id: "backfill-pending",
-            fromUserId: "backfill-sender-pending",
-            toUserId: "backfill-recipient",
-            status: "PENDING",
-            createdAt: requestTimes.pendingCreated,
-            updatedAt: requestTimes.pendingUpdated,
-          },
-          {
             id: "backfill-existing",
             fromUserId: "backfill-sender-existing",
             toUserId: "backfill-recipient",
             status: "PENDING",
-            createdAt: requestTimes.existingCreated,
-            updatedAt: requestTimes.existingUpdated,
+            createdAt: userTimestamp,
+            updatedAt: userTimestamp,
           },
+          ...pendingRequests,
           {
             id: "backfill-accepted",
             fromUserId: "backfill-sender-accepted",
@@ -91,8 +90,8 @@ describeWithDatabase(
           status: "READ",
           actorUserId: "backfill-sender-existing",
           referenceId: "backfill-existing",
-          createdAt: requestTimes.notificationCreated,
-          updatedAt: requestTimes.notificationUpdated,
+          createdAt: notificationCreated,
+          updatedAt: notificationUpdated,
         },
       });
     });
@@ -101,58 +100,56 @@ describeWithDatabase(
       await prisma.$disconnect();
     });
 
-    it("maps pending requests, preserves timestamps, and excludes terminal requests", async () => {
-      await prisma.$executeRawUnsafe(migration);
+    it("maps every pending request exactly once and preserves existing rows", async () => {
+      await expect(prisma.$executeRawUnsafe(migration)).resolves.toBe(5);
+      await expect(prisma.$executeRawUnsafe(migration)).resolves.toBe(0);
 
       const notifications = await prisma.notification.findMany({
         where: {
           referenceId: {
             in: [
-              "backfill-pending",
               "backfill-existing",
               "backfill-accepted",
               "backfill-declined",
+              ...pendingRequests.map(({ id }) => id),
             ],
           },
+        },
+        select: {
+          userId: true,
+          type: true,
+          status: true,
+          actorUserId: true,
+          referenceId: true,
+          payload: true,
+          createdAt: true,
+          updatedAt: true,
         },
         orderBy: { referenceId: "asc" },
       });
 
-      expect(notifications).toHaveLength(2);
       expect(notifications).toEqual([
-        expect.objectContaining({
-          id: "backfill-preexisting-notification",
+        {
           userId: "backfill-recipient",
           type: "FRIEND_REQUEST",
           status: "READ",
           actorUserId: "backfill-sender-existing",
           referenceId: "backfill-existing",
-          createdAt: requestTimes.notificationCreated,
-          updatedAt: requestTimes.notificationUpdated,
-        }),
-        expect.objectContaining({
-          userId: "backfill-recipient",
-          type: "FRIEND_REQUEST",
-          status: "PENDING",
-          actorUserId: "backfill-sender-pending",
-          referenceId: "backfill-pending",
           payload: null,
-          createdAt: requestTimes.pendingCreated,
-          updatedAt: requestTimes.pendingUpdated,
-        }),
+          createdAt: notificationCreated,
+          updatedAt: notificationUpdated,
+        },
+        ...pendingRequests.map((request) => ({
+          userId: request.toUserId,
+          type: "FRIEND_REQUEST" as const,
+          status: "PENDING" as const,
+          actorUserId: request.fromUserId,
+          referenceId: request.id,
+          payload: null,
+          createdAt: request.createdAt,
+          updatedAt: request.updatedAt,
+        })),
       ]);
-    });
-
-    it("is idempotent when the migration is executed again", async () => {
-      await expect(prisma.$executeRawUnsafe(migration)).resolves.toBe(0);
-
-      await expect(
-        prisma.notification.count({
-          where: {
-            referenceId: { in: ["backfill-pending", "backfill-existing"] },
-          },
-        })
-      ).resolves.toBe(2);
     });
   }
 );

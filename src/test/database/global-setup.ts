@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
 import { PrismaClient } from "@prisma/client";
 import type { TestProject } from "vitest/node";
 
+const require = createRequire(import.meta.url);
+const prismaCliPath = require.resolve("prisma/build/index.js");
 const DEFAULT_MAINTENANCE_URL =
   "postgresql://prisma:prisma@localhost:5432/postgres";
 
@@ -51,17 +53,62 @@ export default async function setupDatabaseTests(project: TestProject) {
     randomBytes(4).toString("hex"),
   ].join("_");
   const testUrl = databaseUrl(maintenanceUrl, databaseName);
+  let databaseCreation: Promise<number> | undefined;
+  let cleanupPromise: Promise<void> | undefined;
+  let interrupted = false;
+
+  const cleanup = () => {
+    cleanupPromise ??= (async () => {
+      try {
+        await databaseCreation?.catch(() => undefined);
+        await dropDatabase(maintenance, databaseName);
+      } finally {
+        await maintenance.$disconnect();
+      }
+    })();
+
+    return cleanupPromise;
+  };
+
+  const removeSignalHandlers = () => {
+    process.off("SIGINT", onSigint);
+    process.off("SIGTERM", onSigterm);
+  };
+
+  const cleanupAfterSignal = (signal: NodeJS.Signals) => {
+    interrupted = true;
+    void cleanup()
+      .catch((error) => {
+        console.error(
+          `[database-tests] Failed to drop ${databaseName} after ${signal}.`,
+          error
+        );
+      })
+      .finally(() => {
+        removeSignalHandlers();
+        process.kill(process.pid, signal);
+      });
+  };
+
+  const onSigint = () => cleanupAfterSignal("SIGINT");
+  const onSigterm = () => cleanupAfterSignal("SIGTERM");
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
 
   try {
-    await maintenance.$executeRawUnsafe(`CREATE DATABASE "${databaseName}"`);
+    databaseCreation = maintenance.$executeRawUnsafe(
+      `CREATE DATABASE "${databaseName}"`
+    );
+    await databaseCreation;
+
+    if (interrupted) {
+      await cleanup();
+      return;
+    }
 
     const migration = spawnSync(
       process.execPath,
-      [
-        resolve(process.cwd(), "node_modules/prisma/build/index.js"),
-        "migrate",
-        "deploy",
-      ],
+      [prismaCliPath, "migrate", "deploy"],
       {
         cwd: process.cwd(),
         encoding: "utf8",
@@ -87,13 +134,13 @@ export default async function setupDatabaseTests(project: TestProject) {
 
     project.provide("testDatabaseUrl", testUrl);
   } catch (error) {
-    await dropDatabase(maintenance, databaseName);
-    await maintenance.$disconnect();
+    removeSignalHandlers();
+    await cleanup();
     throw error;
   }
 
   return async () => {
-    await dropDatabase(maintenance, databaseName);
-    await maintenance.$disconnect();
+    removeSignalHandlers();
+    await cleanup();
   };
 }
