@@ -49,6 +49,30 @@ The current seed also creates friendships between Luffy and Zoro and between Luf
 Nami, plus one direct message from Luffy to Zoro. Those records are useful when visually
 checking social surfaces.
 
+### If the seeded credentials fail
+
+Preview seeding is not automatic. [`vercel.json`](../../vercel.json) runs
+`prisma migrate deploy` before the application build but does not run a seed.
+[`package.json`](../../package.json) defines `pnpm db:seed` as the manual
+`tsx prisma/seed.ts` command. A fresh or rebuilt preview database therefore starts with
+no user accounts.
+
+If a seeded login returns **Invalid email or password**, the likely cause is an unseeded
+preview database—not a broken deployment or mistyped credential. An operator can recover
+it from the repository root:
+
+```bash
+DATABASE_URL="<preview pooled URL>" \
+DIRECT_DATABASE_URL="<preview direct URL>" \
+pnpm db:seed
+```
+
+Before running the command, confirm that **both URLs target the intended non-production
+Preview database**. The seed writes user, friendship, and message rows; never run it
+against production. It is safe to rerun against the intended Preview database:
+`prisma/seed.ts` upserts the users and friendships and inserts the sample direct message
+only when it is absent.
+
 ## Keep preview and production accounts separate
 
 OPT-576 records that preview deployments use a non-production database separate from
