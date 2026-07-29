@@ -27,8 +27,6 @@ import {
 } from "@/components/ui/sidebar";
 import {
   UserPlus,
-  Check,
-  X,
   MoreHorizontal,
   ChevronsUpDown,
   LogOut,
@@ -36,7 +34,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
-import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client";
+import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 import {
   MIN_SUBSTRING_SEARCH_LENGTH,
   normalizeSubstringSearchQuery,
@@ -46,12 +44,10 @@ import { UserChannelConnectionStatus } from "@/components/realtime/user-channel-
 import {
   applyFriendEvent,
   type FriendEntry,
-  type FriendRequestEntry,
   type SidebarUser,
 } from "./apply-friend-event";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
-  FriendRequestsResponseSchema,
   FriendsResponseSchema,
   UserSearchResponseSchema,
 } from "@/lib/validators/friends";
@@ -89,7 +85,6 @@ interface SocialSidebarProps {
 export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const { data: session } = useSession();
   const [friends, setFriends] = useState<FriendEntry[]>([]);
-  const [incoming, setIncoming] = useState<FriendRequestEntry[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<SidebarUser[]>([]);
@@ -98,16 +93,11 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const [sendingRequests, setSendingRequests] = useState<Set<string>>(
     new Set()
   );
-  const [resolvingRequests, setResolvingRequests] = useState<Set<string>>(
-    new Set()
-  );
   const [friendToRemove, setFriendToRemove] = useState<SidebarUser | null>(
     null
   );
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
   const [friendsLoadState, setFriendsLoadState] =
-    useState<LoadState>("loading");
-  const [requestsLoadState, setRequestsLoadState] =
     useState<LoadState>("loading");
   const searchRequestId = useRef(0);
   const fetchEpoch = useRef(0);
@@ -118,27 +108,15 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const fetchFriendsData = useCallback(async () => {
     const epoch = fetchEpoch.current;
     setFriendsLoadState("loading");
-    setRequestsLoadState("loading");
 
-    const [friendsResult, requestsResult] = await Promise.allSettled([
-      apiGet("/api/friends", FriendsResponseSchema),
-      apiGet("/api/friends/requests", FriendRequestsResponseSchema),
-    ]);
-
-    if (epoch !== fetchEpoch.current) return;
-
-    if (friendsResult.status === "fulfilled") {
-      setFriends(friendsResult.value.data || []);
+    try {
+      const response = await apiGet("/api/friends", FriendsResponseSchema);
+      if (epoch !== fetchEpoch.current) return;
+      setFriends(response.data || []);
       setFriendsLoadState("success");
-    } else {
+    } catch {
+      if (epoch !== fetchEpoch.current) return;
       setFriendsLoadState("error");
-    }
-
-    if (requestsResult.status === "fulfilled") {
-      setIncoming(requestsResult.value.data?.incoming || []);
-      setRequestsLoadState("success");
-    } else {
-      setRequestsLoadState("error");
     }
   }, []);
 
@@ -159,35 +137,22 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   }, [fetchFriendsData]);
 
   useEffect(() => {
-    const unsubReceived = subscribe("friend:request_received", (event) => {
-      setIncoming(
-        (prev) =>
-          applyFriendEvent({ friends: [], incoming: prev }, event).incoming
-      );
-    });
     const unsubAccepted = subscribe("friend:request_accepted", (event) => {
-      setFriends(
-        (prev) =>
-          applyFriendEvent({ friends: prev, incoming: [] }, event).friends
-      );
-      // The user we sent a request to is now a friend — drop the "Sent" badge.
+      setFriends((prev) => applyFriendEvent(prev, event));
+      // The user we sent a request to is now a friend — drop "Request sent".
       // `isFriend` already takes precedence in the search dropdown, but
       // keeping `pendingSent` in sync avoids a stale entry leaking out later.
       setPendingSent((prev) => removeFromSet(prev, event.friendship.user.id));
     });
     const unsubDeclined = subscribe("friend:request_declined", (event) => {
-      // Without this, the sender keeps seeing "Sent" until a full reload —
-      // the 60s reconcile fetches `friends`/`incoming` but never `pendingSent`.
+      // Without this, the sender keeps seeing "Request sent" until a full
+      // reload because reconciliation fetches friends, not `pendingSent`.
       setPendingSent((prev) => removeFromSet(prev, event.toUserId));
     });
     const unsubRemoved = subscribe("friend:removed", (event) => {
-      setFriends(
-        (prev) =>
-          applyFriendEvent({ friends: prev, incoming: [] }, event).friends
-      );
+      setFriends((prev) => applyFriendEvent(prev, event));
     });
     return () => {
-      unsubReceived();
       unsubAccepted();
       unsubDeclined();
       unsubRemoved();
@@ -268,38 +233,12 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
     [fetchFriendsData]
   );
 
-  const handleFriendRequest = useCallback(
-    async (id: string, action: "accept" | "decline") => {
-      const mutationKey = `resolve:${id}`;
-      if (pendingMutations.current.has(mutationKey)) return;
-
-      pendingMutations.current.add(mutationKey);
-      setResolvingRequests((prev) => new Set(prev).add(id));
-      try {
-        await apiPut(`/api/friends/requests/${id}`, { action });
-        fetchEpoch.current += 1;
-        setIncoming((prev) => prev.filter((r) => r.id !== id));
-        void fetchFriendsData();
-      } catch {
-        toast.error(
-          `Could not ${action} this friend request. Please try again.`
-        );
-      } finally {
-        pendingMutations.current.delete(mutationKey);
-        setResolvingRequests((prev) => removeFromSet(prev, id));
-      }
-    },
-    [fetchFriendsData]
-  );
-
   const friendIds = new Set(friends.map((f) => f.user.id));
   const user = session?.user;
   const userName = user?.username || user?.name || "User";
   const normalizedSearchQ = normalizeSubstringSearchQuery(searchQ);
-  const loadFailed =
-    friendsLoadState === "error" || requestsLoadState === "error";
-  const loadPending =
-    friendsLoadState === "loading" || requestsLoadState === "loading";
+  const loadFailed = friendsLoadState === "error";
+  const loadPending = friendsLoadState === "loading";
 
   // Seed presence for each newly-added friend. The provider ref-counts so
   // re-render cycles with the same friends array don't refetch.
@@ -471,7 +410,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                               </span>
                             ) : alreadySent ? (
                               <span className="text-content-tertiary text-xs">
-                                Sent
+                                Request sent
                               </span>
                             ) : (
                               <Button
@@ -550,74 +489,6 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
               </SidebarGroupContent>
             </SidebarGroup>
           )}
-
-          <SidebarGroup className="py-3">
-            <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-              Requests {incoming.length > 0 && `(${incoming.length})`}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              {requestsLoadState === "loading" && incoming.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-xs">
-                  Loading requests…
-                </p>
-              ) : requestsLoadState === "error" &&
-                incoming.length === 0 ? null : incoming.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-xs">
-                  No pending friend requests.
-                </p>
-              ) : (
-                <SidebarMenu className="gap-1">
-                  {incoming.map((request) => (
-                    <SidebarMenuItem key={request.id}>
-                      <SidebarMenuButton
-                        size="lg"
-                        className="cursor-default pr-16"
-                      >
-                        <UserAvatar
-                          user={request.fromUser!}
-                          size="sm"
-                          variant="dark"
-                        />
-                        <span className="truncate font-medium">
-                          {request.fromUser?.username ||
-                            request.fromUser?.name ||
-                            "Player"}
-                        </span>
-                      </SidebarMenuButton>
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() =>
-                            handleFriendRequest(request.id, "accept")
-                          }
-                          title="Accept friend request"
-                          aria-label="Accept friend request"
-                          disabled={resolvingRequests.has(request.id)}
-                          className="text-accent hover:text-accent size-8"
-                        >
-                          <Check className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() =>
-                            handleFriendRequest(request.id, "decline")
-                          }
-                          title="Decline friend request"
-                          aria-label="Decline friend request"
-                          disabled={resolvingRequests.has(request.id)}
-                          className="text-content-secondary hover:text-content-primary size-8"
-                        >
-                          <X className="size-4" />
-                        </Button>
-                      </div>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              )}
-            </SidebarGroupContent>
-          </SidebarGroup>
 
           <SidebarGroup className="py-3">
             <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">

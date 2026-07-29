@@ -53,7 +53,7 @@ describe("OPT-589 recursive printed-keyword consistency gate", () => {
       "EB01-003": { ...none, rush: true },
       "OP07-032": { ...none, rushCharacter: true },
       // Conditional on the opponent controlling 2+ Characters. This is not an
-      // intrinsic keyword; the schema still needs a future runtime grant.
+      // intrinsic keyword; its authored schema grants it at runtime.
       "EB02-019": none,
       "OP01-121": { ...none, doubleAttack: true, banish: true },
       "ST23-001": { ...none, blocker: true },
@@ -119,6 +119,96 @@ describe("OPT-589 recursive printed-keyword consistency gate", () => {
         }
       }
     }
+  });
+
+  it("rejects every gated permanent keyword flag without rejecting ungated flags", () => {
+    const gatedEffects: Array<{
+      gate: string;
+      effect: EffectSchema["effects"][number];
+    }> = [
+      {
+        gate: "conditions",
+        effect: {
+          id: "conditions_gate",
+          category: "permanent",
+          conditions: {
+            type: "HAND_COUNT",
+            controller: "SELF",
+            operator: ">=",
+            value: 1,
+          },
+          flags: { keywords: ["RUSH"] },
+        },
+      },
+      {
+        gate: "post_cost_conditions",
+        effect: {
+          id: "post_cost_conditions_gate",
+          category: "permanent",
+          post_cost_conditions: {
+            type: "HAND_COUNT",
+            controller: "SELF",
+            operator: ">=",
+            value: 1,
+          },
+          flags: { keywords: ["RUSH"] },
+        },
+      },
+      {
+        gate: "costs",
+        effect: {
+          id: "costs_gate",
+          category: "permanent",
+          costs: [{ type: "REST_DON", amount: 1 }],
+          flags: { keywords: ["RUSH"] },
+        },
+      },
+      {
+        gate: "trigger",
+        effect: {
+          id: "trigger_gate",
+          category: "permanent",
+          trigger: { keyword: "ON_PLAY" },
+          flags: { keywords: ["RUSH"] },
+        },
+      },
+      {
+        gate: "duration",
+        effect: {
+          id: "duration_gate",
+          category: "permanent",
+          duration: { type: "THIS_TURN" },
+          flags: { keywords: ["RUSH"] },
+        },
+      },
+    ];
+
+    for (const { gate, effect } of gatedEffects) {
+      const schema: EffectSchema = {
+        card_id: `SYNTHETIC-${gate}`,
+        card_name: `Synthetic ${gate} gate`,
+        card_type: "Character",
+        effects: [effect],
+      };
+      expect(
+        derivePrintedKeywords(cardData(), schema).rush,
+        `${gate} must gate permanent keyword flags`,
+      ).toBe(false);
+    }
+
+    const ungatedSchema: EffectSchema = {
+      card_id: "SYNTHETIC-UNGATED",
+      card_name: "Synthetic ungated keyword",
+      card_type: "Character",
+      effects: [
+        {
+          id: "ungated_keyword",
+          category: "permanent",
+          flags: { keywords: ["RUSH"] },
+        },
+      ],
+    };
+    expect(derivePrintedKeywords(cardData(), ungatedSchema).rush).toBe(true);
   });
 
   it("keeps structured authored Trigger derivation alive", () => {
