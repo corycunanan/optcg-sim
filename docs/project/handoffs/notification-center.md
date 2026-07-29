@@ -1,7 +1,7 @@
 ---
 linear-project: Notification Center
 linear-project-url: https://linear.app/optcg-sim/project/notification-center-a5b5b2e9dc99
-last-updated: 2026-07-27
+last-updated: 2026-07-29
 ---
 
 # Notification Center — Handoff Doc
@@ -17,16 +17,16 @@ Tickets are ordered by dependencies; OPT-535 was a parallel visual track.
 | Order | Ticket  | Title                                                                                    | Estimate | Depends on                | Status    | PR                                                        | Notes                                                  |
 | ----- | ------- | ---------------------------------------------------------------------------------------- | -------- | ------------------------- | --------- | --------------------------------------------------------- | ------------------------------------------------------ |
 | 1     | OPT-534 | Navbar refresh: link reorganization + Erode treatment + active states                    | —        | —                         | Done      | [#399](https://github.com/corycunanan/optcg-sim/pull/399) | Establishes the navbar base and right-side mount point |
-| 2     | OPT-525 | Notification model + API (list, mark-read, action proxy)                                 | —        | —                         | Done      | [#445](https://github.com/corycunanan/optcg-sim/pull/445) | Durable data/API foundation                            |
-| 3     | OPT-526 | Realtime notification events over UserChannel                                            | —        | OPT-525                   | Done      | [#447](https://github.com/corycunanan/optcg-sim/pull/447) | Live badge and cross-tab reconciliation                |
-| 4     | OPT-527 | Navbar: account/avatar element + notification bell with unread badge                     | —        | OPT-534, OPT-525, OPT-526 | Done      | [#448](https://github.com/corycunanan/optcg-sim/pull/448) | Mounts into the OPT-534 right slot                     |
-| 5     | OPT-528 | Notification panel UI with inline accept/decline                                         | —        | OPT-525, OPT-526, OPT-527 | In Review | [#449](https://github.com/corycunanan/optcg-sim/pull/449) | Action menu opened by the bell                         |
-| 6     | OPT-529 | Migrate friend requests out of the social sidebar; sidebar keeps presence + live invites | —        | OPT-528                   | Backlog   | —                                                         | Coordinate final social-file changes with OPT-535      |
+| 2     | OPT-525 | Notification model + API (list, mark-read, action proxy)                                 | —        | —                         | Done      | [#445](https://github.com/corycunanan/optcg-sim/pull/445) | Durable data/API foundation; squash `b1d60ef`          |
+| 3     | OPT-526 | Realtime notification events over UserChannel                                            | —        | OPT-525                   | Done      | [#447](https://github.com/corycunanan/optcg-sim/pull/447) | Live badge and cross-tab reconciliation; squash `3fb08d1` |
+| 4     | OPT-527 | Navbar: account/avatar element + notification bell with unread badge                     | —        | OPT-534, OPT-525, OPT-526 | Done      | [#448](https://github.com/corycunanan/optcg-sim/pull/448) | Mounts into the OPT-534 right slot; squash `d143862`   |
+| 5     | OPT-528 | Notification panel UI with inline accept/decline                                         | —        | OPT-525, OPT-526, OPT-527 | Done      | [#449](https://github.com/corycunanan/optcg-sim/pull/449) | Action menu opened by the bell; squash `cf39c67`       |
+| 6     | OPT-529 | Migrate friend requests out of the social sidebar; sidebar keeps presence + live invites | —        | OPT-528                   | Done      | [#453](https://github.com/corycunanan/optcg-sim/pull/453) | Sole incoming-request surface is the notification center; squash `010eb40` |
 | 7     | OPT-535 | Social sidebar + docked chat widget visual refresh per artifact                          | —        | —                         | Done      | [#400](https://github.com/corycunanan/optcg-sim/pull/400) | Parallel sibling; no navbar ownership                  |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Next up:** OPT-529.
+**Project complete:** all seven tickets are Done and merged.
 
 ---
 
@@ -61,3 +61,34 @@ Tickets are ordered by dependencies; OPT-535 was a parallel visual track.
 - **Gotchas / do NOT touch:** Keep the notification panel as the sole friend-request action surface after migration; preserve the existing `friend:*` event-driven friend-list updates and OPT-525 API proxy contract.
 - **Unresolved:** Full-page notification history remains deferred; no OPT-529 work is needed for it.
 - **Pointer:** PR #449 and commit `37da558` contain the behavioral and accessibility contracts.
+
+---
+
+## Project Closeout
+
+### Shipped
+
+A durable notification inbox: a Prisma `Notification` model plus list, mark-read, and action-proxy APIs; realtime `notification:*` events over the existing per-user `UserChannel`; a navbar bell with a live unread badge and account menu; an inline accept/decline panel; and removal of the duplicate friend-request UI from the social sidebar. Friend requests now live solely in the notification center.
+
+### Ratified Product Decisions (from Cory, during the run)
+
+- All four navbar links remain. `PLAY` is promoted to the leftmost position with emphasized treatment. The final order is `PLAY`, `HOME`, `CARDS`, `DECKS`.
+- Opening the notification panel marks the visible items read, so the badge clears on open. A separate **Mark all read** control also ships.
+
+### Key Design Points
+
+- Accept/decline proxies `PUT /api/friends/requests/[id]` rather than duplicating it, so notification state and friend-request state cannot drift.
+- A `409` from that route is authoritative: `conflictOutcome()` derives the real terminal state rather than trusting the user's optimistic action.
+- Notification fan-out is post-commit and best-effort via `after(...)`; a realtime failure can never roll back or fail the underlying mutation.
+- Retention pruning runs outside the friend-request transaction and only prunes terminal (`ACCEPTED`/`DECLINED`) rows, so retention contention can never roll back or delete a live friend request.
+- The sidebar still subscribes to `friend:request_accepted`, `friend:request_declined`, and `friend:removed` for friend-list mutations. Only incoming-request handling was removed; do not delete those subscriptions.
+- `20260728233000_backfill_pending_friend_request_notifications` backfills notifications for friend requests that predate the notification table and is idempotent (`ON CONFLICT DO NOTHING`).
+
+### Open Follow-ups (Linear)
+
+- **OPT-580** (Medium) — Notification retention does not bound per-user inbox growth. Pruning runs only on friend-request creation, removes only terminal rows, and is limited to 25 rows per invocation, so `PENDING`, `READ`, and `DISMISSED` rows accumulate without a bound.
+- **OPT-594** (High) — Actionable notifications can fall outside the panel's 20-row window with no way to reach them now that the sidebar fallback is gone. This needs a product decision: prioritize actionable rows, add a separate actionable fetch, or add pagination/history.
+- Add structured outcome codes to OPT-525's `409` responses so `conflictOutcome()` no longer depends on error-message prose.
+- Replace offset `skip`/`take` in `GET /api/notifications` with keyset/cursor pagination.
+- Outgoing “Request sent” state does not survive a page reload. This is pre-existing; the sidebar never consumed the fetch's `outgoing` data.
+- Replace the backfill migration test's SQL-substring assertions with an ephemeral-Postgres execution test if migration-test infrastructure is added.
