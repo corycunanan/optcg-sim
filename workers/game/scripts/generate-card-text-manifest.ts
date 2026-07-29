@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { sanitizeEffectText } from "../../../pipeline/transform.js";
+import { sanitizeEffectText } from "../../../shared/effect-text.js";
 
 export type CanonicalCardCategory = "Character" | "Event" | "Leader" | "Stage";
 

@@ -5,9 +5,6 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "types": ["@cloudflare/workers-types", "node"],
-    "paths": {
-      "@shared/*": ["../../shared/*"]
-    },
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,

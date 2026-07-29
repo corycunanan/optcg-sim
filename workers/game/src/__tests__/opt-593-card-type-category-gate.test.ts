@@ -44,4 +44,18 @@ describe("OPT-593 canonical card category coverage", () => {
       'TEST-CATEGORY: schema card_type "Character" does not match canonical category "Leader"',
     ]);
   });
+
+  it("reports an authored schema missing from the manifest", () => {
+    const newSchema: EffectSchema = {
+      card_id: "NEW-001",
+      card_type: "Character",
+      effects: [],
+    };
+
+    expect(
+      findSchemaCardTypeCategoryViolations({}, { "NEW-001": newSchema })
+    ).toEqual([
+      "NEW-001: canonical category is missing from the card-text manifest",
+    ]);
+  });
 });
