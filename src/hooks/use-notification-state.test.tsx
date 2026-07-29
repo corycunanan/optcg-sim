@@ -54,7 +54,8 @@ let stateEffectCalls = 0;
 
 function notification(
   status: SerializedNotification["status"] = "PENDING",
-  id = "notification-1"
+  id = "notification-1",
+  overrides: Partial<SerializedNotification> = {}
 ): SerializedNotification {
   return {
     id,
@@ -72,6 +73,7 @@ function notification(
       name: "Ace",
       image: null,
     },
+    ...overrides,
   };
 }
 
@@ -212,6 +214,42 @@ describe("useNotificationState", () => {
     expect(latest?.notifications[0].status).toBe("ACCEPTED");
   });
 
+  it("orders a local merge identically to a server refetch of the same rows", async () => {
+    const resolved = Array.from({ length: 20 }, (_, index) =>
+      notification("ACCEPTED", `resolved-${index}`, {
+        createdAt: new Date(Date.UTC(2026, 0, index + 2)).toISOString(),
+      })
+    );
+    const oldActionable = notification("PENDING", "old-actionable", {
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    const serverRows = [
+      oldActionable,
+      ...resolved.slice().reverse().slice(0, 19),
+    ];
+    mocks.apiGet
+      .mockResolvedValueOnce(response(resolved.slice().reverse(), 0))
+      .mockResolvedValueOnce(response(serverRows, 1));
+    await mount();
+
+    await act(async () => {
+      mocks.createdHandler?.({
+        type: "notification:created",
+        notification: oldActionable,
+        unreadCount: 1,
+      });
+    });
+    const locallyMergedIds = latest?.notifications.map(({ id }) => id);
+
+    await act(async () => {
+      mocks.visibilityHandler?.();
+      await Promise.resolve();
+    });
+
+    expect(locallyMergedIds).toEqual(serverRows.map(({ id }) => id));
+    expect(latest?.notifications.map(({ id }) => id)).toEqual(locallyMergedIds);
+  });
+
   it("applies read/dismiss and mark-all-read changes across tabs", async () => {
     const pending = [notification(), notification("PENDING", "notification-2")];
     mocks.apiGet.mockResolvedValueOnce(response(pending, 2));
@@ -230,7 +268,9 @@ describe("useNotificationState", () => {
       });
       await Promise.resolve();
     });
-    expect(latest?.notifications[0].status).toBe("DISMISSED");
+    expect(
+      latest?.notifications.find(({ id }) => id === "notification-1")?.status
+    ).toBe("DISMISSED");
     expect(latest?.unreadCount).toBe(1);
 
     const allRead = [
@@ -246,8 +286,8 @@ describe("useNotificationState", () => {
       await Promise.resolve();
     });
     expect(latest?.notifications.map(({ status }) => status)).toEqual([
-      "DISMISSED",
       "READ",
+      "DISMISSED",
     ]);
     expect(latest?.unreadCount).toBe(0);
   });

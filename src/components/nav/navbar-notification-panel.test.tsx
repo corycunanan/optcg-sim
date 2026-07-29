@@ -110,12 +110,18 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("NavbarNotificationPanel", () => {
-  it("renders newest first and caps the action menu at 20 notifications", async () => {
+  it("renders an old actionable row before newer resolved rows within the 20-row window", async () => {
     mocks.notifications = Array.from({ length: 24 }, (_, index) =>
       notification(
         String(index + 1),
-        new Date(Date.UTC(2026, 0, index + 1)).toISOString()
+        new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+        { status: "ACCEPTED" }
       )
+    );
+    mocks.notifications.push(
+      notification("old-actionable", "2025-01-01T00:00:00.000Z", {
+        status: "PENDING",
+      })
     );
     render(<NavbarNotificationPanel />);
 
@@ -125,9 +131,32 @@ describe("NavbarNotificationPanel", () => {
     ).getAllByRole("listitem");
 
     expect(rows).toHaveLength(20);
-    expect(rows[0]?.textContent).toContain("player-24");
-    expect(rows.at(-1)?.textContent).toContain("player-5");
+    expect(rows[0]?.textContent).toContain("player-old-actionable");
+    expect(rows[1]?.textContent).toContain("player-24");
+    expect(rows.at(-1)?.textContent).toContain("player-6");
     expect(screen.queryByText("player-4")).toBeNull();
+  });
+
+  it("renders every actionable row when more than 20 need a decision", async () => {
+    mocks.notifications = Array.from({ length: 22 }, (_, index) =>
+      notification(
+        String(index + 1),
+        new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+        { status: "PENDING" }
+      )
+    );
+    render(<NavbarNotificationPanel />);
+
+    await openPanel();
+
+    expect(
+      within(
+        screen.getByRole("list", { name: "Recent notifications" })
+      ).getAllByRole("listitem")
+    ).toHaveLength(22);
+    expect(
+      screen.getAllByRole("button", { name: /^Accept friend request/ })
+    ).toHaveLength(22);
   });
 
   it("announces the reachable empty state", async () => {
