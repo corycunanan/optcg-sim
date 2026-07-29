@@ -644,6 +644,13 @@ export const OP04_020_ISSHO: EffectSchema = {
       id: "your_turn_cost_reduction",
       category: "permanent",
       // YOUR_TURN-scoped permanent: only active during your turn
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
       modifiers: [
         {
           type: "MODIFY_COST",
@@ -659,7 +666,7 @@ export const OP04_020_ISSHO: EffectSchema = {
       ],
       duration: {
         type: "WHILE_CONDITION",
-        condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 }] },
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
       },
     },
     {
@@ -2812,9 +2819,12 @@ export const OP04_081_CAVENDISH: EffectSchema = {
     {
       id: "don_attack_active",
       category: "permanent",
-      duration: {
-        type: "WHILE_CONDITION",
-        condition: { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
       },
       modifiers: [
         {
@@ -3751,14 +3761,17 @@ export const OP04_106_CHARLOTTE_BAVAROIS: EffectSchema = {
     {
       id: "conditional_power_boost",
       category: "permanent",
-      duration: {
-        type: "WHILE_CONDITION",
-        condition: {
-          all_of: [
-            { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
-            { type: "COMPARATIVE", metric: "LIFE_COUNT", operator: "<" },
-          ],
-        },
+      conditions: {
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          { type: "COMPARATIVE", metric: "LIFE_COUNT", operator: "<" },
+        ],
       },
       modifiers: [
         {
@@ -3791,9 +3804,12 @@ export const OP04_108_CHARLOTTE_MOSCATO: EffectSchema = {
     {
       id: "don_banish",
       category: "permanent",
-      duration: {
-        type: "WHILE_CONDITION",
-        condition: { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
       },
       modifiers: [
         {

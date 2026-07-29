@@ -2021,8 +2021,9 @@ export const OP15_053_REBECCA: EffectSchema = {
       id: "OP15-053_conditional_blocker",
       category: "permanent",
       conditions: {
-        type: "DON_FIELD_COUNT",
+        type: "DON_GIVEN",
         controller: "SELF",
+        mode: "SPECIFIC_CARD",
         operator: ">=",
         value: 1,
       },
