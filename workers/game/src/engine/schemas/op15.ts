@@ -29,21 +29,32 @@ export const OP15_001_KRIEG: EffectSchema = {
       id: "OP15-001_opponent_turn_debuff",
       category: "permanent",
       conditions: {
-        type: "FIELD_PURITY",
-        controller: "SELF",
-        filter: { traits: ["East Blue"] },
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          {
+            type: "FIELD_PURITY",
+            controller: "SELF",
+            filter: { traits: ["East Blue"] },
+          },
+        ],
       },
       modifiers: [
         {
           type: "MODIFY_POWER",
           target: { type: "ALL_OPPONENT_CHARACTERS" },
           params: { amount: -2000 },
-          duration: {
-            type: "WHILE_CONDITION",
-            condition: { all_of: [{ type: "IS_MY_TURN", controller: "OPPONENT" }, { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 }] },
-          },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "OPPONENT" },
+      },
       // Scoped to opponent's turn via DON!!x1 + Opponent's Turn
       flags: { keywords: [] },
     },
