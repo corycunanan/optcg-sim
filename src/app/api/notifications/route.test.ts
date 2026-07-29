@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ACTIONABLE_NOTIFICATION_WHERE } from "@/lib/notification-order";
 
 const authMock = vi.fn();
 const searchRateLimitMock = vi.fn();
@@ -10,6 +11,12 @@ const notificationUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
 const publishNotificationsReadAllMock = vi.fn();
 const afterCallbacks: Array<() => void | Promise<void>> = [];
+const ACTOR_INCLUDE = {
+  actor: {
+    select: { id: true, username: true, name: true, image: true },
+  },
+} as const;
+const NEWEST_FIRST = [{ createdAt: "desc" }, { id: "desc" }] as const;
 
 vi.mock("next/server", async (importActual) => {
   const actual = await importActual<typeof import("next/server")>();
@@ -91,7 +98,7 @@ beforeEach(() => {
   searchRateLimitMock.mockResolvedValue({ limited: false, remaining: 59 });
   apiRateLimitMock.mockResolvedValue({ limited: false, remaining: 29 });
   notificationFindManyMock.mockResolvedValue([]);
-  notificationCountMock.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+  notificationCountMock.mockResolvedValue(0);
   notificationUpdateManyMock.mockResolvedValue({ count: 0 });
   publishNotificationsReadAllMock.mockResolvedValue(undefined);
   transactionMock.mockImplementation(async (callback) =>
@@ -133,27 +140,34 @@ describe("GET /api/notifications", () => {
         status: "DECLINED",
       }),
     ];
-    notificationFindManyMock.mockResolvedValueOnce(rows);
+    notificationFindManyMock.mockResolvedValueOnce([rows[2], rows[4]]);
     notificationCountMock.mockReset();
-    notificationCountMock.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    notificationCountMock
+      .mockResolvedValueOnce(5)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(2);
 
     const res = await GET(buildRequest("/api/notifications?page=2&limit=2"));
 
     expect(res.status).toBe(200);
     expect(notificationFindManyMock).toHaveBeenCalledWith({
-      where: { userId: "user-1" },
-      include: {
-        actor: {
-          select: { id: true, username: true, name: true, image: true },
-        },
+      where: {
+        userId: "user-1",
+        NOT: ACTIONABLE_NOTIFICATION_WHERE,
       },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      include: ACTOR_INCLUDE,
+      orderBy: NEWEST_FIRST,
+      skip: 0,
+      take: 2,
     });
     expect(notificationCountMock).toHaveBeenNthCalledWith(1, {
       where: { userId: "user-1" },
     });
     expect(notificationCountMock).toHaveBeenNthCalledWith(2, {
       where: { userId: "user-1", status: "PENDING" },
+    });
+    expect(notificationCountMock).toHaveBeenNthCalledWith(3, {
+      where: { userId: "user-1", ...ACTIONABLE_NOTIFICATION_WHERE },
     });
     expect(await res.json()).toEqual({
       data: {
@@ -182,12 +196,14 @@ describe("GET /api/notifications", () => {
         { status: index % 2 === 0 ? "DECLINED" : "ACCEPTED" }
       )
     );
-    notificationFindManyMock.mockResolvedValueOnce([
-      ...newerResolved,
-      oldActionable,
-    ]);
+    notificationFindManyMock
+      .mockResolvedValueOnce([oldActionable])
+      .mockResolvedValueOnce(newerResolved.slice().reverse().slice(0, 19));
     notificationCountMock.mockReset();
-    notificationCountMock.mockResolvedValueOnce(22).mockResolvedValueOnce(1);
+    notificationCountMock
+      .mockResolvedValueOnce(22)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1);
 
     const res = await GET(buildRequest());
     const body = await res.json();
@@ -201,23 +217,78 @@ describe("GET /api/notifications", () => {
     ).toHaveLength(body.data.unreadCount);
   });
 
-  it("excludes another user's rows from the list and both counts", async () => {
-    const stored = [
-      { id: "owned", userId: "user-1", status: "PENDING" },
-      { id: "foreign", userId: "user-2", status: "PENDING" },
-    ];
-    notificationFindManyMock.mockImplementation(async ({ where }) =>
-      stored.filter((row) => !where.userId || row.userId === where.userId)
-    );
+  it("returns every actionable row beyond the limit and paginates resolved history exactly", async () => {
+    const actionableRows = Array.from({ length: 21 }, (_, index) =>
+      notificationRow(
+        `actionable-${index}`,
+        new Date(Date.UTC(2026, 0, index + 1)).toISOString()
+      )
+    ).reverse();
+    const resolvedRows = Array.from({ length: 20 }, (_, index) =>
+      notificationRow(
+        `resolved-${index}`,
+        new Date(Date.UTC(2026, 1, index + 1)).toISOString(),
+        { status: "ACCEPTED" }
+      )
+    ).reverse();
+    notificationFindManyMock
+      .mockImplementationOnce(async ({ take }) => actionableRows.slice(0, take))
+      .mockResolvedValueOnce(resolvedRows);
     notificationCountMock.mockReset();
-    notificationCountMock.mockImplementation(
-      async ({ where }) =>
-        stored.filter(
-          (row) =>
-            (!where.userId || row.userId === where.userId) &&
-            (!where.status || row.status === where.status)
-        ).length
-    );
+    for (let request = 0; request < 2; request += 1) {
+      notificationCountMock
+        .mockResolvedValueOnce(41)
+        .mockResolvedValueOnce(21)
+        .mockResolvedValueOnce(21);
+    }
+
+    const pageOne = await (
+      await GET(buildRequest("/api/notifications?page=1&limit=20"))
+    ).json();
+    const pageTwo = await (
+      await GET(buildRequest("/api/notifications?page=2&limit=20"))
+    ).json();
+
+    expect(
+      pageOne.data.notifications.map(({ id }: { id: string }) => id)
+    ).toEqual(actionableRows.map(({ id }) => id));
+    expect(pageOne.data.notifications).toHaveLength(21);
+    expect(pageOne.data.pagination.totalPages).toBe(2);
+    expect(
+      pageTwo.data.notifications.map(({ id }: { id: string }) => id)
+    ).toEqual(resolvedRows.map(({ id }) => id));
+    expect(pageTwo.data.pagination.totalPages).toBe(2);
+    expect(
+      new Set([
+        ...pageOne.data.notifications.map(({ id }: { id: string }) => id),
+        ...pageTwo.data.notifications.map(({ id }: { id: string }) => id),
+      ]).size
+    ).toBe(41);
+    expect(notificationFindManyMock).toHaveBeenNthCalledWith(1, {
+      where: { userId: "user-1", ...ACTIONABLE_NOTIFICATION_WHERE },
+      include: ACTOR_INCLUDE,
+      orderBy: NEWEST_FIRST,
+      take: 21,
+    });
+    expect(notificationFindManyMock).toHaveBeenNthCalledWith(2, {
+      where: {
+        userId: "user-1",
+        NOT: ACTIONABLE_NOTIFICATION_WHERE,
+      },
+      include: ACTOR_INCLUDE,
+      orderBy: NEWEST_FIRST,
+      skip: 0,
+      take: 20,
+    });
+  });
+
+  it("excludes another user's rows from the list and both counts", async () => {
+    const owned = notificationRow("owned", "2026-01-01");
+    notificationFindManyMock
+      .mockResolvedValueOnce([owned])
+      .mockResolvedValueOnce([]);
+    notificationCountMock.mockReset();
+    notificationCountMock.mockResolvedValue(1);
 
     const res = await GET(buildRequest());
     const body = await res.json();
@@ -228,6 +299,16 @@ describe("GET /api/notifications", () => {
     );
     expect(body.data.pagination.total).toBe(1);
     expect(body.data.unreadCount).toBe(1);
+    expect(
+      notificationFindManyMock.mock.calls.every(
+        ([{ where }]) => where.userId === "user-1"
+      )
+    ).toBe(true);
+    expect(
+      notificationCountMock.mock.calls.every(
+        ([{ where }]) => where.userId === "user-1"
+      )
+    ).toBe(true);
   });
 });
 

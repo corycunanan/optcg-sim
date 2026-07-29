@@ -1,4 +1,13 @@
+import type { Prisma } from "@prisma/client";
+
 export const NOTIFICATION_INBOX_LIMIT = 20;
+export const ACTIONABLE_NOTIFICATION_TYPE = "FRIEND_REQUEST";
+export const ACTIONABLE_NOTIFICATION_STATUSES = ["PENDING", "READ"] as const;
+export const ACTIONABLE_NOTIFICATION_WHERE = {
+  type: ACTIONABLE_NOTIFICATION_TYPE,
+  status: { in: [...ACTIONABLE_NOTIFICATION_STATUSES] },
+  referenceId: { not: null },
+} satisfies Prisma.NotificationWhereInput;
 
 export interface OrderableNotification {
   id: string;
@@ -16,8 +25,10 @@ export function isActionableNotification(
   notification: Pick<OrderableNotification, "type" | "status" | "referenceId">
 ): boolean {
   return (
-    notification.type === "FRIEND_REQUEST" &&
-    (notification.status === "PENDING" || notification.status === "READ") &&
+    notification.type === ACTIONABLE_NOTIFICATION_TYPE &&
+    ACTIONABLE_NOTIFICATION_STATUSES.some(
+      (status) => status === notification.status
+    ) &&
     notification.referenceId !== null
   );
 }

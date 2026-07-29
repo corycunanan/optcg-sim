@@ -11,10 +11,7 @@ import {
   requireAuth,
 } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
-import {
-  isActionableNotification,
-  orderNotifications,
-} from "@/lib/notification-order";
+import { ACTIONABLE_NOTIFICATION_WHERE } from "@/lib/notification-order";
 import { apiLimiter, searchLimiter } from "@/lib/rate-limit";
 import {
   ListNotificationsQuerySchema,
@@ -46,32 +43,68 @@ export async function GET(request: NextRequest) {
     const { notifications, total, unreadCount, totalPages } =
       await prisma.$transaction(
         async (tx) => {
-          const [rows, rowCount, pendingCount] = await Promise.all([
-            tx.notification.findMany({
-              where: { userId },
-              include: {
-                actor: {
-                  select: { id: true, username: true, name: true, image: true },
-                },
-              },
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            }),
+          const [rowCount, pendingCount, actionableCount] = await Promise.all([
             tx.notification.count({ where: { userId } }),
             tx.notification.count({ where: { userId, status: "PENDING" } }),
+            tx.notification.count({
+              where: { userId, ...ACTIONABLE_NOTIFICATION_WHERE },
+            }),
           ]);
 
-          const orderedRows = orderNotifications(rows);
-          const actionableCount = orderedRows.filter(
-            isActionableNotification
-          ).length;
           const firstPageSize = Math.max(limit, actionableCount);
-          const offset = page === 1 ? 0 : firstPageSize + (page - 2) * limit;
+          const nonActionableFirstPageSize = Math.max(
+            0,
+            limit - actionableCount
+          );
+          const include = {
+            actor: {
+              select: { id: true, username: true, name: true, image: true },
+            },
+          } as const;
+          const orderBy = [
+            { createdAt: "desc" as const },
+            { id: "desc" as const },
+          ];
+          const actionableWhere = {
+            userId,
+            ...ACTIONABLE_NOTIFICATION_WHERE,
+          };
+          const nonActionableWhere = {
+            userId,
+            NOT: ACTIONABLE_NOTIFICATION_WHERE,
+          };
+
+          let notifications;
+          if (page === 1) {
+            const [actionableRows, nonActionableRows] = await Promise.all([
+              tx.notification.findMany({
+                where: actionableWhere,
+                include,
+                orderBy,
+                take: firstPageSize,
+              }),
+              nonActionableFirstPageSize > 0
+                ? tx.notification.findMany({
+                    where: nonActionableWhere,
+                    include,
+                    orderBy,
+                    take: nonActionableFirstPageSize,
+                  })
+                : Promise.resolve([]),
+            ]);
+            notifications = [...actionableRows, ...nonActionableRows];
+          } else {
+            notifications = await tx.notification.findMany({
+              where: nonActionableWhere,
+              include,
+              orderBy,
+              skip: nonActionableFirstPageSize + (page - 2) * limit,
+              take: limit,
+            });
+          }
 
           return {
-            notifications: orderedRows.slice(
-              offset,
-              offset + (page === 1 ? firstPageSize : limit)
-            ),
+            notifications,
             total: rowCount,
             unreadCount: pendingCount,
             totalPages:
