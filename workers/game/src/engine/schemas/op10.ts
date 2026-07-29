@@ -72,7 +72,7 @@ export const OP10_001_SMOKER: EffectSchema = {
 export const OP10_002_CAESAR_CLOWN: EffectSchema = {
   card_id: "OP10-002",
   card_name: "Caesar Clown",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "when_attacking_ko",
@@ -109,7 +109,7 @@ export const OP10_002_CAESAR_CLOWN: EffectSchema = {
 export const OP10_003_SUGAR: EffectSchema = {
   card_id: "OP10-003",
   card_name: "Sugar",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "eot_set_don_active",

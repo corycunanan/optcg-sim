@@ -2430,7 +2430,7 @@ export const OP01_090_BAROQUE_WORKS: EffectSchema = {
 export const OP01_091_KING: EffectSchema = {
   card_id: "OP01-091",
   card_name: "King",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "conditional_opponent_debuff",

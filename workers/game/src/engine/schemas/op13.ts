@@ -764,7 +764,7 @@ export const OP13_022_WINDMILL_VILLAGE: EffectSchema = {
 export const OP13_023_UTA: EffectSchema = {
   card_id: "OP13-023",
   card_name: "Uta",
-  card_type: "Leader",
+  card_type: "Character",
   effects: [
     {
       id: "OP13-023_on_play",

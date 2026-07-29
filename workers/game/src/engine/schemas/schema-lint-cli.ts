@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -10,7 +10,18 @@ import {
   getAllAuthoredSchemas,
   validateEffectSchema,
 } from "../schema-registry.js";
-import { findSchemasWithMultipleTriggerBlocks } from "../trigger-schema-coverage.js";
+import {
+  findSchemaCardTypeCategoryViolations,
+  findSchemasWithMultipleTriggerBlocks,
+  type CardTextManifest,
+} from "../trigger-schema-coverage.js";
+
+const cardTextManifest = JSON.parse(
+  readFileSync(
+    resolve(__dirname, "../card-text-manifest.generated.json"),
+    "utf8"
+  )
+) as CardTextManifest;
 
 async function discoverSchemaSources(): Promise<SchemaSourceModule[]> {
   const directory = __dirname;
@@ -46,6 +57,11 @@ async function main(): Promise<void> {
   const schemas = source
     ? modules[0].schemas
     : Object.assign({}, ...modules.map((module) => module.schemas));
+  const categoryCheckedSchemas = source
+    ? Object.fromEntries(
+        Object.entries(schemas).filter(([cardId]) => cardTextManifest[cardId]),
+      )
+    : schemas;
   const diagnostics = [
     ...Object.entries(schemas).flatMap(([cardId, schema]) =>
       validateEffectSchema(schema, cardId),
@@ -53,6 +69,10 @@ async function main(): Promise<void> {
     ...findSchemasWithMultipleTriggerBlocks(schemas).map(
       (cardId) =>
         `${cardId}: multiple TRIGGER blocks are unsupported; combine them into one block`,
+    ),
+    ...findSchemaCardTypeCategoryViolations(
+      cardTextManifest,
+      categoryCheckedSchemas,
     ),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
   ];

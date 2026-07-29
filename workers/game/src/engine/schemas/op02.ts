@@ -766,7 +766,7 @@ export const OP02_024_MOBY_DICK: EffectSchema = {
 export const OP02_026_SANJI: EffectSchema = {
   card_id: "OP02-026",
   card_name: "Sanji",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "on_char_played_set_don",
@@ -2004,7 +2004,7 @@ export const OP02_070_NEW_KAMA_LAND: EffectSchema = {
 export const OP02_025_KINEMON: EffectSchema = {
   card_id: "OP02-025",
   card_name: "Kin'emon",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "OP02-025_activate_cost_reduction",
@@ -3558,7 +3558,7 @@ export const OP02_120_UTA: EffectSchema = {
 export const OP02_121_KUZAN: EffectSchema = {
   card_id: "OP02-121",
   card_name: "Kuzan",
-  card_type: "Leader",
+  card_type: "Character",
   effects: [
     {
       id: "your_turn_cost_aura",

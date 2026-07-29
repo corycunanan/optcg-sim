@@ -18,7 +18,7 @@ import type { EffectSchema } from "../effect-types.js";
 export const ST17_001_CROCODILE: EffectSchema = {
   card_id: "ST17-001",
   card_name: "Crocodile",
-  card_type: "Leader",
+  card_type: "Character",
   effects: [
     {
       id: "on_play_reveal_draw_place",
