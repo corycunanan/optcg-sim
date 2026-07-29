@@ -755,7 +755,7 @@ export const OP13_022_WINDMILL_VILLAGE: EffectSchema = {
 // GREEN — Uta / FILM / Straw Hat Crew (OP13-023 to OP13-040)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── OP13-023 Uta (Leader) ─────────────────────────────────────────────────
+// ─── OP13-023 Uta (Character) ──────────────────────────────────────────────
 // [On Play] Set up to 2 of your DON!! cards as active. Then, you cannot play
 // Character cards with a base cost of 5 or more during this turn.
 // [On K.O.] Play up to 1 Character card with a cost of 5 or less from your

@@ -11,7 +11,7 @@ import type { EffectSchema } from "../effect-types.js";
 // BLUE — The Seven Warlords of the Sea (ST17-001 to ST17-005)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── ST17-001 Crocodile (Leader) — On Play reveal conditional draw + place
+// ─── ST17-001 Crocodile (Character) — On Play reveal conditional draw + place
 // [On Play] Reveal 1 card from the top of your deck. If that card is a {The Seven Warlords of the Sea}
 // type card, draw 2 cards and place 1 card from your hand at the top of your deck.
 

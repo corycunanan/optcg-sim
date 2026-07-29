@@ -3573,7 +3573,7 @@ export const OP12_098_HAIR_REMOVAL_FIST: EffectSchema = {
 // YELLOW — Kalgara / Supernovas / Life manipulation (OP12-099 to OP12-119)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── OP12-099 Kalgara (Leader) ──────────────────────────────────────────────
+// ─── OP12-099 Kalgara (Character) ───────────────────────────────────────────
 // [Your Turn] When a card is removed from your or your opponent's Life cards,
 // draw 1 card. Then, you cannot draw cards using your own effects during this turn.
 
