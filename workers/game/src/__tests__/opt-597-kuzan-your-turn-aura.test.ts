@@ -8,6 +8,7 @@ import type { CardData, CardInstance, GameAction, GameState, PlayerState } from 
 import { getEffectiveFieldCost, getEffectivePower } from "../engine/modifiers.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
+import { findCardInstance } from "../engine/state.js";
 import { OP01_091_KING } from "../engine/schemas/op01.js";
 import { OP02_121_KUZAN } from "../engine/schemas/op02.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
@@ -160,6 +161,16 @@ describe("OPT-597 — OP02-121 Kuzan continuous your-turn cost aura", () => {
   it("applies only to opposing Characters, not the opponent's Leader or Stage", () => {
     const { state, cardDb, opponentFive, opponentLeader, opponentStage } =
       buildFieldState(0);
+
+    const resolvedLeader = findCardInstance(state, opponentLeader.instanceId);
+    const resolvedStage = findCardInstance(state, opponentStage.instanceId);
+    expect(resolvedLeader).not.toBeNull();
+    expect(resolvedStage).not.toBeNull();
+    if (!resolvedLeader || !resolvedStage) {
+      throw new Error("Expected opposing Leader and Stage fixtures on the field");
+    }
+    expect(cardDb.get(resolvedLeader.cardId)?.type).toBe("Leader");
+    expect(cardDb.get(resolvedStage.cardId)?.type).toBe("Stage");
 
     expect(getEffectiveFieldCost(COST_FIVE, state, opponentFive.instanceId, cardDb)).toBe(0);
     expect(
