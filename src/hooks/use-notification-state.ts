@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet } from "@/lib/api-client";
+import {
+  limitNotificationInbox,
+  NOTIFICATION_INBOX_LIMIT,
+} from "@/lib/notification-order";
 import type { EventDispatcher } from "@/lib/realtime/event-dispatcher";
 import { NotificationsResponseSchema } from "@/lib/validators/notifications";
 import type {
@@ -10,8 +14,7 @@ import type {
   SerializedNotification,
 } from "@/types/realtime";
 
-const NOTIFICATION_PAGE_SIZE = 20;
-const NOTIFICATIONS_URL = `/api/notifications?page=1&limit=${NOTIFICATION_PAGE_SIZE}`;
+const NOTIFICATIONS_URL = `/api/notifications?page=1&limit=${NOTIFICATION_INBOX_LIMIT}`;
 
 type NotificationEvent = Extract<
   RealtimeServerEvent,
@@ -71,10 +74,10 @@ export function applyNotificationEvent(
             ({ id }) => id !== event.notification.id
           );
     return {
-      notifications: [event.notification, ...withoutDuplicate].slice(
-        0,
-        NOTIFICATION_PAGE_SIZE
-      ),
+      notifications: limitNotificationInbox([
+        event.notification,
+        ...withoutDuplicate,
+      ]),
       unreadCount: event.unreadCount,
     };
   }
@@ -85,7 +88,10 @@ export function applyNotificationEvent(
 
   const notifications = [...snapshot.notifications];
   notifications[existingIndex] = event.notification;
-  return { notifications, unreadCount: event.unreadCount };
+  return {
+    notifications: limitNotificationInbox(notifications),
+    unreadCount: event.unreadCount,
+  };
 }
 
 /**
@@ -134,7 +140,7 @@ export function useNotificationState(
         return;
 
       let reconciled: NotificationSnapshot = {
-        notifications: response.data.notifications,
+        notifications: limitNotificationInbox(response.data.notifications),
         unreadCount: response.data.unreadCount,
       };
       const appliedThrough = eventSequenceRef.current;
