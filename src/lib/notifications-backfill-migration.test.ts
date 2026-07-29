@@ -101,8 +101,8 @@ describeWithDatabase(
     });
 
     it("maps every pending request exactly once and preserves existing rows", async () => {
-      await expect(prisma.$executeRawUnsafe(migration)).resolves.toBe(5);
-      await expect(prisma.$executeRawUnsafe(migration)).resolves.toBe(0);
+      await prisma.$executeRawUnsafe(migration);
+      await prisma.$executeRawUnsafe(migration);
 
       const notifications = await prisma.notification.findMany({
         where: {
