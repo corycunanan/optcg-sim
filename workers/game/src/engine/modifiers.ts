@@ -127,14 +127,22 @@ function effectAppliesToCard(
     const targetType = mod.target.type?.toUpperCase();
     const controller =
       mod.target.controller ??
-      (targetType === "ALL_YOUR_CHARACTERS" ? "SELF" : undefined);
+      (targetType === "ALL_YOUR_CHARACTERS"
+        ? "SELF"
+        : targetType === "ALL_OPPONENT_CHARACTERS"
+          ? "OPPONENT"
+          : undefined);
     if (controller === "SELF" && card.controller !== effect.controller)
       continue;
     if (controller === "OPPONENT" && card.controller === effect.controller)
       continue;
 
     // Card type check
-    if (targetType === "CHARACTER" || targetType === "ALL_YOUR_CHARACTERS") {
+    if (
+      targetType === "CHARACTER" ||
+      targetType === "ALL_YOUR_CHARACTERS" ||
+      targetType === "ALL_OPPONENT_CHARACTERS"
+    ) {
       const data = cardDb.get(card.cardId);
       if (!data || data.type?.toUpperCase() !== "CHARACTER") continue;
     }

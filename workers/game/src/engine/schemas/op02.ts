@@ -3546,14 +3546,9 @@ export const OP02_120_UTA: EffectSchema = {
   ],
 };
 
-// ─── OP02-121 Kuzan (Leader) ───────────────────────────────────────────────
+// ─── OP02-121 Kuzan (Character) ────────────────────────────────────────────
 // [Your Turn] Give all of your opponent's Characters -5 cost.
 // [On Play] K.O. up to 1 of your opponent's Characters with a cost of 0.
-//
-// NOTE: The [Your Turn] aura is a permanent that applies during your turn.
-// The [On Play] fires when Characters enter the field under this Leader's
-// control (this is a Leader ability — the KO checks after the cost aura
-// reduces enemy character costs).
 
 export const OP02_121_KUZAN: EffectSchema = {
   card_id: "OP02-121",
@@ -3563,10 +3558,6 @@ export const OP02_121_KUZAN: EffectSchema = {
     {
       id: "your_turn_cost_aura",
       category: "permanent",
-      trigger: {
-        keyword: "WHEN_ATTACKING",
-        turn_restriction: "YOUR_TURN",
-      },
       modifiers: [
         {
           type: "MODIFY_COST",
@@ -3574,6 +3565,7 @@ export const OP02_121_KUZAN: EffectSchema = {
           params: { amount: -5 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "on_play_ko_zero_cost",
