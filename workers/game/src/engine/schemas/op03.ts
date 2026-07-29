@@ -2641,7 +2641,7 @@ export const OP03_076_ROB_LUCCI: EffectSchema = {
 export const OP03_077_CHARLOTTE_LINLIN: EffectSchema = {
   card_id: "OP03-077",
   card_name: "Charlotte Linlin",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "when_attacking_add_life",

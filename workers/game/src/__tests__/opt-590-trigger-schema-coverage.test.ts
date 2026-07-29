@@ -66,6 +66,7 @@ describe("OPT-590 canonical Trigger schema coverage", () => {
   it("reports a derived Trigger keyword without a TRIGGER block", () => {
     const syntheticManifest: CardTextManifest = {
       "TEST-FALSE-TRIGGER": {
+        category: "Character",
         hasRealEffectText: true,
         hasTriggerText: false,
       },
@@ -97,10 +98,12 @@ describe("OPT-590 canonical Trigger schema coverage", () => {
   it("reports a canonical Trigger card whose schema is missing", () => {
     const incompleteManifest: CardTextManifest = {
       "TEST-TRIGGER": {
+        category: "Character",
         hasRealEffectText: false,
         hasTriggerText: true,
       },
       "TEST-VANILLA": {
+        category: "Character",
         hasRealEffectText: false,
         hasTriggerText: false,
       },

@@ -1,8 +1,12 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { sanitizeEffectText } from "../../../shared/effect-text.js";
+
+export type CanonicalCardCategory = "Character" | "Event" | "Leader" | "Stage";
 
 interface CanonicalCardTextFacts {
+  category: CanonicalCardCategory;
   hasRealEffectText: boolean;
   hasTriggerText: boolean;
 }
@@ -11,6 +15,7 @@ type CardTextManifest = Record<string, CanonicalCardTextFacts>;
 
 interface CanonicalCardRecord {
   id: string;
+  category: unknown;
   effect?: unknown;
   trigger?: unknown;
 }
@@ -40,11 +45,22 @@ function hasRealText(value: unknown): boolean {
 export function hasLeadingTriggerTag(value: unknown): boolean {
   if (typeof value !== "string") return false;
 
-  const normalized = value.replace(/<br\s*\/?>/gi, "\n");
+  const normalized = sanitizeEffectText(value);
   return normalized.split(/\r?\n/).some((line) => {
     const leadingTagRun = line.match(/^\s*((?:\[[^\]\r\n]+\]\s*)+)/)?.[1];
     return leadingTagRun ? /\[Trigger\]/i.test(leadingTagRun) : false;
   });
+}
+
+function isCanonicalCardCategory(
+  value: unknown
+): value is CanonicalCardCategory {
+  return (
+    value === "Character" ||
+    value === "Event" ||
+    value === "Leader" ||
+    value === "Stage"
+  );
 }
 
 function buildManifest(): CardTextManifest {
@@ -59,17 +75,37 @@ function buildManifest(): CardTextManifest {
     ) as CanonicalCardRecord[];
     for (const card of cards) {
       const cardId = canonicalizeCardId(card.id);
+      if (!isCanonicalCardCategory(card.category)) {
+        throw new Error(
+          `${card.id}: unsupported canonical category ${JSON.stringify(card.category)}`
+        );
+      }
       const previous = manifest.get(cardId) ?? {
+        category: card.category,
         hasRealEffectText: false,
         hasTriggerText: false,
       };
+      if (previous.category !== card.category) {
+        throw new Error(
+          `${cardId}: canonical variants disagree on category (${previous.category} vs ${card.category})`
+        );
+      }
+      const effectText =
+        typeof card.effect === "string"
+          ? sanitizeEffectText(card.effect, `${card.id}.effect`)
+          : "";
+      const triggerText =
+        typeof card.trigger === "string"
+          ? sanitizeEffectText(card.trigger, `${card.id}.trigger`)
+          : "";
       manifest.set(cardId, {
+        category: card.category,
         hasRealEffectText:
-          previous.hasRealEffectText || hasRealText(card.effect),
+          previous.hasRealEffectText || hasRealText(effectText),
         hasTriggerText:
           previous.hasTriggerText ||
-          hasRealText(card.trigger) ||
-          hasLeadingTriggerTag(card.effect),
+          hasRealText(triggerText) ||
+          hasLeadingTriggerTag(effectText),
       });
     }
   }

@@ -2173,7 +2173,7 @@ export const OP12_060_BOEUF_BURST: EffectSchema = {
 export const OP12_061_DONQUIXOTE_ROSINANTE: EffectSchema = {
   card_id: "OP12-061",
   card_name: "Donquixote Rosinante",
-  card_type: "Character",
+  card_type: "Leader",
   effects: [
     {
       id: "OP12-061_replacement",
@@ -3580,7 +3580,7 @@ export const OP12_098_HAIR_REMOVAL_FIST: EffectSchema = {
 export const OP12_099_KALGARA: EffectSchema = {
   card_id: "OP12-099",
   card_name: "Kalgara",
-  card_type: "Leader",
+  card_type: "Character",
   effects: [
     {
       id: "OP12-099_effect_1",

@@ -2,12 +2,37 @@ import type { EffectSchema } from "./effect-types.js";
 import { derivePrintedKeywords } from "./printed-keywords.js";
 import type { CardData } from "../types.js";
 
+export type CanonicalCardCategory = "Character" | "Event" | "Leader" | "Stage";
+
 export interface CanonicalCardTextFacts {
+  category: CanonicalCardCategory;
   hasRealEffectText: boolean;
   hasTriggerText: boolean;
 }
 
 export type CardTextManifest = Record<string, CanonicalCardTextFacts>;
+
+export function findSchemaCardTypeCategoryViolations(
+  manifest: Readonly<CardTextManifest>,
+  schemas: Readonly<Record<string, EffectSchema>>
+): string[] {
+  return Object.entries(schemas)
+    .flatMap(([cardId, schema]) => {
+      const canonicalCategory = manifest[cardId]?.category;
+      if (!canonicalCategory) {
+        return [
+          `${cardId}: canonical category is missing from the card-text manifest`,
+        ];
+      }
+      if (schema.card_type !== canonicalCategory) {
+        return [
+          `${cardId}: schema card_type ${JSON.stringify(schema.card_type)} does not match canonical category ${JSON.stringify(canonicalCategory)}`,
+        ];
+      }
+      return [];
+    })
+    .sort();
+}
 
 function isDirectTriggerBlock(
   block: EffectSchema["effects"][number]
@@ -45,6 +70,7 @@ export function findDerivedTriggersWithoutSchemaBlocks(
   return [...cardIds]
     .filter((cardId) => {
       const facts = manifest[cardId] ?? {
+        category: "Character",
         hasRealEffectText: false,
         hasTriggerText: false,
       };
