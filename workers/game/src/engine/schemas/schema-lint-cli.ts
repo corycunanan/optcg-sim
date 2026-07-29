@@ -26,13 +26,9 @@ const cardTextManifest = JSON.parse(
 ) as CardTextManifest;
 
 const donIntentDeferredToOpt600 = new Set([
-  "OP02-008",
   "OP03-004",
   "OP03-025",
-  "OP03-053",
-  "OP03-090",
   "OP15-001",
-  "OP15-053",
 ]);
 
 function loadBracketedDonRequirements(): Map<string, Set<number>> {
@@ -60,30 +56,48 @@ function loadBracketedDonRequirements(): Map<string, Set<number>> {
   return requirements;
 }
 
-function containsFieldCountAtAttachedDonThreshold(
+function containsDonFieldCount(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(containsDonFieldCount);
+  }
+  if (!value || typeof value !== "object") return false;
+
+  const record = value as Record<string, unknown>;
+  if (record.type === "DON_FIELD_COUNT") return true;
+
+  return Object.values(record).some(containsDonFieldCount);
+}
+
+function hasAttachedDonEncoding(
   value: unknown,
   requirements: Set<number>,
 ): boolean {
   if (Array.isArray(value)) {
     return value.some((entry) =>
-      containsFieldCountAtAttachedDonThreshold(entry, requirements),
+      hasAttachedDonEncoding(entry, requirements),
     );
   }
   if (!value || typeof value !== "object") return false;
 
   const record = value as Record<string, unknown>;
   if (
-    record.type === "DON_FIELD_COUNT" &&
-    record.controller === "SELF" &&
+    record.type === "DON_GIVEN" &&
+    record.mode === "SPECIFIC_CARD" &&
     record.operator === ">=" &&
     typeof record.value === "number" &&
     requirements.has(record.value)
   ) {
     return true;
   }
+  if (
+    typeof record.don_requirement === "number" &&
+    requirements.has(record.don_requirement)
+  ) {
+    return true;
+  }
 
   return Object.values(record).some((entry) =>
-    containsFieldCountAtAttachedDonThreshold(entry, requirements),
+    hasAttachedDonEncoding(entry, requirements),
   );
 }
 
@@ -98,22 +112,13 @@ function findDonIntentViolations(
     const requirements = requirementsByCard.get(cardId);
     if (!requirements) continue;
 
-    for (const block of schema.effects) {
-      const effectLevelValues = [
-        block.conditions,
-        block.duration?.type === "WHILE_CONDITION"
-          ? block.duration.condition
-          : undefined,
-      ];
-      if (
-        effectLevelValues.some((value) =>
-          containsFieldCountAtAttachedDonThreshold(value, requirements),
-        )
-      ) {
-        violations.push(
-          `${cardId}/${block.id}: [DON!! xN] must use DON_GIVEN with mode SPECIFIC_CARD, not DON_FIELD_COUNT`,
-        );
-      }
+    if (
+      containsDonFieldCount(schema) &&
+      !hasAttachedDonEncoding(schema, requirements)
+    ) {
+      violations.push(
+        `${cardId}: canonical [DON!! xN] requires DON_GIVEN/SPECIFIC_CARD or trigger.don_requirement at the printed threshold`,
+      );
     }
   }
 

@@ -23,10 +23,15 @@ import { isProhibitedForCard } from "../engine/prohibitions.js";
 import { resolveEffect } from "../engine/effect-resolver/resolver.js";
 import { evaluateCondition } from "../engine/conditions.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
-import { OP02_014_WHITEY_BAY } from "../engine/schemas/op02.js";
 import {
+  OP02_008_JOZU,
+  OP02_014_WHITEY_BAY,
+} from "../engine/schemas/op02.js";
+import {
+  OP03_053_YOSAKU_AND_JOHNNY,
   OP03_078_ISSHO,
   OP03_079_VERGO,
+  OP03_090_BLUENO,
   OP03_108_CHARLOTTE_CRACKER,
 } from "../engine/schemas/op03.js";
 import {
@@ -35,6 +40,7 @@ import {
   OP04_106_CHARLOTTE_BAVAROIS,
   OP04_108_CHARLOTTE_MOSCATO,
 } from "../engine/schemas/op04.js";
+import { OP05_070_FRA_NOSUKE } from "../engine/schemas/op05.js";
 import {
   OP06_085_KUMACY,
   OP06_110_NEKOMAMUSHI,
@@ -44,6 +50,7 @@ import {
   OP13_002_PORTGAS_D_ACE,
   OP13_004_SABO,
 } from "../engine/schemas/op13.js";
+import { OP15_053_REBECCA } from "../engine/schemas/op15.js";
 import {
   CARDS,
   createBattleReadyState,
@@ -146,6 +153,10 @@ function buildGateFixture(
   cardDb.set(sourceData.id, sourceData);
   cardDb.set(targetData.id, targetData);
   cardDb.set(supportData.id, supportData);
+  cardDb.set(CARDS.LEADER.id, {
+    ...CARDS.LEADER,
+    types: ["Whitebeard Pirates"],
+  });
 
   let state = createBattleReadyState(cardDb);
   const sourceAttachedDon = Array.from(
@@ -190,6 +201,7 @@ function buildGateFixture(
 
   players[0] = {
     ...players[0],
+    deck: players[0].deck.slice(0, 20),
     life: players[0].life.slice(0, 1),
     trash: Array.from({ length: 5 }, (_, index) =>
       character(CARDS.VANILLA.id, 0, `trash-${index}`),
@@ -250,10 +262,14 @@ describe("OPT-601 — attached-DON cost auras", () => {
 
 describe("OPT-601 — attached-DON keyword grants", () => {
   const cases = [
+    ["OP02-008", "RUSH", OP02_008_JOZU, 1],
     ["OP02-014", "CAN_ATTACK_ACTIVE", OP02_014_WHITEY_BAY, 1],
+    ["OP03-090", "BLOCKER", OP03_090_BLUENO, 1],
     ["OP04-081", "CAN_ATTACK_ACTIVE", OP04_081_CAVENDISH, 1],
     ["OP04-108", "BANISH", OP04_108_CHARLOTTE_MOSCATO, 1],
+    ["OP05-070", "RUSH", OP05_070_FRA_NOSUKE, 1],
     ["OP06-110", "CAN_ATTACK_ACTIVE", OP06_110_NEKOMAMUSHI, 2],
+    ["OP15-053", "BLOCKER", OP15_053_REBECCA, 1],
   ] as const;
 
   it.each(cases)(
@@ -288,6 +304,7 @@ describe("OPT-601 — attached-DON keyword grants", () => {
 
 describe("OPT-601 — attached-DON continuous effects", () => {
   const powerCases = [
+    ["OP03-053", OP03_053_YOSAKU_AND_JOHNNY, 1, 8000],
     ["OP03-108", OP03_108_CHARLOTTE_CRACKER, 1, 7000],
     ["OP04-106", OP04_106_CHARLOTTE_BAVAROIS, 1, 7000],
   ] as const;

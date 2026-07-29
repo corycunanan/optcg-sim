@@ -1812,6 +1812,13 @@ export const OP03_053_YOSAKU_AND_JOHNNY: EffectSchema = {
     {
       id: "conditional_power_buff",
       category: "permanent",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
       modifiers: [
         {
           type: "MODIFY_POWER",
@@ -1830,12 +1837,7 @@ export const OP03_053_YOSAKU_AND_JOHNNY: EffectSchema = {
       ],
       duration: {
         type: "WHILE_CONDITION",
-        condition: {
-          all_of: [
-            { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
-            { type: "DECK_COUNT", controller: "SELF", operator: "<=", value: 20 },
-          ],
-        },
+        condition: { type: "DECK_COUNT", controller: "SELF", operator: "<=", value: 20 },
       },
     },
   ],
@@ -2986,6 +2988,13 @@ export const OP03_090_BLUENO: EffectSchema = {
     {
       id: "don_blocker",
       category: "permanent",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -3002,15 +3011,6 @@ export const OP03_090_BLUENO: EffectSchema = {
           },
         },
       ],
-      duration: {
-        type: "WHILE_CONDITION",
-        condition: {
-          type: "DON_FIELD_COUNT",
-          controller: "SELF",
-          operator: ">=",
-          value: 1,
-        },
-      },
     },
     {
       id: "on_ko_play_from_trash",

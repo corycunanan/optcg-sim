@@ -169,6 +169,13 @@ export const OP02_008_JOZU: EffectSchema = {
     {
       id: "conditional_rush",
       category: "permanent",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -190,7 +197,6 @@ export const OP02_008_JOZU: EffectSchema = {
         type: "WHILE_CONDITION",
         condition: {
           all_of: [
-            { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
             { type: "LIFE_COUNT", controller: "SELF", operator: "<=", value: 2 },
             { type: "LEADER_PROPERTY", controller: "SELF", property: { trait_contains: "Whitebeard Pirates" } },
           ],
