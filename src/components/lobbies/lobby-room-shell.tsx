@@ -310,7 +310,10 @@ export function LobbyRoomShell({
     if (!recoveryReentry) return null;
 
     return (
-      <div className="bg-background flex-1 overflow-y-auto">
+      <div
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        data-lobby-frame
+      >
         <div className="mx-auto max-w-3xl px-6 py-10">
           <div className="border-border bg-card rounded-lg border p-6">
             <p className="text-content-primary text-lg font-semibold">
@@ -330,7 +333,10 @@ export function LobbyRoomShell({
 
   if (loading && !lobby) {
     return (
-      <div className="bg-background flex-1 overflow-y-auto">
+      <div
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        data-lobby-frame
+      >
         <div className="text-content-secondary mx-auto flex max-w-7xl items-center gap-2 px-6 py-10 text-sm">
           <span className="bg-content-tertiary size-2 animate-pulse rounded-full" />
           Loading party room...
@@ -341,7 +347,10 @@ export function LobbyRoomShell({
 
   if (!lobby) {
     return (
-      <div className="bg-background flex-1 overflow-y-auto">
+      <div
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        data-lobby-frame
+      >
         <div className="mx-auto max-w-3xl px-6 py-10">
           <div className="border-border bg-card rounded-lg border p-6">
             <p className="text-content-primary text-sm font-semibold">
@@ -384,9 +393,12 @@ export function LobbyRoomShell({
 
   return (
     <TooltipProvider>
-      <div className="bg-background flex-1 overflow-y-auto">
-        <header className="border-border bg-surface-1 border-b">
-          <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+      <div
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        data-lobby-frame
+      >
+        <header className="shrink-0" data-lobby-header>
+          <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-6 py-8 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
             <div className="w-full min-w-0 lg:w-auto">
               <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
                 Game mode
@@ -396,10 +408,10 @@ export function LobbyRoomShell({
               </h1>
             </div>
 
-            <div className="flex w-full flex-wrap items-start gap-3 lg:w-auto lg:justify-end">
+            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto lg:justify-end">
               <div className="min-w-0">
                 <div
-                  className="border-border bg-surface-3 inline-flex w-fit rounded-md border p-1"
+                  className="border-border bg-surface-3 inline-flex h-12 w-fit rounded-md border p-1"
                   role="group"
                   aria-label="Game mode"
                 >
@@ -408,7 +420,7 @@ export function LobbyRoomShell({
                     onClick={() => void onModeChange("PVP")}
                     disabled={!isHost || mutating || isInGame}
                     className={cn(
-                      "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                      "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
                       lobby.mode === "PVP"
                         ? "bg-accent text-accent-foreground disabled:opacity-100"
                         : "text-content-secondary hover:text-content-primary disabled:opacity-50"
@@ -425,7 +437,7 @@ export function LobbyRoomShell({
                         : undefined)
                     }
                   >
-                    <span>
+                    <span className="h-full">
                       <button
                         type="button"
                         onClick={() => void onModeChange("SOLITAIRE")}
@@ -436,7 +448,7 @@ export function LobbyRoomShell({
                           Boolean(solitaireBlockedReason)
                         }
                         className={cn(
-                          "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                          "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
                           lobby.mode === "SOLITAIRE"
                             ? "bg-accent text-accent-foreground disabled:opacity-100"
                             : "text-content-secondary hover:text-content-primary disabled:opacity-50"
@@ -487,7 +499,10 @@ export function LobbyRoomShell({
           </div>
         </header>
 
-        <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+        <main
+          className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-6 py-8 xl:[@media(min-height:50rem)]:min-h-0 xl:[@media(min-height:50rem)]:overflow-hidden"
+          data-lobby-content
+        >
           {joinError && (
             <div
               className="border-error/30 bg-error-soft text-error rounded-lg border p-4 text-sm"
@@ -506,7 +521,7 @@ export function LobbyRoomShell({
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid flex-1 gap-6 lg:grid-cols-2 xl:[@media(min-height:50rem)]:min-h-0">
             <LobbySeatCard
               role="Host"
               player={
@@ -643,7 +658,10 @@ export function LobbyRoomShell({
           )}
         </main>
 
-        <div className="border-border bg-surface-1 sticky bottom-0 z-20 border-t shadow-[var(--shadow-lg)]">
+        <div
+          className="border-border bg-surface-1 z-20 shrink-0 border-t shadow-[var(--shadow-lg)]"
+          data-lobby-action-bar
+        >
           <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
             <div className="flex items-center gap-3">
               {!isGuest && (
@@ -755,8 +773,11 @@ function SpectatorRoom({
     Boolean(lobby.guest) && lobby.guest?.user.id !== lobby.hostUserId;
 
   return (
-    <div className="bg-background flex-1 overflow-y-auto">
-      <header className="border-border bg-surface-1 border-b">
+    <div
+      className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+      data-lobby-frame
+    >
+      <header className="shrink-0" data-lobby-header>
         <div className="mx-auto max-w-7xl px-6 py-8">
           <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
             Watching party
@@ -768,7 +789,10 @@ function SpectatorRoom({
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
+      <main
+        className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-6 py-8 xl:[@media(min-height:50rem)]:min-h-0 xl:[@media(min-height:50rem)]:overflow-hidden"
+        data-lobby-content
+      >
         <div className="grid gap-6 lg:grid-cols-2">
           <SpectatorSeat
             role="Host"
@@ -802,7 +826,10 @@ function SpectatorRoom({
         </div>
       </main>
 
-      <div className="border-border bg-surface-1 sticky bottom-0 z-20 border-t shadow-[var(--shadow-lg)]">
+      <div
+        className="border-border bg-surface-1 z-20 shrink-0 border-t shadow-[var(--shadow-lg)]"
+        data-lobby-action-bar
+      >
         <div className="mx-auto flex max-w-7xl flex-col justify-end gap-3 px-6 py-4 sm:flex-row">
           <Button
             variant="secondary"
@@ -985,7 +1012,7 @@ function PartyCode({
     <button
       type="button"
       onClick={onCopy}
-      className="border-border bg-surface-3 hover:border-border-strong focus-visible:outline-border-focus flex min-h-10 items-center gap-2 rounded-md border p-1 pl-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="border-border bg-surface-3 hover:border-border-strong focus-visible:outline-border-focus flex h-12 items-center gap-2 rounded-md border p-1 pl-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
       aria-label={copied ? "Party link copied" : "Copy party link"}
     >
       <span className="text-content-primary font-mono text-sm font-semibold tracking-widest">

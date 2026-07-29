@@ -71,7 +71,7 @@ export function LobbySeatCard({
   return (
     <section
       className={cn(
-        "border-border bg-surface-1 relative flex min-h-96 flex-col overflow-visible rounded-lg border",
+        "border-border bg-surface-1 relative flex h-full min-h-0 flex-col overflow-visible rounded-lg border",
         disabled && "pointer-events-none opacity-50"
       )}
       aria-label={`${role} seat — ${playerName}`}
@@ -201,7 +201,7 @@ function SelectedDeck({
   const hoveredImage = hoveredCard?.imageUrl ?? null;
 
   return (
-    <div className="relative grid flex-1 gap-5 p-5 sm:grid-cols-[auto_1fr]">
+    <div className="relative grid min-h-0 flex-1 gap-5 p-5 sm:grid-cols-[auto_1fr]">
       <div className="flex flex-col gap-3">
         <button
           type="button"
@@ -234,7 +234,7 @@ function SelectedDeck({
         </div>
       </div>
 
-      <div className="min-w-0">
+      <div className="flex min-h-0 min-w-0 flex-col">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
@@ -247,7 +247,7 @@ function SelectedDeck({
           <Layers3 className="text-content-tertiary size-5 shrink-0" />
         </div>
 
-        <div className="border-border bg-surface-3 h-64 overflow-y-auto rounded-md border">
+        <div className="border-border bg-surface-3 min-h-0 flex-1 overflow-y-auto rounded-md border">
           {groupedCards.length > 0 ? (
             groupedCards.map((group) => (
               <div key={group.key}>
