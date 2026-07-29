@@ -386,64 +386,82 @@ export function LobbyRoomShell({
     <TooltipProvider>
       <div className="bg-background flex-1 overflow-y-auto">
         <header className="border-border bg-surface-1 border-b">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
-            <div className="shrink-0">
+          <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+            <div className="w-full min-w-0 lg:w-auto">
               <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
                 Game mode
               </p>
-              <h1 className="font-display text-content-primary mt-1 text-4xl uppercase">
+              <h1 className="font-display text-content-primary mt-1 truncate text-4xl uppercase">
                 {lobby.format}
               </h1>
             </div>
 
-            <div className="flex items-center justify-end gap-3">
-              <div
-                className="border-border bg-surface-nav inline-flex w-fit rounded-md border p-1"
-                role="group"
-                aria-label="Game mode"
-              >
-                <button
-                  type="button"
-                  onClick={() => void onModeChange("PVP")}
-                  disabled={!isHost || mutating || isInGame}
-                  className={cn(
-                    "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                    lobby.mode === "PVP"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-content-secondary hover:text-content-primary"
-                  )}
-                  aria-pressed={lobby.mode === "PVP"}
+            <div className="flex w-full flex-wrap items-start gap-3 lg:w-auto lg:justify-end">
+              <div className="min-w-0">
+                <div
+                  className="border-border bg-surface-3 inline-flex w-fit rounded-md border p-1"
+                  role="group"
+                  aria-label="Game mode"
                 >
-                  Versus
-                </button>
-                <Tooltip
-                  content={
-                    solitaireBlockedReason ??
-                    (!isHost ? "Only the host can change game mode" : undefined)
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      onClick={() => void onModeChange("SOLITAIRE")}
-                      disabled={
-                        !isHost ||
-                        mutating ||
-                        isInGame ||
-                        Boolean(solitaireBlockedReason)
-                      }
-                      className={cn(
-                        "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                        lobby.mode === "SOLITAIRE"
-                          ? "bg-accent text-accent-foreground"
-                          : "text-content-secondary hover:text-content-primary"
-                      )}
-                      aria-pressed={lobby.mode === "SOLITAIRE"}
-                    >
-                      Solitaire
-                    </button>
-                  </span>
-                </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => void onModeChange("PVP")}
+                    disabled={!isHost || mutating || isInGame}
+                    className={cn(
+                      "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                      lobby.mode === "PVP"
+                        ? "bg-accent text-accent-foreground disabled:opacity-100"
+                        : "text-content-secondary hover:text-content-primary disabled:opacity-50"
+                    )}
+                    aria-pressed={lobby.mode === "PVP"}
+                  >
+                    Versus
+                  </button>
+                  <Tooltip
+                    content={
+                      solitaireBlockedReason ??
+                      (!isHost
+                        ? "Only the host can change game mode"
+                        : undefined)
+                    }
+                  >
+                    <span>
+                      <button
+                        type="button"
+                        onClick={() => void onModeChange("SOLITAIRE")}
+                        disabled={
+                          !isHost ||
+                          mutating ||
+                          isInGame ||
+                          Boolean(solitaireBlockedReason)
+                        }
+                        className={cn(
+                          "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                          lobby.mode === "SOLITAIRE"
+                            ? "bg-accent text-accent-foreground disabled:opacity-100"
+                            : "text-content-secondary hover:text-content-primary disabled:opacity-50"
+                        )}
+                        aria-pressed={lobby.mode === "SOLITAIRE"}
+                        aria-describedby={
+                          solitaireBlockedReason
+                            ? "solitaire-mode-blocked-reason"
+                            : undefined
+                        }
+                      >
+                        Solitaire
+                      </button>
+                    </span>
+                  </Tooltip>
+                </div>
+
+                {solitaireBlockedReason && (
+                  <p
+                    id="solitaire-mode-blocked-reason"
+                    className="text-content-tertiary mt-1 max-w-xs text-xs"
+                  >
+                    {solitaireBlockedReason}
+                  </p>
+                )}
               </div>
 
               <PartyCode
@@ -465,10 +483,6 @@ export function LobbyRoomShell({
                   />
                 </span>
               </Tooltip>
-
-              {solitaireBlockedReason && (
-                <p className="sr-only">{solitaireBlockedReason}</p>
-              )}
             </div>
           </div>
         </header>
