@@ -226,7 +226,13 @@ describe("LobbyRoomShell redesign scenarios", () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
         ? { data: [] }
-        : { data: lobbyState({ status: "WAITING", guest: null }) }
+        : {
+            data: lobbyState({
+              status: "WAITING",
+              format: "Unlimited",
+              guest: null,
+            }),
+          }
     );
 
     await act(async () => {
@@ -237,11 +243,36 @@ describe("LobbyRoomShell redesign scenarios", () => {
       await Promise.resolve();
     });
 
-    expect(renderedText()).toContain("Game mode");
-    expect(renderedText()).toContain("Versus");
-    expect(renderedText()).toContain("Party code");
-    expect(renderedText()).toContain("ABCD");
-    expect(renderedText()).toContain("Join lobby");
+    const text = renderedText();
+    expect(text).toContain("Game mode");
+    expect(text).toContain("Unlimited");
+    expect(text).not.toContain("strawhat's party");
+    expect(text).not.toContain("Party code");
+    expect(text).toContain("ABCD");
+    expect(text).toContain("Join lobby");
+
+    const modeButtons = renderer!.root
+      .findAllByType("button")
+      .filter((button) =>
+        button.children.some(
+          (child) => child === "Versus" || child === "Solitaire"
+        )
+      );
+    expect(modeButtons).toHaveLength(2);
+    expect(modeButtons[0]?.props["aria-pressed"]).toBe(true);
+    expect(modeButtons[0]?.props.className).toContain(
+      "bg-accent text-accent-foreground"
+    );
+    expect(modeButtons[1]?.props["aria-pressed"]).toBe(false);
+    expect(modeButtons.map((button) => button.children)).toEqual([
+      ["Versus"],
+      ["Solitaire"],
+    ]);
+
+    const joinButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Join lobby"));
+    expect(joinButton?.props.variant).toBe("outline");
     expect(renderedText()).toContain("Open seat");
     expect(renderedText()).toContain("Waiting for a challenger");
     expect(renderedText()).toContain("You need an opponent first");
