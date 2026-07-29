@@ -1,191 +1,298 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FriendEntry, FriendRequestEntry } from "./apply-friend-event";
+// @vitest-environment jsdom
 
-type CapturedCallback = (...args: never[]) => unknown;
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import type { RealtimeServerEvent } from "@/types/realtime";
+import type { FriendEntry } from "./apply-friend-event";
+
+type EventType = RealtimeServerEvent["type"];
+type EventFor<T extends EventType> = Extract<
+  RealtimeServerEvent,
+  { type: T }
+>;
+type EventHandler<T extends EventType = EventType> = (
+  event: EventFor<T>
+) => void;
+
+const nami = {
+  id: "friend-1",
+  username: "nami",
+  name: "Nami",
+  image: null,
+};
+const namiFriend: FriendEntry = {
+  friendshipId: "friendship-1",
+  user: nami,
+};
 
 const mocks = vi.hoisted(() => ({
   apiDelete: vi.fn(),
   apiGet: vi.fn(),
   apiPost: vi.fn(),
-  apiPut: vi.fn(),
-  callbacks: [] as CapturedCallback[],
-  setterCalls: [] as unknown[][],
-  setterIndex: 0,
+  handlers: new Map<string, (event: never) => void>(),
+  presence: {} as Record<
+    string,
+    { online: boolean; lastSeen: string | null }
+  >,
+  trackPresence: vi.fn(),
 }));
-
-vi.mock("react", async (importActual) => {
-  const actual = await importActual<typeof import("react")>();
-  return {
-    ...actual,
-    useCallback: <T,>(callback: T) => {
-      mocks.callbacks.push(callback as CapturedCallback);
-      return callback;
-    },
-    useEffect: () => undefined,
-    useRef: <T,>(initial: T) => ({ current: initial }),
-    useState: <T,>(initial: T) => {
-      const index = mocks.setterIndex++;
-      while (mocks.setterCalls.length <= index) mocks.setterCalls.push([]);
-      return [
-        initial,
-        (next: T | ((previous: T) => T)) => {
-          mocks.setterCalls[index]!.push(next);
-        },
-      ];
-    },
-  };
-});
 
 vi.mock("next-auth/react", () => ({
   signOut: vi.fn(),
-  useSession: () => ({ data: { user: { name: "Tester" } } }),
+  useSession: () => ({
+    data: {
+      user: {
+        id: "current-user",
+        username: "tester",
+        name: "Tester",
+        email: "tester@example.com",
+      },
+    },
+  }),
 }));
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn() },
+}));
 
 vi.mock("@/lib/api-client", () => ({
   apiDelete: (...args: unknown[]) => mocks.apiDelete(...args),
   apiGet: (...args: unknown[]) => mocks.apiGet(...args),
   apiPost: (...args: unknown[]) => mocks.apiPost(...args),
-  apiPut: (...args: unknown[]) => mocks.apiPut(...args),
 }));
 
 vi.mock("@/components/realtime/user-channel-provider", () => ({
   useUserChannelEvents: () => ({
-    subscribe: vi.fn(() => vi.fn()),
+    subscribe: (type: string, handler: (event: never) => void) => {
+      mocks.handlers.set(type, handler);
+      return () => mocks.handlers.delete(type);
+    },
     connectionStatus: "connected",
-    presence: {},
-    trackPresence: vi.fn(),
+    presence: mocks.presence,
+    trackPresence: mocks.trackPresence,
   }),
+}));
+
+vi.mock("./user-avatar", () => ({
+  UserAvatar: ({ user }: { user: { username: string | null } }) => (
+    <span aria-hidden="true">{user.username?.slice(0, 1) ?? "?"}</span>
+  ),
 }));
 
 import { SocialSidebar } from "./social-sidebar";
 
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise;
-  });
-  return { promise, resolve };
-}
-
-function applyStateUpdates<T>(initial: T, updates: unknown[]): T {
-  return updates.reduce<T>((state, update) => {
-    if (typeof update === "function") {
-      return (update as (previous: T) => T)(state);
+function renderSidebar(
+  onOpenChat = vi.fn(),
+  friends: FriendEntry[] = [namiFriend]
+) {
+  mocks.apiGet.mockImplementation((url: string) => {
+    if (url === "/api/friends") return Promise.resolve({ data: friends });
+    if (url.startsWith("/api/users/search")) {
+      return Promise.resolve({ data: [nami] });
     }
-    return update as T;
-  }, initial);
+    if (url === "/api/friends/requests") {
+      return Promise.resolve({
+        data: {
+          incoming: [
+            {
+              id: "request-1",
+              fromUser: {
+                id: "requester-1",
+                username: "robin",
+                name: "Robin",
+                image: null,
+              },
+            },
+          ],
+        },
+      });
+    }
+    throw new Error(`Unexpected GET ${url}`);
+  });
+
+  const view = render(
+    <SidebarProvider>
+      <SocialSidebar onOpenChat={onOpenChat} />
+    </SidebarProvider>
+  );
+  return { ...view, onOpenChat };
 }
 
-function captureSidebarCallbacks() {
-  SocialSidebar({ onOpenChat: vi.fn() });
-  return {
-    fetchFriendsData: mocks.callbacks[0] as () => Promise<void>,
-    removeFriend: mocks.callbacks[2] as (userId: string) => Promise<void>,
-    handleFriendRequest: mocks.callbacks[4] as (
-      requestId: string,
-      action: "accept" | "decline"
-    ) => Promise<void>,
-  };
+function emit<T extends EventType>(type: T, event: EventFor<T>) {
+  const handler = mocks.handlers.get(type) as EventHandler<T> | undefined;
+  expect(handler, `subscription for ${type}`).toBeDefined();
+  act(() => handler?.(event));
 }
 
 beforeEach(() => {
-  mocks.apiDelete.mockReset();
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: 1024,
+  });
+  mocks.apiDelete.mockReset().mockResolvedValue({});
   mocks.apiGet.mockReset();
-  mocks.apiPost.mockReset();
-  mocks.apiPut.mockReset();
-  mocks.callbacks = [];
-  mocks.setterCalls = [];
-  mocks.setterIndex = 0;
+  mocks.apiPost.mockReset().mockResolvedValue({});
+  mocks.handlers.clear();
+  mocks.presence = {};
+  mocks.trackPresence.mockReset();
 });
 
-describe("SocialSidebar fetch epochs", () => {
-  it("does not restore a removed friend from a stale in-flight fetch", async () => {
-    const friend: FriendEntry = {
-      friendshipId: "friendship-1",
-      user: {
-        id: "friend-1",
-        username: "nami",
-        name: "Nami",
-        image: null,
-      },
-    };
-    const staleFriends = deferred<{ data: FriendEntry[] }>();
-    const staleRequests = deferred<{
-      data: { incoming: FriendRequestEntry[] };
-    }>();
-    let friendsFetches = 0;
-    let requestFetches = 0;
+afterEach(() => cleanup());
 
-    mocks.apiGet.mockImplementation((url: string) => {
-      if (url === "/api/friends") {
-        friendsFetches += 1;
-        return friendsFetches === 1
-          ? staleFriends.promise
-          : Promise.resolve({ data: [] });
-      }
-      requestFetches += 1;
-      return requestFetches === 1
-        ? staleRequests.promise
-        : Promise.resolve({ data: { incoming: [] } });
-    });
-    mocks.apiDelete.mockResolvedValue({});
+describe("SocialSidebar", () => {
+  it("does not fetch or render incoming friend requests", async () => {
+    renderSidebar();
 
-    const { fetchFriendsData, removeFriend } = captureSidebarCallbacks();
-    const staleFetch = fetchFriendsData();
+    await screen.findByRole("button", { name: "Chat with nami" });
 
-    await removeFriend(friend.user.id);
-    await Promise.resolve();
-    staleFriends.resolve({ data: [friend] });
-    staleRequests.resolve({ data: { incoming: [] } });
-    await staleFetch;
-
-    expect(applyStateUpdates([friend], mocks.setterCalls[0] ?? [])).toEqual([]);
+    expect(
+      mocks.apiGet.mock.calls.some(([url]) => url === "/api/friends/requests")
+    ).toBe(false);
+    expect(screen.queryByText(/^Requests/)).toBeNull();
+    expect(screen.queryByText("robin")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Accept friend request" })
+    ).toBeNull();
   });
 
-  it("does not restore a declined request from a stale in-flight fetch", async () => {
-    const request: FriendRequestEntry = {
-      id: "request-1",
-      fromUser: {
-        id: "friend-1",
-        username: "nami",
-        name: "Nami",
-        image: null,
-      },
-    };
-    const staleFriends = deferred<{ data: FriendEntry[] }>();
-    const staleRequests = deferred<{
-      data: { incoming: FriendRequestEntry[] };
-    }>();
-    let friendsFetches = 0;
-    let requestFetches = 0;
-
-    mocks.apiGet.mockImplementation((url: string) => {
-      if (url === "/api/friends") {
-        friendsFetches += 1;
-        return friendsFetches === 1
-          ? staleFriends.promise
-          : Promise.resolve({ data: [] });
-      }
-      requestFetches += 1;
-      return requestFetches === 1
-        ? staleRequests.promise
-        : Promise.resolve({ data: { incoming: [] } });
-    });
-    mocks.apiPut.mockResolvedValue({});
-
-    const { fetchFriendsData, handleFriendRequest } = captureSidebarCallbacks();
-    const staleFetch = fetchFriendsData();
-
-    await handleFriendRequest(request.id, "decline");
-    await Promise.resolve();
-    staleFriends.resolve({ data: [] });
-    staleRequests.resolve({ data: { incoming: [request] } });
-    await staleFetch;
-
-    expect(applyStateUpdates([request], mocks.setterCalls[1] ?? [])).toEqual(
-      []
+  it("adds an accepted request to the friends list in realtime", async () => {
+    renderSidebar(vi.fn(), []);
+    await waitFor(() =>
+      expect(mocks.handlers.has("friend:request_accepted")).toBe(true)
     );
+
+    emit("friend:request_accepted", {
+      type: "friend:request_accepted",
+      request: {
+        id: "request-1",
+        fromUserId: "current-user",
+        toUserId: nami.id,
+        createdAt: "2026-07-28T00:00:00.000Z",
+        fromUser: {
+          id: "current-user",
+          username: "tester",
+          name: "Tester",
+          image: null,
+        },
+      },
+      friendship: {
+        id: namiFriend.friendshipId,
+        createdAt: "2026-07-28T00:00:01.000Z",
+        user: nami,
+      },
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "Chat with nami" })
+    ).toBeDefined();
+  });
+
+  it("keeps presence-driven online and offline lists current", async () => {
+    const view = renderSidebar();
+    await screen.findByRole("button", { name: "Chat with nami" });
+    expect(screen.getByText("Offline (1)")).toBeDefined();
+
+    mocks.presence = {
+      [nami.id]: { online: true, lastSeen: null },
+    };
+    view.rerender(
+      <SidebarProvider>
+        <SocialSidebar onOpenChat={view.onOpenChat} />
+      </SidebarProvider>
+    );
+
+    expect(screen.getByText("Online (1)")).toBeDefined();
+    expect(screen.getByText("Offline (0)")).toBeDefined();
+    const onlineGroup = screen.getByText("Online (1)").closest(
+      '[data-sidebar="group"]'
+    );
+    expect(onlineGroup).not.toBeNull();
+    expect(
+      within(onlineGroup as HTMLElement).getByRole("button", {
+        name: "Chat with nami",
+      })
+    ).toBeDefined();
+  });
+
+  it("opens chat from a friend row", async () => {
+    const user = userEvent.setup();
+    const onOpenChat = vi.fn();
+    renderSidebar(onOpenChat);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Chat with nami" })
+    );
+
+    expect(onOpenChat).toHaveBeenCalledWith(nami);
+  });
+
+  it("shows Request sent in the add-friend flow", async () => {
+    const user = userEvent.setup();
+    renderSidebar(vi.fn(), []);
+    await screen.findByText("Add friends to start a conversation.");
+
+    await user.click(screen.getByRole("button", { name: "Add friend" }));
+    const search = await screen.findByPlaceholderText(
+      "Search 3+ username characters..."
+    );
+    await user.type(search, "nam");
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Send friend request to nami",
+      })
+    );
+
+    await waitFor(() =>
+      expect(mocks.apiPost).toHaveBeenCalledWith("/api/friends/requests", {
+        toUserId: nami.id,
+      })
+    );
+    expect(await screen.findByText("Request sent")).toBeDefined();
+  });
+
+  it("keeps declined events subscribed to clear outgoing Request sent state", async () => {
+    const user = userEvent.setup();
+    renderSidebar(vi.fn(), []);
+    await user.click(screen.getByRole("button", { name: "Add friend" }));
+    await user.type(
+      await screen.findByPlaceholderText("Search 3+ username characters..."),
+      "nam"
+    );
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Send friend request to nami",
+      })
+    );
+    await screen.findByText("Request sent");
+
+    emit("friend:request_declined", {
+      type: "friend:request_declined",
+      requestId: "request-1",
+      toUserId: nami.id,
+    });
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Send friend request to nami",
+      })
+    ).toBeDefined();
+    expect(screen.queryByText("Request sent")).toBeNull();
   });
 });
