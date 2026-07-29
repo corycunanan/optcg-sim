@@ -13,6 +13,7 @@ const notificationFindFirstMock = vi.fn();
 const notificationCountMock = vi.fn();
 const transactionMock = vi.fn();
 const notifyUserMock = vi.fn();
+const pruneNotificationsMock = vi.fn();
 
 vi.mock("next/server", async (importActual) => {
   const actual = await importActual<typeof import("next/server")>();
@@ -48,6 +49,13 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/realtime/fan-out", () => ({
   notifyUser: (...args: unknown[]) => notifyUserMock(...args),
 }));
+vi.mock("@/lib/notifications", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/notifications")>();
+  return {
+    ...actual,
+    pruneNotifications: (...args: unknown[]) => pruneNotificationsMock(...args),
+  };
+});
 
 const { PUT } = await import("./route");
 
@@ -97,6 +105,7 @@ beforeEach(() => {
   notificationCountMock.mockReset();
   transactionMock.mockReset();
   notifyUserMock.mockReset();
+  pruneNotificationsMock.mockReset();
 
   authMock.mockResolvedValue({
     user: {
@@ -163,6 +172,7 @@ beforeEach(() => {
     });
   });
   notifyUserMock.mockResolvedValue(undefined);
+  pruneNotificationsMock.mockResolvedValue(undefined);
 });
 
 describe("PUT /api/friends/requests/[id] — accept", () => {
@@ -176,6 +186,7 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
 
     expect(res.status).toBe(200);
     expect(rateLimitMock).not.toHaveBeenCalled();
+    expect(pruneNotificationsMock).not.toHaveBeenCalled();
   });
 
   it("notifies the original sender with friend:request_accepted", async () => {
@@ -222,6 +233,7 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
       },
       data: { status: "ACCEPTED" },
     });
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-accepter");
   });
 
   it("does not fan out when the request is not found", async () => {
@@ -295,6 +307,7 @@ describe("PUT /api/friends/requests/[id] — accept", () => {
       "user-accepter",
       resolvedNotificationEvent("ACCEPTED")
     );
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-accepter");
   });
 });
 
@@ -332,16 +345,21 @@ describe("PUT /api/friends/requests/[id] — decline", () => {
       },
       data: { status: "DECLINED" },
     });
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-accepter");
   });
 
-  it("keeps the decline committed when best-effort fan-out fails", async () => {
+  it("keeps the decline committed when best-effort background work fails", async () => {
     notifyUserMock.mockRejectedValue(new Error("realtime unavailable"));
+    pruneNotificationsMock.mockRejectedValue(
+      new Error("retention unavailable")
+    );
     const { request, params } = buildRequest({ action: "decline" });
 
     const res = await PUT(request, { params });
 
     expect(res.status).toBe(200);
     expect(notificationUpdateManyMock).toHaveBeenCalledTimes(1);
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-accepter");
   });
 
   it("keeps a legacy request resolvable when its notification row is missing", async () => {

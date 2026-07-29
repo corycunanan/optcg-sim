@@ -3,11 +3,6 @@ import { prisma } from "@/lib/db";
 import { notificationEventInclude } from "@/lib/realtime/serialize-notification";
 
 export const MAX_NOTIFICATIONS_PER_USER = 100;
-const RETENTION_PRUNE_BATCH_SIZE = 25;
-const RESOLVED_NOTIFICATION_STATUSES = [
-  "ACCEPTED",
-  "DECLINED",
-] satisfies NotificationStatus[];
 
 type FriendRequestNotificationInput = {
   requestId: string;
@@ -37,29 +32,74 @@ export async function createFriendRequestNotification(
 }
 
 /**
- * Best-effort, bounded retention after the durable notification commits.
- * PENDING, READ, and DISMISSED friend-request notifications may still point at
- * a live request, so only terminal outcomes are eligible for pruning.
+ * Best-effort retention after the triggering mutation commits.
+ *
+ * The inbox retains the newest MAX_NOTIFICATIONS_PER_USER rows that are not
+ * backed by a live friend request. Live request notifications are exempt
+ * regardless of notification status, so reading or dismissing one cannot
+ * orphan the still-actionable request.
  */
-export async function pruneResolvedNotifications(userId: string) {
+export async function pruneNotifications(userId: string) {
   try {
+    const liveRequests = await prisma.friendRequest.findMany({
+      where: { toUserId: userId, status: "PENDING" },
+      select: { id: true },
+    });
+    const liveRequestIds = liveRequests.map(({ id }) => id);
+    const isNotLive: Prisma.NotificationWhereInput[] = [
+      { type: { not: "FRIEND_REQUEST" } },
+      { referenceId: null },
+      { referenceId: { notIn: liveRequestIds } },
+    ];
+
     const overflow = await prisma.notification.findMany({
       where: {
         userId,
-        status: { in: RESOLVED_NOTIFICATION_STATUSES },
+        OR: isNotLive,
       },
-      select: { id: true },
+      select: { id: true, type: true, referenceId: true },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: MAX_NOTIFICATIONS_PER_USER,
-      take: RETENTION_PRUNE_BATCH_SIZE,
     });
 
     if (overflow.length > 0) {
+      // Re-check candidate references immediately before deletion. Request
+      // creation and notification creation commit atomically, and request IDs
+      // are immutable, so a row absent from this second live set cannot become
+      // actionable after this point through an application path.
+      const candidateRequestIds = overflow.flatMap((notification) =>
+        notification.type === "FRIEND_REQUEST" && notification.referenceId
+          ? [notification.referenceId]
+          : []
+      );
+      const stillLiveRequests =
+        candidateRequestIds.length === 0
+          ? []
+          : await prisma.friendRequest.findMany({
+              where: {
+                id: { in: candidateRequestIds },
+                toUserId: userId,
+                status: "PENDING",
+              },
+              select: { id: true },
+            });
+      const stillLiveRequestIds = new Set(
+        stillLiveRequests.map(({ id }) => id)
+      );
+      const prunableIds = overflow.flatMap((notification) =>
+        notification.type === "FRIEND_REQUEST" &&
+        notification.referenceId &&
+        stillLiveRequestIds.has(notification.referenceId)
+          ? []
+          : [notification.id]
+      );
+
+      if (prunableIds.length === 0) return;
+
       await prisma.notification.deleteMany({
         where: {
           userId,
-          status: { in: RESOLVED_NOTIFICATION_STATUSES },
-          id: { in: overflow.map(({ id }) => id) },
+          id: { in: prunableIds },
         },
       });
     }

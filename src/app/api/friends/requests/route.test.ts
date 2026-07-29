@@ -7,6 +7,7 @@ const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 const userFindUniqueMock = vi.fn();
 const friendshipFindFirstMock = vi.fn();
 const friendRequestFindFirstMock = vi.fn();
+const friendRequestFindManyMock = vi.fn();
 const friendRequestCreateMock = vi.fn();
 const notificationCreateMock = vi.fn();
 const notificationCountMock = vi.fn();
@@ -35,6 +36,7 @@ vi.mock("@/lib/db", () => ({
     },
     friendRequest: {
       findFirst: (...args: unknown[]) => friendRequestFindFirstMock(...args),
+      findMany: (...args: unknown[]) => friendRequestFindManyMock(...args),
     },
     notification: {
       findMany: (...args: unknown[]) => notificationFindManyMock(...args),
@@ -73,6 +75,7 @@ beforeEach(() => {
   userFindUniqueMock.mockReset();
   friendshipFindFirstMock.mockReset();
   friendRequestFindFirstMock.mockReset();
+  friendRequestFindManyMock.mockReset();
   friendRequestCreateMock.mockReset();
   notificationCreateMock.mockReset();
   notificationCountMock.mockReset();
@@ -86,6 +89,7 @@ beforeEach(() => {
   userFindUniqueMock.mockResolvedValue({ id: "user-recipient" });
   friendshipFindFirstMock.mockResolvedValue(null);
   friendRequestFindFirstMock.mockResolvedValue(null);
+  friendRequestFindManyMock.mockResolvedValue([]);
   friendRequestCreateMock.mockResolvedValue({
     id: "req-1",
     fromUserId: "user-sender",
@@ -160,10 +164,18 @@ describe("POST /api/friends/requests", () => {
     });
   });
 
-  it("prunes only a bounded batch of resolved rows after the request commits", async () => {
+  it("prunes the full non-live overflow after the request commits", async () => {
     notificationFindManyMock.mockResolvedValueOnce([
-      { id: "notification-old-1" },
-      { id: "notification-old-2" },
+      {
+        id: "notification-old-1",
+        type: "FRIEND_REQUEST",
+        referenceId: "request-old-1",
+      },
+      {
+        id: "notification-old-2",
+        type: "FRIEND_REQUEST",
+        referenceId: "request-old-2",
+      },
     ]);
 
     const res = await POST(buildRequest());
@@ -176,17 +188,19 @@ describe("POST /api/friends/requests", () => {
     expect(notificationFindManyMock).toHaveBeenCalledWith({
       where: {
         userId: "user-recipient",
-        status: { in: ["ACCEPTED", "DECLINED"] },
+        OR: [
+          { type: { not: "FRIEND_REQUEST" } },
+          { referenceId: null },
+          { referenceId: { notIn: [] } },
+        ],
       },
-      select: { id: true },
+      select: { id: true, type: true, referenceId: true },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: 100,
-      take: 25,
     });
     expect(notificationDeleteManyMock).toHaveBeenCalledWith({
       where: {
         userId: "user-recipient",
-        status: { in: ["ACCEPTED", "DECLINED"] },
         id: { in: ["notification-old-1", "notification-old-2"] },
       },
     });
