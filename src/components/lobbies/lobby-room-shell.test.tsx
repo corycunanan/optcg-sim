@@ -280,6 +280,44 @@ describe("LobbyRoomShell redesign scenarios", () => {
       .find((button) => button.children.includes("Join lobby"));
     expect(joinButton?.props.variant).toBe("outline");
 
+    const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
+    expect(frame.props.className).toContain("overflow-y-auto");
+    expect(frame.props.className).toContain(
+      "xl:[@media(min-height:50rem)]:overflow-hidden"
+    );
+
+    const pageHeader = renderer!.root.findByProps({
+      "data-lobby-header": true,
+    });
+    expect(pageHeader.props.className).not.toContain("bg-surface-1");
+    expect(pageHeader.props.className).not.toContain("border-b");
+
+    const pageContent = renderer!.root.findByProps({
+      "data-lobby-content": true,
+    });
+    expect(pageContent.props.className).toContain("flex-1");
+    expect(pageContent.props.className).toContain(
+      "xl:[@media(min-height:50rem)]:min-h-0"
+    );
+
+    const actionBar = renderer!.root.findByProps({
+      "data-lobby-action-bar": true,
+    });
+    expect(actionBar.props.className).toContain("shrink-0");
+    expect(actionBar.props.className).toContain("sticky");
+    expect(actionBar.props.className).toContain("bottom-0");
+
+    const modeControl = renderer!.root.findByProps({
+      role: "group",
+      "aria-label": "Game mode",
+    });
+    const partyCodeControl = renderer!.root.findByProps({
+      "aria-label": "Copy party link",
+    });
+    for (const control of [modeControl, partyCodeControl, joinButton]) {
+      expect(control?.props.className).toContain("h-12");
+    }
+
     const headerLayout = renderer!.root.find(
       (node) =>
         typeof node.props.className === "string" &&
@@ -710,6 +748,18 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Deck list");
     expect(renderedText()).toContain("Characters");
     expect(renderedText()).toContain("Everything is set");
+    const deckLists = renderer!.root.findAll(
+      (node) =>
+        typeof node.props.className === "string" &&
+        node.props.className.includes("overflow-y-auto") &&
+        node.props.className.includes("bg-surface-3")
+    );
+    expect(deckLists).toHaveLength(2);
+    for (const deckList of deckLists) {
+      expect(deckList.props.className).toContain("min-h-0");
+      expect(deckList.props.className).toContain("flex-1");
+      expect(deckList.props.className).not.toContain("h-64");
+    }
     expect(
       mocks.apiGet.mock.calls.some(
         ([url]) => typeof url === "string" && url.startsWith("/api/decks/"),
@@ -906,6 +956,19 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(text).not.toContain("Invite");
     expect(text).not.toContain("Solitaire");
     expect(text).not.toContain("Spectate Match");
+    const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
+    expect(frame.props.className).toContain(
+      "xl:[@media(min-height:50rem)]:overflow-hidden"
+    );
+    expect(
+      renderer!.root.findByProps({ "data-lobby-header": true }).props.className
+    ).not.toContain("border-b");
+    const actionBar = renderer!.root.findByProps({
+      "data-lobby-action-bar": true,
+    });
+    expect(actionBar.props.className).toContain("shrink-0");
+    expect(actionBar.props.className).toContain("sticky");
+    expect(actionBar.props.className).toContain("bottom-0");
     expect(
       renderer!.root.findAllByType("button").map((button) => button.children)
     ).toEqual([["Stop spectating"]]);
