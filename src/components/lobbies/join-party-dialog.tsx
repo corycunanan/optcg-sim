@@ -110,7 +110,7 @@ export function JoinPartyDialog({
         }}
       >
         <DialogTrigger asChild>
-          <Button variant="secondary" disabled={disabled}>
+          <Button variant="outline" disabled={disabled}>
             <LogIn data-icon="inline-start" />
             Join lobby
           </Button>

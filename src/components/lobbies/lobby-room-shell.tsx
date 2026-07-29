@@ -3,16 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  Check,
-  Copy,
-  Eye,
-  Layers3,
-  Loader2,
-  Play,
-  Plus,
-  Swords,
-} from "lucide-react";
+import { Eye, Layers3, Loader2, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -395,103 +386,103 @@ export function LobbyRoomShell({
     <TooltipProvider>
       <div className="bg-background flex-1 overflow-y-auto">
         <header className="border-border bg-surface-1 border-b">
-          <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
-            <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
-              <div>
-                <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
-                  Game mode
-                </p>
-                <h1 className="font-display text-content-primary mt-1 text-4xl">
-                  {lobby.mode === "SOLITAIRE" ? "Solitaire" : "Versus"}
-                </h1>
-                <p className="text-content-secondary mt-2 text-sm">
-                  {lobby.format} · {displayName(lobby.host, "Host")}
-                  &apos;s party
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <PartyCode
-                  code={lobby.joinCode}
-                  copied={copied}
-                  onCopy={() => void copyInvite()}
-                />
-                <Tooltip
-                  content={
-                    hasActiveMatch
-                      ? "Rejoin your active match before switching parties"
-                      : undefined
-                  }
-                >
-                  <span>
-                    <JoinPartyDialog
-                      disabled={
-                        mutating || starting || closing || hasActiveMatch
-                      }
-                      initialCode={initialJoinCode}
-                    />
-                  </span>
-                </Tooltip>
-              </div>
+          <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+            <div className="w-full min-w-0 lg:w-auto">
+              <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
+                Game mode
+              </p>
+              <h1 className="font-display text-content-primary mt-1 truncate text-4xl uppercase">
+                {lobby.format}
+              </h1>
             </div>
 
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-              <div
-                className="border-border bg-surface-3 inline-flex w-fit rounded-md border p-1"
-                role="group"
-                aria-label="Game mode"
-              >
-                <button
-                  type="button"
-                  onClick={() => void onModeChange("PVP")}
-                  disabled={!isHost || mutating || isInGame}
-                  className={cn(
-                    "focus-visible:outline-border-focus flex min-h-10 items-center gap-2 rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                    lobby.mode === "PVP"
-                      ? "bg-surface-2 text-content-primary"
-                      : "text-content-secondary hover:text-content-primary"
-                  )}
-                  aria-pressed={lobby.mode === "PVP"}
+            <div className="flex w-full flex-wrap items-start gap-3 lg:w-auto lg:justify-end">
+              <div className="min-w-0">
+                <div
+                  className="border-border bg-surface-3 inline-flex w-fit rounded-md border p-1"
+                  role="group"
+                  aria-label="Game mode"
                 >
-                  <Swords className="size-4" />
-                  Versus
-                </button>
-                <Tooltip
-                  content={
-                    solitaireBlockedReason ??
-                    (!isHost ? "Only the host can change game mode" : undefined)
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      onClick={() => void onModeChange("SOLITAIRE")}
-                      disabled={
-                        !isHost ||
-                        mutating ||
-                        isInGame ||
-                        Boolean(solitaireBlockedReason)
-                      }
-                      className={cn(
-                        "focus-visible:outline-border-focus flex min-h-10 items-center gap-2 rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                        lobby.mode === "SOLITAIRE"
-                          ? "bg-surface-2 text-content-primary"
-                          : "text-content-secondary hover:text-content-primary"
-                      )}
-                      aria-pressed={lobby.mode === "SOLITAIRE"}
-                    >
-                      <Layers3 className="size-4" />
-                      Solitaire
-                    </button>
-                  </span>
-                </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => void onModeChange("PVP")}
+                    disabled={!isHost || mutating || isInGame}
+                    className={cn(
+                      "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                      lobby.mode === "PVP"
+                        ? "bg-accent text-accent-foreground disabled:opacity-100"
+                        : "text-content-secondary hover:text-content-primary disabled:opacity-50"
+                    )}
+                    aria-pressed={lobby.mode === "PVP"}
+                  >
+                    Versus
+                  </button>
+                  <Tooltip
+                    content={
+                      solitaireBlockedReason ??
+                      (!isHost
+                        ? "Only the host can change game mode"
+                        : undefined)
+                    }
+                  >
+                    <span>
+                      <button
+                        type="button"
+                        onClick={() => void onModeChange("SOLITAIRE")}
+                        disabled={
+                          !isHost ||
+                          mutating ||
+                          isInGame ||
+                          Boolean(solitaireBlockedReason)
+                        }
+                        className={cn(
+                          "focus-visible:outline-border-focus flex min-h-10 items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                          lobby.mode === "SOLITAIRE"
+                            ? "bg-accent text-accent-foreground disabled:opacity-100"
+                            : "text-content-secondary hover:text-content-primary disabled:opacity-50"
+                        )}
+                        aria-pressed={lobby.mode === "SOLITAIRE"}
+                        aria-describedby={
+                          solitaireBlockedReason
+                            ? "solitaire-mode-blocked-reason"
+                            : undefined
+                        }
+                      >
+                        Solitaire
+                      </button>
+                    </span>
+                  </Tooltip>
+                </div>
+
+                {solitaireBlockedReason && (
+                  <p
+                    id="solitaire-mode-blocked-reason"
+                    className="text-content-tertiary mt-1 max-w-xs text-xs"
+                  >
+                    {solitaireBlockedReason}
+                  </p>
+                )}
               </div>
 
-              {solitaireBlockedReason && (
-                <p className="text-content-tertiary text-xs">
-                  {solitaireBlockedReason}
-                </p>
-              )}
+              <PartyCode
+                code={lobby.joinCode}
+                copied={copied}
+                onCopy={() => void copyInvite()}
+              />
+              <Tooltip
+                content={
+                  hasActiveMatch
+                    ? "Rejoin your active match before switching parties"
+                    : undefined
+                }
+              >
+                <span>
+                  <JoinPartyDialog
+                    disabled={mutating || starting || closing || hasActiveMatch}
+                    initialCode={initialJoinCode}
+                  />
+                </span>
+              </Tooltip>
             </div>
           </div>
         </header>
@@ -994,25 +985,15 @@ function PartyCode({
     <button
       type="button"
       onClick={onCopy}
-      className="border-border bg-surface-3 hover:border-border-strong focus-visible:outline-border-focus flex min-h-10 items-center gap-3 rounded-md border px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="border-border bg-surface-3 hover:border-border-strong focus-visible:outline-border-focus flex min-h-10 items-center gap-2 rounded-md border p-1 pl-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
       aria-label={copied ? "Party link copied" : "Copy party link"}
     >
-      <span>
-        <span className="text-content-tertiary block text-xs leading-none">
-          Party code
-        </span>
-        <span className="text-content-primary mt-1 block font-mono text-sm font-semibold tracking-widest">
-          {code}
-        </span>
+      <span className="text-content-primary font-mono text-sm font-semibold tracking-widest">
+        {code}
       </span>
-      {copied ? (
-        <Check className="text-success size-4" />
-      ) : (
-        <Copy className="text-content-tertiary size-4" />
-      )}
       <span
         className={cn(
-          "text-xs font-semibold",
+          "border-border bg-surface-1 rounded border px-3 py-2 text-xs font-semibold",
           copied ? "text-success" : "text-content-secondary"
         )}
       >

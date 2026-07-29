@@ -226,7 +226,13 @@ describe("LobbyRoomShell redesign scenarios", () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
         ? { data: [] }
-        : { data: lobbyState({ status: "WAITING", guest: null }) }
+        : {
+            data: lobbyState({
+              status: "WAITING",
+              format: "Unlimited",
+              guest: null,
+            }),
+          }
     );
 
     await act(async () => {
@@ -237,15 +243,107 @@ describe("LobbyRoomShell redesign scenarios", () => {
       await Promise.resolve();
     });
 
-    expect(renderedText()).toContain("Game mode");
-    expect(renderedText()).toContain("Versus");
-    expect(renderedText()).toContain("Party code");
-    expect(renderedText()).toContain("ABCD");
-    expect(renderedText()).toContain("Join lobby");
+    const text = renderedText();
+    expect(text).toContain("Game mode");
+    expect(text).toContain("Unlimited");
+    expect(text).not.toContain("strawhat's party");
+    expect(text).not.toContain("Party code");
+    expect(text).toContain("ABCD");
+    expect(text).toContain("Join lobby");
+
+    const modeButtons = renderer!.root
+      .findAllByType("button")
+      .filter((button) =>
+        button.children.some(
+          (child) => child === "Versus" || child === "Solitaire"
+        )
+      );
+    expect(modeButtons).toHaveLength(2);
+    expect(
+      renderer!.root.findByProps({
+        role: "group",
+        "aria-label": "Game mode",
+      }).props.className
+    ).toContain("bg-surface-3");
+    expect(modeButtons[0]?.props["aria-pressed"]).toBe(true);
+    expect(modeButtons[0]?.props.className).toContain(
+      "bg-accent text-accent-foreground"
+    );
+    expect(modeButtons[1]?.props["aria-pressed"]).toBe(false);
+    expect(modeButtons.map((button) => button.children)).toEqual([
+      ["Versus"],
+      ["Solitaire"],
+    ]);
+
+    const joinButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Join lobby"));
+    expect(joinButton?.props.variant).toBe("outline");
+
+    const headerLayout = renderer!.root.find(
+      (node) =>
+        typeof node.props.className === "string" &&
+        node.props.className.includes("max-w-7xl") &&
+        node.props.className.includes("lg:flex-row")
+    );
+    expect(headerLayout.props.className).toContain("flex-col");
+    expect(
+      renderer!.root.find(
+        (node) =>
+          typeof node.props.className === "string" &&
+          node.props.className.includes("flex-wrap") &&
+          node.props.className.includes("lg:w-auto")
+      )
+    ).toBeDefined();
     expect(renderedText()).toContain("Open seat");
     expect(renderedText()).toContain("Waiting for a challenger");
     expect(renderedText()).toContain("You need an opponent first");
     expect(renderedText()).toContain("Start Match");
+  });
+
+  it("keeps the selected mode legible when guests cannot change it", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : { data: lobbyState({ viewerRole: "guest" }) }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="guest-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const modeButtons = renderer!.root
+      .findAllByType("button")
+      .filter((button) =>
+        button.children.some(
+          (child) => child === "Versus" || child === "Solitaire"
+        )
+      );
+    const [versusButton, solitaireButton] = modeButtons;
+
+    expect(versusButton?.props.disabled).toBe(true);
+    expect(versusButton?.props["aria-pressed"]).toBe(true);
+    expect(versusButton?.props.className).toContain(
+      "bg-accent text-accent-foreground disabled:opacity-100"
+    );
+    expect(versusButton?.props.className).not.toContain("disabled:opacity-50");
+    expect(solitaireButton?.props.disabled).toBe(true);
+    expect(solitaireButton?.props.className).toContain("disabled:opacity-50");
+    expect(solitaireButton?.props["aria-describedby"]).toBe(
+      "solitaire-mode-blocked-reason"
+    );
+    expect(
+      renderer!.root.findByProps({ id: "solitaire-mode-blocked-reason" })
+        .children
+    ).toEqual(["Leave the party to play solitaire"]);
+    expect(
+      renderer!.root.findByProps({ id: "solitaire-mode-blocked-reason" }).props
+        .className
+    ).not.toContain("sr-only");
   });
 
   it("renders an interactive host spectator toggle and keeps the empty count available", async () => {
