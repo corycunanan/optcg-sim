@@ -10,6 +10,7 @@ import { apiLimiter } from "@/lib/rate-limit";
 import { isErrorResponse, parseBody } from "@/lib/validators/helpers";
 import { NotificationActionSchema } from "@/lib/validators/notifications";
 import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
+import { pruneNotifications } from "@/lib/notifications";
 import { publishNotificationUpdated } from "@/lib/realtime/publish-notification";
 
 export async function PUT(
@@ -54,11 +55,13 @@ export async function PUT(
       if (result.count > 0) {
         after(() => publishNotificationUpdated(userId, id));
       }
+      after(() => pruneNotifications(userId));
       return apiAction();
     }
 
     const resolvedStatus = parsed.action === "accept" ? "ACCEPTED" : "DECLINED";
     if (notification.status === resolvedStatus) {
+      after(() => pruneNotifications(userId));
       return apiAction();
     }
     if (
@@ -90,7 +93,12 @@ export async function PUT(
       rateLimitCharge: NOTIFICATION_ACTION_RATE_LIMIT_CHARGED,
     });
 
-    if (response.status !== 404) return response;
+    if (response.status !== 404) {
+      if (response.ok) {
+        after(() => pruneNotifications(userId));
+      }
+      return response;
+    }
 
     // A legacy surface may have resolved the request between our notification
     // read and the proxy call. Reconcile that race idempotently from the
@@ -100,6 +108,7 @@ export async function PUT(
       select: { status: true },
     });
     if (latest?.status === resolvedStatus) {
+      after(() => pruneNotifications(userId));
       return apiAction();
     }
 

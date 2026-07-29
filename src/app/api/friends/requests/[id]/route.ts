@@ -9,7 +9,10 @@ import { prisma } from "@/lib/db";
 import { FriendRequestActionSchema } from "@/lib/validators/friends";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { socialLimiter } from "@/lib/rate-limit";
-import { resolveFriendRequestNotification } from "@/lib/notifications";
+import {
+  pruneNotifications,
+  resolveFriendRequestNotification,
+} from "@/lib/notifications";
 import { NOTIFICATION_ACTION_RATE_LIMIT_CHARGED } from "@/lib/friend-request-rate-limit";
 import { notifyUser } from "@/lib/realtime/fan-out";
 import {
@@ -34,6 +37,12 @@ function fanOutResolvedNotification(
       unreadCount: result.unreadCount,
     })
   );
+}
+
+function scheduleNotificationRetention(userId: string) {
+  // Deliberately post-commit and best-effort. pruneNotifications catches its
+  // own failures, so retention can never change the mutation response.
+  after(() => pruneNotifications(userId));
 }
 
 export async function PUT(
@@ -147,6 +156,9 @@ export async function PUT(
             });
           });
           fanOutResolvedNotification(userId, notificationResult);
+          if (rateLimitCharge !== NOTIFICATION_ACTION_RATE_LIMIT_CHARGED) {
+            scheduleNotificationRetention(userId);
+          }
           return apiAction();
         }
         throw error;
@@ -158,6 +170,9 @@ export async function PUT(
       const { friendship, notificationResult } = result;
 
       fanOutResolvedNotification(userId, notificationResult);
+      if (rateLimitCharge !== NOTIFICATION_ACTION_RATE_LIMIT_CHARGED) {
+        scheduleNotificationRetention(userId);
+      }
 
       // The accepter's user info, sent to the original sender so their
       // sidebar can append the new friend without a refetch.
@@ -197,6 +212,9 @@ export async function PUT(
       }
 
       fanOutResolvedNotification(userId, result.notificationResult);
+      if (rateLimitCharge !== NOTIFICATION_ACTION_RATE_LIMIT_CHARGED) {
+        scheduleNotificationRetention(userId);
+      }
 
       after(() =>
         notifyUser(req.fromUserId, {

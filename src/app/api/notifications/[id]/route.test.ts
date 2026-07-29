@@ -8,6 +8,7 @@ const notificationFindFirstMock = vi.fn();
 const notificationUpdateManyMock = vi.fn();
 const resolveFriendRequestMock = vi.fn();
 const publishNotificationUpdatedMock = vi.fn();
+const pruneNotificationsMock = vi.fn();
 const afterCallbacks: Array<() => void | Promise<void>> = [];
 
 vi.mock("next/server", async (importActual) => {
@@ -38,6 +39,9 @@ vi.mock("@/lib/realtime/publish-notification", () => ({
   publishNotificationUpdated: (...args: unknown[]) =>
     publishNotificationUpdatedMock(...args),
 }));
+vi.mock("@/lib/notifications", () => ({
+  pruneNotifications: (...args: unknown[]) => pruneNotificationsMock(...args),
+}));
 
 const { PUT } = await import("./route");
 
@@ -67,6 +71,7 @@ beforeEach(() => {
   notificationUpdateManyMock.mockReset();
   resolveFriendRequestMock.mockReset();
   publishNotificationUpdatedMock.mockReset();
+  pruneNotificationsMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-1" } });
   rateLimitMock.mockResolvedValue({ limited: false, remaining: 29 });
@@ -80,6 +85,7 @@ beforeEach(() => {
     NextResponse.json({ success: true })
   );
   publishNotificationUpdatedMock.mockResolvedValue(undefined);
+  pruneNotificationsMock.mockResolvedValue(undefined);
 });
 
 describe("PUT /api/notifications/[id]", () => {
@@ -181,6 +187,7 @@ describe("PUT /api/notifications/[id]", () => {
       "user-1",
       "notification-1"
     );
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
   });
 
   it("publishes a dismissed notification after the mutation commits", async () => {
@@ -196,6 +203,7 @@ describe("PUT /api/notifications/[id]", () => {
       "user-1",
       "notification-1"
     );
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
   });
 
   it("keeps the mutation successful when post-commit fan-out fails", async () => {
@@ -209,6 +217,19 @@ describe("PUT /api/notifications/[id]", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
     await expect(flushAfter()).rejects.toThrow("realtime unavailable");
+  });
+
+  it("keeps the mutation successful when post-commit retention fails", async () => {
+    pruneNotificationsMock.mockRejectedValueOnce(
+      new Error("retention unavailable")
+    );
+    const { request, params } = buildRequest("dismiss");
+
+    const res = await PUT(request, { params });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    await expect(flushAfter()).rejects.toThrow("retention unavailable");
   });
 
   it.each(["read", "dismiss"] as const)(
@@ -257,24 +278,34 @@ describe("PUT /api/notifications/[id]", () => {
       expect(context.rateLimitCharge).toBe(
         NOTIFICATION_ACTION_RATE_LIMIT_CHARGED
       );
+      await flushAfter();
+      expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
     }
   );
 
-  it("is idempotent when the notification is already accepted", async () => {
-    notificationFindFirstMock.mockResolvedValueOnce({
-      type: "FRIEND_REQUEST",
-      status: "ACCEPTED",
-      referenceId: "request-1",
-    });
-    const { request, params } = buildRequest("accept");
+  it.each([
+    ["ACCEPTED", "accept"],
+    ["DECLINED", "decline"],
+  ] as const)(
+    "is idempotent when the notification is already %s",
+    async (status, action) => {
+      notificationFindFirstMock.mockResolvedValueOnce({
+        type: "FRIEND_REQUEST",
+        status,
+        referenceId: "request-1",
+      });
+      const { request, params } = buildRequest(action);
 
-    const res = await PUT(request, { params });
+      const res = await PUT(request, { params });
 
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
-    expect(rateLimitMock).toHaveBeenCalledTimes(1);
-    expect(resolveFriendRequestMock).not.toHaveBeenCalled();
-  });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true });
+      expect(rateLimitMock).toHaveBeenCalledTimes(1);
+      expect(resolveFriendRequestMock).not.toHaveBeenCalled();
+      await flushAfter();
+      expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
+    }
+  );
 
   it.each([
     ["ACCEPTED", "decline"],
@@ -335,6 +366,8 @@ describe("PUT /api/notifications/[id]", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
+    await flushAfter();
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
   });
 
   it("handles a concurrent legacy decline idempotently", async () => {
@@ -354,5 +387,7 @@ describe("PUT /api/notifications/[id]", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
+    await flushAfter();
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
   });
 });

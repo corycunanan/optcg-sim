@@ -10,6 +10,7 @@ const notificationCountMock = vi.fn();
 const notificationUpdateManyMock = vi.fn();
 const transactionMock = vi.fn();
 const publishNotificationsReadAllMock = vi.fn();
+const pruneNotificationsMock = vi.fn();
 const afterCallbacks: Array<() => void | Promise<void>> = [];
 const ACTOR_INCLUDE = {
   actor: {
@@ -45,6 +46,9 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/realtime/publish-notification", () => ({
   publishNotificationsReadAll: (...args: unknown[]) =>
     publishNotificationsReadAllMock(...args),
+}));
+vi.mock("@/lib/notifications", () => ({
+  pruneNotifications: (...args: unknown[]) => pruneNotificationsMock(...args),
 }));
 
 const { GET, PUT } = await import("./route");
@@ -93,6 +97,7 @@ beforeEach(() => {
   notificationUpdateManyMock.mockReset();
   transactionMock.mockReset();
   publishNotificationsReadAllMock.mockReset();
+  pruneNotificationsMock.mockReset();
 
   authMock.mockResolvedValue({ user: { id: "user-1" } });
   searchRateLimitMock.mockResolvedValue({ limited: false, remaining: 59 });
@@ -101,6 +106,7 @@ beforeEach(() => {
   notificationCountMock.mockResolvedValue(0);
   notificationUpdateManyMock.mockResolvedValue({ count: 0 });
   publishNotificationsReadAllMock.mockResolvedValue(undefined);
+  pruneNotificationsMock.mockResolvedValue(undefined);
   transactionMock.mockImplementation(async (callback) =>
     callback({
       notification: {
@@ -344,6 +350,7 @@ describe("PUT /api/notifications", () => {
     await flushAfter();
     expect(publishNotificationsReadAllMock).toHaveBeenCalledTimes(1);
     expect(publishNotificationsReadAllMock).toHaveBeenCalledWith("user-1");
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
     expect(await res.json()).toEqual({ success: true });
   });
 
@@ -357,6 +364,7 @@ describe("PUT /api/notifications", () => {
     expect(res.status).toBe(200);
     await flushAfter();
     expect(publishNotificationsReadAllMock).not.toHaveBeenCalled();
+    expect(pruneNotificationsMock).toHaveBeenCalledWith("user-1");
   });
 
   it("keeps mark-all-read successful when post-commit fan-out fails", async () => {
@@ -373,6 +381,22 @@ describe("PUT /api/notifications", () => {
 
     expect(res.status).toBe(200);
     await expect(flushAfter()).rejects.toThrow("realtime unavailable");
+  });
+
+  it("keeps mark-all-read successful when retention fails", async () => {
+    pruneNotificationsMock.mockRejectedValueOnce(
+      new Error("retention unavailable")
+    );
+
+    const res = await PUT(
+      buildRequest("/api/notifications", {
+        action: "mark-all-read",
+      })
+    );
+
+    expect(res.status).toBe(200);
+    await expect(flushAfter()).rejects.toThrow("retention unavailable");
+    expect(await res.json()).toEqual({ success: true });
   });
 
   it("returns 429 before marking notifications read", async () => {

@@ -19,6 +19,7 @@ import {
 } from "@/lib/validators/notifications";
 import { isErrorResponse, parseBody } from "@/lib/validators/helpers";
 import { publishNotificationsReadAll } from "@/lib/realtime/publish-notification";
+import { pruneNotifications } from "@/lib/notifications";
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth();
@@ -162,6 +163,8 @@ export async function PUT(request: NextRequest) {
     if (result.count > 0) {
       after(() => publishNotificationsReadAll(userId));
     }
+    // Additive only: OPT-594 owns the GET list query and ordering.
+    after(() => pruneNotifications(userId));
 
     return apiAction();
   } catch (error) {
