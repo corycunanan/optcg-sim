@@ -23,10 +23,12 @@ Tickets are ordered by dependencies; OPT-535 was a parallel visual track.
 | 5     | OPT-528 | Notification panel UI with inline accept/decline                                         | —        | OPT-525, OPT-526, OPT-527 | Done      | [#449](https://github.com/corycunanan/optcg-sim/pull/449) | Action menu opened by the bell; squash `cf39c67`       |
 | 6     | OPT-529 | Migrate friend requests out of the social sidebar; sidebar keeps presence + live invites | —        | OPT-528                   | Done      | [#453](https://github.com/corycunanan/optcg-sim/pull/453) | Sole incoming-request surface is the notification center; squash `010eb40` |
 | 7     | OPT-535 | Social sidebar + docked chat widget visual refresh per artifact                          | —        | —                         | Done      | [#400](https://github.com/corycunanan/optcg-sim/pull/400) | Parallel sibling; no navbar ownership                  |
+| 8     | OPT-594 | Prioritize actionable notifications in the inbox                                        | —        | OPT-529                   | Done      | [#459](https://github.com/corycunanan/optcg-sim/pull/459) | Actionable rows lead the 20-row panel window; squash `249b3dd` |
+| 9     | OPT-580 | Bound per-user notification retention                                                    | —        | OPT-529                   | Done      | [#460](https://github.com/corycunanan/optcg-sim/pull/460) | Retains 100 non-live rows plus live request notifications; squash `41fd709` |
 
 **Status values:** use Linear status names verbatim (`Backlog`, `Todo`, `In Progress`, `In Review`, `Done`, `Canceled`).
 
-**Project complete:** all seven tickets are Done and merged.
+**Project complete:** all nine Action Plan tickets are Done and merged.
 
 ---
 
@@ -62,6 +64,26 @@ Tickets are ordered by dependencies; OPT-535 was a parallel visual track.
 - **Unresolved:** Full-page notification history remains deferred; no OPT-529 work is needed for it.
 - **Pointer:** PR #449 and commit `37da558` contain the behavioral and accessibility contracts.
 
+### OPT-594 follow-up closeout
+
+**From:** merged follow-up · **Commit:** `249b3dd` · **PR:** [#459](https://github.com/corycunanan/optcg-sim/pull/459)
+
+- **Primer:** `GET /api/notifications` now prioritizes actionable friend-request notifications ahead of resolved/read rows, so an available Accept/Decline action cannot fall outside the panel's 20-row window. Option 1 (prioritize actionable rows) was ratified; a separate actionable fetch, keyset pagination, and a full history view were explicitly not chosen.
+- **Read first:** `src/lib/notification-order.ts`, `src/app/api/notifications/route.ts`, `src/hooks/use-notification-state.ts`, `src/components/nav/navbar-notification-panel.tsx`
+- **Gotchas / do NOT touch:** Keep the actionable predicate in one place in `src/lib/notification-order.ts` and shared by client and server; do not let their orderings diverge. `READ` remains actionable when `type = FRIEND_REQUEST`, `referenceId` is present, and the status is `PENDING` or `READ`, because opening the panel marks visible rows read while actions remain available. Preserve the `RepeatableRead` snapshot shared by rows and counts.
+- **Unresolved:** Keyset/cursor pagination and a full history view remain deferred. Database-backed coverage for raw SQL and migrations is tracked by OPT-598.
+- **Pointer:** PR #459 and squash commit `249b3dd`.
+
+### OPT-580 follow-up closeout
+
+**From:** merged follow-up · **Commit:** `41fd709` · **PR:** [#460](https://github.com/corycunanan/optcg-sim/pull/460)
+
+- **Primer:** Retention pruning now runs after every path that creates a notification or makes one terminal, retaining the newest 100 non-live rows plus any live rows whose referenced `FriendRequest` remains `PENDING`; duplicate pruning is suppressed by `NOTIFICATION_ACTION_RATE_LIMIT_CHARGED`.
+- **Read first:** `src/lib/notifications.ts`, `src/app/api/friends/requests/route.ts`, `src/app/api/friends/requests/[id]/route.ts`, `src/app/api/notifications/[id]/route.ts`, `src/app/api/friends/requests/route.test.ts`
+- **Gotchas / do NOT touch:** Do not move pruning inside a transaction, do not delete a notification whose `FriendRequest` is still `PENDING`, and do not replace the parameterized CTE/DELETE with application-side id arrays. Keep the `NOT EXISTS` liveness guard at both selection and deletion.
+- **Unresolved:** PostgreSQL does not parse the retention statement in CI; database-backed raw SQL and migration coverage is tracked by OPT-598.
+- **Pointer:** PR #460 and squash commit `41fd709`.
+
 ---
 
 ## Project Closeout
@@ -80,15 +102,14 @@ A durable notification inbox: a Prisma `Notification` model plus list, mark-read
 - Accept/decline proxies `PUT /api/friends/requests/[id]` rather than duplicating it, so notification state and friend-request state cannot drift.
 - A `409` from that route is authoritative: `conflictOutcome()` derives the real terminal state rather than trusting the user's optimistic action.
 - Notification fan-out is post-commit and best-effort via `after(...)`; a realtime failure can never roll back or fail the underlying mutation.
-- Retention pruning runs outside the friend-request transaction and only prunes terminal (`ACCEPTED`/`DECLINED`) rows, so retention contention can never roll back or delete a live friend request.
+- Actionable friend-request rows (`PENDING` or `READ` with a `referenceId`) sort ahead of resolved/read rows. The shared predicate in `src/lib/notification-order.ts` keeps API, realtime, and panel ordering aligned; page 1 retrieval is O(actionable count + limit), and later pages are O(limit). The partial index `20260729043000_add_actionable_notification_inbox_index` supports the actionable scan.
+- Retention pruning runs post-commit and best-effort via `after(...)` from every creation or terminal-state path. It retains the newest 100 non-live rows plus all rows backed by a still-`PENDING` friend request, using one parameterized CTE/DELETE with liveness guards at both selection and deletion.
 - The sidebar still subscribes to `friend:request_accepted`, `friend:request_declined`, and `friend:removed` for friend-list mutations. Only incoming-request handling was removed; do not delete those subscriptions.
 - `20260728233000_backfill_pending_friend_request_notifications` backfills notifications for friend requests that predate the notification table and is idempotent (`ON CONFLICT DO NOTHING`).
 
 ### Open Follow-ups (Linear)
 
-- **OPT-580** (Medium) — Notification retention does not bound per-user inbox growth. Pruning runs only on friend-request creation, removes only terminal rows, and is limited to 25 rows per invocation, so `PENDING`, `READ`, and `DISMISSED` rows accumulate without a bound.
-- **OPT-594** (High) — Actionable notifications can fall outside the panel's 20-row window with no way to reach them now that the sidebar fallback is gone. This needs a product decision: prioritize actionable rows, add a separate actionable fetch, or add pagination/history.
+- **OPT-598** (High) — Raw SQL and migrations have no database-backed test harness. `pruneNotifications`'s retention SQL is mocked in tests and the OPT-529 backfill migration is asserted by SQL substring, so PostgreSQL never parses either statement. Delta review proved three semantic mutations to the retention SQL pass all tests, including removing the `live_request.id = candidate.reference_id` correlation—which would exempt every friend-request notification whenever the user has any pending request while CI stays green. Needs ephemeral PostgreSQL in CI.
 - Add structured outcome codes to OPT-525's `409` responses so `conflictOutcome()` no longer depends on error-message prose.
 - Replace offset `skip`/`take` in `GET /api/notifications` with keyset/cursor pagination.
 - Outgoing “Request sent” state does not survive a page reload. This is pre-existing; the sidebar never consumed the fetch's `outgoing` data.
-- Replace the backfill migration test's SQL-substring assertions with an ephemeral-Postgres execution test if migration-test infrastructure is added.
