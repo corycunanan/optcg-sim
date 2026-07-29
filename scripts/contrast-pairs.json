@@ -91,6 +91,12 @@
       "minimum": 4.5
     },
     {
+      "name": "success/panel",
+      "foreground": "--success",
+      "background": "--surface-panel",
+      "minimum": 4.5
+    },
+    {
       "name": "warning/warning-soft",
       "foreground": "--warning",
       "background": "--warning-soft",
