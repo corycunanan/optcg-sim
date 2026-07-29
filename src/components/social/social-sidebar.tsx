@@ -138,10 +138,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
 
   useEffect(() => {
     const unsubAccepted = subscribe("friend:request_accepted", (event) => {
-      setFriends(
-        (prev) =>
-          applyFriendEvent({ friends: prev, incoming: [] }, event).friends
-      );
+      setFriends((prev) => applyFriendEvent(prev, event));
       // The user we sent a request to is now a friend — drop "Request sent".
       // `isFriend` already takes precedence in the search dropdown, but
       // keeping `pendingSent` in sync avoids a stale entry leaking out later.
@@ -153,10 +150,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
       setPendingSent((prev) => removeFromSet(prev, event.toUserId));
     });
     const unsubRemoved = subscribe("friend:removed", (event) => {
-      setFriends(
-        (prev) =>
-          applyFriendEvent({ friends: prev, incoming: [] }, event).friends
-      );
+      setFriends((prev) => applyFriendEvent(prev, event));
     });
     return () => {
       unsubAccepted();
