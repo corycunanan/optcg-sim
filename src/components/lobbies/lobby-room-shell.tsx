@@ -659,7 +659,7 @@ export function LobbyRoomShell({
         </main>
 
         <div
-          className="border-border bg-surface-1 z-20 shrink-0 border-t shadow-[var(--shadow-lg)]"
+          className="border-border bg-surface-1 sticky bottom-0 z-20 shrink-0 border-t shadow-[var(--shadow-lg)]"
           data-lobby-action-bar
         >
           <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
@@ -827,7 +827,7 @@ function SpectatorRoom({
       </main>
 
       <div
-        className="border-border bg-surface-1 z-20 shrink-0 border-t shadow-[var(--shadow-lg)]"
+        className="border-border bg-surface-1 sticky bottom-0 z-20 shrink-0 border-t shadow-[var(--shadow-lg)]"
         data-lobby-action-bar
       >
         <div className="mx-auto flex max-w-7xl flex-col justify-end gap-3 px-6 py-4 sm:flex-row">

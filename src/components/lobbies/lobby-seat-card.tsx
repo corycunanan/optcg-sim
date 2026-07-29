@@ -14,6 +14,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 interface DeckOption extends LobbyRoomDeck {
   format: string;
@@ -185,10 +190,6 @@ function SelectedDeck({
   onPreview: (deckId: string) => void;
   previewSide: "left" | "right";
 }) {
-  const [hoveredCard, setHoveredCard] = useState<LobbyRoomDeckCard | null>(
-    null
-  );
-
   const groupedCards = useMemo(
     () =>
       DECK_GROUPS.map((group) => ({
@@ -197,8 +198,6 @@ function SelectedDeck({
       })).filter((group) => group.cards.length > 0),
     [deck.contents]
   );
-
-  const hoveredImage = hoveredCard?.imageUrl ?? null;
 
   return (
     <div className="relative grid min-h-0 flex-1 gap-5 p-5 sm:grid-cols-[auto_1fr]">
@@ -262,21 +261,11 @@ function SelectedDeck({
                 </div>
                 <ul className="divide-border divide-y">
                   {group.cards.map((entry) => (
-                    <li key={entry.id}>
-                      <button
-                        type="button"
-                        onMouseEnter={() => setHoveredCard(entry)}
-                        onMouseLeave={() => setHoveredCard(null)}
-                        onFocus={() => setHoveredCard(entry)}
-                        onBlur={() => setHoveredCard(null)}
-                        className="text-content-secondary hover:bg-surface-2 hover:text-content-primary focus-visible:bg-surface-2 focus-visible:text-content-primary flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors outline-none"
-                      >
-                        <span className="truncate">{entry.name}</span>
-                        <span className="text-content-primary shrink-0 font-semibold tabular-nums">
-                          ×{entry.quantity}
-                        </span>
-                      </button>
-                    </li>
+                    <DeckListRow
+                      key={entry.id}
+                      entry={entry}
+                      previewSide={previewSide}
+                    />
                   ))}
                 </ul>
               </div>
@@ -288,26 +277,64 @@ function SelectedDeck({
           )}
         </div>
       </div>
-
-      {hoveredImage && hoveredCard && (
-        <div
-          className={cn(
-            "border-border bg-surface-2 aspect-card pointer-events-none absolute top-16 z-30 hidden w-40 overflow-hidden rounded-md border p-1 shadow-[var(--shadow-lg)] xl:block",
-            previewSide === "left" ? "right-full mr-4" : "left-full ml-4"
-          )}
-          aria-hidden="true"
-        >
-          <Image
-            src={hoveredImage}
-            alt=""
-            fill
-            sizes="160px"
-            unoptimized
-            className="h-full w-full rounded object-cover"
-          />
-        </div>
-      )}
     </div>
+  );
+}
+
+function DeckListRow({
+  entry,
+  previewSide,
+}: {
+  entry: LobbyRoomDeckCard;
+  previewSide: "left" | "right";
+}) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const trigger = (
+    <button
+      type="button"
+      onFocus={() => setPreviewOpen(true)}
+      onBlur={() => setPreviewOpen(false)}
+      className="text-content-secondary hover:bg-surface-2 hover:text-content-primary focus-visible:bg-surface-2 focus-visible:text-content-primary flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors outline-none"
+    >
+      <span className="truncate">{entry.name}</span>
+      <span className="text-content-primary shrink-0 font-semibold tabular-nums">
+        ×{entry.quantity}
+      </span>
+    </button>
+  );
+
+  return (
+    <li>
+      {entry.imageUrl ? (
+        <HoverCard
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          openDelay={0}
+          closeDelay={0}
+        >
+          <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+          <HoverCardContent
+            side={previewSide}
+            sideOffset={16}
+            collisionPadding={16}
+            className="border-border bg-surface-2 aspect-card pointer-events-none relative hidden w-40 overflow-hidden rounded-md border p-1 shadow-[var(--shadow-lg)] xl:block"
+            aria-hidden="true"
+            data-lobby-card-preview={previewSide}
+          >
+            <Image
+              src={entry.imageUrl}
+              alt=""
+              fill
+              sizes="160px"
+              unoptimized
+              className="h-full w-full rounded object-cover"
+            />
+          </HoverCardContent>
+        </HoverCard>
+      ) : (
+        trigger
+      )}
+    </li>
   );
 }
 

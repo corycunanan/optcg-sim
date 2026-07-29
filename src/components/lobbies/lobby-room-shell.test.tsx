@@ -304,7 +304,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
       "data-lobby-action-bar": true,
     });
     expect(actionBar.props.className).toContain("shrink-0");
-    expect(actionBar.props.className).not.toContain("sticky");
+    expect(actionBar.props.className).toContain("sticky");
+    expect(actionBar.props.className).toContain("bottom-0");
 
     const modeControl = renderer!.root.findByProps({
       role: "group",
@@ -962,10 +963,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(
       renderer!.root.findByProps({ "data-lobby-header": true }).props.className
     ).not.toContain("border-b");
-    expect(
-      renderer!.root.findByProps({ "data-lobby-action-bar": true }).props
-        .className
-    ).toContain("shrink-0");
+    const actionBar = renderer!.root.findByProps({
+      "data-lobby-action-bar": true,
+    });
+    expect(actionBar.props.className).toContain("shrink-0");
+    expect(actionBar.props.className).toContain("sticky");
+    expect(actionBar.props.className).toContain("bottom-0");
     expect(
       renderer!.root.findAllByType("button").map((button) => button.children)
     ).toEqual([["Stop spectating"]]);
