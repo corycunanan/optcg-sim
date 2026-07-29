@@ -2682,6 +2682,13 @@ export const OP03_078_ISSHO: EffectSchema = {
     {
       id: "your_turn_cost_reduce_all",
       category: "permanent",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
       modifiers: [
         {
           type: "MODIFY_COST",
@@ -2705,17 +2712,7 @@ export const OP03_078_ISSHO: EffectSchema = {
       ],
       duration: {
         type: "WHILE_CONDITION",
-        condition: {
-          all_of: [
-            { type: "IS_MY_TURN", controller: "SELF" },
-            {
-              type: "DON_FIELD_COUNT",
-              controller: "SELF",
-              operator: ">=",
-              value: 1,
-            },
-          ],
-        },
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
       },
     },
     {
@@ -2754,6 +2751,13 @@ export const OP03_079_VERGO: EffectSchema = {
     {
       id: "cannot_be_ko_in_battle",
       category: "permanent",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
@@ -2761,15 +2765,6 @@ export const OP03_079_VERGO: EffectSchema = {
           scope: { cause: "BATTLE" },
         },
       ],
-      duration: {
-        type: "WHILE_CONDITION",
-        condition: {
-          type: "DON_FIELD_COUNT",
-          controller: "SELF",
-          operator: ">=",
-          value: 1,
-        },
-      },
     },
   ],
 };
@@ -3568,6 +3563,18 @@ export const OP03_108_CHARLOTTE_CRACKER: EffectSchema = {
     {
       id: "conditional_double_attack_and_power",
       category: "permanent",
+      conditions: {
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          { type: "COMPARATIVE", metric: "LIFE_COUNT", operator: "<" },
+        ],
+      },
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -3580,15 +3587,6 @@ export const OP03_108_CHARLOTTE_CRACKER: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
-      duration: {
-        type: "WHILE_CONDITION",
-        condition: {
-          all_of: [
-            { type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 1 },
-            { type: "COMPARATIVE", metric: "LIFE_COUNT", operator: "<" },
-          ],
-        },
-      },
     },
     {
       id: "trigger_trash_play_self",

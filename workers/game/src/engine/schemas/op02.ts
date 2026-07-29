@@ -380,8 +380,9 @@ export const OP02_014_WHITEY_BAY: EffectSchema = {
         },
       ],
       conditions: {
-        type: "DON_FIELD_COUNT",
+        type: "DON_GIVEN",
         controller: "SELF",
+        mode: "SPECIFIC_CARD",
         operator: ">=",
         value: 1,
       },
