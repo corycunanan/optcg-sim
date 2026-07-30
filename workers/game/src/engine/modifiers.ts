@@ -15,6 +15,7 @@ import type {
   RuntimeActiveEffect,
   RuntimeOneTimeModifier,
   Modifier,
+  EffectBlock,
   TargetFilter,
   EffectResult,
 } from "./effect-types.js";
@@ -108,65 +109,58 @@ function numericModifierParam(
  * For non-SELF targets (e.g., CHARACTER with filter), dynamically resolves
  * against the card's properties using the modifier's target filter.
  */
-function effectAppliesToCard(
+function modifierAppliesToCard(
   effect: RuntimeActiveEffect,
+  modifier: Modifier,
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>,
   costOverride?: number
 ): boolean {
-  // Static match — card is explicitly listed in appliesTo
+  // Resolver-created effects may pre-resolve any target into appliesTo.
   if (effect.appliesTo?.includes(card.instanceId)) return true;
+
+  // SELF (or implicit SELF) targets are resolved statically at registration.
+  if (!modifier.target || modifier.target.type === "SELF") {
+    return false;
+  }
 
   // Dynamic match — check non-SELF modifier targets against the card
   if (!cardDb) return false;
-  for (const mod of effect.modifiers ?? []) {
-    if (!mod.target || mod.target.type === "SELF") continue;
+  const targetType = modifier.target.type?.toUpperCase();
+  const controller =
+    modifier.target.controller ??
+    (targetType === "ALL_YOUR_CHARACTERS"
+      ? "SELF"
+      : targetType === "ALL_OPPONENT_CHARACTERS"
+        ? "OPPONENT"
+        : undefined);
+  if (controller === "SELF" && card.controller !== effect.controller)
+    return false;
+  if (controller === "OPPONENT" && card.controller === effect.controller)
+    return false;
 
-    // Controller check — ALL_YOUR_CHARACTERS implies SELF controller
-    const targetType = mod.target.type?.toUpperCase();
-    const controller =
-      mod.target.controller ??
-      (targetType === "ALL_YOUR_CHARACTERS"
-        ? "SELF"
-        : targetType === "ALL_OPPONENT_CHARACTERS"
-          ? "OPPONENT"
-          : undefined);
-    if (controller === "SELF" && card.controller !== effect.controller)
-      continue;
-    if (controller === "OPPONENT" && card.controller === effect.controller)
-      continue;
-
-    // Card type check
-    if (
-      targetType === "CHARACTER" ||
-      targetType === "ALL_YOUR_CHARACTERS" ||
-      targetType === "ALL_OPPONENT_CHARACTERS"
-    ) {
-      const data = cardDb.get(card.cardId);
-      if (!data || data.type?.toUpperCase() !== "CHARACTER") continue;
-    }
-
-    // Apply filter if present
-    if (mod.target.filter) {
-      if (
-        matchesFilter(
-          card,
-          mod.target.filter,
-          cardDb,
-          state,
-          undefined,
-          costOverride
-        )
-      )
-        return true;
-    } else {
-      // No filter — matches all cards of the target type/controller
-      return true;
-    }
+  // Card type check
+  if (
+    targetType === "CHARACTER" ||
+    targetType === "ALL_YOUR_CHARACTERS" ||
+    targetType === "ALL_OPPONENT_CHARACTERS"
+  ) {
+    const data = cardDb.get(card.cardId);
+    if (!data || data.type?.toUpperCase() !== "CHARACTER") return false;
   }
 
-  return false;
+  return (
+    !modifier.target.filter ||
+    matchesFilter(
+      card,
+      modifier.target.filter,
+      cardDb,
+      state,
+      undefined,
+      costOverride
+    )
+  );
 }
 
 /**
@@ -220,6 +214,42 @@ function isEffectSourceNegated(
 }
 
 /**
+ * Evaluate the complete permanent-modifier gate in narrowing order.
+ *
+ * Raw-schema cost paths and registered active effects both delegate here so
+ * block conditions, block duration, and modifier duration cannot diverge.
+ */
+function isModifierGateMet(
+  block: Pick<EffectBlock, "conditions" | "duration">,
+  modifier: Modifier | undefined,
+  state: GameState,
+  ctx: ConditionContext
+): boolean {
+  if (block.conditions && !evaluateCondition(state, block.conditions, ctx))
+    return false;
+
+  const blockDuration = block.duration;
+  if (
+    blockDuration?.type === "WHILE_CONDITION" &&
+    blockDuration.condition &&
+    !evaluateCondition(state, blockDuration.condition, ctx)
+  ) {
+    return false;
+  }
+
+  const modifierDuration = modifier?.duration;
+  if (
+    modifierDuration?.type === "WHILE_CONDITION" &&
+    modifierDuration.condition &&
+    !evaluateCondition(state, modifierDuration.condition, ctx)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
  * Returns true for effects that have no WHILE_CONDITION duration (always active).
  *
@@ -249,17 +279,32 @@ export function isEffectConditionMet(
     cardDb,
   };
 
-  // Check block-level conditions (e.g., "if you have no other [Shirahoshi] with cost 2")
-  if (effect.conditions) {
-    if (!evaluateCondition(state, effect.conditions, condCtx)) return false;
-  }
+  return isModifierGateMet(effect, undefined, state, condCtx);
+}
 
-  // Check duration condition (e.g., IS_MY_TURN for opponent's turn effects)
-  const duration = effect.duration;
-  if (!duration || duration.type !== "WHILE_CONDITION" || !duration.condition)
-    return true;
+/**
+ * A modifier-level duration narrows its containing block. It can never make a
+ * modifier active when the block's conditions or duration are false.
+ */
+export function isModifierConditionMet(
+  effect: RuntimeActiveEffect,
+  modifier: Modifier,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>
+): boolean {
+  if (!cardDb) return true; // can't evaluate without cardDb — assume active
 
-  return evaluateCondition(state, duration.condition, condCtx);
+  const isNegationFlag = effect.modifiers?.some(
+    (candidate) => candidate.type === "NEGATE_EFFECTS_FLAG"
+  );
+  if (!isNegationFlag && isEffectSourceNegated(effect, state, cardDb))
+    return false;
+
+  return isModifierGateMet(effect, modifier, state, {
+    sourceCardInstanceId: effect.sourceCardInstanceId,
+    controller: effect.controller,
+    cardDb,
+  });
 }
 
 /**
@@ -313,9 +358,12 @@ export function getEffectivePower(
   const baseSetters = sortByTurnPlayerPriority(
     effects.filter(
       (e) =>
-      effectAppliesToCard(e, card, state, cardDb) &&
-      e.modifiers?.some((m) => m.type === "SET_POWER") &&
-        isEffectConditionMet(e, state, cardDb)
+        e.modifiers?.some(
+          (m) =>
+            m.type === "SET_POWER" &&
+            modifierAppliesToCard(e, m, card, state, cardDb) &&
+            isModifierConditionMet(e, m, state, cardDb)
+        )
     ),
     turnPlayerIndex
   );
@@ -323,7 +371,12 @@ export function getEffectivePower(
     // Last base-setter wins (timestamp/priority order). Turn-player resolves
     // first, non-turn-player resolves last and therefore clobbers.
     const lastSetter = baseSetters[baseSetters.length - 1];
-    const mod = lastSetter.modifiers?.find((m) => m.type === "SET_POWER");
+    const mod = lastSetter.modifiers?.find(
+      (m) =>
+        m.type === "SET_POWER" &&
+        modifierAppliesToCard(lastSetter, m, card, state, cardDb) &&
+        isModifierConditionMet(lastSetter, m, state, cardDb)
+    );
     const value = mod ? numericModifierParam(mod, "value") : undefined;
     if (value !== undefined) power = value;
   }
@@ -333,16 +386,26 @@ export function getEffectivePower(
   const additiveEffects = sortByTurnPlayerPriority(
     effects.filter(
       (e) =>
-      effectAppliesToCard(e, card, state, cardDb) &&
-      e.modifiers?.some((m) => m.type === "MODIFY_POWER") &&
-        isEffectConditionMet(e, state, cardDb)
+        e.modifiers?.some(
+          (m) =>
+            m.type === "MODIFY_POWER" &&
+            modifierAppliesToCard(e, m, card, state, cardDb) &&
+            isModifierConditionMet(e, m, state, cardDb)
+        )
     ),
     turnPlayerIndex
   );
   for (const effect of additiveEffects) {
     for (const mod of effect.modifiers ?? []) {
       const amount = numericModifierParam(mod, "amount");
-      if (mod.type === "MODIFY_POWER" && amount !== undefined) power += amount;
+      if (
+        mod.type === "MODIFY_POWER" &&
+        amount !== undefined &&
+        modifierAppliesToCard(effect, mod, card, state, cardDb) &&
+        isModifierConditionMet(effect, mod, state, cardDb)
+      ) {
+        power += amount;
+      }
     }
   }
 
@@ -383,26 +446,35 @@ export function getEffectiveCost(
     // inside a modifier's target filter resolves against base — this also
     // breaks recursion: OPT-247 made cost_* default to getEffectiveCost(), and
     // without an override the filter would call back into us.
-    const applyingEffects = effects.filter((effect) => {
-      const applies =
-        card && cardDb
-        ? effectAppliesToCard(effect, card, state, cardDb, cost)
-        : effect.appliesTo?.includes(cardInstanceId);
-      if (!applies) return false;
-      return isEffectConditionMet(effect, state, cardDb);
-    });
-
     // Layer 1: SET_COST — last wins after turn-player-first sort.
     const setters = sortByTurnPlayerPriority(
-      applyingEffects.filter((e) =>
-        e.modifiers?.some((m) => m.type === "SET_COST")
+      effects.filter((e) =>
+        e.modifiers?.some(
+          (m) =>
+            m.type === "SET_COST" &&
+            (card && cardDb
+              ? modifierAppliesToCard(e, m, card, state, cardDb, cost)
+              : e.appliesTo?.includes(cardInstanceId)) &&
+            isModifierConditionMet(e, m, state, cardDb)
+        )
       ),
       turnPlayerIndex
     );
     for (const effect of setters) {
       for (const mod of effect.modifiers ?? []) {
         const value = numericModifierParam(mod, "value");
-        if (mod.type === "SET_COST" && value !== undefined) cost = value;
+        const applies =
+          card && cardDb
+            ? modifierAppliesToCard(effect, mod, card, state, cardDb, cost)
+            : effect.appliesTo?.includes(cardInstanceId);
+        if (
+          mod.type === "SET_COST" &&
+          value !== undefined &&
+          applies &&
+          isModifierConditionMet(effect, mod, state, cardDb)
+        ) {
+          cost = value;
+        }
       }
     }
 
@@ -518,10 +590,10 @@ export function getEffectiveCostForRead(
 /**
  * OPT-242: Apply Layer 2 MODIFY_COST modifiers with include-once iteration.
  *
- * Each iteration, any un-included Layer 2 effect whose filter now matches the
- * accumulated cost is included and its modifiers applied. Iteration stops when
- * a full pass adds nothing. Once included, an effect stays included for the
- * remainder of this evaluation (no un-applying), per Bandai ruling.
+ * Each iteration, any un-included Layer 2 modifier whose filter now matches the
+ * accumulated cost is included and applied. Iteration stops when a full pass
+ * adds nothing. Once included, a modifier stays included for the remainder of
+ * this evaluation (no un-applying), per Bandai ruling.
  *
  * This resolves threshold scenarios like OP10-042 Usopp ("your {Dressrosa}
  * Characters with cost ≥2 get +1 cost") interacting with auto cost-reduction:
@@ -541,34 +613,40 @@ function applyLayer2CostModifiers(
 ): number {
   let cost = startingCost;
 
-  // Candidates: effects carrying a MODIFY_COST mod whose block-level condition
-  // is currently met. Applicability-to-card is re-evaluated each pass.
+  // Candidates: effects carrying a MODIFY_COST modifier. Block and
+  // modifier-level gates plus applicability are re-evaluated each pass.
   const rawCandidates = effects.filter(
-    (e) =>
-      e.modifiers?.some((m) => m.type === "MODIFY_COST") &&
-      isEffectConditionMet(e, state, cardDb)
+    (e) => e.modifiers?.some((m) => m.type === "MODIFY_COST")
   );
   const candidates = sortByTurnPlayerPriority(rawCandidates, turnPlayerIndex);
 
-  const includedEffectIds = new Set<string>();
+  const includedModifierKeys = new Set<string>();
   for (let iter = 0; iter < MAX_COST_LAYER2_ITERATIONS; iter++) {
     if (diagnostics) diagnostics.layer2Iterations = iter + 1;
     let addedThisPass = false;
     for (const effect of candidates) {
-      if (includedEffectIds.has(effect.id)) continue;
+      for (const [modifierIndex, mod] of (
+        effect.modifiers ?? []
+      ).entries()) {
+        const inclusionKey = `${effect.id}:${modifierIndex}`;
+        if (includedModifierKeys.has(inclusionKey)) continue;
 
-      const applies =
-        card && cardDb
-        ? effectAppliesToCard(effect, card, state, cardDb, cost)
-        : effect.appliesTo?.includes(cardInstanceId);
-      if (!applies) continue;
-
-      for (const mod of effect.modifiers ?? []) {
         const amount = numericModifierParam(mod, "amount");
-        if (mod.type === "MODIFY_COST" && amount !== undefined) cost += amount;
+        const applies =
+          card && cardDb
+            ? modifierAppliesToCard(effect, mod, card, state, cardDb, cost)
+            : effect.appliesTo?.includes(cardInstanceId);
+        if (
+          mod.type === "MODIFY_COST" &&
+          amount !== undefined &&
+          applies &&
+          isModifierConditionMet(effect, mod, state, cardDb)
+        ) {
+          cost += amount;
+          includedModifierKeys.add(inclusionKey);
+          addedThisPass = true;
+        }
       }
-      includedEffectIds.add(effect.id);
-      addedThisPass = true;
     }
     if (!addedThisPass) break;
   }
@@ -610,13 +688,13 @@ function getHandZoneSelfCostModifier(
     if (block.zone !== "HAND") continue;
     if (!block.modifiers) continue;
 
-    // Evaluate block-level conditions
-    if (block.conditions && !evaluateCondition(state, block.conditions, ctx))
-      continue;
-
     for (const mod of block.modifiers) {
       const amount = numericModifierParam(mod, "amount");
-      if (mod.type === "MODIFY_COST" && amount !== undefined)
+      if (
+        mod.type === "MODIFY_COST" &&
+        amount !== undefined &&
+        isModifierGateMet(block, mod, state, ctx)
+      )
         adjustment += amount;
     }
   }
@@ -674,20 +752,15 @@ function getFieldToHandCostModifier(
         );
         if (handCostMods.length === 0) continue;
 
-        // Evaluate block-level conditions
         const ctx: ConditionContext = {
           sourceCardInstanceId: fieldCard.instanceId,
           controller: fieldCard.controller,
           cardDb,
         };
-        if (
-          block.conditions &&
-          !evaluateCondition(state, block.conditions, ctx)
-        )
-          continue;
 
         // Check if the hand card matches the modifier's target filter
         for (const mod of handCostMods) {
+          if (!isModifierGateMet(block, mod, state, ctx)) continue;
           if (!mod.target?.controller) continue;
 
           // Controller check: the modifier's controller is relative to the field card
@@ -773,11 +846,13 @@ export function hasGrantedKeyword(
   const effects = state.activeEffects;
   return effects.some(
     (e) =>
-      effectAppliesToCard(e, card, state, cardDb) &&
       e.modifiers?.some(
-        (m) => m.type === "GRANT_KEYWORD" && m.params?.keyword === keyword
-      ) &&
-      isEffectConditionMet(e, state, cardDb)
+        (m) =>
+          m.type === "GRANT_KEYWORD" &&
+          m.params?.keyword === keyword &&
+          modifierAppliesToCard(e, m, card, state, cardDb) &&
+          isModifierConditionMet(e, m, state, cardDb)
+      )
   );
 }
 
@@ -797,14 +872,14 @@ export function hasGrantedAttribute(
   const effects = state.activeEffects;
   return effects.some(
     (e) =>
-      effectAppliesToCard(e, card, state, cardDb) &&
       e.modifiers?.some(
         (m) =>
           m.type === "GRANT_ATTRIBUTE" &&
           typeof m.params?.attribute === "string" &&
-          m.params.attribute.toUpperCase() === want
-      ) &&
-      isEffectConditionMet(e, state, cardDb)
+          m.params.attribute.toUpperCase() === want &&
+          modifierAppliesToCard(e, m, card, state, cardDb) &&
+          isModifierConditionMet(e, m, state, cardDb)
+      )
   );
 }
 
@@ -820,11 +895,13 @@ export function hasRemovedKeyword(
   const effects = state.activeEffects;
   return effects.some(
     (e) =>
-      effectAppliesToCard(e, card, state, cardDb) &&
       e.modifiers?.some(
-        (m) => m.type === "REMOVE_KEYWORD" && m.params?.keyword === keyword
-      ) &&
-      isEffectConditionMet(e, state, cardDb)
+        (m) =>
+          m.type === "REMOVE_KEYWORD" &&
+          m.params?.keyword === keyword &&
+          modifierAppliesToCard(e, m, card, state, cardDb) &&
+          isModifierConditionMet(e, m, state, cardDb)
+      )
   );
 }
 

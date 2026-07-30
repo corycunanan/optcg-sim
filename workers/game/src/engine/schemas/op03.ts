@@ -145,8 +145,9 @@ export const OP03_004_CURIEL: EffectSchema = {
           duration: {
             type: "WHILE_CONDITION",
             condition: {
-              type: "DON_FIELD_COUNT",
+              type: "DON_GIVEN",
               controller: "SELF",
+              mode: "SPECIFIC_CARD",
               operator: ">=",
               value: 1,
             },
@@ -882,8 +883,9 @@ export const OP03_025_KRIEG: EffectSchema = {
           duration: {
             type: "WHILE_CONDITION",
             condition: {
-              type: "DON_FIELD_COUNT",
+              type: "DON_GIVEN",
               controller: "SELF",
+              mode: "SPECIFIC_CARD",
               operator: ">=",
               value: 1,
             },

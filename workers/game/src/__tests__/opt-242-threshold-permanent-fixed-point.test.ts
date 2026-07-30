@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
-import type { RuntimeActiveEffect } from "../engine/effect-types.js";
+import type { Modifier, RuntimeActiveEffect } from "../engine/effect-types.js";
 import type { CostEvaluationDiagnostics } from "../engine/modifiers.js";
 import { getEffectiveCost } from "../engine/modifiers.js";
 import { setupGame, createTestCardDb, CARDS, padChars } from "./helpers.js";
@@ -105,6 +105,35 @@ function usoppPermanent(): RuntimeActiveEffect {
     controller: 0,
     appliesTo: [], // dynamic target — resolved each call via filter
     timestamp: 1,
+  };
+}
+
+function siblingCostEffect(
+  id: string,
+  modifiers: Modifier[]
+): RuntimeActiveEffect {
+  return {
+    id,
+    sourceCardInstanceId: `${id}-source`,
+    sourceEffectBlockId: `${id}-block`,
+    category: "permanent",
+    modifiers,
+    duration: { type: "PERMANENT" },
+    expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+    controller: 0,
+    appliesTo: [],
+    timestamp: 1,
+  };
+}
+
+function costIncrease(amount: number, costMin?: number): Modifier {
+  return {
+    type: "MODIFY_COST",
+    target: {
+      type: "ALL_YOUR_CHARACTERS",
+      ...(costMin === undefined ? {} : { filter: { cost_min: costMin } }),
+    },
+    params: { amount },
   };
 }
 
@@ -275,5 +304,42 @@ describe("OPT-242 D4: threshold-filtered permanent modifiers re-evaluate on effe
       activeEffects: [usoppPermanent()] as any,
     };
     expect(getEffectiveCost(card, state, instance.instanceId, cardDb)).toBe(3);
+  });
+});
+
+describe("OPT-600 — sibling Layer 2 modifiers reach an order-independent fixpoint", () => {
+  it.each([
+    ["threshold first", [costIncrease(10, 4), costIncrease(1)]],
+    ["unconditional first", [costIncrease(1), costIncrease(10, 4)]],
+  ] as const)("%s reaches cost 14", (_name, modifiers) => {
+    const { card, instance } = makeDressrosaChar(0, "siblings", 3);
+    const effect = siblingCostEffect("sibling-order", [...modifiers]);
+    const { state, cardDb } = buildState(instance, [effect], [card]);
+
+    expect(getEffectiveCost(card, state, instance.instanceId, cardDb)).toBe(14);
+  });
+
+  it("converges after several passes while applying every modifier once", () => {
+    const { card, instance } = makeDressrosaChar(0, "sibling-chain", 1);
+    const effect = siblingCostEffect("sibling-chain", [
+      costIncrease(1, 4),
+      costIncrease(1, 3),
+      costIncrease(1, 2),
+      costIncrease(1),
+    ]);
+    const { state, cardDb } = buildState(instance, [effect], [card]);
+    const diagnostics: CostEvaluationDiagnostics = { layer2Iterations: 0 };
+
+    expect(
+      getEffectiveCost(
+        card,
+        state,
+        instance.instanceId,
+        cardDb,
+        true,
+        diagnostics
+      )
+    ).toBe(5);
+    expect(diagnostics.layer2Iterations).toBe(5);
   });
 });
