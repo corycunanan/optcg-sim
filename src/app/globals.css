@@ -110,6 +110,7 @@
   --surface-panel: var(--elevation-panel);
   --surface-overlay: var(--elevation-panel);
   --surface-raised: var(--elevation-raised);
+  --surface-2: var(--surface-raised);
   --surface-inset: var(--elevation-inset);
   --surface-nav: var(--elevation-nav);
   --surface-interactive: var(--surface-step-interactive);
@@ -151,10 +152,6 @@
   --destructive-fg: var(--surface-step-ink);
   --error: var(--red-600);
   --error-soft: var(--red-100);
-
-  /* Current-location indicators */
-  --nav-current-indicator: var(--text-step-primary);
-  --nav-current-indicator-on-accent: var(--surface-step-ink);
 
   /* Component dimensions */
   --navbar-actions-width: var(--chrome-navbar-actions-width);
@@ -293,7 +290,7 @@
   --color-surface-nav:  var(--surface-nav);
   --color-surface-base: var(--surface-page);
   --color-surface-1:    var(--surface-panel);
-  --color-surface-2:    var(--surface-raised);
+  --color-surface-2:    var(--surface-2);
   --color-surface-3:    var(--surface-inset);
 
   /* Legacy utility names routed through semantic roles */
@@ -324,10 +321,7 @@
   --color-border:        var(--border-subtle);
   --color-border-strong: var(--border-strong);
   --color-border-focus:  var(--border-focus);
-
-  /* Navigation state */
-  --color-nav-current-indicator: var(--nav-current-indicator);
-  --color-nav-current-indicator-on-accent: var(--nav-current-indicator-on-accent);
+  --color-border-accent: var(--accent-border);
 
   /* Component dimensions */
   --spacing-navbar-actions: var(--navbar-actions-width);

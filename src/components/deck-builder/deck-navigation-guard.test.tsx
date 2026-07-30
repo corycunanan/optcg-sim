@@ -732,10 +732,10 @@ describe("deck builder navigation guard", () => {
     expect(links.map((link) => link.props.href)).toEqual([
       "/lobbies",
       "/",
-      "/cards",
-      "/sets",
       "/decks",
       "/decks/new",
+      "/cards",
+      "/sets",
       "/onboarding",
     ]);
 
@@ -761,10 +761,10 @@ describe("deck builder navigation guard", () => {
     expect(links.map((link) => link.props.href)).toEqual([
       "/lobbies",
       "/",
-      "/cards",
-      "/sets",
       "/decks",
       "/decks/new",
+      "/cards",
+      "/sets",
       "/onboarding",
     ]);
   });

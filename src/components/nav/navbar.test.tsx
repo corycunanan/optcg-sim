@@ -122,42 +122,75 @@ describe("Navbar", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders PLAY first with emphasis and keeps all four links", () => {
+  it("renders Play, Home, Decks, Cards and emphasizes inactive Play", () => {
     const { container } = render(<Navbar />);
     const navText = container.querySelector("nav")?.textContent ?? "";
     const play = screen.getByRole("link", { name: "Play" });
 
     expect(navText.indexOf("Play")).toBeLessThan(navText.indexOf("Home"));
-    expect(navText.indexOf("Home")).toBeLessThan(navText.indexOf("Cards"));
-    expect(navText.indexOf("Cards")).toBeLessThan(navText.indexOf("Decks"));
+    expect(navText.indexOf("Home")).toBeLessThan(navText.indexOf("Decks"));
+    expect(navText.indexOf("Decks")).toBeLessThan(navText.indexOf("Cards"));
     expect(play.className).toContain("bg-gold-500");
     expect(screen.getByRole("link", { name: "Home" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Cards" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Decks" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Cards" })).toBeDefined();
   });
 
   it.each([
-    ["/lobbies", "link", "Play", "play"],
-    ["/", "link", "Home", "standard"],
-    ["/cards", "button", "Cards", "standard"],
-    ["/decks", "button", "Decks", "standard"],
+    ["/lobbies", "link", "Play"],
+    ["/", "link", "Home"],
+    ["/cards", "button", "Cards"],
+    ["/decks", "button", "Decks"],
   ])(
-    "renders the distinct current-route indicator for %s",
-    (pathname, role, accessibleName, indicatorVariant) => {
+    "renders the sole active pill and aria-current for %s",
+    (pathname, role, accessibleName) => {
       mocks.pathname = pathname;
       render(<Navbar />);
 
       const activeControl = screen.getByRole(role, { name: accessibleName });
-      const indicator = activeControl.querySelector(
-        '[data-slot="navbar-current-indicator"]'
-      );
 
-      expect(indicator?.getAttribute("data-variant")).toBe(indicatorVariant);
+      expect(activeControl.getAttribute("aria-current")).toBe("page");
+      expect(activeControl.className).toContain("bg-surface-2");
+      expect(activeControl.className).toContain("text-gold-600");
+
+      const inactiveControls = [
+        screen.getByRole("link", { name: "Play" }),
+        screen.getByRole("link", { name: "Home" }),
+        screen.getByRole("button", { name: "Decks" }),
+        screen.getByRole("button", { name: "Cards" }),
+      ].filter((control) => control !== activeControl);
+
+      for (const inactiveControl of inactiveControls) {
+        const inactiveClassTokens = inactiveControl.className.split(/\s+/);
+
+        expect(inactiveClassTokens).not.toContain("bg-surface-2");
+        expect(inactiveClassTokens).not.toContain("text-gold-600");
+      }
+
       expect(
-        document.querySelectorAll('[data-slot="navbar-current-indicator"]')
-      ).toHaveLength(1);
+        document.querySelector('[data-slot="navbar-current-indicator"]')
+      ).toBeNull();
     }
   );
+
+  it("removes the gold CTA fill from Play while Play is active", () => {
+    mocks.pathname = "/lobbies";
+    render(<Navbar />);
+
+    const play = screen.getByRole("link", { name: "Play" });
+
+    expect(play.className).not.toContain("bg-gold-500");
+    expect(play.className).toContain("bg-surface-2");
+    expect(play.className).toContain("text-gold-600");
+  });
+
+  it("uses the reserved gold border token for the nav divider", () => {
+    const { container } = render(<Navbar />);
+
+    expect(container.querySelector("nav")?.className).toContain(
+      "border-border-accent"
+    );
+  });
 
   it("reflects realtime unread counts, caps at 9+, and omits a zero badge", () => {
     mocks.unreadCount = 4;

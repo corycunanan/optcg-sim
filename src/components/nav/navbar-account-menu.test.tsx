@@ -43,6 +43,7 @@ describe("NavbarAccountMenu", () => {
     const trigger = screen.getByRole("button", {
       name: "Account menu for luffy",
     });
+    expect(trigger.textContent).toContain("luffy");
     trigger.focus();
     await user.keyboard("{Enter}");
 
@@ -62,9 +63,30 @@ describe("NavbarAccountMenu", () => {
     const trigger = screen.getByRole("button", {
       name: "Account menu for Pirate",
     });
+    expect(trigger.textContent).toContain("Pirate");
     trigger.focus();
     await user.keyboard("{Enter}");
 
     expect(screen.getByLabelText("Theme: Default")).toBeDefined();
+  });
+
+  it("constrains and responsively hides the longest permitted username", () => {
+    const longestUsername = "WWWWWWWWWWWWWWWWWWWW";
+    render(<NavbarAccountMenu user={{ username: longestUsername }} />);
+
+    const label = screen.getByText(longestUsername);
+
+    expect(label.getAttribute("data-slot")).toBe("navbar-account-name");
+    expect(label.className).toContain("hidden");
+    expect(label.className).toContain("sm:block");
+    expect(label.className).toContain("max-w-16");
+    expect(label.className).toContain("sm:max-w-24");
+    expect(label.className).toContain("lg:max-w-40");
+    expect(label.className).toContain("truncate");
+    expect(
+      screen.getByRole("button", {
+        name: `Account menu for ${longestUsername}`,
+      })
+    ).toBeDefined();
   });
 });
