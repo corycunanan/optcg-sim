@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Eye, Layers3, Loader2, Play, Plus } from "lucide-react";
+import { Eye, Layers3, Loader2, Play, Plus, Settings } from "lucide-react";
 import { toast } from "sonner";
+import { resolvePregameMode } from "@shared/game-init";
 import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { claimLobbyRecovery } from "@/lib/lobbies/recovery-once";
@@ -27,6 +28,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -47,6 +54,7 @@ import {
 import { JoinPartyDialog } from "./join-party-dialog";
 import { KickPlayerAction } from "./kick-player-action";
 import { LobbySeatCard } from "./lobby-seat-card";
+import { PregameSettings } from "./pregame-settings";
 import { SpectatorsModal } from "./spectators-modal";
 
 interface DeckOption extends LobbyRoomDeck {
@@ -390,6 +398,21 @@ export function LobbyRoomShell({
     realGuestPresent,
     activeGameId,
   });
+  const settingsDisabled =
+    mutating || starting || leaving || closing || hasActiveMatch;
+  const displayedPregameMode =
+    resolvePregameMode(
+      lobby.mode === "SOLITAIRE" ? "SOLITAIRE" : "PVP",
+      lobby.pregameMode,
+      false
+    ) ?? lobby.pregameMode;
+
+  const handlePregameModeChange = (
+    pregameMode: LobbyRoomState["pregameMode"]
+  ) => {
+    if (!isHost || settingsDisabled) return;
+    void runPatch({ pregameMode });
+  };
 
   return (
     <TooltipProvider>
@@ -680,29 +703,63 @@ export function LobbyRoomShell({
               <p className="text-content-tertiary text-xs">{startHint}</p>
             </div>
 
-            {activeGameId ? (
-              <ActiveMatchAction
-                gameId={activeGameId}
-                viewerRole={lobby.viewerRole}
-                onOpen={(gameId) => router.push(`/game/${gameId}`)}
-              />
-            ) : (
-              <Button
-                variant="gold"
-                size="lg"
-                onClick={() => void handleStart()}
-                disabled={
-                  !canStart || mutating || starting || closing || isInGame
-                }
-              >
-                {starting ? (
-                  <Loader2 data-icon="inline-start" className="animate-spin" />
-                ) : (
-                  <Play data-icon="inline-start" />
-                )}
-                Start Match
-              </Button>
-            )}
+            <div
+              className="flex flex-col gap-3 lg:flex-row lg:items-center"
+              data-lobby-match-actions
+            >
+              {activeGameId ? (
+                <ActiveMatchAction
+                  gameId={activeGameId}
+                  viewerRole={lobby.viewerRole}
+                  onOpen={(gameId) => router.push(`/game/${gameId}`)}
+                />
+              ) : (
+                <Button
+                  variant="gold"
+                  size="lg"
+                  onClick={() => void handleStart()}
+                  disabled={
+                    !canStart || mutating || starting || closing || isInGame
+                  }
+                >
+                  {starting ? (
+                    <Loader2
+                      data-icon="inline-start"
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <Play data-icon="inline-start" />
+                  )}
+                  Start Match
+                </Button>
+              )}
+
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    disabled={settingsDisabled}
+                  >
+                    <Settings data-icon="inline-start" />
+                    Match settings
+                  </Button>
+                </DialogTrigger>
+                <DialogContent
+                  size="lg"
+                  className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+                >
+                  <DialogTitle className="sr-only">Match settings</DialogTitle>
+                  <PregameSettings
+                    mode={lobby.mode}
+                    value={displayedPregameMode}
+                    editable={Boolean(isHost)}
+                    disabled={settingsDisabled}
+                    onChange={handlePregameModeChange}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
 
@@ -796,9 +853,7 @@ function SpectatorRoom({
         <div className="grid gap-6 lg:grid-cols-2">
           <SpectatorSeat
             role="Host"
-            player={
-              lobby.host ?? { username: null, name: "Host", image: null }
-            }
+            player={lobby.host ?? { username: null, name: "Host", image: null }}
             deck={lobby.hostDeck}
           />
           <SpectatorSeat
