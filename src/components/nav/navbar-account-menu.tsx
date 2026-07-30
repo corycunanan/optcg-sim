@@ -51,7 +51,7 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
             />
             <span
               data-slot="navbar-account-name"
-              className="hidden max-w-16 truncate text-sm sm:block"
+              className="hidden max-w-16 truncate text-sm sm:block sm:max-w-24 lg:max-w-40"
             >
               {displayName}
             </span>

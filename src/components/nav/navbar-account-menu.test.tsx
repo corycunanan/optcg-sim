@@ -80,6 +80,8 @@ describe("NavbarAccountMenu", () => {
     expect(label.className).toContain("hidden");
     expect(label.className).toContain("sm:block");
     expect(label.className).toContain("max-w-16");
+    expect(label.className).toContain("sm:max-w-24");
+    expect(label.className).toContain("lg:max-w-40");
     expect(label.className).toContain("truncate");
     expect(
       screen.getByRole("button", {

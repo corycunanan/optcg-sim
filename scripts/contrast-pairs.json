@@ -31,6 +31,12 @@
       "minimum": 4.5
     },
     {
+      "name": "primary/raised-state",
+      "foreground": "--text-primary",
+      "background": "--surface-2",
+      "minimum": 4.5
+    },
+    {
       "name": "secondary/page",
       "foreground": "--text-secondary",
       "background": "--surface-page",
