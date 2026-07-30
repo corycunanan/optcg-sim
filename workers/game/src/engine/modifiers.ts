@@ -590,10 +590,10 @@ export function getEffectiveCostForRead(
 /**
  * OPT-242: Apply Layer 2 MODIFY_COST modifiers with include-once iteration.
  *
- * Each iteration, any un-included Layer 2 effect whose filter now matches the
- * accumulated cost is included and its modifiers applied. Iteration stops when
- * a full pass adds nothing. Once included, an effect stays included for the
- * remainder of this evaluation (no un-applying), per Bandai ruling.
+ * Each iteration, any un-included Layer 2 modifier whose filter now matches the
+ * accumulated cost is included and applied. Iteration stops when a full pass
+ * adds nothing. Once included, a modifier stays included for the remainder of
+ * this evaluation (no un-applying), per Bandai ruling.
  *
  * This resolves threshold scenarios like OP10-042 Usopp ("your {Dressrosa}
  * Characters with cost ≥2 get +1 cost") interacting with auto cost-reduction:
@@ -620,15 +620,17 @@ function applyLayer2CostModifiers(
   );
   const candidates = sortByTurnPlayerPriority(rawCandidates, turnPlayerIndex);
 
-  const includedEffectIds = new Set<string>();
+  const includedModifierKeys = new Set<string>();
   for (let iter = 0; iter < MAX_COST_LAYER2_ITERATIONS; iter++) {
     if (diagnostics) diagnostics.layer2Iterations = iter + 1;
     let addedThisPass = false;
     for (const effect of candidates) {
-      if (includedEffectIds.has(effect.id)) continue;
+      for (const [modifierIndex, mod] of (
+        effect.modifiers ?? []
+      ).entries()) {
+        const inclusionKey = `${effect.id}:${modifierIndex}`;
+        if (includedModifierKeys.has(inclusionKey)) continue;
 
-      let appliedModifier = false;
-      for (const mod of effect.modifiers ?? []) {
         const amount = numericModifierParam(mod, "amount");
         const applies =
           card && cardDb
@@ -641,12 +643,10 @@ function applyLayer2CostModifiers(
           isModifierConditionMet(effect, mod, state, cardDb)
         ) {
           cost += amount;
-          appliedModifier = true;
+          includedModifierKeys.add(inclusionKey);
+          addedThisPass = true;
         }
       }
-      if (!appliedModifier) continue;
-      includedEffectIds.add(effect.id);
-      addedThisPass = true;
     }
     if (!addedThisPass) break;
   }
