@@ -15,6 +15,7 @@ import type {
   RuntimeActiveEffect,
   RuntimeOneTimeModifier,
   Modifier,
+  EffectBlock,
   TargetFilter,
   EffectResult,
 } from "./effect-types.js";
@@ -213,6 +214,42 @@ function isEffectSourceNegated(
 }
 
 /**
+ * Evaluate the complete permanent-modifier gate in narrowing order.
+ *
+ * Raw-schema cost paths and registered active effects both delegate here so
+ * block conditions, block duration, and modifier duration cannot diverge.
+ */
+function isModifierGateMet(
+  block: Pick<EffectBlock, "conditions" | "duration">,
+  modifier: Modifier | undefined,
+  state: GameState,
+  ctx: ConditionContext
+): boolean {
+  if (block.conditions && !evaluateCondition(state, block.conditions, ctx))
+    return false;
+
+  const blockDuration = block.duration;
+  if (
+    blockDuration?.type === "WHILE_CONDITION" &&
+    blockDuration.condition &&
+    !evaluateCondition(state, blockDuration.condition, ctx)
+  ) {
+    return false;
+  }
+
+  const modifierDuration = modifier?.duration;
+  if (
+    modifierDuration?.type === "WHILE_CONDITION" &&
+    modifierDuration.condition &&
+    !evaluateCondition(state, modifierDuration.condition, ctx)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
  * Returns true for effects that have no WHILE_CONDITION duration (always active).
  *
@@ -242,17 +279,7 @@ export function isEffectConditionMet(
     cardDb,
   };
 
-  // Check block-level conditions (e.g., "if you have no other [Shirahoshi] with cost 2")
-  if (effect.conditions) {
-    if (!evaluateCondition(state, effect.conditions, condCtx)) return false;
-  }
-
-  // Check duration condition (e.g., IS_MY_TURN for opponent's turn effects)
-  const duration = effect.duration;
-  if (!duration || duration.type !== "WHILE_CONDITION" || !duration.condition)
-    return true;
-
-  return evaluateCondition(state, duration.condition, condCtx);
+  return isModifierGateMet(effect, undefined, state, condCtx);
 }
 
 /**
@@ -265,14 +292,15 @@ export function isModifierConditionMet(
   state: GameState,
   cardDb?: Map<string, CardDataType>
 ): boolean {
-  if (!isEffectConditionMet(effect, state, cardDb)) return false;
-  if (!cardDb) return true;
+  if (!cardDb) return true; // can't evaluate without cardDb — assume active
 
-  const duration = modifier.duration;
-  if (!duration || duration.type !== "WHILE_CONDITION" || !duration.condition)
-    return true;
+  const isNegationFlag = effect.modifiers?.some(
+    (candidate) => candidate.type === "NEGATE_EFFECTS_FLAG"
+  );
+  if (!isNegationFlag && isEffectSourceNegated(effect, state, cardDb))
+    return false;
 
-  return evaluateCondition(state, duration.condition, {
+  return isModifierGateMet(effect, modifier, state, {
     sourceCardInstanceId: effect.sourceCardInstanceId,
     controller: effect.controller,
     cardDb,
@@ -660,13 +688,13 @@ function getHandZoneSelfCostModifier(
     if (block.zone !== "HAND") continue;
     if (!block.modifiers) continue;
 
-    // Evaluate block-level conditions
-    if (block.conditions && !evaluateCondition(state, block.conditions, ctx))
-      continue;
-
     for (const mod of block.modifiers) {
       const amount = numericModifierParam(mod, "amount");
-      if (mod.type === "MODIFY_COST" && amount !== undefined)
+      if (
+        mod.type === "MODIFY_COST" &&
+        amount !== undefined &&
+        isModifierGateMet(block, mod, state, ctx)
+      )
         adjustment += amount;
     }
   }
@@ -724,20 +752,15 @@ function getFieldToHandCostModifier(
         );
         if (handCostMods.length === 0) continue;
 
-        // Evaluate block-level conditions
         const ctx: ConditionContext = {
           sourceCardInstanceId: fieldCard.instanceId,
           controller: fieldCard.controller,
           cardDb,
         };
-        if (
-          block.conditions &&
-          !evaluateCondition(state, block.conditions, ctx)
-        )
-          continue;
 
         // Check if the hand card matches the modifier's target filter
         for (const mod of handCostMods) {
+          if (!isModifierGateMet(block, mod, state, ctx)) continue;
           if (!mod.target?.controller) continue;
 
           // Controller check: the modifier's controller is relative to the field card
