@@ -11,6 +11,10 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres pnpm te
 ```
 
 Docker, Postgres.app, and a local PostgreSQL installation all work. When the
-server is unavailable, database suites skip locally with setup instructions and
-fail during global setup in CI. Tests can use `describeWithDatabase` and
-`createTestPrisma` from `src/test/database/harness.ts`.
+server is unavailable, database suites skip locally with setup instructions,
+including when a local tool sets `CI=true`. Set `TEST_DATABASE_URL` to run them.
+In GitHub Actions (`GITHUB_ACTIONS=true`), an unavailable server fails global
+setup so CI cannot silently skip database coverage. Outside GitHub Actions,
+unset `GITHUB_ACTIONS` to use the local skip behavior. Tests can use
+`describeWithDatabase` and `createTestPrisma` from
+`src/test/database/harness.ts`.

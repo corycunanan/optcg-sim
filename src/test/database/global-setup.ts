@@ -9,6 +9,12 @@ const prismaCliPath = require.resolve("prisma/build/index.js");
 const DEFAULT_MAINTENANCE_URL =
   "postgresql://prisma:prisma@localhost:5432/postgres";
 
+export function shouldFailForUnavailableDatabase(
+  environment: Readonly<Record<string, string | undefined>>
+) {
+  return environment.GITHUB_ACTIONS === "true";
+}
+
 function databaseUrl(baseUrl: string, databaseName: string) {
   const url = new URL(baseUrl);
   url.pathname = `/${databaseName}`;
@@ -35,10 +41,13 @@ export default async function setupDatabaseTests(project: TestProject) {
       "Database-backed tests require a disposable PostgreSQL server. " +
       "Set TEST_DATABASE_URL to a maintenance database that can CREATE DATABASE.";
 
-    if (process.env.CI) {
-      throw new Error(`${message} PostgreSQL was unreachable in CI.`, {
-        cause: error,
-      });
+    if (shouldFailForUnavailableDatabase(process.env)) {
+      throw new Error(
+        `${message} PostgreSQL was unreachable in GitHub Actions. ` +
+          "Restore the PostgreSQL service or set TEST_DATABASE_URL to a reachable maintenance database. " +
+          "Outside GitHub Actions, unset GITHUB_ACTIONS to skip database suites.",
+        { cause: error }
+      );
     }
 
     console.warn(`[database-tests] ${message} Skipping database suites.`);
