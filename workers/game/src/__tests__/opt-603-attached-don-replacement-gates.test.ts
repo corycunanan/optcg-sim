@@ -236,6 +236,23 @@ describe("OPT-603 — authored replacement conditions", () => {
   });
 
   it("OP05-001 offers its replacement only during the opponent's turn", () => {
+    const ownTurnWithoutDon = replacementFixture({
+      cardId: "OP05-001",
+      sourceType: "Leader",
+      sourceDonCount: 0,
+      activePlayerIndex: 0,
+    });
+    expect(
+      checkReplacementForKO(
+        ownTurnWithoutDon.state,
+        ownTurnWithoutDon.target.instanceId,
+        "effect",
+        1,
+        ownTurnWithoutDon.cardDb,
+        resolverExecutionServices
+      ).pendingPrompt
+    ).toBeUndefined();
+
     const ownTurn = replacementFixture({
       cardId: "OP05-001",
       sourceType: "Leader",
