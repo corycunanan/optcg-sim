@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, Layers3, Loader2, Play, Plus, Settings } from "lucide-react";
 import { toast } from "sonner";
+import { resolvePregameMode } from "@shared/game-init";
 import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { claimLobbyRecovery } from "@/lib/lobbies/recovery-once";
@@ -399,6 +400,19 @@ export function LobbyRoomShell({
   });
   const settingsDisabled =
     mutating || starting || leaving || closing || hasActiveMatch;
+  const displayedPregameMode =
+    resolvePregameMode(
+      lobby.mode === "SOLITAIRE" ? "SOLITAIRE" : "PVP",
+      lobby.pregameMode,
+      false
+    ) ?? lobby.pregameMode;
+
+  const handlePregameModeChange = (
+    pregameMode: LobbyRoomState["pregameMode"]
+  ) => {
+    if (!isHost || settingsDisabled) return;
+    void runPatch({ pregameMode });
+  };
 
   return (
     <TooltipProvider>
@@ -689,7 +703,10 @@ export function LobbyRoomShell({
               <p className="text-content-tertiary text-xs">{startHint}</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div
+              className="flex flex-col gap-3 lg:flex-row lg:items-center"
+              data-lobby-match-actions
+            >
               {activeGameId ? (
                 <ActiveMatchAction
                   gameId={activeGameId}
@@ -728,14 +745,17 @@ export function LobbyRoomShell({
                     Match settings
                   </Button>
                 </DialogTrigger>
-                <DialogContent size="lg">
+                <DialogContent
+                  size="lg"
+                  className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+                >
                   <DialogTitle className="sr-only">Match settings</DialogTitle>
                   <PregameSettings
                     mode={lobby.mode}
-                    value={lobby.pregameMode}
+                    value={displayedPregameMode}
                     editable={Boolean(isHost)}
                     disabled={settingsDisabled}
-                    onChange={(pregameMode) => void runPatch({ pregameMode })}
+                    onChange={handlePregameModeChange}
                   />
                 </DialogContent>
               </Dialog>
@@ -833,9 +853,7 @@ function SpectatorRoom({
         <div className="grid gap-6 lg:grid-cols-2">
           <SpectatorSeat
             role="Host"
-            player={
-              lobby.host ?? { username: null, name: "Host", image: null }
-            }
+            player={lobby.host ?? { username: null, name: "Host", image: null }}
             deck={lobby.hostDeck}
           />
           <SpectatorSeat

@@ -106,9 +106,19 @@ vi.mock("@/components/ui/dialog", async () => {
       },
     });
   };
-  const DialogContent = ({ children }: { children?: ReactNode }) => {
+  const DialogContent = ({
+    children,
+    className,
+  }: {
+    children?: ReactNode;
+    className?: string;
+  }) => {
     const context = React.useContext(DialogContext);
-    return context?.open ? <>{children}</> : null;
+    return context?.open ? (
+      <div data-dialog-content className={className}>
+        {children}
+      </div>
+    ) : null;
   };
   const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
   return {
@@ -395,10 +405,26 @@ describe("LobbyRoomShell redesign scenarios", () => {
       .find((button) => button.children.includes("Match settings"));
     expect(settingsButton?.props.variant).toBe("outline");
     expect(settingsButton?.props.disabled).toBe(false);
+    expect(
+      renderer!.root.findByProps({ "data-lobby-match-actions": true }).props
+        .className
+    ).toContain("flex-col");
+    expect(
+      renderer!.root.findByProps({ "data-lobby-match-actions": true }).props
+        .className
+    ).toContain("lg:flex-row");
 
     await act(async () => {
       settingsButton?.props.onClick();
     });
+
+    const settingsDialog = renderer!.root.findByProps({
+      "data-dialog-content": true,
+    });
+    expect(settingsDialog.props.className).toContain(
+      "max-h-[calc(100dvh-2rem)]"
+    );
+    expect(settingsDialog.props.className).toContain("overflow-y-auto");
 
     const pregameRadios = renderer!.root
       .findAllByType("input")
@@ -476,11 +502,56 @@ describe("LobbyRoomShell redesign scenarios", () => {
         ?.props.onClick();
     });
     expect(renderedText()).toContain("Host controlled");
+    const pregameRadios = renderer!.root
+      .findAllByType("input")
+      .filter((input) => input.props.name === "pregame-mode");
+    expect(pregameRadios).toHaveLength(4);
+    expect(pregameRadios.every((input) => input.props.disabled)).toBe(true);
+
+    await act(async () => {
+      pregameRadios
+        .find((radio) => radio.props.value === "GUEST_FIRST")
+        ?.props.onChange();
+      await Promise.resolve();
+    });
+
+    expect(mocks.apiPatch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the selected pregame mode after a failed host update", async () => {
+    mocks.apiPatch.mockRejectedValue(new Error("offline"));
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      renderer!.root
+        .findAllByType("button")
+        .find((button) => button.children.includes("Match settings"))
+        ?.props.onClick();
+    });
+
+    const pregameRadios = renderer!.root
+      .findAllByType("input")
+      .filter((input) => input.props.name === "pregame-mode");
+
+    await act(async () => {
+      pregameRadios
+        .find((radio) => radio.props.value === "GUEST_FIRST")
+        ?.props.onChange();
+      await Promise.resolve();
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith("Lobby update failed");
     expect(
       renderer!.root
         .findAllByType("input")
-        .filter((input) => input.props.name === "pregame-mode")
-        .every((input) => input.props.disabled)
+        .find((radio) => radio.props.value === "PRIORITY_ROLL")?.props.checked
     ).toBe(true);
   });
 
@@ -617,8 +688,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(
       renderer?.root.findByProps({
         role: "switch",
-        "aria-label":
-          "Allow spectators. Turning this off removes 3 watchers.",
+        "aria-label": "Allow spectators. Turning this off removes 3 watchers.",
       })
     ).toBeDefined();
   });
@@ -862,12 +932,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
     }
     expect(
       mocks.apiGet.mock.calls.some(
-        ([url]) => typeof url === "string" && url.startsWith("/api/decks/"),
-      ),
+        ([url]) => typeof url === "string" && url.startsWith("/api/decks/")
+      )
     ).toBe(false);
   });
 
-  it("renders the solitaire second-deck state", async () => {
+  it("renders the solitaire state with a normalized cross-mode selection", async () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
         ? { data: [] }
@@ -875,7 +945,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
             data: lobbyState({
               status: "WAITING",
               mode: "SOLITAIRE",
-              pregameMode: "SOLITAIRE_RANDOM",
+              pregameMode: "HOST_FIRST",
               guest: {
                 guestReady: false,
                 user: {
@@ -1092,32 +1162,38 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(
       renderer!.root.findAllByType("button").map((button) => button.children)
     ).toEqual([["Stop spectating"]]);
-    expect(
-      mocks.apiGet.mock.calls.some(([url]) => url === "/api/decks")
-    ).toBe(false);
+    expect(mocks.apiGet.mock.calls.some(([url]) => url === "/api/decks")).toBe(
+      false
+    );
   });
 
   it.each([
     ["host", "Start Match"],
     ["guest", "Leave lobby"],
-  ] as const)("keeps the %s seated-player branch", async (viewerRole, action) => {
-    mocks.apiGet.mockImplementation(async (url: string) =>
-      url === "/api/decks"
-        ? { data: [] }
-        : { data: lobbyState({ viewerRole }) }
-    );
-
-    await act(async () => {
-      renderer = create(
-        <LobbyRoomShell lobbyId="lobby-1" currentUserId={`${viewerRole}-user`} />
+  ] as const)(
+    "keeps the %s seated-player branch",
+    async (viewerRole, action) => {
+      mocks.apiGet.mockImplementation(async (url: string) =>
+        url === "/api/decks"
+          ? { data: [] }
+          : { data: lobbyState({ viewerRole }) }
       );
-      await Promise.resolve();
-      await Promise.resolve();
-    });
 
-    expect(renderedText()).toContain(action);
-    expect(renderedText()).not.toContain("Waiting for the match to start");
-  });
+      await act(async () => {
+        renderer = create(
+          <LobbyRoomShell
+            lobbyId="lobby-1"
+            currentUserId={`${viewerRole}-user`}
+          />
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(renderedText()).toContain(action);
+      expect(renderedText()).not.toContain("Waiting for the match to start");
+    }
+  );
 
   it("stops spectating through self-leave and returns to the personal lobby", async () => {
     mocks.apiGet.mockResolvedValue({
@@ -1221,42 +1297,45 @@ describe("LobbyRoomShell spectator ejection recovery", () => {
       "LOBBY_CLOSED",
       "The party closed. You've been returned to your own lobby.",
     ],
-  ] as const)("routes %s with one explanatory toast", async (reason, message) => {
-    const lobbyId = `spectator-ejection-${reason.toLowerCase()}`;
-    mocks.apiGet.mockResolvedValue({
-      data: lobbyState({ id: lobbyId, viewerRole: "spectator" }),
-    });
-
-    await act(async () => {
-      renderer = create(
-        <LobbyRoomShell lobbyId={lobbyId} currentUserId="spectator-1" />
-      );
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    const handler = mocks.handlers.get("lobby:spectator_removed");
-    expect(handler).toBeTypeOf("function");
-    await act(async () => {
-      handler?.({
-        type: "lobby:spectator_removed",
-        lobbyId: "some-other-lobby",
-        reason,
+  ] as const)(
+    "routes %s with one explanatory toast",
+    async (reason, message) => {
+      const lobbyId = `spectator-ejection-${reason.toLowerCase()}`;
+      mocks.apiGet.mockResolvedValue({
+        data: lobbyState({ id: lobbyId, viewerRole: "spectator" }),
       });
-    });
-    expect(mocks.toastInfo).not.toHaveBeenCalled();
-    expect(mocks.push).not.toHaveBeenCalled();
 
-    await act(async () => {
-      handler?.({ type: "lobby:spectator_removed", lobbyId, reason });
-    });
+      await act(async () => {
+        renderer = create(
+          <LobbyRoomShell lobbyId={lobbyId} currentUserId="spectator-1" />
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
-    expect(mocks.toastInfo).toHaveBeenCalledTimes(1);
-    expect(mocks.toastInfo).toHaveBeenCalledWith(message);
-    expect(mocks.push).toHaveBeenCalledTimes(1);
-    expect(mocks.push).toHaveBeenCalledWith("/lobbies");
-    expect(renderer!.toJSON()).toBeNull();
-  });
+      const handler = mocks.handlers.get("lobby:spectator_removed");
+      expect(handler).toBeTypeOf("function");
+      await act(async () => {
+        handler?.({
+          type: "lobby:spectator_removed",
+          lobbyId: "some-other-lobby",
+          reason,
+        });
+      });
+      expect(mocks.toastInfo).not.toHaveBeenCalled();
+      expect(mocks.push).not.toHaveBeenCalled();
+
+      await act(async () => {
+        handler?.({ type: "lobby:spectator_removed", lobbyId, reason });
+      });
+
+      expect(mocks.toastInfo).toHaveBeenCalledTimes(1);
+      expect(mocks.toastInfo).toHaveBeenCalledWith(message);
+      expect(mocks.push).toHaveBeenCalledTimes(1);
+      expect(mocks.push).toHaveBeenCalledWith("/lobbies");
+      expect(renderer!.toJSON()).toBeNull();
+    }
+  );
 });
 
 describe("LobbyRoomShell guest removal recovery", () => {
