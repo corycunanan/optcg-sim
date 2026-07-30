@@ -80,6 +80,47 @@ vi.mock("@/components/ui/alert-dialog", () => {
     AlertDialogTitle: Wrapper,
   };
 });
+vi.mock("@/components/ui/dialog", async () => {
+  const React = await import("react");
+  const DialogContext = React.createContext<{
+    open: boolean;
+    setOpen: (open: boolean) => void;
+  } | null>(null);
+  const Dialog = ({ children }: { children?: ReactNode }) => {
+    const [open, setOpen] = React.useState(false);
+    return (
+      <DialogContext.Provider value={{ open, setOpen }}>
+        {children}
+      </DialogContext.Provider>
+    );
+  };
+  const DialogTrigger = ({ children }: { children?: ReactNode }) => {
+    const context = React.useContext(DialogContext);
+    if (!context || !React.isValidElement<ComponentProps<"button">>(children)) {
+      return <>{children}</>;
+    }
+    return React.cloneElement(children, {
+      onClick: (event) => {
+        children.props.onClick?.(event);
+        context.setOpen(true);
+      },
+    });
+  };
+  const DialogContent = ({ children }: { children?: ReactNode }) => {
+    const context = React.useContext(DialogContext);
+    return context?.open ? <>{children}</> : null;
+  };
+  const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
+  return {
+    Dialog,
+    DialogContent,
+    DialogDescription: Wrapper,
+    DialogFooter: Wrapper,
+    DialogHeader: Wrapper,
+    DialogTitle: Wrapper,
+    DialogTrigger,
+  };
+});
 vi.mock("@/components/ui/select", () => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
   return {
@@ -149,7 +190,6 @@ vi.mock("./host-close-action", () => ({
 vi.mock("./invite-friend-popover", () => ({
   InviteFriendPopover: () => null,
 }));
-vi.mock("./pregame-settings", () => ({ PregameSettings: () => null }));
 vi.mock("./kick-player-action", () => ({ KickPlayerAction: () => null }));
 
 import { LobbyInviteToasts } from "./lobby-invite-toast";
@@ -339,6 +379,53 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Start Match");
   });
 
+  it("mounts real match settings and persists the host selection", async () => {
+    mocks.apiPatch.mockResolvedValue({ success: true });
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const settingsButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Match settings"));
+    expect(settingsButton?.props.variant).toBe("outline");
+    expect(settingsButton?.props.disabled).toBe(false);
+
+    await act(async () => {
+      settingsButton?.props.onClick();
+    });
+
+    const pregameRadios = renderer!.root
+      .findAllByType("input")
+      .filter((input) => input.props.name === "pregame-mode");
+    expect(pregameRadios).toHaveLength(4);
+    expect(
+      pregameRadios.find((radio) => radio.props.value === "PRIORITY_ROLL")
+        ?.props.checked
+    ).toBe(true);
+    expect(pregameRadios.every((radio) => radio.props.disabled === false)).toBe(
+      true
+    );
+
+    await act(async () => {
+      pregameRadios
+        .find((radio) => radio.props.value === "GUEST_FIRST")
+        ?.props.onChange();
+      await Promise.resolve();
+    });
+
+    expect(mocks.apiPatch).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1",
+      { pregameMode: "GUEST_FIRST" },
+      expect.anything()
+    );
+  });
+
   it("keeps the selected mode legible when guests cannot change it", async () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
@@ -382,6 +469,19 @@ describe("LobbyRoomShell redesign scenarios", () => {
       renderer!.root.findByProps({ id: "solitaire-mode-blocked-reason" }).props
         .className
     ).not.toContain("sr-only");
+    await act(async () => {
+      renderer!.root
+        .findAllByType("button")
+        .find((button) => button.children.includes("Match settings"))
+        ?.props.onClick();
+    });
+    expect(renderedText()).toContain("Host controlled");
+    expect(
+      renderer!.root
+        .findAllByType("input")
+        .filter((input) => input.props.name === "pregame-mode")
+        .every((input) => input.props.disabled)
+    ).toBe(true);
   });
 
   it("renders an interactive host spectator toggle and keeps the empty count available", async () => {
@@ -802,6 +902,20 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Your second deck");
     expect(renderedText()).toContain("Play both sides");
     expect(renderedText()).toContain("Both players need a deck");
+    await act(async () => {
+      renderer!.root
+        .findAllByType("button")
+        .find((button) => button.children.includes("Match settings"))
+        ?.props.onClick();
+    });
+    const pregameRadios = renderer!.root
+      .findAllByType("input")
+      .filter((input) => input.props.name === "pregame-mode");
+    expect(pregameRadios).toHaveLength(3);
+    expect(
+      pregameRadios.find((radio) => radio.props.value === "SOLITAIRE_RANDOM")
+        ?.props.checked
+    ).toBe(true);
   });
 
   it("replaces Start Match with Rejoin Game while a match is active", async () => {
@@ -829,6 +943,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Rejoin Game");
     expect(renderedText()).not.toContain("Start Match");
     expect(renderedText()).toContain("Your match is already in progress");
+    expect(
+      renderer!.root
+        .findAllByType("button")
+        .find((button) => button.children.includes("Match settings"))?.props
+        .disabled
+    ).toBe(true);
 
     const joinButton = renderer!.root
       .findAllByType("button")
