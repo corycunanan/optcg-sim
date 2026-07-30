@@ -275,6 +275,7 @@ export function registerReplacementsForCard(
           once_per_turn: block.flags?.once_per_turn ?? false,
         },
       }],
+      conditions: block.conditions,
       duration: { type: "PERMANENT" as const },
       expiresAt: { wave: "SOURCE_LEAVES_ZONE" as const },
       controller: cardInstance.controller,

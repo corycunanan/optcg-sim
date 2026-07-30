@@ -498,10 +498,21 @@ export const EB01_014_SANJI: EffectSchema = {
       id: "permanent_power_per_rested_don",
       category: "permanent",
       conditions: {
-        type: "ACTIVE_DON_COUNT",
-        controller: "SELF",
-        operator: ">=",
-        value: 1,
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          {
+            type: "ACTIVE_DON_COUNT",
+            controller: "SELF",
+            operator: ">=",
+            value: 1,
+          },
+        ],
       },
       modifiers: [
         {
@@ -2027,6 +2038,13 @@ export const EB01_058_MONT_BLANC_CRICKET: EffectSchema = {
       category: "permanent",
       conditions: {
         all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
           {
             type: "ACTIVE_DON_COUNT",
             controller: "SELF",

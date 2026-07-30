@@ -46,14 +46,17 @@ export const OP05_001_SABO: EffectSchema = {
           {
             type: "DON_GIVEN",
             controller: "SELF",
-            mode: "ANY_CARD_HAS_DON",
+            mode: "SPECIFIC_CARD",
             operator: ">=",
             value: 1,
+          },
+          {
+            type: "IS_MY_TURN",
+            controller: "OPPONENT",
           },
         ],
       },
       flags: { once_per_turn: true, optional: true },
-      // _comment: "[Opponent's Turn] restriction — this replacement only activates during opponent's turn
       zone: "FIELD",
     },
   ],
