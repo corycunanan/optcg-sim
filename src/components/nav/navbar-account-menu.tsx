@@ -49,7 +49,12 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
               size="sm"
               variant="dark"
             />
-            <span className="text-sm">{displayName}</span>
+            <span
+              data-slot="navbar-account-name"
+              className="hidden max-w-16 truncate text-sm sm:block"
+            >
+              {displayName}
+            </span>
           </NavigationMenuTrigger>
           <NavigationMenuContent className="border-border bg-surface-nav border ring-0">
             <ul className="flex w-48 flex-col gap-1 p-1">

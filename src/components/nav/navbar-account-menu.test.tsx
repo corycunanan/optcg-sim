@@ -69,4 +69,22 @@ describe("NavbarAccountMenu", () => {
 
     expect(screen.getByLabelText("Theme: Default")).toBeDefined();
   });
+
+  it("constrains and responsively hides the longest permitted username", () => {
+    const longestUsername = "WWWWWWWWWWWWWWWWWWWW";
+    render(<NavbarAccountMenu user={{ username: longestUsername }} />);
+
+    const label = screen.getByText(longestUsername);
+
+    expect(label.getAttribute("data-slot")).toBe("navbar-account-name");
+    expect(label.className).toContain("hidden");
+    expect(label.className).toContain("sm:block");
+    expect(label.className).toContain("max-w-16");
+    expect(label.className).toContain("truncate");
+    expect(
+      screen.getByRole("button", {
+        name: `Account menu for ${longestUsername}`,
+      })
+    ).toBeDefined();
+  });
 });

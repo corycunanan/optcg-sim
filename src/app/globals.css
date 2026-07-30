@@ -176,73 +176,73 @@
   /* ── Non-themable feature palettes ── */
 
   /* TCG Card Colors (functional — filter pills, card badges) */
-  --card-red: oklch(55% 0.2 25);
-  --card-blue: oklch(50% 0.18 250);
-  --card-green: oklch(52% 0.18 150);
+  --card-red:    oklch(55% 0.20 25);
+  --card-blue:   oklch(50% 0.18 250);
+  --card-green:  oklch(52% 0.18 150);
   --card-purple: oklch(48% 0.18 300);
-  --card-black: oklch(28% 0.01 245);
+  --card-black:  oklch(28% 0.01 245);
   --card-yellow: oklch(78% 0.18 90);
   --card-yellow-fg: oklch(22% 0.04 245);
   --card-accent-fallback: oklch(22% 0.04 245);
 
   /* Holofoil spectrum (card inspection lighting) */
-  --holo-red: oklch(76% 0.12 25);
-  --holo-gold: oklch(84% 0.12 80);
-  --holo-green: oklch(80% 0.1 155);
-  --holo-cyan: oklch(82% 0.1 210);
-  --holo-blue: oklch(76% 0.12 250);
-  --holo-violet: oklch(76% 0.13 310);
-  --holo-highlight: oklch(98% 0.005 75);
+  --holo-red:         oklch(76% 0.12 25);
+  --holo-gold:        oklch(84% 0.12 80);
+  --holo-green:       oklch(80% 0.10 155);
+  --holo-cyan:        oklch(82% 0.10 210);
+  --holo-blue:        oklch(76% 0.12 250);
+  --holo-violet:      oklch(76% 0.13 310);
+  --holo-highlight:   oklch(98% 0.005 75);
   --holo-cosmos-blue: oklch(72% 0.13 255);
   --holo-cosmos-deep: oklch(58% 0.14 300);
-  --holo-mask-solid: oklch(0% 0 0);
-  --holo-spectrum-1: oklch(78% 0.18 25);
-  --holo-spectrum-2: oklch(86% 0.17 78);
-  --holo-spectrum-3: oklch(82% 0.16 145);
-  --holo-spectrum-4: oklch(84% 0.15 205);
-  --holo-spectrum-5: oklch(76% 0.18 260);
-  --holo-spectrum-6: oklch(78% 0.18 315);
-  --holo-foil-black: oklch(10% 0.02 255);
-  --holo-foil-dark: oklch(25% 0.025 255);
-  --holo-foil-mid: oklch(55% 0.02 255);
-  --holo-foil-light: oklch(88% 0.015 80);
-  --holo-space-deep: oklch(16% 0.06 275);
-  --holo-space-blue: oklch(34% 0.11 255);
-  --holo-star-white: oklch(96% 0.015 80);
-  --holo-star-gold: oklch(88% 0.1 85);
-  --holo-star-cyan: oklch(86% 0.08 210);
+  --holo-mask-solid:  oklch(0% 0 0);
+  --holo-spectrum-1:  oklch(78% 0.18 25);
+  --holo-spectrum-2:  oklch(86% 0.17 78);
+  --holo-spectrum-3:  oklch(82% 0.16 145);
+  --holo-spectrum-4:  oklch(84% 0.15 205);
+  --holo-spectrum-5:  oklch(76% 0.18 260);
+  --holo-spectrum-6:  oklch(78% 0.18 315);
+  --holo-foil-black:  oklch(10% 0.02 255);
+  --holo-foil-dark:   oklch(25% 0.025 255);
+  --holo-foil-mid:    oklch(55% 0.02 255);
+  --holo-foil-light:  oklch(88% 0.015 80);
+  --holo-space-deep:  oklch(16% 0.06 275);
+  --holo-space-blue:  oklch(34% 0.11 255);
+  --holo-star-white:  oklch(96% 0.015 80);
+  --holo-star-gold:   oklch(88% 0.10 85);
+  --holo-star-cyan:   oklch(86% 0.08 210);
 
   /* Game Board (dark testing environment)
      All text tokens pass WCAG AA (4.5:1) against --gb-surface (9%).
      --gb-text-dim ≈5.2:1, --gb-text-muted ≈6.3:1, --gb-text-subtle ≈7.5:1 */
-  --gb-bg: oklch(5% 0.005 245); /* page background */
-  --gb-surface: oklch(9% 0.005 245); /* panels, header */
-  --gb-surface-raised: oklch(14% 0.005 245); /* buttons, interactive */
-  --gb-surface-inset: oklch(4% 0.003 245); /* code blocks, sunken */
-  --gb-border: oklch(20% 0.005 245); /* default borders */
-  --gb-border-strong: oklch(28% 0.005 245); /* prominent borders */
-  --gb-border-subtle: oklch(16% 0.003 245); /* row separators */
-  --gb-text: oklch(82% 0.005 245); /* body text */
-  --gb-text-bright: oklch(96% 0.005 75); /* headings — warm off-white */
-  --gb-text-dim: oklch(52% 0.005 245); /* muted labels — AA on 9% bg */
-  --gb-text-muted: oklch(58% 0.005 245); /* placeholder — AA on 9% bg */
-  --gb-text-subtle: oklch(64% 0.005 245); /* secondary info — AA on 9% bg */
-  --gb-accent-blue: oklch(72% 0.12 240); /* card names, info */
-  --gb-accent-green: oklch(64% 0.18 150); /* active state */
-  --gb-accent-amber: oklch(72% 0.16 80); /* DON, warnings */
-  --gb-accent-red: oklch(60% 0.22 25); /* errors, concede */
-  --gb-accent-purple: oklch(66% 0.14 290); /* counter, battle phase */
-  --gb-accent-rose: oklch(62% 0.18 15); /* life stat */
-  --gb-signal-battle: var(--gb-accent-amber); /* active battle participants */
-  --gb-signal-eligible: var(--gb-accent-blue); /* legal interaction target */
+  --gb-bg:              oklch(5%   0.005 245);  /* page background */
+  --gb-surface:         oklch(9%   0.005 245);  /* panels, header */
+  --gb-surface-raised:  oklch(14%  0.005 245);  /* buttons, interactive */
+  --gb-surface-inset:   oklch(4%   0.003 245);  /* code blocks, sunken */
+  --gb-border:          oklch(20%  0.005 245);  /* default borders */
+  --gb-border-strong:   oklch(28%  0.005 245);  /* prominent borders */
+  --gb-border-subtle:   oklch(16%  0.003 245);  /* row separators */
+  --gb-text:            oklch(82%  0.005 245);  /* body text */
+  --gb-text-bright:     oklch(96%  0.005 75);   /* headings — warm off-white */
+  --gb-text-dim:        oklch(52%  0.005 245);  /* muted labels — AA on 9% bg */
+  --gb-text-muted:      oklch(58%  0.005 245);  /* placeholder — AA on 9% bg */
+  --gb-text-subtle:     oklch(64%  0.005 245);  /* secondary info — AA on 9% bg */
+  --gb-accent-blue:     oklch(72%  0.12  240);  /* card names, info */
+  --gb-accent-green:    oklch(64%  0.18  150);  /* active state */
+  --gb-accent-amber:    oklch(72%  0.16  80);   /* DON, warnings */
+  --gb-accent-red:      oklch(60%  0.22  25);   /* errors, concede */
+  --gb-accent-purple:   oklch(66%  0.14  290);  /* counter, battle phase */
+  --gb-accent-rose:     oklch(62%  0.18  15);   /* life stat */
+  --gb-signal-battle:   var(--gb-accent-amber); /* active battle participants */
+  --gb-signal-eligible: var(--gb-accent-blue);  /* legal interaction target */
   --gb-signal-selected: var(--gb-accent-green); /* confirmed user selection */
-  --gb-signal-hostile: var(--gb-accent-red); /* opponent / destructive target */
-  --gb-signal-disabled: var(--gb-text-dim); /* unavailable interaction */
-  --gb-prompt-bg: oklch(12% 0.01 80); /* prompt/warning panel bg */
-  --gb-board: oklch(18% 0.005 245); /* game board felt background */
-  --gb-board-dark: oklch(0% 0 0); /* banner, mid-zone, hand strips */
-  --gb-navbar: oklch(16% 0.008 245); /* game navbar */
-  --gb-shadow-don: 3px 3px 0px 0px rgba(0, 0, 0, 0.25); /* DON!! card drop shadow */
+  --gb-signal-hostile:  var(--gb-accent-red);   /* opponent / destructive target */
+  --gb-signal-disabled: var(--gb-text-dim);     /* unavailable interaction */
+  --gb-prompt-bg:       oklch(12%  0.01  80);   /* prompt/warning panel bg */
+  --gb-board:           oklch(18%  0.005 245);  /* game board felt background */
+  --gb-board-dark:      oklch(0%   0     0);    /* banner, mid-zone, hand strips */
+  --gb-navbar:          oklch(16%  0.008 245); /* game navbar */
+  --gb-shadow-don:      3px 3px 0px 0px rgba(0, 0, 0, 0.25); /* DON!! card drop shadow */
 
   /* ── shadcn/ui compatibility aliases ──
      Maps our existing tokens to shadcn's expected variable names.
@@ -282,16 +282,16 @@
 
 @theme inline {
   /* Fonts */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans:    var(--font-geist-sans);
+  --font-mono:    var(--font-geist-mono);
   --font-display: var(--font-erode);
 
   /* Surfaces */
-  --color-surface-nav: var(--surface-nav);
+  --color-surface-nav:  var(--surface-nav);
   --color-surface-base: var(--surface-page);
-  --color-surface-1: var(--surface-panel);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-inset);
+  --color-surface-1:    var(--surface-panel);
+  --color-surface-2:    var(--surface-2);
+  --color-surface-3:    var(--surface-inset);
 
   /* Legacy utility names routed through semantic roles */
   --color-navy-900: var(--accent-fg);
@@ -311,39 +311,39 @@
   --color-red-100: var(--destructive-soft);
 
   /* Text — use as text-content-primary etc to avoid conflicts */
-  --color-content-primary: var(--text-primary);
+  --color-content-primary:   var(--text-primary);
   --color-content-secondary: var(--text-secondary);
-  --color-content-tertiary: var(--text-tertiary);
-  --color-content-disabled: var(--text-disabled);
-  --color-content-inverse: var(--text-inverse);
+  --color-content-tertiary:  var(--text-tertiary);
+  --color-content-disabled:  var(--text-disabled);
+  --color-content-inverse:   var(--text-inverse);
 
   /* Borders */
-  --color-border: var(--border-subtle);
+  --color-border:        var(--border-subtle);
   --color-border-strong: var(--border-strong);
-  --color-border-focus: var(--border-focus);
+  --color-border-focus:  var(--border-focus);
   --color-border-accent: var(--accent-border);
 
   /* Component dimensions */
   --spacing-navbar-actions: var(--navbar-actions-width);
 
   /* Semantic */
-  --color-success: var(--success);
+  --color-success:      var(--success);
   --color-success-soft: var(--success-soft);
-  --color-warning: var(--warning);
+  --color-warning:      var(--warning);
   --color-warning-soft: var(--warning-soft);
-  --color-error: var(--error);
-  --color-error-soft: var(--error-soft);
+  --color-error:        var(--error);
+  --color-error-soft:   var(--error-soft);
 
   /* Overlays */
-  --color-overlay: var(--overlay);
+  --color-overlay:       var(--overlay);
   --color-overlay-light: var(--overlay-light);
 
   /* TCG Card Colors */
-  --color-card-red: var(--card-red);
-  --color-card-blue: var(--card-blue);
-  --color-card-green: var(--card-green);
+  --color-card-red:    var(--card-red);
+  --color-card-blue:   var(--card-blue);
+  --color-card-green:  var(--card-green);
   --color-card-purple: var(--card-purple);
-  --color-card-black: var(--card-black);
+  --color-card-black:  var(--card-black);
   --color-card-yellow: var(--card-yellow);
 
   /* Shadows */
@@ -352,41 +352,41 @@
   --shadow-lg: var(--shadow-lg);
 
   /* Game Board */
-  --color-gb-bg: var(--gb-bg);
-  --color-gb-surface: var(--gb-surface);
+  --color-gb-bg:             var(--gb-bg);
+  --color-gb-surface:        var(--gb-surface);
   --color-gb-surface-raised: var(--gb-surface-raised);
-  --color-gb-surface-inset: var(--gb-surface-inset);
-  --color-gb-border: var(--gb-border);
-  --color-gb-border-strong: var(--gb-border-strong);
-  --color-gb-border-subtle: var(--gb-border-subtle);
-  --color-gb-text: var(--gb-text);
-  --color-gb-text-bright: var(--gb-text-bright);
-  --color-gb-text-dim: var(--gb-text-dim);
-  --color-gb-text-muted: var(--gb-text-muted);
-  --color-gb-text-subtle: var(--gb-text-subtle);
-  --color-gb-accent-blue: var(--gb-accent-blue);
-  --color-gb-accent-green: var(--gb-accent-green);
-  --color-gb-accent-amber: var(--gb-accent-amber);
-  --color-gb-accent-red: var(--gb-accent-red);
-  --color-gb-accent-purple: var(--gb-accent-purple);
-  --color-gb-accent-rose: var(--gb-accent-rose);
-  --color-gb-signal-battle: var(--gb-signal-battle);
+  --color-gb-surface-inset:  var(--gb-surface-inset);
+  --color-gb-border:         var(--gb-border);
+  --color-gb-border-strong:  var(--gb-border-strong);
+  --color-gb-border-subtle:  var(--gb-border-subtle);
+  --color-gb-text:           var(--gb-text);
+  --color-gb-text-bright:    var(--gb-text-bright);
+  --color-gb-text-dim:       var(--gb-text-dim);
+  --color-gb-text-muted:     var(--gb-text-muted);
+  --color-gb-text-subtle:    var(--gb-text-subtle);
+  --color-gb-accent-blue:    var(--gb-accent-blue);
+  --color-gb-accent-green:   var(--gb-accent-green);
+  --color-gb-accent-amber:   var(--gb-accent-amber);
+  --color-gb-accent-red:     var(--gb-accent-red);
+  --color-gb-accent-purple:  var(--gb-accent-purple);
+  --color-gb-accent-rose:    var(--gb-accent-rose);
+  --color-gb-signal-battle:   var(--gb-signal-battle);
   --color-gb-signal-eligible: var(--gb-signal-eligible);
   --color-gb-signal-selected: var(--gb-signal-selected);
-  --color-gb-signal-hostile: var(--gb-signal-hostile);
+  --color-gb-signal-hostile:  var(--gb-signal-hostile);
   --color-gb-signal-disabled: var(--gb-signal-disabled);
-  --color-gb-prompt-bg: var(--gb-prompt-bg);
-  --color-gb-board: var(--gb-board);
-  --color-gb-board-dark: var(--gb-board-dark);
-  --color-gb-navbar: var(--gb-navbar);
+  --color-gb-prompt-bg:      var(--gb-prompt-bg);
+  --color-gb-board:          var(--gb-board);
+  --color-gb-board-dark:     var(--gb-board-dark);
+  --color-gb-navbar:         var(--gb-navbar);
 
   /* Shadows */
   --shadow-don: var(--gb-shadow-don);
 
   /* Border Radius — 4 values only, override Tailwind defaults */
-  --radius: 0.25rem; /* 4px  — rounded      — badges, tags */
-  --radius-md: 0.5rem; /* 8px  — rounded-md   — inputs, buttons */
-  --radius-lg: 0.75rem; /* 12px — rounded-lg   — panels, modals */
+  --radius:    0.25rem;  /* 4px  — rounded      — badges, tags */
+  --radius-md: 0.5rem;   /* 8px  — rounded-md   — inputs, buttons */
+  --radius-lg: 0.75rem;  /* 12px — rounded-lg   — panels, modals */
   /* rounded-full stays at 9999px — pills, avatars */
 
   /* ── shadcn/ui Tailwind theme mappings ──

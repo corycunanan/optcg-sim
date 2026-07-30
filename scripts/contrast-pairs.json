@@ -25,6 +25,12 @@
       "minimum": 4.5
     },
     {
+      "name": "primary/nav",
+      "foreground": "--text-primary",
+      "background": "--surface-nav",
+      "minimum": 4.5
+    },
+    {
       "name": "secondary/page",
       "foreground": "--text-secondary",
       "background": "--surface-page",

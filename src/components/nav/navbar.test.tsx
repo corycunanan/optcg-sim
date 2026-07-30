@@ -152,6 +152,21 @@ describe("Navbar", () => {
       expect(activeControl.getAttribute("aria-current")).toBe("page");
       expect(activeControl.className).toContain("bg-surface-2");
       expect(activeControl.className).toContain("text-gold-600");
+
+      const inactiveControls = [
+        screen.getByRole("link", { name: "Play" }),
+        screen.getByRole("link", { name: "Home" }),
+        screen.getByRole("button", { name: "Decks" }),
+        screen.getByRole("button", { name: "Cards" }),
+      ].filter((control) => control !== activeControl);
+
+      for (const inactiveControl of inactiveControls) {
+        const inactiveClassTokens = inactiveControl.className.split(/\s+/);
+
+        expect(inactiveClassTokens).not.toContain("bg-surface-2");
+        expect(inactiveClassTokens).not.toContain("text-gold-600");
+      }
+
       expect(
         document.querySelector('[data-slot="navbar-current-indicator"]')
       ).toBeNull();
