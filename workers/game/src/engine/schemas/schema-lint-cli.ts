@@ -25,14 +25,8 @@ const cardTextManifest = JSON.parse(
   )
 ) as CardTextManifest;
 
-const donIntentDeferredToOpt600 = new Set([
-  "OP03-004",
-  "OP03-025",
-  "OP15-001",
-]);
-
-function loadBracketedDonRequirements(): Map<string, Set<number>> {
-  const requirements = new Map<string, Set<number>>();
+function loadBracketedDonCardIds(): Set<string> {
+  const cardIds = new Set<string>();
   const cardsDirectory = resolve(repoRoot, "docs/cards");
   const files = readdirSync(cardsDirectory)
     .filter((file) => file.endsWith(".md"))
@@ -44,80 +38,49 @@ function loadBracketedDonRequirements(): Map<string, Set<number>> {
     for (const block of source.split(/\n---\n/)) {
       const cardId = block.match(/\*\*([A-Z]+\d*-\d+)\*\*/)?.[1];
       if (!cardId) continue;
-      const values = [
-        ...block.matchAll(/\[DON!! x(\d+)\]/g),
-      ].map((match) => Number(match[1]));
-      if (values.length > 0) {
-        requirements.set(cardId, new Set(values));
+      if (/\[DON!! x\d+\]/.test(block)) {
+        cardIds.add(cardId);
       }
     }
   }
 
-  return requirements;
+  return cardIds;
 }
 
-function containsDonFieldCount(value: unknown): boolean {
+function hasAttachedDonEncoding(value: unknown): boolean {
   if (Array.isArray(value)) {
-    return value.some(containsDonFieldCount);
-  }
-  if (!value || typeof value !== "object") return false;
-
-  const record = value as Record<string, unknown>;
-  if (record.type === "DON_FIELD_COUNT") return true;
-
-  return Object.values(record).some(containsDonFieldCount);
-}
-
-function hasAttachedDonEncoding(
-  value: unknown,
-  requirements: Set<number>,
-): boolean {
-  if (Array.isArray(value)) {
-    return value.some((entry) =>
-      hasAttachedDonEncoding(entry, requirements),
-    );
+    return value.some(hasAttachedDonEncoding);
   }
   if (!value || typeof value !== "object") return false;
 
   const record = value as Record<string, unknown>;
   if (
     record.type === "DON_GIVEN" &&
-    record.mode === "SPECIFIC_CARD" &&
-    record.operator === ">=" &&
-    typeof record.value === "number" &&
-    requirements.has(record.value)
+    record.mode === "SPECIFIC_CARD"
   ) {
     return true;
   }
   if (
-    typeof record.don_requirement === "number" &&
-    requirements.has(record.don_requirement)
+    typeof record.don_requirement === "number"
   ) {
     return true;
   }
 
-  return Object.values(record).some((entry) =>
-    hasAttachedDonEncoding(entry, requirements),
-  );
+  return Object.values(record).some(hasAttachedDonEncoding);
 }
 
 function findDonIntentViolations(
   schemas: Record<string, import("../effect-types.js").EffectSchema>,
 ): string[] {
-  const requirementsByCard = loadBracketedDonRequirements();
+  const bracketedDonCardIds = loadBracketedDonCardIds();
   const violations: string[] = [];
 
   for (const [cardId, schema] of Object.entries(schemas)) {
-    if (donIntentDeferredToOpt600.has(cardId)) continue;
-    const requirements = requirementsByCard.get(cardId);
-    if (!requirements) continue;
+    if (!bracketedDonCardIds.has(cardId)) continue;
 
-    if (
-      containsDonFieldCount(schema) &&
-      !hasAttachedDonEncoding(schema, requirements)
-    ) {
+    if (!hasAttachedDonEncoding(schema)) {
       violations.push(
-        `${cardId}: canonical [DON!! xN] requires DON_GIVEN/SPECIFIC_CARD or trigger.don_requirement at the printed threshold`,
+        `${cardId}: canonical [DON!! xN] requires DON_GIVEN/SPECIFIC_CARD or trigger.don_requirement`,
       );
     }
   }

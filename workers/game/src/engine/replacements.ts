@@ -33,6 +33,7 @@ import type {
 import { findCardInstance } from "./state.js";
 import { updateTopFrame } from "./effect-stack.js";
 import { matchesFilter } from "./conditions.js";
+import { isEffectConditionMet } from "./modifiers.js";
 import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
@@ -268,7 +269,7 @@ function replacementMatchesTarget(
     return false;
   }
 
-  return true;
+  return isEffectConditionMet(effect, state, cardDb);
 }
 
 function checkReplacementForEvent(

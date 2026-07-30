@@ -46,7 +46,7 @@ export const OP05_001_SABO: EffectSchema = {
           {
             type: "DON_GIVEN",
             controller: "SELF",
-            mode: "ANY_CARD_HAS_DON",
+            mode: "SPECIFIC_CARD",
             operator: ">=",
             value: 1,
           },
