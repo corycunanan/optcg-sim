@@ -94,12 +94,14 @@ function replacementFixture({
   sourceDonCount = 0,
   leaderTypes = [],
   includeLuffy = false,
+  activePlayerIndex = 1,
 }: {
   cardId: string;
   sourceType?: "Character" | "Leader";
   sourceDonCount?: number;
   leaderTypes?: string[];
   includeLuffy?: boolean;
+  activePlayerIndex?: 0 | 1;
 }): ReplacementFixture {
   const cardDb = createTestCardDb();
   const sourceSeed = data(cardId, sourceType);
@@ -165,7 +167,7 @@ function replacementFixture({
     players,
     turn: {
       ...state.turn,
-      activePlayerIndex: 1,
+      activePlayerIndex,
     },
   };
 
@@ -231,6 +233,42 @@ describe("OPT-603 — authored replacement conditions", () => {
     expect(positiveResult.pendingPrompt?.options.promptType).toBe(
       "OPTIONAL_EFFECT"
     );
+  });
+
+  it("OP05-001 offers its replacement only during the opponent's turn", () => {
+    const ownTurn = replacementFixture({
+      cardId: "OP05-001",
+      sourceType: "Leader",
+      sourceDonCount: 1,
+      activePlayerIndex: 0,
+    });
+    expect(
+      checkReplacementForKO(
+        ownTurn.state,
+        ownTurn.target.instanceId,
+        "effect",
+        1,
+        ownTurn.cardDb,
+        resolverExecutionServices
+      ).pendingPrompt
+    ).toBeUndefined();
+
+    const opponentTurn = replacementFixture({
+      cardId: "OP05-001",
+      sourceType: "Leader",
+      sourceDonCount: 1,
+      activePlayerIndex: 1,
+    });
+    expect(
+      checkReplacementForKO(
+        opponentTurn.state,
+        opponentTurn.target.instanceId,
+        "effect",
+        1,
+        opponentTurn.cardDb,
+        resolverExecutionServices
+      ).pendingPrompt?.options.promptType
+    ).toBe("OPTIONAL_EFFECT");
   });
 
   it("EB04-044 requires a Navy Leader before offering its removal replacement", () => {
@@ -441,6 +479,17 @@ describe("OPT-603 — attached-DON permanent gates", () => {
           sourceDonCount: 1,
           lifeCount: 5,
           activeDonCount: 1,
+          restedDonCount: 0,
+        })
+      )
+    ).toBe(6000);
+    expect(
+      effectiveSourcePower(
+        permanentFixture({
+          cardId: "EB01-058",
+          sourceDonCount: 1,
+          lifeCount: 2,
+          activeDonCount: 0,
           restedDonCount: 0,
         })
       )
