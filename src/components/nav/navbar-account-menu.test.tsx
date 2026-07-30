@@ -43,6 +43,7 @@ describe("NavbarAccountMenu", () => {
     const trigger = screen.getByRole("button", {
       name: "Account menu for luffy",
     });
+    expect(trigger.textContent).toContain("luffy");
     trigger.focus();
     await user.keyboard("{Enter}");
 
@@ -62,6 +63,7 @@ describe("NavbarAccountMenu", () => {
     const trigger = screen.getByRole("button", {
       name: "Account menu for Pirate",
     });
+    expect(trigger.textContent).toContain("Pirate");
     trigger.focus();
     await user.keyboard("{Enter}");
 

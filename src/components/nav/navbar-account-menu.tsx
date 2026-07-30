@@ -38,7 +38,7 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
         <NavigationMenuItem>
           <NavigationMenuTrigger
             aria-label={`Account menu for ${displayName}`}
-            className="text-content-primary hover:bg-surface-2 focus:bg-surface-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-open:bg-surface-2 bg-transparent px-1 focus-visible:ring-2"
+            className="text-content-primary hover:bg-surface-2 focus:bg-surface-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-open:bg-surface-2 gap-2 bg-transparent px-1 focus-visible:ring-2"
           >
             <UserAvatar
               user={{
@@ -49,6 +49,7 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
               size="sm"
               variant="dark"
             />
+            <span className="text-sm">{displayName}</span>
           </NavigationMenuTrigger>
           <NavigationMenuContent className="border-border bg-surface-nav border ring-0">
             <ul className="flex w-48 flex-col gap-1 p-1">
