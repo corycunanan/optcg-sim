@@ -202,12 +202,9 @@ function withRestedDonCount(fixture: CardFixture, count: number): CardFixture {
   const players = [...fixture.state.players] as [PlayerState, PlayerState];
   players[0] = {
     ...players[0],
-    donCostArea: [
-      don(`active-${fixture.sourceData.id}`, "ACTIVE"),
-      ...Array.from({ length: count }, (_, index) =>
-        don(`rested-${fixture.sourceData.id}-${index}`, "RESTED")
-      ),
-    ],
+    donCostArea: Array.from({ length: count }, (_, index) =>
+      don(`rested-${fixture.sourceData.id}-${index}`, "RESTED")
+    ),
   };
   return { ...fixture, state: { ...fixture.state, players } };
 }
@@ -268,6 +265,14 @@ describe("OPT-605 — canonical card formulas", () => {
     expect(effectivePower(withHandCount(base, 3))).toBe(9000);
   });
 
+  it.each([
+    ["opponent's turn", { attachedDon: 1, activePlayerIndex: 1 as const }],
+    ["own turn without attached DON!!", { attachedDon: 0 }],
+  ])("OP01-072 contributes zero on %s", (_scenario, options) => {
+    const fixture = withHandCount(authoredFixture("OP01-072", options), 3);
+    expect(effectivePower(fixture)).toBe(5000);
+  });
+
   it("OP01-083 gains +1000 per 2 Events in trash", () => {
     const base = authoredFixture("OP01-083", {
       attachedDon: 1,
@@ -276,6 +281,21 @@ describe("OPT-605 — canonical card formulas", () => {
     expect(effectivePower(withTrashCount(base, 1, "Event"))).toBe(6000);
     expect(effectivePower(withTrashCount(base, 2, "Event"))).toBe(7000);
     expect(effectivePower(withTrashCount(base, 4, "Event"))).toBe(8000);
+  });
+
+  it.each([
+    ["opponent's turn", { attachedDon: 1, activePlayerIndex: 1 as const }],
+    ["own turn without attached DON!!", { attachedDon: 0 }],
+  ])("OP01-083 contributes zero on %s", (_scenario, options) => {
+    const fixture = withTrashCount(
+      authoredFixture("OP01-083", {
+        ...options,
+        leaderTraits: ["Baroque Works"],
+      }),
+      2,
+      "Event"
+    );
+    expect(effectivePower(fixture)).toBe(5000);
   });
 
   it("OP06-085 gains +1000 per 5 trash cards during its controller's turn", () => {
@@ -553,19 +573,17 @@ describe("OPT-605 — live resolution and cost fixpoint", () => {
     expect(effectivePower(fixture)).toBe(7000);
   });
 
-  it("throws instead of silently resolving a cardDb-dependent source to zero", () => {
+  it("skips a supported cardDb-dependent value when optional cardDb is omitted", () => {
     const fixture = authoredFixture("EB01-027", {
       leaderTraits: ["Baroque Works"],
     });
-    expect(() =>
+    expect(
       getEffectivePower(
         fixture.source,
         fixture.sourceData,
         withTrashCount(fixture, 2, "Event").state
       )
-    ).toThrow(
-      "Unable to resolve permanent modifier permanent_power_per_events.amount: EVENTS_IN_TRASH requires card data"
-    );
+    ).toBe(5000);
   });
 
   it("keeps one-time modifiers on the numeric-only path", () => {
@@ -770,7 +788,6 @@ function assertPermanentRegistryDynamicValuesResolve(
           const value = modifier.params?.[key];
           if (!value || typeof value !== "object") continue;
           const resolution = resolvePermanentDynamicValue(value, {
-            resultRefs: new Map(),
             state,
             controller: 0,
             cardDb,
@@ -849,6 +866,63 @@ describe("OPT-605 — registry-driven permanent dynamic contract", () => {
     };
     expect(() => assertPermanentRegistryDynamicValuesResolve(schemas)).toThrow(
       "OPT605-UNSUPPORTED-TYPE/unsupported_type_block/modifier[0].amount: dynamic value type 'ACTION_RESULT' cannot resolve for a permanent modifier"
+    );
+  });
+
+  it("rejects a THIS_WAY source that requires action context", () => {
+    const schemas: Record<string, EffectSchema> = {
+      "OPT605-THIS-WAY": {
+        effects: [
+          {
+            id: "this_way_block",
+            category: "permanent",
+            modifiers: [
+              {
+                type: "MODIFY_POWER",
+                params: {
+                  amount: {
+                    type: "PER_COUNT",
+                    source: "DON_RESTED_THIS_WAY",
+                    multiplier: 1000,
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    expect(() => assertPermanentRegistryDynamicValuesResolve(schemas)).toThrow(
+      "OPT605-THIS-WAY/this_way_block/modifier[0].amount: PER_COUNT source 'DON_RESTED_THIS_WAY' requires action-result context"
+    );
+  });
+
+  it("rejects a ref-bearing source that requires action context", () => {
+    const schemas: Record<string, EffectSchema> = {
+      "OPT605-REF-SOURCE": {
+        effects: [
+          {
+            id: "ref_source_block",
+            category: "permanent",
+            modifiers: [
+              {
+                type: "MODIFY_POWER",
+                params: {
+                  amount: {
+                    type: "PER_COUNT",
+                    source: "REVEALED_CARD_COST",
+                    multiplier: 1000,
+                    ref: "revealed",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    expect(() => assertPermanentRegistryDynamicValuesResolve(schemas)).toThrow(
+      "OPT605-REF-SOURCE/ref_source_block/modifier[0].amount: PER_COUNT source 'REVEALED_CARD_COST' requires action-result context"
     );
   });
 });

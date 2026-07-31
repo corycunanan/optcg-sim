@@ -117,13 +117,13 @@ function permanentModifierParam(
   if (!value || typeof value !== "object") return undefined;
 
   const resolution = resolvePermanentDynamicValue(value, {
-    resultRefs: new Map(),
     state,
     controller,
     cardDb,
     matchesFilter,
   });
   if (resolution.resolved) return resolution.value;
+  if (resolution.reason === "MISSING_CARD_DB") return undefined;
 
   throw new Error(
     `Unable to resolve permanent modifier ${sourceLabel}.${key}: ${resolution.detail}`,

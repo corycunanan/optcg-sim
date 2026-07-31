@@ -24,7 +24,8 @@ export type DynamicValueResolution =
         | "MISSING_STATE"
         | "MISSING_CONTROLLER"
         | "MISSING_CARD_DB"
-        | "MISSING_FILTER_RESOLVER";
+        | "MISSING_FILTER_RESOLVER"
+        | "REQUIRES_ACTION_CONTEXT";
       detail: string;
     };
 
@@ -41,6 +42,11 @@ export interface DynamicValueResolutionContext {
   ) => boolean;
 }
 
+type PermanentDynamicValueResolutionContext = Omit<
+  DynamicValueResolutionContext,
+  "resultRefs"
+>;
+
 const THIS_WAY_TO_COST_REF: Record<string, string> = {
   DON_RESTED_THIS_WAY: "__cost_don_rested",
   CARDS_TRASHED_THIS_WAY: "__cost_cards_trashed",
@@ -48,6 +54,34 @@ const THIS_WAY_TO_COST_REF: Record<string, string> = {
   CHARACTERS_KO_THIS_WAY: "__cost_characters_ko",
   CARDS_PLACED_TO_DECK_THIS_WAY: "__cost_cards_placed_to_deck",
 };
+
+/**
+ * Every PER_COUNT source must declare whether it can be recomputed from live
+ * game state or requires references produced while resolving an action.
+ *
+ * The Record is intentionally exhaustive: adding a new DynamicSource fails
+ * type-check until its permanent-resolution capability is classified.
+ */
+const PER_COUNT_SOURCE_CONTEXT = {
+  CARDS_TRASHED_THIS_WAY: "ACTION_CONTEXT",
+  DON_RESTED_THIS_WAY: "ACTION_CONTEXT",
+  CHARACTERS_RETURNED_THIS_WAY: "ACTION_CONTEXT",
+  CHARACTERS_KO_THIS_WAY: "ACTION_CONTEXT",
+  CARDS_PLACED_TO_DECK_THIS_WAY: "ACTION_CONTEXT",
+  REVEALED_CARD_COST: "ACTION_CONTEXT",
+  DON_GIVEN_TO_TARGET: "ACTION_CONTEXT",
+  EVENTS_IN_TRASH: "LIVE_STATE",
+  CARDS_IN_TRASH: "LIVE_STATE",
+  MATCHING_CHARACTERS_ON_FIELD: "LIVE_STATE",
+  HAND_COUNT: "LIVE_STATE",
+  CHARACTERS_ON_FIELD: "LIVE_STATE",
+  OPPONENT_CHARACTERS_ON_FIELD: "LIVE_STATE",
+  DON_FIELD_COUNT: "LIVE_STATE",
+  RESTED_DON_COUNT: "LIVE_STATE",
+} as const satisfies Record<
+  import("./effect-types.js").DynamicSource,
+  "ACTION_CONTEXT" | "LIVE_STATE"
+>;
 
 function resolved(value: number): DynamicValueResolution {
   return { resolved: true, value };
@@ -61,7 +95,7 @@ function unresolved(
 }
 
 function requireStateAndController(
-  context: DynamicValueResolutionContext
+  context: Pick<DynamicValueResolutionContext, "state" | "controller">
 ): DynamicValueResolution | null {
   if (!context.state) {
     return unresolved(
@@ -187,7 +221,7 @@ export function resolveDynamicValue(
  */
 export function resolvePermanentDynamicValue(
   value: unknown,
-  context: DynamicValueResolutionContext
+  context: PermanentDynamicValueResolutionContext
 ): DynamicValueResolution {
   if (!value || typeof value !== "object") {
     return unresolved(
@@ -202,14 +236,60 @@ export function resolvePermanentDynamicValue(
       `dynamic value type '${String(type)}' cannot resolve for a permanent modifier`
     );
   }
-  return resolveDynamicValue(value as DynamicValue, context);
+  if (type === "GAME_STATE") {
+    const missingContext = requireStateAndController(context);
+    if (missingContext) return missingContext;
+    const gameStateValue = value as Extract<
+      DynamicValue,
+      { type: "GAME_STATE" }
+    >;
+    const playerIndex =
+      gameStateValue.controller === "OPPONENT"
+        ? context.controller === 0
+          ? 1
+          : 0
+        : context.controller!;
+    return resolveGameStateSource(
+      context.state!,
+      playerIndex,
+      gameStateValue.source,
+      context.cardDb
+    );
+  }
+
+  const perCountValue = value as Extract<DynamicValue, { type: "PER_COUNT" }>;
+  if (PER_COUNT_SOURCE_CONTEXT[perCountValue.source] === "ACTION_CONTEXT") {
+    return unresolved(
+      "REQUIRES_ACTION_CONTEXT",
+      `PER_COUNT source '${perCountValue.source}' requires action-result context`
+    );
+  }
+
+  const missingContext = requireStateAndController(context);
+  if (missingContext) return missingContext;
+
+  const count = resolvePerCountSource(
+    context.state!,
+    context.controller!,
+    perCountValue.source,
+    context,
+    perCountValue.filter
+  );
+  if (!count.resolved) return count;
+  return resolved(
+    Math.floor(count.value / (perCountValue.divisor ?? 1)) *
+      (perCountValue.multiplier ?? 1)
+  );
 }
 
 function resolvePerCountSource(
   state: GameState,
   controller: 0 | 1,
   source: import("./effect-types.js").DynamicSource,
-  context: DynamicValueResolutionContext,
+  context: Pick<
+    DynamicValueResolutionContext,
+    "cardDb" | "matchesFilter"
+  >,
   filter?: TargetFilter
 ): DynamicValueResolution {
   const player = state.players[controller];
@@ -279,12 +359,6 @@ function resolvePerCountSource(
       );
     case "OPPONENT_CHARACTERS_ON_FIELD":
       return resolved(opponent.characters.filter(isPresent).length);
-    case "DON_RESTED_THIS_WAY":
-    case "CARDS_TRASHED_THIS_WAY":
-    case "CHARACTERS_RETURNED_THIS_WAY":
-    case "CHARACTERS_KO_THIS_WAY":
-    case "CARDS_PLACED_TO_DECK_THIS_WAY":
-      return resolved(0);
     default:
       return unresolved(
         "UNSUPPORTED_SOURCE",

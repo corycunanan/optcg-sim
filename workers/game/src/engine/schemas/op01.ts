@@ -1971,10 +1971,12 @@ export const OP01_072_SMILEY: EffectSchema = {
     {
       id: "dynamic_hand_power",
       category: "permanent",
-      trigger: {
-        keyword: "WHEN_ATTACKING",
-        don_requirement: 1,
-        turn_restriction: "YOUR_TURN",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
       },
       modifiers: [
         {
@@ -1989,6 +1991,10 @@ export const OP01_072_SMILEY: EffectSchema = {
           },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
+      },
     },
   ],
 };
@@ -2183,15 +2189,21 @@ export const OP01_083_MR1: EffectSchema = {
     {
       id: "dynamic_event_trash_power",
       category: "permanent",
-      trigger: {
-        keyword: "WHEN_ATTACKING",
-        don_requirement: 1,
-        turn_restriction: "YOUR_TURN",
-      },
       conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Baroque Works" },
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          {
+            type: "LEADER_PROPERTY",
+            controller: "SELF",
+            property: { trait: "Baroque Works" },
+          },
+        ],
       },
       modifiers: [
         {
@@ -2200,6 +2212,10 @@ export const OP01_083_MR1: EffectSchema = {
           params: { amount: { type: "PER_COUNT", source: "EVENTS_IN_TRASH", multiplier: 1000, divisor: 2 } },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
+      },
     },
   ],
 };
