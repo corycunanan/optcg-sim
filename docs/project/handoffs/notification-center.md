@@ -71,7 +71,7 @@ Tickets are ordered by dependencies; OPT-535 was a parallel visual track.
 - **Primer:** `GET /api/notifications` now prioritizes actionable friend-request notifications ahead of resolved/read rows, so an available Accept/Decline action cannot fall outside the panel's 20-row window. Option 1 (prioritize actionable rows) was ratified; a separate actionable fetch, keyset pagination, and a full history view were explicitly not chosen.
 - **Read first:** `src/lib/notification-order.ts`, `src/app/api/notifications/route.ts`, `src/hooks/use-notification-state.ts`, `src/components/nav/navbar-notification-panel.tsx`
 - **Gotchas / do NOT touch:** Keep the actionable predicate in one place in `src/lib/notification-order.ts` and shared by client and server; do not let their orderings diverge. `READ` remains actionable when `type = FRIEND_REQUEST`, `referenceId` is present, and the status is `PENDING` or `READ`, because opening the panel marks visible rows read while actions remain available. Preserve the `RepeatableRead` snapshot shared by rows and counts.
-- **Unresolved:** Keyset/cursor pagination and a full history view remain deferred. OPT-598 shipped database-backed raw SQL and migration coverage through the per-run PostgreSQL harness in `src/test/database/global-setup.ts`.
+- **Unresolved:** Keyset/cursor pagination and a full history view remain deferred. OPT-598 shipped database-backed raw SQL and migration coverage through the per-run PostgreSQL harness in `src/test/database/global-setup.ts`, with execution covered by `src/lib/notifications.integration.test.ts` and `src/lib/notifications-backfill-migration.test.ts`.
 - **Pointer:** PR #459 and squash commit `249b3dd`.
 
 ### OPT-580 follow-up closeout
@@ -81,7 +81,7 @@ Tickets are ordered by dependencies; OPT-535 was a parallel visual track.
 - **Primer:** Retention pruning now runs after every path that creates a notification or makes one terminal, retaining the newest 100 non-live rows plus any live rows whose referenced `FriendRequest` remains `PENDING`; duplicate pruning is suppressed by `NOTIFICATION_ACTION_RATE_LIMIT_CHARGED`.
 - **Read first:** `src/lib/notifications.ts`, `src/app/api/friends/requests/route.ts`, `src/app/api/friends/requests/[id]/route.ts`, `src/app/api/notifications/[id]/route.ts`, `src/app/api/friends/requests/route.test.ts`
 - **Gotchas / do NOT touch:** Do not move pruning inside a transaction, do not delete a notification whose `FriendRequest` is still `PENDING`, and do not replace the parameterized CTE/DELETE with application-side id arrays. Keep the `NOT EXISTS` liveness guard at both selection and deletion.
-- **Unresolved:** None; OPT-598 shipped database-backed coverage for the retention SQL and backfill migration through the per-run PostgreSQL harness in `src/test/database/global-setup.ts`.
+- **Unresolved:** None; OPT-598 shipped database-backed coverage for the retention SQL and backfill migration through the per-run PostgreSQL harness in `src/test/database/global-setup.ts`, with execution asserted in `src/lib/notifications.integration.test.ts` and `src/lib/notifications-backfill-migration.test.ts`.
 - **Pointer:** PR #460 and squash commit `41fd709`.
 
 ---
