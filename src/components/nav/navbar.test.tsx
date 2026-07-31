@@ -62,25 +62,79 @@ vi.mock("@/components/deck-builder/deck-navigation-guard", () => ({
   ),
 }));
 
-vi.mock("@/components/ui/navigation-menu", () => ({
-  NavigationMenu: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  NavigationMenuList: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  NavigationMenuItem: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  NavigationMenuTrigger: ({ children, ...props }: ComponentProps<"button">) => (
-    <button {...props}>{children}</button>
-  ),
-  NavigationMenuContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  NavigationMenuLink: ({ children }: { children: ReactNode }) => children,
-  navigationMenuTriggerStyle: () => "navigation-trigger",
-}));
+vi.mock("@/components/ui/navigation-menu", async () => {
+  const { createContext, useContext, useState } = await import("react");
+  const { createPortal } = await import("react-dom");
+  const ViewportContext = createContext<{
+    enabled: boolean;
+    element: HTMLDivElement | null;
+  }>({ enabled: false, element: null });
+
+  return {
+    NavigationMenu: ({
+      children,
+      className,
+      viewport = true,
+    }: {
+      children: ReactNode;
+      className?: string;
+      viewport?: boolean;
+    }) => {
+      const [viewportElement, setViewportElement] =
+        useState<HTMLDivElement | null>(null);
+
+      return (
+        <div
+          data-slot="navigation-menu"
+          data-viewport={viewport}
+          className={className}
+        >
+          <ViewportContext.Provider
+            value={{ enabled: viewport, element: viewportElement }}
+          >
+            {children}
+            {viewport && (
+              <div
+                ref={setViewportElement}
+                data-slot="navigation-menu-viewport"
+              />
+            )}
+          </ViewportContext.Provider>
+        </div>
+      );
+    },
+    NavigationMenuList: ({
+      children,
+      className,
+    }: {
+      children: ReactNode;
+      className?: string;
+    }) => (
+      <div data-slot="navigation-menu-list" className={className}>
+        {children}
+      </div>
+    ),
+    NavigationMenuItem: ({ children }: { children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    NavigationMenuTrigger: ({
+      children,
+      ...props
+    }: ComponentProps<"button">) => <button {...props}>{children}</button>,
+    NavigationMenuContent: ({ children }: { children: ReactNode }) => {
+      const viewportContext = useContext(ViewportContext);
+      const content = <div data-slot="navigation-menu-content">{children}</div>;
+
+      if (viewportContext.enabled && viewportContext.element) {
+        return createPortal(content, viewportContext.element);
+      }
+
+      return viewportContext.enabled ? null : content;
+    },
+    NavigationMenuLink: ({ children }: { children: ReactNode }) => children,
+    navigationMenuTriggerStyle: () => "navigation-trigger",
+  };
+});
 
 import { Navbar } from "./navbar";
 
@@ -190,6 +244,36 @@ describe("Navbar", () => {
     expect(container.querySelector("nav")?.className).toContain(
       "border-border-accent"
     );
+  });
+
+  it("keeps dropdown content outside the overflow-clipping links scroller", () => {
+    render(<Navbar />);
+
+    const linksScroller = document.querySelector(
+      '[data-slot="navbar-links-scroller"]'
+    );
+    const viewport = document.querySelector(
+      '[data-slot="navigation-menu-viewport"]'
+    );
+    const dropdownContent = screen
+      .getByText("My Decks")
+      .closest('[data-slot="navigation-menu-content"]');
+
+    expect(linksScroller).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(viewport?.contains(dropdownContent)).toBe(true);
+    expect(linksScroller?.contains(dropdownContent)).toBe(false);
+    expect(linksScroller?.contains(viewport)).toBe(false);
+  });
+
+  it("caps the inner nav content while keeping the full-width bar separate", () => {
+    const { container } = render(<Navbar />);
+    const nav = container.querySelector("nav");
+    const navContent = document.querySelector('[data-slot="navbar-content"]');
+
+    expect(navContent?.className.split(/\s+/)).toContain("max-w-7xl");
+    expect(navContent?.parentElement).toBe(nav);
+    expect(nav?.className.split(/\s+/)).not.toContain("max-w-7xl");
   });
 
   it("reflects realtime unread counts, caps at 9+, and omits a zero badge", () => {
