@@ -144,9 +144,15 @@ export function resolveDynamicValue(
         );
       }
       const targetCard = findCardInstance(state, targetId);
-      const count = targetCard
-        ? (context.cardDb.get(targetCard.cardId)?.cost ?? 0)
-        : 0;
+      if (!targetCard) return resolved(0);
+      const targetData = context.cardDb.get(targetCard.cardId);
+      if (!targetData) {
+        return unresolved(
+          "MISSING_CARD_DB",
+          `card data not found for revealed card '${targetCard.cardId}'`
+        );
+      }
+      const count = targetData.cost ?? 0;
       return resolved(Math.floor(count / divisor) * multiplier);
     }
 
@@ -418,7 +424,14 @@ function resolveGameStateSource(
           "LEADER_BASE_POWER requires card data"
         );
       }
-      return resolved(cardDb.get(player.leader.cardId)?.power ?? 0);
+      const leaderData = cardDb.get(player.leader.cardId);
+      if (!leaderData) {
+        return unresolved(
+          "MISSING_CARD_DB",
+          `card data not found for Leader '${player.leader.cardId}'`
+        );
+      }
+      return resolved(leaderData.power ?? 0);
     default:
       return unresolved(
         "UNSUPPORTED_SOURCE",

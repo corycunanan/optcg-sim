@@ -13,10 +13,15 @@ import type {
   PlayerState,
 } from "../types.js";
 import type {
+  EffectResult,
   EffectSchema,
   RuntimeActiveEffect,
 } from "../engine/effect-types.js";
-import { resolvePermanentDynamicValue } from "../engine/dynamic-values.js";
+import {
+  resolveDynamicValue,
+  resolvePermanentDynamicValue,
+} from "../engine/dynamic-values.js";
+import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
 import {
   getEffectiveCost,
   getEffectivePower,
@@ -584,6 +589,72 @@ describe("OPT-605 — live resolution and cost fixpoint", () => {
         withTrashCount(fixture, 2, "Event").state
       )
     ).toBe(5000);
+  });
+
+  it("skips a cardDb-independent value when omitted card data prevents gate evaluation", () => {
+    const fixture = withHandCount(
+      authoredFixture("OP01-072", {
+        attachedDon: 0,
+        activePlayerIndex: 1,
+      }),
+      3
+    );
+    expect(
+      getEffectivePower(fixture.source, fixture.sourceData, fixture.state)
+    ).toBe(5000);
+  });
+
+  it("skips LEADER_BASE_POWER when the existing cardDb lacks the Leader", () => {
+    const fixture = authoredFixture("OP14-053", {
+      activePlayerIndex: 1,
+      power: 2000,
+    });
+    const incompleteCardDb = new Map(fixture.cardDb);
+    incompleteCardDb.delete(fixture.state.players[0].leader.cardId);
+
+    expect(
+      getEffectivePower(
+        fixture.source,
+        fixture.sourceData,
+        fixture.state,
+        incompleteCardDb
+      )
+    ).toBe(2000);
+  });
+
+  it("reports missing revealed-card data while preserving the action fallback", () => {
+    const fixture = authoredFixture("ST27-004");
+    const resultRefs = new Map<string, EffectResult>([
+      [
+        "revealed",
+        { targetInstanceIds: [fixture.source.instanceId], count: 1 },
+      ],
+    ]);
+    const amount = {
+      type: "PER_COUNT" as const,
+      source: "REVEALED_CARD_COST" as const,
+      ref: "revealed",
+      multiplier: 1,
+    };
+    const incompleteCardDb = new Map<string, CardData>();
+
+    expect(
+      resolveDynamicValue(amount, {
+        resultRefs,
+        state: fixture.state,
+        controller: 0,
+        cardDb: incompleteCardDb,
+      })
+    ).toMatchObject({ resolved: false, reason: "MISSING_CARD_DB" });
+    expect(
+      resolveAmount(
+        amount,
+        resultRefs,
+        fixture.state,
+        0,
+        incompleteCardDb
+      )
+    ).toBe(0);
   });
 
   it("keeps one-time modifiers on the numeric-only path", () => {

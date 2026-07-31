@@ -116,6 +116,11 @@ function permanentModifierParam(
   if (typeof value === "number") return value;
   if (!value || typeof value !== "object") return undefined;
 
+  // Without card data, permanent modifier gates cannot be evaluated. Do not
+  // trust a dynamic value that happens not to need card data when every gate
+  // was skipped; omitting it preserves the pre-dynamic-modifier behavior.
+  if (!cardDb) return undefined;
+
   const resolution = resolvePermanentDynamicValue(value, {
     state,
     controller,
