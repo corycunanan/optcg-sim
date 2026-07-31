@@ -9,13 +9,11 @@ import type {
   DynamicValue,
   EffectResult,
   EffectBlock,
-  TargetFilter,
 } from "../effect-types.js";
-import type { CardData, CardInstance, GameState } from "../../types.js";
+import type { CardData, GameState } from "../../types.js";
 import { matchesFilter } from "../conditions.js";
-import { findCardInstance } from "../state.js";
 import type { ExpiryTiming } from "../effect-types.js";
-import { isPresent } from "../type-guards.js";
+import { resolveDynamicValue } from "../dynamic-values.js";
 
 export { getActionParams } from "../effect-types.js";
 
@@ -29,18 +27,6 @@ export function getSearchAndPlayPickLimit(
   if ("exact" in pick) return pick.exact;
   return validTargetCount;
 }
-
-function findCardInstanceForDV(state: GameState, instanceId: string): CardInstance | null {
-  return findCardInstance(state, instanceId);
-}
-
-const THIS_WAY_TO_COST_REF: Record<string, string> = {
-  DON_RESTED_THIS_WAY: "__cost_don_rested",
-  CARDS_TRASHED_THIS_WAY: "__cost_cards_trashed",
-  CHARACTERS_RETURNED_THIS_WAY: "__cost_cards_returned",
-  CHARACTERS_KO_THIS_WAY: "__cost_characters_ko",
-  CARDS_PLACED_TO_DECK_THIS_WAY: "__cost_cards_placed_to_deck",
-};
 
 // ─── Choice Label Generation ─────────────────────────────────────────────────
 
@@ -96,154 +82,21 @@ export function resolveAmount(
 ): number {
   if (typeof amount === "number") return amount;
   if (!amount) return 0;
-  const dv = amount;
-
-  if (dv.type === "FIXED") return dv.value ?? 0;
-
-  if (dv.type === "PER_COUNT" && state != null && controller != null) {
-    const source = dv.source;
-    const costRefKey = THIS_WAY_TO_COST_REF[source];
-    if (costRefKey) {
-      const costRef = resultRefs.get(costRefKey);
-      if (costRef) {
-        return Math.floor(costRef.count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
-      }
-    }
-    if (source === "REVEALED_CARD_COST" && dv.ref && cardDb) {
-      const refResult = resultRefs.get(dv.ref);
-      if (refResult?.targetInstanceIds?.length) {
-        const targetCard = findCardInstanceForDV(state, refResult.targetInstanceIds[0]);
-        if (targetCard) {
-          const data = cardDb.get(targetCard.cardId);
-          return Math.floor((data?.cost ?? 0) / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
-        }
-      }
-    }
-    if (source === "DON_GIVEN_TO_TARGET" && dv.ref) {
-      const refResult = resultRefs.get(dv.ref);
-      if (refResult?.targetInstanceIds?.length) {
-        const targetCard = findCardInstanceForDV(state, refResult.targetInstanceIds[0]);
-        if (targetCard) {
-          return Math.floor(targetCard.attachedDon.length / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
-        }
-      }
-      if (refResult) {
-        return Math.floor(refResult.count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
-      }
-    }
-    const count = resolvePerCountSource(state, controller, source, cardDb, dv.filter);
-    return Math.floor(count / (dv.divisor ?? 1)) * (dv.multiplier ?? 1);
-  }
-
-  if (dv.type === "GAME_STATE" && state != null && controller != null) {
-    const ctrl = dv.controller ?? "SELF";
-    const pi = ctrl === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
-    return resolveGameStateSource(state, pi, dv.source, cardDb);
-  }
-
-  if (dv.type === "ACTION_RESULT") {
-    const result = resultRefs.get(dv.ref);
-    return result?.count ?? 0;
-  }
-
-  if (dv.type === "CHOSEN_VALUE") {
-    const chosen = resultRefs.get(dv.ref)?.value;
-    return typeof chosen === "number" && Number.isInteger(chosen) ? chosen : 0;
-  }
-
-  if (dv.type === "DRAW_TO" && state != null && controller != null) {
-    return Math.max(0, dv.target_count - state.players[controller].hand.length);
-  }
+  const resolution = resolveDynamicValue(amount, {
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+    matchesFilter,
+  });
+  if (resolution.resolved) return resolution.value;
 
   // Fallback for PER_COUNT without state (legacy calls)
-  if (dv.type === "PER_COUNT") {
-    return dv.multiplier ?? 1;
+  if (amount.type === "PER_COUNT" && (state == null || controller == null)) {
+    return amount.multiplier ?? 1;
   }
 
   return 0;
-}
-
-function resolvePerCountSource(
-  state: GameState,
-  controller: 0 | 1,
-  source: import("../effect-types.js").DynamicSource,
-  cardDb?: Map<string, CardData>,
-  filter?: TargetFilter,
-): number {
-  const p = state.players[controller];
-  const opp = state.players[controller === 0 ? 1 : 0];
-
-  switch (source) {
-    case "HAND_COUNT":
-      return p.hand.length;
-    case "CARDS_IN_TRASH":
-      return p.trash.length;
-    case "EVENTS_IN_TRASH": {
-      if (!cardDb) return 0;
-      return p.trash.filter((c) => {
-        const data = cardDb.get(c.cardId);
-        return data?.type.toUpperCase() === "EVENT";
-      }).length;
-    }
-    case "CHARACTERS_ON_FIELD":
-    case "MATCHING_CHARACTERS_ON_FIELD": {
-      let chars = p.characters.filter(isPresent);
-      if (filter && cardDb) {
-        chars = chars.filter((c) => matchesFilter(c, filter, cardDb, state));
-      }
-      // filter.unique_names: count distinct card names (OP16-034 "for each of
-      // your Characters with a different card name").
-      if (filter?.unique_names) {
-        return new Set(chars.map((c) => cardDb?.get(c.cardId)?.name ?? c.cardId)).size;
-      }
-      return chars.length;
-    }
-    case "DON_FIELD_COUNT":
-      return p.donCostArea.length + p.leader.attachedDon.length +
-        p.characters.reduce((sum, c) => sum + (c ? c.attachedDon.length : 0), 0);
-    case "OPPONENT_CHARACTERS_ON_FIELD":
-      return opp.characters.filter(Boolean).length;
-    case "DON_RESTED_THIS_WAY":
-    case "CARDS_TRASHED_THIS_WAY":
-    case "CHARACTERS_RETURNED_THIS_WAY":
-    case "CHARACTERS_KO_THIS_WAY":
-    case "CARDS_PLACED_TO_DECK_THIS_WAY":
-      // These are populated from cost results / action results — return 0 as default
-      return 0;
-    default:
-      return 0;
-  }
-}
-
-function resolveGameStateSource(
-  state: GameState,
-  playerIndex: 0 | 1,
-  source: import("../effect-types.js").GameStateSource,
-  cardDb?: Map<string, CardData>
-): number {
-  const p = state.players[playerIndex];
-  const opp = state.players[playerIndex === 0 ? 1 : 0];
-
-  switch (source) {
-    case "LIFE_COUNT": return p.life.length;
-    case "OPPONENT_LIFE_COUNT": return opp.life.length;
-    case "COMBINED_LIFE_COUNT": return p.life.length + opp.life.length;
-    case "DON_FIELD_COUNT":
-      return p.donCostArea.length + p.leader.attachedDon.length +
-        p.characters.reduce((sum, c) => sum + (c ? c.attachedDon.length : 0), 0);
-    case "OPPONENT_DON_FIELD_COUNT":
-      return opp.donCostArea.length + opp.leader.attachedDon.length +
-        opp.characters.reduce((sum, c) => sum + (c ? c.attachedDon.length : 0), 0);
-    case "HAND_COUNT": return p.hand.length;
-    case "DECK_COUNT": return p.deck.length;
-    case "RESTED_CARD_COUNT":
-      return p.characters.filter((c) => c !== null && c.state === "RESTED").length;
-    case "LEADER_BASE_POWER": {
-      const leaderData = cardDb?.get(p.leader.cardId);
-      return leaderData?.power ?? 0;
-    }
-    default: return 0;
-  }
 }
 
 // ─── computeExpiry ────────────────────────────────────────────────────────────

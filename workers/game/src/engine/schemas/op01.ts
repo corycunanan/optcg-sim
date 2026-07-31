@@ -1980,7 +1980,13 @@ export const OP01_072_SMILEY: EffectSchema = {
         {
           type: "MODIFY_POWER",
           target: { type: "SELF" },
-          params: { amount: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } },
+          params: {
+            amount: {
+              type: "PER_COUNT",
+              source: "HAND_COUNT",
+              multiplier: 1000,
+            },
+          },
         },
       ],
     },

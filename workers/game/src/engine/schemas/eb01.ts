@@ -521,7 +521,7 @@ export const EB01_014_SANJI: EffectSchema = {
           params: {
             amount: {
               type: "PER_COUNT",
-              source: "RESTED_CARD_COUNT",
+              source: "RESTED_DON_COUNT",
               multiplier: 1000,
               divisor: 3,
             },
