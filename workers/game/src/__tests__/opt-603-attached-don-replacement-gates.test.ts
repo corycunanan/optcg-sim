@@ -416,7 +416,7 @@ function effectiveSourcePower(fixture: PermanentFixture): number {
 }
 
 describe("OPT-603 — attached-DON permanent gates", () => {
-  it("EB01-014 adds its source-attached DON!! gate without replacing its active-DON condition", () => {
+  it("EB01-014 requires source-attached DON!! but no active cost-area DON!!", () => {
     const gateIsMet = (fixture: PermanentFixture): boolean => {
       const effect = fixture.state.activeEffects.find(
         (candidate) =>
@@ -428,9 +428,8 @@ describe("OPT-603 — attached-DON permanent gates", () => {
       return isEffectConditionMet(effect, fixture.state, fixture.cardDb);
     };
 
-    // OPT-605 tracks dynamic permanent modifier amounts. Assert only this
-    // ticket's gate so that fixing the currently inert PER_COUNT power value
-    // does not turn this regression into a false failure.
+    // OPT-605 resolves the dynamic permanent value and removes the extra
+    // ACTIVE_DON_COUNT gate that is absent from the canonical card text.
     expect(
       gateIsMet(
         permanentFixture({
@@ -463,7 +462,7 @@ describe("OPT-603 — attached-DON permanent gates", () => {
           restedDonCount: 3,
         })
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("EB01-058 adds its source-attached DON!! gate without replacing its active-DON and Life conditions", () => {

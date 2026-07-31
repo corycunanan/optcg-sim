@@ -567,7 +567,8 @@ export type DynamicSource =
   | "HAND_COUNT"
   | "CHARACTERS_ON_FIELD"
   | "OPPONENT_CHARACTERS_ON_FIELD"
-  | "DON_FIELD_COUNT";
+  | "DON_FIELD_COUNT"
+  | "RESTED_DON_COUNT";
 
 export type GameStateSource =
   | "LIFE_COUNT"

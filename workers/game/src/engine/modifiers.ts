@@ -37,6 +37,7 @@ import {
   type SharedTargetFilter,
   type SharedTargetFilterCard,
 } from "../../../../shared/target-filter.js";
+import { resolvePermanentDynamicValue } from "./dynamic-values.js";
 
 type ConditionContext = Omit<QueryConditionContext, "queries">;
 
@@ -101,6 +102,37 @@ function numericModifierParam(
 ): number | undefined {
   const value = modifier.params?.[key];
   return typeof value === "number" ? value : undefined;
+}
+
+function permanentModifierParam(
+  modifier: Modifier,
+  key: "amount" | "value",
+  state: GameState,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData> | undefined,
+  sourceLabel: string,
+): number | undefined {
+  const value = modifier.params?.[key];
+  if (typeof value === "number") return value;
+  if (!value || typeof value !== "object") return undefined;
+
+  // Without card data, permanent modifier gates cannot be evaluated. Do not
+  // trust a dynamic value that happens not to need card data when every gate
+  // was skipped; omitting it preserves the pre-dynamic-modifier behavior.
+  if (!cardDb) return undefined;
+
+  const resolution = resolvePermanentDynamicValue(value, {
+    state,
+    controller,
+    cardDb,
+    matchesFilter,
+  });
+  if (resolution.resolved) return resolution.value;
+  if (resolution.reason === "MISSING_CARD_DB") return undefined;
+
+  throw new Error(
+    `Unable to resolve permanent modifier ${sourceLabel}.${key}: ${resolution.detail}`,
+  );
 }
 
 /**
@@ -377,7 +409,16 @@ export function getEffectivePower(
         modifierAppliesToCard(lastSetter, m, card, state, cardDb) &&
         isModifierConditionMet(lastSetter, m, state, cardDb)
     );
-    const value = mod ? numericModifierParam(mod, "value") : undefined;
+    const value = mod
+      ? permanentModifierParam(
+          mod,
+          "value",
+          state,
+          lastSetter.controller,
+          cardDb,
+          lastSetter.sourceEffectBlockId,
+        )
+      : undefined;
     if (value !== undefined) power = value;
   }
 
@@ -397,13 +438,18 @@ export function getEffectivePower(
   );
   for (const effect of additiveEffects) {
     for (const mod of effect.modifiers ?? []) {
-      const amount = numericModifierParam(mod, "amount");
-      if (
-        mod.type === "MODIFY_POWER" &&
-        amount !== undefined &&
-        modifierAppliesToCard(effect, mod, card, state, cardDb) &&
-        isModifierConditionMet(effect, mod, state, cardDb)
-      ) {
+      if (mod.type !== "MODIFY_POWER") continue;
+      if (!modifierAppliesToCard(effect, mod, card, state, cardDb)) continue;
+      if (!isModifierConditionMet(effect, mod, state, cardDb)) continue;
+      const amount = permanentModifierParam(
+        mod,
+        "amount",
+        state,
+        effect.controller,
+        cardDb,
+        effect.sourceEffectBlockId,
+      );
+      if (amount !== undefined) {
         power += amount;
       }
     }
@@ -462,17 +508,22 @@ export function getEffectiveCost(
     );
     for (const effect of setters) {
       for (const mod of effect.modifiers ?? []) {
-        const value = numericModifierParam(mod, "value");
+        if (mod.type !== "SET_COST") continue;
         const applies =
           card && cardDb
             ? modifierAppliesToCard(effect, mod, card, state, cardDb, cost)
             : effect.appliesTo?.includes(cardInstanceId);
-        if (
-          mod.type === "SET_COST" &&
-          value !== undefined &&
-          applies &&
-          isModifierConditionMet(effect, mod, state, cardDb)
-        ) {
+        if (!applies || !isModifierConditionMet(effect, mod, state, cardDb))
+          continue;
+        const value = permanentModifierParam(
+          mod,
+          "value",
+          state,
+          effect.controller,
+          cardDb,
+          effect.sourceEffectBlockId,
+        );
+        if (value !== undefined) {
           cost = value;
         }
       }
@@ -631,17 +682,22 @@ function applyLayer2CostModifiers(
         const inclusionKey = `${effect.id}:${modifierIndex}`;
         if (includedModifierKeys.has(inclusionKey)) continue;
 
-        const amount = numericModifierParam(mod, "amount");
+        if (mod.type !== "MODIFY_COST") continue;
         const applies =
           card && cardDb
             ? modifierAppliesToCard(effect, mod, card, state, cardDb, cost)
             : effect.appliesTo?.includes(cardInstanceId);
-        if (
-          mod.type === "MODIFY_COST" &&
-          amount !== undefined &&
-          applies &&
-          isModifierConditionMet(effect, mod, state, cardDb)
-        ) {
+        if (!applies || !isModifierConditionMet(effect, mod, state, cardDb))
+          continue;
+        const amount = permanentModifierParam(
+          mod,
+          "amount",
+          state,
+          effect.controller,
+          cardDb,
+          effect.sourceEffectBlockId,
+        );
+        if (amount !== undefined) {
           cost += amount;
           includedModifierKeys.add(inclusionKey);
           addedThisPass = true;
@@ -689,12 +745,17 @@ function getHandZoneSelfCostModifier(
     if (!block.modifiers) continue;
 
     for (const mod of block.modifiers) {
-      const amount = numericModifierParam(mod, "amount");
-      if (
-        mod.type === "MODIFY_COST" &&
-        amount !== undefined &&
-        isModifierGateMet(block, mod, state, ctx)
-      )
+      if (mod.type !== "MODIFY_COST") continue;
+      if (!isModifierGateMet(block, mod, state, ctx)) continue;
+      const amount = permanentModifierParam(
+        mod,
+        "amount",
+        state,
+        card.controller,
+        cardDb,
+        block.id,
+      );
+      if (amount !== undefined)
         adjustment += amount;
     }
   }
@@ -785,7 +846,14 @@ function getFieldToHandCostModifier(
           )
             continue;
 
-          const amount = numericModifierParam(mod, "amount");
+          const amount = permanentModifierParam(
+            mod,
+            "amount",
+            state,
+            fieldCard.controller,
+            cardDb,
+            block.id,
+          );
           if (amount !== undefined) adjustment += amount;
         }
       }

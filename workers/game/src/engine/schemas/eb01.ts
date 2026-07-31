@@ -498,21 +498,11 @@ export const EB01_014_SANJI: EffectSchema = {
       id: "permanent_power_per_rested_don",
       category: "permanent",
       conditions: {
-        all_of: [
-          {
-            type: "DON_GIVEN",
-            controller: "SELF",
-            mode: "SPECIFIC_CARD",
-            operator: ">=",
-            value: 1,
-          },
-          {
-            type: "ACTIVE_DON_COUNT",
-            controller: "SELF",
-            operator: ">=",
-            value: 1,
-          },
-        ],
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
       },
       modifiers: [
         {
@@ -521,7 +511,7 @@ export const EB01_014_SANJI: EffectSchema = {
           params: {
             amount: {
               type: "PER_COUNT",
-              source: "RESTED_CARD_COUNT",
+              source: "RESTED_DON_COUNT",
               multiplier: 1000,
               divisor: 3,
             },
