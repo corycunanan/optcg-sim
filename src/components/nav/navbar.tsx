@@ -43,126 +43,139 @@ export function Navbar() {
     "font-nav rounded-md px-2 py-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus sm:px-3";
 
   return (
-    <nav className="bg-surface-nav border-border-accent sticky top-0 z-40 flex h-16 shrink-0 items-center border-b px-2 sm:px-6">
-      <NavigationMenu
-        viewport={false}
-        className="max-w-none min-w-0 flex-1 justify-start overflow-x-auto"
+    <nav className="bg-surface-nav border-border-accent sticky top-0 z-40 h-16 shrink-0 border-b">
+      <div
+        data-slot="navbar-content"
+        className="mx-auto flex h-full w-full max-w-7xl items-center px-2 sm:px-6"
       >
-        <NavigationMenuList className="gap-1">
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild>
-              <DeckNavigationGuardLink
-                href="/lobbies"
-                aria-current={playActive ? "page" : undefined}
-                className={cn(
-                  navigationMenuTriggerStyle(),
-                  triggerStyles,
-                  playActive ? activeTriggerStyles : playTriggerStyles
-                )}
-              >
-                Play
-              </DeckNavigationGuardLink>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
+        <NavigationMenu className="max-w-none min-w-0 flex-1 justify-start">
+          <div
+            data-slot="navbar-links-scroller"
+            className="min-w-0 flex-1 overflow-x-auto"
+          >
+            <NavigationMenuList className="w-max justify-start gap-1">
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <DeckNavigationGuardLink
+                    href="/lobbies"
+                    aria-current={playActive ? "page" : undefined}
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      triggerStyles,
+                      playActive ? activeTriggerStyles : playTriggerStyles
+                    )}
+                  >
+                    Play
+                  </DeckNavigationGuardLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
 
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild>
-              <DeckNavigationGuardLink
-                href="/"
-                aria-current={pathname === "/" ? "page" : undefined}
-                className={cn(
-                  navigationMenuTriggerStyle(),
-                  triggerStyles,
-                  pathname === "/" && activeTriggerStyles
-                )}
-              >
-                Home
-              </DeckNavigationGuardLink>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <DeckNavigationGuardLink
+                    href="/"
+                    aria-current={pathname === "/" ? "page" : undefined}
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      triggerStyles,
+                      pathname === "/" && activeTriggerStyles
+                    )}
+                  >
+                    Home
+                  </DeckNavigationGuardLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
 
-          <NavigationMenuItem>
-            <NavigationMenuTrigger
-              data-active={decksActive || undefined}
-              aria-current={decksActive ? "page" : undefined}
-              className={cn(triggerStyles, decksActive && activeTriggerStyles)}
-            >
-              Decks
-            </NavigationMenuTrigger>
-            <NavigationMenuContent className="border-border bg-popover border ring-0">
-              <ul className="flex w-48 flex-col gap-1 p-1">
-                <li>
-                  <NavigationMenuLink asChild>
-                    <DeckNavigationGuardLink
-                      href="/decks"
-                      className={linkStyles}
-                    >
-                      My Decks
-                    </DeckNavigationGuardLink>
-                  </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <DeckNavigationGuardLink
-                      href="/decks/new"
-                      className={linkStyles}
-                    >
-                      + New Deck
-                    </DeckNavigationGuardLink>
-                  </NavigationMenuLink>
-                </li>
-              </ul>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger
+                  data-active={decksActive || undefined}
+                  aria-current={decksActive ? "page" : undefined}
+                  className={cn(
+                    triggerStyles,
+                    decksActive && activeTriggerStyles
+                  )}
+                >
+                  Decks
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="flex w-48 flex-col gap-1 p-1">
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <DeckNavigationGuardLink
+                          href="/decks"
+                          className={linkStyles}
+                        >
+                          My Decks
+                        </DeckNavigationGuardLink>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <DeckNavigationGuardLink
+                          href="/decks/new"
+                          className={linkStyles}
+                        >
+                          + New Deck
+                        </DeckNavigationGuardLink>
+                      </NavigationMenuLink>
+                    </li>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
 
-          <NavigationMenuItem>
-            <NavigationMenuTrigger
-              data-active={cardsActive || undefined}
-              aria-current={cardsActive ? "page" : undefined}
-              className={cn(triggerStyles, cardsActive && activeTriggerStyles)}
-            >
-              Cards
-            </NavigationMenuTrigger>
-            <NavigationMenuContent className="border-border bg-popover border ring-0">
-              <ul className="flex w-48 flex-col gap-1 p-1">
-                <li>
-                  <NavigationMenuLink asChild>
-                    <DeckNavigationGuardLink
-                      href="/cards"
-                      className={linkStyles}
-                    >
-                      All Cards
-                    </DeckNavigationGuardLink>
-                  </NavigationMenuLink>
-                </li>
-                <li>
-                  <NavigationMenuLink asChild>
-                    <DeckNavigationGuardLink
-                      href="/sets"
-                      className={linkStyles}
-                    >
-                      Sets
-                    </DeckNavigationGuardLink>
-                  </NavigationMenuLink>
-                </li>
-              </ul>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
-        </NavigationMenuList>
-      </NavigationMenu>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger
+                  data-active={cardsActive || undefined}
+                  aria-current={cardsActive ? "page" : undefined}
+                  className={cn(
+                    triggerStyles,
+                    cardsActive && activeTriggerStyles
+                  )}
+                >
+                  Cards
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="flex w-48 flex-col gap-1 p-1">
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <DeckNavigationGuardLink
+                          href="/cards"
+                          className={linkStyles}
+                        >
+                          All Cards
+                        </DeckNavigationGuardLink>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <DeckNavigationGuardLink
+                          href="/sets"
+                          className={linkStyles}
+                        >
+                          Sets
+                        </DeckNavigationGuardLink>
+                      </NavigationMenuLink>
+                    </li>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </div>
+        </NavigationMenu>
 
-      {sessionStatus !== "unauthenticated" && (
-        <div
-          data-slot="navbar-actions"
-          data-state={sessionStatus === "loading" ? "loading" : "ready"}
-          aria-hidden={sessionStatus === "loading" || undefined}
-          className="min-w-navbar-actions ml-2 flex h-10 shrink-0 items-center justify-end gap-2"
-        >
-          {sessionStatus === "authenticated" && session?.user && (
-            <NavbarActions user={session.user} />
-          )}
-        </div>
-      )}
+        {sessionStatus !== "unauthenticated" && (
+          <div
+            data-slot="navbar-actions"
+            data-state={sessionStatus === "loading" ? "loading" : "ready"}
+            aria-hidden={sessionStatus === "loading" || undefined}
+            className="min-w-navbar-actions ml-2 flex h-10 shrink-0 items-center justify-end gap-2"
+          >
+            {sessionStatus === "authenticated" && session?.user && (
+              <NavbarActions user={session.user} />
+            )}
+          </div>
+        )}
+      </div>
     </nav>
   );
 }
