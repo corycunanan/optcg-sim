@@ -33,7 +33,7 @@ export function Navbar() {
   const playActive = isRouteWithin("/lobbies") || isRouteWithin("/game");
 
   const triggerStyles =
-    "font-nav relative bg-transparent px-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse sm:px-3";
+    "font-nav relative bg-transparent px-1 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse sm:px-3";
   const activeTriggerStyles =
     "bg-surface-2 text-gold-600 hover:text-gold-600 focus:text-gold-600 data-popup-open:text-gold-600 data-open:text-gold-600";
   const playTriggerStyles =
@@ -49,11 +49,11 @@ export function Navbar() {
         className="mx-auto flex h-full w-full max-w-7xl items-center px-2 sm:px-6"
       >
         <NavigationMenu className="max-w-none min-w-0 flex-1 justify-start">
-          <div
-            data-slot="navbar-links-scroller"
-            className="min-w-0 flex-1 overflow-x-auto"
-          >
-            <NavigationMenuList className="w-max justify-start gap-1">
+          <div className="min-w-0 flex-1">
+            <NavigationMenuList
+              data-navbar-links-scroller
+              className="w-full justify-start gap-0 overflow-x-auto sm:gap-1"
+            >
               <NavigationMenuItem>
                 <NavigationMenuLink asChild>
                   <DeckNavigationGuardLink
@@ -86,7 +86,7 @@ export function Navbar() {
                 </NavigationMenuLink>
               </NavigationMenuItem>
 
-              <NavigationMenuItem>
+              <NavigationMenuItem className="static">
                 <NavigationMenuTrigger
                   data-active={decksActive || undefined}
                   aria-current={decksActive ? "page" : undefined}
@@ -123,7 +123,7 @@ export function Navbar() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
 
-              <NavigationMenuItem>
+              <NavigationMenuItem className="static">
                 <NavigationMenuTrigger
                   data-active={cardsActive || undefined}
                   aria-current={cardsActive ? "page" : undefined}
