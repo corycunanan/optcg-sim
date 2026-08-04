@@ -912,10 +912,10 @@ export const OP01_032_ASHURA_DOJI: EffectSchema = {
             value: 1,
           },
           {
-            type: "RESTED_CARD_COUNT",
+            type: "CARD_ON_FIELD",
             controller: "OPPONENT",
-            operator: ">=",
-            value: 2,
+            filter: { card_type: "CHARACTER", is_rested: true },
+            count: { operator: ">=", value: 2 },
           },
         ],
       },

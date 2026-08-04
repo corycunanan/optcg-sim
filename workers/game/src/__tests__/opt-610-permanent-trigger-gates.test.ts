@@ -107,12 +107,16 @@ function fixture(
     sourceType = "Character",
     allies = [],
     opponents = [],
+    costAreaDon = 8,
+    opponentRestedDon = 0,
   }: {
     activePlayerIndex?: 0 | 1;
     attachedDon?: number;
     sourceType?: "Character" | "Leader";
     allies?: Array<{ data: CardData; card: CardInstance }>;
     opponents?: Array<{ data: CardData; card: CardInstance }>;
+    costAreaDon?: number;
+    opponentRestedDon?: number;
   } = {}
 ): Fixture {
   const schema = getEffectSchema(cardId);
@@ -143,10 +147,15 @@ function fixture(
       ...(sourceType === "Character" ? [source] : []),
       ...allies.map((entry) => entry.card),
     ]),
+    donCostArea: players[0].donCostArea.slice(0, costAreaDon),
   };
   players[1] = {
     ...players[1],
     characters: padChars(opponents.map((entry) => entry.card)),
+    donCostArea: players[1].donCostArea.map((donCard, index) => ({
+      ...donCard,
+      state: index < opponentRestedDon ? "RESTED" : "ACTIVE",
+    })),
   };
   state = {
     ...state,
@@ -239,7 +248,7 @@ describe("OPT-610 — permanent modifier gates", () => {
     expect(power(ally, allyData, makeScene(0, 0))).toBe(5000);
   });
 
-  it("OP01-032 requires attached DON!! in addition to 2 rested opposing cards", () => {
+  it("OP01-032 requires attached DON!! and 2 rested opposing Characters", () => {
     const opponents = [0, 1].map((index) => {
       const opponentData = data(`OPPONENT-OP01-032-${index}`);
       return {
@@ -250,10 +259,34 @@ describe("OPT-610 — permanent modifier gates", () => {
       };
     });
     const valid = fixture("OP01-032", { attachedDon: 1, opponents });
-    const invalid = fixture("OP01-032", { attachedDon: 0, opponents });
-
+    const noAttachedDon = fixture("OP01-032", {
+      attachedDon: 0,
+      opponents,
+    });
     expect(power(valid.source, valid.sourceData, valid)).toBe(8000);
-    expect(power(invalid.source, invalid.sourceData, invalid)).toBe(5000);
+    expect(
+      power(noAttachedDon.source, noAttachedDon.sourceData, noAttachedDon)
+    ).toBe(5000);
+  });
+
+  it("OP01-032 does not count a rested DON!! as a rested Character", () => {
+    const opponentData = data("OPPONENT-OP01-032-ONLY");
+    const opponent = instance(opponentData.id, 1, "opponent-op01-032-only", {
+      state: "RESTED",
+    });
+    const oneCharacterAndOneDon = fixture("OP01-032", {
+      attachedDon: 1,
+      opponents: [{ data: opponentData, card: opponent }],
+      opponentRestedDon: 1,
+    });
+
+    expect(
+      power(
+        oneCharacterAndOneDon.source,
+        oneCharacterAndOneDon.sourceData,
+        oneCharacterAndOneDon
+      )
+    ).toBe(6000);
   });
 
   it("OP01-109 gates its 8-DON field buff by turn and attached DON!!", () => {
@@ -269,6 +302,21 @@ describe("OPT-610 — permanent modifier gates", () => {
     expect(
       power(noAttachedDon.source, noAttachedDon.sourceData, noAttachedDon)
     ).toBe(5000);
+  });
+
+  it("OP01-109 contributes zero below 8 DON!! on its field", () => {
+    const belowDonThreshold = fixture("OP01-109", {
+      attachedDon: 1,
+      costAreaDon: 6,
+    });
+
+    expect(
+      power(
+        belowDonThreshold.source,
+        belowDonThreshold.sourceData,
+        belowDonThreshold
+      )
+    ).toBe(6000);
   });
 });
 
