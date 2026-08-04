@@ -231,6 +231,18 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
     return errors;
   }
 
+  // State-filtered DON counts can appear anywhere conditions are carried,
+  // including schema-level rule_modifications. Walk each top-level value once
+  // so nested effect and rule conditions share the same validation contract.
+  for (const [field, value] of Object.entries(candidate)) {
+    errors.push(
+      ...validateDonFieldCountStateFiltersInValue(
+        value,
+        `${prefix} ${field}`,
+      ),
+    );
+  }
+
   const blockIds = new Set<string>();
 
   for (let i = 0; i < candidate.effects.length; i++) {
@@ -278,7 +290,6 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
   const errors: string[] = [];
 
   errors.push(...validateTargetFiltersInValue(block, prefix));
-  errors.push(...validateDonFieldCountStateFiltersInValue(block, prefix));
   if (block.trigger !== undefined) {
     errors.push(...validateTriggerShape(block.trigger, `${prefix}.trigger`));
   }

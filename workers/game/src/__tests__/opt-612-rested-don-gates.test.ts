@@ -192,6 +192,17 @@ describe("OPT-612 — rested DON!! gate vocabulary", () => {
       "[TEST-612] effects[0].conditions.state: Invalid DON_FIELD_COUNT state 'EXHAUSTED'; use ACTIVE or RESTED"
     );
   });
+
+  it("rejects invalid DON_FIELD_COUNT state filters in rule modifications", () => {
+    const invalid = structuredClone(authoredSchema("OP13-003")) as {
+      rule_modifications?: Array<{ condition?: { state?: string } }>;
+    };
+    invalid.rule_modifications![0]!.condition!.state = "EXHAUSTED";
+
+    expect(validateEffectSchema(invalid, "TEST-612")).toContain(
+      "[TEST-612] rule_modifications[0].condition.state: Invalid DON_FIELD_COUNT state 'EXHAUSTED'; use ACTIVE or RESTED"
+    );
+  });
 });
 
 describe("OPT-612 — OP07-023 Caribou", () => {
