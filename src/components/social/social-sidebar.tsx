@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSession, signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -11,12 +10,10 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
@@ -25,14 +22,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import {
-  UserPlus,
-  MoreHorizontal,
-  ChevronsUpDown,
-  LogOut,
-  Search,
-  MessageCircle,
-} from "lucide-react";
+import { UserPlus, MoreHorizontal, Search, MessageCircle } from "lucide-react";
 import { UserAvatar } from "./user-avatar";
 import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 import {
@@ -83,7 +73,6 @@ interface SocialSidebarProps {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
-  const { data: session } = useSession();
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
@@ -234,8 +223,6 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   );
 
   const friendIds = new Set(friends.map((f) => f.user.id));
-  const user = session?.user;
-  const userName = user?.username || user?.name || "User";
   const normalizedSearchQ = normalizeSubstringSearchQuery(searchQ);
   const loadFailed = friendsLoadState === "error";
   const loadPending = friendsLoadState === "loading";
@@ -331,9 +318,9 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
       <Sidebar
         side="right"
         collapsible="none"
-        className="social-rail bg-surface-nav w-[280px] shrink-0 border-l"
+        className="social-rail bg-surface-nav fixed top-16 right-0 bottom-0 z-30 h-auto w-[280px] border-l"
       >
-        <SidebarHeader className="border-border border-b px-4 py-4">
+        <SidebarHeader className="border-border-accent border-b px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-content-primary text-xl">
               Friends
@@ -534,66 +521,9 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
               )}
             </SidebarGroupContent>
           </SidebarGroup>
-        </SidebarContent>
 
-        <SidebarFooter className="border-border border-t px-3 py-3">
           <UserChannelConnectionStatus connectionStatus={connectionStatus} />
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton size="lg">
-                    <UserAvatar
-                      user={{
-                        username: user?.username ?? null,
-                        name: user?.name ?? null,
-                        image: user?.image ?? null,
-                      }}
-                      size="sm"
-                      variant="dark"
-                    />
-                    <span className="truncate font-semibold">{userName}</span>
-                    <ChevronsUpDown className="ml-auto size-4" />
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  side="top"
-                  align="end"
-                  className="w-[--radix-dropdown-menu-trigger-width]"
-                >
-                  <DropdownMenuItem
-                    disabled
-                    className="flex items-center gap-2 opacity-100"
-                  >
-                    <UserAvatar
-                      user={{
-                        username: user?.username ?? null,
-                        name: user?.name ?? null,
-                        image: user?.image ?? null,
-                      }}
-                      size="sm"
-                    />
-                    <div className="flex min-w-0 flex-col gap-1 leading-none">
-                      <span className="truncate font-semibold">{userName}</span>
-                      {user?.email && (
-                        <span className="text-content-tertiary truncate text-xs">
-                          {user.email}
-                        </span>
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                  >
-                    <LogOut className="size-4" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
+        </SidebarContent>
       </Sidebar>
 
       <AlertDialog
