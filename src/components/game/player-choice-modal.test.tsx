@@ -1,0 +1,159 @@
+import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/components/ui", () => {
+  const Wrapper = ({ children }: PropsWithChildren) => <>{children}</>;
+  return {
+    Dialog: Wrapper,
+    DialogContent: Wrapper,
+    DialogHeader: Wrapper,
+    DialogTitle: Wrapper,
+  };
+});
+
+vi.mock("./game-button", () => ({
+  GameButton: ({
+    children,
+    onClick,
+    disabled,
+    className,
+    "aria-label": ariaLabel,
+    "aria-pressed": ariaPressed,
+  }: ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: string;
+    size?: string;
+  }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={className}
+      aria-label={ariaLabel}
+      aria-pressed={ariaPressed}
+    >
+      {children}
+    </button>
+  ),
+}));
+
+import { PlayerChoiceModal } from "./player-choice-modal";
+
+const choices = [
+  { id: "don-rest:1", label: "Rest 1 -> +2000" },
+  { id: "don-rest:2", label: "Rest 2 -> +4000" },
+];
+
+function findButton(renderer: ReactTestRenderer, label: string) {
+  return renderer.root
+    .findAllByType("button")
+    .find((button) => button.children.join("") === label)!;
+}
+
+describe("PlayerChoiceModal confirmed selection mode", () => {
+  it("selects without submitting and requires Confirm", async () => {
+    const onAction = vi.fn();
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="Choose how many DON!! cards to rest"
+          choices={choices}
+          confirmOrSkip
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={onAction}
+        />,
+      );
+    });
+
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
+    await act(async () => {
+      findButton(renderer, "Rest 2 -> +4000").props.onClick();
+    });
+    expect(onAction).not.toHaveBeenCalled();
+    expect(findButton(renderer, "Rest 2 -> +4000").props["aria-pressed"])
+      .toBe(true);
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(false);
+
+    await act(async () => {
+      findButton(renderer, "Confirm").props.onClick();
+    });
+    expect(onAction).toHaveBeenCalledWith({
+      type: "PLAYER_CHOICE",
+      choiceId: "don-rest:2",
+    });
+  });
+
+  it("sends Skip separately from the real amount rows", async () => {
+    const onAction = vi.fn();
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="Choose how many DON!! cards to rest"
+          choices={choices}
+          confirmOrSkip
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={onAction}
+        />,
+      );
+    });
+
+    await act(async () => {
+      findButton(renderer, "Skip").props.onClick();
+    });
+    expect(onAction).toHaveBeenCalledWith({
+      type: "PLAYER_CHOICE",
+      choiceId: "skip",
+    });
+    expect(choices.some((choice) => choice.id === "skip")).toBe(false);
+  });
+
+  it("preserves click-to-submit for existing PLAYER_CHOICE prompts", async () => {
+    const onAction = vi.fn();
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="Choose a branch"
+          choices={choices}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={onAction}
+        />,
+      );
+    });
+
+    await act(async () => {
+      findButton(renderer, "Rest 1 -> +2000").props.onClick();
+    });
+    expect(onAction).toHaveBeenCalledWith({
+      type: "PLAYER_CHOICE",
+      choiceId: "don-rest:1",
+    });
+    expect(renderer.root.findAllByType("button").some(
+      (button) => button.children.join("") === "Confirm",
+    )).toBe(false);
+  });
+
+  it("does not auto-submit a lone confirmed choice", async () => {
+    const onAction = vi.fn();
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="Choose how many DON!! cards to rest"
+          choices={choices.slice(0, 1)}
+          confirmOrSkip
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={onAction}
+        />,
+      );
+    });
+
+    expect(onAction).not.toHaveBeenCalled();
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
+  });
+});

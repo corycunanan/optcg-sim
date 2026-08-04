@@ -440,6 +440,9 @@ function validatePromptPayload(
     prompt.options.promptType === "PLAYER_CHOICE" &&
     action.type === "PLAYER_CHOICE"
   ) {
+    if (prompt.options.confirmOrSkip && action.choiceId === "skip") {
+      return null;
+    }
     return prompt.options.choices.some(
       (choice) => choice.id === action.choiceId
     )

@@ -750,6 +750,8 @@ export interface PlayerChoicePrompt {
   choices: { id: string; label: string }[];
   effectDescription: string;
   source?: "PREGAME" | "EFFECT";
+  /** Select a row first, then submit it from a Confirm/Skip footer. */
+  confirmOrSkip?: boolean;
   donReturn?: {
     count: number;
     sources: Array<{
