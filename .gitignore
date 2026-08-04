@@ -54,6 +54,15 @@ next-env.d.ts
 # Browser artifacts
 .artifacts/
 
+# DesignSync generated artifacts
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/build/
+.design-sync/learnings/
+types/
+index.d.ts
+
 # bg-shell state
 .bg-shell/
 .env.vercel-token
