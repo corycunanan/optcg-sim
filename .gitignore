@@ -55,13 +55,13 @@ next-env.d.ts
 .artifacts/
 
 # DesignSync generated artifacts
-.ds-sync/
-ds-bundle/
-.design-sync/.cache/
-.design-sync/build/
-.design-sync/learnings/
-types/
-index.d.ts
+/.ds-sync/
+/ds-bundle/
+/.design-sync/.cache/
+/.design-sync/build/
+/.design-sync/learnings/
+/types/
+/index.d.ts
 
 # bg-shell state
 .bg-shell/
