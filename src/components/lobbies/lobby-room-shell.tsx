@@ -1170,10 +1170,10 @@ export function InvitePanel({
         </div>
         <div className="min-w-0">
           <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-            Open seat
+            Waiting for a challenger
           </p>
           <h2 className="text-content-primary mt-1 text-lg font-semibold uppercase">
-            Waiting for a challenger
+            Open seat
           </h2>
         </div>
       </header>
