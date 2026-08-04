@@ -753,8 +753,9 @@ export const OP07_023_CARIBOU: EffectSchema = {
       id: "OP07-023_effect_1",
       category: "permanent",
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "DON_FIELD_COUNT",
         controller: "SELF",
+        state: "RESTED",
         operator: ">=",
         value: 6,
       },

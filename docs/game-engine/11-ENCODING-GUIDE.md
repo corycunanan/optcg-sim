@@ -123,6 +123,7 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "If you have N or more cards in your trash" | `{ "type": "TRASH_COUNT", "controller": "SELF", "operator": ">=", "value": N }` |
 | "If you have N or less cards in your deck" | `{ "type": "DECK_COUNT", "controller": "SELF", "operator": "<=", "value": N }` |
 | "If you have N DON!! cards on your field" | `{ "type": "DON_FIELD_COUNT", "controller": "SELF", "operator": ">=", "value": N }` |
+| "If you have N or more rested DON!! cards" | `{ "type": "DON_FIELD_COUNT", "controller": "SELF", "state": "RESTED", "operator": ">=", "value": N }` |
 | "If you have N or more active DON!! cards" | `{ "type": "ACTIVE_DON_COUNT", "controller": "SELF", "operator": ">=", "value": N }` |
 | "If all of your DON!! cards are rested" | `{ "type": "ALL_DON_STATE", "controller": "SELF", "required_state": "RESTED" }` |
 | "If you have [Name]..." | `{ "type": "CARD_ON_FIELD", "controller": "SELF", "filter": { "name": "Name" } }` |

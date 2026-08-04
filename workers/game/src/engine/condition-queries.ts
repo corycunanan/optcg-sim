@@ -181,19 +181,23 @@ function evaluateSimple(
       if (cond.controller === "EITHER") {
         return (
           compareNum(
-            getDonFieldCount(state.players[0]),
+            getDonFieldCount(state.players[0], cond.state),
             cond.operator,
             cond.value
           ) ||
           compareNum(
-            getDonFieldCount(state.players[1]),
+            getDonFieldCount(state.players[1], cond.state),
             cond.operator,
             cond.value
           )
         );
       }
       const p = getPlayerByController(state, cond.controller, ctx.controller);
-      return compareNum(getDonFieldCount(p), cond.operator, cond.value);
+      return compareNum(
+        getDonFieldCount(p, cond.state),
+        cond.operator,
+        cond.value
+      );
     }
 
     case "ACTIVE_DON_COUNT": {
@@ -892,7 +896,13 @@ function getPlayerByController(
   return state.players[resolveController(controller, selfIndex)];
 }
 
-function getDonFieldCount(p: PlayerState): number {
+function getDonFieldCount(
+  p: PlayerState,
+  state?: import("./effect-types.js").CardState
+): number {
+  if (state) {
+    return p.donCostArea.filter((don) => don.state === state).length;
+  }
   let count = p.donCostArea.length;
   count += p.leader.attachedDon.length;
   for (const c of p.characters) if (c) count += c.attachedDon.length;
