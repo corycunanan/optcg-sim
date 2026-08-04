@@ -41,6 +41,34 @@ import {
 } from "../../replacements.js";
 import { getEventCardInstanceId, replacePendingEventReferences } from "../../events.js";
 import { transitionCards } from "../../zone-transition.js";
+import {
+  applyCostTransactionState,
+  captureCostTransactionState,
+  type CostTransactionState,
+} from "../cost/transaction.js";
+
+/**
+ * Frames persisted before OPT-614 have no staged state. Earlier costs are
+ * already committed to the root and cannot be reconstructed, so abandon must
+ * publish their retained events instead of pretending those mutations rolled
+ * back. Result refs cover silent payments such as REST_DON.
+ */
+function isLegacyCostTransactionFrame(frame: EffectStackFrame): boolean {
+  return frame.costTransactionState === undefined && (
+    frame.currentCostIndex > 0 ||
+    frame.accumulatedEvents.length > 0 ||
+    frame.costResultRefs.some(([, result]) => result.count > 0)
+  );
+}
+
+function eventsForCostAbandon(
+  frame: EffectStackFrame,
+  additionalEvents: PendingEvent[] = [],
+): PendingEvent[] {
+  return isLegacyCostTransactionFrame(frame)
+    ? [...frame.accumulatedEvents, ...additionalEvents]
+    : additionalEvents;
+}
 
 export function abortReplacedCost(
   state: GameState,
@@ -50,20 +78,12 @@ export function abortReplacedCost(
   services: EffectResolverServices,
   frameOnStack = true
 ): EffectResolverResult {
-  let nextState = frameOnStack ? popFrame(state) : state;
-  const block = frame.effectBlock;
-  if (isOncePerTurnBlock(block) && !frame.oncePerTurnMarked) {
-    nextState = markOncePerTurnUsed(
-      nextState,
-      block.id,
-      frame.sourceCardInstanceId
-    );
-  }
+  const nextState = frameOnStack ? popFrame(state) : state;
   return services.processRemainingTriggers(
     nextState,
     frame.pendingTriggers,
     cardDb,
-    events
+    eventsForCostAbandon(frame, events),
   );
 }
 
@@ -242,6 +262,7 @@ function finishCostsAndRunActions(
  */
 function resumeAfterBranchPick(
   state: GameState,
+  transactionBaseline: CostTransactionState,
   topFrame: EffectStackFrame,
   replacedCosts: Cost[],
   controller: 0 | 1,
@@ -250,7 +271,7 @@ function resumeAfterBranchPick(
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
 ): EffectResolverResult {
-  const events: PendingEvent[] = [];
+  const events: PendingEvent[] = [...topFrame.accumulatedEvents];
   let nextState = popFrame(state);
 
   const block = topFrame.effectBlock;
@@ -262,7 +283,9 @@ function resumeAfterBranchPick(
     cardDb,
     sourceCardInstanceId,
     block,
-    services
+    services,
+    transactionBaseline,
+    events,
   );
 
   if (resumeResult.cannotPay) {
@@ -270,11 +293,12 @@ function resumeAfterBranchPick(
       resumeResult.state,
       topFrame.pendingTriggers,
       cardDb,
-      events
+      eventsForCostAbandon(topFrame, resumeResult.events),
     );
   }
 
   nextState = resumeResult.state;
+  events.length = 0;
   events.push(...resumeResult.events);
 
   if (resumeResult.pendingPrompt) {
@@ -318,6 +342,28 @@ export function handleAwaitingCostSelection(
 ): EffectResolverResult {
   const { sourceCardInstanceId, controller } = topFrame;
   const cost = topFrame.costs[topFrame.currentCostIndex];
+  const baselineState = state;
+  const transactionBaseline = captureCostTransactionState(baselineState);
+  const workingState = topFrame.costTransactionState
+    ? applyCostTransactionState(baselineState, topFrame.costTransactionState)
+    : baselineState;
+  const suspendCurrentFrame = (
+    stateWithFrame: GameState,
+    stagedEvents: PendingEvent[],
+    pendingPrompt: NonNullable<EffectResolverResult["pendingPrompt"]>,
+    stagedState: GameState = stateWithFrame,
+  ): EffectResolverResult => {
+    const withTransaction = updateTopFrame(stateWithFrame, {
+      accumulatedEvents: [...stagedEvents],
+      costTransactionState: captureCostTransactionState(stagedState),
+    });
+    return {
+      state: applyCostTransactionState(withTransaction, transactionBaseline),
+      events: [],
+      resolved: false,
+      pendingPrompt,
+    };
+  };
 
   // Reconstruct accumulated cost refs from the frame
   const accumulatedCostRefs = new Map<string, EffectResult>(
@@ -331,9 +377,10 @@ export function handleAwaitingCostSelection(
     cost.amount === "ANY_NUMBER"
   ) {
     return services.processRemainingTriggers(
-      popFrame(state),
+      popFrame(baselineState),
       topFrame.pendingTriggers,
-      cardDb
+      cardDb,
+      eventsForCostAbandon(topFrame),
     );
   }
 
@@ -341,8 +388,8 @@ export function handleAwaitingCostSelection(
     action.type === "PLAYER_CHOICE" &&
     action.choiceId === "__PAY_FIXED_COST__"
   ) {
-    let nextState = popFrame(state);
-    const events: PendingEvent[] = [];
+    let nextState = popFrame(workingState);
+    const events: PendingEvent[] = [...topFrame.accumulatedEvents];
     const paid = payCosts(
       nextState,
       [cost],
@@ -351,13 +398,11 @@ export function handleAwaitingCostSelection(
       sourceCardInstanceId
     );
     if (!paid) {
-      return abortReplacedCost(
-        nextState,
-        topFrame,
-        events,
+      return services.processRemainingTriggers(
+        popFrame(baselineState),
+        topFrame.pendingTriggers,
         cardDb,
-        services,
-        false
+        eventsForCostAbandon(topFrame),
       );
     }
     nextState = paid.state;
@@ -373,16 +418,16 @@ export function handleAwaitingCostSelection(
         cardDb,
         sourceCardInstanceId,
         topFrame.effectBlock,
-        services
+        services,
+        transactionBaseline,
+        events,
       );
       if (remaining.cannotPay) {
-        return abortReplacedCost(
+        return services.processRemainingTriggers(
           remaining.state,
-          topFrame,
-          [...events, ...remaining.events],
+          topFrame.pendingTriggers,
           cardDb,
-          services,
-          false
+          eventsForCostAbandon(topFrame),
         );
       }
       nextState = remaining.state;
@@ -390,11 +435,13 @@ export function handleAwaitingCostSelection(
       if (remaining.pendingPrompt) {
         return {
           state: nextState,
-          events,
+          events: remaining.events,
           resolved: false,
           pendingPrompt: remaining.pendingPrompt,
         };
       }
+      events.length = 0;
+      events.push(...remaining.events);
       mergeCostRefs(accumulatedCostRefs, remaining.costResult);
     }
     return finishCostsAndRunActions(
@@ -422,7 +469,8 @@ export function handleAwaitingCostSelection(
     replacedCosts[topFrame.currentCostIndex] = chosen;
 
     return resumeAfterBranchPick(
-      state,
+      workingState,
+      transactionBaseline,
       topFrame,
       replacedCosts,
       controller,
@@ -452,7 +500,8 @@ export function handleAwaitingCostSelection(
     replacedCosts[topFrame.currentCostIndex] = { ...cost, position };
 
     return resumeAfterBranchPick(
-      state,
+      workingState,
+      transactionBaseline,
       topFrame,
       replacedCosts,
       controller,
@@ -476,7 +525,8 @@ export function handleAwaitingCostSelection(
     replacedCosts.splice(topFrame.currentCostIndex, 1, ...branch);
 
     return resumeAfterBranchPick(
-      state,
+      workingState,
+      transactionBaseline,
       topFrame,
       replacedCosts,
       controller,
@@ -488,8 +538,8 @@ export function handleAwaitingCostSelection(
   }
 
   // ── LIFE_TO_HAND / generic SELECT_TARGET cost payment ────────────────────
-  const events: PendingEvent[] = [];
-  let nextState = state;
+  const events: PendingEvent[] = [...topFrame.accumulatedEvents];
+  let nextState = workingState;
 
   if (
     action.type === "PLAYER_CHOICE" &&
@@ -524,11 +574,11 @@ export function handleAwaitingCostSelection(
     const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
     const p = nextState.players[controller];
     if (p.life.length === 0) {
-      nextState = popFrame(nextState);
       return services.processRemainingTriggers(
-        nextState,
+        popFrame(baselineState),
         topFrame.pendingTriggers,
-        cardDb
+        cardDb,
+        eventsForCostAbandon(topFrame),
       );
     }
 
@@ -627,18 +677,17 @@ export function handleAwaitingCostSelection(
         validTargets: selected,
         costArrangeStage: true,
       });
-      return {
-        state: nextState,
+      return suspendCurrentFrame(
+        nextState,
         events,
-        resolved: false,
-        pendingPrompt: buildTrashToDeckArrangePrompt(
+        buildTrashToDeckArrangePrompt(
           nextState,
           selected,
           controller,
           topFrame.id,
           (cost as SimpleCost).position === "TOP" ? "TOP" : "BOTTOM"
         ),
-      };
+      );
     }
 
     const appliedTrash = applyCostSelection(
@@ -688,23 +737,23 @@ export function handleAwaitingCostSelection(
         validTargets: group,
         costArrangeStage: true,
       });
-      return {
-        state: nextState,
+      return suspendCurrentFrame(
+        nextState,
         events,
-        resolved: false,
-        pendingPrompt: buildTrashToDeckArrangePrompt(
+        buildTrashToDeckArrangePrompt(
           nextState,
           group,
           controller,
           topFrame.id,
           (cost as SimpleCost).position === "TOP" ? "TOP" : "BOTTOM"
         ),
-      };
+      );
     }
 
     if (!topFrame.costReplacementChecked) {
+      const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
-        nextState,
+        applyCostTransactionState(nextState, transactionBaseline),
         sourceCardInstanceId,
         controller,
         cardDb,
@@ -720,15 +769,22 @@ export function handleAwaitingCostSelection(
           },
           costReplacementChecked: true,
         });
-        return {
-          state: nextState,
+        return suspendCurrentFrame(
+          nextState,
           events,
-          resolved: false,
-          pendingPrompt: replacement.pendingPrompt,
-        };
+          replacement.pendingPrompt,
+          stagedBeforeReplacement,
+        );
       }
       if (replacement.replaced)
-        return abortReplacedCost(nextState, topFrame, events, cardDb, services);
+        return abortReplacedCost(
+          nextState,
+          topFrame,
+          replacement.events,
+          cardDb,
+          services,
+        );
+      nextState = stagedBeforeReplacement;
     }
 
     const appliedGroup = applyCostSelection(nextState, cost, group, controller);
@@ -766,8 +822,9 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
+      const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
-        nextState,
+        applyCostTransactionState(nextState, transactionBaseline),
         sourceCardInstanceId,
         controller,
         cardDb,
@@ -785,15 +842,22 @@ export function handleAwaitingCostSelection(
           },
           costReplacementChecked: true,
         });
-        return {
-          state: nextState,
+        return suspendCurrentFrame(
+          nextState,
           events,
-          resolved: false,
-          pendingPrompt: replacement.pendingPrompt,
-        };
+          replacement.pendingPrompt,
+          stagedBeforeReplacement,
+        );
       }
       if (replacement.replaced)
-        return abortReplacedCost(nextState, topFrame, events, cardDb, services);
+        return abortReplacedCost(
+          nextState,
+          topFrame,
+          replacement.events,
+          cardDb,
+          services,
+        );
+      nextState = stagedBeforeReplacement;
     }
 
     const appliedOrdered = applyCostSelection(
@@ -887,10 +951,15 @@ export function handleAwaitingCostSelection(
       // Cost exits are still effect-caused removal events, but a replacement
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.
+      const stagedBeforeReplacement = nextState;
+      const replacementInput = applyCostTransactionState(
+        nextState,
+        transactionBaseline,
+      );
       let replacement =
         cost.type === "KO_OWN_CHARACTER"
           ? checkReplacementForKO(
-              nextState,
+              replacementInput,
               selected[0],
               "effect",
               controller,
@@ -898,7 +967,7 @@ export function handleAwaitingCostSelection(
               services
             )
           : checkReplacementForRemoval(
-              nextState,
+              replacementInput,
               selected[0],
               controller,
               cardDb,
@@ -912,7 +981,7 @@ export function handleAwaitingCostSelection(
         !replacement.pendingPrompt
       ) {
         replacement = checkReplacementForRemoval(
-          nextState,
+          replacement.state,
           selected[0],
           controller,
           cardDb,
@@ -929,16 +998,23 @@ export function handleAwaitingCostSelection(
           },
           costReplacementChecked: true,
         });
-        return {
-          state: nextState,
+        return suspendCurrentFrame(
+          nextState,
           events,
-          resolved: false,
-          pendingPrompt: replacement.pendingPrompt,
-        };
+          replacement.pendingPrompt,
+          stagedBeforeReplacement,
+        );
       }
       if (replacement.replaced) {
-        return abortReplacedCost(nextState, topFrame, events, cardDb, services);
+        return abortReplacedCost(
+          nextState,
+          topFrame,
+          replacement.events,
+          cardDb,
+          services,
+        );
       }
+      nextState = stagedBeforeReplacement;
     }
     const appliedSelected = applyCostSelection(
       nextState,
@@ -1024,7 +1100,7 @@ export function handleAwaitingCostSelection(
       });
     }
   } else {
-    return { state, events, resolved: false };
+    return { state, events: [], resolved: false };
   }
 
   const block = topFrame.effectBlock;
@@ -1045,18 +1121,22 @@ export function handleAwaitingCostSelection(
       cardDb,
       sourceCardInstanceId,
       block,
-      services
+      services,
+      transactionBaseline,
+      events,
     );
 
     if (remainingCostResult.cannotPay) {
       return services.processRemainingTriggers(
         remainingCostResult.state,
         topFrame.pendingTriggers,
-        cardDb
+        cardDb,
+        eventsForCostAbandon(topFrame),
       );
     }
 
     nextState = remainingCostResult.state;
+    events.length = 0;
     events.push(...remainingCostResult.events);
 
     if (remainingCostResult.pendingPrompt) {

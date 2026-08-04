@@ -368,13 +368,6 @@ export function handleAwaitingOptionalResponse(
 
     if (costResult.cannotPay) {
       nextState = popFrame(costResult.state);
-      if (isOncePerTurnBlock(block)) {
-        nextState = markOncePerTurnUsed(
-          nextState,
-          block.id,
-          sourceCardInstanceId
-        );
-      }
       return services.processRemainingTriggers(
         nextState,
         topFrame.pendingTriggers,

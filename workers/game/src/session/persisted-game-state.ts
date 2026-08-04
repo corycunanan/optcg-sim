@@ -294,6 +294,7 @@ const StackFrameCore = z.strictObject({
       z.strictObject({ targetInstanceIds: StringArray, count: FiniteNumber }),
     ])
   ),
+  costTransactionState: z.unknown().optional(),
   costReplacementAction: z.unknown().optional(),
   costReplacementChecked: z.boolean().optional(),
   pendingTriggers: z.array(z.unknown()),
