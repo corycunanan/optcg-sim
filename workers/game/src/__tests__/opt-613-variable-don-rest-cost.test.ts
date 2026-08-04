@@ -36,7 +36,7 @@ function makeLuffyLeader(): CardData {
   };
 }
 
-function setupLuffyDefender() {
+function setupLuffyDefender(activeDonCount = 5) {
   const cardDb = createTestCardDb();
   const luffyData = makeLuffyLeader();
   cardDb.set(luffyData.id, luffyData);
@@ -53,7 +53,7 @@ function setupLuffyDefender() {
       },
     ],
   };
-  const activeDon: DonInstance[] = Array.from({ length: 5 }, (_, index) => ({
+  const activeDon: DonInstance[] = Array.from({ length: activeDonCount }, (_, index) => ({
     instanceId: `opt613-active-don-${index}`,
     state: "ACTIVE",
     attachedTo: null,
@@ -112,11 +112,11 @@ describe("OPT-613 — variable DON!! rest costs", () => {
       promptType: "PLAYER_CHOICE",
       effectDescription: "Choose how many DON!! cards to rest",
       choices: [
-        { id: "don-rest:1", label: "Rest 1 -> +2000" },
-        { id: "don-rest:2", label: "Rest 2 -> +4000" },
-        { id: "don-rest:3", label: "Rest 3 -> +6000" },
-        { id: "don-rest:4", label: "Rest 4 -> +8000" },
-        { id: "don-rest:5", label: "Rest 5 -> +10000" },
+        { id: "don-rest:1", label: "Rest 1 → +2000" },
+        { id: "don-rest:2", label: "Rest 2 → +4000" },
+        { id: "don-rest:3", label: "Rest 3 → +6000" },
+        { id: "don-rest:4", label: "Rest 4 → +8000" },
+        { id: "don-rest:5", label: "Rest 5 → +10000" },
       ],
       confirmOrSkip: true,
     });
@@ -146,6 +146,67 @@ describe("OPT-613 — variable DON!! rest costs", () => {
     expect(battle.state.turn.battle).toBeNull();
     expect(getEffectivePower(battle.state.players[1].leader, luffyData, battle.state, cardDb))
       .toBe(powerBefore);
+  });
+
+  it("treats OP13-001 as unpayable with zero active DON!! without prompting or mutation", () => {
+    const { state, cardDb, leader } = setupLuffyDefender(0);
+    const offered = resolveEffect(
+      state,
+      OP13_001_MONKEY_D_LUFFY.effects[0],
+      leader.instanceId,
+      1,
+      cardDb,
+    );
+    expect(offered.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+
+    const activated = resumeFromStack(
+      offered.state,
+      { type: "PLAYER_CHOICE", choiceId: "activate" },
+      cardDb,
+    );
+    expect(activated.pendingPrompt).toBeUndefined();
+    expect(activated.state.effectStack).toHaveLength(0);
+    expect(activated.state.players).toEqual(state.players);
+    expect(activated.state.activeEffects).toEqual(state.activeEffects);
+    expect(activated.state.turn.oncePerTurnUsed).toEqual(state.turn.oncePerTurnUsed);
+  });
+
+  it("offers only variable DON!! counts that leave the remaining cost suffix payable", () => {
+    const cardDb = createTestCardDb();
+    const initial = createBattleReadyState(cardDb);
+    const players = [...initial.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      donCostArea: players[0].donCostArea.slice(0, 3).map((don) => ({
+        ...don,
+        state: "ACTIVE" as const,
+      })),
+    };
+    const state = { ...initial, players };
+    const block: EffectBlock = {
+      id: "opt613-variable-before-fixed-rest",
+      category: "activate",
+      costs: [
+        { type: "REST_DON", amount: "ANY_NUMBER" },
+        { type: "REST_DON", amount: 2 },
+      ],
+      actions: [{ type: "DRAW", params: { amount: 0 } }],
+    };
+
+    const prompted = resolveEffect(
+      state,
+      block,
+      state.players[0].leader.instanceId,
+      0,
+      cardDb,
+    );
+    expect(prompted.pendingPrompt?.options).toEqual({
+      promptType: "PLAYER_CHOICE",
+      effectDescription: "Choose how many DON!! cards to rest",
+      choices: [{ id: "don-rest:1", label: "Rest 1" }],
+      confirmOrSkip: true,
+    });
+    expect(prompted.state.players).toEqual(state.players);
   });
 
   it("routes DON_REST ANY_NUMBER through the same chosen-count prompt", () => {

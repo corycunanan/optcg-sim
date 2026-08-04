@@ -80,7 +80,28 @@ export function payCostsWithSelection(
       const amounts = Array.from(
         { length: activeDonCount },
         (_, index) => index + 1,
-      );
+      ).filter((amount) => {
+        const hypotheticalPayment = payCosts(
+          nextState,
+          [{ ...cost, amount }],
+          controller,
+          cardDb,
+          sourceCardInstanceId,
+        );
+        if (!hypotheticalPayment) return false;
+        return workingCosts.slice(i + 1).every((remainingCost) =>
+          isCostPayable(
+            hypotheticalPayment.state,
+            remainingCost,
+            controller,
+            cardDb,
+            sourceCardInstanceId,
+          ),
+        );
+      });
+      if (amounts.length === 0) {
+        return { state: nextState, events, cannotPay: true };
+      }
       const frameId = generateFrameId(nextState);
       nextState = frameId.state;
       const frame: EffectStackFrame = {
@@ -115,7 +136,7 @@ export function payCostsWithSelection(
             id: `don-rest:${amount}`,
             label: payoffPerDon === null
               ? `Rest ${amount}`
-              : `Rest ${amount} -> ${payoffPerDon * amount >= 0 ? "+" : ""}${
+              : `Rest ${amount} → ${payoffPerDon * amount >= 0 ? "+" : ""}${
                 payoffPerDon * amount
               }`,
           })),

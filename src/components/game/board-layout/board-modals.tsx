@@ -102,7 +102,7 @@ export function BoardModals({
       {/* OPT-366: pregame PLAYER_CHOICE prompts are owned by <PregameOverlay/>
           in live-game-shell. Skip the generic modal to avoid double-rendering. */}
       {activePrompt?.promptType === "PLAYER_CHOICE" &&
-        (activePrompt.choices.length > 0 || activePrompt.confirmOrSkip) &&
+        activePrompt.choices.length > 0 &&
         activePrompt.source !== "PREGAME" && (
           <PlayerChoiceModal
             key={activePromptId ?? "player-choice"}

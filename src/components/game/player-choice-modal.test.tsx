@@ -39,8 +39,8 @@ vi.mock("./game-button", () => ({
 import { PlayerChoiceModal } from "./player-choice-modal";
 
 const choices = [
-  { id: "don-rest:1", label: "Rest 1 -> +2000" },
-  { id: "don-rest:2", label: "Rest 2 -> +4000" },
+  { id: "don-rest:1", label: "Rest 1 → +2000" },
+  { id: "don-rest:2", label: "Rest 2 → +4000" },
 ];
 
 function findButton(renderer: ReactTestRenderer, label: string) {
@@ -68,10 +68,10 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
 
     expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
     await act(async () => {
-      findButton(renderer, "Rest 2 -> +4000").props.onClick();
+      findButton(renderer, "Rest 2 → +4000").props.onClick();
     });
     expect(onAction).not.toHaveBeenCalled();
-    expect(findButton(renderer, "Rest 2 -> +4000").props["aria-pressed"])
+    expect(findButton(renderer, "Rest 2 → +4000").props["aria-pressed"])
       .toBe(true);
     expect(findButton(renderer, "Confirm").props.disabled).toBe(false);
 
@@ -126,7 +126,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
     });
 
     await act(async () => {
-      findButton(renderer, "Rest 1 -> +2000").props.onClick();
+      findButton(renderer, "Rest 1 → +2000").props.onClick();
     });
     expect(onAction).toHaveBeenCalledWith({
       type: "PLAYER_CHOICE",
