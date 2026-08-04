@@ -912,10 +912,10 @@ export const P_037_MONKEY_D_LUFFY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {

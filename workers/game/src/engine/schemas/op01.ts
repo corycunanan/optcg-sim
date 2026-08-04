@@ -1469,10 +1469,10 @@ export const OP01_052_RAIZO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         { type: "DRAW", params: { amount: 1 } },

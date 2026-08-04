@@ -863,10 +863,10 @@ export const OP10_024_EDWARD_NEWGATE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
@@ -907,10 +907,10 @@ export const OP10_025_ENEL: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         { type: "DRAW", params: { amount: 3 } },
@@ -1053,10 +1053,10 @@ export const OP10_029_DRACULE_MIHAWK: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
@@ -1326,10 +1326,10 @@ export const OP10_038_RORONOA_ZORO: EffectSchema = {
       id: "opponent_turn_conditional_buff",
       category: "permanent",
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       modifiers: [
         {
