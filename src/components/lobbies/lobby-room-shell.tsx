@@ -1169,12 +1169,12 @@ export function InvitePanel({
           <Plus className="text-content-tertiary size-5" />
         </div>
         <div className="min-w-0">
-          <h2 className="text-content-primary text-lg font-semibold uppercase">
+          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
             Open seat
-          </h2>
-          <p className="text-content-tertiary mt-1 text-xs font-semibold tracking-widest uppercase">
-            Waiting for a challenger
           </p>
+          <h2 className="text-content-primary mt-1 text-lg font-semibold uppercase">
+            Waiting for a challenger
+          </h2>
         </div>
       </header>
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-8 text-center">
