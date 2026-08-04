@@ -9,7 +9,7 @@ export default function DecksLoading() {
       aria-label="Loading decks"
     >
       <div className="bg-navy-900 w-full">
-        <div className="mx-auto flex items-center justify-between gap-4 px-6 py-12">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-12">
           <div className="flex flex-col gap-2">
             <Skeleton className="bg-navy-700 h-8 w-40" />
             <Skeleton className="bg-navy-700 h-4 w-64" />
@@ -18,7 +18,7 @@ export default function DecksLoading() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 px-6 py-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-6 py-8 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={index}
