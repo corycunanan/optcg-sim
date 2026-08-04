@@ -811,10 +811,10 @@ export const OP09_024_USOPP: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         { type: "DRAW", params: { amount: 2 } },
@@ -865,10 +865,10 @@ export const OP09_026_SAKAZUKI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
@@ -900,10 +900,10 @@ export const OP09_027_SABO: EffectSchema = {
       trigger: { keyword: "WHEN_ATTACKING" },
       flags: { once_per_turn: true },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 3,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 3 },
       },
       actions: [
         { type: "DRAW", params: { amount: 1 } },
@@ -1033,10 +1033,10 @@ export const OP09_031_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         { type: "SET_ACTIVE", target: { type: "SELF" } },
@@ -1086,10 +1086,10 @@ export const OP09_033_NICO_ROBIN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
@@ -1165,10 +1165,10 @@ export const OP09_035_PORTGAS_D_ACE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
@@ -1199,10 +1199,10 @@ export const OP09_036_MONKEY_D_LUFFY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
@@ -1255,10 +1255,10 @@ export const OP09_037_LIM: EffectSchema = {
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 3,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 3 },
       },
       actions: [
         { type: "SET_ACTIVE", target: { type: "SELF" } },
@@ -1286,7 +1286,12 @@ export const OP09_039_GUM_GUM_CUATRO_JET_CROSS_SHOCK_BAZOOKA: EffectSchema = {
       conditions: {
         all_of: [
           { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "ODYSSEY" } },
-          { type: "RESTED_CARD_COUNT", controller: "SELF", operator: ">=", value: 2 },
+          {
+            type: "CARD_ON_FIELD",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER", is_rested: true },
+            count: { operator: ">=", value: 2 },
+          },
         ],
       },
       actions: [
@@ -1336,10 +1341,10 @@ export const OP09_040_THUNDER_LANCE_FLIP_CALIBER_PHOENIX_SHOT: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
@@ -1408,7 +1413,12 @@ export const OP09_041_SOUL_FRANKY_SWING_ARM_BOXING_SOLID: EffectSchema = {
           conditions: {
             all_of: [
               { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "ODYSSEY" } },
-              { type: "RESTED_CARD_COUNT", controller: "SELF", operator: ">=", value: 2 },
+              {
+                type: "CARD_ON_FIELD",
+                controller: "SELF",
+                filter: { card_type: "CHARACTER", is_rested: true },
+                count: { operator: ">=", value: 2 },
+              },
             ],
           },
           chain: "THEN",

@@ -1160,10 +1160,10 @@ export const OP05_031_BUFFALO: EffectSchema = {
         once_per_turn: true,
       },
       conditions: {
-        type: "RESTED_CARD_COUNT",
+        type: "CARD_ON_FIELD",
         controller: "SELF",
-        operator: ">=",
-        value: 2,
+        filter: { card_type: "CHARACTER", is_rested: true },
+        count: { operator: ">=", value: 2 },
       },
       actions: [
         {
