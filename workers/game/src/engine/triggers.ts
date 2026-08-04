@@ -201,6 +201,7 @@ export function registerPermanentEffectsForCard(
           prohibitionType: prohibition.type,
           scope: prohibition.scope ?? {},
           duration,
+          expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
           controller: cardInstance.controller,
           appliesTo,
           target,
