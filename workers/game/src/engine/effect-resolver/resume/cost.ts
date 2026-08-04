@@ -47,6 +47,29 @@ import {
   type CostTransactionState,
 } from "../cost/transaction.js";
 
+/**
+ * Frames persisted before OPT-614 have no staged state. Earlier costs are
+ * already committed to the root and cannot be reconstructed, so abandon must
+ * publish their retained events instead of pretending those mutations rolled
+ * back. Result refs cover silent payments such as REST_DON.
+ */
+function isLegacyCostTransactionFrame(frame: EffectStackFrame): boolean {
+  return frame.costTransactionState === undefined && (
+    frame.currentCostIndex > 0 ||
+    frame.accumulatedEvents.length > 0 ||
+    frame.costResultRefs.some(([, result]) => result.count > 0)
+  );
+}
+
+function eventsForCostAbandon(
+  frame: EffectStackFrame,
+  additionalEvents: PendingEvent[] = [],
+): PendingEvent[] {
+  return isLegacyCostTransactionFrame(frame)
+    ? [...frame.accumulatedEvents, ...additionalEvents]
+    : additionalEvents;
+}
+
 export function abortReplacedCost(
   state: GameState,
   frame: EffectStackFrame,
@@ -60,7 +83,7 @@ export function abortReplacedCost(
     nextState,
     frame.pendingTriggers,
     cardDb,
-    events
+    eventsForCostAbandon(frame, events),
   );
 }
 
@@ -270,7 +293,7 @@ function resumeAfterBranchPick(
       resumeResult.state,
       topFrame.pendingTriggers,
       cardDb,
-      resumeResult.events,
+      eventsForCostAbandon(topFrame, resumeResult.events),
     );
   }
 
@@ -356,7 +379,8 @@ export function handleAwaitingCostSelection(
     return services.processRemainingTriggers(
       popFrame(baselineState),
       topFrame.pendingTriggers,
-      cardDb
+      cardDb,
+      eventsForCostAbandon(topFrame),
     );
   }
 
@@ -378,6 +402,7 @@ export function handleAwaitingCostSelection(
         popFrame(baselineState),
         topFrame.pendingTriggers,
         cardDb,
+        eventsForCostAbandon(topFrame),
       );
     }
     nextState = paid.state;
@@ -402,6 +427,7 @@ export function handleAwaitingCostSelection(
           remaining.state,
           topFrame.pendingTriggers,
           cardDb,
+          eventsForCostAbandon(topFrame),
         );
       }
       nextState = remaining.state;
@@ -551,7 +577,8 @@ export function handleAwaitingCostSelection(
       return services.processRemainingTriggers(
         popFrame(baselineState),
         topFrame.pendingTriggers,
-        cardDb
+        cardDb,
+        eventsForCostAbandon(topFrame),
       );
     }
 
@@ -750,7 +777,13 @@ export function handleAwaitingCostSelection(
         );
       }
       if (replacement.replaced)
-        return abortReplacedCost(nextState, topFrame, events, cardDb, services);
+        return abortReplacedCost(
+          nextState,
+          topFrame,
+          replacement.events,
+          cardDb,
+          services,
+        );
       nextState = stagedBeforeReplacement;
     }
 
@@ -817,7 +850,13 @@ export function handleAwaitingCostSelection(
         );
       }
       if (replacement.replaced)
-        return abortReplacedCost(nextState, topFrame, events, cardDb, services);
+        return abortReplacedCost(
+          nextState,
+          topFrame,
+          replacement.events,
+          cardDb,
+          services,
+        );
       nextState = stagedBeforeReplacement;
     }
 
@@ -967,7 +1006,13 @@ export function handleAwaitingCostSelection(
         );
       }
       if (replacement.replaced) {
-        return abortReplacedCost(nextState, topFrame, events, cardDb, services);
+        return abortReplacedCost(
+          nextState,
+          topFrame,
+          replacement.events,
+          cardDb,
+          services,
+        );
       }
       nextState = stagedBeforeReplacement;
     }
@@ -1085,7 +1130,8 @@ export function handleAwaitingCostSelection(
       return services.processRemainingTriggers(
         remainingCostResult.state,
         topFrame.pendingTriggers,
-        cardDb
+        cardDb,
+        eventsForCostAbandon(topFrame),
       );
     }
 
