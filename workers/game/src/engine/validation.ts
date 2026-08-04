@@ -7,7 +7,11 @@
 
 import type { CardData, GameAction, GameState } from "../types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
-import { getEffectiveCost, hasRemovedKeyword } from "./modifiers.js";
+import {
+  getEffectiveCost,
+  hasGrantedKeyword,
+  hasRemovedKeyword,
+} from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader, hasEffectiveKeyword } from "./keywords.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
@@ -187,7 +191,22 @@ function validateDeclareAttack(
       return "This card can only attack Characters on the turn it is played";
     }
   } else if (targetFound.card.zone === "CHARACTER") {
-    if (targetFound.card.state !== "RESTED") return "Can only attack rested Characters";
+    const canAttackActive =
+      hasGrantedKeyword(
+        attackerFound.card,
+        "CAN_ATTACK_ACTIVE",
+        state,
+        cardDb,
+      ) &&
+      !hasRemovedKeyword(
+        attackerFound.card,
+        "CAN_ATTACK_ACTIVE",
+        state,
+        cardDb,
+      );
+    if (targetFound.card.state !== "RESTED" && !canAttackActive) {
+      return "Can only attack rested Characters";
+    }
   } else {
     return "Invalid attack target";
   }

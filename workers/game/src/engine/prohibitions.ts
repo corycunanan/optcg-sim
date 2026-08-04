@@ -60,8 +60,8 @@ function evaluateConditionalOverride(
 // Leader is [Buggy]") are likewise re-evaluated at match time.
 
 /**
- * Re-evaluate a prohibition's carried block/prohibition conditions.
- * Prohibitions without conditions are always active.
+ * Re-evaluate a prohibition's carried block/prohibition conditions and any
+ * WHILE_CONDITION duration. Prohibitions without either gate are always active.
  *
  * Also honors the OPT-253 negation contract: while the prohibition's source
  * card is effect-negated on the field, its schema-sourced prohibitions pause —
@@ -78,13 +78,28 @@ export function isProhibitionConditionMet(
   const source = findCardInstance(state, prohibition.sourceCardInstanceId);
   if (source && isCardNegated(source, state, cardDb)) return false;
 
-  if (!prohibition.conditions) return true;
   const ctx: ConditionContext = {
     sourceCardInstanceId: prohibition.sourceCardInstanceId,
     controller: prohibition.controller,
     cardDb,
   };
-  return evaluateCondition(state, prohibition.conditions, ctx);
+  if (
+    prohibition.conditions &&
+    !evaluateCondition(state, prohibition.conditions, ctx)
+  ) {
+    return false;
+  }
+
+  const duration = prohibition.duration;
+  if (
+    duration?.type === "WHILE_CONDITION" &&
+    duration.condition &&
+    !evaluateCondition(state, duration.condition, ctx)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /**

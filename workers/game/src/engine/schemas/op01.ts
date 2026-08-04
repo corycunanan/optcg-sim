@@ -24,10 +24,12 @@ export const OP01_001_RORONOA_ZORO: EffectSchema = {
     {
       id: "don_aura_buff",
       category: "permanent",
-      trigger: {
-        keyword: "WHEN_ATTACKING",
-        don_requirement: 1,
-        turn_restriction: "YOUR_TURN",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
       },
       modifiers: [
         {
@@ -36,6 +38,10 @@ export const OP01_001_RORONOA_ZORO: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
+      },
     },
   ],
 };
@@ -489,10 +495,12 @@ export const OP01_019_BARTOLOMEO: EffectSchema = {
     {
       id: "opp_turn_buff",
       category: "permanent",
-      trigger: {
-        keyword: "ON_OPPONENT_ATTACK",
-        don_requirement: 2,
-        turn_restriction: "OPPONENT_TURN",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 2,
       },
       modifiers: [
         {
@@ -501,6 +509,10 @@ export const OP01_019_BARTOLOMEO: EffectSchema = {
           params: { amount: 3000 },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "OPPONENT" },
+      },
     },
   ],
 };
@@ -549,7 +561,13 @@ export const OP01_021_FRANKY: EffectSchema = {
     {
       id: "can_attack_active",
       category: "permanent",
-      trigger: { keyword: "WHEN_ATTACKING", don_requirement: 1 },
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
+      },
       modifiers: [
         {
           type: "GRANT_KEYWORD",
@@ -597,7 +615,13 @@ export const OP01_024_LUFFY: EffectSchema = {
     {
       id: "ko_protection",
       category: "permanent",
-      trigger: { keyword: "WHEN_ATTACKING", don_requirement: 2 },
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 2,
+      },
       prohibitions: [
         {
           type: "CANNOT_BE_KO",
@@ -878,12 +902,22 @@ export const OP01_032_ASHURA_DOJI: EffectSchema = {
     {
       id: "conditional_buff",
       category: "permanent",
-      trigger: { keyword: "WHEN_ATTACKING", don_requirement: 1 },
       conditions: {
-        type: "RESTED_CARD_COUNT",
-        controller: "OPPONENT",
-        operator: ">=",
-        value: 2,
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          {
+            type: "RESTED_CARD_COUNT",
+            controller: "OPPONENT",
+            operator: ">=",
+            value: 2,
+          },
+        ],
       },
       modifiers: [
         {
@@ -2823,16 +2857,22 @@ export const OP01_109_WHOS_WHO: EffectSchema = {
     {
       id: "conditional_don_buff",
       category: "permanent",
-      trigger: {
-        keyword: "WHEN_ATTACKING",
-        don_requirement: 1,
-        turn_restriction: "YOUR_TURN",
-      },
       conditions: {
-        type: "DON_FIELD_COUNT",
-        controller: "SELF",
-        operator: ">=",
-        value: 8,
+        all_of: [
+          {
+            type: "DON_GIVEN",
+            controller: "SELF",
+            mode: "SPECIFIC_CARD",
+            operator: ">=",
+            value: 1,
+          },
+          {
+            type: "DON_FIELD_COUNT",
+            controller: "SELF",
+            operator: ">=",
+            value: 8,
+          },
+        ],
       },
       modifiers: [
         {
@@ -2841,6 +2881,10 @@ export const OP01_109_WHOS_WHO: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
+      },
     },
   ],
 };

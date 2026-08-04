@@ -293,6 +293,11 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
       break;
 
     case "permanent":
+      if (block.trigger !== undefined) {
+        errors.push(
+          `${prefix}: 'permanent' block cannot have 'trigger'; encode live gates with 'conditions' and 'duration'`,
+        );
+      }
       if (!block.modifiers && !block.prohibitions && !block.flags?.keywords?.length) {
         errors.push(
           `${prefix}: 'permanent' block needs 'modifiers', 'prohibitions', or non-empty 'flags.keywords'`,

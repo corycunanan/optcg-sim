@@ -549,10 +549,12 @@ export const OP02_019_RAKUYO: EffectSchema = {
     {
       id: "aura_wb_buff",
       category: "permanent",
-      trigger: {
-        keyword: "WHEN_ATTACKING",
-        don_requirement: 1,
-        turn_restriction: "YOUR_TURN",
+      conditions: {
+        type: "DON_GIVEN",
+        controller: "SELF",
+        mode: "SPECIFIC_CARD",
+        operator: ">=",
+        value: 1,
       },
       modifiers: [
         {
@@ -566,6 +568,10 @@ export const OP02_019_RAKUYO: EffectSchema = {
           params: { amount: 1000 },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
+      },
     },
   ],
 };
@@ -3324,10 +3330,6 @@ export const OP02_114_BORSALINO: EffectSchema = {
     {
       id: "opp_turn_buff_and_protection",
       category: "permanent",
-      trigger: {
-        keyword: "ON_OPPONENT_ATTACK",
-        turn_restriction: "OPPONENT_TURN",
-      },
       modifiers: [
         {
           type: "MODIFY_POWER",
@@ -3341,6 +3343,10 @@ export const OP02_114_BORSALINO: EffectSchema = {
           scope: { cause: "EFFECT" },
         },
       ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "OPPONENT" },
+      },
     },
     {
       id: "blocker",

@@ -44,6 +44,30 @@ describe("OPT-471 authoritative authored-schema gate", () => {
     expect(diagnostics).toEqual([]);
   });
 
+  it("rejects trigger fields on permanent blocks", () => {
+    const fixture = {
+      card_id: "TEST-471",
+      effects: [
+        {
+          id: "ignored-trigger",
+          category: "permanent",
+          trigger: { keyword: "WHEN_ATTACKING", don_requirement: 1 },
+          modifiers: [
+            {
+              type: "MODIFY_POWER",
+              target: { type: "SELF" },
+              params: { amount: 1000 },
+            },
+          ],
+        },
+      ],
+    } satisfies EffectSchema;
+
+    expect(validateEffectSchema(fixture, "TEST-471")).toContain(
+      "[TEST-471] effects[0]: 'permanent' block cannot have 'trigger'; encode live gates with 'conditions' and 'duration'"
+    );
+  });
+
   it("rejects a schema source export omitted from the runtime registry", () => {
     const unregistered = {
       card_id: "TEST-UNREGISTERED",
@@ -52,11 +76,16 @@ describe("OPT-471 authoritative authored-schema gate", () => {
 
     expect(
       validateSchemaSourceParity(
-        [{ path: "new-set.ts", schemas: { "TEST-UNREGISTERED": unregistered } }],
-        {},
-      ),
+        [
+          {
+            path: "new-set.ts",
+            schemas: { "TEST-UNREGISTERED": unregistered },
+          },
+        ],
+        {}
+      )
     ).toContain(
-      "[schema-source] new-set.ts exports TEST-UNREGISTERED, but schema-registry.ts does not register it",
+      "[schema-source] new-set.ts exports TEST-UNREGISTERED, but schema-registry.ts does not register it"
     );
   });
 

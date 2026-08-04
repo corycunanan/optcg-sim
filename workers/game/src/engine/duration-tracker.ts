@@ -95,7 +95,12 @@ export function expireSourceLeftZone(
   const prohibitions = state.prohibitions;
   const remainingProhibitions = prohibitions.filter((p) => {
     if (p.sourceCardInstanceId !== instanceId) return true;
-    if (p.duration.type === "PERMANENT") return false;
+    if (
+      p.duration.type === "PERMANENT" ||
+      p.expiresAt?.wave === "SOURCE_LEAVES_ZONE"
+    ) {
+      return false;
+    }
     return true;
   });
 
