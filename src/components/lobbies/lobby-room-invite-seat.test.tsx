@@ -9,7 +9,11 @@ vi.mock("@/components/social/user-avatar", () => ({
 }));
 
 vi.mock("./invite-friend-popover", () => ({
-  InviteFriendPopover: () => <button type="button">Invite a friend</button>,
+  InviteFriendPopover: ({ triggerVariant }: { triggerVariant?: string }) => (
+    <button type="button" data-trigger-variant={triggerVariant}>
+      Invite a friend
+    </button>
+  ),
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -79,7 +83,11 @@ describe("InvitePanel countdown lifecycle", () => {
     });
 
     expect(renderedText()).toContain("Open seat");
+    expect(renderedText()).toContain("Waiting for a challenger");
     expect(renderedText()).toContain("Invite to nami expired");
+    expect(
+      renderer?.root.findByProps({ "data-trigger-variant": "open-seat" })
+    ).toBeDefined();
 
     act(() => renderer?.unmount());
     renderer = null;
