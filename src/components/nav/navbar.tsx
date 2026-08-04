@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import {
 export function Navbar() {
   const pathname = usePathname();
   const { data: session, status: sessionStatus } = useSession();
+  const [activeMenu, setActiveMenu] = useState("");
 
   if (pathname.startsWith("/game/")) return null;
 
@@ -48,7 +50,11 @@ export function Navbar() {
         data-slot="navbar-content"
         className="mx-auto flex h-full w-full max-w-7xl items-center px-2 sm:px-6"
       >
-        <NavigationMenu className="max-w-none min-w-0 flex-1 justify-start">
+        <NavigationMenu
+          value={activeMenu}
+          onValueChange={setActiveMenu}
+          className="max-w-none min-w-0 flex-1 justify-start"
+        >
           <div
             data-slot="navbar-links-scroller"
             className="min-w-0 flex-1 overflow-x-auto"
@@ -86,13 +92,14 @@ export function Navbar() {
                 </NavigationMenuLink>
               </NavigationMenuItem>
 
-              <NavigationMenuItem>
+              <NavigationMenuItem value="decks">
                 <NavigationMenuTrigger
                   data-active={decksActive || undefined}
                   aria-current={decksActive ? "page" : undefined}
                   className={cn(
                     triggerStyles,
-                    decksActive && activeTriggerStyles
+                    decksActive && activeTriggerStyles,
+                    activeMenu === "decks" && "navbar-dropdown-anchor"
                   )}
                 >
                   Decks
@@ -123,13 +130,14 @@ export function Navbar() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
 
-              <NavigationMenuItem>
+              <NavigationMenuItem value="cards">
                 <NavigationMenuTrigger
                   data-active={cardsActive || undefined}
                   aria-current={cardsActive ? "page" : undefined}
                   className={cn(
                     triggerStyles,
-                    cardsActive && activeTriggerStyles
+                    cardsActive && activeTriggerStyles,
+                    activeMenu === "cards" && "navbar-dropdown-anchor"
                   )}
                 >
                   Cards
