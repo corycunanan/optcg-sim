@@ -326,6 +326,19 @@ export function handleAwaitingCostSelection(
 
   if (
     action.type === "PLAYER_CHOICE" &&
+    action.choiceId === "skip" &&
+    (cost.type === "REST_DON" || cost.type === "DON_REST") &&
+    cost.amount === "ANY_NUMBER"
+  ) {
+    return services.processRemainingTriggers(
+      popFrame(state),
+      topFrame.pendingTriggers,
+      cardDb
+    );
+  }
+
+  if (
+    action.type === "PLAYER_CHOICE" &&
     action.choiceId === "__PAY_FIXED_COST__"
   ) {
     let nextState = popFrame(state);
@@ -478,8 +491,33 @@ export function handleAwaitingCostSelection(
   const events: PendingEvent[] = [];
   let nextState = state;
 
-  // LIFE_TO_HAND / TRASH_FROM_LIFE with TOP_OR_BOTTOM — player chose a position
   if (
+    action.type === "PLAYER_CHOICE" &&
+    (cost.type === "REST_DON" || cost.type === "DON_REST") &&
+    cost.amount === "ANY_NUMBER"
+  ) {
+    if (!topFrame.validTargets.includes(action.choiceId)) {
+      return { state, events: [], resolved: false };
+    }
+    const amount = Number(action.choiceId.replace("don-rest:", ""));
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return { state, events: [], resolved: false };
+    }
+    const paid = payCosts(
+      nextState,
+      [{ ...cost, amount }],
+      controller,
+      cardDb,
+      sourceCardInstanceId
+    );
+    if (!paid) {
+      return { state, events: [], resolved: false };
+    }
+    nextState = paid.state;
+    events.push(...paid.events);
+    mergeCostRefs(accumulatedCostRefs, paid.costResult);
+  // LIFE_TO_HAND / TRASH_FROM_LIFE with TOP_OR_BOTTOM — player chose a position
+  } else if (
     action.type === "PLAYER_CHOICE" &&
     (cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE")
   ) {

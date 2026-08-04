@@ -23,6 +23,7 @@ interface PlayerChoiceModalProps {
       kind: "COST_ACTIVE" | "COST_RESTED" | "ATTACHED";
     }>;
   };
+  confirmOrSkip?: boolean;
   isHidden: boolean;
   onHide: () => void;
   onAction: (action: GameAction) => void;
@@ -32,6 +33,7 @@ export function PlayerChoiceModal({
   effectDescription,
   choices,
   donReturn,
+  confirmOrSkip = false,
   isHidden,
   onHide,
   onAction,
@@ -39,6 +41,9 @@ export function PlayerChoiceModal({
   const [donSelection, setDonSelection] = React.useState<
     Record<string, number>
   >({});
+  const [selectedChoiceId, setSelectedChoiceId] = React.useState<string | null>(
+    null
+  );
   const selectedDonCount = Object.values(donSelection).reduce(
     (sum, count) => sum + count,
     0
@@ -84,7 +89,12 @@ export function PlayerChoiceModal({
   // payable). Auto-dispatch the lone choice and log so we notice in dev.
   const autoDispatchedRef = React.useRef(false);
   React.useEffect(() => {
-    if (choices.length !== 1 || autoDispatchedRef.current) return;
+    if (
+      confirmOrSkip ||
+      choices.length !== 1 ||
+      autoDispatchedRef.current
+    )
+      return;
     autoDispatchedRef.current = true;
     const [only] = choices;
     console.warn(
@@ -94,9 +104,9 @@ export function PlayerChoiceModal({
       { choiceId: only.id, label: only.label }
     );
     onAction({ type: "PLAYER_CHOICE", choiceId: only.id });
-  }, [choices, onAction]);
+  }, [choices, confirmOrSkip, onAction]);
 
-  if (choices.length <= 1) return null;
+  if (!confirmOrSkip && choices.length <= 1) return null;
 
   return (
     <Dialog
@@ -178,6 +188,47 @@ export function PlayerChoiceModal({
                 onClick={submitDonReturn}
               >
                 Return DON!!
+              </GameButton>
+            </div>
+          </>
+        ) : confirmOrSkip ? (
+          <>
+            <div className="flex flex-col gap-2 overflow-y-auto px-4 py-4">
+              {choices.map((choice) => (
+                <GameButton
+                  key={choice.id}
+                  variant={
+                    selectedChoiceId === choice.id ? "amber" : "secondary"
+                  }
+                  onClick={() => setSelectedChoiceId(choice.id)}
+                  aria-pressed={selectedChoiceId === choice.id}
+                  className="h-auto w-full justify-start px-4 py-3 text-sm"
+                >
+                  {choice.label}
+                </GameButton>
+              ))}
+            </div>
+            <div className="border-gb-border flex items-center justify-end gap-2 border-t px-4 py-3">
+              <GameButton
+                variant="secondary"
+                onClick={() =>
+                  onAction({ type: "PLAYER_CHOICE", choiceId: "skip" })
+                }
+              >
+                Skip
+              </GameButton>
+              <GameButton
+                variant="amber"
+                disabled={selectedChoiceId === null}
+                onClick={() => {
+                  if (selectedChoiceId === null) return;
+                  onAction({
+                    type: "PLAYER_CHOICE",
+                    choiceId: selectedChoiceId,
+                  });
+                }}
+              >
+                Confirm
               </GameButton>
             </div>
           </>

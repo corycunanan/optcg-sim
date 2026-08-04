@@ -297,7 +297,9 @@ export function payCosts(
 
       case "REST_DON": {
         // Alias for DON_REST — rest N active DON in cost area
-        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const amount = cost.amount === "ANY_NUMBER"
+          ? nextState.players[controller].donCostArea.filter((d) => d.state === "ACTIVE").length
+          : typeof cost.amount === "number" ? cost.amount : 1;
         const p = nextState.players[controller];
         const activeDon = p.donCostArea.filter((d) => d.state === "ACTIVE");
         if (activeDon.length < amount) return null;

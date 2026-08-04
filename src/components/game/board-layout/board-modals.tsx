@@ -109,6 +109,7 @@ export function BoardModals({
             effectDescription={activePrompt.effectDescription}
             choices={activePrompt.choices}
             donReturn={activePrompt.donReturn}
+            confirmOrSkip={activePrompt.confirmOrSkip}
             isHidden={isPromptHidden}
             onHide={onHide}
             onAction={onAction}

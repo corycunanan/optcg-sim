@@ -19,6 +19,24 @@ import {
   getCostLabel,
 } from "./prompts.js";
 
+function getDonRestPayoffPerDon(effectBlock: EffectBlock): number | null {
+  const payoffs = (effectBlock.actions ?? []).flatMap((action) => {
+    if (action.type !== "MODIFY_POWER") return [];
+    const amount = action.params?.amount;
+    if (
+      typeof amount !== "object" ||
+      amount.type !== "PER_COUNT" ||
+      amount.source !== "DON_RESTED_THIS_WAY"
+    ) {
+      return [];
+    }
+    const divisor = amount.divisor ?? 1;
+    if (divisor <= 0 || amount.multiplier % divisor !== 0) return [];
+    return [amount.multiplier / divisor];
+  });
+  return payoffs.length === 1 ? payoffs[0] : null;
+}
+
 /**
  * Pay costs iteratively. Auto-payable costs are paid inline.
  * Selection-based costs push a stack frame and return a prompt.
@@ -50,6 +68,85 @@ export function payCostsWithSelection(
   const workingCosts = [...costs];
   for (let i = startIndex; i < workingCosts.length; i++) {
     const cost = workingCosts[i];
+
+    if (
+      (cost.type === "REST_DON" || cost.type === "DON_REST") &&
+      cost.amount === "ANY_NUMBER"
+    ) {
+      const activeDonCount = nextState.players[controller].donCostArea.filter(
+        (don) => don.state === "ACTIVE",
+      ).length;
+      const payoffPerDon = getDonRestPayoffPerDon(effectBlock);
+      const amounts = Array.from(
+        { length: activeDonCount },
+        (_, index) => index + 1,
+      ).filter((amount) => {
+        const hypotheticalPayment = payCosts(
+          nextState,
+          [{ ...cost, amount }],
+          controller,
+          cardDb,
+          sourceCardInstanceId,
+        );
+        if (!hypotheticalPayment) return false;
+        return workingCosts.slice(i + 1).every((remainingCost) =>
+          isCostPayable(
+            hypotheticalPayment.state,
+            remainingCost,
+            controller,
+            cardDb,
+            sourceCardInstanceId,
+          ),
+        );
+      });
+      if (amounts.length === 0) {
+        return { state: nextState, events, cannotPay: true };
+      }
+      const frameId = generateFrameId(nextState);
+      nextState = frameId.state;
+      const frame: EffectStackFrame = {
+        id: frameId.id,
+        sourceCardInstanceId,
+        controller,
+        effectBlock,
+        phase: "AWAITING_COST_SELECTION",
+        pausedAction: null,
+        remainingActions: effectBlock.actions ?? [],
+        resultRefs: [],
+        validTargets: amounts.map((amount) => `don-rest:${amount}`),
+        costs: workingCosts,
+        currentCostIndex: i,
+        costsPaid: false,
+        oncePerTurnMarked: false,
+        costResultRefs: [...costResultToEntries(costResult)],
+        pendingTriggers: [],
+        simultaneousTriggers: [],
+        accumulatedEvents: events,
+      };
+      nextState = pushFrame(nextState, frame);
+      if (isEngineTerminated(nextState)) {
+        return { state: nextState, events, cannotPay: true };
+      }
+
+      const pendingPrompt: PendingPromptState = {
+        options: {
+          promptType: "PLAYER_CHOICE",
+          effectDescription: "Choose how many DON!! cards to rest",
+          choices: amounts.map((amount) => ({
+            id: `don-rest:${amount}`,
+            label: payoffPerDon === null
+              ? `Rest ${amount}`
+              : `Rest ${amount} → ${payoffPerDon * amount >= 0 ? "+" : ""}${
+                payoffPerDon * amount
+              }`,
+          })),
+          confirmOrSkip: true,
+        },
+        respondingPlayer: controller,
+        resumeContext: frame.id,
+      };
+      return { state: nextState, events, pendingPrompt };
+    }
 
     // CHOOSE_ONE_COST — present payable options to the player.
     if (cost.type === "CHOOSE_ONE_COST") {
