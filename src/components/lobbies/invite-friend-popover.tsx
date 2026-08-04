@@ -29,9 +29,14 @@ interface FriendEntry {
 interface Props {
   lobbyId: string;
   onInviteSent?: () => void;
+  triggerVariant?: "default" | "open-seat";
 }
 
-export function InviteFriendPopover({ lobbyId, onInviteSent }: Props) {
+export function InviteFriendPopover({
+  lobbyId,
+  onInviteSent,
+  triggerVariant = "default",
+}: Props) {
   const [open, setOpen] = useState(false);
   const [friends, setFriends] = useState<FriendEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -89,13 +94,28 @@ export function InviteFriendPopover({ lobbyId, onInviteSent }: Props) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" className="group">
-          <span className="bg-gold-500 text-navy-900 group-hover:bg-gold-400 flex size-8 items-center justify-center rounded-full transition-colors">
-            <Plus className="size-4" />
-          </span>
-          Invite a friend
-        </Button>
+        {triggerVariant === "open-seat" ? (
+          <button
+            type="button"
+            aria-label="Invite a friend"
+            className="bg-gold-500 text-navy-900 hover:bg-gold-400 focus-visible:ring-border-focus flex size-16 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <Plus className="size-6" aria-hidden="true" />
+          </button>
+        ) : (
+          <Button variant="ghost" className="group">
+            <span className="bg-gold-500 text-navy-900 group-hover:bg-gold-400 flex size-8 items-center justify-center rounded-full transition-colors">
+              <Plus className="size-4" />
+            </span>
+            Invite a friend
+          </Button>
+        )}
       </PopoverTrigger>
+      {triggerVariant === "open-seat" && (
+        <p className="text-content-primary text-sm font-semibold">
+          Invite a friend
+        </p>
+      )}
       <PopoverContent align="end" className="w-80">
         <div className="flex flex-col gap-2">
           <Input

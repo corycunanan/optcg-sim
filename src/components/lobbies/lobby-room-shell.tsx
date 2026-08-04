@@ -1160,26 +1160,39 @@ export function InvitePanel({
   }
 
   return (
-    <section className="border-border-strong bg-surface-1 flex min-h-96 flex-col items-center justify-center gap-6 rounded-lg border border-dashed p-8 text-center">
-      <div className="border-gold-500 text-gold-500 flex size-16 items-center justify-center rounded-full border">
-        <Plus className="size-6" />
+    <section className="border-border-strong bg-surface-1 flex min-h-96 flex-col rounded-lg border border-dashed">
+      <header className="border-border flex min-h-20 items-center gap-3 border-b border-dashed px-5 py-4 text-left">
+        <div
+          className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded-full border border-dashed"
+          aria-hidden="true"
+        >
+          <Plus className="text-content-tertiary size-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+            Waiting for a challenger
+          </p>
+          <h2 className="text-content-primary mt-1 text-lg font-semibold uppercase">
+            Open seat
+          </h2>
+        </div>
+      </header>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-8 text-center">
+        {pendingInvite && pendingInviteName && timing?.kind === "expired" && (
+          <p className="text-content-secondary text-sm">
+            {pendingInvite && pendingInviteName && timing?.kind === "expired"
+              ? `Invite to ${pendingInviteName} expired`
+              : null}
+          </p>
+        )}
+        {showInviteFriend && (
+          <InviteFriendPopover
+            lobbyId={lobbyId}
+            onInviteSent={onInviteSent}
+            triggerVariant="open-seat"
+          />
+        )}
       </div>
-      <div>
-        <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-          Guest
-        </p>
-        <h2 className="font-display text-content-primary mt-2 text-2xl">
-          Open seat
-        </h2>
-        <p className="text-content-secondary mt-2 text-sm">
-          {pendingInvite && pendingInviteName && timing?.kind === "expired"
-            ? `Invite to ${pendingInviteName} expired`
-            : "Waiting for a challenger"}
-        </p>
-      </div>
-      {showInviteFriend && (
-        <InviteFriendPopover lobbyId={lobbyId} onInviteSent={onInviteSent} />
-      )}
     </section>
   );
 }
