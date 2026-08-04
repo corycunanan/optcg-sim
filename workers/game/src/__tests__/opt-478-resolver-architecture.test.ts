@@ -85,12 +85,14 @@ describe("OPT-478 resolver architecture contract", () => {
     for (const moduleName of graph.keys()) visit(moduleName);
 
     expect([...graph.keys()].sort()).toEqual([
+      "feasibility",
       "orchestrator",
       "payability",
       "payment",
       "prompts",
       "resume",
       "targets",
+      "transaction",
     ]);
   });
 });

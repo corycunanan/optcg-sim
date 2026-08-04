@@ -433,11 +433,7 @@ export function resolveEffect(
     );
 
     if (costPayResult.cannotPay) {
-      state = markOncePerTurnUsed(
-        costPayResult.state,
-        block.id,
-        sourceCardInstanceId
-      );
+      state = costPayResult.state;
       log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
       return { state, events, resolved: false };
     }

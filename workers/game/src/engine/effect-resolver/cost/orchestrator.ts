@@ -9,7 +9,13 @@ import { costResultToEntries } from "../types.js";
 import type { EffectResolverServices } from "../services.js";
 import { payCosts } from "./payment.js";
 import { applyCostSelection } from "./resume.js";
-import { costNeedsPlayerSelection, isCostPayable } from "./payability.js";
+import { costNeedsPlayerSelection } from "./payability.js";
+import { isCostSequencePayable } from "./feasibility.js";
+import {
+  applyCostTransactionState,
+  captureCostTransactionState,
+  type CostTransactionState,
+} from "./transaction.js";
 import { computeCostTargets, getCostCards, resolveAmount } from "./targets.js";
 import {
   blockShufflesDeck,
@@ -50,9 +56,32 @@ export function payCostsWithSelection(
   sourceCardInstanceId: string,
   effectBlock: EffectBlock,
   services: EffectResolverServices,
+  transactionBaseline?: CostTransactionState,
+  priorEvents: PendingEvent[] = [],
 ): CostSelectionResult {
-  const events: PendingEvent[] = [];
+  const events: PendingEvent[] = [...priorEvents];
   let nextState = state;
+  const baseline = transactionBaseline ?? captureCostTransactionState(state);
+  const cannotPay = (): CostSelectionResult => ({
+    state: applyCostTransactionState(nextState, baseline),
+    events: [],
+    cannotPay: true,
+  });
+  const pushCostFrame = (
+    frame: EffectStackFrame,
+    stagedState: GameState = nextState,
+  ): void => {
+    nextState = pushFrame(nextState, {
+      ...frame,
+      accumulatedEvents: [...events],
+      costTransactionState: captureCostTransactionState(stagedState),
+    });
+  };
+  const suspend = (pendingPrompt: PendingPromptState): CostSelectionResult => ({
+    state: applyCostTransactionState(nextState, baseline),
+    events: [],
+    pendingPrompt,
+  });
   const costResult: CostResult = {
     donRestedCount: 0,
     cardsTrashedCount: 0,
@@ -89,18 +118,16 @@ export function payCostsWithSelection(
           sourceCardInstanceId,
         );
         if (!hypotheticalPayment) return false;
-        return workingCosts.slice(i + 1).every((remainingCost) =>
-          isCostPayable(
-            hypotheticalPayment.state,
-            remainingCost,
-            controller,
-            cardDb,
-            sourceCardInstanceId,
-          ),
+        return isCostSequencePayable(
+          hypotheticalPayment.state,
+          workingCosts.slice(i + 1),
+          controller,
+          cardDb,
+          sourceCardInstanceId,
         );
       });
       if (amounts.length === 0) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
       const frameId = generateFrameId(nextState);
       nextState = frameId.state;
@@ -122,10 +149,11 @@ export function payCostsWithSelection(
         pendingTriggers: [],
         simultaneousTriggers: [],
         accumulatedEvents: events,
+        costTransactionState: captureCostTransactionState(nextState),
       };
-      nextState = pushFrame(nextState, frame);
+      pushCostFrame(frame);
       if (isEngineTerminated(nextState)) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
 
       const pendingPrompt: PendingPromptState = {
@@ -145,7 +173,7 @@ export function payCostsWithSelection(
         respondingPlayer: controller,
         resumeContext: frame.id,
       };
-      return { state: nextState, events, pendingPrompt };
+      return suspend(pendingPrompt);
     }
 
     // CHOOSE_ONE_COST — present payable options to the player.
@@ -153,13 +181,19 @@ export function payCostsWithSelection(
       const options = cost.options ?? [];
       const payableIndices: number[] = [];
       for (let oi = 0; oi < options.length; oi++) {
-        if (isCostPayable(nextState, options[oi], controller, cardDb, sourceCardInstanceId)) {
+        if (isCostSequencePayable(
+          nextState,
+          [options[oi], ...workingCosts.slice(i + 1)],
+          controller,
+          cardDb,
+          sourceCardInstanceId,
+        )) {
           payableIndices.push(oi);
         }
       }
 
       if (payableIndices.length === 0) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
 
       if (payableIndices.length === 1) {
@@ -190,8 +224,8 @@ export function payCostsWithSelection(
         simultaneousTriggers: [],
         accumulatedEvents: events,
       };
-      nextState = pushFrame(nextState, frame);
-      if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
+      pushCostFrame(frame);
+      if (isEngineTerminated(nextState)) return cannotPay();
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -205,21 +239,25 @@ export function payCostsWithSelection(
         respondingPlayer: controller,
         resumeContext: frame.id,
       };
-      return { state: nextState, events, pendingPrompt };
+      return suspend(pendingPrompt);
     }
 
     // CHOICE — branching cost paths; each option is a full Cost[].
     if (cost.type === "CHOICE") {
       const payableBranchIndices: number[] = [];
       for (let bi = 0; bi < cost.options.length; bi++) {
-        const branchPayable = cost.options[bi].every((c) =>
-          isCostPayable(nextState, c, controller, cardDb, sourceCardInstanceId),
+        const branchPayable = isCostSequencePayable(
+          nextState,
+          [...cost.options[bi], ...workingCosts.slice(i + 1)],
+          controller,
+          cardDb,
+          sourceCardInstanceId,
         );
         if (branchPayable) payableBranchIndices.push(bi);
       }
 
       if (payableBranchIndices.length === 0) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
 
       if (payableBranchIndices.length === 1) {
@@ -250,8 +288,8 @@ export function payCostsWithSelection(
         simultaneousTriggers: [],
         accumulatedEvents: events,
       };
-      nextState = pushFrame(nextState, frame);
-      if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
+      pushCostFrame(frame);
+      if (isEngineTerminated(nextState)) return cannotPay();
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -265,7 +303,7 @@ export function payCostsWithSelection(
         respondingPlayer: controller,
         resumeContext: frame.id,
       };
-      return { state: nextState, events, pendingPrompt };
+      return suspend(pendingPrompt);
     }
 
     // OPT-371: PLACE_FROM_TRASH_TO_DECK — the player chooses WHICH trash
@@ -278,7 +316,7 @@ export function payCostsWithSelection(
       const amount = resolveAmount(cost);
       const validTargets = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
       if (validTargets.length < amount) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
 
       // OPT-372: TOP_OR_BOTTOM — the player picks the destination first;
@@ -307,12 +345,9 @@ export function payCostsWithSelection(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        nextState = pushFrame(nextState, frame);
-        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
-        return {
-          state: nextState,
-          events,
-          pendingPrompt: {
+        pushCostFrame(frame);
+        if (isEngineTerminated(nextState)) return cannotPay();
+        return suspend({
             options: {
               promptType: "PLAYER_CHOICE",
               effectDescription: "Choose top or bottom of your deck for the placed cards",
@@ -323,8 +358,7 @@ export function payCostsWithSelection(
             },
             respondingPlayer: controller,
             resumeContext: frame.id,
-          },
-        };
+          });
       }
 
       const needsSelection = validTargets.length > amount;
@@ -354,16 +388,12 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
           costArrangeStage: true,
         };
-        nextState = pushFrame(nextState, frame);
-        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
-        return {
-          state: nextState,
-          events,
-          pendingPrompt: buildTrashToDeckArrangePrompt(
+        pushCostFrame(frame);
+        if (isEngineTerminated(nextState)) return cannotPay();
+        return suspend(buildTrashToDeckArrangePrompt(
             nextState, validTargets, controller, frame.id,
             cost.position === "TOP" ? "TOP" : "BOTTOM",
-          ),
-        };
+          ));
       }
       // No choice and order is moot — pay automatically below.
       autoPayTrashToDeck = !needsSelection;
@@ -383,11 +413,11 @@ export function payCostsWithSelection(
         ? player.stage?.instanceId === sourceCardInstanceId
         : player.characters.some((c) => c?.instanceId === sourceCardInstanceId);
       if (!sourceOnField) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
       const trashCandidates = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
       if (trashCandidates.length < amount) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
 
       const needsSelection = trashCandidates.length > amount;
@@ -417,8 +447,8 @@ export function payCostsWithSelection(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        nextState = pushFrame(nextState, frame);
-        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
+        pushCostFrame(frame);
+        if (isEngineTerminated(nextState)) return cannotPay();
         const pendingPrompt: PendingPromptState = {
           options: {
             promptType: "SELECT_TARGET",
@@ -432,7 +462,7 @@ export function payCostsWithSelection(
           respondingPlayer: controller,
           resumeContext: frame.id,
         };
-        return { state: nextState, events, pendingPrompt };
+        return suspend(pendingPrompt);
       }
 
       const group = [sourceCardInstanceId, ...trashCandidates];
@@ -461,16 +491,12 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
           costArrangeStage: true,
         };
-        nextState = pushFrame(nextState, frame);
-        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
-        return {
-          state: nextState,
-          events,
-          pendingPrompt: buildTrashToDeckArrangePrompt(
+        pushCostFrame(frame);
+        if (isEngineTerminated(nextState)) return cannotPay();
+        return suspend(buildTrashToDeckArrangePrompt(
             nextState, group, controller, frame.id,
             cost.position === "TOP" ? "TOP" : "BOTTOM",
-          ),
-        };
+          ));
       }
 
       // Block shuffles afterward — order is moot, pay in default order.
@@ -487,7 +513,7 @@ export function payCostsWithSelection(
           cost.position === "TOP_OR_BOTTOM") {
         const p = nextState.players[controller];
         if (p.life.length === 0) {
-          return { state: nextState, events, cannotPay: true };
+          return cannotPay();
         }
 
         const frameId = generateFrameId(nextState);
@@ -511,8 +537,8 @@ export function payCostsWithSelection(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        nextState = pushFrame(nextState, frame);
-        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
+        pushCostFrame(frame);
+        if (isEngineTerminated(nextState)) return cannotPay();
 
         const pendingPrompt: PendingPromptState = {
           options: {
@@ -528,7 +554,7 @@ export function payCostsWithSelection(
           respondingPlayer: controller,
           resumeContext: frame.id,
         };
-        return { state: nextState, events, pendingPrompt };
+        return suspend(pendingPrompt);
       }
 
       // Build valid targets for this cost
@@ -536,7 +562,7 @@ export function payCostsWithSelection(
       const amount = typeof cost.amount === "number" ? cost.amount : 1;
 
       if (validTargets.length < amount) {
-        return { state: nextState, events, cannotPay: true };
+        return cannotPay();
       }
 
       // Push stack frame for cost selection
@@ -561,8 +587,8 @@ export function payCostsWithSelection(
         simultaneousTriggers: [],
         accumulatedEvents: events,
       };
-      nextState = pushFrame(nextState, frame);
-      if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
+      pushCostFrame(frame);
+      if (isEngineTerminated(nextState)) return cannotPay();
 
       const costLabel = getCostLabel(cost);
       const pendingPrompt: PendingPromptState = {
@@ -578,7 +604,7 @@ export function payCostsWithSelection(
         respondingPlayer: controller,
         resumeContext: frame.id,
       };
-      return { state: nextState, events, pendingPrompt };
+      return suspend(pendingPrompt);
     }
 
     // Fixed-source field exits have no selection prompt, but replacement
@@ -594,8 +620,9 @@ export function payCostsWithSelection(
       return undefined;
     })();
     if (fixedExitTarget) {
+      const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
-        nextState,
+        applyCostTransactionState(nextState, baseline),
         fixedExitTarget,
         controller,
         cardDb,
@@ -616,19 +643,20 @@ export function payCostsWithSelection(
           costReplacementAction: { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
           costReplacementChecked: true,
         };
-        nextState = pushFrame(nextState, frame);
-        if (isEngineTerminated(nextState)) return { state: nextState, events, cannotPay: true };
-        return { state: nextState, events, pendingPrompt: replacement.pendingPrompt };
+        pushCostFrame(frame, stagedBeforeReplacement);
+        if (isEngineTerminated(nextState)) return cannotPay();
+        return suspend(replacement.pendingPrompt);
       }
       if (replacement.replaced) {
-        return { state: nextState, events, cannotPay: true };
+        return { state: nextState, events: replacement.events, cannotPay: true };
       }
+      nextState = stagedBeforeReplacement;
     }
 
     // Auto-payable cost — use existing payCosts for this single cost
     const singleResult = payCosts(nextState, [cost], controller, cardDb, sourceCardInstanceId);
     if (!singleResult) {
-      return { state: nextState, events, cannotPay: true };
+      return cannotPay();
     }
     nextState = singleResult.state;
     events.push(...singleResult.events);

@@ -417,11 +417,12 @@ describe("OPT-371: OP05-082 Shirahoshi cost shape (REST_SELF + place 2, integrat
     ]);
 
     const first = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, SOURCE_CHAR_ID, block, resolverExecutionServices);
-    // REST_SELF auto-paid — the source is already rested when selection opens.
+    // REST_SELF is staged — the authoritative state stays unchanged while the
+    // remaining selection and arrangement prompts are still open.
     const sourceAfterRest = first.state.players[0].characters.find(
       (c) => c?.instanceId === SOURCE_CHAR_ID,
     );
-    expect(sourceAfterRest?.state).toBe("RESTED");
+    expect(sourceAfterRest?.state).toBe("ACTIVE");
     expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
 
     const afterSelect = resumeFromStack(
@@ -430,6 +431,9 @@ describe("OPT-371: OP05-082 Shirahoshi cost shape (REST_SELF + place 2, integrat
       cardDb,
     );
     expect(afterSelect.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    expect(afterSelect.state.players[0].characters.find(
+      (c) => c?.instanceId === SOURCE_CHAR_ID,
+    )?.state).toBe("ACTIVE");
 
     const done = resumeFromStack(
       afterSelect.state,
@@ -443,6 +447,8 @@ describe("OPT-371: OP05-082 Shirahoshi cost shape (REST_SELF + place 2, integrat
     );
     expect(done.pendingPrompt).toBeUndefined();
     const p = done.state.players[0];
+    expect(p.characters.find((c) => c?.instanceId === SOURCE_CHAR_ID)?.state)
+      .toBe("RESTED");
     expect(p.trash.map((c) => c.instanceId)).toEqual(["trash-c"]);
     expect(p.deck[p.deck.length - 1].instanceId).not.toBe("trash-a");
     expect(p.deck[p.deck.length - 2].instanceId).not.toBe("trash-b");

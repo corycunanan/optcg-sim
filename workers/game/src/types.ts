@@ -219,6 +219,8 @@ export interface EffectStackFrame {
   costsPaid: boolean;
   oncePerTurnMarked: boolean;
   costResultRefs: [string, { targetInstanceIds: string[]; count: number }][];
+  /** Cost mutations staged off the authoritative root until every cost pays. */
+  costTransactionState?: import("./engine/effect-resolver/cost/transaction.js").CostTransactionState;
   /** Validated response parked while an optional cost-exit replacement prompts. */
   costReplacementAction?: GameAction;
   /** Prevents a declined replacement from being offered again on resume. */
