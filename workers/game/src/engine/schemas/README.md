@@ -245,6 +245,7 @@ For cards with multiple trigger conditions (OR logic):
 | `TRASH_COUNT` | "If you have N or more in trash" | `{ type: "TRASH_COUNT", controller: "SELF", operator: ">=", value: 10 }` |
 | `DECK_COUNT` | "If you have N or less in deck" | `{ type: "DECK_COUNT", controller: "SELF", operator: "<=", value: 5 }` |
 | `DON_FIELD_COUNT` | "If you have N DON!! on field" | `{ type: "DON_FIELD_COUNT", controller: "SELF", operator: ">=", value: 5 }` |
+| `DON_FIELD_COUNT` + `state` | "If you have N rested DON!!" | `{ type: "DON_FIELD_COUNT", controller: "SELF", state: "RESTED", operator: ">=", value: 6 }` |
 | `ACTIVE_DON_COUNT` | "If you have N active DON!!" | `{ type: "ACTIVE_DON_COUNT", controller: "SELF", operator: ">=", value: 3 }` |
 | `ALL_DON_STATE` | "If all DON!! are rested" | `{ type: "ALL_DON_STATE", controller: "SELF", state: "RESTED" }` |
 

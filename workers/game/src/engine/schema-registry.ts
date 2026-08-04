@@ -139,6 +139,7 @@ const VALID_CONTROLLERS: ReadonlySet<Controller> = new Set([
   "EITHER",
   "ANY",
 ]);
+const VALID_CARD_STATES: ReadonlySet<string> = new Set(["ACTIVE", "RESTED"]);
 const SELF_OR_OPPONENT_CONTROLLERS: ReadonlySet<Controller> = new Set([
   "SELF",
   "OPPONENT",
@@ -228,6 +229,18 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
   if (!candidate.effects || !Array.isArray(candidate.effects)) {
     errors.push(`${prefix} Missing or non-array 'effects' field`);
     return errors;
+  }
+
+  // State-filtered DON counts can appear anywhere conditions are carried,
+  // including schema-level rule_modifications. Walk each top-level value once
+  // so nested effect and rule conditions share the same validation contract.
+  for (const [field, value] of Object.entries(candidate)) {
+    errors.push(
+      ...validateDonFieldCountStateFiltersInValue(
+        value,
+        `${prefix} ${field}`,
+      ),
+    );
   }
 
   const blockIds = new Set<string>();
@@ -377,6 +390,43 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
     }
   }
 
+  return errors;
+}
+
+function validateDonFieldCountStateFiltersInValue(
+  value: unknown,
+  prefix: string,
+  depth = 0,
+): string[] {
+  if (!value || typeof value !== "object" || depth > 20) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) =>
+      validateDonFieldCountStateFiltersInValue(
+        entry,
+        `${prefix}[${index}]`,
+        depth + 1,
+      ),
+    );
+  }
+
+  const errors: string[] = [];
+  if (Reflect.get(value, "type") === "DON_FIELD_COUNT") {
+    const state = Reflect.get(value, "state");
+    if (state !== undefined && !VALID_CARD_STATES.has(String(state))) {
+      errors.push(
+        `${prefix}.state: Invalid DON_FIELD_COUNT state '${String(state)}'; use ACTIVE or RESTED`,
+      );
+    }
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    errors.push(
+      ...validateDonFieldCountStateFiltersInValue(
+        nested,
+        `${prefix}.${key}`,
+        depth + 1,
+      ),
+    );
+  }
   return errors;
 }
 

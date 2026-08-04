@@ -802,8 +802,9 @@ export const OP12_021_IPPONMATSU: EffectSchema = {
             property: { attribute: "SLASH" },
           },
           {
-            type: "RESTED_CARD_COUNT",
+            type: "DON_FIELD_COUNT",
             controller: "SELF",
+            state: "RESTED",
             operator: ">=",
             value: 6,
           },

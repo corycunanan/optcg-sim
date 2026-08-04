@@ -117,7 +117,7 @@ All SimpleCondition types at a glance. Each is detailed in the section indicated
 | `HAND_COUNT` | Hand card count | "If you have N or less cards in your hand..." | Various |
 | `TRASH_COUNT` | Trash card count | "If you have N or more cards in your trash..." | Various |
 | `DECK_COUNT` | Deck card count | "If you have N or less cards in your deck..." | OP03-045, OP15-022 |
-| `DON_FIELD_COUNT` | Total DON!! on field | "If you have N DON!! cards on your field..." | P-104, P-107 |
+| `DON_FIELD_COUNT` | Total DON!! on field, optionally filtered by cost-area state | "If you have N DON!! cards on your field..." | P-104, P-107, OP07-023 |
 | `ACTIVE_DON_COUNT` | Active (untapped) DON!! count | "If you have N or more active DON!! cards..." | OP04-028, OP13-001 |
 | `ALL_DON_STATE` | All DON!! in one state | "If all of your DON!! cards are rested..." | OP02-027 |
 | `CARD_ON_FIELD` | Card matching filter exists | "If you have [Name]..." / "If you have a Character with..." | OP01-044, OP04-005 |
@@ -324,12 +324,13 @@ interface DeckCountCondition {
 
 ### DON_FIELD_COUNT
 
-Checks the total number of DON!! cards on a player's field (active + rested combined).
+Checks the total number of DON!! cards on a player's field (active + rested combined). When `state` is present, counts only matching DON!! cards in the player's cost area; attached DON!! cards are not active or rested cost-area resources and are excluded.
 
 ```typescript
 interface DonFieldCountCondition {
   type: "DON_FIELD_COUNT";
   controller: Controller;
+  state?: CardState;
   operator: NumericOperator;
   value: number;
 }
@@ -339,6 +340,7 @@ interface DonFieldCountCondition {
 |-------------|-----------|---------------|
 | "If you have N DON!! cards on your field..." | `"SELF"` | Many across all sets |
 | "If either you or your opponent has 10 DON!! cards on the field..." | `"EITHER"` | P-104, P-107 |
+| "If you have N or more rested DON!! cards..." | `"SELF"` with `state: "RESTED"` | OP07-023, OP12-021 |
 
 ### ACTIVE_DON_COUNT
 

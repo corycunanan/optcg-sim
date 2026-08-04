@@ -302,6 +302,8 @@ export interface DeckCountCondition {
 export interface DonFieldCountCondition {
   type: "DON_FIELD_COUNT";
   controller: Controller;
+  /** When present, count matching DON!! in the cost area only. */
+  state?: CardState;
   operator: NumericOperator;
   value: number;
 }
