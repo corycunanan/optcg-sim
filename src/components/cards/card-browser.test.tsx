@@ -19,6 +19,7 @@ vi.mock("./set-filter", () => ({
 }));
 
 import { CardBrowser } from "./card-browser";
+import { CardBrowserLoading } from "./card-browser-loading";
 
 let renderer: ReactTestRenderer | null = null;
 
@@ -160,6 +161,29 @@ describe("CardBrowser layout", () => {
       expect(String(section.props.className).split(/\s+/)).toContain(
         "max-w-7xl"
       );
+    }
+  });
+
+  it("renders the route loading skeleton in the same container", async () => {
+    await act(async () => {
+      renderer = create(<CardBrowserLoading />);
+    });
+
+    const paddedSections = renderer!.root
+      .findAllByType("div")
+      .filter((node) =>
+        String(node.props.className ?? "")
+          .split(/\s+/)
+          .includes("px-6")
+      );
+
+    // The skeleton renders at route level with no padded parent, so each of its
+    // bands must carry the container itself or it will jump on load.
+    expect(paddedSections.length).toBeGreaterThanOrEqual(3);
+    for (const section of paddedSections) {
+      const classes = String(section.props.className).split(/\s+/);
+      expect(classes).toContain("max-w-7xl");
+      expect(classes).not.toContain("-mx-6");
     }
   });
 });
