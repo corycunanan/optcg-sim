@@ -387,6 +387,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Waiting for a challenger");
     expect(renderedText()).toContain("You need an opponent first");
     expect(renderedText()).toContain("Start Match");
+    const startButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Start Match"));
+    expect(startButton?.props.disabled).toBe(true);
+    expect(startButton?.props.className).toContain("disabled:bg-surface-3");
+    expect(startButton?.props.className).toContain("disabled:opacity-100");
   });
 
   it("mounts real match settings and persists the host selection", async () => {
@@ -586,6 +592,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
     });
 
     expect(toggle?.props["aria-checked"]).toBe(false);
+    expect(toggle?.props.className).toContain("bg-content-tertiary");
     expect(count?.props.disabled).toBeUndefined();
 
     await act(async () => {
@@ -605,7 +612,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
     ).toBe(true);
   });
 
-  it("gives the guest a clear spectator consent state before readying", async () => {
+  it("keeps the guest spectator state in the footer", async () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
         ? { data: [] }
@@ -653,15 +660,14 @@ describe("LobbyRoomShell redesign scenarios", () => {
     const guestSeat = renderer?.root.findByProps({
       "aria-label": "Guest seat — zoro",
     });
-    const guestTraversal = guestSeat?.findAll(() => true) ?? [];
-    const consentIndex = guestTraversal.findIndex(
-      (node) => node.props["data-spectator-consent"] !== undefined
-    );
-    const readyIndex = guestTraversal.findIndex(
-      (node) => node.type === "button" && node.props["aria-pressed"] === false
-    );
-    expect(consentIndex).toBeGreaterThanOrEqual(0);
-    expect(readyIndex).toBeGreaterThan(consentIndex);
+    expect(
+      guestSeat?.findAllByProps({ "data-spectator-control": true })
+    ).toHaveLength(0);
+    expect(
+      renderer?.root
+        .findByProps({ "data-lobby-action-bar": true })
+        .findAllByProps({ "data-spectator-control": true })
+    ).toHaveLength(1);
   });
 
   it("warns hosts that turning spectators off removes current watchers", async () => {
@@ -685,12 +691,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
       await Promise.resolve();
     });
 
-    expect(
-      renderer?.root.findByProps({
-        role: "switch",
-        "aria-label": "Allow spectators. Turning this off removes 3 watchers.",
-      })
-    ).toBeDefined();
+    const enabledToggle = renderer?.root.findByProps({
+      role: "switch",
+      "aria-label": "Allow spectators. Turning this off removes 3 watchers.",
+    });
+    expect(enabledToggle).toBeDefined();
+    expect(enabledToggle?.props.className).toContain("bg-gold-500");
   });
 
   it("opens the spectator surface and reconciles live membership without closing", async () => {
