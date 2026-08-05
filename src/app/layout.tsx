@@ -63,16 +63,20 @@ export default async function RootLayout({
           <UserChannelProvider>
             <DeckNavigationGuardProvider>
               <SidebarProvider>
-                <div className="flex h-screen w-full overflow-hidden">
-                  {/* Left column: navbar + content */}
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <Navbar />
+                <div
+                  data-slot="app-shell"
+                  className="flex h-screen w-full flex-col overflow-hidden"
+                >
+                  <Navbar />
+                  <div
+                    data-slot="app-content-row"
+                    className="flex min-h-0 min-w-0 flex-1"
+                  >
                     <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                       {children}
                     </main>
+                    <SocialShell />
                   </div>
-                  {/* Right column: sidebar (full viewport height) */}
-                  <SocialShell />
                 </div>
               </SidebarProvider>
             </DeckNavigationGuardProvider>
