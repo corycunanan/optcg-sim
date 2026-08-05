@@ -19,6 +19,7 @@ vi.mock("./set-filter", () => ({
 }));
 
 import { CardBrowser } from "./card-browser";
+import { CardBrowserLoading } from "./card-browser-loading";
 
 let renderer: ReactTestRenderer | null = null;
 
@@ -113,5 +114,76 @@ describe("CardBrowser filters", () => {
     await act(async () => setFilterProps.onChange([]));
 
     expect(mocks.push).toHaveBeenCalledWith("/cards?set=all");
+  });
+});
+
+describe("CardBrowser layout", () => {
+  it("aligns every content section to the app-wide container", async () => {
+    await act(async () => {
+      renderer = create(
+        <CardBrowser
+          initialCards={[]}
+          total={0}
+          page={1}
+          totalPages={3}
+          sets={[{ setLabel: "OP15", setName: "Example Set", packId: "OP15" }]}
+          currentFilters={{
+            q: "",
+            color: "",
+            type: "",
+            set: "OP15",
+            block: "",
+            originOnly: "",
+          }}
+          routePath="/cards"
+        />
+      );
+    });
+
+    await act(async () =>
+      renderer!.root
+        .findByProps({ "aria-controls": "card-filters" })
+        .props.onClick()
+    );
+
+    // Every horizontally padded section must share the max-w-7xl container so
+    // the header, filters, grid, and pagination keep the same left edge.
+    const paddedSections = renderer!.root
+      .findAllByType("div")
+      .filter((node) =>
+        String(node.props.className ?? "")
+          .split(/\s+/)
+          .includes("px-6")
+      );
+
+    expect(paddedSections.length).toBeGreaterThanOrEqual(4);
+    for (const section of paddedSections) {
+      expect(String(section.props.className).split(/\s+/)).toContain(
+        "max-w-7xl"
+      );
+    }
+  });
+
+  it("renders the route loading skeleton in the same container", async () => {
+    await act(async () => {
+      renderer = create(<CardBrowserLoading />);
+    });
+
+    const paddedSections = renderer!.root
+      .findAllByType("div")
+      .filter((node) =>
+        String(node.props.className ?? "")
+          .split(/\s+/)
+          .includes("px-6")
+      );
+
+    // The skeleton renders at route level with no padded parent, so each of its
+    // bands must carry the container itself or it will jump on load.
+    expect(paddedSections.length).toBeGreaterThanOrEqual(3);
+    for (const section of paddedSections) {
+      const classes = String(section.props.className).split(/\s+/);
+      expect(classes).toContain("max-w-7xl");
+      expect(classes).not.toContain("-mx-6");
+    }
   });
 });

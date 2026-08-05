@@ -28,7 +28,7 @@ export default function LobbyRoomLoading() {
       aria-label="Loading lobby room"
     >
       <div className="bg-navy-900 w-full" aria-hidden="true">
-        <div className="mx-auto flex items-center justify-between gap-4 px-6 py-12">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-12">
           <div className="flex flex-col gap-2">
             <Skeleton className="bg-navy-700 h-8 w-40" />
             <Skeleton className="bg-navy-700 h-4 w-80 max-w-full" />
@@ -38,7 +38,7 @@ export default function LobbyRoomLoading() {
       </div>
 
       <div
-        className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8"
+        className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8"
         aria-hidden="true"
       >
         <div className="border-border bg-card flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
