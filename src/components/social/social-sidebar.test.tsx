@@ -15,10 +15,7 @@ import type { RealtimeServerEvent } from "@/types/realtime";
 import type { FriendEntry } from "./apply-friend-event";
 
 type EventType = RealtimeServerEvent["type"];
-type EventFor<T extends EventType> = Extract<
-  RealtimeServerEvent,
-  { type: T }
->;
+type EventFor<T extends EventType> = Extract<RealtimeServerEvent, { type: T }>;
 type EventHandler<T extends EventType = EventType> = (
   event: EventFor<T>
 ) => void;
@@ -39,10 +36,7 @@ const mocks = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   handlers: new Map<string, (event: never) => void>(),
-  presence: {} as Record<
-    string,
-    { online: boolean; lastSeen: string | null }
-  >,
+  presence: {} as Record<string, { online: boolean; lastSeen: string | null }>,
   trackPresence: vi.fn(),
 }));
 
@@ -157,6 +151,25 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("SocialSidebar", () => {
+  it("uses the gold divider and omits the duplicate account footer", () => {
+    const { container } = renderSidebar();
+
+    expect(
+      container.querySelector('[data-slot="sidebar-header"]')?.className
+    ).toContain("border-border-accent");
+    expect(screen.queryByText("tester")).toBeNull();
+    expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
+  });
+
+  it("pins the rail below the navbar through the viewport bottom", () => {
+    const { container } = renderSidebar();
+    const rail = container.querySelector('[data-slot="sidebar"]');
+
+    expect(rail?.className).toContain("fixed");
+    expect(rail?.className).toContain("top-16");
+    expect(rail?.className).toContain("bottom-0");
+  });
+
   it("does not fetch or render incoming friend requests", async () => {
     renderSidebar();
 
@@ -220,9 +233,9 @@ describe("SocialSidebar", () => {
 
     expect(screen.getByText("Online (1)")).toBeDefined();
     expect(screen.getByText("Offline (0)")).toBeDefined();
-    const onlineGroup = screen.getByText("Online (1)").closest(
-      '[data-sidebar="group"]'
-    );
+    const onlineGroup = screen
+      .getByText("Online (1)")
+      .closest('[data-sidebar="group"]');
     expect(onlineGroup).not.toBeNull();
     expect(
       within(onlineGroup as HTMLElement).getByRole("button", {

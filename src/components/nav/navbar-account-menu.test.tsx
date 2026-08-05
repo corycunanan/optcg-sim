@@ -89,4 +89,21 @@ describe("NavbarAccountMenu", () => {
       })
     ).toBeDefined();
   });
+
+  it("right-aligns the menu panel to its account trigger", async () => {
+    const user = userEvent.setup();
+    render(<NavbarAccountMenu user={{ username: "luffy" }} />);
+
+    const trigger = screen.getByRole("button", {
+      name: "Account menu for luffy",
+    });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    const content = document.querySelector(
+      '[data-slot="navigation-menu-content"]'
+    );
+    expect(content?.className).toContain("right-0");
+    expect(content?.className).toContain("left-auto");
+  });
 });

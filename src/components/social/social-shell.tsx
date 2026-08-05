@@ -17,9 +17,9 @@ const ChatWidget = dynamic(
 const LobbyInviteToasts = dynamic(
   () =>
     import("@/components/lobbies/lobby-invite-toast").then(
-      (mod) => mod.LobbyInviteToasts,
+      (mod) => mod.LobbyInviteToasts
     ),
-  { ssr: false },
+  { ssr: false }
 );
 
 export function SocialShell() {
@@ -38,6 +38,7 @@ export function SocialShell() {
       <LobbyInviteToasts />
       {!isGame && (
         <>
+          <div className="w-[280px] shrink-0" aria-hidden="true" />
           <SocialSidebar onOpenChat={setChatUser} />
           {chatUser && (
             <ChatWidget

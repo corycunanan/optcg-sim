@@ -56,7 +56,7 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
               {displayName}
             </span>
           </NavigationMenuTrigger>
-          <NavigationMenuContent className="border-border bg-surface-nav border ring-0">
+          <NavigationMenuContent className="border-border bg-surface-nav right-0 left-auto border ring-0">
             <ul className="flex w-48 flex-col gap-1 p-1">
               <li>
                 <NavigationMenuLink asChild>
