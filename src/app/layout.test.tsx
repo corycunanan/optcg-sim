@@ -51,9 +51,11 @@ vi.mock("@/components/deck-builder/deck-navigation-guard", () => ({
 vi.mock("@/components/ui/sidebar", () => ({
   SidebarProvider: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock("@/components/nav/navbar", () => ({ Navbar: () => null }));
+vi.mock("@/components/nav/navbar", () => ({
+  Navbar: () => <nav data-testid="navbar" />,
+}));
 vi.mock("@/components/social/social-shell", () => ({
-  SocialShell: () => null,
+  SocialShell: () => <aside data-testid="social-shell" />,
 }));
 vi.mock("@/components/ui/sonner", () => ({ Toaster: () => null }));
 
@@ -83,5 +85,21 @@ describe("RootLayout theme stamping", () => {
 
     expect(html).toContain('<html lang="en">');
     expect(html).not.toContain("data-theme=");
+  });
+});
+
+describe("RootLayout shell geometry", () => {
+  it("renders the navbar above the shared content and social row", async () => {
+    const html = renderToStaticMarkup(
+      await RootLayout({ children: <div>content</div> })
+    );
+
+    const navbarIndex = html.indexOf('data-testid="navbar"');
+    const contentRowIndex = html.indexOf('data-slot="app-content-row"');
+    const socialShellIndex = html.indexOf('data-testid="social-shell"');
+
+    expect(navbarIndex).toBeGreaterThan(-1);
+    expect(contentRowIndex).toBeGreaterThan(navbarIndex);
+    expect(socialShellIndex).toBeGreaterThan(contentRowIndex);
   });
 });
