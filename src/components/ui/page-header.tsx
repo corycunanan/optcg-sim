@@ -9,9 +9,12 @@ function PageHeader({
 }) {
   return (
     <div
-      className={cn("w-full border-b border-border-strong bg-navy-900", className)}
+      className={cn(
+        "border-border-strong bg-navy-900 w-full border-b",
+        className
+      )}
     >
-      <div className="mx-auto flex items-center justify-between gap-4 px-6 py-12">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-12">
         {children}
       </div>
     </div>
@@ -24,14 +27,12 @@ function PageHeaderContent({ children }: { children: React.ReactNode }) {
 
 function PageHeaderTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h1 className="font-display text-3xl text-content-inverse">
-      {children}
-    </h1>
+    <h1 className="font-display text-content-inverse text-3xl">{children}</h1>
   );
 }
 
 function PageHeaderDescription({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-content-secondary">{children}</p>;
+  return <p className="text-content-secondary text-sm">{children}</p>;
 }
 
 function PageHeaderActions({ children }: { children: React.ReactNode }) {

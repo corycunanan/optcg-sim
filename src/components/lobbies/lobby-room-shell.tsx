@@ -597,21 +597,6 @@ export function LobbyRoomShell({
                   onPreview={setPreviewDeckId}
                   previewSide="right"
                   disabled={isInGame}
-                  disclosure={
-                    isGuest ? (
-                      <SpectatorPill
-                        allowSpectators={lobby.allowSpectators}
-                        spectatorCount={lobby.spectatorCount}
-                        viewerRole={lobby.viewerRole}
-                        toggling={spectatorToggling}
-                        onToggle={(allowSpectators) =>
-                          void handleSpectatorToggle(allowSpectators)
-                        }
-                        onOpenSpectators={handleOpenSpectators}
-                        countButtonRef={spectatorCountButtonRef}
-                      />
-                    ) : undefined
-                  }
                   actions={
                     isHost ? (
                       <KickPlayerAction
@@ -687,19 +672,17 @@ export function LobbyRoomShell({
         >
           <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
             <div className="flex items-center gap-3">
-              {!isGuest && (
-                <SpectatorPill
-                  allowSpectators={lobby.allowSpectators}
-                  spectatorCount={lobby.spectatorCount}
-                  viewerRole={lobby.viewerRole}
-                  toggling={spectatorToggling}
-                  onToggle={(allowSpectators) =>
-                    void handleSpectatorToggle(allowSpectators)
-                  }
-                  onOpenSpectators={handleOpenSpectators}
-                  countButtonRef={spectatorCountButtonRef}
-                />
-              )}
+              <SpectatorPill
+                allowSpectators={lobby.allowSpectators}
+                spectatorCount={lobby.spectatorCount}
+                viewerRole={lobby.viewerRole}
+                toggling={spectatorToggling}
+                onToggle={(allowSpectators) =>
+                  void handleSpectatorToggle(allowSpectators)
+                }
+                onOpenSpectators={handleOpenSpectators}
+                countButtonRef={spectatorCountButtonRef}
+              />
               <p className="text-content-tertiary text-xs">{startHint}</p>
             </div>
 
@@ -717,6 +700,7 @@ export function LobbyRoomShell({
                 <Button
                   variant="gold"
                   size="lg"
+                  className="disabled:border-border disabled:bg-surface-3 disabled:text-content-tertiary disabled:opacity-100"
                   onClick={() => void handleStart()}
                   disabled={
                     !canStart || mutating || starting || closing || isInGame
@@ -1004,7 +988,10 @@ function SpectatorPill({
       : "Allow spectators";
 
   return (
-    <div className="border-border bg-surface-3 flex min-h-10 items-center gap-3 rounded-full border p-1 pl-3">
+    <div
+      className="border-border bg-surface-3 flex min-h-10 items-center gap-3 rounded-full border p-1 pl-3"
+      data-spectator-control
+    >
       {isHost ? (
         <>
           <button
@@ -1016,13 +1003,13 @@ function SpectatorPill({
             onClick={() => onToggle(!allowSpectators)}
             className={cn(
               "focus-visible:ring-border-focus relative h-6 w-10 shrink-0 rounded-full p-1 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-wait",
-              allowSpectators ? "bg-navy-700" : "bg-content-tertiary"
+              allowSpectators ? "bg-gold-500" : "bg-content-tertiary"
             )}
           >
             <span
               className={cn(
-                "bg-surface-1 block size-4 rounded-full transition-transform",
-                allowSpectators && "translate-x-4"
+                "block size-4 rounded-full transition-transform",
+                allowSpectators ? "bg-navy-900 translate-x-4" : "bg-surface-1"
               )}
             />
           </button>

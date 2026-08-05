@@ -170,17 +170,19 @@ export function CardBrowser({
       {/* Scrollable content area */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {filtersOpen && (
-          <div id="card-filters" className="border-border border-b px-6 py-6">
-            <CardFilters
-              sets={sets}
-              currentFilters={currentFilters}
-              onFilterChange={updateFilters}
-            />
+          <div id="card-filters" className="border-border border-b">
+            <div className="mx-auto w-full max-w-7xl px-6 py-6">
+              <CardFilters
+                sets={sets}
+                currentFilters={currentFilters}
+                onFilterChange={updateFilters}
+              />
+            </div>
           </div>
         )}
 
         {/* Search bar */}
-        <div className="px-6 py-6">
+        <div className="mx-auto w-full max-w-7xl px-6 py-6">
           <form onSubmit={handleSearch}>
             <div className="flex gap-2">
               <Input
@@ -206,13 +208,18 @@ export function CardBrowser({
           </form>
         </div>
 
-        <div className={cn("px-6", totalPages <= 1 && "pb-6")}>
+        <div
+          className={cn(
+            "mx-auto w-full max-w-7xl px-6",
+            totalPages <= 1 && "pb-6"
+          )}
+        >
           <CardGrid cards={initialCards} onCardClick={setModalCardId} />
         </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 pb-6">
+          <div className="mx-auto w-full max-w-7xl px-6 pb-6">
             <Pagination
               page={page}
               totalPages={totalPages}
