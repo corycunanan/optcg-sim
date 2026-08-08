@@ -30,6 +30,14 @@ describe("PregameSettings", () => {
     expect(markup).not.toContain("Host controlled");
   });
 
+  it("renders plain rows without nested card or divider borders", () => {
+    const markup = renderSettings(true);
+
+    expect(markup).not.toContain("border-border");
+    expect(markup).not.toContain("divide-border");
+    expect(markup).toContain("bg-surface-2");
+  });
+
   it("renders the same selection read-only for guests", () => {
     const markup = renderSettings(false);
 
