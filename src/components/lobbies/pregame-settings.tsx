@@ -124,7 +124,7 @@ export function PregameSettings({
             <label
               key={option.value}
               className={cn(
-                "flex min-h-16 cursor-pointer items-start gap-3 rounded-md px-4 py-3 transition-colors",
+                "flex min-h-16 cursor-pointer items-start gap-3 px-4 py-3 transition-colors",
                 selected && "bg-surface-2",
                 (!editable || disabled) && "cursor-default",
               )}
