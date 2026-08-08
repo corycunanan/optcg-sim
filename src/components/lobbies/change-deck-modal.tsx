@@ -92,9 +92,14 @@ export function ChangeDeckModal({
         <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
           {/*
             No visible eyebrow — `aria-label` is what names the rail now.
+            Square corners per the shape semantics: rounded rectangles are
+            reserved for cards, and a dense row list is the quiet end of
+            angular. Square rather than chamfered because the box keeps a 1px
+            border, and clip-path chamfers need the two-layer technique —
+            disproportionate for a control this small.
           */}
           <div
-            className="border-border bg-surface-3 max-h-48 min-h-0 overflow-y-auto rounded-md border p-1 sm:max-h-none"
+            className="border-border bg-surface-3 max-h-48 min-h-0 overflow-y-auto border p-1 sm:max-h-none"
             role="group"
             aria-label="Your decks"
           >
@@ -113,7 +118,7 @@ export function ChangeDeckModal({
                     onClick={() => setSelectedId(deck.id)}
                     aria-pressed={isSelected}
                     className={cn(
-                      "focus-visible:outline-border-focus flex w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
+                      "focus-visible:outline-border-focus flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
                       isSelected
                         ? "bg-surface-1 text-content-primary font-semibold"
                         : "text-content-secondary hover:bg-surface-2 hover:text-content-primary"
@@ -162,7 +167,7 @@ export function ChangeDeckModal({
 
             {failed && (
               <div
-                className="border-error/30 bg-error-soft flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-md border p-5 text-center"
+                className="border-error/30 bg-error-soft flex min-h-0 flex-1 flex-col items-center justify-center gap-3 border p-5 text-center"
                 role="alert"
               >
                 <p className="text-error text-sm">

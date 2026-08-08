@@ -54,18 +54,18 @@ function stackLabel(group: DeckCardGroup): string {
 
 /* ── Stat pill for the hover tooltip ─────────────────────────────────── */
 
-function StatPill({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string | number;
-  className?: string;
-}) {
+/**
+ * Tier-5 convention: every numeric value is white. The stat's identity is
+ * carried by its label, not by a per-stat hue — the previous cost/power/
+ * counter colouring competed with card art for chroma and leaned on
+ * off-system palette classes.
+ */
+function StatPill({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="px-2 text-center">
-      <div className={cn("text-sm font-bold", className)}>{String(value)}</div>
+      <div className="text-content-primary text-sm font-bold">
+        {String(value)}
+      </div>
       <div className="text-content-tertiary text-xs tracking-wide uppercase">
         {label}
       </div>
@@ -88,43 +88,22 @@ function CardTooltip({ card }: { card: DeckCardInfo }) {
       {isFieldCard ? (
         <div className="mb-3 flex flex-wrap gap-5 text-xs">
           {card.type === "Leader" ? (
-            <StatPill
-              label="Life"
-              value={card.life ?? card.cost ?? 0}
-              className="text-error"
-            />
+            <StatPill label="Life" value={card.life ?? card.cost ?? 0} />
           ) : (
-            <StatPill
-              label="Cost"
-              value={card.cost ?? 0}
-              className="text-gold-600"
-            />
+            <StatPill label="Cost" value={card.cost ?? 0} />
           )}
-          <StatPill
-            label="Power"
-            value={(card.power ?? 0).toLocaleString()}
-            className="text-green-600"
-          />
+          <StatPill label="Power" value={(card.power ?? 0).toLocaleString()} />
           {card.type !== "Leader" && (
             <StatPill
               label="Counter"
               value={card.counter != null ? `+${card.counter}` : "—"}
-              className="text-purple-600"
             />
           )}
         </div>
       ) : (
         <div className="mb-3 flex flex-wrap gap-3 text-xs">
-          {card.cost != null && (
-            <StatPill
-              label="Cost"
-              value={card.cost}
-              className="text-gold-600"
-            />
-          )}
-          {card.life != null && (
-            <StatPill label="Life" value={card.life} className="text-error" />
-          )}
+          {card.cost != null && <StatPill label="Cost" value={card.cost} />}
+          {card.life != null && <StatPill label="Life" value={card.life} />}
         </div>
       )}
 
@@ -196,7 +175,17 @@ export function DeckCardGrid({
                 />
               </button>
             </HoverCardTrigger>
-            <HoverCardContent side="top" className="w-72">
+            {/*
+              Tier-5 information surface: square corners, flat opaque dark,
+              neutral hairline lit top-left → bottom-right, no glow. The
+              overrides land through tailwind-merge against the shared
+              HoverCard primitive rather than editing it.
+            */}
+            <HoverCardContent
+              side="top"
+              className="bg-surface-info edge-info w-72 rounded-none shadow-none"
+              data-tier5-surface
+            >
               <CardTooltip card={group.card} />
             </HoverCardContent>
           </HoverCard>

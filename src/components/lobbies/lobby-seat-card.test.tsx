@@ -390,6 +390,59 @@ describe("LobbySeatCard deck switching", () => {
     expect(scroller?.className).not.toContain("border");
   });
 
+  it("follows the shape semantics: angular chrome, rounded cards", async () => {
+    const user = userEvent.setup();
+    renderSeat({ deckEditable: true });
+
+    await user.click(
+      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
+    );
+    const dialog = await screen.findByRole("dialog");
+    const pane = within(dialog);
+    await pane.findByRole("button", { name: "Roronoa Zoro, 4 copies" });
+
+    // Chrome is square: the rail and its dense rows carry no card radius.
+    const rail = pane.getByRole("group", { name: "Your decks" });
+    expect(rail.className).not.toMatch(/(^|\s)rounded/);
+    for (const row of pane.getAllByRole("button", { name: /Rush|Nami/ })) {
+      expect(row.className).not.toMatch(/(^|\s)rounded/);
+    }
+
+    // Card silhouettes keep their radius — that is the figure-ground point.
+    const art = dialog.querySelector("img");
+    expect(art?.parentElement?.className).toMatch(/(^|\s)rounded/);
+  });
+
+  it("renders the card tooltip as a Tier-5 information surface", async () => {
+    const user = userEvent.setup();
+    renderSeat({ deckEditable: true });
+
+    await user.click(
+      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
+    );
+    const dialog = await screen.findByRole("dialog");
+    const zoro = await within(dialog).findByRole("button", {
+      name: "Roronoa Zoro, 4 copies",
+    });
+
+    zoro.focus();
+    await screen.findByText(/OP01-025/);
+
+    const tooltip = document.querySelector<HTMLElement>("[data-tier5-surface]");
+    expect(tooltip).not.toBeNull();
+    // Square, flat, opaque, unglowing — Tier 5 opts out of panel treatment.
+    expect(tooltip?.className).toContain("rounded-none");
+    expect(tooltip?.className).toContain("shadow-none");
+    expect(tooltip?.className).toContain("bg-surface-info");
+    expect(tooltip?.className).toContain("edge-info");
+
+    // Numeric values are white; no per-stat hue competing with card art.
+    const power = within(tooltip!).getByText("Power").previousElementSibling;
+    expect(power?.className).toContain("text-content-primary");
+    expect(tooltip?.innerHTML).not.toContain("text-green-600");
+    expect(tooltip?.innerHTML).not.toContain("text-purple-600");
+  });
+
   it("puts every card stack in the keyboard path with its tooltip", async () => {
     const user = userEvent.setup();
     renderSeat({ deckEditable: true });
