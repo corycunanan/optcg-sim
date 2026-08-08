@@ -413,6 +413,28 @@ describe("LobbySeatCard deck switching", () => {
     expect(art?.parentElement?.className).toMatch(/(^|\s)rounded/);
   });
 
+  it("steps the rail elevation one direction from rest to selected", async () => {
+    const user = userEvent.setup();
+    renderSeat({ deckEditable: true });
+
+    await user.click(
+      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
+    );
+    const pane = within(await screen.findByRole("dialog"));
+
+    // The rail carries no fill of its own — it sits on the modal surface.
+    const rail = pane.getByRole("group", { name: "Your decks" });
+    expect(rail.className).not.toContain("bg-surface");
+
+    // Rest → hover → selected lightens: modal surface, surface-2, surface-3.
+    const selected = pane.getByRole("button", { name: /Straw Hat Rush/ });
+    const unselected = pane.getByRole("button", { name: /Kid Rush/ });
+    expect(selected.getAttribute("aria-pressed")).toBe("true");
+    expect(selected.className).toContain("bg-surface-3");
+    expect(unselected.className).not.toContain("bg-surface-3");
+    expect(unselected.className).toContain("hover:bg-surface-2");
+  });
+
   it("renders the card tooltip as a Tier-5 information surface", async () => {
     const user = userEvent.setup();
     renderSeat({ deckEditable: true });

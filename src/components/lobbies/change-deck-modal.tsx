@@ -97,9 +97,14 @@ export function ChangeDeckModal({
             angular. Square rather than chamfered because the box keeps a 1px
             border, and clip-path chamfers need the two-layer technique —
             disproportionate for a control this small.
+
+            No background fill — the rail sits on the modal surface. The
+            border stays: it is now the only thing delimiting the scrollable
+            list region, and the selected row's lighter fill needs an edge to
+            read against.
           */}
           <div
-            className="border-border bg-surface-3 max-h-48 min-h-0 overflow-y-auto border p-1 sm:max-h-none"
+            className="border-border max-h-48 min-h-0 overflow-y-auto border p-1 sm:max-h-none"
             role="group"
             aria-label="Your decks"
           >
@@ -119,8 +124,13 @@ export function ChangeDeckModal({
                     aria-pressed={isSelected}
                     className={cn(
                       "focus-visible:outline-border-focus flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
+                      // Rest sits on the bare modal surface (27%), hover
+                      // lifts to surface-2 (32%), selection lands on
+                      // surface-3 (37%) — one direction, lighter with
+                      // engagement. Each text/background pairing is already
+                      // in the contrast manifest.
                       isSelected
-                        ? "bg-surface-1 text-content-primary font-semibold"
+                        ? "bg-surface-3 text-content-primary font-semibold"
                         : "text-content-secondary hover:bg-surface-2 hover:text-content-primary"
                     )}
                   >
