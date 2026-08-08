@@ -356,10 +356,38 @@ describe("LobbySeatCard deck switching", () => {
     // The visible ×N caption is decorative — the count is in the stack label.
     expect(pane.getByText("×4").getAttribute("aria-hidden")).toBe("true");
     expect(pane.getByText("×1")).toBeDefined();
-    expect(pane.getByText("5 cards")).toBeDefined();
 
     // The grouped text list is gone from this pane.
     expect(pane.queryByText("Characters")).toBeNull();
+  });
+
+  it("presents the art on a bare pane with a plain modal title", async () => {
+    const user = userEvent.setup();
+    renderSeat({ deckEditable: true });
+
+    await user.click(
+      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
+    );
+    const dialog = await screen.findByRole("dialog");
+    const pane = within(dialog);
+    await pane.findByRole("button", { name: "Roronoa Zoro, 4 copies" });
+
+    // Title uses the shared DialogTitle default, not the display face.
+    const title = pane.getByRole("heading", { name: "Change deck" });
+    expect(title.className).not.toContain("font-display");
+    expect(title.className).not.toContain("uppercase");
+
+    // No rail eyebrow and no pane header — the rail keeps its accessible name.
+    expect(pane.queryByText("Decks")).toBeNull();
+    expect(pane.queryByText(/cards$/)).toBeNull();
+    expect(pane.queryByText(/Monkey\.D\.Luffy$/)).toBeNull();
+    expect(pane.getByRole("group", { name: "Your decks" })).toBeDefined();
+
+    // The grid keeps its own scroll region; no panel chrome around it.
+    const scroller = dialog.querySelector<HTMLElement>(".overflow-y-auto.p-2");
+    expect(scroller).not.toBeNull();
+    expect(scroller?.className).not.toContain("bg-surface-3");
+    expect(scroller?.className).not.toContain("border");
   });
 
   it("puts every card stack in the keyboard path with its tooltip", async () => {
