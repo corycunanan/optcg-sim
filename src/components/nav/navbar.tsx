@@ -21,8 +21,21 @@ export function Navbar() {
   const pathname = usePathname();
   const { data: session, status: sessionStatus } = useSession();
   const [activeMenu, setActiveMenu] = useState("");
+  // Radix keeps painting the viewport through its exit animation after the
+  // value clears, so the just-closed trigger has to stay the CSS anchor or the
+  // closing panel snaps to the nav's left edge mid-fade.
+  const [lastMenu, setLastMenu] = useState("");
 
   if (pathname.startsWith("/game/")) return null;
+
+  const handleMenuChange = (value: string) => {
+    setActiveMenu(value);
+    if (value) setLastMenu(value);
+  };
+
+  // Exactly one trigger may carry `anchor-name`: the open menu wins, and the
+  // previous one is only used once nothing is open.
+  const anchoredMenu = activeMenu || lastMenu;
 
   const isRouteWithin = (route: string) =>
     pathname === route || pathname.startsWith(`${route}/`);
@@ -52,7 +65,7 @@ export function Navbar() {
       >
         <NavigationMenu
           value={activeMenu}
-          onValueChange={setActiveMenu}
+          onValueChange={handleMenuChange}
           className="max-w-none min-w-0 flex-1 justify-start"
         >
           <div
@@ -99,7 +112,7 @@ export function Navbar() {
                   className={cn(
                     triggerStyles,
                     decksActive && activeTriggerStyles,
-                    activeMenu === "decks" && "navbar-dropdown-anchor"
+                    anchoredMenu === "decks" && "navbar-dropdown-anchor"
                   )}
                 >
                   Decks
@@ -137,7 +150,7 @@ export function Navbar() {
                   className={cn(
                     triggerStyles,
                     cardsActive && activeTriggerStyles,
-                    activeMenu === "cards" && "navbar-dropdown-anchor"
+                    anchoredMenu === "cards" && "navbar-dropdown-anchor"
                   )}
                 >
                   Cards
