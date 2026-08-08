@@ -729,10 +729,7 @@ export function LobbyRoomShell({
                     Match settings
                   </Button>
                 </DialogTrigger>
-                <DialogContent
-                  size="lg"
-                  className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
-                >
+                <DialogContent size="lg">
                   <DialogTitle className="sr-only">Match settings</DialogTitle>
                   <PregameSettings
                     mode={lobby.mode}
