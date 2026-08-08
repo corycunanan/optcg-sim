@@ -45,6 +45,13 @@ export function deckCardTotal(groups: DeckCardGroup[]): number {
   return groups.reduce((sum, group) => sum + group.count, 0);
 }
 
+/** The single accessible name for a fanned stack: name plus copy count. */
+function stackLabel(group: DeckCardGroup): string {
+  return `${group.card.name}, ${group.count} ${
+    group.count === 1 ? "copy" : "copies"
+  }`;
+}
+
 /* ── Stat pill for the hover tooltip ─────────────────────────────────── */
 
 function StatPill({
@@ -158,31 +165,46 @@ export function DeckCardGrid({
         <div key={group.card.id} className="flex flex-col gap-1">
           <HoverCard openDelay={200} closeDelay={0}>
             <HoverCardTrigger asChild>
-              <CardFanStack
-                cardId={group.card.id}
-                count={group.count}
-                className="cursor-pointer"
-                renderCard={(i) => (
-                  <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-transform duration-150 hover:z-10 hover:-translate-y-2">
-                    <img
-                      src={group.imageUrl}
-                      alt={group.card.name}
-                      className={cn(
-                        "h-full w-full object-cover",
-                        group.count > 1 && i > 0 && "brightness-90"
-                      )}
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-              />
+              {/*
+                A real button so the stack is tabbable and Radix's focus path
+                opens the tooltip — the fan is the only way to reach a card's
+                cost/power/effect text. It carries the single accessible name
+                for the whole stack; the art inside is decorative and the ×N
+                caption is hidden, so a four-copy card announces once.
+              */}
+              <button
+                type="button"
+                aria-label={stackLabel(group)}
+                className="focus-visible:ring-border-focus flex cursor-pointer rounded focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                <CardFanStack
+                  cardId={group.card.id}
+                  count={group.count}
+                  renderCard={(i) => (
+                    <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-transform duration-150 hover:z-10 hover:-translate-y-2">
+                      <img
+                        src={group.imageUrl}
+                        alt=""
+                        className={cn(
+                          "h-full w-full object-cover",
+                          group.count > 1 && i > 0 && "brightness-90"
+                        )}
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+                />
+              </button>
             </HoverCardTrigger>
             <HoverCardContent side="top" className="w-72">
               <CardTooltip card={group.card} />
             </HoverCardContent>
           </HoverCard>
           {showCounts && (
-            <span className="text-content-tertiary text-xs font-semibold tabular-nums">
+            <span
+              className="text-content-tertiary text-xs font-semibold tabular-nums"
+              aria-hidden="true"
+            >
               ×{group.count}
             </span>
           )}

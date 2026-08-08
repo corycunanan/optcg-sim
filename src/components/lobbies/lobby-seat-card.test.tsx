@@ -340,15 +340,52 @@ describe("LobbySeatCard deck switching", () => {
     const pane = within(dialog);
 
     // Leader plus one ×4 character — the leader is a grid entry, not a
-    // separate thumbnail beside the pane title.
-    expect(await pane.findByAltText("Monkey.D.Luffy")).toBeDefined();
-    expect(pane.getAllByAltText("Roronoa Zoro")).toHaveLength(4);
-    expect(pane.getByText("×4")).toBeDefined();
+    // separate thumbnail beside the pane title. One stack per distinct card
+    // carries the whole group's accessible name; the art inside is decorative.
+    expect(
+      await pane.findByRole("button", { name: "Monkey.D.Luffy, 1 copy" })
+    ).toBeDefined();
+    const zoro = pane.getByRole("button", { name: "Roronoa Zoro, 4 copies" });
+    expect(zoro.querySelectorAll("img")).toHaveLength(4);
+    expect(
+      [...zoro.querySelectorAll("img")].every(
+        (image) => image.getAttribute("alt") === ""
+      )
+    ).toBe(true);
+
+    // The visible ×N caption is decorative — the count is in the stack label.
+    expect(pane.getByText("×4").getAttribute("aria-hidden")).toBe("true");
     expect(pane.getByText("×1")).toBeDefined();
     expect(pane.getByText("5 cards")).toBeDefined();
 
     // The grouped text list is gone from this pane.
     expect(pane.queryByText("Characters")).toBeNull();
+  });
+
+  it("puts every card stack in the keyboard path with its tooltip", async () => {
+    const user = userEvent.setup();
+    renderSeat({ deckEditable: true });
+
+    await user.click(
+      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
+    );
+    const dialog = await screen.findByRole("dialog");
+    const pane = within(dialog);
+    const zoro = await pane.findByRole("button", {
+      name: "Roronoa Zoro, 4 copies",
+    });
+
+    // Tab order reaches the stack — it is a real button, not a bare div.
+    const reached: Element[] = [];
+    for (let step = 0; step < 20 && !reached.includes(zoro); step += 1) {
+      await user.tab();
+      if (document.activeElement) reached.push(document.activeElement);
+    }
+    expect(reached).toContain(zoro);
+
+    // Radix opens the hover card on focus, so the cost/power/effect text is
+    // reachable without a pointer.
+    expect(await screen.findByText(/OP01-025/)).toBeDefined();
   });
 
   it("swaps the grid to the previewed deck without committing", async () => {
@@ -361,10 +398,16 @@ describe("LobbySeatCard deck switching", () => {
     await screen.findByRole("dialog");
     await user.click(screen.getByRole("button", { name: /Kid Rush/ }));
 
-    expect(await screen.findByAltText("Eustass Kid")).toBeDefined();
-    expect(screen.getAllByAltText("Kid & Killer")).toHaveLength(2);
-    expect(screen.getAllByAltText("Damned Punk")).toHaveLength(3);
-    expect(screen.queryByAltText("Roronoa Zoro")).toBeNull();
+    expect(
+      await screen.findByRole("button", { name: "Eustass Kid, 1 copy" })
+    ).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Kid & Killer, 2 copies" })
+    ).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Damned Punk, 3 copies" })
+    ).toBeDefined();
+    expect(screen.queryByRole("button", { name: /Roronoa Zoro/ })).toBeNull();
     expect(props.onDeckChange).not.toHaveBeenCalled();
   });
 
@@ -398,7 +441,9 @@ describe("LobbySeatCard deck switching", () => {
 
     await user.click(screen.getByRole("button", { name: /Kid Rush/ }));
     await waitFor(() => expect(mocks.apiGet).toHaveBeenCalled());
-    expect(await screen.findAllByAltText("Kid & Killer")).toHaveLength(2);
+    expect(
+      await screen.findByRole("button", { name: "Kid & Killer, 2 copies" })
+    ).toBeDefined();
     expect(props.onDeckChange).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Use this deck" }));
@@ -424,7 +469,9 @@ describe("LobbySeatCard deck switching", () => {
     await act(async () => {
       release(deckDetail("deck-2"));
     });
-    expect(await screen.findAllByAltText("Kid & Killer")).toHaveLength(2);
+    expect(
+      await screen.findByRole("button", { name: "Kid & Killer, 2 copies" })
+    ).toBeDefined();
   });
 
   it("surfaces a retryable error instead of poisoning the deck cache", async () => {
@@ -446,7 +493,9 @@ describe("LobbySeatCard deck switching", () => {
     // Retry refetches rather than serving a cached empty grouping.
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
-    expect(await screen.findAllByAltText("Kid & Killer")).toHaveLength(2);
+    expect(
+      await screen.findByRole("button", { name: "Kid & Killer, 2 copies" })
+    ).toBeDefined();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(deckRequests("deck-2")).toBe(2);
 
@@ -476,7 +525,9 @@ describe("LobbySeatCard deck switching", () => {
     await screen.findByRole("dialog");
     await user.click(screen.getByRole("button", { name: /Kid Rush/ }));
 
-    expect(await screen.findAllByAltText("Kid & Killer")).toHaveLength(2);
+    expect(
+      await screen.findByRole("button", { name: "Kid & Killer, 2 copies" })
+    ).toBeDefined();
   });
 
   it("discards the preview on cancel", async () => {
