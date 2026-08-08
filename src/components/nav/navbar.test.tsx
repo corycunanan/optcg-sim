@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { ComponentProps, ReactNode } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
     | "authenticated"
     | "loading"
     | "unauthenticated",
+  // Captured from the navbar's own controlled NavigationMenu so tests can
+  // drive Radix's open/close value changes.
+  setMenuValue: null as ((value: string) => void) | null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -75,13 +78,19 @@ vi.mock("@/components/ui/navigation-menu", async () => {
       children,
       className,
       viewport = true,
+      onValueChange,
     }: {
       children: ReactNode;
       className?: string;
       viewport?: boolean;
+      onValueChange?: (value: string) => void;
     }) => {
       const [viewportElement, setViewportElement] =
         useState<HTMLDivElement | null>(null);
+
+      // The account menu renders an uncontrolled NavigationMenu too, so only
+      // the controlled one is captured.
+      if (onValueChange) mocks.setMenuValue = onValueChange;
 
       return (
         <div
@@ -151,9 +160,16 @@ beforeEach(() => {
     theme: "default",
   };
   mocks.sessionStatus = "authenticated";
+  mocks.setMenuValue = null;
 });
 
 afterEach(() => cleanup());
+
+function setMenuValue(value: string) {
+  act(() => {
+    mocks.setMenuValue?.(value);
+  });
+}
 
 describe("Navbar", () => {
   it("renders the authed account cluster on a non-game route", () => {
@@ -264,6 +280,32 @@ describe("Navbar", () => {
     expect(viewport?.contains(dropdownContent)).toBe(true);
     expect(linksScroller?.contains(dropdownContent)).toBe(false);
     expect(linksScroller?.contains(viewport)).toBe(false);
+  });
+
+  it("keeps the dropdown anchor on the closing trigger and moves it when switching menus", () => {
+    render(<Navbar />);
+
+    const decks = screen.getByRole("button", { name: "Decks" });
+    const cards = screen.getByRole("button", { name: "Cards" });
+    const hasAnchor = (control: HTMLElement) =>
+      control.className.split(/\s+/).includes("navbar-dropdown-anchor");
+
+    expect(hasAnchor(decks)).toBe(false);
+    expect(hasAnchor(cards)).toBe(false);
+
+    setMenuValue("decks");
+    expect(hasAnchor(decks)).toBe(true);
+    expect(hasAnchor(cards)).toBe(false);
+
+    // Radix clears the value before its exit animation finishes; the closing
+    // panel has to stay anchored to the trigger it belongs to.
+    setMenuValue("");
+    expect(hasAnchor(decks)).toBe(true);
+    expect(hasAnchor(cards)).toBe(false);
+
+    setMenuValue("cards");
+    expect(hasAnchor(cards)).toBe(true);
+    expect(hasAnchor(decks)).toBe(false);
   });
 
   it("caps the inner nav content while keeping the full-width bar separate", () => {

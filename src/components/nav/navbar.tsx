@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -19,8 +20,22 @@ import {
 export function Navbar() {
   const pathname = usePathname();
   const { data: session, status: sessionStatus } = useSession();
+  const [activeMenu, setActiveMenu] = useState("");
+  // Radix keeps painting the viewport through its exit animation after the
+  // value clears, so the just-closed trigger has to stay the CSS anchor or the
+  // closing panel snaps to the nav's left edge mid-fade.
+  const [lastMenu, setLastMenu] = useState("");
 
   if (pathname.startsWith("/game/")) return null;
+
+  const handleMenuChange = (value: string) => {
+    setActiveMenu(value);
+    if (value) setLastMenu(value);
+  };
+
+  // Exactly one trigger may carry `anchor-name`: the open menu wins, and the
+  // previous one is only used once nothing is open.
+  const anchoredMenu = activeMenu || lastMenu;
 
   const isRouteWithin = (route: string) =>
     pathname === route || pathname.startsWith(`${route}/`);
@@ -48,7 +63,11 @@ export function Navbar() {
         data-slot="navbar-content"
         className="mx-auto flex h-full w-full max-w-7xl items-center px-2 sm:px-6"
       >
-        <NavigationMenu className="max-w-none min-w-0 flex-1 justify-start">
+        <NavigationMenu
+          value={activeMenu}
+          onValueChange={handleMenuChange}
+          className="max-w-none min-w-0 flex-1 justify-start"
+        >
           <div
             data-slot="navbar-links-scroller"
             className="min-w-0 flex-1 overflow-x-auto"
@@ -86,13 +105,14 @@ export function Navbar() {
                 </NavigationMenuLink>
               </NavigationMenuItem>
 
-              <NavigationMenuItem>
+              <NavigationMenuItem value="decks">
                 <NavigationMenuTrigger
                   data-active={decksActive || undefined}
                   aria-current={decksActive ? "page" : undefined}
                   className={cn(
                     triggerStyles,
-                    decksActive && activeTriggerStyles
+                    decksActive && activeTriggerStyles,
+                    anchoredMenu === "decks" && "navbar-dropdown-anchor"
                   )}
                 >
                   Decks
@@ -123,13 +143,14 @@ export function Navbar() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
 
-              <NavigationMenuItem>
+              <NavigationMenuItem value="cards">
                 <NavigationMenuTrigger
                   data-active={cardsActive || undefined}
                   aria-current={cardsActive ? "page" : undefined}
                   className={cn(
                     triggerStyles,
-                    cardsActive && activeTriggerStyles
+                    cardsActive && activeTriggerStyles,
+                    anchoredMenu === "cards" && "navbar-dropdown-anchor"
                   )}
                 >
                   Cards

@@ -531,6 +531,17 @@ textarea:focus-visible,
   outline: none;
 }
 
+/* ─── Navbar dropdown positioning ───────────────────────────── */
+
+.navbar-dropdown-anchor {
+  anchor-name: --navbar-dropdown-trigger;
+}
+
+.navbar-dropdown-viewport-position {
+  position-anchor: --navbar-dropdown-trigger;
+  left: anchor(left);
+}
+
 /* ─── Admin Card Color Buttons ───────────────────────────────── */
 
 .admin-card-color-button[aria-pressed="true"][data-color="red"] {

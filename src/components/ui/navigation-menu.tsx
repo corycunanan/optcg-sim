@@ -101,8 +101,9 @@ function NavigationMenuViewport({
 }: React.ComponentProps<typeof NavigationMenuPrimitive.Viewport>) {
   return (
     <div
+      data-slot="navigation-menu-viewport-position"
       className={cn(
-        "absolute top-full left-0 isolate z-50 flex justify-center"
+        "navbar-dropdown-viewport-position absolute top-full isolate z-50 flex justify-center"
       )}
     >
       <NavigationMenuPrimitive.Viewport
