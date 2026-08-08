@@ -116,7 +116,13 @@ export function LobbyRoomShell({
   const [recoveryReentry, setRecoveryReentry] = useState(false);
   const [spectatorsOpen, setSpectatorsOpen] = useState(false);
   const [confirmDisband, setConfirmDisband] = useState(false);
-  const [confirmKick, setConfirmKick] = useState(false);
+  // The kick confirmation pins the guest it was opened against. `DELETE
+  // /api/lobbies/[id]/guest` targets whoever is seated, so a boolean would let
+  // a confirmation opened against guest A land on replacement guest B.
+  const [kickTarget, setKickTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const recoveryHandledRef = useRef(false);
   const spectatorCountButtonRef = useRef<HTMLButtonElement>(null);
   const viewerRole = lobby?.viewerRole;
@@ -124,6 +130,20 @@ export function LobbyRoomShell({
 
   const hostUserId = lobby?.hostUserId ?? null;
   const guestUserId = lobby?.guest?.user.id ?? null;
+
+  // Retract the confirmation the moment the seat it targeted changes hands or
+  // empties. Adjusted during render rather than in an effect so the stale
+  // dialog never paints.
+  if (kickTarget && guestUserId !== kickTarget.id) {
+    setKickTarget(null);
+  }
+
+  // Mirror of the seated guest that `handleKick` can read without depending on
+  // the closure the confirmation captured when it opened.
+  const seatedGuestIdRef = useRef<string | null>(guestUserId);
+  useEffect(() => {
+    seatedGuestIdRef.current = guestUserId;
+  }, [guestUserId]);
 
   useEffect(() => {
     const ids = [hostUserId, guestUserId].filter(
@@ -304,10 +324,17 @@ export function LobbyRoomShell({
     }
   };
 
-  const handleKick = async () => {
+  const handleKick = async (target: { id: string; name: string }) => {
+    // Last check before the seat-scoped DELETE: the guest may have left (and
+    // been replaced) between opening the confirmation and confirming it.
+    if (seatedGuestIdRef.current !== target.id) {
+      toast.info(`${target.name} already left the party`);
+      await refresh();
+      return;
+    }
     try {
       await kickGuest();
-      toast.success(`${guestName} was removed from the party`);
+      toast.success(`${target.name} was removed from the party`);
     } catch (err) {
       toast.error(
         err instanceof ApiError ? err.message : "Could not kick player"
@@ -595,7 +622,7 @@ export function LobbyRoomShell({
               onReadyChange={(ready) => void runPatch({ ready })}
               onPreview={setPreviewDeckId}
               previewSide="left"
-              disabled={isInGame}
+              dimmed={isInGame}
               menuItems={
                 canDisband ? (
                   <HostCloseMenuItem
@@ -625,14 +652,17 @@ export function LobbyRoomShell({
                   onReadyChange={(ready) => void runPatch({ ready })}
                   onPreview={setPreviewDeckId}
                   previewSide="right"
-                  disabled={isInGame}
+                  dimmed={isInGame}
                   menuItems={
                     isHost ? (
                       <KickPlayerMenuItem
                         playerName={guestName}
                         kicking={kicking}
                         disabled={mutating || starting || isInGame}
-                        onSelect={() => setConfirmKick(true)}
+                        onSelect={() => {
+                          if (!guestUserId) return;
+                          setKickTarget({ id: guestUserId, name: guestName });
+                        }}
                       />
                     ) : isGuest ? (
                       <GuestLeaveMenuItem
@@ -807,13 +837,16 @@ export function LobbyRoomShell({
           onClose={() => void handleClose()}
         />
         <KickPlayerConfirmDialog
-          open={confirmKick}
-          onOpenChange={setConfirmKick}
-          playerName={guestName}
+          open={kickTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setKickTarget(null);
+          }}
+          playerName={kickTarget?.name ?? guestName}
           kicking={kicking}
           onKick={() => {
-            setConfirmKick(false);
-            void handleKick();
+            const target = kickTarget;
+            setKickTarget(null);
+            if (target) void handleKick(target);
           }}
         />
 

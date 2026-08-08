@@ -67,7 +67,7 @@ export function ChangeDeckModal({
     selectedId && selectedId === currentDeck?.id
       ? currentDeck.contents
       : undefined;
-  const { contents, loading } = useDeckContents(
+  const { contents, loading, failed, retry } = useDeckContents(
     open ? selectedId : null,
     seededContents
   );
@@ -168,19 +168,43 @@ export function ChangeDeckModal({
               </div>
             </div>
 
-            {loading ? (
+            {loading && (
               <div
                 className="border-border bg-surface-3 flex min-h-0 flex-1 flex-col gap-2 rounded-md border p-3"
-                aria-hidden="true"
+                role="status"
               >
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="h-3 w-4/5" />
-                <Skeleton className="h-3 w-3/5" />
+                <span className="sr-only">
+                  Loading {previewDeck?.name ?? "deck"} list
+                </span>
+                <Skeleton className="h-3 w-full" aria-hidden="true" />
+                <Skeleton className="h-3 w-4/5" aria-hidden="true" />
+                <Skeleton className="h-3 w-3/5" aria-hidden="true" />
               </div>
-            ) : (
+            )}
+
+            {failed && (
+              <div
+                className="border-error/30 bg-error-soft flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-md border p-5 text-center"
+                role="alert"
+              >
+                <p className="text-error text-sm">
+                  Could not load this deck list.
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={retry}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            {!loading && !failed && (
               <DeckContentsList
                 contents={contents}
-                emptyLabel="Deck list unavailable"
+                emptyLabel="This deck has no cards yet"
                 className="max-h-64 sm:max-h-none"
               />
             )}
@@ -223,31 +247,54 @@ function useDeckContents(
   seed: LobbyRoomDeckContents | undefined
 ) {
   const [cache, setCache] = useState<Record<string, LobbyRoomDeckContents>>({});
+  const [failedId, setFailedId] = useState<string | null>(null);
+
+  // A failure is scoped to the deck currently in the pane and is dropped as
+  // soon as the selection moves (including to `null` when the modal closes),
+  // so reopening the modal retries rather than replaying a stale error.
+  const [lastDeckId, setLastDeckId] = useState(deckId);
+  if (deckId !== lastDeckId) {
+    setLastDeckId(deckId);
+    setFailedId(null);
+  }
 
   const cached = deckId ? cache[deckId] : undefined;
   const contents = seed ?? cached;
+  const failed = Boolean(deckId) && failedId === deckId;
 
   useEffect(() => {
-    if (!deckId || seed || cached) return;
+    if (!deckId || seed || cached || failed) return;
 
     let cancelled = false;
-    const store = (value: LobbyRoomDeckContents) => {
-      if (cancelled) return;
-      setCache((current) => ({ ...current, [deckId]: value }));
-    };
 
     apiGet(`/api/decks/${deckId}`, DeckDetailResponseSchema)
-      .then((json) => store(groupDeckDetail(json.data)))
-      // Cache the empty grouping so a failed fetch settles on the
-      // "Deck list unavailable" state instead of spinning forever.
-      .catch(() => store(emptyDeckContents()));
+      .then((json) => {
+        if (cancelled) return;
+        // Only successes are cached. A transient failure must not poison the
+        // deck for the lifetime of the (seat-lived, always-mounted) modal.
+        setCache((current) => ({
+          ...current,
+          [deckId]: groupDeckDetail(json.data),
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) setFailedId(deckId);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [deckId, seed, cached]);
+    // `failed` flipping back to false is what re-arms the fetch on retry.
+  }, [deckId, seed, cached, failed]);
 
-  return { contents, loading: Boolean(deckId) && !contents };
+  const retry = () => setFailedId(null);
+
+  return {
+    contents,
+    failed,
+    retry,
+    loading: Boolean(deckId) && !contents && !failed,
+  };
 }
 
 function emptyDeckContents(): LobbyRoomDeckContents {

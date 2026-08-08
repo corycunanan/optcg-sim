@@ -40,7 +40,7 @@ export function LobbySeatCard({
   previewSide,
   disclosure,
   menuItems,
-  disabled = false,
+  dimmed = false,
 }: {
   role: "Host" | "Guest";
   player: {
@@ -63,7 +63,14 @@ export function LobbySeatCard({
   disclosure?: ReactNode;
   /** Extra `DropdownMenuItem`s appended to this seat's overflow menu. */
   menuItems?: ReactNode;
-  disabled?: boolean;
+  /**
+   * Recedes the seat while the match owns the table. Purely visual — every
+   * mutating control is already gated by `deckEditable` / `readyEditable` /
+   * `readyDisabled`, and suppressing pointer events here would also kill the
+   * read-only affordances (deck preview, the overflow menu, card art hovers)
+   * that stay meaningful mid-match.
+   */
+  dimmed?: boolean;
 }) {
   const playerName = displayName(player);
   const [changeDeckOpen, setChangeDeckOpen] = useState(false);
@@ -72,7 +79,7 @@ export function LobbySeatCard({
     <section
       className={cn(
         "border-border bg-surface-1 relative flex h-full min-h-0 flex-col overflow-visible rounded-lg border",
-        disabled && "pointer-events-none opacity-50"
+        dimmed && "opacity-50"
       )}
       aria-label={`${role} seat — ${playerName}`}
     >

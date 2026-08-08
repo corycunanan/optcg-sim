@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   spectatorsModal: vi.fn(),
+  kickMenuItem: vi.fn(),
+  kickConfirmDialog: vi.fn(),
   trackPresence: vi.fn(),
   presence: {} as Record<string, { online: boolean; lastSeen: string | null }>,
   handlers: new Map<string, (event: RealtimeServerEvent) => void>(),
@@ -219,8 +221,18 @@ vi.mock("./invite-friend-popover", () => ({
   InviteFriendPopover: () => null,
 }));
 vi.mock("./kick-player-action", () => ({
-  KickPlayerMenuItem: () => null,
-  KickPlayerConfirmDialog: () => null,
+  KickPlayerMenuItem: (props: { playerName: string; onSelect: () => void }) => {
+    mocks.kickMenuItem(props);
+    return null;
+  },
+  KickPlayerConfirmDialog: (props: {
+    open: boolean;
+    playerName: string;
+    onKick: () => void;
+  }) => {
+    mocks.kickConfirmDialog(props);
+    return null;
+  },
 }));
 
 import { LobbyInviteToasts } from "./lobby-invite-toast";
@@ -274,6 +286,8 @@ beforeEach(() => {
   mocks.toastSuccess.mockReset();
   mocks.toastError.mockReset();
   mocks.spectatorsModal.mockReset();
+  mocks.kickMenuItem.mockReset();
+  mocks.kickConfirmDialog.mockReset();
   mocks.handlers.clear();
   mocks.apiGet.mockImplementation(async (url: string) =>
     url === "/api/decks" ? { data: [] } : { data: lobbyState() }
@@ -1305,6 +1319,119 @@ describe("LobbyRoomShell redesign scenarios", () => {
       .findAllByType("button")
       .find((button) => button.children.includes("Leave lobby"));
     expect(leaveButton?.props.disabled).toBe(true);
+  });
+});
+
+describe("LobbyRoomShell kick targeting", () => {
+  const replacementGuest = {
+    guestReady: false,
+    user: {
+      id: "guest-user-2",
+      username: "sanji",
+      name: "Sanji",
+      image: null,
+    },
+    deck: null,
+  };
+
+  function latestDialogProps() {
+    return mocks.kickConfirmDialog.mock.calls.at(-1)?.[0] as {
+      open: boolean;
+      playerName: string;
+      onKick: () => void;
+    };
+  }
+
+  async function renderHostWithGuest() {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks" ? { data: [] } : { data: lobbyState() }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      mocks.kickMenuItem.mock.calls.at(-1)?.[0].onSelect();
+    });
+  }
+
+  it("pins the confirmation to the guest it was opened against", async () => {
+    await renderHostWithGuest();
+
+    const dialog = latestDialogProps();
+    expect(dialog.open).toBe(true);
+    expect(dialog.playerName).toBe("zoro");
+  });
+
+  it("retracts the confirmation when the seat changes hands while it is open", async () => {
+    await renderHostWithGuest();
+    expect(latestDialogProps().open).toBe(true);
+
+    await act(async () => {
+      mocks.handlers.get("lobby:state_changed")?.({
+        type: "lobby:state_changed",
+        lobby: { ...lobbyState(), version: 8, guest: replacementGuest },
+      });
+    });
+
+    expect(latestDialogProps().open).toBe(false);
+  });
+
+  it("retracts the confirmation when the guest seat empties", async () => {
+    await renderHostWithGuest();
+
+    await act(async () => {
+      mocks.handlers.get("lobby:state_changed")?.({
+        type: "lobby:state_changed",
+        lobby: { ...lobbyState(), version: 8, guest: null },
+      });
+    });
+
+    expect(latestDialogProps().open).toBe(false);
+  });
+
+  it("aborts the kick when the captured guest is no longer seated", async () => {
+    await renderHostWithGuest();
+    const confirm = latestDialogProps().onKick;
+
+    // The seat turns over between opening the confirmation and confirming it.
+    await act(async () => {
+      mocks.handlers.get("lobby:state_changed")?.({
+        type: "lobby:state_changed",
+        lobby: { ...lobbyState(), version: 8, guest: replacementGuest },
+      });
+    });
+
+    await act(async () => {
+      confirm();
+      await Promise.resolve();
+    });
+
+    expect(mocks.apiDelete).not.toHaveBeenCalled();
+    expect(mocks.toastInfo).toHaveBeenCalledWith("zoro already left the party");
+  });
+
+  it("kicks the captured guest while they are still seated", async () => {
+    mocks.apiDelete.mockResolvedValue({ data: { success: true } });
+    await renderHostWithGuest();
+
+    await act(async () => {
+      latestDialogProps().onKick();
+      await Promise.resolve();
+    });
+
+    expect(mocks.apiDelete).toHaveBeenCalledWith(
+      "/api/lobbies/lobby-1/guest",
+      expect.anything()
+    );
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "zoro was removed from the party"
+    );
   });
 });
 
