@@ -94,17 +94,14 @@ export function ChangeDeckModal({
             No visible eyebrow — `aria-label` is what names the rail now.
             Square corners per the shape semantics: rounded rectangles are
             reserved for cards, and a dense row list is the quiet end of
-            angular. Square rather than chamfered because the box keeps a 1px
-            border, and clip-path chamfers need the two-layer technique —
-            disproportionate for a control this small.
+            angular.
 
-            No background fill — the rail sits on the modal surface. The
-            border stays: it is now the only thing delimiting the scrollable
-            list region, and the selected row's lighter fill needs an edge to
-            read against.
+            No fill and no border either — the rail sits directly on the modal
+            surface and the selected row's lighter tint is the only
+            delimitation it needs. Chrome recedes; the art is the figure.
           */}
           <div
-            className="border-border max-h-48 min-h-0 overflow-y-auto border p-1 sm:max-h-none"
+            className="max-h-48 min-h-0 overflow-y-auto p-1 sm:max-h-none"
             role="group"
             aria-label="Your decks"
           >

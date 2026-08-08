@@ -422,9 +422,11 @@ describe("LobbySeatCard deck switching", () => {
     );
     const pane = within(await screen.findByRole("dialog"));
 
-    // The rail carries no fill of its own — it sits on the modal surface.
+    // The rail carries neither fill nor border — it sits on the modal
+    // surface, and the selected row's tint is the only delimitation.
     const rail = pane.getByRole("group", { name: "Your decks" });
     expect(rail.className).not.toContain("bg-surface");
+    expect(rail.className).not.toContain("border");
 
     // Rest → hover → selected lightens: modal surface, surface-2, surface-3.
     const selected = pane.getByRole("button", { name: /Straw Hat Rush/ });
