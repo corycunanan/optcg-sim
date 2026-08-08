@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
-import { Check, UserRound } from "lucide-react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
-import {
-  DeckDetailResponseSchema,
-  type DeckDetailResponse,
-} from "@/lib/validators/cards";
-import type { LobbyRoomDeck, LobbyRoomDeckContents } from "@/lib/lobbies/state";
+import { DeckDetailResponseSchema } from "@/lib/validators/cards";
+import type { LobbyRoomDeck } from "@/lib/lobbies/state";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +16,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DeckContentsList } from "./deck-contents-list";
+import {
+  DeckCardGrid,
+  groupDeckCards,
+  type DeckCardGroup,
+} from "./deck-card-grid";
 
 export interface LobbyDeckOption extends LobbyRoomDeck {
   format: string;
@@ -63,13 +63,8 @@ export function ChangeDeckModal({
     () => decks.find((deck) => deck.id === selectedId) ?? null,
     [decks, selectedId]
   );
-  const seededContents =
-    selectedId && selectedId === currentDeck?.id
-      ? currentDeck.contents
-      : undefined;
-  const { contents, loading, failed, retry } = useDeckContents(
-    open ? selectedId : null,
-    seededContents
+  const { groups, loading, failed, retry } = useDeckGroups(
+    open ? selectedId : null
   );
 
   const previewDeck =
@@ -79,112 +74,107 @@ export function ChangeDeckModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size="lg"
-        className="flex max-h-[80vh] flex-col gap-5"
+        size="xl"
+        // The grid owns the only scroll region; the dialog frame stays fixed
+        // so the rail and the commit buttons never scroll away. `overflow-y-
+        // hidden` overrides the primitive's default `overflow-y-auto`.
+        className="flex max-h-[80vh] flex-col gap-5 overflow-y-hidden sm:max-w-6xl"
         data-change-deck-modal
       >
         <DialogHeader>
-          <DialogTitle className="font-display uppercase">
-            Change deck
-          </DialogTitle>
+          {/* Shared DialogTitle default — matches every other modal title. */}
+          <DialogTitle>Change deck</DialogTitle>
           <DialogDescription>
             Preview any of your decks, then confirm to take it into the match.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
-          <div className="flex min-h-0 flex-col gap-2">
-            <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-              Decks
-            </p>
-            <div
-              className="border-border bg-surface-3 max-h-48 min-h-0 flex-1 overflow-y-auto rounded-md border p-1 sm:max-h-none"
-              role="group"
-              aria-label="Your decks"
-            >
-              {decks.length === 0 ? (
-                <p className="text-content-tertiary px-3 py-2 text-xs">
-                  No decks yet. Build one to play.
-                </p>
-              ) : (
-                decks.map((deck) => {
-                  const isSelected = deck.id === selectedId;
-                  const isCurrent = deck.id === currentDeck?.id;
-                  return (
-                    <button
-                      key={deck.id}
-                      type="button"
-                      onClick={() => setSelectedId(deck.id)}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        "focus-visible:outline-border-focus flex w-full items-center justify-between gap-2 rounded px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
-                        isSelected
-                          ? "bg-surface-1 text-content-primary font-semibold"
-                          : "text-content-secondary hover:bg-surface-2 hover:text-content-primary"
-                      )}
-                    >
-                      <span className="truncate">{deck.name}</span>
-                      {isCurrent && (
-                        <>
-                          <span className="sr-only">Current deck</span>
-                          <Check
-                            className="text-gold-600 size-4 shrink-0"
-                            aria-hidden="true"
-                          />
-                        </>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
+          {/*
+            No visible eyebrow — `aria-label` is what names the rail now.
+            Square corners per the shape semantics: rounded rectangles are
+            reserved for cards, and a dense row list is the quiet end of
+            angular.
+
+            No fill and no border either — the rail sits directly on the modal
+            surface and the selected row's lighter tint is the only
+            delimitation it needs. Chrome recedes; the art is the figure.
+          */}
+          <div
+            className="max-h-48 min-h-0 overflow-y-auto p-1 sm:max-h-none"
+            role="group"
+            aria-label="Your decks"
+          >
+            {decks.length === 0 ? (
+              <p className="text-content-tertiary px-3 py-2 text-xs">
+                No decks yet. Build one to play.
+              </p>
+            ) : (
+              decks.map((deck) => {
+                const isSelected = deck.id === selectedId;
+                const isCurrent = deck.id === currentDeck?.id;
+                return (
+                  <button
+                    key={deck.id}
+                    type="button"
+                    onClick={() => setSelectedId(deck.id)}
+                    aria-pressed={isSelected}
+                    className={cn(
+                      "focus-visible:outline-border-focus flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
+                      // Rest sits on the bare modal surface (27%), hover
+                      // lifts to surface-2 (32%), selection lands on
+                      // surface-3 (37%) — one direction, lighter with
+                      // engagement. Each text/background pairing is already
+                      // in the contrast manifest.
+                      isSelected
+                        ? "bg-surface-3 text-content-primary font-semibold"
+                        : "text-content-secondary hover:bg-surface-2 hover:text-content-primary"
+                    )}
+                  >
+                    <span className="truncate">{deck.name}</span>
+                    {isCurrent && (
+                      <>
+                        <span className="sr-only">Current deck</span>
+                        <Check
+                          className="text-gold-600 size-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                      </>
+                    )}
+                  </button>
+                );
+              })
+            )}
           </div>
 
-          <div className="flex min-h-0 flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="border-border bg-surface-3 aspect-card relative w-16 shrink-0 overflow-hidden rounded-md border">
-                {previewDeck?.leaderImageUrl ? (
-                  <Image
-                    src={previewDeck.leaderImageUrl}
-                    alt={previewDeck.leaderName ?? previewDeck.name}
-                    fill
-                    sizes="64px"
-                    unoptimized
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-content-tertiary flex h-full items-center justify-center">
-                    <UserRound className="size-5" />
-                  </span>
-                )}
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-content-primary truncate text-base font-semibold">
-                  {previewDeck?.name ?? "Select a deck"}
-                </h3>
-                <p className="text-content-tertiary mt-1 truncate font-mono text-xs">
-                  {previewDeck?.leaderName ?? previewDeck?.leaderId ?? "—"}
-                </p>
-              </div>
-            </div>
-
+          {/*
+            The art sits directly on the modal surface — no panel. This column
+            is still the only scroll region, so the rail and the commit buttons
+            never scroll away. `p-2` keeps the hover lift and the focus ring
+            off the clipping edge.
+          */}
+          <div className="flex min-h-0 flex-col">
             {loading && (
               <div
-                className="border-border bg-surface-3 flex min-h-0 flex-1 flex-col gap-2 rounded-md border p-3"
+                className="flex min-h-0 flex-1 flex-wrap content-start gap-4 p-2"
                 role="status"
               >
                 <span className="sr-only">
                   Loading {previewDeck?.name ?? "deck"} list
                 </span>
-                <Skeleton className="h-3 w-full" aria-hidden="true" />
-                <Skeleton className="h-3 w-4/5" aria-hidden="true" />
-                <Skeleton className="h-3 w-3/5" aria-hidden="true" />
+                {Array.from({ length: 8 }, (_, index) => (
+                  <Skeleton
+                    key={index}
+                    className="w-card-thumb aspect-card rounded"
+                    aria-hidden="true"
+                  />
+                ))}
               </div>
             )}
 
             {failed && (
               <div
-                className="border-error/30 bg-error-soft flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-md border p-5 text-center"
+                className="border-error/30 bg-error-soft flex min-h-0 flex-1 flex-col items-center justify-center gap-3 border p-5 text-center"
                 role="alert"
               >
                 <p className="text-error text-sm">
@@ -201,13 +191,17 @@ export function ChangeDeckModal({
               </div>
             )}
 
-            {!loading && !failed && (
-              <DeckContentsList
-                contents={contents}
-                emptyLabel="This deck has no cards yet"
-                className="max-h-64 sm:max-h-none"
-              />
-            )}
+            {!loading &&
+              !failed &&
+              (groups.length > 0 ? (
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                  <DeckCardGrid groups={groups} showCounts />
+                </div>
+              ) : (
+                <div className="text-content-tertiary flex min-h-0 flex-1 items-center justify-center p-5 text-center text-xs">
+                  This deck has no cards yet
+                </div>
+              ))}
           </div>
         </div>
 
@@ -237,16 +231,21 @@ export function ChangeDeckModal({
   );
 }
 
+const NO_GROUPS: DeckCardGroup[] = [];
+
 /**
- * Deck contents for the preview pane. The seated deck arrives pre-grouped on
- * the lobby snapshot; every other deck is fetched once and memoised for the
- * lifetime of the modal so re-selecting a row is instant.
+ * Art groups for the preview pane. Every deck — including the seated one — is
+ * fetched once and memoised for the lifetime of the modal, so re-selecting a
+ * rail row is instant.
+ *
+ * The lobby snapshot's pre-grouped `contents` is deliberately not used as a
+ * seed any more: it carries only name/quantity/art and no card type, cost,
+ * power, or effect text, so it cannot feed the grid's hover tooltips or place
+ * the leader in the grid. Seeding it would have made the seated deck the one
+ * deck that renders a degraded pane.
  */
-function useDeckContents(
-  deckId: string | null,
-  seed: LobbyRoomDeckContents | undefined
-) {
-  const [cache, setCache] = useState<Record<string, LobbyRoomDeckContents>>({});
+function useDeckGroups(deckId: string | null) {
+  const [cache, setCache] = useState<Record<string, DeckCardGroup[]>>({});
   const [failedId, setFailedId] = useState<string | null>(null);
 
   // A failure is scoped to the deck currently in the pane and is dropped as
@@ -259,11 +258,10 @@ function useDeckContents(
   }
 
   const cached = deckId ? cache[deckId] : undefined;
-  const contents = seed ?? cached;
   const failed = Boolean(deckId) && failedId === deckId;
 
   useEffect(() => {
-    if (!deckId || seed || cached || failed) return;
+    if (!deckId || cached || failed) return;
 
     let cancelled = false;
 
@@ -274,7 +272,7 @@ function useDeckContents(
         // deck for the lifetime of the (seat-lived, always-mounted) modal.
         setCache((current) => ({
           ...current,
-          [deckId]: groupDeckDetail(json.data),
+          [deckId]: groupDeckCards(json.data),
         }));
       })
       .catch(() => {
@@ -285,39 +283,14 @@ function useDeckContents(
       cancelled = true;
     };
     // `failed` flipping back to false is what re-arms the fetch on retry.
-  }, [deckId, seed, cached, failed]);
+  }, [deckId, cached, failed]);
 
   const retry = () => setFailedId(null);
 
   return {
-    contents,
+    groups: cached ?? NO_GROUPS,
     failed,
     retry,
-    loading: Boolean(deckId) && !contents && !failed,
+    loading: Boolean(deckId) && !cached && !failed,
   };
-}
-
-function emptyDeckContents(): LobbyRoomDeckContents {
-  return { characters: [], events: [], stages: [] };
-}
-
-/** Mirrors `groupDeckCards` in `src/lib/lobbies/build-state.ts`. */
-function groupDeckDetail(
-  deck: DeckDetailResponse["data"]
-): LobbyRoomDeckContents {
-  const contents = emptyDeckContents();
-
-  for (const entry of deck.cards) {
-    const card = {
-      id: entry.cardId,
-      name: entry.card.name,
-      quantity: entry.quantity,
-      imageUrl: entry.selectedArtUrl ?? entry.card.imageUrl,
-    };
-    if (entry.card.type === "Character") contents.characters.push(card);
-    if (entry.card.type === "Event") contents.events.push(card);
-    if (entry.card.type === "Stage") contents.stages.push(card);
-  }
-
-  return contents;
 }

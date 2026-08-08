@@ -175,6 +175,24 @@
       "minimum": 3
     },
     {
+      "name": "tier5-primary/info",
+      "foreground": "--text-primary",
+      "background": "--surface-info",
+      "minimum": 4.5
+    },
+    {
+      "name": "tier5-secondary/info",
+      "foreground": "--text-secondary",
+      "background": "--surface-info",
+      "minimum": 4.5
+    },
+    {
+      "name": "tier5-tertiary/info",
+      "foreground": "--text-tertiary",
+      "background": "--surface-info",
+      "minimum": 4.5
+    },
+    {
       "name": "notification-primary/overlay",
       "foreground": "--text-primary",
       "background": "--surface-overlay",
