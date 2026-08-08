@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { EllipsisVertical, X } from "lucide-react";
+import { X } from "lucide-react";
 import { ApiError } from "@/lib/api-client";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,23 +11,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-interface HostCloseActionProps {
-  canClose: boolean;
-  guestName: string | null;
-  closing: boolean;
-  disabled?: boolean;
-  compact?: boolean;
-  onClose: () => void;
-}
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 interface RunHostCloseOptions {
   close: () => Promise<void>;
@@ -66,68 +49,48 @@ export function closeLobbyImpactCopy(guestName: string | null) {
   return "This will disband your party and cancel outstanding invites. This cannot be undone.";
 }
 
-export function HostCloseAction({
-  canClose,
-  guestName,
+/**
+ * Host seat action, contributed to the seat card's `⋮` overflow menu. The
+ * confirmation lives in {@link HostCloseConfirmDialog} and is rendered outside
+ * the menu — a dialog nested inside `DropdownMenuContent` unmounts the moment
+ * the menu closes on select.
+ */
+export function HostCloseMenuItem({
   closing,
   disabled = false,
-  compact = false,
-  onClose,
-}: HostCloseActionProps) {
-  const [confirmationOpen, setConfirmationOpen] = useState(false);
-
-  if (!canClose) return null;
-
-  if (compact) {
-    return (
-      <>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={disabled || closing}
-              aria-label="More actions for host"
-            >
-              <EllipsisVertical />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => setConfirmationOpen(true)}
-            >
-              <X />
-              Disband party
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <AlertDialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
-          <HostCloseConfirmation
-            guestName={guestName}
-            closing={closing}
-            onClose={onClose}
-          />
-        </AlertDialog>
-      </>
-    );
-  }
-
+  onSelect,
+}: {
+  closing: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          type="button"
-          variant="secondary"
-          size="default"
-          disabled={disabled || closing}
-        >
-          <X data-icon="inline-start" />
-          {closing ? "Disbanding..." : "Disband party"}
-        </Button>
-      </AlertDialogTrigger>
+    <DropdownMenuItem
+      variant="destructive"
+      disabled={disabled || closing}
+      onSelect={onSelect}
+    >
+      <X />
+      {closing ? "Disbanding..." : "Disband party"}
+    </DropdownMenuItem>
+  );
+}
+
+export function HostCloseConfirmDialog({
+  open,
+  onOpenChange,
+  guestName,
+  closing,
+  onClose,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  guestName: string | null;
+  closing: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <HostCloseConfirmation
         guestName={guestName}
         closing={closing}

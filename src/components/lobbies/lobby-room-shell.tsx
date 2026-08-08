@@ -42,9 +42,14 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/social/user-avatar";
+import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import { DeckPreviewModal } from "./deck-preview-modal";
-import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
-import { HostCloseAction, runHostClose } from "./host-close-action";
+import { GuestLeaveMenuItem, runGuestLeave } from "./guest-leave-action";
+import {
+  HostCloseConfirmDialog,
+  HostCloseMenuItem,
+  runHostClose,
+} from "./host-close-action";
 import { lobbyRoomRecovery, rejoinGameId } from "./lobby-room-recovery";
 import { InviteFriendPopover } from "./invite-friend-popover";
 import {
@@ -52,7 +57,10 @@ import {
   resolveInviteSeatTiming,
 } from "./invite-countdown";
 import { JoinPartyDialog } from "./join-party-dialog";
-import { KickPlayerAction } from "./kick-player-action";
+import {
+  KickPlayerConfirmDialog,
+  KickPlayerMenuItem,
+} from "./kick-player-action";
 import { LobbySeatCard } from "./lobby-seat-card";
 import { PregameSettings } from "./pregame-settings";
 import { SpectatorsModal } from "./spectators-modal";
@@ -72,6 +80,7 @@ interface LobbyRoomShellProps {
 
 export function LobbyRoomShell({
   lobbyId,
+  currentUserId,
   joinError,
   initialJoinCode,
 }: LobbyRoomShellProps) {
@@ -106,9 +115,29 @@ export function LobbyRoomShell({
   const [cancelingInvite, setCancelingInvite] = useState(false);
   const [recoveryReentry, setRecoveryReentry] = useState(false);
   const [spectatorsOpen, setSpectatorsOpen] = useState(false);
+  const [confirmDisband, setConfirmDisband] = useState(false);
+  const [confirmKick, setConfirmKick] = useState(false);
   const recoveryHandledRef = useRef(false);
   const spectatorCountButtonRef = useRef<HTMLButtonElement>(null);
   const viewerRole = lobby?.viewerRole;
+  const { presence, trackPresence } = useUserChannelEvents();
+
+  const hostUserId = lobby?.hostUserId ?? null;
+  const guestUserId = lobby?.guest?.user.id ?? null;
+
+  useEffect(() => {
+    const ids = [hostUserId, guestUserId].filter(
+      (id): id is string => Boolean(id) && id !== currentUserId
+    );
+    if (ids.length > 0) trackPresence(ids);
+  }, [hostUserId, guestUserId, currentUserId, trackPresence]);
+
+  // The viewer is, by definition, connected — presence only reports on other
+  // users (and is friendship-gated server-side), so seat it locally.
+  const seatOnline = (userId: string | null) =>
+    userId
+      ? userId === currentUserId || Boolean(presence[userId]?.online)
+      : false;
 
   useEffect(() => {
     if (!viewerRole || viewerRole === "spectator") return;
@@ -400,6 +429,11 @@ export function LobbyRoomShell({
   });
   const settingsDisabled =
     mutating || starting || leaving || closing || hasActiveMatch;
+  const canDisband = Boolean(
+    isHost &&
+    lobby.mode === "PVP" &&
+    (lobby.status === "WAITING" || lobby.status === "READY")
+  );
   const displayedPregameMode =
     resolvePregameMode(
       lobby.mode === "SOLITAIRE" ? "SOLITAIRE" : "PVP",
@@ -550,31 +584,26 @@ export function LobbyRoomShell({
               player={
                 lobby.host ?? { username: null, name: "Host", image: null }
               }
+              online={seatOnline(lobby.hostUserId)}
               deck={lobby.hostDeck}
               ready={lobby.hostReady}
               readyEditable={Boolean(isHost && !isInGame)}
               readyDisabled={!lobby.hostDeck || mutating}
               deckEditable={Boolean(isHost && !isInGame)}
               decks={decks}
-              deckPlaceholder="Choose your deck"
               onDeckChange={(deckId) => void runPatch({ hostDeckId: deckId })}
               onReadyChange={(ready) => void runPatch({ ready })}
               onPreview={setPreviewDeckId}
               previewSide="left"
               disabled={isInGame}
-              actions={
-                <HostCloseAction
-                  canClose={Boolean(
-                    isHost &&
-                    lobby.mode === "PVP" &&
-                    (lobby.status === "WAITING" || lobby.status === "READY")
-                  )}
-                  guestName={realGuestPresent ? guestName : null}
-                  closing={closing}
-                  disabled={mutating || starting}
-                  compact
-                  onClose={() => void handleClose()}
-                />
+              menuItems={
+                canDisband ? (
+                  <HostCloseMenuItem
+                    closing={closing}
+                    disabled={mutating || starting}
+                    onSelect={() => setConfirmDisband(true)}
+                  />
+                ) : null
               }
             />
 
@@ -583,13 +612,13 @@ export function LobbyRoomShell({
                 <LobbySeatCard
                   role="Guest"
                   player={lobby.guest.user}
+                  online={seatOnline(lobby.guest.user.id)}
                   deck={lobby.guest.deck}
                   ready={lobby.guest.guestReady}
                   readyEditable={Boolean(isGuest && !isInGame)}
                   readyDisabled={!lobby.guest.deck || mutating}
                   deckEditable={Boolean(isGuest && !isInGame)}
                   decks={decks}
-                  deckPlaceholder="Choose your deck"
                   onDeckChange={(deckId) =>
                     void runPatch({ guestDeckId: deckId })
                   }
@@ -597,23 +626,21 @@ export function LobbyRoomShell({
                   onPreview={setPreviewDeckId}
                   previewSide="right"
                   disabled={isInGame}
-                  actions={
+                  menuItems={
                     isHost ? (
-                      <KickPlayerAction
+                      <KickPlayerMenuItem
                         playerName={guestName}
                         kicking={kicking}
                         disabled={mutating || starting || isInGame}
-                        onKick={() => void handleKick()}
+                        onSelect={() => setConfirmKick(true)}
                       />
-                    ) : (
-                      <GuestLeaveAction
-                        isGuest={Boolean(isGuest)}
+                    ) : isGuest ? (
+                      <GuestLeaveMenuItem
                         leaving={leaving}
                         disabled={mutating || hasActiveMatch}
-                        compact
                         onLeave={() => void handleLeave()}
                       />
-                    )
+                    ) : null
                   }
                 />
               ) : (
@@ -774,6 +801,24 @@ export function LobbyRoomShell({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <HostCloseConfirmDialog
+          open={confirmDisband}
+          onOpenChange={setConfirmDisband}
+          guestName={realGuestPresent ? guestName : null}
+          closing={closing}
+          onClose={() => void handleClose()}
+        />
+        <KickPlayerConfirmDialog
+          open={confirmKick}
+          onOpenChange={setConfirmKick}
+          playerName={guestName}
+          kicking={kicking}
+          onKick={() => {
+            setConfirmKick(false);
+            void handleKick();
+          }}
+        />
 
         <DeckPreviewModal
           deckId={previewDeckId}

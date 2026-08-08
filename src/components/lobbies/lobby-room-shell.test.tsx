@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   spectatorsModal: vi.fn(),
+  trackPresence: vi.fn(),
+  presence: {} as Record<string, { online: boolean; lastSeen: string | null }>,
   handlers: new Map<string, (event: RealtimeServerEvent) => void>(),
 }));
 
@@ -47,6 +49,8 @@ vi.mock("@/lib/api-client", () => ({
 vi.mock("@/components/realtime/user-channel-provider", () => ({
   useUserChannelEvents: () => ({
     connectionStatus: "connected" as const,
+    presence: mocks.presence,
+    trackPresence: mocks.trackPresence,
     subscribe: (
       type: string,
       handler: (event: RealtimeServerEvent) => void
@@ -131,6 +135,18 @@ vi.mock("@/components/ui/dialog", async () => {
     DialogTrigger,
   };
 });
+// Seat overflow menus render their items eagerly here so the structural
+// assertions below can see seat actions without driving Radix open state.
+vi.mock("@/components/ui/dropdown-menu", () => {
+  const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
+  return {
+    DropdownMenu: Wrapper,
+    DropdownMenuContent: Wrapper,
+    DropdownMenuItem: Wrapper,
+    DropdownMenuSeparator: () => null,
+    DropdownMenuTrigger: Wrapper,
+  };
+});
 vi.mock("@/components/ui/select", () => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
   return {
@@ -179,28 +195,31 @@ vi.mock("./spectators-modal", () => ({
   },
 }));
 vi.mock("./guest-leave-action", () => ({
-  GuestLeaveAction: ({
-    isGuest,
+  GuestLeaveMenuItem: ({
+    leaving,
     disabled,
   }: {
-    isGuest: boolean;
+    leaving: boolean;
     disabled?: boolean;
-  }) =>
-    isGuest ? (
-      <button type="button" disabled={disabled}>
-        Leave lobby
-      </button>
-    ) : null,
+  }) => (
+    <button type="button" disabled={disabled || leaving}>
+      Leave lobby
+    </button>
+  ),
   runGuestLeave: vi.fn(),
 }));
 vi.mock("./host-close-action", () => ({
-  HostCloseAction: () => null,
+  HostCloseMenuItem: () => null,
+  HostCloseConfirmDialog: () => null,
   runHostClose: vi.fn(),
 }));
 vi.mock("./invite-friend-popover", () => ({
   InviteFriendPopover: () => null,
 }));
-vi.mock("./kick-player-action", () => ({ KickPlayerAction: () => null }));
+vi.mock("./kick-player-action", () => ({
+  KickPlayerMenuItem: () => null,
+  KickPlayerConfirmDialog: () => null,
+}));
 
 import { LobbyInviteToasts } from "./lobby-invite-toast";
 import { LobbyRoomShell } from "./lobby-room-shell";
