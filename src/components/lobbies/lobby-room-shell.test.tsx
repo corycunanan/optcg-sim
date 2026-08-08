@@ -113,13 +113,15 @@ vi.mock("@/components/ui/dialog", async () => {
   const DialogContent = ({
     children,
     className,
+    size,
   }: {
     children?: ReactNode;
     className?: string;
+    size?: string;
   }) => {
     const context = React.useContext(DialogContext);
     return context?.open ? (
-      <div data-dialog-content className={className}>
+      <div data-dialog-content data-dialog-size={size} className={className}>
         {children}
       </div>
     ) : null;
@@ -446,10 +448,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
     const settingsDialog = renderer!.root.findByProps({
       "data-dialog-content": true,
     });
-    expect(settingsDialog.props.className).toContain(
-      "max-h-[calc(100dvh-2rem)]"
-    );
-    expect(settingsDialog.props.className).toContain("overflow-y-auto");
+    expect(settingsDialog.props["data-dialog-size"]).toBe("lg");
+    expect(settingsDialog.props.className).toBeUndefined();
 
     const pregameRadios = renderer!.root
       .findAllByType("input")

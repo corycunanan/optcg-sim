@@ -103,6 +103,24 @@
       "minimum": 4.5
     },
     {
+      "name": "gold-fill/panel",
+      "foreground": "--accent",
+      "background": "--surface-panel",
+      "minimum": 4.5
+    },
+    {
+      "name": "gold-hover-fill/raised",
+      "foreground": "--accent-hover",
+      "background": "--surface-raised",
+      "minimum": 4.5
+    },
+    {
+      "name": "gold-hover-fill/panel",
+      "foreground": "--accent-hover",
+      "background": "--surface-panel",
+      "minimum": 4.5
+    },
+    {
       "name": "success/success-soft",
       "foreground": "--success",
       "background": "--success-soft",
@@ -130,6 +148,12 @@
       "name": "destructive-button-foreground/destructive-fill",
       "foreground": "--navy-900",
       "background": "--destructive",
+      "minimum": 4.5
+    },
+    {
+      "name": "destructive-button-foreground/destructive-hover-fill",
+      "foreground": "--navy-900",
+      "background": "--destructive-hover",
       "minimum": 4.5
     },
     {
