@@ -1,54 +1,46 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Children, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { Layers3, Lock, UserRound } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { LobbyRoomDeck, LobbyRoomDeckCard } from "@/lib/lobbies/state";
-import { UserAvatar } from "@/components/social/user-avatar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  EllipsisVertical,
+  Eye,
+  Layers3,
+  Replace,
+  UserRound,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { LobbyRoomDeck } from "@/lib/lobbies/state";
+import { UserAvatar } from "@/components/social/user-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
-
-interface DeckOption extends LobbyRoomDeck {
-  format: string;
-  totalCards: number;
-  colors: string[];
-}
-
-const DECK_GROUPS = [
-  { key: "characters", label: "Characters" },
-  { key: "events", label: "Events" },
-  { key: "stages", label: "Stages" },
-] as const;
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { DeckContentsList } from "./deck-contents-list";
+import { ChangeDeckModal, type LobbyDeckOption } from "./change-deck-modal";
 
 export function LobbySeatCard({
   role,
   player,
+  online,
   deck,
   ready,
   readyEditable,
   readyDisabled,
   deckEditable,
   decks,
-  deckPlaceholder,
   onDeckChange,
   onReadyChange,
   onPreview,
   previewSide,
   disclosure,
-  actions,
-  disabled = false,
+  menuItems,
+  dimmed = false,
 }: {
   role: "Host" | "Guest";
   player: {
@@ -56,28 +48,38 @@ export function LobbySeatCard({
     name: string | null;
     image: string | null;
   };
+  /** Realtime presence for this seat; renders the avatar's green dot. */
+  online?: boolean;
   deck: LobbyRoomDeck | null;
   ready: boolean;
   readyEditable: boolean;
   readyDisabled: boolean;
   deckEditable: boolean;
-  decks: DeckOption[];
-  deckPlaceholder: string;
+  decks: LobbyDeckOption[];
   onDeckChange: (deckId: string) => void;
   onReadyChange: (ready: boolean) => void;
   onPreview: (deckId: string) => void;
   previewSide: "left" | "right";
   disclosure?: ReactNode;
-  actions?: ReactNode;
-  disabled?: boolean;
+  /** Extra `DropdownMenuItem`s appended to this seat's overflow menu. */
+  menuItems?: ReactNode;
+  /**
+   * Recedes the seat while the match owns the table. Purely visual — every
+   * mutating control is already gated by `deckEditable` / `readyEditable` /
+   * `readyDisabled`, and suppressing pointer events here would also kill the
+   * read-only affordances (deck preview, the overflow menu, card art hovers)
+   * that stay meaningful mid-match.
+   */
+  dimmed?: boolean;
 }) {
   const playerName = displayName(player);
+  const [changeDeckOpen, setChangeDeckOpen] = useState(false);
 
   return (
     <section
       className={cn(
         "border-border bg-surface-1 relative flex h-full min-h-0 flex-col overflow-visible rounded-lg border",
-        disabled && "pointer-events-none opacity-50"
+        dimmed && "opacity-50"
       )}
       aria-label={`${role} seat — ${playerName}`}
     >
@@ -89,59 +91,44 @@ export function LobbySeatCard({
           {disclosure}
         </div>
       )}
-      <header className="border-border flex min-h-20 items-center justify-between gap-4 border-b px-5 py-4">
+      <header className="border-border flex min-h-20 items-start justify-between gap-4 border-b px-5 py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <UserAvatar user={player} size="md" variant="dark" />
+          <UserAvatar
+            user={player}
+            size="md"
+            variant="dark"
+            showOnline={online}
+          />
           <div className="min-w-0">
-            <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-              {role}
-            </p>
             <h2 className="text-content-primary truncate text-lg font-semibold">
               {playerName}
             </h2>
+            <p className="text-gold-600 mt-1 text-xs font-semibold tracking-widest uppercase">
+              {role}
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {readyEditable ? (
-            <button
-              type="button"
-              onClick={() => onReadyChange(!ready)}
-              disabled={readyDisabled}
-              className={cn(
-                "focus-visible:outline-border-focus inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                ready
-                  ? "border-success/20 bg-success-soft text-success"
-                  : "border-border bg-surface-2 text-content-secondary hover:border-border-strong hover:text-content-primary"
-              )}
-              aria-pressed={ready}
-            >
-              <span
-                className={cn(
-                  "size-2 rounded-full",
-                  ready ? "bg-success" : "bg-content-tertiary"
-                )}
-              />
-              {ready ? "Ready" : "Not ready"}
-            </button>
-          ) : (
-            <span
-              className={cn(
-                "inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold",
-                ready
-                  ? "border-success/20 bg-success-soft text-success"
-                  : "border-border bg-surface-2 text-content-secondary"
-              )}
-            >
-              <span
-                className={cn(
-                  "size-2 rounded-full",
-                  ready ? "bg-success" : "bg-content-tertiary"
-                )}
-              />
-              {ready ? "Ready" : "Not ready"}
-            </span>
-          )}
-          {actions}
+          <ReadyPill
+            ready={ready}
+            editable={readyEditable}
+            disabled={readyDisabled}
+            onChange={onReadyChange}
+          />
+          <SeatOverflowMenu seatLabel={`${role} seat — ${playerName}`}>
+            {deckEditable ? (
+              <DropdownMenuItem onSelect={() => setChangeDeckOpen(true)}>
+                <Replace />
+                Change deck…
+              </DropdownMenuItem>
+            ) : deck ? (
+              <DropdownMenuItem onSelect={() => onPreview(deck.id)}>
+                <Eye />
+                Preview deck
+              </DropdownMenuItem>
+            ) : null}
+            {menuItems}
+          </SeatOverflowMenu>
         </div>
       </header>
 
@@ -149,64 +136,160 @@ export function LobbySeatCard({
         <SelectedDeck
           key={deck.id}
           deck={deck}
+          deckEditable={deckEditable}
+          onChangeDeck={() => setChangeDeckOpen(true)}
           onPreview={onPreview}
           previewSide={previewSide}
         />
       ) : (
-        <NoDeckChosen />
+        <NoDeckChosen
+          deckEditable={deckEditable}
+          onChangeDeck={() => setChangeDeckOpen(true)}
+        />
       )}
 
-      <footer className="border-border mt-auto border-t p-4">
-        {deckEditable ? (
-          <Select value={deck?.id ?? ""} onValueChange={onDeckChange}>
-            <SelectTrigger className="bg-surface-3 w-full">
-              <SelectValue placeholder={deckPlaceholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {decks.map((deckOption) => (
-                <SelectItem key={deckOption.id} value={deckOption.id}>
-                  {deckOption.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <div className="border-border bg-surface-3 text-content-secondary flex min-h-10 items-center gap-2 rounded-md border px-3 text-sm">
-            <Lock className="size-4" />
-            <span className="truncate">{deck?.name ?? "Waiting for deck"}</span>
-          </div>
-        )}
-      </footer>
+      {deckEditable && (
+        <ChangeDeckModal
+          open={changeDeckOpen}
+          onOpenChange={setChangeDeckOpen}
+          decks={decks}
+          currentDeck={deck}
+          onConfirm={onDeckChange}
+        />
+      )}
     </section>
+  );
+}
+
+/**
+ * The seat's single `⋮` menu. Renders nothing when no action applies to the
+ * current seat state — an empty menu is worse than no affordance.
+ */
+function SeatOverflowMenu({
+  seatLabel,
+  children,
+}: {
+  seatLabel: string;
+  children: ReactNode;
+}) {
+  const items = Children.toArray(children).filter(Boolean);
+  if (items.length === 0) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`More actions for ${seatLabel}`}
+        >
+          <EllipsisVertical />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {items.map((item, index) => (
+          <SeatMenuSection key={index} first={index === 0}>
+            {item}
+          </SeatMenuSection>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function SeatMenuSection({
+  first,
+  children,
+}: {
+  first: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {!first && <DropdownMenuSeparator />}
+      {children}
+    </>
+  );
+}
+
+function ReadyPill({
+  ready,
+  editable,
+  disabled,
+  onChange,
+}: {
+  ready: boolean;
+  editable: boolean;
+  disabled: boolean;
+  onChange: (ready: boolean) => void;
+}) {
+  const label = ready ? "Ready" : "Not ready";
+  const tone = ready
+    ? "border-success/20 bg-success-soft text-success"
+    : "border-border bg-surface-2 text-content-secondary";
+  const content = (
+    <>
+      <span
+        className={cn(
+          "size-2 rounded-full",
+          ready ? "bg-success" : "bg-content-tertiary"
+        )}
+        aria-hidden="true"
+      />
+      {label}
+    </>
+  );
+  const base =
+    "inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold tracking-widest uppercase";
+
+  if (!editable) {
+    return <span className={cn(base, tone)}>{content}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!ready)}
+      disabled={disabled}
+      aria-pressed={ready}
+      className={cn(
+        base,
+        "focus-visible:outline-border-focus transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        ready
+          ? tone
+          : "border-border bg-surface-2 text-content-secondary hover:border-border-strong hover:text-content-primary"
+      )}
+    >
+      {content}
+    </button>
   );
 }
 
 function SelectedDeck({
   deck,
+  deckEditable,
+  onChangeDeck,
   onPreview,
   previewSide,
 }: {
   deck: LobbyRoomDeck;
+  deckEditable: boolean;
+  onChangeDeck: () => void;
   onPreview: (deckId: string) => void;
   previewSide: "left" | "right";
 }) {
-  const groupedCards = useMemo(
-    () =>
-      DECK_GROUPS.map((group) => ({
-        ...group,
-        cards: deck.contents?.[group.key] ?? [],
-      })).filter((group) => group.cards.length > 0),
-    [deck.contents]
-  );
-
   return (
     <div className="relative grid min-h-0 flex-1 gap-5 p-5 sm:grid-cols-[auto_1fr]">
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          onClick={() => onPreview(deck.id)}
+          onClick={() => (deckEditable ? onChangeDeck() : onPreview(deck.id))}
           className="bg-surface-3 border-border group aspect-card focus-visible:outline-border-focus relative w-32 overflow-hidden rounded-md border text-left shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-2"
-          aria-label={`Preview ${deck.name}`}
+          aria-label={
+            deckEditable ? `Change deck — ${deck.name}` : `Preview ${deck.name}`
+          }
+          data-deck-leader-action={deckEditable ? "change" : "preview"}
         >
           {deck.leaderImageUrl ? (
             <Image
@@ -246,110 +329,44 @@ function SelectedDeck({
           <Layers3 className="text-content-tertiary size-5 shrink-0" />
         </div>
 
-        <div className="border-border bg-surface-3 min-h-0 flex-1 overflow-y-auto rounded-md border">
-          {groupedCards.length > 0 ? (
-            groupedCards.map((group) => (
-              <div key={group.key}>
-                <div className="bg-surface-2 text-content-tertiary sticky top-0 z-10 flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-widest uppercase">
-                  <span>{group.label}</span>
-                  <span className="tabular-nums">
-                    {group.cards.reduce(
-                      (total, entry) => total + entry.quantity,
-                      0
-                    )}
-                  </span>
-                </div>
-                <ul className="divide-border divide-y">
-                  {group.cards.map((entry) => (
-                    <DeckListRow
-                      key={entry.id}
-                      entry={entry}
-                      previewSide={previewSide}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ))
-          ) : (
-            <div className="text-content-tertiary flex h-full items-center justify-center px-5 text-center text-xs">
-              Deck list unavailable
-            </div>
-          )}
-        </div>
+        <DeckContentsList contents={deck.contents} previewSide={previewSide} />
       </div>
     </div>
   );
 }
 
-function DeckListRow({
-  entry,
-  previewSide,
+function NoDeckChosen({
+  deckEditable,
+  onChangeDeck,
 }: {
-  entry: LobbyRoomDeckCard;
-  previewSide: "left" | "right";
+  deckEditable: boolean;
+  onChangeDeck: () => void;
 }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const trigger = (
-    <button
-      type="button"
-      onFocus={() => setPreviewOpen(true)}
-      onBlur={() => setPreviewOpen(false)}
-      className="text-content-secondary hover:bg-surface-2 hover:text-content-primary focus-visible:bg-surface-2 focus-visible:text-content-primary flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors outline-none"
-    >
-      <span className="truncate">{entry.name}</span>
-      <span className="text-content-primary shrink-0 font-semibold tabular-nums">
-        ×{entry.quantity}
-      </span>
-    </button>
-  );
-
-  return (
-    <li>
-      {entry.imageUrl ? (
-        <HoverCard
-          open={previewOpen}
-          onOpenChange={setPreviewOpen}
-          openDelay={0}
-          closeDelay={0}
-        >
-          <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
-          <HoverCardContent
-            side={previewSide}
-            sideOffset={16}
-            collisionPadding={16}
-            className="border-border bg-surface-2 aspect-card pointer-events-none relative hidden w-40 overflow-hidden rounded-md border p-1 shadow-[var(--shadow-lg)] xl:block"
-            aria-hidden="true"
-            data-lobby-card-preview={previewSide}
-          >
-            <Image
-              src={entry.imageUrl}
-              alt=""
-              fill
-              sizes="160px"
-              unoptimized
-              className="h-full w-full rounded object-cover"
-            />
-          </HoverCardContent>
-        </HoverCard>
-      ) : (
-        trigger
-      )}
-    </li>
-  );
-}
-
-function NoDeckChosen() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 py-10 text-center">
-      <div className="border-border bg-surface-3 aspect-card flex w-24 items-center justify-center rounded-md border border-dashed">
-        <UserRound className="text-content-tertiary size-8" />
-      </div>
+      {deckEditable ? (
+        <button
+          type="button"
+          onClick={onChangeDeck}
+          className="border-border bg-surface-3 hover:border-border-strong focus-visible:outline-border-focus aspect-card flex w-24 items-center justify-center rounded-md border border-dashed transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+          aria-label="Choose a deck"
+          data-deck-leader-action="change"
+        >
+          <UserRound className="text-content-tertiary size-8" />
+        </button>
+      ) : (
+        <div className="border-border bg-surface-3 aspect-card flex w-24 items-center justify-center rounded-md border border-dashed">
+          <UserRound className="text-content-tertiary size-8" />
+        </div>
+      )}
       <div>
         <h3 className="text-content-primary text-base font-semibold">
           No deck chosen
         </h3>
         <p className="text-content-tertiary mt-1 text-sm">
-          Choose a deck to reveal your leader and list.
+          {deckEditable
+            ? "Choose a deck to reveal your leader and list."
+            : "Waiting on their deck selection."}
         </p>
       </div>
       <div className="flex w-full max-w-64 flex-col gap-2" aria-hidden="true">

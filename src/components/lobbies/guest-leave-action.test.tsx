@@ -1,28 +1,44 @@
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api-client";
-import { GuestLeaveAction, runGuestLeave } from "./guest-leave-action";
 
-describe("GuestLeaveAction", () => {
-  it("shows an explicit leave action to a guest", () => {
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenuItem: ({
+    children,
+    disabled,
+    onSelect,
+  }: {
+    children: ReactNode;
+    disabled?: boolean;
+    onSelect?: () => void;
+  }) => (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onSelect}
+    >
+      {children}
+    </button>
+  ),
+}));
+
+import { GuestLeaveMenuItem, runGuestLeave } from "./guest-leave-action";
+
+describe("GuestLeaveMenuItem", () => {
+  it("offers the guest a leave entry for the seat overflow menu", () => {
     const markup = renderToStaticMarkup(
-      <GuestLeaveAction isGuest leaving={false} onLeave={vi.fn()} />
+      <GuestLeaveMenuItem leaving={false} onLeave={vi.fn()} />
     );
 
-    expect(markup).toContain("Leave Lobby");
+    expect(markup).toContain('role="menuitem"');
+    expect(markup).toContain("Leave lobby");
   });
 
-  it("renders no host action", () => {
+  it("disables the entry while a leave request is pending", () => {
     const markup = renderToStaticMarkup(
-      <GuestLeaveAction isGuest={false} leaving={false} onLeave={vi.fn()} />
-    );
-
-    expect(markup).toBe("");
-  });
-
-  it("disables the action while a leave request is pending", () => {
-    const markup = renderToStaticMarkup(
-      <GuestLeaveAction isGuest leaving onLeave={vi.fn()} />
+      <GuestLeaveMenuItem leaving onLeave={vi.fn()} />
     );
 
     expect(markup).toContain("disabled");

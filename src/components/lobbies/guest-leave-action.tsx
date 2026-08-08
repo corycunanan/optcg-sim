@@ -1,20 +1,12 @@
 "use client";
 
-import { EllipsisVertical, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { LogOut } from "lucide-react";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ApiError } from "@/lib/api-client";
 
-interface GuestLeaveActionProps {
-  isGuest: boolean;
+interface GuestLeaveMenuItemProps {
   leaving: boolean;
   disabled?: boolean;
-  compact?: boolean;
   onLeave: () => void;
 }
 
@@ -47,48 +39,20 @@ export async function runGuestLeave({
   }
 }
 
-export function GuestLeaveAction({
-  isGuest,
+/**
+ * Guest's own seat action, contributed to the seat card's `⋮` overflow menu.
+ * Leaving is reversible (the guest can rejoin with the party code), so this
+ * commits immediately instead of routing through a confirmation.
+ */
+export function GuestLeaveMenuItem({
   leaving,
   disabled = false,
-  compact = false,
   onLeave,
-}: GuestLeaveActionProps) {
-  if (!isGuest) return null;
-
-  if (compact) {
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            disabled={disabled || leaving}
-            aria-label="More actions for guest"
-          >
-            <EllipsisVertical />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={onLeave}>
-            <LogOut />
-            {leaving ? "Leaving..." : "Leave lobby"}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  }
-
+}: GuestLeaveMenuItemProps) {
   return (
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={onLeave}
-      disabled={disabled || leaving}
-    >
-      <LogOut data-icon="inline-start" />
-      {leaving ? "Leaving..." : "Leave Lobby"}
-    </Button>
+    <DropdownMenuItem disabled={disabled || leaving} onSelect={onLeave}>
+      <LogOut />
+      {leaving ? "Leaving..." : "Leave lobby"}
+    </DropdownMenuItem>
   );
 }

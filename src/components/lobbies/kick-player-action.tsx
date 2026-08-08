@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { EllipsisVertical, UserMinus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { UserMinus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,77 +11,73 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
-interface KickPlayerActionProps {
-  playerName: string;
-  kicking: boolean;
-  disabled?: boolean;
-  onKick: () => void;
-}
-
-export function KickPlayerAction({
+/**
+ * Host-only action on the guest seat, contributed to that seat's `⋮` overflow
+ * menu. The confirmation is {@link KickPlayerConfirmDialog}, rendered outside
+ * the menu so selecting the item (which closes the menu) cannot unmount it.
+ */
+export function KickPlayerMenuItem({
   playerName,
   kicking,
   disabled = false,
-  onKick,
-}: KickPlayerActionProps) {
-  const [confirmationOpen, setConfirmationOpen] = useState(false);
-
+  onSelect,
+}: {
+  playerName: string;
+  kicking: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`More actions for ${playerName}`}
-            disabled={disabled || kicking}
-          >
-            <EllipsisVertical />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => setConfirmationOpen(true)}
-          >
-            <UserMinus />
-            Kick player
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <DropdownMenuItem
+      variant="destructive"
+      disabled={disabled || kicking}
+      onSelect={onSelect}
+    >
+      <UserMinus />
+      {kicking ? "Kicking..." : `Kick ${playerName}`}
+    </DropdownMenuItem>
+  );
+}
 
-      <AlertDialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Kick {playerName}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove {playerName} from your party and reopen the guest
-              seat.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={kicking}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={kicking}
-              onClick={(event) => {
-                event.preventDefault();
-                onKick();
-              }}
-            >
-              {kicking ? "Kicking..." : "Kick player"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+export function KickPlayerConfirmDialog({
+  open,
+  onOpenChange,
+  playerName,
+  kicking,
+  onKick,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  playerName: string;
+  kicking: boolean;
+  onKick: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Kick {playerName}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will remove {playerName} from your party and reopen the guest
+            seat.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={kicking}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={kicking}
+            onClick={(event) => {
+              event.preventDefault();
+              onKick();
+            }}
+          >
+            {kicking ? "Kicking..." : "Kick player"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

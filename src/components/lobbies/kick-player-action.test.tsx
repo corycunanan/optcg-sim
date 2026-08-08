@@ -2,27 +2,28 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
-vi.mock("@/components/ui/dropdown-menu", () => {
-  const Wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
-  return {
-    DropdownMenu: Wrapper,
-    DropdownMenuContent: Wrapper,
-    DropdownMenuTrigger: Wrapper,
-    DropdownMenuItem: ({
-      children,
-      onSelect,
-      variant,
-    }: {
-      children: ReactNode;
-      onSelect?: () => void;
-      variant?: string;
-    }) => (
-      <button type="button" data-variant={variant} onClick={onSelect}>
-        {children}
-      </button>
-    ),
-  };
-});
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenuItem: ({
+    children,
+    disabled,
+    onSelect,
+    variant,
+  }: {
+    children: ReactNode;
+    disabled?: boolean;
+    onSelect?: () => void;
+    variant?: string;
+  }) => (
+    <button
+      type="button"
+      data-variant={variant}
+      disabled={disabled}
+      onClick={onSelect}
+    >
+      {children}
+    </button>
+  ),
+}));
 
 vi.mock("@/components/ui/alert-dialog", () => {
   const Wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
@@ -63,7 +64,41 @@ vi.mock("@/components/ui/alert-dialog", () => {
   };
 });
 
-import { KickPlayerAction } from "./kick-player-action";
+import { useState } from "react";
+import {
+  KickPlayerConfirmDialog,
+  KickPlayerMenuItem,
+} from "./kick-player-action";
+
+/**
+ * Mirrors the shell's composition: the menu entry lives inside the seat's
+ * overflow menu while the confirmation is rendered outside it.
+ */
+function KickHarness({
+  kicking = false,
+  onKick,
+}: {
+  kicking?: boolean;
+  onKick: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <KickPlayerMenuItem
+        playerName="Zoro"
+        kicking={kicking}
+        onSelect={() => setOpen(true)}
+      />
+      <KickPlayerConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        playerName="Zoro"
+        kicking={kicking}
+        onKick={onKick}
+      />
+    </>
+  );
+}
 
 let renderer: ReactTestRenderer | null = null;
 
@@ -75,10 +110,10 @@ afterEach(() => {
 describe("KickPlayerAction", () => {
   it("opens a destructive confirmation from the occupied-seat menu", async () => {
     await act(async () => {
-      renderer = create(
-        <KickPlayerAction playerName="Zoro" kicking={false} onKick={vi.fn()} />
-      );
+      renderer = create(<KickHarness onKick={vi.fn()} />);
     });
+
+    expect(JSON.stringify(renderer!.toJSON())).toContain("Kick Zoro");
 
     const menuItem = renderer!.root
       .findAllByType("button")
@@ -87,15 +122,15 @@ describe("KickPlayerAction", () => {
 
     const dialog = renderer!.root.findByProps({ role: "alertdialog" });
     expect(dialog).toBeDefined();
-    expect(JSON.stringify(renderer!.toJSON())).toContain("reopen the guest seat");
+    expect(JSON.stringify(renderer!.toJSON())).toContain(
+      "reopen the guest seat"
+    );
   });
 
   it("runs the kick action from the destructive confirmation", async () => {
     const onKick = vi.fn();
     await act(async () => {
-      renderer = create(
-        <KickPlayerAction playerName="Zoro" kicking={false} onKick={onKick} />
-      );
+      renderer = create(<KickHarness onKick={onKick} />);
     });
 
     const buttons = () => renderer!.root.findAllByType("button");
@@ -111,5 +146,18 @@ describe("KickPlayerAction", () => {
     await act(async () => confirm?.props.onClick());
 
     expect(onKick).toHaveBeenCalledOnce();
+  });
+
+  it("disables the menu entry while a kick is in flight", async () => {
+    await act(async () => {
+      renderer = create(<KickHarness kicking onKick={vi.fn()} />);
+    });
+
+    const menuItem = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.props["data-variant"] === "destructive");
+
+    expect(menuItem?.props.disabled).toBe(true);
+    expect(JSON.stringify(renderer!.toJSON())).toContain("Kicking...");
   });
 });
