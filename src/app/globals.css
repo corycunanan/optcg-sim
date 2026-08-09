@@ -89,6 +89,10 @@
   --chamfer-step-sm: 4px;
   --chamfer-step-md: 8px;
   --chamfer-step-lg: 12px;
+  /* Perimeter widths for the clipped frame: the hairline between the edge and
+     surface layers, and the keyboard focus ring. */
+  --chamfer-step-hairline: 1px;
+  --chamfer-step-focus-ring: 2px;
 
   /* State ramps */
   --green-600: oklch(70% 0.15 150);
@@ -166,6 +170,8 @@
   --chamfer-sm: var(--chamfer-step-sm);
   --chamfer-md: var(--chamfer-step-md);
   --chamfer-lg: var(--chamfer-step-lg);
+  --chamfer-hairline: var(--chamfer-step-hairline);
+  --chamfer-focus-ring: var(--chamfer-step-focus-ring);
   --edge-neutral: var(--border-step-emphasis);
   --edge-gold: var(--gold-border);
   --edge-lighting: var(--info-edge-value);
@@ -640,9 +646,18 @@ textarea:focus-visible,
 
    `border-*` does not follow `clip-path`, so a hairline needs the two-layer
    technique — an outer layer painted with the edge color and an inner surface
-   layer inset by 1px, both clipped to the same polygon. `--chamfer-cut` is set
-   once on the frame root by a `chamfer-cut-*` utility and inherits into every
-   layer, so the layers can never drift out of agreement. */
+   layer inset by the hairline width. `--chamfer-cut` is set once on the frame
+   root by a `chamfer-cut-*` utility and inherits into every layer, so the
+   layers can never drift out of agreement.
+
+   ── Miter compensation ──
+   The two layers must NOT share an identical polygon. Insetting a layer by `d`
+   moves its diagonal from `x + y = cut` to `x + y = cut + 2d`, a perpendicular
+   separation of `d·√2` — so a 1px inset with an equal cut paints a diagonal
+   hairline ~41% heavier than the straight edges. Restoring a uniform
+   perpendicular width `d` requires shrinking the inner cut by `(2 − √2)·d`.
+   That factor, 0.5857864, is the `CHAMFER_MITER` constant below and is applied
+   anywhere one clipped layer is inset inside another. */
 
 @utility chamfer-cut-sm {
   --chamfer-cut: var(--chamfer-sm);
@@ -656,29 +671,69 @@ textarea:focus-visible,
   --chamfer-cut: var(--chamfer-lg);
 }
 
+/* Both clip patterns read two per-element inputs:
+     --chamfer-clip-inset  how far the polygon is pulled in from this element's
+                           own box (default 0; used to reveal the focus ring)
+     --chamfer-clip-cut    the cut depth for this layer (default: the frame's
+                           --chamfer-cut, i.e. no miter compensation) */
+
 /* Default pattern: top-left + bottom-right, agreeing with the top-left light. */
 @utility chamfer-outer {
+  --chamfer-clip-i: var(--chamfer-clip-inset, 0px);
+  --chamfer-clip-c: var(
+    --chamfer-clip-cut,
+    var(--chamfer-cut, var(--chamfer-md))
+  );
   clip-path: polygon(
-    var(--chamfer-cut, var(--chamfer-md)) 0,
-    100% 0,
-    100% calc(100% - var(--chamfer-cut, var(--chamfer-md))),
-    calc(100% - var(--chamfer-cut, var(--chamfer-md))) 100%,
-    0 100%,
-    0 var(--chamfer-cut, var(--chamfer-md))
+    calc(var(--chamfer-clip-i) + var(--chamfer-clip-c)) var(--chamfer-clip-i),
+    calc(100% - var(--chamfer-clip-i)) var(--chamfer-clip-i),
+    calc(100% - var(--chamfer-clip-i))
+      calc(100% - var(--chamfer-clip-i) - var(--chamfer-clip-c)),
+    calc(100% - var(--chamfer-clip-i) - var(--chamfer-clip-c))
+      calc(100% - var(--chamfer-clip-i)),
+    var(--chamfer-clip-i) calc(100% - var(--chamfer-clip-i)),
+    var(--chamfer-clip-i) calc(var(--chamfer-clip-i) + var(--chamfer-clip-c))
   );
 }
 
 /* Symmetric four-corner cut, for feature panels that read as centered. */
 @utility chamfer-all {
+  --chamfer-clip-i: var(--chamfer-clip-inset, 0px);
+  --chamfer-clip-c: var(
+    --chamfer-clip-cut,
+    var(--chamfer-cut, var(--chamfer-md))
+  );
   clip-path: polygon(
-    var(--chamfer-cut, var(--chamfer-md)) 0,
-    calc(100% - var(--chamfer-cut, var(--chamfer-md))) 0,
-    100% var(--chamfer-cut, var(--chamfer-md)),
-    100% calc(100% - var(--chamfer-cut, var(--chamfer-md))),
-    calc(100% - var(--chamfer-cut, var(--chamfer-md))) 100%,
-    var(--chamfer-cut, var(--chamfer-md)) 100%,
-    0 calc(100% - var(--chamfer-cut, var(--chamfer-md))),
-    0 var(--chamfer-cut, var(--chamfer-md))
+    calc(var(--chamfer-clip-i) + var(--chamfer-clip-c)) var(--chamfer-clip-i),
+    calc(100% - var(--chamfer-clip-i) - var(--chamfer-clip-c))
+      var(--chamfer-clip-i),
+    calc(100% - var(--chamfer-clip-i))
+      calc(var(--chamfer-clip-i) + var(--chamfer-clip-c)),
+    calc(100% - var(--chamfer-clip-i))
+      calc(100% - var(--chamfer-clip-i) - var(--chamfer-clip-c)),
+    calc(100% - var(--chamfer-clip-i) - var(--chamfer-clip-c))
+      calc(100% - var(--chamfer-clip-i)),
+    calc(var(--chamfer-clip-i) + var(--chamfer-clip-c))
+      calc(100% - var(--chamfer-clip-i)),
+    var(--chamfer-clip-i)
+      calc(100% - var(--chamfer-clip-i) - var(--chamfer-clip-c)),
+    var(--chamfer-clip-i) calc(var(--chamfer-clip-i) + var(--chamfer-clip-c))
+  );
+}
+
+/* Physical hairline inset carried by the edge layer. */
+@utility chamfer-hairline {
+  padding: var(--chamfer-hairline);
+}
+
+/* Applied to a layer that sits one hairline inside its parent: compensates the
+   miter so the perpendicular hairline width is uniform on cuts and straight
+   edges alike, and resets the focus inset so an inherited value from a focused
+   ancestor layer cannot shrink this layer a second time. */
+@utility chamfer-hairline-inset {
+  --chamfer-clip-inset: 0px;
+  --chamfer-clip-cut: calc(
+    var(--chamfer-cut, var(--chamfer-md)) - 0.5857864 * var(--chamfer-hairline)
   );
 }
 
@@ -696,19 +751,26 @@ textarea:focus-visible,
   background-image: var(--edge-lighting);
 }
 
-/* Keyboard focus. `outline` ignores `clip-path`, so an interactive frame keeps
-   its rectangular hit target and outline-free root, and paints a chamfered
-   halo layer just outside the clipped shape instead. The halo sits behind the
-   in-flow surface (negative z-index inside the root's isolated stacking
-   context), so it reads as a 2px ring on every edge variant, borderless
-   included. */
+/* ── Keyboard focus ──
+   `outline` ignores `clip-path`, so an interactive frame suppresses the native
+   outline and draws its own chamfered ring. The ring is painted *entirely
+   inside the root box* — nothing is drawn outside it — so a tight
+   `overflow-hidden` ancestor can never clip the focus indicator away.
+
+   Mechanism: a focus layer fills the root, clipped to the full polygon and
+   painted with the focus color, sitting behind the in-flow content. On focus
+   the outermost visible layer (the edge layer when present, otherwise the
+   surface) shrinks its own clip by the ring width — `clip-path` never affects
+   layout, so nothing shifts — exposing a uniform chamfered ring of the focus
+   color. On a hairline variant the ring reads as the edge swapped for the
+   focus color; on `edge="none"` it is the only perimeter drawn. */
 .chamfer-focusable:focus-visible {
   outline: none;
 }
 
 .chamfer-focus-layer {
   position: absolute;
-  inset: -2px;
+  inset: 0;
   z-index: -1;
   background-color: var(--border-focus);
   opacity: 0;
@@ -718,6 +780,16 @@ textarea:focus-visible,
 .chamfer-focusable:focus-visible > .chamfer-focus-layer,
 .chamfer-focusable:has(:focus-visible) > .chamfer-focus-layer {
   opacity: 1;
+}
+
+/* Same miter compensation as the hairline, at the ring width. */
+.chamfer-focusable:focus-visible > .chamfer-focus-clip,
+.chamfer-focusable:has(:focus-visible) > .chamfer-focus-clip {
+  --chamfer-clip-inset: var(--chamfer-focus-ring);
+  --chamfer-clip-cut: calc(
+    var(--chamfer-cut, var(--chamfer-md)) - 0.5857864 *
+      var(--chamfer-focus-ring)
+  );
 }
 
 /* ─── Card Utilities ────────────────────────────────────────── */

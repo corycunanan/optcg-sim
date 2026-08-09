@@ -151,18 +151,23 @@ const INLINE_STYLE_CUSTOM_PROPERTY_ALLOWLIST = new Map(
 // chamfer required, and the three-radius rule stays in force everywhere else —
 // a component that keeps `rounded`/`rounded-md`/`rounded-lg` is still correct.
 //
-// The one mechanical check is anti-rot, scoped entirely to the new vocabulary:
-// a `chamfer-*` class referenced from .tsx must actually be declared in
-// globals.css. Without it a renamed or deleted utility degrades silently into
-// an unclipped rectangle, which is invisible in review. No other allowlist is
-// widened by this rule.
+// Two mechanical checks are scoped entirely to the new vocabulary:
+//
+// 1. Anti-rot — a `chamfer-*` class referenced from .tsx must actually be
+//    declared in globals.css. Without it a renamed or deleted utility degrades
+//    silently into an unclipped rectangle, which is invisible in review.
+// 2. No dynamic composition — Tailwind's scanner only sees whole class names
+//    in the source, so `` `chamfer-cut-${cut}` `` compiles to nothing. Chamfer
+//    classes must come from static literal maps.
+//
+// Scanning is AST-scoped to string literals in class positions, so CSS-selector
+// strings, `data-*` values, and module specifiers are never mistaken for
+// classes. No other allowlist is widened by these rules.
 const GLOBALS_CSS_PATH = join(SOURCE_ROOT, "app", "globals.css");
-// Two non-utility uses of the `chamfer-` prefix are skipped rather than
-// resolved against globals.css: module specifiers (`./chamfer-frame`), and
-// `data-slot` values, which name the frame's layers for tests and styling
-// hooks.
-const SHAPE_UTILITY_RE =
-  /(?<!data-slot["']?\s*[=:]\s*["'])(?<![\w./-])chamfer-[a-z][a-z0-9-]*/g;
+// A complete class name never ends in a hyphen; a dangling `chamfer-cut-` is
+// the prefix half of a dynamic composition, reported by that rule instead.
+const SHAPE_CLASS_TOKEN_RE = /^chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?$/;
+const SHAPE_PREFIX_RE = /chamfer-[a-z0-9-]*$/;
 const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
 
 const RULES = [
@@ -224,9 +229,19 @@ if (IS_MAIN) {
       );
     }
 
-    const shapeUsages = findShapeVocabularyUsages(source);
-    shapeUtilityUsageCount += shapeUsages.length;
-    for (const usage of shapeUsages) {
+    for (const usage of findShapeVocabularyUsages(source)) {
+      if (usage.kind === "dynamic") {
+        addViolation(
+          path,
+          sourceFile,
+          usage.index,
+          "shape-vocabulary",
+          `dynamically composed chamfer class ${JSON.stringify(`${usage.utility}\${…}`)}; Tailwind only sees whole class names, so select from a static literal map`
+        );
+        continue;
+      }
+
+      shapeUtilityUsageCount += 1;
       if (declaredShapeUtilities.has(usage.utility)) continue;
       addViolation(
         path,
@@ -314,19 +329,110 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
 }
 
 /**
- * Every `chamfer-*` class referenced by a .tsx source, with its offset.
- * Usage is always allowed; only an undeclared name is a violation.
+ * Every `chamfer-*` class reference in a .tsx source, as
+ * `{ index, utility, kind }`. `kind: "class"` is a static literal class token —
+ * always allowed, and only a name missing from globals.css is a violation.
+ * `kind: "dynamic"` is a template literal that concatenates a chamfer prefix
+ * with a substitution, which Tailwind cannot see and is always a violation.
+ *
+ * Only string literals in class positions are scanned. `data-*` / `aria-*`
+ * attribute values, non-`className` JSX attributes, and module specifiers are
+ * skipped, and a token must be a whole class name — so CSS selector strings
+ * such as `[data-slot="chamfer-frame"]` are not class references.
  */
 export function findShapeVocabularyUsages(source) {
-  const scanSource = stripComments(source);
+  const sourceFile = ts.createSourceFile(
+    "scan.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  );
   const usages = [];
 
-  SHAPE_UTILITY_RE.lastIndex = 0;
-  for (const match of scanSource.matchAll(SHAPE_UTILITY_RE)) {
-    usages.push({ index: match.index, utility: match[0] });
+  const visit = (node) => {
+    if (
+      (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
+      !isNonClassLiteral(node)
+    ) {
+      for (const utility of shapeClassTokens(node.text)) {
+        usages.push({
+          index: node.getStart(sourceFile),
+          utility,
+          kind: "class",
+        });
+      }
+    }
+
+    if (ts.isTemplateExpression(node)) {
+      const fragments = [
+        node.head,
+        ...node.templateSpans.map((s) => s.literal),
+      ];
+      for (const fragment of fragments) {
+        // A chamfer prefix flush against a substitution is dynamic composition.
+        const dynamic = SHAPE_PREFIX_RE.exec(fragment.text);
+        if (dynamic && !ts.isTemplateTail(fragment)) {
+          usages.push({
+            index: node.getStart(sourceFile),
+            utility: dynamic[0],
+            kind: "dynamic",
+          });
+        }
+        for (const utility of shapeClassTokens(fragment.text)) {
+          usages.push({
+            index: node.getStart(sourceFile),
+            utility,
+            kind: "class",
+          });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return usages;
+}
+
+/** Whole `chamfer-*` class tokens in a literal, ignoring variant prefixes. */
+function shapeClassTokens(text) {
+  return text
+    .split(/\s+/)
+    .map((token) => token.replace(/^!/, "").split(":").at(-1))
+    .filter((token) => SHAPE_CLASS_TOKEN_RE.test(token));
+}
+
+/** Literal positions that hold something other than a class list. */
+function isNonClassLiteral(node) {
+  const parent = node.parent;
+  if (!parent) return false;
+
+  if (ts.isJsxAttribute(parent)) {
+    return parent.name.getText() !== "className";
+  }
+  if (
+    ts.isJsxExpression(parent) &&
+    parent.parent &&
+    ts.isJsxAttribute(parent.parent)
+  ) {
+    return parent.parent.name.getText() !== "className";
+  }
+  if (ts.isPropertyAssignment(parent) && parent.initializer === node) {
+    return /^["']?(?:data|aria)-/.test(parent.name.getText());
   }
 
-  return usages;
+  return (
+    ts.isImportDeclaration(parent) ||
+    ts.isExportDeclaration(parent) ||
+    ts.isImportTypeNode(parent) ||
+    ts.isExternalModuleReference(parent) ||
+    ts.isImportSpecifier(parent) ||
+    (ts.isCallExpression(parent) &&
+      parent.arguments[0] === node &&
+      /^(?:require|import)$/.test(parent.expression.getText()))
+  );
 }
 
 /** Chamfer utilities declared in globals.css, as `@utility` or a class rule. */

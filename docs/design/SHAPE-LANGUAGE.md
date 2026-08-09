@@ -106,15 +106,22 @@ region**. If two pennants compete, neither is featured.
   `edge="none"` is a first-class borderless variant and the default. The CSS lives in
   `src/app/globals.css` as `chamfer-*` utilities over the `--chamfer-*` and `--edge-*`
   tokens; the design-system lint treats that vocabulary as an **allowance**, not a
-  requirement, and only fails when a `chamfer-*` class is used without a matching
-  declaration. Feature polygons (pennant, swallowtail, hex, diamond) are **not** in the
-  primitive and remain deferred.
+  requirement (see Rollout step 1), and fails only on a `chamfer-*` class with no matching
+  declaration or one composed dynamically. Feature polygons (pennant, swallowtail, hex,
+  diamond) are **not** in the primitive and remain deferred.
 - **CSS:** `clip-path: polygon(...)` for all cuts. Borders on clipped elements require the
   **two-layer technique**: outer element carries the edge color, inner element (inset by the
-  hairline width, same polygon) carries the surface. `border-*` properties do not follow clip-path.
-- **Focus rings:** `outline` ignores clip-path geometry. Focus states use an inset ring layer
-  (a third layer or `box-shadow: inset`) or a dedicated focus polygon; verify visibility on every
-  clipped interactive shape.
+  hairline width) carries the surface. `border-*` properties do not follow clip-path.
+- **Miter compensation:** the two layers must *not* share an identical polygon. Insetting a layer by
+  `d` moves its diagonal from `x + y = cut` to `x + y = cut + 2d`, a perpendicular separation of
+  `d·√2` — so an equal cut paints a diagonal hairline ~41% heavier than the straight edges. Reduce
+  the inner cut by `(2 − √2)·d` to keep the perpendicular width uniform.
+- **Focus rings:** `outline` ignores clip-path geometry, and `box-shadow: inset` is **not** a
+  substitute — it traces the border-box rectangle, so the clip erases it exactly at the cuts. Draw
+  the ring *inside* the element's own bounds (a focus-colored layer beneath, revealed by shrinking
+  the outermost layer's clip by the ring width), never outside them: any `overflow-hidden` ancestor
+  would clip an outset halo away and leave keyboard focus invisible. Verify visibility on every
+  clipped interactive shape, borderless included.
 - **Hit areas:** clip-path clips pointer events. For small controls, keep the interactive box
   rectangular and clip a *child* so the hit target stays ≥ the visual shape.
 - **ScaledBoard:** inside the scaled subtree (~0.59 at the 1280×640 floor), 1px hairlines and 4px
@@ -125,7 +132,12 @@ region**. If two pennants compete, neither is featured.
 
 ## Rollout
 
-1. **Now (documentation-first):** new Figma work uses this vocabulary. No lint changes yet.
+1. **Now (opt-in enablers):** new Figma work uses this vocabulary. The `ChamferFrame` primitive and
+   its tokens ship as an **additive allowance** (OPT-629) — a surface may adopt chamfers, none is
+   required to, and the radius rule is unchanged for everything that has not. The lint's only
+   chamfer rules police the vocabulary's own integrity (a `chamfer-*` class must be declared in
+   `globals.css`, and must not be composed dynamically); this is deliberately *not* the adoption
+   contract in step 5.
 2. **Tier-5 tooltips** ship square-cornered (already in flight — OPT-616 / OPT-624). First shipped
    proof of the angular register.
 3. **Game board / material surfaces** adopt the vocabulary as the material tier ladder rolls out
@@ -134,4 +146,6 @@ region**. If two pennants compete, neither is featured.
    redesign, lobby cohesion work), each migration amending the radius rule's allowlist.
 5. **Contract amendment:** once adoption reaches critical mass, styling rule #5 (three-radius set)
    in CLAUDE.md / BRANDING-GUIDELINES.md is rewritten to this doc's semantics table, and
-   `scripts/lint-design-system.mjs` learns the chamfer steps.
+   `scripts/lint-design-system.mjs` goes from *allowing* chamfers (step 1) to *requiring* them on
+   chrome — the point at which `rounded-*` on a non-card surface becomes a violation. Until then the
+   three-radius rule remains fully in force.

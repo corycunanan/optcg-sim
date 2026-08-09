@@ -107,16 +107,48 @@ describe("shape-language allowance", () => {
     expect(
       findShapeVocabularyUsages('className="chamfer-cut-md chamfer-outer"')
     ).toEqual([
-      expect.objectContaining({ utility: "chamfer-cut-md" }),
-      expect.objectContaining({ utility: "chamfer-outer" }),
+      expect.objectContaining({ utility: "chamfer-cut-md", kind: "class" }),
+      expect.objectContaining({ utility: "chamfer-outer", kind: "class" }),
     ]);
   });
 
-  it("skips data-slot layer names, which are hooks rather than utilities", () => {
+  it("reads through Tailwind variant and important prefixes", () => {
     expect(
       findShapeVocabularyUsages(
-        '<div data-slot="chamfer-frame" />; const p = { "data-slot": "chamfer-surface" };'
+        'className="hover:chamfer-outer !chamfer-cut-lg"'
       )
-    ).toEqual([]);
+    ).toEqual([
+      expect.objectContaining({ utility: "chamfer-outer" }),
+      expect.objectContaining({ utility: "chamfer-cut-lg" }),
+    ]);
+  });
+
+  it("flags dynamically composed chamfer classes", () => {
+    expect(
+      findShapeVocabularyUsages("const c = `chamfer-cut-${cut}`;")
+    ).toEqual([
+      expect.objectContaining({ utility: "chamfer-cut-", kind: "dynamic" }),
+    ]);
+  });
+
+  it("allows a static chamfer class inside an otherwise dynamic template", () => {
+    expect(
+      findShapeVocabularyUsages("const c = `chamfer-outer ${extra}`;")
+    ).toEqual([
+      expect.objectContaining({ utility: "chamfer-outer", kind: "class" }),
+    ]);
+  });
+
+  it.each([
+    ['<div data-slot="chamfer-frame" />', "data-slot JSX attribute"],
+    ['const p = { "data-slot": "chamfer-surface" };', "data-slot object key"],
+    ['<div data-testid="chamfer-example" />', "non-class JSX attribute"],
+    [
+      "root.querySelector('[data-slot=\"chamfer-frame\"]');",
+      "CSS selector string",
+    ],
+    ['import { ChamferFrame } from "./chamfer-frame";', "module specifier"],
+  ])("does not treat %s as a class reference (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([]);
   });
 });

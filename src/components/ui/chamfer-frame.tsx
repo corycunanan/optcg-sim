@@ -14,17 +14,23 @@ import { cn } from "@/lib/utils";
  *
  * ```text
  * root            unclipped, rectangular  ← hit target, focus owner, `asChild`
- *  ├─ focus layer only when `interactive`
- *  ├─ edge layer  only when `edge !== "none"` (1px hairline, clipped)
+ *  ├─ focus layer only when `interactive`; fills the root, painted behind
+ *  ├─ edge layer  only when `edge !== "none"` (one hairline, clipped)
  *  └─ surface     clipped; carries `surfaceClassName` and the children
  * ```
  *
- * Two rules drive that shape:
+ * Three rules drive that shape:
  *
  * - `clip-path` clips pointer events, so the interactive box stays rectangular
  *   and the clip applies to a child. The corner triangles remain clickable.
- * - `outline` ignores `clip-path`, so keyboard focus paints a chamfered halo
- *   layer instead of an outline. It is visible on every edge variant.
+ * - `outline` ignores `clip-path`, so keyboard focus is drawn as a chamfered
+ *   ring *inside* the root box: the focus layer fills the root and the
+ *   outermost clipped layer shrinks its own clip to expose it. Nothing is
+ *   painted outside the root, so an `overflow-hidden` ancestor cannot clip the
+ *   focus indicator away.
+ * - Two clipped layers are never given the same polygon. Insetting a layer
+ *   widens its diagonal relative to its straight edges, so the inner cut is
+ *   miter-compensated by `(2 − √2) × inset` (see `chamfer-hairline-inset`).
  *
  * Class routing: `className` lands on the rectangular root (layout, sizing,
  * and — with `asChild` — the interactive element itself); `surfaceClassName`
@@ -43,6 +49,10 @@ import { cn } from "@/lib/utils";
  *   <Link href="/decks/1">Straw Hat Aggro</Link>
  * </ChamferFrame>
  * ```
+ *
+ * Class names are static literals on purpose: Tailwind's scanner needs whole
+ * class names in the source, so composing them dynamically is unsupported and
+ * the design-system lint rejects it.
  */
 
 /** Cut depth: 4 / 8 / 12px — the only chamfer steps in the vocabulary. */
@@ -74,14 +84,22 @@ type ChamferCut = keyof typeof CHAMFER_CUT_CLASSES;
 type ChamferCorners = keyof typeof CHAMFER_CORNER_CLASSES;
 type ChamferEdge = keyof typeof CHAMFER_EDGE_CLASSES;
 
-interface ChamferFrameProps extends React.ComponentPropsWithoutRef<"div"> {
+interface ChamferFrameProps extends Omit<
+  React.ComponentPropsWithRef<"div">,
+  "ref"
+> {
+  /**
+   * Ref to the frame root. Typed as `HTMLElement` because `asChild` promotes
+   * the caller's element — an anchor, button, or list item — to that root.
+   */
+  ref?: React.Ref<HTMLElement>;
   /** Chamfer depth. `sm` 4px, `md` 8px, `lg` 12px. Defaults to `md`. */
   cut?: ChamferCut;
   /** Which corners are cut. Defaults to `outer` (top-left + bottom-right). */
   corners?: ChamferCorners;
   /** Hairline treatment. Defaults to `none` (borderless). */
   edge?: ChamferEdge;
-  /** Renders the chamfered focus halo when the frame or its content is focused. */
+  /** Draws the chamfered focus ring when the frame or its content is focused. */
   interactive?: boolean;
   /** Merges the frame's root props onto the single child element. */
   asChild?: boolean;
@@ -89,10 +107,82 @@ interface ChamferFrameProps extends React.ComponentPropsWithoutRef<"div"> {
   surfaceClassName?: string;
 }
 
-type SlottableChildProps = {
-  className?: string;
-  children?: React.ReactNode;
-};
+type UnknownProps = Record<string, unknown>;
+type AnyHandler = (...args: unknown[]) => unknown;
+
+const EVENT_HANDLER_PATTERN = /^on[A-Z]/;
+
+/**
+ * Attaches a node to every supplied ref, honoring React 19 ref cleanups so the
+ * caller's ref and the frame's own ref can coexist on the promoted root.
+ */
+function composeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
+  return (node: T | null) => {
+    const cleanups: Array<() => void> = [];
+
+    for (const ref of refs) {
+      if (typeof ref === "function") {
+        const cleanup = ref(node);
+        if (typeof cleanup === "function") cleanups.push(cleanup);
+      } else if (ref) {
+        const objectRef = ref as React.RefObject<T | null>;
+        objectRef.current = node;
+        cleanups.push(() => {
+          objectRef.current = null;
+        });
+      }
+    }
+
+    return () => {
+      for (const cleanup of cleanups) cleanup();
+    };
+  };
+}
+
+/**
+ * Merges the frame's props onto the promoted child. The child wins on plain
+ * values and `style` keys, event handlers run child-first then frame, and
+ * `className` / `children` / `ref` are composed by the caller.
+ */
+function mergeSlotProps(
+  frameProps: UnknownProps,
+  childProps: UnknownProps
+): UnknownProps {
+  const merged: UnknownProps = { ...frameProps };
+
+  for (const [key, childValue] of Object.entries(childProps)) {
+    if (key === "className" || key === "children" || key === "ref") continue;
+
+    const frameValue = frameProps[key];
+
+    if (EVENT_HANDLER_PATTERN.test(key)) {
+      if (
+        typeof childValue === "function" &&
+        typeof frameValue === "function"
+      ) {
+        merged[key] = (...args: unknown[]) => {
+          (childValue as AnyHandler)(...args);
+          (frameValue as AnyHandler)(...args);
+        };
+      } else {
+        merged[key] = childValue ?? frameValue;
+      }
+      continue;
+    }
+
+    if (key === "style") {
+      merged.style = {
+        ...(frameValue as React.CSSProperties | undefined),
+        ...(childValue as React.CSSProperties | undefined),
+      };
+      continue;
+    }
+
+    merged[key] = childValue;
+  }
+
+  return merged;
+}
 
 function ChamferFrame({
   cut = "md",
@@ -103,6 +193,7 @@ function ChamferFrame({
   className,
   surfaceClassName,
   children,
+  ref,
   ...props
 }: ChamferFrameProps) {
   const clipClass = CHAMFER_CORNER_CLASSES[corners];
@@ -122,11 +213,22 @@ function ChamferFrame({
     "data-edge": edge,
   };
 
+  // The focus ring is exposed by shrinking the clip of whichever layer is
+  // outermost, so only that layer opts into the focus geometry.
+  const focusClipClass = interactive ? "chamfer-focus-clip" : undefined;
+
   const layers = (content: React.ReactNode) => {
     const surface = (
       <div
         data-slot="chamfer-surface"
-        className={cn(clipClass, "h-full", surfaceClassName)}
+        className={cn(
+          clipClass,
+          // Inside a hairline the surface is physically inset, so its cut is
+          // miter-compensated; standalone it is the outermost clipped layer.
+          edgeClass ? "chamfer-hairline-inset" : focusClipClass,
+          "h-full",
+          surfaceClassName
+        )}
       >
         {content}
       </div>
@@ -144,7 +246,12 @@ function ChamferFrame({
         {edgeClass ? (
           <div
             data-slot="chamfer-edge"
-            className={cn(clipClass, edgeClass, "h-full p-px")}
+            className={cn(
+              clipClass,
+              edgeClass,
+              focusClipClass,
+              "chamfer-hairline h-full"
+            )}
           >
             {surface}
           </div>
@@ -162,21 +269,35 @@ function ChamferFrame({
   if (asChild) {
     const child = React.Children.only(
       children
-    ) as React.ReactElement<SlottableChildProps>;
+    ) as React.ReactElement<UnknownProps>;
+    const childProps: UnknownProps = child.props ?? {};
 
     return React.cloneElement(
       child,
       {
-        ...props,
+        ...mergeSlotProps(props as UnknownProps, childProps),
         ...rootProps,
-        className: cn(rootClassName, child.props.className),
-      } as SlottableChildProps,
-      layers(child.props.children)
+        className: cn(
+          rootClassName,
+          childProps.className as string | undefined
+        ),
+        ref: composeRefs(
+          ref,
+          childProps.ref as React.Ref<HTMLElement> | undefined
+        ),
+      },
+      layers(childProps.children as React.ReactNode)
     );
   }
 
   return (
-    <div {...rootProps} className={rootClassName} {...props}>
+    <div
+      {...rootProps}
+      // Narrowing the widened `HTMLElement` ref back to the default root.
+      ref={ref as React.Ref<HTMLDivElement> | undefined}
+      className={rootClassName}
+      {...props}
+    >
       {layers(children)}
     </div>
   );
