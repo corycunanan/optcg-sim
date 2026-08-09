@@ -87,6 +87,8 @@ export {
   SelectScrollDownButton,
 } from "./select";
 
+export { ChamferFrame } from "./chamfer-frame";
+
 // Card Fan Stack
 export { CardFanStack } from "./card-fan-stack";
 

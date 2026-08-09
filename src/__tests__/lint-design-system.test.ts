@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { findTextViolations } from "../../scripts/lint-design-system.mjs";
+import {
+  collectDeclaredShapeUtilities,
+  findShapeVocabularyUsages,
+  findTextViolations,
+} from "../../scripts/lint-design-system.mjs";
 
 const SHOULD_FLAG = [
   { syntax: "text-[10px]", rule: "font-size" },
@@ -70,5 +74,96 @@ describe("design-system text rules", () => {
     '/* className="top-1.5 text-[length:10px] [color:#fff]" */',
   ])("ignores commented source: %s", (source) => {
     expect(findTextViolations(source)).toEqual([]);
+  });
+});
+
+describe("shape-language allowance", () => {
+  it("does not flag the chamfer vocabulary under the existing rules", () => {
+    expect(
+      findTextViolations(
+        'className="chamfer-cut-lg chamfer-all chamfer-edge-lighting p-4"'
+      )
+    ).toEqual([]);
+  });
+
+  it("leaves the three-radius vocabulary untouched", () => {
+    expect(findTextViolations('className="rounded-md border p-4"')).toEqual([]);
+  });
+
+  it("collects chamfer utilities declared as @utility or class rules", () => {
+    const declared = collectDeclaredShapeUtilities(
+      "@utility chamfer-outer { clip-path: polygon(0 0); }\n" +
+        ".chamfer-focus-layer { opacity: 0; }\n" +
+        ".rounded-lg { border-radius: 12px; }"
+    );
+
+    expect([...declared].sort()).toEqual([
+      "chamfer-focus-layer",
+      "chamfer-outer",
+    ]);
+  });
+
+  it("reports chamfer class usages so undeclared names can be resolved", () => {
+    expect(
+      findShapeVocabularyUsages(
+        '<div className="chamfer-cut-md chamfer-outer" />'
+      )
+    ).toEqual([
+      expect.objectContaining({ utility: "chamfer-cut-md", kind: "class" }),
+      expect.objectContaining({ utility: "chamfer-outer", kind: "class" }),
+    ]);
+  });
+
+  it("reads through Tailwind variant and important prefixes", () => {
+    expect(
+      findShapeVocabularyUsages(
+        '<div className="hover:chamfer-outer !chamfer-cut-lg" />'
+      )
+    ).toEqual([
+      expect.objectContaining({ utility: "chamfer-outer" }),
+      expect.objectContaining({ utility: "chamfer-cut-lg" }),
+    ]);
+  });
+
+  it.each([
+    ['cn("chamfer-outer", extra)', "cn argument"],
+    ['clsx({ "chamfer-outer": on })', "clsx object key"],
+    ['cva("base", { variants: { c: { a: "chamfer-outer" } } })', "cva variant"],
+    ['cn(on ? "chamfer-outer" : null)', "conditional"],
+    ['cn(on && "chamfer-outer")', "logical"],
+    ['cn(["chamfer-outer"])', "array"],
+    ['<div className={cn("chamfer-outer")} />', "nested in className"],
+  ])("reads a static class out of %s (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([
+      expect.objectContaining({ utility: "chamfer-outer", kind: "class" }),
+    ]);
+  });
+
+  it.each([
+    ["<div className={`chamfer-cut-${cut}`} />", "template substitution"],
+    ['<div className={"chamfer-cut-" + cut} />', "binary concatenation"],
+    ['<div className={["chamfer-cut-", cut].join("")} />', "array join"],
+    ["<div className={`chamfer-outer ${extra}`} />", "interpolated class list"],
+    ["cn(`chamfer-cut-${cut}`)", "inside a class helper"],
+  ])("flags %s as dynamic composition (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([
+      expect.objectContaining({ kind: "dynamic" }),
+    ]);
+  });
+
+  it.each([
+    ['<div data-slot="chamfer-frame" />', "data-slot JSX attribute"],
+    ["<div data-slot={`chamfer-${kind}`} />", "dynamic data-slot value"],
+    ['const p = { "data-slot": "chamfer-surface" };', "data-slot object key"],
+    ['<div data-testid="chamfer-example" />', "non-class JSX attribute"],
+    ['const status = "chamfer-example";', "plain string constant"],
+    ['root.querySelector("chamfer-example");', "selector argument"],
+    [
+      "root.querySelector('[data-slot=\"chamfer-frame\"]');",
+      "CSS selector string",
+    ],
+    ['import { ChamferFrame } from "./chamfer-frame";', "module specifier"],
+  ])("does not treat %s as a class reference (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([]);
   });
 });

@@ -144,6 +144,43 @@ const INLINE_STYLE_CUSTOM_PROPERTY_ALLOWLIST = new Map(
   }).map(([path, properties]) => [path, new Set(properties)])
 );
 
+// ── Shape language allowance (docs/design/SHAPE-LANGUAGE.md) ──
+// The 45° chamfer vocabulary is ADDITIVE: the `chamfer-*` utilities and the
+// `--chamfer-*` / `--edge-*` tokens declared in globals.css are *permitted*
+// wherever a surface opts into the angular register. Nothing here makes a
+// chamfer required, and the three-radius rule stays in force everywhere else —
+// a component that keeps `rounded`/`rounded-md`/`rounded-lg` is still correct.
+//
+// Two mechanical checks are scoped entirely to the new vocabulary:
+//
+// 1. Anti-rot — a `chamfer-*` class referenced from .tsx must actually be
+//    declared in globals.css. Without it a renamed or deleted utility degrades
+//    silently into an unclipped rectangle, which is invisible in review.
+// 2. No dynamic composition — Tailwind's scanner only sees whole class names
+//    in the source, so `` `chamfer-cut-${cut}` `` compiles to nothing. Chamfer
+//    classes must come from static literal maps.
+//
+// Both checks are scoped to *class positions* — a `className`/`class` JSX
+// attribute, or an argument of `cn()` / `cva()` / `clsx()` — descending only
+// through the expression forms those helpers evaluate as classes (conditional,
+// logical, array, object). A `chamfer-` string anywhere else in a .tsx file is
+// not a class and is never inspected, so selector strings, `data-*` values,
+// identifiers, and module specifiers cannot produce a finding. No other
+// allowlist is widened by these rules.
+const GLOBALS_CSS_PATH = join(SOURCE_ROOT, "app", "globals.css");
+const CLASS_ATTRIBUTE_NAMES = new Set(["className", "class"]);
+const CLASS_HELPER_NAMES = new Set(["cn", "cva", "clsx", "classNames"]);
+const CLASS_LOGICAL_OPERATORS = new Set([
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
+// A complete class name never ends in a hyphen; a dangling `chamfer-cut-` is
+// the prefix half of a dynamic composition, reported by that rule instead.
+const SHAPE_CLASS_TOKEN_RE = /^chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?$/;
+const SHAPE_FRAGMENT_RE = /(?:^|\s)(chamfer-[a-z0-9-]*)/;
+const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
+
 const RULES = [
   {
     name: "font-size",
@@ -166,9 +203,13 @@ const IS_MAIN =
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 const files = IS_MAIN ? collectTsxFiles(SOURCE_ROOT) : [];
+const declaredShapeUtilities = IS_MAIN
+  ? collectDeclaredShapeUtilities(readFileSync(GLOBALS_CSS_PATH, "utf8"))
+  : new Set();
 const violations = [];
 let buttonOverrideCount = 0;
 let exemptSpacingFileCount = 0;
+let shapeUtilityUsageCount = 0;
 
 if (IS_MAIN) {
   for (const absolutePath of files) {
@@ -196,6 +237,29 @@ if (IS_MAIN) {
         violation.index,
         violation.rule,
         violation.message
+      );
+    }
+
+    for (const usage of findShapeVocabularyUsages(source)) {
+      if (usage.kind === "dynamic") {
+        addViolation(
+          path,
+          sourceFile,
+          usage.index,
+          "shape-vocabulary",
+          `dynamically composed chamfer class ${JSON.stringify(`${usage.utility}\${…}`)}; Tailwind only sees whole class names, so select from a static literal map`
+        );
+        continue;
+      }
+
+      shapeUtilityUsageCount += 1;
+      if (declaredShapeUtilities.has(usage.utility)) continue;
+      addViolation(
+        path,
+        sourceFile,
+        usage.index,
+        "shape-vocabulary",
+        `undeclared chamfer utility ${JSON.stringify(usage.utility)}; declare it in src/app/globals.css per docs/design/SHAPE-LANGUAGE.md`
       );
     }
 
@@ -273,6 +337,189 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
   return matches.sort(
     (a, b) => a.index - b.index || a.rule.localeCompare(b.rule)
   );
+}
+
+/**
+ * Every `chamfer-*` class reference in a .tsx source, as
+ * `{ index, utility, kind }`.
+ *
+ * Only *class positions* are inspected: a `className`/`class` JSX attribute, or
+ * an argument of a class helper (`cn`/`cva`/`clsx`/`classNames`). Within one,
+ * descent follows the expression forms those helpers evaluate as classes —
+ * string literals, conditionals, `&&`/`||`/`??`, arrays, object keys and
+ * values, and nested helper calls. Nothing outside a class position is
+ * examined, so `const status = "chamfer-example"`, `querySelector(...)`,
+ * `data-slot={...}`, and module specifiers can never produce a finding.
+ *
+ * - `kind: "class"` — a static literal class token. Always allowed; only a name
+ *   missing from globals.css is a violation.
+ * - `kind: "dynamic"` — a non-literal expression in a class position whose
+ *   string parts contain a `chamfer-` token (template substitution, `+`
+ *   concatenation, `[...].join()`, …). Tailwind only ever sees whole class
+ *   names, so this is always a violation.
+ */
+export function findShapeVocabularyUsages(source) {
+  const sourceFile = ts.createSourceFile(
+    "scan.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  );
+  const usages = [];
+  const scanned = new Set();
+
+  const record = (node, utility, kind) => {
+    usages.push({ index: node.getStart(sourceFile), utility, kind });
+  };
+
+  /** Walks one class-position expression. */
+  const scanClassExpression = (node) => {
+    if (!node || scanned.has(node)) return;
+    scanned.add(node);
+
+    if (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node) ||
+      ts.isNonNullExpression(node) ||
+      ts.isJsxExpression(node)
+    ) {
+      scanClassExpression(node.expression);
+      return;
+    }
+
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      for (const utility of shapeClassTokens(node.text)) {
+        record(node, utility, "class");
+      }
+      return;
+    }
+
+    if (ts.isConditionalExpression(node)) {
+      scanClassExpression(node.whenTrue);
+      scanClassExpression(node.whenFalse);
+      return;
+    }
+
+    if (
+      ts.isBinaryExpression(node) &&
+      CLASS_LOGICAL_OPERATORS.has(node.operatorToken.kind)
+    ) {
+      scanClassExpression(node.left);
+      scanClassExpression(node.right);
+      return;
+    }
+
+    if (ts.isArrayLiteralExpression(node)) {
+      for (const element of node.elements) scanClassExpression(element);
+      return;
+    }
+
+    if (ts.isObjectLiteralExpression(node)) {
+      // clsx keys its classes; cva nests them as variant values.
+      for (const property of node.properties) {
+        if (!ts.isPropertyAssignment(property)) continue;
+        const name = property.name;
+        if (
+          ts.isStringLiteral(name) ||
+          ts.isNoSubstitutionTemplateLiteral(name)
+        ) {
+          scanClassExpression(name);
+        } else if (ts.isComputedPropertyName(name)) {
+          scanClassExpression(name.expression);
+        }
+        scanClassExpression(property.initializer);
+      }
+      return;
+    }
+
+    if (isClassHelperCall(node)) {
+      for (const argument of node.arguments) scanClassExpression(argument);
+      return;
+    }
+
+    // Anything else here is composed at runtime. It is only a finding when it
+    // actually carries chamfer text; plain identifiers stay silent.
+    const fragment = firstShapeFragment(node);
+    if (fragment) record(node, fragment, "dynamic");
+  };
+
+  const visit = (node) => {
+    if (
+      ts.isJsxAttribute(node) &&
+      CLASS_ATTRIBUTE_NAMES.has(node.name.getText()) &&
+      node.initializer
+    ) {
+      scanClassExpression(node.initializer);
+    } else if (isClassHelperCall(node) && !scanned.has(node)) {
+      scanned.add(node);
+      for (const argument of node.arguments) scanClassExpression(argument);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return usages;
+}
+
+function isClassHelperCall(node) {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    CLASS_HELPER_NAMES.has(node.expression.text)
+  );
+}
+
+/** Whole `chamfer-*` class tokens in a literal, ignoring variant prefixes. */
+function shapeClassTokens(text) {
+  return text
+    .split(/\s+/)
+    .map((token) => token.replace(/^!/, "").split(":").at(-1))
+    .filter((token) => SHAPE_CLASS_TOKEN_RE.test(token));
+}
+
+/** The first `chamfer-` fragment in any string part of an expression tree. */
+function firstShapeFragment(node) {
+  let found = null;
+
+  const check = (text) => {
+    if (found) return;
+    const match = SHAPE_FRAGMENT_RE.exec(text);
+    if (match) found = match[1];
+  };
+
+  const walk = (current) => {
+    if (found) return;
+
+    if (
+      ts.isStringLiteral(current) ||
+      ts.isNoSubstitutionTemplateLiteral(current)
+    ) {
+      check(current.text);
+    } else if (ts.isTemplateExpression(current)) {
+      check(current.head.text);
+      for (const span of current.templateSpans) check(span.literal.text);
+    }
+
+    ts.forEachChild(current, walk);
+  };
+
+  walk(node);
+  return found;
+}
+
+/** Chamfer utilities declared in globals.css, as `@utility` or a class rule. */
+export function collectDeclaredShapeUtilities(css) {
+  const declared = new Set();
+
+  SHAPE_DECLARATION_RE.lastIndex = 0;
+  for (const match of css.matchAll(SHAPE_DECLARATION_RE)) {
+    declared.add(match[1]);
+  }
+
+  return declared;
 }
 
 export function stripComments(source) {
@@ -427,5 +674,8 @@ function printInfo() {
   );
   console.log(
     `Button className overrides: ${buttonOverrideCount} (informational).`
+  );
+  console.log(
+    `Shape language: ${declaredShapeUtilities.size} chamfer utilities declared in globals.css, ${shapeUtilityUsageCount} allowed usage(s) in .tsx.`
   );
 }
