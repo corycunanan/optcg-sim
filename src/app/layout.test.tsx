@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -93,16 +95,20 @@ describe("RootLayout shell geometry", () => {
     const html = renderToStaticMarkup(
       await RootLayout({ children: <div>content</div> })
     );
+    const document = new DOMParser().parseFromString(html, "text/html");
+    const appShell = document.querySelector('[data-slot="app-shell"]');
+    const contentColumn = document.querySelector(
+      '[data-slot="app-content-column"]'
+    );
+    const navbar = document.querySelector('[data-testid="navbar"]');
+    const main = document.querySelector("main");
+    const socialShell = document.querySelector('[data-testid="social-shell"]');
 
-    const contentColumnIndex = html.indexOf('data-slot="app-content-column"');
-    const navbarIndex = html.indexOf('data-testid="navbar"');
-    const mainIndex = html.indexOf("<main");
-    const socialShellIndex = html.indexOf('data-testid="social-shell"');
-
-    expect(contentColumnIndex).toBeGreaterThan(-1);
-    expect(navbarIndex).toBeGreaterThan(contentColumnIndex);
-    expect(mainIndex).toBeGreaterThan(navbarIndex);
-    expect(socialShellIndex).toBeGreaterThan(mainIndex);
-    expect(html).not.toContain('data-slot="app-content-row"');
+    expect(contentColumn?.parentElement).toBe(appShell);
+    expect(navbar?.parentElement).toBe(contentColumn);
+    expect(main?.parentElement).toBe(contentColumn);
+    expect(socialShell?.parentElement).toBe(appShell);
+    expect(socialShell?.previousElementSibling).toBe(contentColumn);
+    expect(document.querySelector('[data-slot="app-content-row"]')).toBeNull();
   });
 });
