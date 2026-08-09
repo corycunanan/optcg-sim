@@ -166,7 +166,7 @@ describe("SocialSidebar", () => {
     const rail = container.querySelector('[data-slot="sidebar"]');
 
     expect(rail?.className).toContain("fixed");
-    expect(rail?.className).toContain("top-16");
+    expect(rail?.className).not.toContain("top-16");
     expect(rail?.className).toContain("bottom-0");
   });
 

@@ -89,17 +89,20 @@ describe("RootLayout theme stamping", () => {
 });
 
 describe("RootLayout shell geometry", () => {
-  it("renders the navbar above the shared content and social row", async () => {
+  it("renders the navbar inside the content column beside the social shell", async () => {
     const html = renderToStaticMarkup(
       await RootLayout({ children: <div>content</div> })
     );
 
+    const contentColumnIndex = html.indexOf('data-slot="app-content-column"');
     const navbarIndex = html.indexOf('data-testid="navbar"');
-    const contentRowIndex = html.indexOf('data-slot="app-content-row"');
+    const mainIndex = html.indexOf("<main");
     const socialShellIndex = html.indexOf('data-testid="social-shell"');
 
-    expect(navbarIndex).toBeGreaterThan(-1);
-    expect(contentRowIndex).toBeGreaterThan(navbarIndex);
-    expect(socialShellIndex).toBeGreaterThan(contentRowIndex);
+    expect(contentColumnIndex).toBeGreaterThan(-1);
+    expect(navbarIndex).toBeGreaterThan(contentColumnIndex);
+    expect(mainIndex).toBeGreaterThan(navbarIndex);
+    expect(socialShellIndex).toBeGreaterThan(mainIndex);
+    expect(html).not.toContain('data-slot="app-content-row"');
   });
 });
