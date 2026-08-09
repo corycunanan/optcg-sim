@@ -66,12 +66,13 @@ const MAIN_DECK_SIZE = 50;
  * `relative z-10`.
  *
  * Focus stops, in order: thumbnail, deck name, kebab. The frame's chamfered
- * ring is the **single** indicator for all three, so both nested controls
- * suppress their own ring. `ChamferFrame`'s focus support is
- * `:has(:focus-visible)`, which matches any descendant and cannot be narrowed
- * to the link alone from the consumer side — so a control that kept its own
- * indicator would paint two rings at once. Scoping that selector belongs to
- * the primitive; see the PR discussion.
+ * ring is the **single** indicator for all three, so every stop opts out of
+ * its own — the thumbnail's ring, the kebab Button's outline, and the global
+ * `:focus-visible` outline the link would otherwise pick up from globals.css.
+ * `ChamferFrame`'s focus support is `:has(:focus-visible)`, which matches any
+ * descendant and cannot be narrowed to the link alone from the consumer side,
+ * so any stop that kept its own indicator would paint two at once. Scoping
+ * that selector belongs to the primitive; see the PR discussion.
  */
 function DeckRow({ deck }: { deck: DeckListItem }) {
   const { leader } = deck;
@@ -141,9 +142,15 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-content-primary truncate text-base">
+              {/*
+                `focus-visible:outline-none` opts out of the global
+                `:focus-visible` outline in globals.css — on this stop the
+                frame ring is already drawing, and the global rule would
+                outline the text box inside it as a second indicator.
+              */}
               <Link
                 href={`/decks/${deck.id}`}
-                className="after:absolute after:inset-0"
+                className="after:absolute after:inset-0 focus-visible:outline-none"
               >
                 {deck.name}
               </Link>

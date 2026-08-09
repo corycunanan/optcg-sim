@@ -148,7 +148,7 @@ describe("DeckList row", () => {
 
     // `ChamferFrame`'s `:has(:focus-visible)` support cannot be narrowed to
     // the stretched link from the consumer side, so the frame ring is the
-    // single indicator and both nested controls suppress their own.
+    // single indicator and every stop suppresses its own.
     const frame = row().querySelector<HTMLElement>(
       '[data-slot="chamfer-frame"]'
     )!;
@@ -159,6 +159,12 @@ describe("DeckList row", () => {
     });
     expect(thumbnail.className).toContain("focus-visible:outline-none");
     expect(thumbnail.className).not.toMatch(/focus-visible:ring/);
+
+    // The link would otherwise take the global `:focus-visible` outline from
+    // globals.css on top of the frame ring.
+    const link = within(row()).getByRole("link", { name: "Straw Hat Aggro" });
+    expect(link.className).toContain("focus-visible:outline-none");
+    expect(link.className).not.toMatch(/focus-visible:ring/);
 
     const kebab = within(row()).getByRole("button", {
       name: "More actions for Straw Hat Aggro",
