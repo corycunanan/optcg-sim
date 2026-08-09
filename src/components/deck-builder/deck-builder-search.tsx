@@ -308,7 +308,7 @@ export function DeckBuilderSearch({
                         aria-label={`Inspect ${card.name}`}
                         onClick={() => setInspectCard(card)}
                         className={cn(
-                          "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
+                          "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 active:scale-[0.97]",
                           qtyInDeck > 0
                             ? "border-border-focus"
                             : "border-border",

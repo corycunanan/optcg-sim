@@ -364,11 +364,8 @@ export function isCardAllowedByDeckRestrictionRules(
 
 export function validateDeck(
   leader: DeckLeader | null,
-  cards: DeckCard[],
-  _format: string = "Standard"
+  cards: DeckCard[]
 ): DeckValidation {
-  void _format;
-
   const results: ValidationResult[] = [];
   const stats = computeStats(cards);
 

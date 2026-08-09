@@ -158,7 +158,7 @@ export async function requirePlayableDeck(
     const card = cardById.get(deckCard.cardId);
     return card ? [toValidationCard(deckCard, card)] : [];
   });
-  const validation = validateDeck(leader, validationCards, deck.format);
+  const validation = validateDeck(leader, validationCards);
   const results = [...validation.results];
 
   if (leaderCard && leaderCard.type !== "Leader") {

@@ -94,10 +94,6 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
       "color",
     ],
     "src/components/deck-builder/deck-builder-search.tsx": ["background"],
-    "src/components/deck-builder/deck-builder-stats.tsx": [
-      "background",
-      "opacity",
-    ],
     // Fixed map-art treatments.
     "src/app/page.tsx": ["backgroundImage", "filter"],
     // Runtime board, drag, and animation state.

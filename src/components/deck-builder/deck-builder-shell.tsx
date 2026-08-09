@@ -132,8 +132,8 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
           effectText: state.leader.effectText || "",
         }
       : null;
-    return validateDeck(leaderForValidation, cardsArray, state.format);
-  }, [state.leader, state.cards, state.format]);
+    return validateDeck(leaderForValidation, cardsArray);
+  }, [state.leader, state.cards]);
 
   // Save deck
   const saveDeck = useCallback(async () => {

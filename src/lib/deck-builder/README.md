@@ -37,7 +37,7 @@ See the reducer cases in [`state.ts`](./state.ts) for exact transition behavior.
 
 ## Validation
 
-`validateDeck(leader, cards, format)` returns `{ isValid, results, stats }`.
+`validateDeck(leader, cards)` returns `{ isValid, results, stats }`.
 Current error checks cover leader presence, exactly 50 main-deck cards, copy
 limits (including schema-authored unlimited overrides), leader color affinity,
 schema-authored leader deck restrictions, banned/restricted cards, and Leader
