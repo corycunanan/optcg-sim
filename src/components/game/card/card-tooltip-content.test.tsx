@@ -121,20 +121,49 @@ function extractEffectBody(markup: string): string {
   return markup.slice(start, end + "</div>".length);
 }
 
-function legacyEffectBody(effectText: string): string {
-  const paragraphs = effectText
-    .split(/\n{2,}/)
-    .map(
-      (paragraph) =>
-        `<p class="whitespace-pre-wrap">${paragraph}</p>`
-    )
-    .join("");
-
-  return `<div class="${EFFECT_WRAPPER_CLASS}">${paragraphs}</div>`;
+/** Tags become spaces so adjacent badge/text spans stay word-separated. */
+function textOf(markup: string): string {
+  return markup.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function expectLegacyEffectBody(markup: string, effectText = LEGACY_EFFECT_TEXT) {
-  expect(extractEffectBody(markup)).toBe(legacyEffectBody(effectText));
+/**
+ * Nothing is lost or invented when bracket tokens move into badges: the body's
+ * text content matches the source clause text with its brackets removed.
+ */
+function expectContentPreserved(effectBody: string, effectText: string) {
+  expect(textOf(effectBody)).toBe(
+    effectText.replace(/[[\]]/g, " ").replace(/\s+/g, " ").trim()
+  );
+}
+
+function expectNoAvailabilityStyling(effectBody: string) {
+  expect(effectBody).not.toContain("text-gb-text-bright");
+  expect(effectBody).not.toContain("text-gb-accent-green");
+  expect(effectBody).not.toContain("text-gb-text-muted");
+  expect(effectBody).not.toContain("used this turn");
+  expect(effectBody).not.toContain("cost unavailable");
+}
+
+/**
+ * The Tier-5 structure is unconditional: every clause shows its condition
+ * badges and its exact remaining text even when no availability is known.
+ */
+function expectUngradedClauseBody(
+  markup: string,
+  effectText = LEGACY_EFFECT_TEXT
+): string {
+  const effectBody = extractEffectBody(markup);
+
+  expect(effectBody).toContain(">On Play</span>");
+  expect(effectBody).toContain(">Activate: Main</span>");
+  expect(effectBody).not.toContain("[On Play]");
+  expect(effectBody).toContain("Draw 1 card.  ");
+  expect(effectBody).toContain("Rest this card. \t");
+  expect(effectBody).toContain("Trailing paragraph.  ");
+  expectNoAvailabilityStyling(effectBody);
+  expectContentPreserved(effectBody, effectText);
+
+  return effectBody;
 }
 
 function openingTagForBlock(effectBody: string, blockId: string): string {
@@ -147,16 +176,16 @@ function openingTagForBlock(effectBody: string, blockId: string): string {
 }
 
 describe("CardTooltipContent effect availability", () => {
-  it("preserves exact legacy paragraphs outside the provider", () => {
-    expectLegacyEffectBody(renderTooltip({ withProvider: false }));
+  it("badges and preserves every clause outside the provider", () => {
+    expectUngradedClauseBody(renderTooltip({ withProvider: false }));
   });
 
-  it("preserves exact legacy paragraphs when the provider has no card entries", () => {
-    expectLegacyEffectBody(renderTooltip({ effectAvailability: {} }));
+  it("badges and preserves every clause when the provider has no card entries", () => {
+    expectUngradedClauseBody(renderTooltip({ effectAvailability: {} }));
   });
 
-  it("preserves exact legacy paragraphs when the card instance is null", () => {
-    expectLegacyEffectBody(
+  it("badges and preserves every clause when the card instance is null", () => {
+    expectUngradedClauseBody(
       renderTooltip({
         cardInstance: null,
         effectAvailability: {
@@ -166,8 +195,8 @@ describe("CardTooltipContent effect availability", () => {
     );
   });
 
-  it("preserves exact legacy paragraphs for an unparseable schema", () => {
-    expectLegacyEffectBody(
+  it("badges and preserves every clause for an unparseable schema", () => {
+    const effectBody = expectUngradedClauseBody(
       renderTooltip({
         cardData: { ...data, effectSchema: null },
         effectAvailability: {
@@ -175,9 +204,11 @@ describe("CardTooltipContent effect availability", () => {
         },
       })
     );
+
+    expect(effectBody).not.toContain("data-effect-block");
   });
 
-  it("preserves exact legacy paragraphs when every clause is ambiguous", () => {
+  it("badges and preserves every clause when every clause is ambiguous", () => {
     const ambiguousData: CardData = {
       ...data,
       effectSchema: {
@@ -206,7 +237,7 @@ describe("CardTooltipContent effect availability", () => {
       },
     };
 
-    expectLegacyEffectBody(
+    const effectBody = expectUngradedClauseBody(
       renderTooltip({
         cardData: ambiguousData,
         effectAvailability: {
@@ -214,6 +245,8 @@ describe("CardTooltipContent effect availability", () => {
         },
       })
     );
+
+    expect(effectBody).not.toContain("data-effect-block");
   });
 
   it("greys only the unavailable clause and keeps every clause's own text", () => {
@@ -265,6 +298,44 @@ describe("CardTooltipContent effect availability", () => {
     expect(effectBody).toContain("Rest this card.");
     // Badges inherit the clause colour, so they grey with it.
     expect(effectBody).not.toContain("[Activate: Main]");
+  });
+
+  it("keeps the separator between alternative timing tokens", () => {
+    const effectText = "[Main]/[Counter] Draw 1 card.";
+    const effectBody = extractEffectBody(
+      renderTooltip({
+        cardData: { ...data, effectText },
+        effectAvailability: {},
+      })
+    );
+
+    expect(effectBody).toContain(">Main</span><span>/</span>");
+    expect(effectBody).toContain(">Counter</span>");
+    expect(effectBody).toContain("Draw 1 card.");
+    expectContentPreserved(effectBody, effectText);
+  });
+
+  it("greys a clause's condition badges along with the clause", () => {
+    const effectBody = extractEffectBody(
+      renderTooltip({
+        effectAvailability: {
+          "card-1": [
+            {
+              effectId: "activate-main",
+              status: "blocked",
+              reason: "CONDITION",
+            },
+          ],
+        },
+      })
+    );
+    const blockedTag = openingTagForBlock(effectBody, "activate-main");
+
+    // The badge carries no colour of its own, so it inherits the greyed clause.
+    expect(blockedTag).toContain("text-gb-text-muted");
+    expect(effectBody).toContain(">Activate: Main</span>");
+    expect(effectBody).not.toContain("text-gb-text-muted bg-gb-surface-raised");
+    expect(effectBody).toContain("condition not met");
   });
 });
 

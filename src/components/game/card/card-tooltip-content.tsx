@@ -39,22 +39,33 @@ import {
 /** Leading `[…]` tokens on a clause line, e.g. `[On Play]`, `[Once Per Turn]`. */
 const LEADING_CLAUSE_TOKENS = /^(?:\[[^\]]+\]\s*\/?\s*)+/;
 
+interface ClauseBadge {
+  label: string;
+  /** Literal separator printed after this badge, e.g. the `/` in `[Main]/[Counter]`. */
+  separator: string | null;
+}
+
 interface ClauseParts {
-  badges: string[];
+  badges: ClauseBadge[];
   text: string;
 }
 
 /**
  * Splits a clause's leading bracket tokens off as condition badges. Content is
- * only re-homed, never rewritten: the badges hold the bracket labels and the
- * remainder keeps its original spacing.
+ * only re-homed, never rewritten: the badges hold the bracket labels, any
+ * separator between two tokens is preserved (`[Main]/[Counter]` keeps its "or"
+ * relationship), and the remainder keeps its original spacing.
  */
 function splitClauseBadges(line: string): ClauseParts {
   const match = line.match(LEADING_CLAUSE_TOKENS);
   if (!match) return { badges: [], text: line };
 
-  const badges = Array.from(match[0].matchAll(/\[([^\]]+)\]/g), (token) =>
-    token[1].trim()
+  const badges = Array.from(
+    match[0].matchAll(/\[([^\]]+)\]([^[]*)/g),
+    (token): ClauseBadge => {
+      const trailing = token[2].trim();
+      return { label: token[1].trim(), separator: trailing || null };
+    }
   );
 
   return { badges, text: line.slice(match[0].length) };
@@ -144,11 +155,6 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   const cardAvailability = instanceId
     ? getCardAvailability(instanceId)
     : [];
-  const hasAvailableClause = effectClauses.some(
-    (clause) =>
-      clause.blockId &&
-      cardAvailability.some((entry) => entry.effectId === clause.blockId)
-  );
   const statuses = buildTooltipStatuses({
     card,
     instanceId,
@@ -225,61 +231,65 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
 
       {data.effectText && (
         <div className="text-gb-text flex flex-col gap-3 text-xs leading-relaxed">
-          {!hasAvailableClause
-            ? data.effectText.split(/\n{2,}/).map((paragraph, i) => (
-                <p key={i} className="whitespace-pre-wrap">{paragraph}</p>
-              ))
-            : (() => {
-                let clauseIndex = 0;
+          {(() => {
+            let clauseIndex = 0;
 
-                return data.effectText.split(/\n{2,}/).map((paragraph, i) => (
-                  <p key={i} className="whitespace-pre-wrap">
-                    {paragraph.split(/(\r?\n)/).map((line, lineIndex) => {
-                      if (/^\r?\n$/.test(line) || line.trim().length === 0) {
-                        return line;
-                      }
+            // Structure is unconditional: every clause gets its condition
+            // badges. Availability only decides greying and the trailing
+            // reason badge, so a card rendered without availability data (a
+            // hand card, a deck preview, an unmatched schema) still reads as
+            // Tier 5 rather than falling back to raw bracket tokens.
+            return data.effectText.split(/\n{2,}/).map((paragraph, i) => (
+              <p key={i} className="whitespace-pre-wrap">
+                {paragraph.split(/(\r?\n)/).map((line, lineIndex) => {
+                  if (/^\r?\n$/.test(line) || line.trim().length === 0) {
+                    return line;
+                  }
 
-                      const clause = effectClauses[clauseIndex++];
-                      const availability = clause?.blockId
-                        ? getEffectStatus(instanceId, clause.blockId)
-                        : null;
-                      const blockedReason = availability?.reason
-                        ? BLOCKED_REASON_COPY[availability.reason]
+                  const clause = effectClauses[clauseIndex++];
+                  const availability = clause?.blockId
+                    ? getEffectStatus(instanceId, clause.blockId)
+                    : null;
+                  const blockedReason = availability?.reason
+                    ? BLOCKED_REASON_COPY[availability.reason]
+                    : undefined;
+                  const suffix =
+                    availability?.status === "used"
+                      ? "used this turn"
+                      : availability?.status === "blocked"
+                        ? blockedReason
                         : undefined;
-                      const suffix =
-                        availability?.status === "used"
-                          ? "used this turn"
-                          : availability?.status === "blocked"
-                            ? blockedReason
-                            : undefined;
-                      const { badges, text } = splitClauseBadges(line);
+                  const { badges, text } = splitClauseBadges(line);
 
-                      return (
-                        <span
-                          key={lineIndex}
-                          data-effect-block={clause?.blockId ?? undefined}
-                          className={cn(
-                            "inline-flex flex-wrap items-center gap-2",
-                            availability?.status === "usable" &&
-                              "text-gb-text-bright",
-                            availability?.status === "active" &&
-                              "text-gb-accent-green",
-                            (availability?.status === "used" ||
-                              availability?.status === "blocked") &&
-                              "text-gb-text-muted"
-                          )}
-                        >
-                          {badges.map((badge, badgeIndex) => (
-                            <TooltipBadge key={badgeIndex}>{badge}</TooltipBadge>
-                          ))}
-                          {text && <span className="whitespace-pre-wrap">{text}</span>}
-                          {suffix && <TooltipBadge>{suffix}</TooltipBadge>}
-                        </span>
-                      );
-                    })}
-                  </p>
-                ));
-              })()}
+                  return (
+                    <span
+                      key={lineIndex}
+                      data-effect-block={clause?.blockId ?? undefined}
+                      className={cn(
+                        "inline-flex flex-wrap items-center gap-2",
+                        availability?.status === "usable" &&
+                          "text-gb-text-bright",
+                        availability?.status === "active" &&
+                          "text-gb-accent-green",
+                        (availability?.status === "used" ||
+                          availability?.status === "blocked") &&
+                          "text-gb-text-muted"
+                      )}
+                    >
+                      {badges.map((badge, badgeIndex) => (
+                        <React.Fragment key={badgeIndex}>
+                          <TooltipBadge>{badge.label}</TooltipBadge>
+                          {badge.separator && <span>{badge.separator}</span>}
+                        </React.Fragment>
+                      ))}
+                      {text && <span className="whitespace-pre-wrap">{text}</span>}
+                      {suffix && <TooltipBadge>{suffix}</TooltipBadge>}
+                    </span>
+                  );
+                })}
+              </p>
+            ));
+          })()}
         </div>
       )}
 
