@@ -26,6 +26,7 @@ import {
   collectDeckRestrictionRules,
   isCardAllowedByDeckRestrictionRules,
 } from "@/lib/deck-builder/validation";
+import { COLORS, COLOR_BG } from "@/lib/cards/colors-ui";
 
 interface DeckBuilderSearchProps {
   onAddCard: (card: DeckCardEntry["card"]) => void;
@@ -35,18 +36,7 @@ interface DeckBuilderSearchProps {
   leader: DeckLeaderEntry | null;
 }
 
-const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const TYPES = ["Leader", "Character", "Event", "Stage"];
-
-// Card color backgrounds (dynamic — CSS variables only, no hardcoded hex)
-const COLOR_BG: Record<string, string> = {
-  Red: "var(--card-red)",
-  Blue: "var(--card-blue)",
-  Green: "var(--card-green)",
-  Purple: "var(--card-purple)",
-  Black: "var(--card-black)",
-  Yellow: "var(--card-yellow)",
-};
 
 export function DeckBuilderSearch({
   onAddCard,

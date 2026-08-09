@@ -11,7 +11,8 @@ import {
   PageHeaderActions,
 } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { DeckList, type DeckListItem } from "./deck-list";
+import type { DeckListItem } from "./deck-list";
+import { DeckListFilter } from "./deck-list-filter";
 
 export const metadata = {
   title: "My Decks — OPTCG Simulator",
@@ -125,7 +126,7 @@ export default async function DecksPage() {
             </Link>
           </div>
         ) : (
-          <DeckList decks={items} />
+          <DeckListFilter decks={items} />
         )}
       </div>
     </div>
