@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { EllipsisVertical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, apiDelete } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,9 +28,19 @@ import {
 interface DeckDeleteButtonProps {
   deckId: string;
   deckName: string;
+  /**
+   * Placement is the caller's job — the trigger owns only its size, its
+   * hover/focus reveal, and its menu. `/decks` drops it into the row's
+   * metadata cluster; other surfaces may position it absolutely.
+   */
+  className?: string;
 }
 
-export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
+export function DeckDeleteButton({
+  deckId,
+  deckName,
+  className,
+}: DeckDeleteButtonProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
@@ -59,7 +70,10 @@ export function DeckDeleteButton({ deckId, deckName }: DeckDeleteButtonProps) {
             variant="secondary"
             size="icon"
             aria-label={`More actions for ${deckName}`}
-            className="absolute top-2 right-2 size-12 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:data-[state=open]:opacity-100"
+            className={cn(
+              "size-12 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:data-[state=open]:opacity-100",
+              className
+            )}
           >
             <EllipsisVertical />
           </Button>

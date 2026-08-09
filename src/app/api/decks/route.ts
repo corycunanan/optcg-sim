@@ -12,6 +12,7 @@ import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
 import { findCopyLimitViolations } from "@/lib/decks/copy-limits";
 import { CARD_SELECT } from "@/lib/decks/card-select";
+import { collectDeckColors } from "@/lib/decks/colors";
 
 export async function GET() {
   const authResult = await requireAuth();
@@ -45,15 +46,21 @@ export async function GET() {
             },
           },
         },
-        leader: { select: { id: true, name: true, imageUrl: true } },
+        leader: {
+          select: { id: true, name: true, color: true, imageUrl: true },
+        },
       },
     });
 
     // Transform to include computed fields
     const data = decks.map((deck) => {
       const totalCards = deck.cards.reduce((sum, dc) => sum + dc.quantity, 0);
-      const colors = new Set<string>();
-      deck.cards.forEach((dc) => dc.card.color.forEach((c) => colors.add(c)));
+      // OPT-617 — leader-inclusive, shared with the /decks page so the dots
+      // there and the colours here can never disagree.
+      const colors = collectDeckColors(
+        deck.leader.color,
+        deck.cards.map((dc) => dc.card.color)
+      );
 
       return {
         id: deck.id,
@@ -63,7 +70,7 @@ export async function GET() {
         leaderImageUrl: deck.leaderArtUrl ?? deck.leader.imageUrl,
         format: deck.format,
         totalCards,
-        colors: Array.from(colors),
+        colors,
         coverImage: deck.cards[0]?.card.imageUrl ?? null,
         createdAt: deck.createdAt,
         updatedAt: deck.updatedAt,

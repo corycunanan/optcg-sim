@@ -1,3 +1,4 @@
+import { ChamferFrame } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DecksLoading() {
@@ -18,26 +19,30 @@ export default function DecksLoading() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-6 py-8 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Mirrors the row list: same chamfer, same surface step, same gap. */}
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-8">
         {Array.from({ length: 6 }).map((_, index) => (
-          <div
+          <ChamferFrame
             key={index}
-            className="border-border bg-card overflow-hidden rounded border"
+            cut="lg"
+            surfaceClassName="bg-surface-1 flex items-center gap-4 p-4"
             aria-hidden="true"
           >
-            <Skeleton className="h-36 w-full rounded-none" />
-            <div className="space-y-2 p-4">
-              <Skeleton className="h-4 w-3/5" />
-              <Skeleton className="h-3 w-4/5" />
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex gap-2">
-                  <Skeleton className="h-3 w-3 rounded-full" />
-                  <Skeleton className="h-3 w-3 rounded-full" />
-                </div>
-                <Skeleton className="h-3 w-20" />
+            {/* The card silhouette keeps its radius; the rest stays square. */}
+            <Skeleton className="aspect-card w-14 shrink-0 rounded" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-4 w-2/5 rounded-none" />
+                <Skeleton className="h-3 w-1/4 rounded-none" />
+              </div>
+              <div className="flex shrink-0 items-center gap-4">
+                <Skeleton className="size-3 rounded-full" />
+                <Skeleton className="h-3 w-12 rounded-none" />
+                <Skeleton className="h-3 w-20 rounded-none" />
+                <Skeleton className="size-12" />
               </div>
             </div>
-          </div>
+          </ChamferFrame>
         ))}
       </div>
       <span className="sr-only">Loading your decks…</span>
