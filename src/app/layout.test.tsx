@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,17 +91,24 @@ describe("RootLayout theme stamping", () => {
 });
 
 describe("RootLayout shell geometry", () => {
-  it("renders the navbar above the shared content and social row", async () => {
+  it("renders the navbar inside the content column beside the social shell", async () => {
     const html = renderToStaticMarkup(
       await RootLayout({ children: <div>content</div> })
     );
+    const document = new DOMParser().parseFromString(html, "text/html");
+    const appShell = document.querySelector('[data-slot="app-shell"]');
+    const contentColumn = document.querySelector(
+      '[data-slot="app-content-column"]'
+    );
+    const navbar = document.querySelector('[data-testid="navbar"]');
+    const main = document.querySelector("main");
+    const socialShell = document.querySelector('[data-testid="social-shell"]');
 
-    const navbarIndex = html.indexOf('data-testid="navbar"');
-    const contentRowIndex = html.indexOf('data-slot="app-content-row"');
-    const socialShellIndex = html.indexOf('data-testid="social-shell"');
-
-    expect(navbarIndex).toBeGreaterThan(-1);
-    expect(contentRowIndex).toBeGreaterThan(navbarIndex);
-    expect(socialShellIndex).toBeGreaterThan(contentRowIndex);
+    expect(contentColumn?.parentElement).toBe(appShell);
+    expect(navbar?.parentElement).toBe(contentColumn);
+    expect(main?.parentElement).toBe(contentColumn);
+    expect(socialShell?.parentElement).toBe(appShell);
+    expect(socialShell?.previousElementSibling).toBe(contentColumn);
+    expect(document.querySelector('[data-slot="app-content-row"]')).toBeNull();
   });
 });

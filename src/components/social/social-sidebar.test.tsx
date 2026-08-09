@@ -161,13 +161,18 @@ describe("SocialSidebar", () => {
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
   });
 
-  it("pins the rail below the navbar through the viewport bottom", () => {
+  it("pins the rail across the full viewport height", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector('[data-slot="sidebar"]');
+    const content = container.querySelector('[data-slot="sidebar-content"]');
 
     expect(rail?.className).toContain("fixed");
-    expect(rail?.className).toContain("top-16");
-    expect(rail?.className).toContain("bottom-0");
+    expect(rail?.className).toContain("inset-y-0");
+    expect(rail?.className).not.toContain("top-16");
+    expect(rail?.className).not.toContain("h-auto");
+    expect(content?.className).toContain("min-h-0");
+    expect(content?.className).toContain("flex-1");
+    expect(content?.className).toContain("overflow-auto");
   });
 
   it("does not fetch or render incoming friend requests", async () => {
