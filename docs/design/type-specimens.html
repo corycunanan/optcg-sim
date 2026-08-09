@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPTCG Typography — Type Ramp Specimens</title>
+<!-- Optional: Geist for the §8 before/after comparison only. Degrades to system sans offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Fonts (repo-relative; open this file from docs/design/) ── */
+  @font-face {
+    font-family: "Erode";
+    src: url("../../src/app/fonts/Erode-Variable.woff2") format("woff2");
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Public Sans";
+    src: url("../../src/app/fonts/PublicSans-Variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  /* ── Tokens (mirrors globals.css warm-navy defaults) ── */
+  :root {
+    --surface-page:  oklch(22% 0.04 245);
+    --surface-panel: oklch(27% 0.04 245);
+    --surface-inset: oklch(37% 0.035 245);
+    --surface-info:  oklch(15% 0.02 245);
+    --text-primary:  #f4f6fb;
+    --text-secondary: rgba(255, 255, 255, 0.72);
+    --text-tertiary:  rgba(255, 255, 255, 0.58);
+    --border-subtle:  rgba(255, 255, 255, 0.10);
+    --border-default: rgba(255, 255, 255, 0.14);
+    --gold-500: oklch(78% 0.14 75);
+    --accent-text: oklch(78% 0.12 75);
+    --red-600: oklch(70% 0.17 25);
+    --sans: "Public Sans", system-ui, sans-serif;
+    --display: "Erode", var(--sans);
+    --mono: ui-monospace, "SF Mono", Menlo, monospace; /* Geist Mono stand-in */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--surface-page);
+    color: var(--text-primary);
+    font: 400 14px/1.5 var(--sans);
+    padding: 48px clamp(24px, 6vw, 96px) 96px;
+  }
+  header h1 {
+    font-size: 20px; font-weight: 300; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--text-secondary); font-family: var(--sans);
+  }
+  header p { color: var(--text-tertiary); font-size: 13px; margin-top: 6px; max-width: 70ch; }
+
+  section { margin-top: 64px; }
+  section > h2 {
+    font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent-text); border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 8px; margin-bottom: 8px;
+  }
+  section > .note { font-size: 13px; color: var(--text-tertiary); margin-bottom: 8px; max-width: 70ch; }
+
+  .row {
+    display: grid; grid-template-columns: 260px 1fr; gap: 32px;
+    padding: 20px 0; border-bottom: 1px solid var(--border-subtle);
+    align-items: baseline;
+  }
+  .row:last-child { border-bottom: none; }
+  .meta .role { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .meta .recipe { font-family: var(--mono); font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: block; }
+  .meta .use { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; max-width: 34ch; }
+  @media (max-width: 760px) { .row { grid-template-columns: 1fr; gap: 8px; } }
+
+  /* ── Display roles (Erode 600 uppercase .025em — the .font-display lock) ── */
+  .d { font-family: var(--display); font-weight: 600; text-transform: uppercase; letter-spacing: .025em; }
+  .display-hero-home { font-size: 60px; line-height: 1; }
+  .display-hero-auth { font-size: 48px; line-height: 1; }
+  .title-page       { font-size: 30px; }
+  .title-section    { font-size: 24px; }
+  .title-subsection { font-size: 20px; }
+
+  /* ── Sans roles ── */
+  .heading    { font-size: 18px; font-weight: 600; }
+  .subheading { font-size: 16px; font-weight: 600; }
+  .body       { font-size: 14px; }
+  .body-prose { font-size: 14px; line-height: 1.625; max-width: 65ch; color: var(--text-secondary); }
+  .body-lg    { font-size: 16px; line-height: 1.625; max-width: 65ch; }
+  .label      { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+  .overline   { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--text-tertiary); }
+  .caption    { font-size: 12px; color: var(--text-tertiary); }
+
+  /* ── Mono roles ── */
+  .code       { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .code-entry { font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: .1em; }
+  .code-block { font-family: var(--mono); font-size: 12px; word-break: break-all; color: var(--text-tertiary); }
+
+  /* ── Component mocks ── */
+  .badge {
+    display: inline-block; font-size: 12px; font-weight: 500;
+    background: var(--surface-inset); border: 1px solid var(--border-default);
+    border-radius: 4px; padding: 2px 8px;
+  }
+  .btn {
+    display: inline-block; font-size: 14px; font-weight: 500;
+    background: var(--gold-500); color: oklch(25% 0.05 75);
+    border-radius: 8px; padding: 8px 16px;
+  }
+  .btn-sm { font-size: 12px; padding: 4px 12px; }
+  .panel {
+    background: var(--surface-panel); border: 1px solid var(--border-subtle);
+    border-radius: 12px; padding: 24px; max-width: 420px;
+  }
+  .input {
+    font-size: 14px; color: var(--text-tertiary);
+    background: var(--surface-inset); border: 1px solid var(--border-default);
+    border-radius: 8px; padding: 8px 12px; margin-top: 6px; max-width: 280px;
+  }
+  .toast {
+    background: var(--surface-panel); border: 1px solid var(--border-subtle);
+    border-radius: 8px; padding: 12px 16px; max-width: 340px;
+  }
+
+  /* ── Weight / tracking demo helpers ── */
+  .w400 { font-weight: 400; } .w500 { font-weight: 500; } .w600 { font-weight: 600; }
+  .w700 { font-weight: 700; text-decoration: line-through; text-decoration-color: var(--red-600); text-decoration-thickness: 2px; }
+  .big { font-size: 24px; }
+
+  .scaled-board {
+    background: var(--surface-info); border: 1px solid var(--border-default);
+    border-radius: 8px; padding: 16px; width: 420px;
+    transform: scale(.59); transform-origin: top left;
+  }
+  .scale-wrap { height: 120px; }
+  .board-overline { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-tertiary); }
+  .board-body { font-size: 18px; }
+  .board-counter { font-size: 16px; font-variant-numeric: tabular-nums; }
+  .bad-xs { font-size: 12px; color: var(--red-600); }
+
+  .geist { font-family: "Geist", system-ui, sans-serif; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 900px; }
+  .compare h3 { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 12px; }
+  .compare p { font-size: 14px; line-height: 1.625; color: var(--text-secondary); margin-bottom: 12px; }
+  .compare .h { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+  @media (max-width: 760px) { .compare { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>OPTCG Typography — Type Ramp</h1>
+  <p>Living specimen for <code>docs/design/TYPOGRAPHY.md</code>. Erode (display) and Public Sans (body) load
+     from <code>src/app/fonts/</code> — open this file from a checkout. Mono roles render in a system stand-in
+     for Geist Mono. Text picks a role, not a size: if a combination isn't on this sheet, it isn't in the system.</p>
+</header>
+
+<section>
+  <h2>1 · Display roles — Erode 600, uppercase, 0.025em (atomic)</h2>
+  <div class="row">
+    <div class="meta"><div class="role">display-hero</div><code class="recipe">font-display text-6xl / text-5xl leading-none</code><div class="use">Home (60px) and auth (48px) heroes only. One per page.</div></div>
+    <div><div class="d display-hero-home">Set Sail</div><div class="d display-hero-auth" style="margin-top:12px">Welcome Back</div></div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">title-page</div><code class="recipe">font-display text-3xl</code><div class="use">The h1 of a page (PageHeaderTitle). Exactly one.</div></div>
+    <div class="d title-page">Deck Builder</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">title-section</div><code class="recipe">font-display text-2xl</code><div class="use">h2 — major page regions.</div></div>
+    <div class="d title-section">Battle Lobby</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">title-subsection</div><code class="recipe">font-display text-xl</code><div class="use">h3 — smallest display size. Below 20px, sans takes over.</div></div>
+    <div class="d title-subsection">Recent Matches</div>
+  </div>
+</section>
+
+<section>
+  <h2>2 · Sans roles — Public Sans 400 / 500 / 600</h2>
+  <div class="row">
+    <div class="meta"><div class="role">heading</div><code class="recipe">text-lg font-semibold text-content-primary</code><div class="use">Dialog/Sheet/panel titles. Primitive default.</div></div>
+    <div class="heading">Confirm your deck</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">subheading</div><code class="recipe">text-base font-semibold</code><div class="use">Card titles, list-group headers, card names.</div></div>
+    <div class="subheading">Monkey.D.Luffy</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">body</div><code class="recipe">text-sm (+ leading-relaxed max-w-prose multiline)</code><div class="use">Default UI body.</div></div>
+    <div class="body-prose">When your Leader would take damage, you may trash the top card of your deck instead. If it has a Trigger, activate it. Then, rest this card and draw one card for each DON!! attached.</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">body-lg</div><code class="recipe">text-base leading-relaxed</code><div class="use">Long-form / featured copy; body floor inside the board.</div></div>
+    <div class="body-lg">Build a 50-card deck around your Leader, then test it in a live match against a friend.</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">label</div><code class="recipe">text-sm font-medium text-content-secondary</code><div class="use">Form labels, menu labels, key–value keys. Label primitive.</div></div>
+    <div class="label">Deck name</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">overline</div><code class="recipe">text-xs font-semibold uppercase tracking-widest text-content-tertiary</code><div class="use">Eyebrows, filter-group headers, zone/stat titles.</div></div>
+    <div class="overline">Card Effects</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">caption</div><code class="recipe">text-xs text-content-tertiary</code><div class="use">Timestamps, metadata, hints.</div></div>
+    <div class="caption">Last edited 3 hours ago · 50 cards</div>
+  </div>
+</section>
+
+<section>
+  <h2>3 · Mono roles — Geist Mono (stand-in shown)</h2>
+  <div class="row">
+    <div class="meta"><div class="role">code</div><code class="recipe">font-mono text-xs font-semibold</code><div class="use">Card / set IDs.</div></div>
+    <div class="code">OP01-001 · ST30-004</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">code-entry</div><code class="recipe">font-mono text-sm font-semibold tracking-widest</code><div class="use">Join codes humans transcribe.</div></div>
+    <div class="code-entry">XK4-9QN</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">code-block</div><code class="recipe">font-mono text-xs break-all</code><div class="use">Error digests, import/export text.</div></div>
+    <div class="code-block">digest: 3f9a1c77b2e64d0a8c5f12ab90de34f6</div>
+  </div>
+</section>
+
+<section>
+  <h2>4 · Weights — 400 / 500 / 600, nothing heavier</h2>
+  <p class="note">Public Sans renders exactly three weights. 700+ is not part of the sans system — Erode owns loud.</p>
+  <div class="row">
+    <div class="meta"><div class="role">400 · reading</div><code class="recipe">(default)</code></div>
+    <div class="big w400">The crew gathers at Water Seven</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">500 · interactive</div><code class="recipe">font-medium</code></div>
+    <div class="big w500">The crew gathers at Water Seven</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">600 · structural</div><code class="recipe">font-semibold</code></div>
+    <div class="big w600">The crew gathers at Water Seven</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">700 · banned</div><code class="recipe">font-bold — migrate to 600</code></div>
+    <div class="big w700">The crew gathers at Water Seven</div>
+  </div>
+</section>
+
+<section>
+  <h2>5 · Case &amp; tracking — a function of size</h2>
+  <div class="row">
+    <div class="meta"><div class="role">≤ text-sm</div><code class="recipe">uppercase tracking-widest (0.1em)</code></div>
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;">Filter by color</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">text-base / text-lg</div><code class="recipe">uppercase tracking-wider (0.05em)</code></div>
+    <div style="font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Character Zone</div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">above text-lg</div><code class="recipe">use a display role instead</code></div>
+    <div class="d title-section">Erode Owns Large Uppercase</div>
+  </div>
+</section>
+
+<section>
+  <h2>6 · Primitives with their defaults baked in</h2>
+  <div class="row">
+    <div class="meta"><div class="role">Badge · Button</div><code class="recipe">text-xs font-medium · text-sm font-medium</code></div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <span class="badge">Leader</span><span class="badge">OP01</span>
+      <span class="btn">Start Match</span><span class="btn btn-sm">Copy</span>
+    </div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">Dialog</div><code class="recipe">title: heading · description: body</code></div>
+    <div class="panel">
+      <div class="heading">Leave this lobby?</div>
+      <div class="body" style="color:var(--text-secondary);margin-top:8px;">Your seat opens up for other players and your ready state is cleared.</div>
+      <div style="margin-top:16px;display:flex;gap:8px;"><span class="btn btn-sm">Leave</span><span class="badge" style="padding:4px 12px;">Cancel</span></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">Label + Input</div><code class="recipe">label: text-sm font-medium</code></div>
+    <div><div class="label">Lobby name</div><div class="input">Thousand Sunny — casual</div></div>
+  </div>
+  <div class="row">
+    <div class="meta"><div class="role">Toast</div><code class="recipe">title: text-sm font-medium · description: text-xs</code></div>
+    <div class="toast"><div style="font-size:14px;font-weight:500;">Deck saved</div><div class="caption" style="margin-top:2px;">“Red Luffy Aggro” — 50 cards, legal</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>7 · Inside-board floor — why 12px is banned on the board</h2>
+  <p class="note">The board subtree renders at ~0.59 scale at the floor viewport. Both panels below are scaled to 0.59:
+     chrome sizes collapse, board roles hold. Red line = chrome text-xs after scaling (~7px effective).</p>
+  <div class="row">
+    <div class="meta"><div class="role">board roles</div><code class="recipe">overline → text-base wider · body → text-lg · counters → text-base tabular-nums</code></div>
+    <div class="scale-wrap">
+      <div class="scaled-board">
+        <div class="board-overline">Character Zone</div>
+        <div class="board-body" style="margin-top:6px;">Roronoa Zoro — 5000</div>
+        <div class="board-counter" style="margin-top:4px;color:var(--text-secondary);">DON!! 4/10 · Life 3</div>
+        <div class="bad-xs" style="margin-top:8px;">this is chrome text-xs — illegible at board scale</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>8 · Before / after — Geist vs Public Sans</h2>
+  <p class="note">Geist loads from Google Fonts for this comparison only (falls back to system sans offline).</p>
+  <div class="compare">
+    <div class="geist">
+      <h3 style="font-family:var(--sans);">Before — Geist Sans</h3>
+      <div class="h">Straw Hat Crew</div>
+      <p>Search 3,000+ cards, build tournament-legal decks, and battle in real time. Card costs 4 · Power 6000 · Counter +1000.</p>
+      <p style="font-weight:500;">Medium label · <span style="font-weight:600;">Semibold heading</span></p>
+    </div>
+    <div>
+      <h3>After — Public Sans</h3>
+      <div class="h">Straw Hat Crew</div>
+      <p>Search 3,000+ cards, build tournament-legal decks, and battle in real time. Card costs 4 · Power 6000 · Counter +1000.</p>
+      <p style="font-weight:500;">Medium label · <span style="font-weight:600;">Semibold heading</span></p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

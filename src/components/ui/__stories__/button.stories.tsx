@@ -68,7 +68,7 @@ export const DisplayFontProof: Story = {
     <div className="flex flex-col items-center gap-4">
       <h1 className="font-display text-3xl">One Piece TCG</h1>
       <p className="font-sans text-base text-content-secondary">
-        Geist Sans body — Erode heading.
+        Public Sans body — Erode heading.
       </p>
       <Button>Confirm</Button>
     </div>

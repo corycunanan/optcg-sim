@@ -341,7 +341,7 @@
 
 @theme inline {
   /* Fonts */
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-public-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-erode);
 
@@ -519,7 +519,12 @@
 }
 
 /* ─── Display Font Treatment ─────────────────────────────────── */
-/* Display headings use uppercase Erode Semibold. */
+/* Display headings use uppercase Erode Semibold. The family comes from
+   the Tailwind `font-display` utility (via --font-display in @theme);
+   this unlayered rule supplies the locked treatment. Unlayered on
+   purpose: the display treatment is atomic and must not be overridden
+   by per-component weight/case/tracking utilities.
+   See docs/design/TYPOGRAPHY.md. */
 
 .font-display {
   font-weight: 600;
@@ -530,7 +535,7 @@
 
 /* Global navbar links use the locked Erode navigation treatment. */
 .font-nav {
-  font-family: var(--font-erode), var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-erode), var(--font-public-sans), system-ui, sans-serif;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -557,7 +562,7 @@ body {
   overflow: hidden;
   background: var(--surface-page);
   color: var(--text-primary);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-public-sans), system-ui, sans-serif;
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────── */
