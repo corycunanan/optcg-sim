@@ -269,7 +269,6 @@ describe("notifyLobby production database cost", () => {
       characters: [
         {
           id: "OP01-024",
-          cardId: "OP01-024",
           name: "Known Character",
           quantity: 4,
           imageUrl: "/known-alt.png",

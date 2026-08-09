@@ -24,7 +24,6 @@ export type LobbyRoomStatus =
 
 export interface LobbyRoomDeckCard {
   id: string;
-  cardId: string;
   name: string;
   quantity: number;
   imageUrl: string;

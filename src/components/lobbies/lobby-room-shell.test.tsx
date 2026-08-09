@@ -904,7 +904,6 @@ describe("LobbyRoomShell redesign scenarios", () => {
         characters: [
           {
             id: "OP01-024",
-            cardId: "OP01-024",
             name: "Monkey.D.Luffy",
             quantity: 4,
             imageUrl: "/card.png",
@@ -1112,7 +1111,6 @@ describe("LobbyRoomShell redesign scenarios", () => {
         characters: [
           {
             id: "OP01-024",
-            cardId: "OP01-024",
             name: "Private Gum-Gum Card",
             quantity: 4,
             imageUrl: "/card.png",
@@ -1131,7 +1129,6 @@ describe("LobbyRoomShell redesign scenarios", () => {
         characters: [
           {
             id: "OP01-025",
-            cardId: "OP01-025",
             name: "Private Three Sword Card",
             quantity: 4,
             imageUrl: "/card.png",

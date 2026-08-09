@@ -42,7 +42,6 @@ const deck: LobbyRoomDeck = {
     characters: [
       {
         id: "OP01-025",
-        cardId: "OP01-025",
         name: "Roronoa Zoro",
         quantity: 4,
         imageUrl: "/card.png",

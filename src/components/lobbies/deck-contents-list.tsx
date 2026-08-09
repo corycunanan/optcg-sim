@@ -103,12 +103,12 @@ function DeckListRow({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [cardDetails, setCardDetails] = useState<CardDetail | null>(
-    () => cardDetailsCache.get(entry.cardId) ?? null
+    () => cardDetailsCache.get(entry.id) ?? null
   );
 
   const handlePreviewOpenChange = (open: boolean) => {
     if (open && !cardDetails) {
-      setCardDetails(cardDetailsCache.get(entry.cardId) ?? null);
+      setCardDetails(cardDetailsCache.get(entry.id) ?? null);
     }
     setPreviewOpen(open);
   };
@@ -116,15 +116,17 @@ function DeckListRow({
   useEffect(() => {
     if (!previewOpen || cardDetails) return;
 
-    if (cardDetailsCache.has(entry.cardId)) return;
+    if (cardDetailsCache.has(entry.id)) return;
 
     let active = true;
+    // `id` is the canonical card ID assigned by the sole producer,
+    // `groupDeckCards()` in the lobby state builder.
     apiGet(
-      `/api/cards/${encodeURIComponent(entry.cardId)}`,
+      `/api/cards/${encodeURIComponent(entry.id)}`,
       CardDetailResponseSchema
     )
       .then(({ data }) => {
-        cardDetailsCache.set(entry.cardId, data);
+        cardDetailsCache.set(entry.id, data);
         if (active) setCardDetails(data);
       })
       .catch(() => {
@@ -134,7 +136,7 @@ function DeckListRow({
     return () => {
       active = false;
     };
-  }, [cardDetails, entry.cardId, previewOpen]);
+  }, [cardDetails, entry.id, previewOpen]);
 
   if (!previewSide) {
     return (
