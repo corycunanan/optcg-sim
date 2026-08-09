@@ -1,17 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { apiGet } from "@/lib/api-client";
+import {
+  CardDetailResponseSchema,
+  type CardDetail,
+} from "@/lib/validators/cards";
 import type {
   LobbyRoomDeckCard,
   LobbyRoomDeckContents,
 } from "@/lib/lobbies/state";
 import {
+  CardInfoPanel,
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card";
+} from "@/components/ui";
+
+const cardDetailsCache = new Map<string, CardDetail>();
 
 export const DECK_GROUPS = [
   { key: "characters", label: "Characters" },
@@ -94,6 +102,41 @@ function DeckListRow({
   previewSide: "left" | "right" | null;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [cardDetails, setCardDetails] = useState<CardDetail | null>(
+    () => cardDetailsCache.get(entry.id) ?? null
+  );
+
+  const handlePreviewOpenChange = (open: boolean) => {
+    if (open && !cardDetails) {
+      setCardDetails(cardDetailsCache.get(entry.id) ?? null);
+    }
+    setPreviewOpen(open);
+  };
+
+  useEffect(() => {
+    if (!previewOpen || cardDetails) return;
+
+    if (cardDetailsCache.has(entry.id)) return;
+
+    let active = true;
+    // `id` is the canonical card ID assigned by the sole producer,
+    // `groupDeckCards()` in the lobby state builder.
+    apiGet(
+      `/api/cards/${encodeURIComponent(entry.id)}`,
+      CardDetailResponseSchema
+    )
+      .then(({ data }) => {
+        cardDetailsCache.set(entry.id, data);
+        if (active) setCardDetails(data);
+      })
+      .catch(() => {
+        // The existing image-only preview is the intentional failure state.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [cardDetails, entry.id, previewOpen]);
 
   if (!previewSide) {
     return (
@@ -109,8 +152,8 @@ function DeckListRow({
   const trigger = (
     <button
       type="button"
-      onFocus={() => setPreviewOpen(true)}
-      onBlur={() => setPreviewOpen(false)}
+      onFocus={() => handlePreviewOpenChange(true)}
+      onBlur={() => handlePreviewOpenChange(false)}
       className="text-content-secondary hover:bg-surface-2 hover:text-content-primary focus-visible:bg-surface-2 focus-visible:text-content-primary flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors outline-none"
     >
       <span className="truncate">{entry.name}</span>
@@ -125,7 +168,7 @@ function DeckListRow({
       {entry.imageUrl ? (
         <HoverCard
           open={previewOpen}
-          onOpenChange={setPreviewOpen}
+          onOpenChange={handlePreviewOpenChange}
           openDelay={0}
           closeDelay={0}
         >
@@ -134,18 +177,37 @@ function DeckListRow({
             side={previewSide}
             sideOffset={16}
             collisionPadding={16}
-            className="border-border bg-surface-2 aspect-card pointer-events-none relative hidden w-40 overflow-hidden rounded-md border p-1 shadow-[var(--shadow-lg)] xl:block"
+            className="pointer-events-none hidden w-auto rounded-none border-0 bg-transparent p-0 shadow-none xl:flex"
             aria-hidden="true"
             data-lobby-card-preview={previewSide}
           >
-            <Image
-              src={entry.imageUrl}
-              alt=""
-              fill
-              sizes="160px"
-              unoptimized
-              className="h-full w-full rounded object-cover"
-            />
+            <div className="relative aspect-card w-40 shrink-0 overflow-hidden rounded-md">
+              <Image
+                src={entry.imageUrl}
+                alt=""
+                fill
+                sizes="160px"
+                unoptimized
+                className="h-full w-full rounded object-cover"
+              />
+            </div>
+            {cardDetails && (
+              <CardInfoPanel
+                className="w-72"
+                name={cardDetails.name}
+                cardType={cardDetails.type}
+                cardId={cardDetails.id}
+                cost={cardDetails.cost}
+                power={cardDetails.power}
+                counter={cardDetails.counter}
+                life={cardDetails.life}
+                colors={cardDetails.color}
+                traits={cardDetails.traits}
+                attribute={cardDetails.attribute}
+                effectText={cardDetails.effectText}
+                triggerText={cardDetails.triggerText}
+              />
+            )}
           </HoverCardContent>
         </HoverCard>
       ) : (
