@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CardDetailResponseSchema,
-  CardSearchResponseSchema,
-} from "./cards";
+import { CardDetailResponseSchema, CardSearchResponseSchema } from "./cards";
 
 const baseCard = {
   id: "OP01-075",
@@ -25,7 +22,7 @@ const baseCard = {
 };
 
 describe("card API response contracts", () => {
-  it("strips full-record fields from search results", () => {
+  it("preserves card-info fields in search results", () => {
     const parsed = CardSearchResponseSchema.parse({
       data: [
         {
@@ -44,7 +41,13 @@ describe("card API response contracts", () => {
       color: baseCard.color,
       type: baseCard.type,
       cost: baseCard.cost,
+      power: baseCard.power,
+      counter: baseCard.counter,
+      life: baseCard.life,
       traits: baseCard.traits,
+      attribute: baseCard.attribute,
+      effectText: baseCard.effectText,
+      triggerText: baseCard.triggerText,
       imageUrl: baseCard.imageUrl,
     });
   });

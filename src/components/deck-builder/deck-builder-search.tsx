@@ -11,6 +11,13 @@ import {
   type CardSearchResult,
 } from "@/lib/validators/cards";
 import {
+  CardInfoPanel,
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from "@/components/ui";
+import {
   MIN_SUBSTRING_SEARCH_LENGTH,
   isSubstringSearchQueryTooShort,
   normalizeSubstringSearchQuery,
@@ -288,62 +295,88 @@ export function DeckBuilderSearch({
               </p>
             </div>
           )}
-          <div className="grid grid-cols-3 gap-2">
-            {results.map((card) => {
-              const inDeck = deckCards.get(card.id);
-              const qtyInDeck = inDeck?.quantity || 0;
-              const isLeaderColor =
-                leaderColors.length === 0 ||
-                card.color.some((c) => leaderColors.includes(c)) ||
-                card.type === "Leader";
-              const isLeaderRestrictionAllowed =
-                card.type === "Leader" ||
-                isCardAllowedByDeckRestrictionRules(
-                  leaderRestrictionRules,
-                  card
-                );
+          <TooltipProvider delayDuration={200} disableHoverableContent>
+            <div className="grid grid-cols-3 gap-2">
+              {results.map((card) => {
+                const inDeck = deckCards.get(card.id);
+                const qtyInDeck = inDeck?.quantity || 0;
+                const isLeaderColor =
+                  leaderColors.length === 0 ||
+                  card.color.some((c) => leaderColors.includes(c)) ||
+                  card.type === "Leader";
+                const isLeaderRestrictionAllowed =
+                  card.type === "Leader" ||
+                  isCardAllowedByDeckRestrictionRules(
+                    leaderRestrictionRules,
+                    card
+                  );
 
-              return (
-                <button
-                  key={card.id}
-                  aria-label={`Inspect ${card.name}`}
-                  onClick={() => setInspectCard(card)}
-                  className={cn(
-                    "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
-                    qtyInDeck > 0 ? "border-border-focus" : "border-border",
-                    (!isLeaderColor || !isLeaderRestrictionAllowed) &&
-                      "opacity-40"
-                  )}
-                >
-                  <div className="aspect-card relative w-full overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={card.imageUrl}
-                      alt={card.name}
-                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.04]"
-                      loading="lazy"
-                    />
-                    {qtyInDeck > 0 && (
-                      <div className="bg-primary text-primary-foreground absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold">
-                        {qtyInDeck}
-                      </div>
-                    )}
-                  </div>
-                  {/* Mini info */}
-                  <div className="px-2 py-1">
-                    <p className="text-content-primary truncate text-xs leading-tight font-medium">
-                      {card.name}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <span className="text-content-tertiary text-xs">
-                        {card.id}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <TooltipRoot key={card.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-label={`Inspect ${card.name}`}
+                        onClick={() => setInspectCard(card)}
+                        className={cn(
+                          "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
+                          qtyInDeck > 0
+                            ? "border-border-focus"
+                            : "border-border",
+                          (!isLeaderColor || !isLeaderRestrictionAllowed) &&
+                            "opacity-40"
+                        )}
+                      >
+                        <div className="aspect-card relative w-full overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={card.imageUrl}
+                            alt={card.name}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.04]"
+                            loading="lazy"
+                          />
+                          {qtyInDeck > 0 && (
+                            <div className="bg-primary text-primary-foreground absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold">
+                              {qtyInDeck}
+                            </div>
+                          )}
+                        </div>
+                        {/* Mini info */}
+                        <div className="px-2 py-1">
+                          <p className="text-content-primary truncate text-xs leading-tight font-medium">
+                            {card.name}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <span className="text-content-tertiary text-xs">
+                              {card.id}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      className="w-72 max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
+                    >
+                      <CardInfoPanel
+                        name={card.name}
+                        cardType={card.type}
+                        cardId={card.id}
+                        cost={card.cost}
+                        power={card.power}
+                        counter={card.counter}
+                        life={card.life}
+                        colors={card.color}
+                        traits={card.traits}
+                        attribute={card.attribute}
+                        effectText={card.effectText}
+                        triggerText={card.triggerText}
+                      />
+                    </TooltipContent>
+                  </TooltipRoot>
+                );
+              })}
+            </div>
+          </TooltipProvider>
 
           {/* Pagination */}
           {totalPages > 1 && (
