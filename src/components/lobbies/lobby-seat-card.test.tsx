@@ -461,7 +461,8 @@ describe("LobbySeatCard deck switching", () => {
     expect(tooltip?.className).toContain("edge-info");
 
     // Numeric values are white; no per-stat hue competing with card art.
-    const power = within(tooltip!).getByText("Power").previousElementSibling;
+    // Frame 82 anatomy puts the wide-tracked label above its value.
+    const power = within(tooltip!).getByText("Power").nextElementSibling;
     expect(power?.className).toContain("text-content-primary");
     expect(tooltip?.innerHTML).not.toContain("text-green-600");
     expect(tooltip?.innerHTML).not.toContain("text-purple-600");

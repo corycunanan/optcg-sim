@@ -8,6 +8,7 @@ import { getDeckCardCopyLimit } from "@/lib/deck-builder/validation";
 import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import {
   CardFanStack,
+  CardInfoPanel,
   TooltipProvider,
   TooltipRoot,
   TooltipTrigger,
@@ -38,7 +39,9 @@ interface CardGroup {
   life: number | null;
   effectText: string;
   triggerText: string | null;
+  colors: string[];
   traits: string[];
+  attribute: string[];
   count: number;
   copyLimit: number;
   isLeader: boolean;
@@ -63,7 +66,9 @@ function buildGroups(
       life: leader.life,
       effectText: leader.effectText || "",
       triggerText: null,
+      colors: leader.color,
       traits: leader.traits,
+      attribute: leader.attribute,
       count: 1,
       copyLimit: 1,
       isLeader: true,
@@ -89,7 +94,9 @@ function buildGroups(
       life: entry.card.life ?? null,
       effectText: entry.card.effectText || "",
       triggerText: entry.card.triggerText ?? null,
+      colors: entry.card.color,
       traits: entry.card.traits,
+      attribute: entry.card.attribute,
       count: entry.quantity,
       copyLimit: getDeckCardCopyLimit(entry.card),
       isLeader: false,
@@ -97,95 +104,6 @@ function buildGroups(
   }
 
   return groups;
-}
-
-/* ── Stat pill ──────────────────────────────────────────────────────── */
-
-function StatPill({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string | number;
-  className?: string;
-}) {
-  return (
-    <div className="px-2 text-center">
-      <div className={cn("text-sm font-bold", className)}>{String(value)}</div>
-      <div className="text-content-tertiary text-xs tracking-wide uppercase">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-/* ── Card tooltip ───────────────────────────────────────────────────── */
-
-function CardTooltipBody({ group }: { group: CardGroup }) {
-  const isFieldCard = group.type === "Leader" || group.type === "Character";
-
-  return (
-    <>
-      <div className="text-content-primary text-sm font-bold">{group.name}</div>
-      <div className="text-content-tertiary mb-3 text-xs">
-        {group.type} &middot; {group.cardId}
-      </div>
-
-      {isFieldCard ? (
-        <div className="mb-3 flex flex-wrap gap-5 text-xs">
-          {group.type === "Leader" ? (
-            <StatPill
-              label="Life"
-              value={group.life ?? group.cost ?? 0}
-              className="text-error"
-            />
-          ) : (
-            <StatPill
-              label="Cost"
-              value={group.cost ?? 0}
-              className="text-gold-600"
-            />
-          )}
-          <StatPill
-            label="Power"
-            value={(group.power ?? 0).toLocaleString()}
-            className="text-green-600"
-          />
-          {group.type !== "Leader" && (
-            <StatPill
-              label="Counter"
-              value={group.counter != null ? `+${group.counter}` : "—"}
-              className="text-purple-600"
-            />
-          )}
-        </div>
-      ) : (
-        <div className="mb-3 flex flex-wrap gap-3 text-xs">
-          {group.cost != null && (
-            <StatPill
-              label="Cost"
-              value={group.cost}
-              className="text-gold-600"
-            />
-          )}
-          {group.life != null && (
-            <StatPill label="Life" value={group.life} className="text-error" />
-          )}
-        </div>
-      )}
-
-      {group.effectText && (
-        <div className="text-content-secondary border-border flex flex-col gap-2 border-t pt-3 text-xs leading-relaxed">
-          {group.effectText.split(/\n{2,}/).map((paragraph, i) => (
-            <p key={i} className="whitespace-pre-wrap">
-              {paragraph}
-            </p>
-          ))}
-        </div>
-      )}
-    </>
-  );
 }
 
 /* ── Main component ─────────────────────────────────────────────────── */
@@ -294,11 +212,30 @@ export function DeckBuilderList({
                   )}
                 </div>
               </TooltipTrigger>
+              {/*
+                Tier-5: the CardInfoPanel owns the surface, so the Radix
+                wrapper is stripped back to a bare positioner. Without this
+                the popup would nest a rounded, bordered, padded panel around
+                the square Tier-5 body and read as two stacked surfaces.
+              */}
               <TooltipContent
                 side="top"
-                className="bg-background border-border text-content-primary w-72 p-3"
+                className="w-72 max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
               >
-                <CardTooltipBody group={group} />
+                <CardInfoPanel
+                  name={group.name}
+                  cardType={group.type}
+                  cardId={group.cardId}
+                  cost={group.cost}
+                  power={group.power}
+                  counter={group.counter}
+                  life={group.life}
+                  colors={group.colors}
+                  traits={group.traits}
+                  attribute={group.attribute}
+                  effectText={group.effectText}
+                  triggerText={group.triggerText}
+                />
               </TooltipContent>
             </TooltipRoot>
           ))}
