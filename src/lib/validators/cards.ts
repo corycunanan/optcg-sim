@@ -60,16 +60,8 @@ export const CardResponseSchema = z.object({
 
 export type CardResponse = z.infer<typeof CardResponseSchema>;
 
-/** Slim card shape returned by GET /api/cards search results. */
-export const CardSearchResultSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  color: z.array(z.string()),
-  type: z.string(),
-  cost: z.number().nullable(),
-  traits: z.array(z.string()),
-  imageUrl: z.string(),
-});
+/** Full card shape returned by GET /api/cards search results. */
+export const CardSearchResultSchema = CardResponseSchema;
 
 export type CardSearchResult = z.infer<typeof CardSearchResultSchema>;
 

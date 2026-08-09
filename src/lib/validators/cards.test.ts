@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CardDetailResponseSchema,
-  CardSearchResponseSchema,
-} from "./cards";
+import { CardDetailResponseSchema, CardSearchResponseSchema } from "./cards";
 
 const baseCard = {
   id: "OP01-075",
@@ -25,7 +22,7 @@ const baseCard = {
 };
 
 describe("card API response contracts", () => {
-  it("strips full-record fields from search results", () => {
+  it("preserves card-info fields in search results", () => {
     const parsed = CardSearchResponseSchema.parse({
       data: [
         {
@@ -39,13 +36,8 @@ describe("card API response contracts", () => {
     });
 
     expect(parsed.data[0]).toEqual({
-      id: baseCard.id,
-      name: baseCard.name,
-      color: baseCard.color,
-      type: baseCard.type,
-      cost: baseCard.cost,
-      traits: baseCard.traits,
-      imageUrl: baseCard.imageUrl,
+      ...baseCard,
+      effectSchema: { rule_modifications: [] },
     });
   });
 
