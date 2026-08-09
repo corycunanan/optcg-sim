@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { findTextViolations } from "../../scripts/lint-design-system.mjs";
+import {
+  collectDeclaredShapeUtilities,
+  findShapeVocabularyUsages,
+  findTextViolations,
+} from "../../scripts/lint-design-system.mjs";
 
 const SHOULD_FLAG = [
   { syntax: "text-[10px]", rule: "font-size" },
@@ -70,5 +74,49 @@ describe("design-system text rules", () => {
     '/* className="top-1.5 text-[length:10px] [color:#fff]" */',
   ])("ignores commented source: %s", (source) => {
     expect(findTextViolations(source)).toEqual([]);
+  });
+});
+
+describe("shape-language allowance", () => {
+  it("does not flag the chamfer vocabulary under the existing rules", () => {
+    expect(
+      findTextViolations(
+        'className="chamfer-cut-lg chamfer-all chamfer-edge-lighting p-4"'
+      )
+    ).toEqual([]);
+  });
+
+  it("leaves the three-radius vocabulary untouched", () => {
+    expect(findTextViolations('className="rounded-md border p-4"')).toEqual([]);
+  });
+
+  it("collects chamfer utilities declared as @utility or class rules", () => {
+    const declared = collectDeclaredShapeUtilities(
+      "@utility chamfer-outer { clip-path: polygon(0 0); }\n" +
+        ".chamfer-focus-layer { opacity: 0; }\n" +
+        ".rounded-lg { border-radius: 12px; }"
+    );
+
+    expect([...declared].sort()).toEqual([
+      "chamfer-focus-layer",
+      "chamfer-outer",
+    ]);
+  });
+
+  it("reports chamfer class usages so undeclared names can be resolved", () => {
+    expect(
+      findShapeVocabularyUsages('className="chamfer-cut-md chamfer-outer"')
+    ).toEqual([
+      expect.objectContaining({ utility: "chamfer-cut-md" }),
+      expect.objectContaining({ utility: "chamfer-outer" }),
+    ]);
+  });
+
+  it("skips data-slot layer names, which are hooks rather than utilities", () => {
+    expect(
+      findShapeVocabularyUsages(
+        '<div data-slot="chamfer-frame" />; const p = { "data-slot": "chamfer-surface" };'
+      )
+    ).toEqual([]);
   });
 });

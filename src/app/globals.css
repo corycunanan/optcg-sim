@@ -82,6 +82,14 @@
   --border-step-emphasis: rgba(255, 255, 255, 0.16);
   --border-step-strong: rgba(255, 255, 255, 0.18);
 
+  /* Chamfer depth steps (docs/design/SHAPE-LANGUAGE.md)
+     45° cuts only, at exactly 4 / 8 / 12px — the badge / control / panel
+     ladder. These are the shape counterpart to the radius steps and are the
+     only cut depths the chamfer vocabulary recognizes. */
+  --chamfer-step-sm: 4px;
+  --chamfer-step-md: 8px;
+  --chamfer-step-lg: 12px;
+
   /* State ramps */
   --green-600: oklch(70% 0.15 150);
   --green-100: oklch(27% 0.04 150);
@@ -147,6 +155,20 @@
   --border-strong: var(--border-step-strong);
   --border-focus: var(--gold-500);
   --edge-info: var(--info-edge-value);
+
+  /* Shape language (docs/design/SHAPE-LANGUAGE.md)
+     Chamfer depth roles plus the edge paints used by the two-layer clipped
+     frame. The edge roles deliberately point at existing primitives rather
+     than restating raw values, so a preset that re-tunes the border or gold
+     ramps carries through to every chamfered frame. `--edge-gold` is the
+     reserved decorative border gold: hairline ornament only, never
+     accessibility-critical. */
+  --chamfer-sm: var(--chamfer-step-sm);
+  --chamfer-md: var(--chamfer-step-md);
+  --chamfer-lg: var(--chamfer-step-lg);
+  --edge-neutral: var(--border-step-emphasis);
+  --edge-gold: var(--gold-border);
+  --edge-lighting: var(--info-edge-value);
 
   /* Accent */
   --accent: var(--gold-500);
@@ -607,6 +629,95 @@ textarea:focus-visible,
 @utility edge-info {
   border-image-source: var(--edge-info);
   border-image-slice: 1;
+}
+
+/* ─── Shape Language — Chamfered Frames ─────────────────────── */
+
+/* The 45° chamfer vocabulary from docs/design/SHAPE-LANGUAGE.md, consumed
+   through the ChamferFrame primitive (src/components/ui/chamfer-frame.tsx).
+   These utilities are an *allowance*, not a requirement: the three-radius rule
+   still governs every surface that has not opted into the angular register.
+
+   `border-*` does not follow `clip-path`, so a hairline needs the two-layer
+   technique — an outer layer painted with the edge color and an inner surface
+   layer inset by 1px, both clipped to the same polygon. `--chamfer-cut` is set
+   once on the frame root by a `chamfer-cut-*` utility and inherits into every
+   layer, so the layers can never drift out of agreement. */
+
+@utility chamfer-cut-sm {
+  --chamfer-cut: var(--chamfer-sm);
+}
+
+@utility chamfer-cut-md {
+  --chamfer-cut: var(--chamfer-md);
+}
+
+@utility chamfer-cut-lg {
+  --chamfer-cut: var(--chamfer-lg);
+}
+
+/* Default pattern: top-left + bottom-right, agreeing with the top-left light. */
+@utility chamfer-outer {
+  clip-path: polygon(
+    var(--chamfer-cut, var(--chamfer-md)) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer-cut, var(--chamfer-md))),
+    calc(100% - var(--chamfer-cut, var(--chamfer-md))) 100%,
+    0 100%,
+    0 var(--chamfer-cut, var(--chamfer-md))
+  );
+}
+
+/* Symmetric four-corner cut, for feature panels that read as centered. */
+@utility chamfer-all {
+  clip-path: polygon(
+    var(--chamfer-cut, var(--chamfer-md)) 0,
+    calc(100% - var(--chamfer-cut, var(--chamfer-md))) 0,
+    100% var(--chamfer-cut, var(--chamfer-md)),
+    100% calc(100% - var(--chamfer-cut, var(--chamfer-md))),
+    calc(100% - var(--chamfer-cut, var(--chamfer-md))) 100%,
+    var(--chamfer-cut, var(--chamfer-md)) 100%,
+    0 calc(100% - var(--chamfer-cut, var(--chamfer-md))),
+    0 var(--chamfer-cut, var(--chamfer-md))
+  );
+}
+
+/* Edge paints for the outer layer of the two-layer frame. */
+@utility chamfer-edge-neutral {
+  background-color: var(--edge-neutral);
+}
+
+@utility chamfer-edge-gold {
+  background-color: var(--edge-gold);
+}
+
+/* Tier-5 lighting: brighter top-left falling to dimmer bottom-right. */
+@utility chamfer-edge-lighting {
+  background-image: var(--edge-lighting);
+}
+
+/* Keyboard focus. `outline` ignores `clip-path`, so an interactive frame keeps
+   its rectangular hit target and outline-free root, and paints a chamfered
+   halo layer just outside the clipped shape instead. The halo sits behind the
+   in-flow surface (negative z-index inside the root's isolated stacking
+   context), so it reads as a 2px ring on every edge variant, borderless
+   included. */
+.chamfer-focusable:focus-visible {
+  outline: none;
+}
+
+.chamfer-focus-layer {
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  background-color: var(--border-focus);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chamfer-focusable:focus-visible > .chamfer-focus-layer,
+.chamfer-focusable:has(:focus-visible) > .chamfer-focus-layer {
+  opacity: 1;
 }
 
 /* ─── Card Utilities ────────────────────────────────────────── */

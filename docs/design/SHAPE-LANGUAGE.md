@@ -99,6 +99,16 @@ region**. If two pennants compete, neither is featured.
 
 ## Implementation notes
 
+- **Shipped primitive (OPT-629):** chamfers are available through
+  `ChamferFrame` (`src/components/ui/chamfer-frame.tsx`), which encapsulates every note
+  below. Props: `cut` (`sm`/`md`/`lg` → 4/8/12px), `corners` (`outer`/`all`), `edge`
+  (`none`/`neutral`/`gold`/`lighting`), `interactive`, `asChild`, and `surfaceClassName`.
+  `edge="none"` is a first-class borderless variant and the default. The CSS lives in
+  `src/app/globals.css` as `chamfer-*` utilities over the `--chamfer-*` and `--edge-*`
+  tokens; the design-system lint treats that vocabulary as an **allowance**, not a
+  requirement, and only fails when a `chamfer-*` class is used without a matching
+  declaration. Feature polygons (pennant, swallowtail, hex, diamond) are **not** in the
+  primitive and remain deferred.
 - **CSS:** `clip-path: polygon(...)` for all cuts. Borders on clipped elements require the
   **two-layer technique**: outer element carries the edge color, inner element (inset by the
   hairline width, same polygon) carries the surface. `border-*` properties do not follow clip-path.

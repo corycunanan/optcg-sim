@@ -144,6 +144,27 @@ const INLINE_STYLE_CUSTOM_PROPERTY_ALLOWLIST = new Map(
   }).map(([path, properties]) => [path, new Set(properties)])
 );
 
+// ── Shape language allowance (docs/design/SHAPE-LANGUAGE.md) ──
+// The 45° chamfer vocabulary is ADDITIVE: the `chamfer-*` utilities and the
+// `--chamfer-*` / `--edge-*` tokens declared in globals.css are *permitted*
+// wherever a surface opts into the angular register. Nothing here makes a
+// chamfer required, and the three-radius rule stays in force everywhere else —
+// a component that keeps `rounded`/`rounded-md`/`rounded-lg` is still correct.
+//
+// The one mechanical check is anti-rot, scoped entirely to the new vocabulary:
+// a `chamfer-*` class referenced from .tsx must actually be declared in
+// globals.css. Without it a renamed or deleted utility degrades silently into
+// an unclipped rectangle, which is invisible in review. No other allowlist is
+// widened by this rule.
+const GLOBALS_CSS_PATH = join(SOURCE_ROOT, "app", "globals.css");
+// Two non-utility uses of the `chamfer-` prefix are skipped rather than
+// resolved against globals.css: module specifiers (`./chamfer-frame`), and
+// `data-slot` values, which name the frame's layers for tests and styling
+// hooks.
+const SHAPE_UTILITY_RE =
+  /(?<!data-slot["']?\s*[=:]\s*["'])(?<![\w./-])chamfer-[a-z][a-z0-9-]*/g;
+const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
+
 const RULES = [
   {
     name: "font-size",
@@ -166,9 +187,13 @@ const IS_MAIN =
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 const files = IS_MAIN ? collectTsxFiles(SOURCE_ROOT) : [];
+const declaredShapeUtilities = IS_MAIN
+  ? collectDeclaredShapeUtilities(readFileSync(GLOBALS_CSS_PATH, "utf8"))
+  : new Set();
 const violations = [];
 let buttonOverrideCount = 0;
 let exemptSpacingFileCount = 0;
+let shapeUtilityUsageCount = 0;
 
 if (IS_MAIN) {
   for (const absolutePath of files) {
@@ -196,6 +221,19 @@ if (IS_MAIN) {
         violation.index,
         violation.rule,
         violation.message
+      );
+    }
+
+    const shapeUsages = findShapeVocabularyUsages(source);
+    shapeUtilityUsageCount += shapeUsages.length;
+    for (const usage of shapeUsages) {
+      if (declaredShapeUtilities.has(usage.utility)) continue;
+      addViolation(
+        path,
+        sourceFile,
+        usage.index,
+        "shape-vocabulary",
+        `undeclared chamfer utility ${JSON.stringify(usage.utility)}; declare it in src/app/globals.css per docs/design/SHAPE-LANGUAGE.md`
       );
     }
 
@@ -273,6 +311,34 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
   return matches.sort(
     (a, b) => a.index - b.index || a.rule.localeCompare(b.rule)
   );
+}
+
+/**
+ * Every `chamfer-*` class referenced by a .tsx source, with its offset.
+ * Usage is always allowed; only an undeclared name is a violation.
+ */
+export function findShapeVocabularyUsages(source) {
+  const scanSource = stripComments(source);
+  const usages = [];
+
+  SHAPE_UTILITY_RE.lastIndex = 0;
+  for (const match of scanSource.matchAll(SHAPE_UTILITY_RE)) {
+    usages.push({ index: match.index, utility: match[0] });
+  }
+
+  return usages;
+}
+
+/** Chamfer utilities declared in globals.css, as `@utility` or a class rule. */
+export function collectDeclaredShapeUtilities(css) {
+  const declared = new Set();
+
+  SHAPE_DECLARATION_RE.lastIndex = 0;
+  for (const match of css.matchAll(SHAPE_DECLARATION_RE)) {
+    declared.add(match[1]);
+  }
+
+  return declared;
 }
 
 export function stripComments(source) {
@@ -427,5 +493,8 @@ function printInfo() {
   );
   console.log(
     `Button className overrides: ${buttonOverrideCount} (informational).`
+  );
+  console.log(
+    `Shape language: ${declaredShapeUtilities.size} chamfer utilities declared in globals.css, ${shapeUtilityUsageCount} allowed usage(s) in .tsx.`
   );
 }
