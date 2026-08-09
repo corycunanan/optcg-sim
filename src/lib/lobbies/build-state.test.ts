@@ -133,6 +133,7 @@ describe("buildLobbyRoomState participant deck contents", () => {
         characters: [
           {
             id: "OP01-024",
+            cardId: "OP01-024",
             name: "Monkey.D.Luffy",
             quantity: 4,
             imageUrl: "https://images.example/alt.png",
@@ -141,6 +142,7 @@ describe("buildLobbyRoomState participant deck contents", () => {
         events: [
           {
             id: "OP01-029",
+            cardId: "OP01-029",
             name: "Radical Beam!!",
             quantity: 2,
             imageUrl: "https://images.example/event.png",

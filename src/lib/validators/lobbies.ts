@@ -27,6 +27,7 @@ const LobbyUserSchema = z.object({
 
 const LobbyDeckCardSchema = z.object({
   id: z.string(),
+  cardId: z.string(),
   name: z.string(),
   quantity: z.number().int().positive(),
   imageUrl: z.string(),

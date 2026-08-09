@@ -42,6 +42,7 @@ const deck: LobbyRoomDeck = {
     characters: [
       {
         id: "OP01-025",
+        cardId: "OP01-025",
         name: "Roronoa Zoro",
         quantity: 4,
         imageUrl: "/card.png",
@@ -144,6 +145,33 @@ function deckDetail(rawDeckId: string) {
   };
 }
 
+function cardDetail() {
+  return {
+    data: {
+      id: "OP01-025",
+      name: "Roronoa Zoro",
+      type: "Character",
+      color: ["Red"],
+      cost: 3,
+      power: 5000,
+      counter: 1000,
+      life: null,
+      imageUrl: "/card.png",
+      banStatus: "LEGAL",
+      blockNumber: 1,
+      traits: ["Straw Hat Crew"],
+      attribute: ["Slash"],
+      effectText: "This Character gains +1000 power.",
+      triggerText: null,
+      rarity: "R",
+      originSet: "OP01",
+      effectSchema: null,
+      artVariants: [],
+      cardSets: [],
+    },
+  };
+}
+
 function requestedDeckId(url: string) {
   return url.replace("/api/decks/", "");
 }
@@ -183,9 +211,10 @@ function deferDeck2(pending: () => Promise<unknown>) {
 
 beforeEach(() => {
   mocks.apiGet.mockReset();
-  mocks.apiGet.mockImplementation(async (url: string) =>
-    deckDetail(requestedDeckId(url))
-  );
+  mocks.apiGet.mockImplementation(async (url: string) => {
+    if (url.startsWith("/api/cards/")) return cardDetail();
+    return deckDetail(requestedDeckId(url));
+  });
 });
 
 afterEach(() => cleanup());
@@ -653,6 +682,23 @@ describe("LobbySeatCard deck switching", () => {
 });
 
 describe("LobbySeatCard card preview", () => {
+  it("renders full card information after hover details load", async () => {
+    const user = userEvent.setup();
+    renderSeat();
+
+    await user.hover(screen.getByRole("button", { name: /Roronoa Zoro/ }));
+
+    expect(
+      await screen.findByText("This Character gains +1000 power.")
+    ).toBeDefined();
+    expect(screen.getByText("Character · OP01-025")).toBeDefined();
+    expect(screen.getByText("Red · Straw Hat Crew · Slash")).toBeDefined();
+    expect(mocks.apiGet).toHaveBeenCalledWith(
+      "/api/cards/OP01-025",
+      expect.anything()
+    );
+  });
+
   it.each(["left", "right"] as const)(
     "portals the %s-side preview outside an overflow-hidden frame",
     async (previewSide) => {

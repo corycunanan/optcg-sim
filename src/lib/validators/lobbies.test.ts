@@ -102,6 +102,7 @@ describe("LobbyRoomStateSchema participant deck contents", () => {
       characters: [
         {
           id: "OP01-024",
+          cardId: "OP01-024",
           name: "Monkey.D.Luffy",
           quantity: 4,
           imageUrl: "https://images.example/OP01-024.png",

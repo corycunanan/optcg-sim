@@ -305,6 +305,7 @@ function groupDeckCards(cards: DeckCardRow[]): LobbyRoomDeckContents {
   for (const entry of cards) {
     const card = {
       id: entry.cardId,
+      cardId: entry.cardId,
       name: entry.card.name,
       quantity: entry.quantity,
       imageUrl: entry.selectedArtUrl ?? entry.card.imageUrl,
