@@ -190,8 +190,8 @@ Emotional goals: delight when browsing cards, focus when building decks, immersi
   - Six TCG card colors, `--card-yellow-fg`, `--card-accent-fallback`, holofoil colors, and `--gb-*` game-board tokens are non-themable feature contracts
 - **Typography:**
   - **Display/headings:** Erode variable (self-hosted WOFF2, weights 300–700 through `next/font/local`) — `.font-display` uses 600, normal style, uppercase, and `0.025em` letter spacing. Per the locked direction, navbar links use Erode 700, uppercase, `0.04em` letter spacing, and 16px; the family application ships with the OPT-534 navbar refresh, while the current navbar remains an interim Geist Sans rendering.
-  - **Body:** Geist Sans — all body text, labels, UI elements.
-  - Strict type scale: 12/14/16/18/20/24/30/36/48px. No custom `text-[Xpx]` sizes in components. See `docs/design/BRANDING-GUIDELINES.md` for full scale.
+  - **Body:** Public Sans (self-hosted variable WOFF2, weights 400/500/600 only) — all body text, labels, UI elements. Geist Mono remains for codes/digests.
+  - Strict type scale: 12/14/16/18/20/24/30/36/48px. No custom `text-[Xpx]` sizes in components. Text picks a role from the ramp in `docs/design/TYPOGRAPHY.md` (source of truth for family/size/weight/case/tracking per role and per-primitive defaults).
 - **Accessibility:** WCAG AA — 4.5:1 contrast for text, keyboard navigable, focus visible. Every registered theme must pass the 19-pair `pnpm run check:contrast` gate; new semantic foreground/background combinations must be added to `scripts/contrast-pairs.json`.
 - **Card presentation:** Restrained elevated navy surfaces let art breathe. Single, clean hover state — no stacking of lift + shadow + blur.
 - **Anti-references:** NOT gloomy, low-contrast, cold gray, or gamer-neon. NOT generic SaaS dashboard. NOT over-decorated with gradients and backdrop blurs.

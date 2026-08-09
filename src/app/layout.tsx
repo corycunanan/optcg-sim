@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { SessionProvider } from "next-auth/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -17,9 +17,16 @@ import {
 } from "@/lib/theme";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const publicSans = localFont({
+  src: [
+    {
+      path: "./fonts/PublicSans-Variable.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+  ],
+  variable: "--font-public-sans",
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -56,7 +63,7 @@ export default async function RootLayout({
   return (
     <html lang="en" data-theme={themeDataAttribute(theme)}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${erode.variable} antialiased`}
+        className={`${publicSans.variable} ${geistMono.variable} ${erode.variable} antialiased`}
       >
         <SessionProvider>
           <ThemeReconciler />

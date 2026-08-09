@@ -236,60 +236,27 @@ Theme selectors must not override the six TCG card colors, `--card-yellow-fg`, `
 
 ## 4. Typography
 
+> **Superseded:** the full type system — font stack, role-based ramp, weight/case/tracking rules, and per-primitive defaults — now lives in **[TYPOGRAPHY.md](TYPOGRAPHY.md)**. This section keeps only the brand-level summary; where the two disagree, TYPOGRAPHY.md wins.
+
 ### Font Stack
 
 | Role | Font | Weights / Styles | Usage |
 |------|------|------------------|-------|
-| **Display** | Erode variable (self-hosted WOFF2) | 300–700 available; 600 treatment | Page titles, section headers, and hero text. Normal style, uppercase, `0.025em` letter spacing. |
-| **Body** | Geist Sans | 400, 500, 600 | All body text, labels, UI elements, navigation |
-| **Mono** | Geist Mono | 400 | Code, card IDs, technical data |
+| **Display** | Erode variable (self-hosted WOFF2) | 300–700 loaded; 600 treatment (700 navbar only) | Page titles, section headers, and hero text. Normal style, uppercase, `0.025em` letter spacing. |
+| **Body** | Public Sans variable (self-hosted WOFF2) | 100–900 loaded; 400 / 500 / 600 rendered | All body text, labels, UI elements |
+| **Mono** | Geist Mono | 400, 600 | Code, card IDs, technical data |
 
-### Why These Fonts
+Both display and body are self-hosted from `src/app/fonts/` through `next/font/local` with `font-display: swap`. The `.font-display` treatment fixes headings at Erode 600, normal style, uppercase, `0.025em` letter spacing; navbar links use `.font-nav` (Erode 700, uppercase, `0.04em`, `text-base`) per the locked direction.
 
-- **Erode** is self-hosted from `src/app/fonts/Erode-Variable.woff2` through `next/font/local`, exposed as `--font-erode`, and loaded with `font-display: swap`. The variable file provides weights 300–700 without a Google Fonts request. The shared `.font-display` treatment fixes headings at 600, normal style, uppercase, and `0.025em` letter spacing.
-- **Geist Sans** is a modern geometric sans with excellent screen rendering. The contrast between Erode's expressive serif forms and a clean geometric body creates the dramatic but usable hierarchy.
+### Core Rules (details in TYPOGRAPHY.md)
 
-### Type Scale
-
-Strict scale — no custom `text-[Xpx]` values in components.
-
-| Token | Size | Line Height | Weight | Usage |
-|-------|------|-------------|--------|-------|
-| `display-xl` | 48px | 1.1 | Erode 600 | Hero headlines only |
-| `display-lg` | 36px | 1.15 | Erode 600 | Page titles |
-| `display-md` | 30px | 1.2 | Erode 600 | Section titles |
-| `display-sm` | 24px | 1.25 | Erode 600 | Sub-section titles |
-| `heading` | 20px | 1.3 | Geist 600 | Card titles, panel headers |
-| `body-lg` | 18px | 1.6 | Geist 400 | Featured body text |
-| `body` | 16px | 1.5 | Geist 400 | Default body text |
-| `body-sm` | 14px | 1.5 | Geist 400 | Secondary text, metadata |
-| `caption` | 12px | 1.4 | Geist 500 | Badges, labels, timestamps |
-
-### Responsive Type Scaling
-
-Following Riftbound's 3-breakpoint responsive reduction:
-
-| Token | Desktop (>1024px) | Tablet (601-1024px) | Mobile (<=600px) |
-|-------|--------------------|---------------------|-------------------|
-| `display-xl` | 48px | 36px | 30px |
-| `display-lg` | 36px | 30px | 24px |
-| `display-md` | 30px | 24px | 20px |
-| `display-sm` | 24px | 20px | 18px |
-| `heading` | 20px | 18px | 16px |
-| `body-lg` | 18px | 16px | 16px |
-| `body` | 16px | 16px | 16px |
-| `body-sm` | 14px | 14px | 14px |
-| `caption` | 12px | 12px | 12px |
-
-### Typography Rules
-
-1. `.font-display` is always Erode 600, normal style, uppercase, with `0.025em` letter spacing. Featured callouts and pull-quotes use the same upright treatment.
-2. Navbar links use Erode 700, uppercase, `0.04em` letter spacing, and 16px (`text-base`) per the locked direction. The Erode family application ships with the OPT-534 navbar refresh; the current navbar remains an interim Geist Sans rendering.
-3. Body text max line-length: 65-75 characters (`max-w-prose` or `max-w-[65ch]`)
-4. Minimum font size: 12px (`text-xs`). Never use `text-[10px]` or `text-[11px]`.
-   - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses chrome's 12px floor to ~7px effective. Inside any element rendered within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body / paragraph text. Chrome (navbar, modals, tooltips, popovers, side panels) keeps the 12px floor unchanged. See §13 for the full inside-board override set.
-5. Use `font-display: swap` for web font loading
-6. Use `tabular-nums` for any numeric data (costs, power, life counts)
+1. Text picks a **role** from the TYPOGRAPHY.md ramp, not an ad-hoc size/weight combination.
+2. Strict size scale — no custom `text-[Xpx]` values in components. Minimum 12px (`text-xs`).
+   - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses chrome's 12px floor to ~7px effective. Inside `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body text. Chrome keeps the 12px floor. See §13.
+3. Public Sans renders only 400/500/600 — `font-bold`+ is not part of the sans system.
+4. Uppercase sans always carries tracking (`tracking-widest` ≤ `text-sm`, `tracking-wider` at `text-base`/`text-lg`); `.font-display` is atomic and never modified.
+5. Body text max line-length: 65-75 characters (`max-w-prose`).
+6. Use `tabular-nums` for any numeric data (costs, power, life counts).
 
 ---
 
