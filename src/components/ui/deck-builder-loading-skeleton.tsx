@@ -71,7 +71,11 @@ export function DeckBuilderLoadingSkeleton({ label }: { label: string }) {
             <div className="flex flex-wrap gap-4">
               {deckCards.map((_, index) => (
                 <div key={index} className="space-y-2">
-                  <Skeleton className="aspect-card w-24 rounded" />
+                  <div className="flex">
+                    <Skeleton className="aspect-card w-24 shrink-0 rounded" />
+                    <Skeleton className="aspect-card -ml-16 w-24 shrink-0 rounded" />
+                    <Skeleton className="aspect-card -ml-16 w-24 shrink-0 rounded" />
+                  </div>
                   <Skeleton className="mx-auto h-5 w-16" />
                 </div>
               ))}

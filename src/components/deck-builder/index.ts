@@ -2,7 +2,6 @@ export { DeckBuilderHeader } from "./deck-builder-header";
 export { DeckBuilderList } from "./deck-builder-list";
 export { DeckBuilderSearch } from "./deck-builder-search";
 export { DeckBuilderShell } from "./deck-builder-shell";
-export { DeckBuilderStatsCharts } from "./deck-builder-stats";
 export { DeckBuilderValidation } from "./deck-builder-validation";
 export { DeckDeleteButton } from "./deck-delete-button";
 export { ExportModal } from "./export-modal";

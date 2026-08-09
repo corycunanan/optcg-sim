@@ -1,13 +1,5 @@
 import { cn } from "@/lib/utils";
-
-const COLOR_DOT_CLASSES: Readonly<Record<string, string>> = {
-  red: "bg-card-red",
-  blue: "bg-card-blue",
-  green: "bg-card-green",
-  purple: "bg-card-purple",
-  black: "bg-card-black",
-  yellow: "bg-card-yellow",
-};
+import { COLOR_DOT_CLASSES } from "@/lib/cards/colors-ui";
 
 interface DeckColorIndicatorsProps {
   colors: readonly string[];
@@ -31,7 +23,8 @@ export function DeckColorIndicators({ colors }: DeckColorIndicatorsProps) {
             aria-hidden="true"
             className={cn(
               "size-3 shrink-0 rounded-full",
-              COLOR_DOT_CLASSES[color.toLowerCase()] ?? "bg-surface-3"
+              COLOR_DOT_CLASSES[color as keyof typeof COLOR_DOT_CLASSES] ??
+                "bg-surface-3"
             )}
           />
           <span aria-hidden="true">{color}</span>
