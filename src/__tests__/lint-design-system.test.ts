@@ -105,7 +105,9 @@ describe("shape-language allowance", () => {
 
   it("reports chamfer class usages so undeclared names can be resolved", () => {
     expect(
-      findShapeVocabularyUsages('className="chamfer-cut-md chamfer-outer"')
+      findShapeVocabularyUsages(
+        '<div className="chamfer-cut-md chamfer-outer" />'
+      )
     ).toEqual([
       expect.objectContaining({ utility: "chamfer-cut-md", kind: "class" }),
       expect.objectContaining({ utility: "chamfer-outer", kind: "class" }),
@@ -115,7 +117,7 @@ describe("shape-language allowance", () => {
   it("reads through Tailwind variant and important prefixes", () => {
     expect(
       findShapeVocabularyUsages(
-        'className="hover:chamfer-outer !chamfer-cut-lg"'
+        '<div className="hover:chamfer-outer !chamfer-cut-lg" />'
       )
     ).toEqual([
       expect.objectContaining({ utility: "chamfer-outer" }),
@@ -123,26 +125,39 @@ describe("shape-language allowance", () => {
     ]);
   });
 
-  it("flags dynamically composed chamfer classes", () => {
-    expect(
-      findShapeVocabularyUsages("const c = `chamfer-cut-${cut}`;")
-    ).toEqual([
-      expect.objectContaining({ utility: "chamfer-cut-", kind: "dynamic" }),
-    ]);
-  });
-
-  it("allows a static chamfer class inside an otherwise dynamic template", () => {
-    expect(
-      findShapeVocabularyUsages("const c = `chamfer-outer ${extra}`;")
-    ).toEqual([
+  it.each([
+    ['cn("chamfer-outer", extra)', "cn argument"],
+    ['clsx({ "chamfer-outer": on })', "clsx object key"],
+    ['cva("base", { variants: { c: { a: "chamfer-outer" } } })', "cva variant"],
+    ['cn(on ? "chamfer-outer" : null)', "conditional"],
+    ['cn(on && "chamfer-outer")', "logical"],
+    ['cn(["chamfer-outer"])', "array"],
+    ['<div className={cn("chamfer-outer")} />', "nested in className"],
+  ])("reads a static class out of %s (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([
       expect.objectContaining({ utility: "chamfer-outer", kind: "class" }),
     ]);
   });
 
   it.each([
+    ["<div className={`chamfer-cut-${cut}`} />", "template substitution"],
+    ['<div className={"chamfer-cut-" + cut} />', "binary concatenation"],
+    ['<div className={["chamfer-cut-", cut].join("")} />', "array join"],
+    ["<div className={`chamfer-outer ${extra}`} />", "interpolated class list"],
+    ["cn(`chamfer-cut-${cut}`)", "inside a class helper"],
+  ])("flags %s as dynamic composition (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([
+      expect.objectContaining({ kind: "dynamic" }),
+    ]);
+  });
+
+  it.each([
     ['<div data-slot="chamfer-frame" />', "data-slot JSX attribute"],
+    ["<div data-slot={`chamfer-${kind}`} />", "dynamic data-slot value"],
     ['const p = { "data-slot": "chamfer-surface" };', "data-slot object key"],
     ['<div data-testid="chamfer-example" />', "non-class JSX attribute"],
+    ['const status = "chamfer-example";', "plain string constant"],
+    ['root.querySelector("chamfer-example");', "selector argument"],
     [
       "root.querySelector('[data-slot=\"chamfer-frame\"]');",
       "CSS selector string",

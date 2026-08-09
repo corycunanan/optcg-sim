@@ -290,6 +290,33 @@ describe("ChamferFrame asChild", () => {
     expect(childRef).toHaveBeenCalledWith(anchor);
   });
 
+  it("detaches plain callback refs on unmount", () => {
+    const frameRef = vi.fn();
+    const childRef = vi.fn();
+
+    const { container, unmount } = render(
+      <ChamferFrame asChild ref={frameRef}>
+        <a href="#deck" ref={childRef}>
+          Deck
+        </a>
+      </ChamferFrame>
+    );
+    const anchor = frameOf(container);
+
+    expect(frameRef).toHaveBeenCalledWith(anchor);
+    expect(childRef).toHaveBeenCalledWith(anchor);
+
+    frameRef.mockClear();
+    childRef.mockClear();
+    unmount();
+
+    // The composed ref always returns a cleanup, so React never falls back to
+    // the legacy null-call convention — it has to be synthesized for callbacks
+    // that return no cleanup of their own.
+    expect(frameRef).toHaveBeenCalledWith(null);
+    expect(childRef).toHaveBeenCalledWith(null);
+  });
+
   it("composes same-named handlers, child first", async () => {
     const user = userEvent.setup();
     const calls: string[] = [];

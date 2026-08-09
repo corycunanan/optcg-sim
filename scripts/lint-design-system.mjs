@@ -160,14 +160,25 @@ const INLINE_STYLE_CUSTOM_PROPERTY_ALLOWLIST = new Map(
 //    in the source, so `` `chamfer-cut-${cut}` `` compiles to nothing. Chamfer
 //    classes must come from static literal maps.
 //
-// Scanning is AST-scoped to string literals in class positions, so CSS-selector
-// strings, `data-*` values, and module specifiers are never mistaken for
-// classes. No other allowlist is widened by these rules.
+// Both checks are scoped to *class positions* — a `className`/`class` JSX
+// attribute, or an argument of `cn()` / `cva()` / `clsx()` — descending only
+// through the expression forms those helpers evaluate as classes (conditional,
+// logical, array, object). A `chamfer-` string anywhere else in a .tsx file is
+// not a class and is never inspected, so selector strings, `data-*` values,
+// identifiers, and module specifiers cannot produce a finding. No other
+// allowlist is widened by these rules.
 const GLOBALS_CSS_PATH = join(SOURCE_ROOT, "app", "globals.css");
+const CLASS_ATTRIBUTE_NAMES = new Set(["className", "class"]);
+const CLASS_HELPER_NAMES = new Set(["cn", "cva", "clsx", "classNames"]);
+const CLASS_LOGICAL_OPERATORS = new Set([
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
 // A complete class name never ends in a hyphen; a dangling `chamfer-cut-` is
 // the prefix half of a dynamic composition, reported by that rule instead.
 const SHAPE_CLASS_TOKEN_RE = /^chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?$/;
-const SHAPE_PREFIX_RE = /chamfer-[a-z0-9-]*$/;
+const SHAPE_FRAGMENT_RE = /(?:^|\s)(chamfer-[a-z0-9-]*)/;
 const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
 
 const RULES = [
@@ -330,15 +341,22 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
 
 /**
  * Every `chamfer-*` class reference in a .tsx source, as
- * `{ index, utility, kind }`. `kind: "class"` is a static literal class token —
- * always allowed, and only a name missing from globals.css is a violation.
- * `kind: "dynamic"` is a template literal that concatenates a chamfer prefix
- * with a substitution, which Tailwind cannot see and is always a violation.
+ * `{ index, utility, kind }`.
  *
- * Only string literals in class positions are scanned. `data-*` / `aria-*`
- * attribute values, non-`className` JSX attributes, and module specifiers are
- * skipped, and a token must be a whole class name — so CSS selector strings
- * such as `[data-slot="chamfer-frame"]` are not class references.
+ * Only *class positions* are inspected: a `className`/`class` JSX attribute, or
+ * an argument of a class helper (`cn`/`cva`/`clsx`/`classNames`). Within one,
+ * descent follows the expression forms those helpers evaluate as classes —
+ * string literals, conditionals, `&&`/`||`/`??`, arrays, object keys and
+ * values, and nested helper calls. Nothing outside a class position is
+ * examined, so `const status = "chamfer-example"`, `querySelector(...)`,
+ * `data-slot={...}`, and module specifiers can never produce a finding.
+ *
+ * - `kind: "class"` — a static literal class token. Always allowed; only a name
+ *   missing from globals.css is a violation.
+ * - `kind: "dynamic"` — a non-literal expression in a class position whose
+ *   string parts contain a `chamfer-` token (template substitution, `+`
+ *   concatenation, `[...].join()`, …). Tailwind only ever sees whole class
+ *   names, so this is always a violation.
  */
 export function findShapeVocabularyUsages(source) {
   const sourceFile = ts.createSourceFile(
@@ -349,44 +367,94 @@ export function findShapeVocabularyUsages(source) {
     ts.ScriptKind.TSX
   );
   const usages = [];
+  const scanned = new Set();
+
+  const record = (node, utility, kind) => {
+    usages.push({ index: node.getStart(sourceFile), utility, kind });
+  };
+
+  /** Walks one class-position expression. */
+  const scanClassExpression = (node) => {
+    if (!node || scanned.has(node)) return;
+    scanned.add(node);
+
+    if (
+      ts.isParenthesizedExpression(node) ||
+      ts.isAsExpression(node) ||
+      ts.isSatisfiesExpression(node) ||
+      ts.isNonNullExpression(node) ||
+      ts.isJsxExpression(node)
+    ) {
+      scanClassExpression(node.expression);
+      return;
+    }
+
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      for (const utility of shapeClassTokens(node.text)) {
+        record(node, utility, "class");
+      }
+      return;
+    }
+
+    if (ts.isConditionalExpression(node)) {
+      scanClassExpression(node.whenTrue);
+      scanClassExpression(node.whenFalse);
+      return;
+    }
+
+    if (
+      ts.isBinaryExpression(node) &&
+      CLASS_LOGICAL_OPERATORS.has(node.operatorToken.kind)
+    ) {
+      scanClassExpression(node.left);
+      scanClassExpression(node.right);
+      return;
+    }
+
+    if (ts.isArrayLiteralExpression(node)) {
+      for (const element of node.elements) scanClassExpression(element);
+      return;
+    }
+
+    if (ts.isObjectLiteralExpression(node)) {
+      // clsx keys its classes; cva nests them as variant values.
+      for (const property of node.properties) {
+        if (!ts.isPropertyAssignment(property)) continue;
+        const name = property.name;
+        if (
+          ts.isStringLiteral(name) ||
+          ts.isNoSubstitutionTemplateLiteral(name)
+        ) {
+          scanClassExpression(name);
+        } else if (ts.isComputedPropertyName(name)) {
+          scanClassExpression(name.expression);
+        }
+        scanClassExpression(property.initializer);
+      }
+      return;
+    }
+
+    if (isClassHelperCall(node)) {
+      for (const argument of node.arguments) scanClassExpression(argument);
+      return;
+    }
+
+    // Anything else here is composed at runtime. It is only a finding when it
+    // actually carries chamfer text; plain identifiers stay silent.
+    const fragment = firstShapeFragment(node);
+    if (fragment) record(node, fragment, "dynamic");
+  };
 
   const visit = (node) => {
     if (
-      (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) &&
-      !isNonClassLiteral(node)
+      ts.isJsxAttribute(node) &&
+      CLASS_ATTRIBUTE_NAMES.has(node.name.getText()) &&
+      node.initializer
     ) {
-      for (const utility of shapeClassTokens(node.text)) {
-        usages.push({
-          index: node.getStart(sourceFile),
-          utility,
-          kind: "class",
-        });
-      }
-    }
-
-    if (ts.isTemplateExpression(node)) {
-      const fragments = [
-        node.head,
-        ...node.templateSpans.map((s) => s.literal),
-      ];
-      for (const fragment of fragments) {
-        // A chamfer prefix flush against a substitution is dynamic composition.
-        const dynamic = SHAPE_PREFIX_RE.exec(fragment.text);
-        if (dynamic && !ts.isTemplateTail(fragment)) {
-          usages.push({
-            index: node.getStart(sourceFile),
-            utility: dynamic[0],
-            kind: "dynamic",
-          });
-        }
-        for (const utility of shapeClassTokens(fragment.text)) {
-          usages.push({
-            index: node.getStart(sourceFile),
-            utility,
-            kind: "class",
-          });
-        }
-      }
+      scanClassExpression(node.initializer);
+    } else if (isClassHelperCall(node) && !scanned.has(node)) {
+      scanned.add(node);
+      for (const argument of node.arguments) scanClassExpression(argument);
     }
 
     ts.forEachChild(node, visit);
@@ -394,6 +462,14 @@ export function findShapeVocabularyUsages(source) {
 
   visit(sourceFile);
   return usages;
+}
+
+function isClassHelperCall(node) {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    CLASS_HELPER_NAMES.has(node.expression.text)
+  );
 }
 
 /** Whole `chamfer-*` class tokens in a literal, ignoring variant prefixes. */
@@ -404,35 +480,34 @@ function shapeClassTokens(text) {
     .filter((token) => SHAPE_CLASS_TOKEN_RE.test(token));
 }
 
-/** Literal positions that hold something other than a class list. */
-function isNonClassLiteral(node) {
-  const parent = node.parent;
-  if (!parent) return false;
+/** The first `chamfer-` fragment in any string part of an expression tree. */
+function firstShapeFragment(node) {
+  let found = null;
 
-  if (ts.isJsxAttribute(parent)) {
-    return parent.name.getText() !== "className";
-  }
-  if (
-    ts.isJsxExpression(parent) &&
-    parent.parent &&
-    ts.isJsxAttribute(parent.parent)
-  ) {
-    return parent.parent.name.getText() !== "className";
-  }
-  if (ts.isPropertyAssignment(parent) && parent.initializer === node) {
-    return /^["']?(?:data|aria)-/.test(parent.name.getText());
-  }
+  const check = (text) => {
+    if (found) return;
+    const match = SHAPE_FRAGMENT_RE.exec(text);
+    if (match) found = match[1];
+  };
 
-  return (
-    ts.isImportDeclaration(parent) ||
-    ts.isExportDeclaration(parent) ||
-    ts.isImportTypeNode(parent) ||
-    ts.isExternalModuleReference(parent) ||
-    ts.isImportSpecifier(parent) ||
-    (ts.isCallExpression(parent) &&
-      parent.arguments[0] === node &&
-      /^(?:require|import)$/.test(parent.expression.getText()))
-  );
+  const walk = (current) => {
+    if (found) return;
+
+    if (
+      ts.isStringLiteral(current) ||
+      ts.isNoSubstitutionTemplateLiteral(current)
+    ) {
+      check(current.text);
+    } else if (ts.isTemplateExpression(current)) {
+      check(current.head.text);
+      for (const span of current.templateSpans) check(span.literal.text);
+    }
+
+    ts.forEachChild(current, walk);
+  };
+
+  walk(node);
+  return found;
 }
 
 /** Chamfer utilities declared in globals.css, as `@utility` or a class rule. */

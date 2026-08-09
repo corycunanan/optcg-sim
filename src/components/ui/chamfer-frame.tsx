@@ -115,6 +115,10 @@ const EVENT_HANDLER_PATTERN = /^on[A-Z]/;
 /**
  * Attaches a node to every supplied ref, honoring React 19 ref cleanups so the
  * caller's ref and the frame's own ref can coexist on the promoted root.
+ *
+ * Because this composed callback always returns a cleanup, React never falls
+ * back to the legacy `ref(null)` detach convention — so a plain callback ref
+ * that returns nothing gets its `null` call synthesized here.
  */
 function composeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
   return (node: T | null) => {
@@ -123,7 +127,9 @@ function composeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
     for (const ref of refs) {
       if (typeof ref === "function") {
         const cleanup = ref(node);
-        if (typeof cleanup === "function") cleanups.push(cleanup);
+        cleanups.push(
+          typeof cleanup === "function" ? cleanup : () => ref(null)
+        );
       } else if (ref) {
         const objectRef = ref as React.RefObject<T | null>;
         objectRef.current = node;
