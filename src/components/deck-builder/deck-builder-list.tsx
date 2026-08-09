@@ -39,7 +39,9 @@ interface CardGroup {
   life: number | null;
   effectText: string;
   triggerText: string | null;
+  colors: string[];
   traits: string[];
+  attribute: string[];
   count: number;
   copyLimit: number;
   isLeader: boolean;
@@ -64,7 +66,9 @@ function buildGroups(
       life: leader.life,
       effectText: leader.effectText || "",
       triggerText: null,
+      colors: leader.color,
       traits: leader.traits,
+      attribute: leader.attribute,
       count: 1,
       copyLimit: 1,
       isLeader: true,
@@ -90,7 +94,9 @@ function buildGroups(
       life: entry.card.life ?? null,
       effectText: entry.card.effectText || "",
       triggerText: entry.card.triggerText ?? null,
+      colors: entry.card.color,
       traits: entry.card.traits,
+      attribute: entry.card.attribute,
       count: entry.quantity,
       copyLimit: getDeckCardCopyLimit(entry.card),
       isLeader: false,
@@ -224,7 +230,9 @@ export function DeckBuilderList({
                   power={group.power}
                   counter={group.counter}
                   life={group.life}
+                  colors={group.colors}
                   traits={group.traits}
+                  attribute={group.attribute}
                   effectText={group.effectText}
                   triggerText={group.triggerText}
                 />
