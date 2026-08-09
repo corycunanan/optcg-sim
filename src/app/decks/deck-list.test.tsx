@@ -126,6 +126,46 @@ describe("DeckList row", () => {
     expect(surface.className).toContain("group-hover:bg-surface-2");
   });
 
+  it("lets the metadata cluster wrap so a narrow row never overflows", () => {
+    render(<DeckList decks={[DECK]} />);
+
+    // jsdom cannot measure, so the invariant is asserted at class level: the
+    // cluster's intrinsic width (colour labels + count + date + a 48px kebab)
+    // exceeds the space beside the thumbnail at 320px, so it has to wrap
+    // internally rather than only move below the deck name.
+    const cluster = row().querySelector<HTMLElement>(
+      '[data-slot="deck-row-meta"]'
+    )!;
+    expect(cluster.className).toContain("flex-wrap");
+    expect(cluster.className).toContain("min-w-0");
+    // It only refuses to shrink once there is room beside the name.
+    expect(cluster.className).toContain("sm:shrink-0");
+    expect(cluster.className).not.toMatch(/(?:^|\s)shrink-0(?:\s|$)/);
+  });
+
+  it("shows exactly one focus indicator per focus stop", () => {
+    render(<DeckList decks={[DECK]} />);
+
+    // `ChamferFrame`'s `:has(:focus-visible)` support cannot be narrowed to
+    // the stretched link from the consumer side, so the frame ring is the
+    // single indicator and both nested controls suppress their own.
+    const frame = row().querySelector<HTMLElement>(
+      '[data-slot="chamfer-frame"]'
+    )!;
+    expect(frame.className).toContain("chamfer-focusable");
+
+    const thumbnail = within(row()).getByRole("button", {
+      name: "Leader details for Roronoa Zoro",
+    });
+    expect(thumbnail.className).toContain("focus-visible:outline-none");
+    expect(thumbnail.className).not.toMatch(/focus-visible:ring/);
+
+    const kebab = within(row()).getByRole("button", {
+      name: "More actions for Straw Hat Aggro",
+    });
+    expect(kebab.className).toContain("focus-visible:outline-none");
+  });
+
   it("stretches the deck link over the whole row", () => {
     render(<DeckList decks={[DECK]} />);
 

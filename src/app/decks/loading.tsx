@@ -35,7 +35,7 @@ export default function DecksLoading() {
                 <Skeleton className="h-4 w-2/5 rounded-none" />
                 <Skeleton className="h-3 w-1/4 rounded-none" />
               </div>
-              <div className="flex shrink-0 items-center gap-4">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:shrink-0">
                 <Skeleton className="size-3 rounded-full" />
                 <Skeleton className="h-3 w-12 rounded-none" />
                 <Skeleton className="h-3 w-20 rounded-none" />

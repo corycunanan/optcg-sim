@@ -63,9 +63,15 @@ const MAIN_DECK_SIZE = 50;
  * single-click navigable *and* keeps the two nested controls — the leader
  * tooltip trigger and the kebab — as real siblings rather than illegal
  * interactive descendants of an anchor. Both lift above the overlay with
- * `relative z-10`. Focus stops, in order: thumbnail, deck name, kebab; the
- * frame's chamfered focus ring lights for whichever is focused because
- * `interactive` also watches `:has(:focus-visible)`.
+ * `relative z-10`.
+ *
+ * Focus stops, in order: thumbnail, deck name, kebab. The frame's chamfered
+ * ring is the **single** indicator for all three, so both nested controls
+ * suppress their own ring. `ChamferFrame`'s focus support is
+ * `:has(:focus-visible)`, which matches any descendant and cannot be narrowed
+ * to the link alone from the consumer side — so a control that kept its own
+ * indicator would paint two rings at once. Scoping that selector belongs to
+ * the primitive; see the PR discussion.
  */
 function DeckRow({ deck }: { deck: DeckListItem }) {
   const { leader } = deck;
@@ -83,12 +89,14 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
             {/*
               A real button so the leader panel is reachable by keyboard as
               well as hover — it is the only route to the leader's life,
-              power, and effect text from this page.
+              power, and effect text from this page. Its own focus ring is
+              suppressed: the frame's chamfered ring is the row's single
+              focus indicator.
             */}
             <button
               type="button"
               aria-label={`Leader details for ${leader.name}`}
-              className="focus-visible:ring-border-focus relative z-10 w-14 shrink-0 cursor-help rounded focus-visible:ring-2 focus-visible:outline-none"
+              className="relative z-10 w-14 shrink-0 cursor-help rounded focus-visible:outline-none"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -145,7 +153,17 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-4">
+          {/*
+            The cluster wraps internally as well as moving below the name:
+            colour labels + count + date + a 48px kebab exceed the width left
+            beside the thumbnail at 320px, so `shrink-0` alone would push the
+            row into horizontal overflow. It only refuses to shrink once
+            there is room for it beside the name.
+          */}
+          <div
+            data-slot="deck-row-meta"
+            className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:shrink-0"
+          >
             <DeckColorIndicators colors={deck.colors} />
             <span className="text-content-secondary text-sm tabular-nums">
               {deck.totalCards}/{MAIN_DECK_SIZE}
@@ -156,10 +174,15 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
             >
               {deck.updatedAtLabel}
             </time>
+            {/*
+              `focus-visible:outline-none` defers to the frame ring: the Button
+              primitive's own focus outline would be the row's second
+              simultaneous indicator.
+            */}
             <DeckDeleteButton
               deckId={deck.id}
               deckName={deck.name}
-              className="relative z-10"
+              className="relative z-10 focus-visible:outline-none"
             />
           </div>
         </div>
