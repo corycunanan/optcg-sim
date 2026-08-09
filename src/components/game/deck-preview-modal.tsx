@@ -153,10 +153,17 @@ export function GameDeckPreviewModal({
                         )}
                       />
                     </TooltipTrigger>
+                    {/*
+                      Same Tier-5 information surface as the board tooltip
+                      (see use-card-tooltip.tsx): flat opaque dark on the
+                      board's own tokens, square corners, no glow, one neutral
+                      perimeter lit top-left → bottom-right.
+                    */}
                     <TooltipContent
                       side="top"
                       sideOffset={8}
-                      className="w-72 bg-gb-surface border-gb-border-strong text-gb-text rounded-md p-3 shadow-lg"
+                      data-tier5-surface
+                      className="bg-gb-surface-info gb-edge-info text-gb-text w-72 rounded-none p-3 shadow-none"
                     >
                       {data && (
                         <CardTooltipContent

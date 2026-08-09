@@ -260,6 +260,21 @@
   --gb-navbar: oklch(16% 0.008 245); /* game navbar */
   --gb-shadow-don: 3px 3px 0px 0px rgba(0, 0, 0, 0.25); /* DON!! card drop shadow */
 
+  /* Tier-5 information surface — board side. See docs/design/MATERIAL-LANGUAGE.md.
+     The board keeps its own token context, so these mirror the app's
+     --surface-info/--edge-info pair without borrowing app values. The surface
+     sits one step below --gb-surface so tooltips read as their own information
+     layer over both the felt (18%) and the dark strips (0%), and every gb text
+     token keeps (slightly improves on) its documented contrast. The edge is a
+     neutral hairline lit top-left → bottom-right for the single implied light
+     source; square corners let border-image paint it without a radius conflict. */
+  --gb-surface-info: oklch(8% 0.005 245);
+  --gb-edge-info: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.1)
+  );
+
   /* ── shadcn/ui compatibility aliases ──
      Maps our existing tokens to shadcn's expected variable names.
      See docs/design/BRANDING-GUIDELINES.md Section 3 for rationale. */
@@ -371,6 +386,7 @@
   /* Game Board */
   --color-gb-bg: var(--gb-bg);
   --color-gb-surface: var(--gb-surface);
+  --color-gb-surface-info: var(--gb-surface-info);
   --color-gb-surface-raised: var(--gb-surface-raised);
   --color-gb-surface-inset: var(--gb-surface-inset);
   --color-gb-border: var(--gb-border);
@@ -606,6 +622,14 @@ textarea:focus-visible,
    surface, corners, and glow removal all resolve through tailwind-merge. */
 @utility edge-info {
   border-image-source: var(--edge-info);
+  border-image-slice: 1;
+}
+
+/* Board-side twin of `edge-info`, resolved through the game board's own token
+   context. Pair with `bg-gb-surface-info rounded-none shadow-none` at the call
+   site; the 1px border width comes from the tooltip primitive's base class. */
+@utility gb-edge-info {
+  border-image-source: var(--gb-edge-info);
   border-image-slice: 1;
 }
 
