@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { DeckDeleteButton } from "@/components/deck-builder/deck-delete-button";
+import { collectDeckColors } from "@/lib/decks/colors";
 import {
   PageHeader,
   PageHeaderContent,
@@ -11,11 +11,21 @@ import {
   PageHeaderActions,
 } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { DeckColorIndicators } from "./deck-color-indicators";
+import { DeckList, type DeckListItem } from "./deck-list";
 
 export const metadata = {
   title: "My Decks — OPTCG Simulator",
 };
+
+/**
+ * Compact "last touched" stamp. Built once at module scope and applied on the
+ * server so the rendered string can't drift between server and client.
+ */
+const UPDATED_AT_FORMAT = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 export default async function DecksPage() {
   const session = await auth();
@@ -23,33 +33,64 @@ export default async function DecksPage() {
     redirect("/login");
   }
 
+  // The leader comes through the `Deck.leader` relation rather than a second
+  // `card.findMany`, which also gets the stats and rules text the row's leader
+  // tooltip needs in the same round trip.
   const decks = await prisma.deck.findMany({
     where: { userId: session.user.id },
     orderBy: { updatedAt: "desc" },
+    relationLoadStrategy: "join",
     include: {
       cards: {
-        include: {
-          card: {
-            select: {
-              id: true,
-              name: true,
-              color: true,
-              type: true,
-              imageUrl: true,
-            },
-          },
+        select: { quantity: true, card: { select: { color: true } } },
+      },
+      leader: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          color: true,
+          cost: true,
+          power: true,
+          counter: true,
+          life: true,
+          traits: true,
+          attribute: true,
+          effectText: true,
+          triggerText: true,
+          imageUrl: true,
         },
       },
     },
   });
 
-  // Also fetch leaders for each deck
-  const leaderIds = [...new Set(decks.map((d) => d.leaderId))];
-  const leaders = await prisma.card.findMany({
-    where: { id: { in: leaderIds } },
-    select: { id: true, name: true, color: true, imageUrl: true, power: true },
-  });
-  const leaderMap = new Map(leaders.map((l) => [l.id, l]));
+  const items: DeckListItem[] = decks.map((deck) => ({
+    id: deck.id,
+    name: deck.name,
+    totalCards: deck.cards.reduce((sum, dc) => sum + dc.quantity, 0),
+    colors: collectDeckColors(
+      deck.leader.color,
+      deck.cards.map((dc) => dc.card.color)
+    ),
+    updatedAtIso: deck.updatedAt.toISOString(),
+    updatedAtLabel: UPDATED_AT_FORMAT.format(deck.updatedAt),
+    leader: {
+      id: deck.leader.id,
+      name: deck.leader.name,
+      type: deck.leader.type,
+      // The owner's chosen art variant wins, matching GET /api/decks.
+      imageUrl: deck.leaderArtUrl ?? deck.leader.imageUrl,
+      colors: deck.leader.color,
+      cost: deck.leader.cost,
+      power: deck.leader.power,
+      counter: deck.leader.counter,
+      life: deck.leader.life,
+      traits: deck.leader.traits,
+      attribute: deck.leader.attribute,
+      effectText: deck.leader.effectText,
+      triggerText: deck.leader.triggerText,
+    },
+  }));
 
   return (
     <div className="bg-background flex-1 overflow-y-auto">
@@ -68,7 +109,7 @@ export default async function DecksPage() {
       </PageHeader>
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
-        {decks.length === 0 ? (
+        {items.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-content-secondary text-lg font-semibold">
               No decks yet
@@ -84,58 +125,7 @@ export default async function DecksPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {decks.map((deck) => {
-              const leader = leaderMap.get(deck.leaderId);
-              const totalCards = deck.cards.reduce(
-                (sum, dc) => sum + dc.quantity,
-                0
-              );
-              const colors = new Set<string>();
-              deck.cards.forEach((dc) =>
-                dc.card.color.forEach((c) => colors.add(c))
-              );
-              if (leader) leader.color.forEach((c) => colors.add(c));
-
-              return (
-                <article key={deck.id} className="group relative">
-                  <Link
-                    href={`/decks/${deck.id}`}
-                    className="border-border bg-surface-1 hover:border-border-strong block overflow-hidden rounded border transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
-                  >
-                    {leader && (
-                      <div className="relative h-36 overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={leader.imageUrl}
-                          alt=""
-                          className="h-full w-full object-cover object-top opacity-60 transition-transform duration-300 group-hover:scale-[1.05]"
-                        />
-                        <div className="from-surface-1 absolute inset-0 bg-gradient-to-t to-transparent" />
-                      </div>
-                    )}
-
-                    <div className="relative p-4">
-                      <h3 className="text-content-primary pr-16 text-base font-bold">
-                        {deck.name}
-                      </h3>
-                      <p className="text-content-tertiary mt-1 text-xs">
-                        {leader?.name || "No leader"} · {totalCards}/50 cards
-                      </p>
-
-                      <div className="mt-2 flex items-end gap-2">
-                        <DeckColorIndicators colors={Array.from(colors)} />
-                        <span className="text-content-tertiary ml-auto shrink-0 text-xs">
-                          {deck.updatedAt.toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                  <DeckDeleteButton deckId={deck.id} deckName={deck.name} />
-                </article>
-              );
-            })}
-          </div>
+          <DeckList decks={items} />
         )}
       </div>
     </div>

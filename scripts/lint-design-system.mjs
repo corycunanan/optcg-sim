@@ -87,7 +87,6 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
     // Functional card-color accents and selectors.
     "src/app/admin/cards/[id]/page.tsx": ["borderLeft"],
     "src/app/admin/cards/new/page.tsx": ["background", "borderColor", "color"],
-    "src/app/decks/page.tsx": ["background"],
     "src/components/cards/card-filters.tsx": [
       "background",
       "borderColor",
