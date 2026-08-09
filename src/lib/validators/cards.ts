@@ -60,8 +60,22 @@ export const CardResponseSchema = z.object({
 
 export type CardResponse = z.infer<typeof CardResponseSchema>;
 
-/** Full card shape returned by GET /api/cards search results. */
-export const CardSearchResultSchema = CardResponseSchema;
+/** Card fields required by the deck-builder search grid and info tooltip. */
+export const CardSearchResultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.array(z.string()),
+  type: z.string(),
+  cost: z.number().nullable(),
+  power: z.number().nullable(),
+  counter: z.number().nullable(),
+  life: z.number().nullable(),
+  traits: z.array(z.string()),
+  attribute: z.array(z.string()),
+  effectText: z.string(),
+  triggerText: z.string().nullable(),
+  imageUrl: z.string(),
+});
 
 export type CardSearchResult = z.infer<typeof CardSearchResultSchema>;
 

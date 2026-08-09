@@ -36,8 +36,19 @@ describe("card API response contracts", () => {
     });
 
     expect(parsed.data[0]).toEqual({
-      ...baseCard,
-      effectSchema: { rule_modifications: [] },
+      id: baseCard.id,
+      name: baseCard.name,
+      color: baseCard.color,
+      type: baseCard.type,
+      cost: baseCard.cost,
+      power: baseCard.power,
+      counter: baseCard.counter,
+      life: baseCard.life,
+      traits: baseCard.traits,
+      attribute: baseCard.attribute,
+      effectText: baseCard.effectText,
+      triggerText: baseCard.triggerText,
+      imageUrl: baseCard.imageUrl,
     });
   });
 

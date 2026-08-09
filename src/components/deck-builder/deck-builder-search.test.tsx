@@ -40,8 +40,6 @@ const zoro = {
   attribute: ["Slash"],
   effectText: "[On Play] Draw 1 card.",
   triggerText: null,
-  rarity: "SR",
-  originSet: "OP01",
 };
 
 function renderSearch() {
@@ -91,5 +89,21 @@ describe("DeckBuilderSearch card tooltip", () => {
     );
 
     expect(screen.getByText("Inspecting OP01-025")).toBeTruthy();
+  });
+
+  it("opens the tooltip when keyboard focus reaches the tile", async () => {
+    renderSearch();
+    const tile = await screen.findByRole("button", {
+      name: "Inspect Roronoa Zoro",
+    });
+
+    tile.focus();
+
+    await waitFor(() => {
+      expect(tile.getAttribute("aria-describedby")).toBeTruthy();
+      expect(
+        document.querySelector<HTMLElement>("[data-tier5-surface]")
+      ).not.toBeNull();
+    });
   });
 });

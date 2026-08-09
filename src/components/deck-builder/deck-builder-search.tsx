@@ -312,19 +312,20 @@ export function DeckBuilderSearch({
                   );
 
                 return (
-                  <button
-                    key={card.id}
-                    aria-label={`Inspect ${card.name}`}
-                    onClick={() => setInspectCard(card)}
-                    className={cn(
-                      "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
-                      qtyInDeck > 0 ? "border-border-focus" : "border-border",
-                      (!isLeaderColor || !isLeaderRestrictionAllowed) &&
-                        "opacity-40"
-                    )}
-                  >
-                    <TooltipRoot>
-                      <TooltipTrigger asChild>
+                  <TooltipRoot key={card.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-label={`Inspect ${card.name}`}
+                        onClick={() => setInspectCard(card)}
+                        className={cn(
+                          "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 hover:shadow-sm active:scale-[0.97]",
+                          qtyInDeck > 0
+                            ? "border-border-focus"
+                            : "border-border",
+                          (!isLeaderColor || !isLeaderRestrictionAllowed) &&
+                            "opacity-40"
+                        )}
+                      >
                         <div className="aspect-card relative w-full overflow-hidden">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
@@ -339,39 +340,39 @@ export function DeckBuilderSearch({
                             </div>
                           )}
                         </div>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        className="w-72 max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
-                      >
-                        <CardInfoPanel
-                          name={card.name}
-                          cardType={card.type}
-                          cardId={card.id}
-                          cost={card.cost}
-                          power={card.power}
-                          counter={card.counter}
-                          life={card.life}
-                          colors={card.color}
-                          traits={card.traits}
-                          attribute={card.attribute}
-                          effectText={card.effectText}
-                          triggerText={card.triggerText}
-                        />
-                      </TooltipContent>
-                    </TooltipRoot>
-                    {/* Mini info */}
-                    <div className="px-2 py-1">
-                      <p className="text-content-primary truncate text-xs leading-tight font-medium">
-                        {card.name}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <span className="text-content-tertiary text-xs">
-                          {card.id}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
+                        {/* Mini info */}
+                        <div className="px-2 py-1">
+                          <p className="text-content-primary truncate text-xs leading-tight font-medium">
+                            {card.name}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <span className="text-content-tertiary text-xs">
+                              {card.id}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      className="w-72 max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
+                    >
+                      <CardInfoPanel
+                        name={card.name}
+                        cardType={card.type}
+                        cardId={card.id}
+                        cost={card.cost}
+                        power={card.power}
+                        counter={card.counter}
+                        life={card.life}
+                        colors={card.color}
+                        traits={card.traits}
+                        attribute={card.attribute}
+                        effectText={card.effectText}
+                        triggerText={card.triggerText}
+                      />
+                    </TooltipContent>
+                  </TooltipRoot>
                 );
               })}
             </div>

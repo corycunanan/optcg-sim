@@ -17,10 +17,6 @@ export const CARD_SEARCH_SELECT = {
   effectText: true,
   triggerText: true,
   imageUrl: true,
-  banStatus: true,
-  blockNumber: true,
-  rarity: true,
-  originSet: true,
 } as const satisfies Prisma.CardSelect;
 
 /** Public card database projection matching the card browser client contract. */
