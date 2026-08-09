@@ -1,11 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 /**
- * Slim card projection for the deck-builder search grid.
- *
- * `color`, `type`, `cost`, and `traits` are required for proactive leader
- * restriction dimming. Full card text, legality schemas, and relations are
- * loaded from GET /api/cards/[id] when the user inspects a card.
+ * Card projection for the deck-builder search grid and card-info tooltip.
  */
 export const CARD_SEARCH_SELECT = {
   id: true,
@@ -13,7 +9,13 @@ export const CARD_SEARCH_SELECT = {
   color: true,
   type: true,
   cost: true,
+  power: true,
+  counter: true,
+  life: true,
   traits: true,
+  attribute: true,
+  effectText: true,
+  triggerText: true,
   imageUrl: true,
 } as const satisfies Prisma.CardSelect;
 

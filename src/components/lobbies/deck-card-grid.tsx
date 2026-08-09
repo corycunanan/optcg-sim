@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import {
   CardFanStack,
+  CardInfoPanel,
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
@@ -50,74 +51,6 @@ function stackLabel(group: DeckCardGroup): string {
   return `${group.card.name}, ${group.count} ${
     group.count === 1 ? "copy" : "copies"
   }`;
-}
-
-/* ── Stat pill for the hover tooltip ─────────────────────────────────── */
-
-/**
- * Tier-5 convention: every numeric value is white. The stat's identity is
- * carried by its label, not by a per-stat hue — the previous cost/power/
- * counter colouring competed with card art for chroma and leaned on
- * off-system palette classes.
- */
-function StatPill({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="px-2 text-center">
-      <div className="text-content-primary text-sm font-bold">
-        {String(value)}
-      </div>
-      <div className="text-content-tertiary text-xs tracking-wide uppercase">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-/* ── Card tooltip content (mirrors game board tooltip) ───────────────── */
-
-function CardTooltip({ card }: { card: DeckCardInfo }) {
-  const isFieldCard = card.type === "Leader" || card.type === "Character";
-
-  return (
-    <>
-      <div className="text-content-primary text-sm font-bold">{card.name}</div>
-      <div className="text-content-tertiary mb-3 text-xs">
-        {card.type} &middot; {card.id}
-      </div>
-
-      {isFieldCard ? (
-        <div className="mb-3 flex flex-wrap gap-5 text-xs">
-          {card.type === "Leader" ? (
-            <StatPill label="Life" value={card.life ?? card.cost ?? 0} />
-          ) : (
-            <StatPill label="Cost" value={card.cost ?? 0} />
-          )}
-          <StatPill label="Power" value={(card.power ?? 0).toLocaleString()} />
-          {card.type !== "Leader" && (
-            <StatPill
-              label="Counter"
-              value={card.counter != null ? `+${card.counter}` : "—"}
-            />
-          )}
-        </div>
-      ) : (
-        <div className="mb-3 flex flex-wrap gap-3 text-xs">
-          {card.cost != null && <StatPill label="Cost" value={card.cost} />}
-          {card.life != null && <StatPill label="Life" value={card.life} />}
-        </div>
-      )}
-
-      {card.effectText && (
-        <div className="text-content-secondary border-border flex flex-col gap-2 border-t pt-3 text-xs leading-relaxed">
-          {card.effectText.split(/\n{2,}/).map((paragraph, i) => (
-            <p key={i} className="whitespace-pre-wrap">
-              {paragraph}
-            </p>
-          ))}
-        </div>
-      )}
-    </>
-  );
 }
 
 /**
@@ -176,17 +109,30 @@ export function DeckCardGrid({
               </button>
             </HoverCardTrigger>
             {/*
-              Tier-5 information surface: square corners, flat opaque dark,
-              neutral hairline lit top-left → bottom-right, no glow. The
-              overrides land through tailwind-merge against the shared
-              HoverCard primitive rather than editing it.
+              Tier-5 information surface. `CardInfoPanel` owns the surface —
+              flat opaque dark, square corners, one neutral hairline lit
+              top-left → bottom-right — so the HoverCard primitive is reduced
+              to a bare positioner through tailwind-merge rather than nesting
+              a second visible panel around it.
             */}
             <HoverCardContent
               side="top"
-              className="bg-surface-info edge-info w-72 rounded-none shadow-none"
-              data-tier5-surface
+              className="w-72 rounded-none border-0 bg-transparent p-0 shadow-none"
             >
-              <CardTooltip card={group.card} />
+              <CardInfoPanel
+                name={group.card.name}
+                cardType={group.card.type}
+                cardId={group.card.id}
+                cost={group.card.cost}
+                power={group.card.power}
+                counter={group.card.counter}
+                life={group.card.life}
+                colors={group.card.color}
+                traits={group.card.traits}
+                attribute={group.card.attribute}
+                effectText={group.card.effectText}
+                triggerText={group.card.triggerText}
+              />
             </HoverCardContent>
           </HoverCard>
           {showCounts && (

@@ -20,6 +20,10 @@ export {
   DialogPortal,
 } from "./dialog";
 
+// Card info panel (Tier-5 information surface)
+export { CardInfoPanel } from "./card-info-panel";
+export type { CardInfoPanelProps } from "./card-info-panel";
+
 // Tooltip
 export {
   Tooltip,

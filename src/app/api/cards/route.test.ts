@@ -35,13 +35,19 @@ const validBody = {
   blockNumber: 1,
 };
 
-const slimSearchCard = {
+const searchCard = {
   id: "OP01-001",
   name: "Roronoa Zoro",
   color: ["Red"],
   type: "Leader",
   cost: null,
+  power: 5000,
+  counter: null,
+  life: 5,
   traits: ["Supernovas", "Straw Hat Crew"],
+  attribute: ["Strike"],
+  effectText: "[Your Turn] All of your Characters gain +1000 power.",
+  triggerText: null,
   imageUrl: "https://cdn.example.com/OP01-001.png",
 };
 
@@ -101,7 +107,7 @@ describe("GET /api/cards search", () => {
     });
   });
 
-  it("uses the explicit slim Prisma select", async () => {
+  it("uses the explicit tooltip-ready Prisma select", async () => {
     await GET(new NextRequest("http://localhost/api/cards"));
 
     const query = findManyMock.mock.calls[0]?.[0];
@@ -117,13 +123,19 @@ describe("GET /api/cards search", () => {
       color: true,
       type: true,
       cost: true,
+      power: true,
+      counter: true,
+      life: true,
       traits: true,
+      attribute: true,
+      effectText: true,
+      triggerText: true,
       imageUrl: true,
     });
   });
 
-  it("returns only the public slim card shape", async () => {
-    findManyMock.mockResolvedValue([slimSearchCard]);
+  it("returns only the public tooltip-ready card shape", async () => {
+    findManyMock.mockResolvedValue([searchCard]);
     countMock.mockResolvedValue(1);
 
     const res = await GET(new NextRequest("http://localhost/api/cards"));
@@ -131,11 +143,25 @@ describe("GET /api/cards search", () => {
 
     expect(res.status).toBe(200);
     expect(body).toEqual({
-      data: [slimSearchCard],
+      data: [searchCard],
       pagination: { total: 1, page: 1, limit: 40, totalPages: 1 },
     });
     expect(Object.keys(body.data[0]).sort()).toEqual(
-      ["id", "name", "color", "type", "cost", "traits", "imageUrl"].sort(),
+      [
+        "id",
+        "name",
+        "color",
+        "type",
+        "cost",
+        "power",
+        "counter",
+        "life",
+        "traits",
+        "attribute",
+        "effectText",
+        "triggerText",
+        "imageUrl",
+      ].sort(),
     );
     expect(body.data[0]).not.toHaveProperty("effectSchema");
     expect(body.data[0]).not.toHaveProperty("artVariants");
