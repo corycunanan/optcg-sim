@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * than two nested ones.
  */
 export interface CardInfoPanelProps {
-  /** Printed card name. Rendered bold + uppercase. */
+  /** Printed card name. Rendered semibold + uppercase. */
   name: string;
   /** Card category — "Leader", "Character", "Event", "Stage", "DON!!". */
   cardType: string;

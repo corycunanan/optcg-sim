@@ -46,10 +46,14 @@ describe("CardInfoPanel", () => {
     );
 
     const name = screen.getByText("Roronoa Zoro");
-    expect(name.className).toContain("uppercase");
-    expect(name.className).toContain("font-semibold");
-    expect(name.className).toContain("tracking-widest");
-    expect(name.className).toContain("text-content-primary");
+    const classes = name.className.split(/\s+/);
+    expect(classes).toContain("text-sm");
+    expect(classes).toContain("font-semibold");
+    expect(classes).toContain("tracking-widest");
+    expect(classes).toContain("uppercase");
+    expect(classes).toContain("text-content-primary");
+    expect(classes).not.toContain("font-bold");
+    expect(classes).not.toContain("tracking-wide");
 
     const meta = screen.getByText(/Character/);
     expect(meta.textContent).toContain("OP01-025");
