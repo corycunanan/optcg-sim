@@ -1332,7 +1332,7 @@ function SolitaireSeat({
               <p className="text-content-primary text-sm font-semibold">
                 {deck.name}
               </p>
-              <p className="text-content-tertiary mt-1 font-mono text-xs">
+              <p className="text-content-tertiary mt-1 font-mono text-xs font-semibold">
                 {deck.leaderName ?? deck.leaderId}
               </p>
             </div>

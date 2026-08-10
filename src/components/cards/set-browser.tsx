@@ -46,7 +46,7 @@ export async function SetBrowser({ cardsRoute }: SetBrowserProps) {
                 className="border-border bg-surface-1 flex items-center justify-between rounded-lg border p-4 transition-all hover:-translate-y-px hover:shadow-md"
               >
                 <div>
-                  <span className="text-content-primary font-mono text-sm font-bold">
+                  <span className="text-content-primary font-mono text-xs font-semibold">
                     {set.setLabel}
                   </span>
                   <p className="text-content-tertiary mt-1 text-xs">
