@@ -80,7 +80,7 @@ export default function SandboxHubPage() {
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-content-primary text-base font-bold">
+                <h3 className="text-content-primary text-base font-semibold">
                   Board Scaffold
                 </h3>
                 <p className="text-content-tertiary mt-1 text-sm">
@@ -128,7 +128,7 @@ function ScenarioTile({ scenario }: { scenario: Scenario }) {
       className="group border-border bg-card hover:border-border-strong flex h-full flex-col gap-3 rounded-lg border p-4 transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-content-primary text-sm font-bold">
+        <h3 className="text-content-primary text-sm font-semibold">
           {scenario.title}
         </h3>
         <Badge variant="secondary">{CATEGORY_LABELS[scenario.category]}</Badge>

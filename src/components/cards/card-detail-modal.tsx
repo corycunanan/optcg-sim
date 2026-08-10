@@ -51,7 +51,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">{label}</span>
-      <span className="text-lg font-bold tabular-nums text-content-primary">{value}</span>
+      <span className="text-lg font-semibold tabular-nums text-content-primary">{value}</span>
     </div>
   );
 }
@@ -161,7 +161,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                       </Badge>
                     ))}
                     {card.banStatus !== "LEGAL" && (
-                      <Badge variant="error" className="px-3 py-1 font-bold">
+                      <Badge variant="error" className="px-3 py-1 font-semibold">
                         {card.banStatus}
                       </Badge>
                     )}

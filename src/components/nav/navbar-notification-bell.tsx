@@ -49,7 +49,7 @@ export const NavbarNotificationBell = forwardRef<
         <Badge
           data-slot="notification-unread-badge"
           aria-hidden="true"
-          className="bg-error text-navy-900 absolute -top-1 -right-1 size-5 rounded-full p-0 text-xs font-bold"
+          className="bg-error text-navy-900 absolute -top-1 -right-1 size-5 rounded-full p-0 text-xs font-semibold"
         >
           {badgeLabel}
         </Badge>

@@ -26,7 +26,7 @@ export const EmptySlot = React.memo(function EmptySlot({
         className,
       )}
     >
-      <span className="text-base font-bold text-gb-text-dim/40 leading-none select-none uppercase tracking-wider">
+      <span className="text-base font-semibold text-gb-text-dim/40 leading-none select-none uppercase tracking-wider">
         {label}
       </span>
     </div>

@@ -47,7 +47,7 @@ export function PileReceipt({
           <motion.span
             key={receipt.id}
             aria-hidden="true"
-            className="text-gb-text-bright block text-base font-bold tabular-nums"
+            className="text-gb-text-bright block text-base font-semibold tabular-nums"
             initial={deltaMotion.initial}
             animate={deltaMotion.animate}
             transition={deltaMotion.transition}

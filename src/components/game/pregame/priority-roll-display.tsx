@@ -43,7 +43,7 @@ export function PriorityRollDisplay({
           reduceMotion={reduceMotion ?? false}
           label="Player 1"
         />
-        <span className="text-gb-text-subtle text-2xl font-bold">vs</span>
+        <span className="text-gb-text-subtle text-2xl font-semibold">vs</span>
         <Die
           value={rolls?.[1] ?? null}
           highlight={priorityDeciderIndex === 1}
@@ -54,7 +54,7 @@ export function PriorityRollDisplay({
 
       {priorityDeciderIndex !== null && (
         <div className="flex flex-col items-center gap-2">
-          <div className="text-gb-accent-amber text-sm font-bold uppercase tracking-widest">
+          <div className="text-gb-accent-amber text-sm font-semibold uppercase tracking-widest">
             {youWon ? "You won the roll" : "Opponent won the roll"}
           </div>
           {!youWon && (
@@ -86,7 +86,7 @@ function Die({ value, highlight, reduceMotion, label }: DieProps) {
         animate={{ rotate: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 18 }}
         className={cn(
-          "flex h-24 w-24 items-center justify-center rounded-lg border-2 text-5xl font-bold",
+          "flex h-24 w-24 items-center justify-center rounded-lg border-2 text-5xl font-semibold",
           highlight
             ? "border-gb-accent-amber bg-gb-prompt-bg text-gb-accent-amber shadow-lg"
             : "border-gb-border-strong bg-gb-surface text-gb-text",

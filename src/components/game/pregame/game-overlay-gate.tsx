@@ -270,7 +270,7 @@ function SpectatorPregameOverlay({
             value={pregame.priorityRolls[0]}
             won={pregame.priorityDeciderIndex === 0}
           />
-          <span className="text-gb-text-subtle text-2xl font-bold">vs</span>
+          <span className="text-gb-text-subtle text-2xl font-semibold">vs</span>
           <PassiveRoll
             name={playerOneName}
             value={pregame.priorityRolls[1]}
@@ -314,7 +314,7 @@ function PassiveRoll({
     <div className="flex flex-col items-center gap-3">
       <div
         className={cn(
-          "flex h-24 w-24 items-center justify-center rounded-lg border-2 text-5xl font-bold",
+          "flex h-24 w-24 items-center justify-center rounded-lg border-2 text-5xl font-semibold",
           won
             ? "border-gb-accent-amber bg-gb-prompt-bg text-gb-accent-amber shadow-lg"
             : "border-gb-border-strong bg-gb-surface text-gb-text"

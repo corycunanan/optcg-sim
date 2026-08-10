@@ -14,7 +14,7 @@ export function CardActionBadge({
       aria-hidden
       data-effect-action-badge={state}
       className={cn(
-        "rounded bg-gb-board-dark/80 px-1 text-base font-bold leading-none text-gb-signal-battle",
+        "rounded bg-gb-board-dark/80 px-1 text-base font-semibold leading-none text-gb-signal-battle",
         state !== "available" && "opacity-40",
       )}
     >

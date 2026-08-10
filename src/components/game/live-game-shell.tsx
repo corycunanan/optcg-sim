@@ -262,7 +262,7 @@ function GameSessionView({
       return (
         <div className="bg-gb-board flex h-full w-full items-center justify-center px-4">
           <div className="flex max-w-md flex-col items-center gap-4 text-center">
-            <div className="text-gb-text-bright text-lg font-bold">
+            <div className="text-gb-text-bright text-lg font-semibold">
               Can&rsquo;t reach the game server
             </div>
             <div className="text-gb-text text-sm leading-relaxed">
@@ -470,7 +470,7 @@ function GameSessionView({
           >
             <span
               className={cn(
-                "text-sm font-bold",
+                "text-sm font-semibold",
                 opponent.gamePausedForOpponent
                   ? "text-gb-accent-amber"
                   : "text-gb-accent-blue"
@@ -657,7 +657,7 @@ function LoadingGameState({
     <div className="bg-gb-board flex h-full w-full items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <Spinner className="text-gb-text-bright size-6" />
-        <div className="text-gb-text-bright text-sm font-bold">{label}</div>
+        <div className="text-gb-text-bright text-sm font-semibold">{label}</div>
         {children}
       </div>
     </div>
@@ -672,7 +672,7 @@ function MissingGameState({
   return (
     <div className="bg-gb-board flex h-full w-full items-center justify-center px-4">
       <div className="flex max-w-md flex-col items-center gap-4 text-center">
-        <div className="text-gb-text-bright text-lg font-bold">
+        <div className="text-gb-text-bright text-lg font-semibold">
           Game not found
         </div>
         <div className="text-gb-text text-sm leading-relaxed">

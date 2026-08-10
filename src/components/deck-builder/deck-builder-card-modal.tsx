@@ -66,7 +66,7 @@ export function DeckBuilderCardModal({
                   >
                     −
                   </Button>
-                  <span className="text-content-primary w-8 text-center text-lg font-bold tabular-nums">
+                  <span className="text-content-primary w-8 text-center text-lg font-semibold tabular-nums">
                     {quantityInDeck}
                   </span>
                   <Button

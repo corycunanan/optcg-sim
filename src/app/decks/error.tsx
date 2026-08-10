@@ -23,7 +23,7 @@ export default function DecksError({
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <p className="text-xl font-extrabold text-red-600">
+          <p className="text-xl font-semibold text-red-600">
             Something went wrong
           </p>
           <p className="text-sm text-content-secondary leading-relaxed">
