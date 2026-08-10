@@ -126,7 +126,7 @@ export function CardInfoPanel({
       )}
     >
       <div className="flex flex-col gap-1">
-        <div className="text-content-primary text-sm font-bold tracking-wide uppercase">
+        <div className="text-content-primary text-sm font-semibold tracking-widest uppercase">
           {name}
         </div>
         <div className="text-content-secondary text-xs">

@@ -45,7 +45,7 @@ export function CardFront({
         />
       ) : (
         <>
-          <div className="px-1 pt-1 text-base leading-tight font-bold text-gb-text-bright line-clamp-2">
+          <div className="px-1 pt-1 text-base leading-tight font-semibold text-gb-text-bright line-clamp-2">
             {data?.name ?? fallbackLabel ?? "?"}
           </div>
           {data?.type && (

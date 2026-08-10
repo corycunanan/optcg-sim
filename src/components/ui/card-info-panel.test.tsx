@@ -40,14 +40,15 @@ describe("CardInfoPanel", () => {
     expect(panel!.className).not.toContain("backdrop");
   });
 
-  it("leads with a bold uppercase name over the type and card id", () => {
+  it("leads with a semibold uppercase name over the type and card id", () => {
     render(
       <CardInfoPanel name="Roronoa Zoro" cardType="Character" cardId="OP01-025" />
     );
 
     const name = screen.getByText("Roronoa Zoro");
     expect(name.className).toContain("uppercase");
-    expect(name.className).toContain("font-bold");
+    expect(name.className).toContain("font-semibold");
+    expect(name.className).toContain("tracking-widest");
     expect(name.className).toContain("text-content-primary");
 
     const meta = screen.getByText(/Character/);

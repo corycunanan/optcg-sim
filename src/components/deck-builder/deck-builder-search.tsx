@@ -332,7 +332,7 @@ export function DeckBuilderSearch({
                         </div>
                         {/* Mini info */}
                         <div className="px-2 py-1">
-                          <p className="text-content-primary truncate text-xs leading-tight font-medium">
+                          <p className="text-content-primary truncate text-xs leading-tight font-semibold">
                             {card.name}
                           </p>
                           <div className="flex items-center gap-1">
