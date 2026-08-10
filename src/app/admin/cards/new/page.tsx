@@ -407,9 +407,9 @@ function Field({
     <div>
       <Label htmlFor={htmlFor} className="mb-2 block">
         {label}
-        {required && <span className="ml-1">*</span>}
+        {required && <span className="text-error ml-1">*</span>}
         {hint && (
-          <span className="ml-1">
+          <span className="text-content-tertiary ml-1 font-normal">
             ({hint})
           </span>
         )}
