@@ -31,9 +31,9 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
 
       {scenario.cardsUsed.length > 0 && (
         <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Cards used
-          </h3>
+          </h2>
           <ul className="space-y-2">
             {scenario.cardsUsed.map((id) => (
               <CardListItem key={id} cardId={id} />
