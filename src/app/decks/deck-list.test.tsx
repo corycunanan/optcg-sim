@@ -64,6 +64,21 @@ async function openLeaderPanel(): Promise<HTMLElement> {
 }
 
 describe("DeckList row", () => {
+  it("renders deck names as level-two headings without a level-one heading", () => {
+    render(
+      <DeckList
+        decks={[DECK, { ...DECK, id: "deck-2", name: "Enel Control" }]}
+      />
+    );
+
+    expect(
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent)
+    ).toEqual(expect.arrayContaining(["Straw Hat Aggro", "Enel Control"]));
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+  });
+
   it("renders the deck identity, metadata cluster, and delete action", () => {
     render(<DeckList decks={[DECK]} />);
     const listItem = row();
