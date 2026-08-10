@@ -175,7 +175,7 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
         onClick={() => setCollapsed((v) => !v)}
         className="flex items-center justify-between px-3 py-2 cursor-pointer border-b border-gb-border-subtle hover:bg-gb-surface-raised transition-colors rounded-t-lg"
       >
-        <span className="text-xs font-bold uppercase tracking-widest text-gb-text-dim">
+        <span className="text-xs font-semibold uppercase tracking-widest text-gb-text-dim">
           Event Log
         </span>
         <div className="flex items-center gap-2">

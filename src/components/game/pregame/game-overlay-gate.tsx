@@ -104,7 +104,7 @@ export function GameOverlayGate({
           onInteractOutside={(event) => event.preventDefault()}
         >
           <DialogHeader className="items-center">
-            <DialogTitle className="text-gb-text-subtle text-xs font-semibold tracking-widest">
+            <DialogTitle className="text-gb-text-subtle">
               MATCH COMPLETE
             </DialogTitle>
           </DialogHeader>
@@ -322,7 +322,7 @@ function PassiveRoll({
       >
         {value}
       </div>
-      <span className="text-gb-text-dim text-xs tracking-widest uppercase">
+      <span className="text-gb-text-dim text-xs font-semibold tracking-widest uppercase">
         {name}
       </span>
     </div>

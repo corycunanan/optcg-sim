@@ -35,7 +35,7 @@ export function TrashPreviewModal({
       >
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gb-border space-y-2">
           <div className="flex items-center gap-3">
-            <DialogTitle className="text-sm font-bold text-gb-text-bright">
+            <DialogTitle className="text-gb-text-bright">
               {title}
             </DialogTitle>
             <Badge

@@ -38,7 +38,7 @@ export function RevealTriggerModal({
         className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[400px] p-0 gap-0"
       >
         <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
-          <DialogTitle className="text-xs font-semibold text-gb-text-subtle tracking-wider uppercase">
+          <DialogTitle className="text-gb-text-subtle">
             Trigger
           </DialogTitle>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
