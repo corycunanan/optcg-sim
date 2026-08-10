@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui";
 import { ApiError, apiPost } from "@/lib/api-client";
 import { RegisterResponseSchema } from "@/lib/validators/auth";
 import { AuthUnavailableAlert } from "./auth-unavailable-alert";
@@ -151,10 +152,11 @@ export function CredentialsForm({
       {mode === "signin" ? (
         <form onSubmit={handleSignIn} className="space-y-3">
           <div>
-            <label className="text-content-secondary mb-1 block text-xs font-semibold">
+            <Label htmlFor="signin-email" className="mb-1 block">
               Email
-            </label>
+            </Label>
             <Input
+              id="signin-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -163,10 +165,11 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="text-content-secondary mb-1 block text-xs font-semibold">
+            <Label htmlFor="signin-password" className="mb-1 block">
               Password
-            </label>
+            </Label>
             <Input
+              id="signin-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -181,10 +184,11 @@ export function CredentialsForm({
       ) : (
         <form onSubmit={handleSignUp} className="space-y-3">
           <div>
-            <label className="text-content-secondary mb-1 block text-xs font-semibold">
+            <Label htmlFor="signup-email" className="mb-1 block">
               Email
-            </label>
+            </Label>
             <Input
+              id="signup-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -193,10 +197,11 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="text-content-secondary mb-1 block text-xs font-semibold">
+            <Label htmlFor="signup-username" className="mb-1 block">
               Username
-            </label>
+            </Label>
             <Input
+              id="signup-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -206,10 +211,11 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="text-content-secondary mb-1 block text-xs font-semibold">
+            <Label htmlFor="signup-password" className="mb-1 block">
               Password
-            </label>
+            </Label>
             <Input
+              id="signup-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -219,10 +225,11 @@ export function CredentialsForm({
             />
           </div>
           <div>
-            <label className="text-content-secondary mb-1 block text-xs font-semibold">
+            <Label htmlFor="signup-confirm-password" className="mb-1 block">
               Confirm Password
-            </label>
+            </Label>
             <Input
+              id="signup-confirm-password"
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}

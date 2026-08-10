@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui";
 import { apiPost } from "@/lib/api-client";
 import { SetUsernameResponseSchema } from "@/lib/validators/user";
 
@@ -79,12 +80,12 @@ export default function OnboardingPage() {
             )}
 
             <div>
-              <label
+              <Label
                 htmlFor="username"
-                className="text-content-secondary mb-2 block text-sm font-medium"
+                className="mb-2 block"
               >
                 Username
-              </label>
+              </Label>
               <Input
                 id="username"
                 type="text"

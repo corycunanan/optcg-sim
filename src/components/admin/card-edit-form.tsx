@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
@@ -162,8 +163,9 @@ export function CardEditForm({ card }: { card: Card }) {
       </div>
 
       {/* Name */}
-      <Field label="Name" required>
+      <Field label="Name" htmlFor="name" required>
         <Input
+          id="name"
           type="text"
           value={form.name}
           onChange={(e) => update("name", e.target.value)}
@@ -213,8 +215,9 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Field label="Cost">
+        <Field label="Cost" htmlFor="cost">
           <Input
+            id="cost"
             type="number"
             value={form.cost}
             onChange={(e) => update("cost", e.target.value)}
@@ -222,8 +225,9 @@ export function CardEditForm({ card }: { card: Card }) {
             className="tabular-nums"
           />
         </Field>
-        <Field label="Power">
+        <Field label="Power" htmlFor="power">
           <Input
+            id="power"
             type="number"
             value={form.power}
             onChange={(e) => update("power", e.target.value)}
@@ -232,8 +236,9 @@ export function CardEditForm({ card }: { card: Card }) {
             className="tabular-nums"
           />
         </Field>
-        <Field label="Counter">
+        <Field label="Counter" htmlFor="counter">
           <Input
+            id="counter"
             type="number"
             value={form.counter}
             onChange={(e) => update("counter", e.target.value)}
@@ -242,8 +247,9 @@ export function CardEditForm({ card }: { card: Card }) {
             className="tabular-nums"
           />
         </Field>
-        <Field label="Life" hint="Leaders only">
+        <Field label="Life" htmlFor="life" hint="Leaders only">
           <Input
+            id="life"
             type="number"
             value={form.life}
             onChange={(e) => update("life", e.target.value)}
@@ -255,16 +261,18 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Metadata row */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Rarity">
+        <Field label="Rarity" htmlFor="rarity">
           <Input
+            id="rarity"
             type="text"
             value={form.rarity}
             onChange={(e) => update("rarity", e.target.value)}
             placeholder="Rare, SuperRare..."
           />
         </Field>
-        <Field label="Block Number" required>
+        <Field label="Block Number" htmlFor="block-number" required>
           <Input
+            id="block-number"
             type="number"
             value={form.blockNumber}
             onChange={(e) => update("blockNumber", e.target.value)}
@@ -272,9 +280,9 @@ export function CardEditForm({ card }: { card: Card }) {
             max={10}
           />
         </Field>
-        <Field label="Ban Status">
+        <Field label="Ban Status" htmlFor="ban-status">
           <Select value={form.banStatus} onValueChange={(v) => update("banStatus", v)}>
-            <SelectTrigger>
+            <SelectTrigger id="ban-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -289,8 +297,9 @@ export function CardEditForm({ card }: { card: Card }) {
       </div>
 
       {/* Attribute + Traits */}
-      <Field label="Attributes" hint="Comma-separated">
+      <Field label="Attributes" htmlFor="attributes" hint="Comma-separated">
         <Input
+          id="attributes"
           type="text"
           value={form.attribute}
           onChange={(e) => update("attribute", e.target.value)}
@@ -298,8 +307,9 @@ export function CardEditForm({ card }: { card: Card }) {
         />
       </Field>
 
-      <Field label="Traits" hint="Comma-separated">
+      <Field label="Traits" htmlFor="traits" hint="Comma-separated">
         <Input
+          id="traits"
           type="text"
           value={form.traits}
           onChange={(e) => update("traits", e.target.value)}
@@ -308,8 +318,9 @@ export function CardEditForm({ card }: { card: Card }) {
       </Field>
 
       {/* Effect Text */}
-      <Field label="Effect Text">
+      <Field label="Effect Text" htmlFor="effect-text">
         <Textarea
+          id="effect-text"
           value={form.effectText}
           onChange={(e) => update("effectText", e.target.value)}
           rows={5}
@@ -318,8 +329,9 @@ export function CardEditForm({ card }: { card: Card }) {
       </Field>
 
       {/* Trigger Text */}
-      <Field label="Trigger Text">
+      <Field label="Trigger Text" htmlFor="trigger-text">
         <Textarea
+          id="trigger-text"
           value={form.triggerText}
           onChange={(e) => update("triggerText", e.target.value)}
           rows={2}
@@ -328,8 +340,9 @@ export function CardEditForm({ card }: { card: Card }) {
       </Field>
 
       {/* Image URL */}
-      <Field label="Image URL">
+      <Field label="Image URL" htmlFor="image-url">
         <Input
+          id="image-url"
           type="text"
           value={form.imageUrl}
           onChange={(e) => update("imageUrl", e.target.value)}
@@ -352,9 +365,9 @@ export function CardEditForm({ card }: { card: Card }) {
           checked={form.isReprint}
           onCheckedChange={(checked) => update("isReprint", !!checked)}
         />
-        <label htmlFor="isReprint" className="text-sm text-content-secondary">
+        <Label htmlFor="isReprint">
           This card is a reprint (ID prefix doesn&apos;t match origin pack)
-        </label>
+        </Label>
       </div>
 
       {/* Actions */}
@@ -376,28 +389,30 @@ export function CardEditForm({ card }: { card: Card }) {
 
 function Field({
   label,
+  htmlFor,
   hint,
   required,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   hint?: string;
   required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-content-secondary">
+      <Label htmlFor={htmlFor} className="mb-2 block">
         {label}
         {required && (
-          <span className="ml-1 text-error">*</span>
+          <span className="ml-1">*</span>
         )}
         {hint && (
-          <span className="ml-1 font-normal text-content-tertiary">
+          <span className="ml-1">
             ({hint})
           </span>
         )}
-      </label>
+      </Label>
       {children}
     </div>
   );

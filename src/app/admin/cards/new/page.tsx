@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { apiPost } from "@/lib/api-client";
 import { CreateCardResponseSchema } from "@/lib/validators/cards";
@@ -151,8 +152,9 @@ export default function NewCardPage() {
 
         {/* Card ID + Name row */}
         <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
-          <Field label="Card ID" required>
+          <Field label="Card ID" htmlFor="card-id" required>
             <Input
+              id="card-id"
               type="text"
               value={form.id}
               onChange={(e) => update("id", e.target.value)}
@@ -160,8 +162,9 @@ export default function NewCardPage() {
               className="font-mono"
             />
           </Field>
-          <Field label="Name" required>
+          <Field label="Name" htmlFor="name" required>
             <Input
+              id="name"
               type="text"
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
@@ -224,8 +227,9 @@ export default function NewCardPage() {
 
         {/* Stats row */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Field label="Cost">
+          <Field label="Cost" htmlFor="cost">
             <Input
+              id="cost"
               type="number"
               value={form.cost}
               onChange={(e) => update("cost", e.target.value)}
@@ -233,8 +237,9 @@ export default function NewCardPage() {
               className="tabular-nums"
             />
           </Field>
-          <Field label="Power">
+          <Field label="Power" htmlFor="power">
             <Input
+              id="power"
               type="number"
               value={form.power}
               onChange={(e) => update("power", e.target.value)}
@@ -243,8 +248,9 @@ export default function NewCardPage() {
               className="tabular-nums"
             />
           </Field>
-          <Field label="Counter">
+          <Field label="Counter" htmlFor="counter">
             <Input
+              id="counter"
               type="number"
               value={form.counter}
               onChange={(e) => update("counter", e.target.value)}
@@ -253,8 +259,9 @@ export default function NewCardPage() {
               className="tabular-nums"
             />
           </Field>
-          <Field label="Life" hint="Leaders only">
+          <Field label="Life" htmlFor="life" hint="Leaders only">
             <Input
+              id="life"
               type="number"
               value={form.life}
               onChange={(e) => update("life", e.target.value)}
@@ -266,16 +273,18 @@ export default function NewCardPage() {
 
         {/* Metadata row */}
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Rarity">
+          <Field label="Rarity" htmlFor="rarity">
             <Input
+              id="rarity"
               type="text"
               value={form.rarity}
               onChange={(e) => update("rarity", e.target.value)}
               placeholder="Rare, SuperRare..."
             />
           </Field>
-          <Field label="Block Number" required>
+          <Field label="Block Number" htmlFor="block-number" required>
             <Input
+              id="block-number"
               type="number"
               value={form.blockNumber}
               onChange={(e) => update("blockNumber", e.target.value)}
@@ -283,12 +292,12 @@ export default function NewCardPage() {
               max={10}
             />
           </Field>
-          <Field label="Ban Status">
+          <Field label="Ban Status" htmlFor="ban-status">
             <Select
               value={form.banStatus}
               onValueChange={(v) => update("banStatus", v)}
             >
-              <SelectTrigger>
+              <SelectTrigger id="ban-status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -303,8 +312,9 @@ export default function NewCardPage() {
         </div>
 
         {/* Attribute + Traits */}
-        <Field label="Attributes" hint="Comma-separated">
+        <Field label="Attributes" htmlFor="attributes" hint="Comma-separated">
           <Input
+            id="attributes"
             type="text"
             value={form.attribute}
             onChange={(e) => update("attribute", e.target.value)}
@@ -312,8 +322,9 @@ export default function NewCardPage() {
           />
         </Field>
 
-        <Field label="Traits" hint="Comma-separated">
+        <Field label="Traits" htmlFor="traits" hint="Comma-separated">
           <Input
+            id="traits"
             type="text"
             value={form.traits}
             onChange={(e) => update("traits", e.target.value)}
@@ -322,8 +333,9 @@ export default function NewCardPage() {
         </Field>
 
         {/* Effect Text */}
-        <Field label="Effect Text">
+        <Field label="Effect Text" htmlFor="effect-text">
           <Textarea
+            id="effect-text"
             value={form.effectText}
             onChange={(e) => update("effectText", e.target.value)}
             rows={5}
@@ -332,8 +344,9 @@ export default function NewCardPage() {
         </Field>
 
         {/* Trigger Text */}
-        <Field label="Trigger Text">
+        <Field label="Trigger Text" htmlFor="trigger-text">
           <Textarea
+            id="trigger-text"
             value={form.triggerText}
             onChange={(e) => update("triggerText", e.target.value)}
             rows={2}
@@ -342,8 +355,9 @@ export default function NewCardPage() {
         </Field>
 
         {/* Image URL */}
-        <Field label="Image URL">
+        <Field label="Image URL" htmlFor="image-url">
           <Input
+            id="image-url"
             type="text"
             value={form.imageUrl}
             onChange={(e) => update("imageUrl", e.target.value)}
@@ -378,26 +392,28 @@ export default function NewCardPage() {
 
 function Field({
   label,
+  htmlFor,
   hint,
   required,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   hint?: string;
   required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="text-content-secondary mb-2 block text-sm font-medium">
+      <Label htmlFor={htmlFor} className="mb-2 block">
         {label}
-        {required && <span className="text-error ml-1">*</span>}
+        {required && <span className="ml-1">*</span>}
         {hint && (
-          <span className="text-content-tertiary ml-1 font-normal">
+          <span className="ml-1">
             ({hint})
           </span>
         )}
-      </label>
+      </Label>
       {children}
     </div>
   );
