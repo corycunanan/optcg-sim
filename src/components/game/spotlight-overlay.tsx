@@ -136,7 +136,7 @@ export function SpotlightOverlay({
             className="border-gb-accent-amber/40 bg-gb-surface flex flex-col items-center gap-6 border px-10 py-8 shadow-2xl"
           >
             <div className="flex flex-col items-center gap-2 text-center">
-              <span className="text-gb-accent-amber text-base font-bold tracking-widest uppercase">
+              <span className="text-gb-accent-amber text-base font-semibold tracking-wider uppercase">
                 {copy.eyebrow}
               </span>
               <DialogTitle className="font-display text-3xl text-gb-text-bright">

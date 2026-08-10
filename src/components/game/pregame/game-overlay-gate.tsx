@@ -108,7 +108,7 @@ export function GameOverlayGate({
               MATCH COMPLETE
             </DialogTitle>
           </DialogHeader>
-          <p className={cn("text-3xl font-extrabold", endState.colorClass)}>
+          <p className={cn("font-display text-3xl", endState.colorClass)}>
             {endState.title}
           </p>
           <p className="text-gb-text text-sm leading-relaxed">
@@ -166,7 +166,7 @@ function SpectatorMatchComplete({
           <span className="text-gb-text-subtle text-xs font-semibold tracking-widest uppercase">
             Match complete
           </span>
-          <h2 className="text-gb-accent-amber text-3xl font-bold">
+          <h2 className="text-gb-accent-amber font-display text-3xl">
             {winner === null ? "Draw" : `${playerDisplayNames[winner]} wins`}
           </h2>
           <p className="text-gb-text max-w-md text-sm leading-relaxed">
@@ -253,7 +253,7 @@ function SpectatorPregameOverlay({
       className="bg-gb-board/90 pointer-events-none fixed inset-0 z-[90] flex flex-col items-center justify-center gap-8 px-6 text-center backdrop-blur-sm"
     >
       <div className="flex flex-col items-center gap-2">
-        <h2 className="text-gb-text-bright text-3xl font-bold tracking-widest uppercase">
+        <h2 className="text-gb-text-bright font-display text-3xl">
           {pregame.phase === "MULLIGAN_DECISIONS"
             ? "Opening hands"
             : "Preparing the game"}

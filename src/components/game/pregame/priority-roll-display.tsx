@@ -28,7 +28,7 @@ export function PriorityRollDisplay({
   return (
     <div className="bg-gb-board/90 fixed inset-0 z-[200] flex flex-col items-center justify-center gap-8 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-2">
-        <h2 className="text-gb-text-bright text-3xl font-bold uppercase tracking-widest">
+        <h2 className="text-gb-text-bright font-display text-3xl">
           Priority Decision
         </h2>
         <p className="text-gb-text-dim text-sm">
