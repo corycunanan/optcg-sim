@@ -132,6 +132,7 @@ Inside the `<ScaledBoard>` / `BoardLayout` scaled subtree the board renders at ~
 | heading (on-board overlays) | `text-base`–`text-lg` `font-semibold`; spotlight moments may use `font-display text-3xl` (deliberate hero exception) |
 
 Portaled content (tooltips, modals, popovers) is chrome and keeps chrome roles, even when triggered from the board. Full override table: `BRANDING-GUIDELINES.md` §13.
+`NavMenu` dropdown content is portaled outside `<ScaledBoard>` and keeps its chrome `text-xs` menu-item role.
 
 ## 7. Numbers, Prose, and Misc
 
