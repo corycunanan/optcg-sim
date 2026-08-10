@@ -15,7 +15,7 @@ export function TooltipStat({
 
   return (
     <div className="text-center px-2">
-      <div className={`flex items-center justify-center gap-1 font-bold text-sm ${colorClass}`}>
+      <div className={`flex items-center justify-center gap-1 font-semibold text-sm ${colorClass}`}>
         <span>{String(value)}</span>
         {modified === "up" && (
           <span className="text-xs leading-none">&#x25B2;</span>

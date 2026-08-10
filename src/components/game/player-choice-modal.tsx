@@ -153,7 +153,7 @@ export function PlayerChoiceModal({
                         <Minus className="size-4" aria-hidden="true" />
                       </GameButton>
                       <span
-                        className="text-gb-text-bright text-center text-sm font-bold"
+                        className="text-gb-text-bright text-center text-sm font-semibold"
                         aria-live="polite"
                       >
                         {value}

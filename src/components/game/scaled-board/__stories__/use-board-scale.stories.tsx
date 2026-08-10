@@ -6,7 +6,7 @@ function ScaleDebugOverlay() {
   return (
     <div className="absolute left-8 top-8 rounded-md bg-surface-1 px-6 py-4 font-mono text-base text-content-primary shadow-md">
       <div>
-        scale: <span className="font-bold">{scale.toFixed(4)}</span>
+        scale: <span className="font-semibold">{scale.toFixed(4)}</span>
       </div>
       <div>
         design: {designWidth}×{designHeight}

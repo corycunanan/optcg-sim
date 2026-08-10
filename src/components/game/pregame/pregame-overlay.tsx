@@ -83,7 +83,7 @@ export function PregameOverlay({
   // HAND_DEAL / START_OF_GAME_FX / LIFE_PLACEMENT / DONE — usually transient.
   return (
     <div className="bg-gb-board/85 fixed inset-0 z-[200] flex items-center justify-center backdrop-blur-sm">
-      <div className="text-gb-text-bright text-lg font-bold">
+      <div className="text-gb-text-bright text-lg font-semibold">
         Preparing the game…
       </div>
     </div>

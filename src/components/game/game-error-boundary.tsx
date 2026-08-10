@@ -34,7 +34,7 @@ export class GameErrorBoundary extends React.Component<Props, State> {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <p className="text-xl font-extrabold text-gb-accent-red">
+              <p className="text-xl font-semibold text-gb-accent-red">
                 Something went wrong
               </p>
               <p className="text-sm text-gb-text leading-relaxed">

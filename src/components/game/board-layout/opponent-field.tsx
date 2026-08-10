@@ -220,7 +220,7 @@ function OpponentFieldComponent({
             )}
           </div>
         ) : (
-          <span className="text-base font-bold text-gb-text-dim/40 leading-none select-none">
+          <span className="text-base font-semibold text-gb-text-dim/40 leading-none select-none">
             STG
           </span>
         )}

@@ -56,7 +56,7 @@ export function CardFront({
           <div className="flex-1" />
           <div className="px-1 pb-1 flex items-end justify-between">
             {data?.power != null && (
-              <span className="text-base font-bold leading-none text-gb-accent-green">
+              <span className="text-base font-semibold leading-none text-gb-accent-green">
                 {data.power >= 1000
                   ? `${(data.power / 1000).toFixed(0)}K`
                   : data.power}

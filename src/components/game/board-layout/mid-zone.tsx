@@ -37,7 +37,7 @@ const BattleDisplay = React.memo(function BattleDisplay({
     <div className="flex shrink-0 items-center gap-3">
       <span
         className={cn(
-          "text-base font-bold tracking-wider uppercase",
+          "text-base font-semibold tracking-wider uppercase",
           info.battleSubPhase === "COUNTER_STEP"
             ? "text-gb-accent-red"
             : info.battleSubPhase === "BLOCK_STEP"
@@ -52,24 +52,24 @@ const BattleDisplay = React.memo(function BattleDisplay({
         <span className="text-gb-text-subtle max-w-[80px] truncate text-base">
           {info.attackerName}
         </span>
-        <span className="text-gb-text-bright text-base font-bold tabular-nums">
+        <span className="text-gb-text-bright text-base font-semibold tabular-nums">
           {formatPower(info.attackerPower)}
         </span>
       </div>
 
-      <span className="text-gb-text-dim text-base font-bold">VS</span>
+      <span className="text-gb-text-dim text-base font-semibold">VS</span>
 
       <div className="flex items-center gap-1">
         <span
           className={cn(
-            "text-base font-bold tabular-nums",
+            "text-base font-semibold tabular-nums",
             boosted ? "text-gb-accent-green" : "text-gb-text-bright"
           )}
         >
           {formatPower(info.defenderPower)}
         </span>
         {boosted && (
-          <span className="text-gb-accent-green/70 text-base font-bold tabular-nums">
+          <span className="text-gb-accent-green/70 text-base font-semibold tabular-nums">
             +{formatPower(info.counterPowerAdded)}
           </span>
         )}
@@ -192,7 +192,7 @@ export const MidZone = React.memo(function MidZone({
           aria-live="polite"
           className="flex min-w-0 items-center gap-2 text-base"
         >
-          <span className="text-gb-accent-amber font-bold" aria-hidden>
+          <span className="text-gb-accent-amber font-semibold" aria-hidden>
             &#x26A1;
           </span>
           <span className="text-gb-text-dim truncate">
@@ -207,7 +207,7 @@ export const MidZone = React.memo(function MidZone({
       {/* Hidden modal prompt indicator */}
       {activePrompt && !targetSelectionMode && isPromptHidden && (
         <div className="flex shrink-0 items-center gap-2">
-          <span className="text-gb-accent-amber text-base font-bold">
+          <span className="text-gb-accent-amber text-base font-semibold">
             &#x26A1; ACTION REQUIRED
           </span>
           <GameButton
@@ -227,7 +227,7 @@ export const MidZone = React.memo(function MidZone({
         !targetSelectionMode &&
         !isPromptHidden && (
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-gb-accent-amber text-base font-bold">
+            <span className="text-gb-accent-amber text-base font-semibold">
               &#x26A1; {activePrompt.promptType.replace(/_/g, " ")}
             </span>
             {activePrompt.promptType === "REVEAL_TRIGGER" &&
@@ -274,7 +274,7 @@ export const MidZone = React.memo(function MidZone({
           data-target-selection-control=""
         >
           <span
-            className="text-gb-accent-amber shrink-0 text-base font-bold"
+            className="text-gb-accent-amber shrink-0 text-base font-semibold"
             aria-hidden
           >
             &#x26A1;

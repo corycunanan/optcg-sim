@@ -44,7 +44,7 @@ function CardGridItem({
         )}
         {/* Ban badge */}
         {loaded && card.banStatus !== "LEGAL" && (
-          <Badge variant="error" className="absolute top-2 left-2 font-bold">
+          <Badge variant="error" className="absolute top-2 left-2 font-semibold">
             {card.banStatus}
           </Badge>
         )}

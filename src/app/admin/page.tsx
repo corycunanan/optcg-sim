@@ -124,7 +124,7 @@ function StatBox({
       <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
         {label}
       </div>
-      <div className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-content-primary">
+      <div className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-content-primary">
         {value.toLocaleString()}
       </div>
     </div>

@@ -52,7 +52,7 @@ function CardInfoStat({ label, value }: { label: string; value: string }) {
       <span className="text-content-secondary text-xs font-semibold tracking-widest uppercase">
         {label}
       </span>
-      <span className="text-content-primary text-sm font-bold tabular-nums">
+      <span className="text-content-primary text-sm font-semibold tabular-nums">
         {value}
       </span>
     </div>

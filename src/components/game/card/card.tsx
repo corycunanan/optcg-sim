@@ -336,7 +336,7 @@ export const Card = React.memo(function Card({
             <motion.div
               key={`power-pill:${powerMod.nonce ?? powerMod.value}`}
               className={cn(
-                "rounded-full px-2 py-1 text-base font-bold",
+                "rounded-full px-2 py-1 text-base font-semibold",
                 powerModTone === "absolute"
                   ? "bg-gb-accent-blue text-gb-text-bright"
                   : powerModTone === "positive"

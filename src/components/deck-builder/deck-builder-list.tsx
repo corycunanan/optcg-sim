@@ -191,11 +191,11 @@ export function DeckBuilderList({
                       <button
                         aria-label="Remove one"
                         onClick={() => onDecrement(group.cardId)}
-                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors"
+                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-semibold transition-colors"
                       >
                         −
                       </button>
-                      <span className="text-content-primary min-w-4 text-center text-xs font-bold tabular-nums">
+                      <span className="text-content-primary min-w-4 text-center text-xs font-semibold tabular-nums">
                         {group.count}
                       </span>
                       <button
@@ -204,7 +204,7 @@ export function DeckBuilderList({
                         disabled={
                           group.count >= group.copyLimit || totalCards >= 50
                         }
-                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-bold transition-colors disabled:opacity-30"
+                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-semibold transition-colors disabled:opacity-30"
                       >
                         +
                       </button>

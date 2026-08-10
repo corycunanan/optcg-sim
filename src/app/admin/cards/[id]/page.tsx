@@ -86,7 +86,7 @@ export default async function CardDetailPage({
                 </p>
               </div>
               {card.banStatus !== "LEGAL" && (
-                <Badge variant="error" className="font-bold">
+                <Badge variant="error" className="font-semibold">
                   {card.banStatus}
                 </Badge>
               )}
@@ -222,7 +222,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
         {label}
       </div>
-      <div className="mt-1 text-lg font-bold tabular-nums text-content-primary">
+      <div className="mt-1 text-lg font-semibold tabular-nums text-content-primary">
         {value}
       </div>
     </div>
