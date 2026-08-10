@@ -52,6 +52,7 @@ describe("CardInfoPanel", () => {
     expect(classes).toContain("tracking-widest");
     expect(classes).toContain("uppercase");
     expect(classes).toContain("text-content-primary");
+    expect(classes).not.toContain("font-bold");
     expect(classes).not.toContain("tracking-wide");
 
     const meta = screen.getByText(/Character/);
