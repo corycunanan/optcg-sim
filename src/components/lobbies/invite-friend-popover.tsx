@@ -133,12 +133,12 @@ export function InviteFriendPopover({
               </p>
             )}
             {!loading && friends.length === 0 && (
-              <p className="text-content-tertiary px-2 py-3 text-xs">
+              <p className="text-content-tertiary px-2 py-3 text-sm">
                 Add friends from the sidebar to invite them.
               </p>
             )}
             {!loading && friends.length > 0 && filtered.length === 0 && (
-              <p className="text-content-tertiary px-2 py-3 text-xs">
+              <p className="text-content-tertiary px-2 py-3 text-sm">
                 No friends match.
               </p>
             )}

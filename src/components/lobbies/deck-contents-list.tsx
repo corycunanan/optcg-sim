@@ -86,7 +86,7 @@ export function DeckContentsList({
           </div>
         ))
       ) : (
-        <div className="text-content-tertiary flex h-full items-center justify-center px-5 py-6 text-center text-xs">
+        <div className="text-content-tertiary flex h-full items-center justify-center px-5 py-6 text-center text-sm">
           {emptyLabel}
         </div>
       )}

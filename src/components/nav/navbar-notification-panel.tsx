@@ -540,7 +540,14 @@ export function NavbarNotificationPanel() {
             tabIndex={0}
             className="focus-visible:ring-border-focus m-4 rounded-md px-4 py-8 text-center outline-none focus-visible:ring-2"
           >
-            <p className="text-content-primary text-sm font-medium">
+            <p
+              className={cn(
+                "text-sm",
+                loadState === "loading" || loadState === "error"
+                  ? "text-content-primary font-medium"
+                  : "text-content-tertiary"
+              )}
+            >
               {loadState === "loading"
                 ? "Loading notifications…"
                 : loadState === "error"

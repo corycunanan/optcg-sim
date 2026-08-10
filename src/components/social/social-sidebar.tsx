@@ -446,7 +446,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                   {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
                     searchState === "success" &&
                     searchResults.length === 0 && (
-                      <p className="text-content-tertiary mt-2 text-center text-xs">
+                      <p className="text-content-tertiary mt-2 text-center text-sm">
                         No users found
                       </p>
                     )}
@@ -488,7 +488,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                 </p>
               ) : friendsLoadState === "error" &&
                 friends.length === 0 ? null : onlineFriends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-xs">
+                <p className="text-content-tertiary px-2 text-sm">
                   No friends online.
                 </p>
               ) : (
