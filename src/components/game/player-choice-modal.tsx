@@ -120,7 +120,7 @@ export function PlayerChoiceModal({
         className="bg-gb-surface border-gb-border-strong text-gb-text flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[400px]"
       >
         <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
-          <DialogTitle className="text-gb-text-bright text-sm font-bold">
+          <DialogTitle className="text-gb-text-bright">
             {effectDescription}
           </DialogTitle>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
