@@ -277,7 +277,7 @@ export function DeckBuilderSearch({
           )}
           {!queryTooShort && !loadFailed && !isLoading && results.length === 0 && (
             <div className="py-10 text-center">
-              <p className="text-content-secondary text-sm font-medium">
+              <p className="text-content-tertiary text-sm">
                 No cards match
               </p>
               <p className="text-content-tertiary mt-1 text-xs">

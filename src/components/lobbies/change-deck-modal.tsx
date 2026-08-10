@@ -106,7 +106,7 @@ export function ChangeDeckModal({
             aria-label="Your decks"
           >
             {decks.length === 0 ? (
-              <p className="text-content-tertiary px-3 py-2 text-xs">
+              <p className="text-content-tertiary px-3 py-2 text-sm">
                 No decks yet. Build one to play.
               </p>
             ) : (
@@ -198,7 +198,7 @@ export function ChangeDeckModal({
                   <DeckCardGrid groups={groups} showCounts />
                 </div>
               ) : (
-                <div className="text-content-tertiary flex min-h-0 flex-1 items-center justify-center p-5 text-center text-xs">
+                <div className="text-content-tertiary flex min-h-0 flex-1 items-center justify-center p-5 text-center text-sm">
                   This deck has no cards yet
                 </div>
               ))}

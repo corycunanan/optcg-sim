@@ -112,7 +112,7 @@ export default async function DecksPage() {
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         {items.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="text-content-secondary text-lg font-semibold">
+            <p className="text-content-tertiary text-sm">
               No decks yet
             </p>
             <p className="text-content-tertiary mt-1 text-sm">

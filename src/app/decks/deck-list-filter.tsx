@@ -55,7 +55,7 @@ export function DeckListFilter({ decks }: { decks: DeckListItem[] }) {
 
       {filteredDecks.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-content-secondary text-lg font-semibold">
+          <p className="text-content-tertiary text-sm">
             No decks match
           </p>
           <Button
