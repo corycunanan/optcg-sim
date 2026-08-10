@@ -46,7 +46,7 @@ export function MulliganModal({
         className="bg-gb-board/90 inset-0 z-[200] flex h-full max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-6 border-0 p-0 backdrop-blur-sm sm:max-w-none"
       >
         <div className="flex flex-col items-center gap-2">
-          <DialogTitle className="text-gb-text-bright text-2xl font-bold tracking-widest uppercase">
+          <DialogTitle className="text-gb-text-bright">
             Mulligan
           </DialogTitle>
           <DialogDescription className="text-gb-text-dim max-w-md text-center text-sm">

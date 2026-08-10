@@ -107,9 +107,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
             <Skeleton className="h-6 w-48" />
           ) : (
             <div>
-              <DialogTitle className="text-xl font-bold tracking-tight">
-                {card.name}
-              </DialogTitle>
+              <DialogTitle>{card.name}</DialogTitle>
               <p className="mt-1 text-xs text-content-tertiary">
                 {card.id} · {card.type} · {card.rarity}
               </p>

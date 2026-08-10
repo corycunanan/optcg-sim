@@ -104,7 +104,7 @@ export function GameOverlayGate({
           onInteractOutside={(event) => event.preventDefault()}
         >
           <DialogHeader className="items-center">
-            <DialogTitle className="text-gb-text-subtle text-xs font-semibold tracking-widest">
+            <DialogTitle className="text-gb-text-subtle">
               MATCH COMPLETE
             </DialogTitle>
           </DialogHeader>

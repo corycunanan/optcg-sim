@@ -45,7 +45,7 @@ export function LifePreviewModal({
       >
         <DialogHeader className="border-gb-border space-y-2 border-b px-6 pt-6 pb-4">
           <div className="flex items-center gap-3">
-            <DialogTitle className="text-gb-text-bright text-sm font-bold">
+            <DialogTitle className="text-gb-text-bright">
               {title}
             </DialogTitle>
             <Badge
