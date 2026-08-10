@@ -150,7 +150,7 @@ export function CardEditForm({ card }: { card: Card }) {
       {/* Card ID + Origin Set (read-only) */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Card ID" hint="Read-only">
-          <div className="w-full rounded-md border border-border bg-card px-3 py-2 font-mono text-xs font-semibold text-content-tertiary">
+          <div className="w-full rounded-md border border-border bg-card px-3 py-2 font-mono text-sm text-content-tertiary">
             {card.id}
           </div>
         </Field>

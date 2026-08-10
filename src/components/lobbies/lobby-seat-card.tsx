@@ -310,7 +310,7 @@ function SelectedDeck({
           <p className="text-content-primary truncate text-sm font-semibold">
             {deck.leaderName ?? deck.name}
           </p>
-          <p className="text-content-tertiary mt-1 font-mono text-sm font-semibold tracking-widest">
+          <p className="text-content-tertiary mt-1 font-mono text-xs font-semibold">
             {deck.leaderId}
           </p>
         </div>
