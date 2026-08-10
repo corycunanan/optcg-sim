@@ -238,7 +238,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                     <div className="flex flex-col gap-2">
                       {card.cardSets.map((cs) => (
                         <div key={cs.id} className="flex items-center gap-2 text-sm">
-                          <span className="font-mono font-medium text-content-primary">{cs.setLabel}</span>
+                          <span className="font-mono text-xs font-semibold text-content-primary">{cs.setLabel}</span>
                           <span className="text-content-tertiary">—</span>
                           <span className="text-content-secondary">{cs.setName}</span>
                           {cs.isOrigin && (

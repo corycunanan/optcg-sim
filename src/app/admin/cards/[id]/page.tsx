@@ -179,7 +179,7 @@ export default async function CardDetailPage({
                     key={cs.id}
                     className="flex items-center gap-2 text-sm"
                   >
-                    <span className="font-mono font-medium text-content-primary">
+                    <span className="font-mono text-xs font-semibold text-content-primary">
                       {cs.setLabel}
                     </span>
                     <span className="text-content-tertiary">—</span>

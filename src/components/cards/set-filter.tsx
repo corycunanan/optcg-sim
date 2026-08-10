@@ -178,7 +178,7 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
                       checked={selected}
                       className="pointer-events-none"
                     />
-                    <span className="shrink-0 font-mono text-xs font-bold">
+                    <span className="shrink-0 font-mono text-xs font-semibold">
                       {s.setLabel}
                     </span>
                     <span className="text-content-secondary truncate text-xs">

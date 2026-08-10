@@ -157,7 +157,7 @@ export default function NewCardPage() {
               value={form.id}
               onChange={(e) => update("id", e.target.value)}
               placeholder="OP15-096"
-              className="font-mono"
+              className="font-mono text-xs font-semibold"
             />
           </Field>
           <Field label="Name" required>
