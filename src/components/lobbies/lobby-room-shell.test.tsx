@@ -338,7 +338,11 @@ describe("LobbyRoomShell redesign scenarios", () => {
     const roomHeadings = renderer!.root.findAllByType("h1");
     expect(roomHeadings).toHaveLength(1);
     expect(roomHeadings[0].children).toEqual(["Unlimited"]);
-    expect(renderer!.root.findAllByType("h2").length).toBeGreaterThanOrEqual(1);
+    expect(
+      renderer!.root
+        .findAllByType("h2")
+        .some((heading) => heading.children.join("") === "Open seat")
+    ).toBe(true);
 
     const modeButtons = renderer!.root
       .findAllByType("button")
