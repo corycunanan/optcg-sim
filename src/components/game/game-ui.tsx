@@ -24,7 +24,7 @@ export function TooltipStat({
           <span className="text-xs leading-none">&#x25BC;</span>
         )}
       </div>
-      <div className="text-xs text-gb-text-muted uppercase tracking-wide">
+      <div className="text-xs font-semibold text-gb-text-muted uppercase tracking-widest">
         {label}
       </div>
     </div>

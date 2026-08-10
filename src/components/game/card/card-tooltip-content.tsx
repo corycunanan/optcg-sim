@@ -73,7 +73,7 @@ function splitClauseBadges(line: string): ClauseParts {
 
 function TooltipBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="bg-gb-surface-raised inline-flex px-2 py-1 text-xs font-semibold tracking-wide uppercase">
+    <span className="bg-gb-surface-raised inline-flex px-2 py-1 text-xs font-semibold tracking-widest uppercase">
       {children}
     </span>
   );
@@ -99,7 +99,7 @@ function TooltipStat({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-gb-text-subtle text-xs tracking-wide uppercase">
+      <span className="text-gb-text-subtle text-xs font-semibold tracking-widest uppercase">
         {label}
       </span>
       <span className="text-gb-text-bright flex items-center gap-1 text-sm font-semibold tabular-nums">
@@ -174,7 +174,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
         <div className="text-gb-text-bright text-sm font-semibold">
           {data.name}
         </div>
-        <div className="text-gb-text-subtle text-xs tracking-wide uppercase">
+        <div className="text-gb-text-subtle text-xs tracking-widest uppercase">
           {data.type} &middot; {cardId}
         </div>
       </div>

@@ -417,7 +417,7 @@ function GameSessionView({
       {solitaire && (
         <div className="border-gb-border-strong bg-gb-surface fixed top-4 left-4 z-[70] flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg">
           <div className="flex flex-col gap-1">
-            <span className="text-gb-accent-amber text-xs font-bold tracking-widest uppercase">
+            <span className="text-gb-accent-amber text-xs font-semibold tracking-widest uppercase">
               Solitaire
             </span>
             <span className="text-gb-text-bright text-sm font-semibold">

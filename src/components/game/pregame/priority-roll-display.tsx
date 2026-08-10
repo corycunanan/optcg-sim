@@ -94,7 +94,7 @@ function Die({ value, highlight, reduceMotion, label }: DieProps) {
       >
         {value ?? "—"}
       </motion.div>
-      <span className="text-gb-text-dim text-xs uppercase tracking-widest">{label}</span>
+      <span className="text-gb-text-dim text-xs font-semibold uppercase tracking-widest">{label}</span>
     </div>
   );
 }
