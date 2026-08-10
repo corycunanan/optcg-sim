@@ -106,7 +106,7 @@ export function SpectatorsModal({
         </DialogHeader>
 
         {spectators.length === 0 ? (
-          <p className="text-content-secondary py-8 text-center text-sm">
+          <p className="text-content-tertiary py-8 text-center text-sm">
             No spectators watching yet
           </p>
         ) : (

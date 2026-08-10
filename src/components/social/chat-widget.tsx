@@ -416,7 +416,7 @@ export function ChatWidget({
             )}
             {!loading && !historyLoadFailed && messages.length === 0 && (
               <p
-                className="text-content-tertiary py-6 text-center text-xs"
+                className="text-content-tertiary py-6 text-center text-sm"
                 role="status"
               >
                 No messages yet. Say something!
