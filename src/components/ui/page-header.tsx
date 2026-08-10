@@ -32,7 +32,7 @@ function PageHeaderTitle({ children }: { children: React.ReactNode }) {
 }
 
 function PageHeaderDescription({ children }: { children: React.ReactNode }) {
-  return <p className="text-content-secondary text-sm">{children}</p>;
+  return <p className="text-content-secondary max-w-prose text-sm">{children}</p>;
 }
 
 function PageHeaderActions({ children }: { children: React.ReactNode }) {
