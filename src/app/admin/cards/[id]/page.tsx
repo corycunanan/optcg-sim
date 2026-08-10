@@ -78,7 +78,7 @@ export default async function CardDetailPage({
           >
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="font-display text-2xl text-content-primary">
+                <h1 className="font-display text-3xl text-content-primary">
                   {card.name}
                 </h1>
                 <p className="mt-1 text-sm text-content-tertiary">

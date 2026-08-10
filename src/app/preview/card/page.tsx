@@ -138,7 +138,7 @@ export default function CardPreviewPage() {
       <div className="h-full overflow-y-auto bg-gb-board p-8 text-gb-text">
         <div className="mx-auto max-w-6xl space-y-12">
           <header className="space-y-2">
-            <h1 className="font-display text-4xl text-gb-text-bright">
+            <h1 className="font-display text-3xl text-gb-text-bright">
               Card Primitive Preview
             </h1>
             <p className="text-sm text-gb-text-subtle">

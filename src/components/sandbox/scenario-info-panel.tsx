@@ -21,9 +21,9 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-5">
       <header className="space-y-2">
         <Badge variant={badgeVariant(scenario)}>{badgeLabel(scenario)}</Badge>
-        <h2 className="font-display text-lg text-content-primary">
+        <h1 className="font-display text-xl text-content-primary">
           {scenario.title}
-        </h2>
+        </h1>
         <p className="text-sm text-content-tertiary">{scenario.description}</p>
       </header>
 
