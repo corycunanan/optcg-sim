@@ -141,7 +141,7 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
         */}
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-content-primary truncate text-base">
+            <h2 className="text-content-primary truncate text-base font-semibold">
               {/*
                 `focus-visible:outline-none` opts out of the global
                 `:focus-visible` outline in globals.css — on this stop the

@@ -48,9 +48,14 @@ export function SandboxShell({
           <span aria-hidden className="text-content-disabled">
             ·
           </span>
-          <h1 className="truncate text-sm font-bold text-content-primary">
+          {/*
+            Breadcrumb crumb, not the page title: the scenario name gets its
+            real heading treatment in ScenarioInfoPanel, which owns this
+            surface's single h1 (OPT-634).
+          */}
+          <span className="truncate text-sm font-medium text-content-primary">
             {scenario.title}
-          </h1>
+          </span>
         </header>
 
         <div className="flex flex-1 min-h-0">

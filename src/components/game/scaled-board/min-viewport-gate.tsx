@@ -31,8 +31,8 @@ function MinViewportMessage() {
   return (
     <div className="flex h-full w-full items-center justify-center bg-gb-board px-4">
       <div className="flex flex-col items-center gap-4 max-w-md text-center">
-        <h1 className="text-lg font-bold text-gb-text-bright">
-          OPTCG Sim is designed for desktop.
+        <h1 className="font-display text-3xl text-gb-text-bright">
+          OPTCG Sim is designed for desktop
         </h1>
         <p className="text-sm text-gb-text leading-relaxed">
           Please use a larger screen &mdash; at least 1280&times;640 &mdash; to

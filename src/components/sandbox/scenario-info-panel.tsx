@@ -21,9 +21,9 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-5">
       <header className="space-y-2">
         <Badge variant={badgeVariant(scenario)}>{badgeLabel(scenario)}</Badge>
-        <h2 className="font-display text-lg text-content-primary">
+        <h1 className="font-display text-xl text-content-primary">
           {scenario.title}
-        </h2>
+        </h1>
         <p className="text-sm text-content-tertiary">{scenario.description}</p>
       </header>
 
@@ -31,9 +31,9 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
 
       {scenario.cardsUsed.length > 0 && (
         <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Cards used
-          </h3>
+          </h2>
           <ul className="space-y-2">
             {scenario.cardsUsed.map((id) => (
               <CardListItem key={id} cardId={id} />

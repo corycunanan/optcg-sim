@@ -487,7 +487,7 @@ export function LobbyRoomShell({
               <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
                 Game mode
               </p>
-              <h1 className="font-display text-content-primary mt-1 truncate text-4xl uppercase">
+              <h1 className="font-display text-content-primary mt-1 truncate text-3xl">
                 {lobby.format}
               </h1>
             </div>
@@ -898,7 +898,7 @@ function SpectatorRoom({
           <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
             Watching party
           </p>
-          <h1 className="font-display text-content-primary mt-1 text-4xl">
+          <h1 className="font-display text-content-primary mt-1 text-3xl">
             {displayName(lobby.host, "Host")}&apos;s party
           </h1>
           <p className="text-content-secondary mt-2 text-sm">{lobby.format}</p>
@@ -1190,16 +1190,16 @@ export function InvitePanel({
             <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
               Guest
             </p>
-            <p className="text-content-primary text-lg font-semibold">
+            <h2 className="text-content-primary text-lg font-semibold">
               Invite pending
-            </p>
+            </h2>
           </div>
         </header>
         <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 py-10 text-center">
           <div>
-            <h2 className="font-display text-content-primary text-2xl">
+            <h3 className="font-display text-content-primary text-2xl">
               Invite sent to {pendingInviteName}
-            </h2>
+            </h3>
             <p className="text-content-secondary mt-2 text-sm">
               Their seat is reserved until the invitation expires.
             </p>
@@ -1234,7 +1234,7 @@ export function InvitePanel({
           <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
             Waiting for a challenger
           </p>
-          <h2 className="text-content-primary mt-1 text-lg font-semibold uppercase">
+          <h2 className="text-content-primary mt-1 text-lg font-semibold">
             Open seat
           </h2>
         </div>
