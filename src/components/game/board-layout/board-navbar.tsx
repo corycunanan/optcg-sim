@@ -86,7 +86,7 @@ export function BoardNavbar({
         role="group"
         aria-label="Turn and phase status"
       >
-        <span className="text-gb-text-bright text-xs font-bold">
+        <span className="text-gb-text-bright text-xs font-bold tabular-nums">
           <span className="sr-only">
             {turnNumber === null ? "Turn unavailable" : `Turn ${turnNumber}`}
           </span>
@@ -140,7 +140,7 @@ export function BoardNavbar({
           </span>
         )}
         {playerIndex !== null && (
-          <span className="text-gb-text-dim text-xs">
+          <span className="text-gb-text-dim text-xs tabular-nums">
             <span className="sr-only">You are Player {playerIndex + 1}</span>
             <span aria-hidden="true">P{playerIndex + 1}</span>
           </span>
