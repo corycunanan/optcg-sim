@@ -5,6 +5,7 @@ import type {
   LobbyRoomMode,
   LobbyRoomPregameMode,
 } from "@/lib/lobbies/state";
+import { Label } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export const PREGAME_MODE_OPTIONS: ReadonlyArray<{
@@ -121,7 +122,7 @@ export function PregameSettings({
         {options.map((option) => {
           const selected = option.value === value;
           return (
-            <label
+            <Label
               key={option.value}
               className={cn(
                 "flex min-h-16 cursor-pointer items-start gap-3 px-4 py-3 transition-colors",
@@ -149,7 +150,7 @@ export function PregameSettings({
                   {option.explanation}
                 </span>
               </span>
-            </label>
+            </Label>
           );
         })}
       </fieldset>

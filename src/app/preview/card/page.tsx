@@ -9,7 +9,7 @@ import type {
 } from "@shared/game-types";
 import { Card } from "@/components/game/card";
 import type { CardState, CardVariant } from "@/components/game/card";
-import { Button, TooltipProvider } from "@/components/ui";
+import { Button, Label, TooltipProvider } from "@/components/ui";
 
 /**
  * Internal preview page for the `<Card>` primitive. Not linked from the app —
@@ -148,15 +148,19 @@ export default function CardPreviewPage() {
               </code>{" "}
               primitive (OPT-266). Not linked from the app.
             </p>
-            <label className="inline-flex items-center gap-2 pt-2">
+            <Label
+              htmlFor="flip-all-cards"
+              className="inline-flex items-center gap-2 pt-2"
+            >
               <input
+                id="flip-all-cards"
                 type="checkbox"
                 checked={flipped}
                 onChange={(e) => setFlipped(e.target.checked)}
                 className="size-4"
               />
-              <span className="text-sm">Flip all cards (face ↔ sleeve)</span>
-            </label>
+              <span>Flip all cards (face ↔ sleeve)</span>
+            </Label>
           </header>
 
           <Section title="Variants — default (state=active)">
