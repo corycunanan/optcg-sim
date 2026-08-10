@@ -155,7 +155,7 @@ export default async function CardDetailPage({
           {/* Effect text */}
           {card.effectText && (
             <Section title="Effect">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
+              <p className="max-w-prose whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
                 {card.effectText}
               </p>
             </Section>
