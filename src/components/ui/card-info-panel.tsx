@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * than two nested ones.
  */
 export interface CardInfoPanelProps {
-  /** Printed card name. Rendered bold + uppercase. */
+  /** Printed card name. Rendered semibold + uppercase. */
   name: string;
   /** Card category — "Leader", "Character", "Event", "Stage", "DON!!". */
   cardType: string;
@@ -126,7 +126,7 @@ export function CardInfoPanel({
       )}
     >
       <div className="flex flex-col gap-1">
-        <div className="text-content-primary text-sm font-bold tracking-wide uppercase">
+        <div className="text-content-primary text-sm font-semibold tracking-widest uppercase">
           {name}
         </div>
         <div className="text-content-secondary text-xs">

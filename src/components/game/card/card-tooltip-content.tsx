@@ -171,7 +171,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
       )}
 
       <div className="flex flex-col gap-1">
-        <div className="text-gb-text-bright text-sm font-semibold">
+        <div className="text-gb-text-bright text-base font-semibold">
           {data.name}
         </div>
         <div className="text-gb-text-subtle text-xs font-semibold tracking-widest uppercase">

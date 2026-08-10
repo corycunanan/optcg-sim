@@ -76,7 +76,7 @@ export function CardActionMenuContent({
       sideOffset={4}
     >
       <DropdownMenuLabel className="text-gb-text-bright">
-        <span className="block truncate text-xs font-bold">
+        <span className="block truncate text-base font-semibold">
           {data?.name ?? "Unknown Card"}
         </span>
         <span className="text-gb-text-dim block text-xs font-normal">
