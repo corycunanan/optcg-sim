@@ -11,7 +11,7 @@ interface SleevePickerProps {
 export function SleevePicker({ selectedUrl, onSelect }: SleevePickerProps) {
   return (
     <div className="flex flex-col gap-4 p-4">
-      <h3 className="text-content-primary text-sm font-bold tracking-wide uppercase">
+      <h3 className="text-content-primary text-sm font-semibold tracking-widest uppercase">
         Card Sleeves
       </h3>
       <div className="grid grid-cols-3 gap-3">
@@ -21,7 +21,7 @@ export function SleevePicker({ selectedUrl, onSelect }: SleevePickerProps) {
           aria-pressed={selectedUrl === null}
           onClick={() => onSelect(null)}
           className={cn(
-            "bg-card text-content-secondary aspect-card focus-visible:ring-border-focus flex items-center justify-center overflow-hidden rounded-md border-2 text-xs font-bold uppercase transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+            "bg-card text-content-secondary aspect-card focus-visible:ring-border-focus flex items-center justify-center overflow-hidden rounded-md border-2 text-xs font-semibold tracking-widest uppercase transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
             selectedUrl === null
               ? "border-border-focus ring-border-focus ring-2"
               : "border-border hover:border-content-tertiary"

@@ -31,7 +31,7 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
 
       {scenario.cardsUsed.length > 0 && (
         <section className="space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-content-tertiary">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
             Cards used
           </h3>
           <ul className="space-y-2">
@@ -68,7 +68,7 @@ function HintBanner({ hint }: { hint: ScenarioInputHint }) {
   return (
     <div
       data-testid="scenario-info-hint"
-      className={`rounded-md border px-3 py-2 text-xs font-bold uppercase tracking-widest ${styles}`}
+      className={`rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-widest ${styles}`}
     >
       {hint.text}
     </div>

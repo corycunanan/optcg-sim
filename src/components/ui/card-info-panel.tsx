@@ -49,7 +49,7 @@ export interface CardInfoPanelProps {
 function CardInfoStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-content-secondary text-xs font-medium tracking-widest uppercase">
+      <span className="text-content-secondary text-xs font-semibold tracking-widest uppercase">
         {label}
       </span>
       <span className="text-content-primary text-sm font-bold tabular-nums">
@@ -161,7 +161,7 @@ export function CardInfoPanel({
 
       {trigger && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-secondary text-xs font-medium tracking-widest uppercase">
+          <span className="text-content-secondary text-xs font-semibold tracking-widest uppercase">
             Trigger
           </span>
           <p className="text-content-secondary text-xs leading-relaxed whitespace-pre-wrap">

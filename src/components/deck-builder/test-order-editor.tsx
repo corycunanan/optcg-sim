@@ -128,7 +128,7 @@ export function TestOrderEditor({
 
       {/* Life section */}
       <section className="space-y-3">
-        <h4 className="text-xs font-medium text-content-secondary uppercase tracking-wider">
+        <h4 className="text-xs font-semibold text-content-secondary uppercase tracking-widest">
           Life ({lifeSlots} cards)
         </h4>
         <div className="space-y-2">
@@ -147,7 +147,7 @@ export function TestOrderEditor({
 
       {/* Hand section */}
       <section className="space-y-3">
-        <h4 className="text-xs font-medium text-content-secondary uppercase tracking-wider">
+        <h4 className="text-xs font-semibold text-content-secondary uppercase tracking-widest">
           Opening Hand (5 cards)
         </h4>
         <div className="space-y-2">

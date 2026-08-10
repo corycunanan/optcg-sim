@@ -322,7 +322,7 @@ function PassiveRoll({
       >
         {value}
       </div>
-      <span className="text-gb-text-dim text-xs tracking-widest uppercase">
+      <span className="text-gb-text-dim text-xs font-semibold tracking-widest uppercase">
         {name}
       </span>
     </div>
