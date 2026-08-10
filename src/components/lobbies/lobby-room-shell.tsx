@@ -1181,7 +1181,10 @@ export function InvitePanel({
 
   if (pendingInvite && pendingInviteName && timing?.kind === "invited") {
     return (
-      <section className="border-border bg-surface-1 flex min-h-96 flex-col rounded-lg border">
+      <section
+        aria-label="Guest seat — invite pending"
+        className="border-border bg-surface-1 flex min-h-96 flex-col rounded-lg border"
+      >
         <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
           <div className="ring-gold-500/30 animate-pulse rounded-full ring-2">
             <UserAvatar user={pendingInvite.user} size="md" variant="dark" />

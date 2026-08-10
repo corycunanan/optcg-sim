@@ -66,6 +66,16 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("DecksPage", () => {
+  it("renders My Decks as the single level-one heading", async () => {
+    await renderPage();
+
+    const headings = screen.getAllByRole("heading", { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "My Decks" })
+    ).toBe(headings[0]);
+  });
+
   it("loads the leader through the Deck.leader relation in one query", async () => {
     await renderPage();
 

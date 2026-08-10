@@ -335,6 +335,10 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(text).not.toContain("Party code");
     expect(text).toContain("ABCD");
     expect(text).toContain("Join lobby");
+    const roomHeadings = renderer!.root.findAllByType("h1");
+    expect(roomHeadings).toHaveLength(1);
+    expect(roomHeadings[0].children).toEqual(["Unlimited"]);
+    expect(renderer!.root.findAllByType("h2").length).toBeGreaterThanOrEqual(1);
 
     const modeButtons = renderer!.root
       .findAllByType("button")
@@ -867,6 +871,23 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain(
       "Cancel the invite before switching to solitaire"
     );
+    expect(
+      renderer!.root.findByProps({
+        "aria-label": "Guest seat — invite pending",
+      }).type
+    ).toBe("section");
+    expect(
+      renderer!.root
+        .findAllByType("h2")
+        .some((heading) => heading.children.join("") === "Invite pending")
+    ).toBe(true);
+    expect(
+      renderer!.root
+        .findAllByType("h3")
+        .some((heading) =>
+          heading.children.join("").startsWith("Invite sent to ")
+        )
+    ).toBe(true);
   });
 
   it("renders occupied host and guest seats with self-scoped controls", async () => {
