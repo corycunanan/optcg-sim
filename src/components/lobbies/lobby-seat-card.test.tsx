@@ -435,12 +435,37 @@ describe("LobbySeatCard overflow menu", () => {
     expect(props.onPreview).toHaveBeenCalledTimes(2);
   });
 
-  it("hides the trigger entirely when no action applies to the seat state", () => {
+  it("drops the trigger but holds its slot when no action applies", () => {
+    // A guest looking at a host who has not picked a deck: no preview, no
+    // host-only items, nothing to put in the menu.
     renderSeat({ deck: null, deckEditable: false });
 
     expect(
       screen.queryByRole("button", { name: /More actions for/ })
     ).toBeNull();
+
+    // The four-group rhythm survives, so this seat still lines up with the
+    // one beside it.
+    const section = seatSection();
+    expect(section.children).toHaveLength(4);
+
+    const placeholder = section.firstElementChild!;
+    expect(placeholder.hasAttribute("data-seat-menu-placeholder")).toBe(true);
+    // Reserves the icon button's box without becoming a control.
+    expect(placeholder.className).toContain("size-10");
+    expect(placeholder.getAttribute("aria-hidden")).toBe("true");
+    expect(placeholder.tagName).toBe("SPAN");
+    expect(placeholder.hasAttribute("tabindex")).toBe(false);
+    expect(placeholder.textContent).toBe("");
+  });
+
+  it("keeps the same four-group rhythm whether or not the menu renders", () => {
+    renderSeat({ deck: null, deckEditable: false });
+    const withoutMenu = seatSection().children.length;
+    cleanup();
+
+    renderSeat({ deckEditable: true, readyEditable: true });
+    expect(seatSection().children).toHaveLength(withoutMenu);
   });
 });
 

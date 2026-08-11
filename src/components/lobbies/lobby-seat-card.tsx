@@ -143,8 +143,12 @@ export function LobbySeatCard({
 }
 
 /**
- * The seat's single `⋮` menu. Renders nothing when no action applies to the
- * current seat state — an empty menu is worse than no affordance.
+ * The seat's single `⋮` menu. When no action applies to the current seat state
+ * the trigger is dropped — an empty menu is worse than no affordance — but its
+ * box is held open by an inert placeholder. Two seats render side by side, so
+ * collapsing the group would start one identity row a control-height above the
+ * other; the placeholder is `aria-hidden`, unfocusable, and paints nothing, so
+ * it costs the keyboard and screen-reader paths nothing.
  */
 function SeatOverflowMenu({
   seatLabel,
@@ -156,7 +160,15 @@ function SeatOverflowMenu({
   children: ReactNode;
 }) {
   const items = Children.toArray(children).filter(Boolean);
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn("size-10", className)}
+        data-seat-menu-placeholder
+      />
+    );
+  }
 
   return (
     <DropdownMenu>
