@@ -946,7 +946,6 @@ function SpectatorRoom({
       >
         <div className="mx-auto flex max-w-7xl flex-col justify-end gap-3 px-6 py-4 sm:flex-row">
           <Button
-            variant="secondary"
             size="lg"
             disabled={stopping}
             onClick={onStop}
@@ -1212,7 +1211,6 @@ export function InvitePanel({
           </p>
           {showInviteFriend && (
             <Button
-              variant="secondary"
               onClick={onCancelInvite}
               disabled={cancelingInvite}
             >

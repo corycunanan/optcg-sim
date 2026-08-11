@@ -257,7 +257,6 @@ function InviteCard({
       </div>
       <div className="mt-3 flex gap-2">
         <Button
-          variant="gold"
           onClick={onJoin}
           disabled={busy}
           className="flex-1"
@@ -265,7 +264,6 @@ function InviteCard({
           {busy ? "Joining..." : "Join"}
         </Button>
         <Button
-          variant="secondary"
           onClick={onDecline}
           disabled={busy}
           className="flex-1"

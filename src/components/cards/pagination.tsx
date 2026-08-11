@@ -58,7 +58,7 @@ export function Pagination({
               <PaginationEllipsis />
             ) : (
               <Button
-                variant={p === page ? "outline" : "ghost"}
+                variant="ghost"
                 size="icon"
                 onClick={() => onPageChange(p)}
                 aria-current={p === page ? "page" : undefined}

@@ -492,7 +492,6 @@ export function NavbarNotificationPanel() {
                       <div className="mt-3 flex gap-2">
                         <Button
                           type="button"
-                          variant="gold"
                           size="sm"
                           disabled={resolvingIds.has(notification.id)}
                           aria-label={`Accept friend request from ${name}`}

@@ -180,7 +180,7 @@ export default function NewCardPage() {
               <Button
                 key={t}
                 type="button"
-                variant={form.type === t ? "default" : "secondary"}
+                variant={form.type === t ? "outline" : "default"}
                 size="sm"
                 onClick={() => update("type", t)}
               >
@@ -379,7 +379,6 @@ export default function NewCardPage() {
           </Button>
           <Button
             type="button"
-            variant="secondary"
             onClick={() => router.back()}
           >
             Cancel

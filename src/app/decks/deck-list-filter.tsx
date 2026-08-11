@@ -60,7 +60,6 @@ export function DeckListFilter({ decks }: { decks: DeckListItem[] }) {
           </p>
           <Button
             type="button"
-            variant="secondary"
             className="mt-6"
             onClick={() => setSelectedColors([])}
           >

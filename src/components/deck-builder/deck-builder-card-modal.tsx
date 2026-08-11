@@ -59,7 +59,7 @@ export function DeckBuilderCardModal({
               <>
                 <div className="flex items-center gap-1">
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="icon-sm"
                     onClick={onRemove}
                     aria-label="Remove one"
@@ -70,7 +70,7 @@ export function DeckBuilderCardModal({
                     {quantityInDeck}
                   </span>
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="icon-sm"
                     onClick={handleAdd}
                     disabled={
