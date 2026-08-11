@@ -106,4 +106,45 @@ describe("NavbarAccountMenu", () => {
     expect(content?.className).toContain("right-0");
     expect(content?.className).toContain("left-auto");
   });
+
+  it("renders through the shared chamfered surface with body-role rows", async () => {
+    const user = userEvent.setup();
+    render(<NavbarAccountMenu user={{ username: "luffy" }} />);
+
+    const trigger = screen.getByRole("button", {
+      name: "Account menu for luffy",
+    });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    const surface = document.querySelector(
+      '[data-slot="navbar-dropdown-surface"]'
+    );
+    expect(surface).not.toBeNull();
+    expect(surface?.getAttribute("data-cut")).toBe("md");
+    expect(surface?.getAttribute("data-edge")).toBe("neutral");
+
+    // The content is a bare positioning shell — it paints no panel of its own.
+    const content = document.querySelector(
+      '[data-slot="navigation-menu-content"]'
+    );
+    const contentClasses = (content?.className ?? "").split(/\s+/);
+    for (const painted of [
+      "border",
+      "border-border",
+      "bg-surface-nav",
+      "ring-0",
+    ]) {
+      expect(contentClasses).not.toContain(painted);
+    }
+
+    const item = screen
+      .getByRole("link", { name: "Profile" })
+      .className.split(/\s+/);
+    expect(item).toContain("text-sm");
+    expect(item).toContain("focus-visible:outline-2");
+    expect(item).toContain("focus-visible:-outline-offset-2");
+    expect(item).not.toContain("focus-visible:ring-2");
+    expect(item).not.toContain("rounded-md");
+  });
 });

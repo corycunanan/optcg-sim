@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { toast } from "sonner";
+import { NavbarDropdownSurface } from "@/components/nav/navbar-dropdown-surface";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import { UserAvatar } from "@/components/social/user-avatar";
 import { Button } from "@/components/ui/button";
@@ -382,7 +383,9 @@ export function NavbarNotificationPanel() {
         role="dialog"
         aria-labelledby={titleId}
         align="end"
-        sideOffset={8}
+        // Clears the navbar's bottom border, matching the offset the Decks,
+        // Cards, and account dropdowns resolve to from their own triggers.
+        sideOffset={12}
         onKeyDown={handlePanelKeyDown}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
@@ -392,183 +395,190 @@ export function NavbarNotificationPanel() {
             )
             ?.focus();
         }}
-        className="border-border bg-popover text-popover-foreground w-96 max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-lg border p-0 ring-0"
+        // Positioning shell only: the popover's own radius, border, padding,
+        // and shadow are stripped so the chamfered NavbarDropdownSurface inside
+        // is the single painted material.
+        className="w-96 max-w-[calc(100vw-2rem)] gap-0 rounded-none border-0 bg-transparent p-0 shadow-none"
       >
-        <div className="border-border flex items-center justify-between gap-4 border-b px-4 py-3">
-          <h2 id={titleId} className="text-sm font-semibold">
-            Notifications
-          </h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={!hasUnread}
-            onClick={() => void markAllRead()}
-            className="text-accent-text hover:text-content-primary"
-          >
-            Mark all read
-          </Button>
-        </div>
-
-        {visibleNotifications.length > 0 ? (
-          <ul
-            aria-label="Recent notifications"
-            className="max-h-96 overflow-y-auto"
-          >
-            {visibleNotifications.map((notification) => {
-              const optimisticAction = isResolved(notification)
-                ? undefined
-                : optimisticActions.get(notification.id);
-              const resolved =
-                isResolved(notification) || optimisticAction !== undefined;
-              const reconciling =
-                !resolved && reconcilingIds.has(notification.id);
-              const actionable =
-                !resolved &&
-                !reconciling &&
-                isActionableNotification(notification);
-              const unread =
-                notification.status === "PENDING" &&
-                !locallyReadIds.has(notification.id);
-              const name = displayName(notification);
-              const description = outcomeDescription(
-                notification,
-                optimisticAction
-              );
-              const rowDescription = reconciling
-                ? `Friend request from ${name} was already resolved. Updating status.`
-                : !resolved && notification.referenceId === null
-                  ? `Friend request from ${name} unavailable`
-                  : description;
-
-              return (
-                <li
-                  key={notification.id}
-                  data-notification-row
-                  tabIndex={0}
-                  aria-label={`${unread ? "Unread. " : ""}${rowDescription}, ${formatRelativeTime(notification.createdAt)}`}
-                  className={cn(
-                    "border-border bg-popover focus-visible:ring-border-focus flex gap-3 border-b px-4 py-3 outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-inset"
-                  )}
-                >
-                  <UserAvatar
-                    user={{
-                      username: notification.actor?.username ?? null,
-                      name: notification.actor?.name ?? null,
-                      image: notification.actor?.image ?? null,
-                    }}
-                    size="sm"
-                    variant="dark"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex gap-2">
-                      {unread && (
-                        <span
-                          data-slot="notification-unread-indicator"
-                          aria-hidden="true"
-                          className="bg-accent mt-2 size-2 shrink-0 rounded-full"
-                        />
-                      )}
-                      <p className="text-content-primary text-sm leading-5">
-                        {resolved ? (
-                          description
-                        ) : reconciling ? (
-                          rowDescription
-                        ) : (
-                          <>
-                            <strong className="font-semibold">{name}</strong>{" "}
-                            sent you a friend request
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <time
-                      dateTime={notification.createdAt}
-                      className="text-content-tertiary mt-1 block text-xs"
-                    >
-                      {formatRelativeTime(notification.createdAt)}
-                    </time>
-                    {actionable && (
-                      <div className="mt-3 flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={resolvingIds.has(notification.id)}
-                          aria-label={`Accept friend request from ${name}`}
-                          onClick={() =>
-                            void resolveRequest(notification, "accept")
-                          }
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={resolvingIds.has(notification.id)}
-                          aria-label={`Decline friend request from ${name}`}
-                          onClick={() =>
-                            void resolveRequest(notification, "decline")
-                          }
-                        >
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-                    {!resolved && !reconciling && !notification.referenceId && (
-                      <p className="text-content-secondary mt-3 text-xs">
-                        Friend request unavailable
-                      </p>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <div
-            data-empty-state
-            role="status"
-            aria-label={
-              loadState === "loading"
-                ? "Loading notifications"
-                : loadState === "error"
-                  ? "Notifications unavailable"
-                  : "No notifications yet"
-            }
-            tabIndex={0}
-            className="focus-visible:ring-border-focus m-4 rounded-md px-4 py-8 text-center outline-none focus-visible:ring-2"
-          >
-            <p
-              className={cn(
-                "text-sm",
-                loadState === "loading" || loadState === "error"
-                  ? "text-content-primary font-medium"
-                  : "text-content-tertiary"
-              )}
+        <NavbarDropdownSurface>
+          <div className="border-border flex items-center justify-between gap-4 border-b px-4 py-3">
+            <h2 id={titleId} className="text-sm font-semibold">
+              Notifications
+            </h2>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={!hasUnread}
+              onClick={() => void markAllRead()}
+              className="text-accent-text hover:text-content-primary"
             >
-              {loadState === "loading"
-                ? "Loading notifications…"
-                : loadState === "error"
-                  ? "Notifications unavailable"
-                  : "No notifications yet"}
-            </p>
-            {loadState === "error" && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="mt-3"
-                onClick={() => void refresh()}
-              >
-                Try again
-              </Button>
-            )}
+              Mark all read
+            </Button>
           </div>
-        )}
-        <p aria-live="polite" aria-atomic="true" className="sr-only">
-          {announcement}
-        </p>
+
+          {visibleNotifications.length > 0 ? (
+            <ul
+              aria-label="Recent notifications"
+              className="max-h-96 overflow-y-auto"
+            >
+              {visibleNotifications.map((notification) => {
+                const optimisticAction = isResolved(notification)
+                  ? undefined
+                  : optimisticActions.get(notification.id);
+                const resolved =
+                  isResolved(notification) || optimisticAction !== undefined;
+                const reconciling =
+                  !resolved && reconcilingIds.has(notification.id);
+                const actionable =
+                  !resolved &&
+                  !reconciling &&
+                  isActionableNotification(notification);
+                const unread =
+                  notification.status === "PENDING" &&
+                  !locallyReadIds.has(notification.id);
+                const name = displayName(notification);
+                const description = outcomeDescription(
+                  notification,
+                  optimisticAction
+                );
+                const rowDescription = reconciling
+                  ? `Friend request from ${name} was already resolved. Updating status.`
+                  : !resolved && notification.referenceId === null
+                    ? `Friend request from ${name} unavailable`
+                    : description;
+
+                return (
+                  <li
+                    key={notification.id}
+                    data-notification-row
+                    tabIndex={0}
+                    aria-label={`${unread ? "Unread. " : ""}${rowDescription}, ${formatRelativeTime(notification.createdAt)}`}
+                    className={cn(
+                      "border-border bg-popover focus-visible:outline-border-focus flex gap-3 border-b px-4 py-3 last:border-b-0 focus-visible:outline-2 focus-visible:-outline-offset-2"
+                    )}
+                  >
+                    <UserAvatar
+                      user={{
+                        username: notification.actor?.username ?? null,
+                        name: notification.actor?.name ?? null,
+                        image: notification.actor?.image ?? null,
+                      }}
+                      size="sm"
+                      variant="dark"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex gap-2">
+                        {unread && (
+                          <span
+                            data-slot="notification-unread-indicator"
+                            aria-hidden="true"
+                            className="bg-accent mt-2 size-2 shrink-0 rounded-full"
+                          />
+                        )}
+                        <p className="text-content-primary text-sm leading-5">
+                          {resolved ? (
+                            description
+                          ) : reconciling ? (
+                            rowDescription
+                          ) : (
+                            <>
+                              <strong className="font-semibold">{name}</strong>{" "}
+                              sent you a friend request
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <time
+                        dateTime={notification.createdAt}
+                        className="text-content-tertiary mt-1 block text-xs"
+                      >
+                        {formatRelativeTime(notification.createdAt)}
+                      </time>
+                      {actionable && (
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={resolvingIds.has(notification.id)}
+                            aria-label={`Accept friend request from ${name}`}
+                            onClick={() =>
+                              void resolveRequest(notification, "accept")
+                            }
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={resolvingIds.has(notification.id)}
+                            aria-label={`Decline friend request from ${name}`}
+                            onClick={() =>
+                              void resolveRequest(notification, "decline")
+                            }
+                          >
+                            Decline
+                          </Button>
+                        </div>
+                      )}
+                      {!resolved &&
+                        !reconciling &&
+                        !notification.referenceId && (
+                          <p className="text-content-secondary mt-3 text-xs">
+                            Friend request unavailable
+                          </p>
+                        )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div
+              data-empty-state
+              role="status"
+              aria-label={
+                loadState === "loading"
+                  ? "Loading notifications"
+                  : loadState === "error"
+                    ? "Notifications unavailable"
+                    : "No notifications yet"
+              }
+              tabIndex={0}
+              className="focus-visible:outline-border-focus m-4 px-4 py-8 text-center focus-visible:outline-2 focus-visible:-outline-offset-2"
+            >
+              <p
+                className={cn(
+                  "text-sm",
+                  loadState === "loading" || loadState === "error"
+                    ? "text-content-primary font-medium"
+                    : "text-content-tertiary"
+                )}
+              >
+                {loadState === "loading"
+                  ? "Loading notifications…"
+                  : loadState === "error"
+                    ? "Notifications unavailable"
+                    : "No notifications yet"}
+              </p>
+              {loadState === "error" && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => void refresh()}
+                >
+                  Try again
+                </Button>
+              )}
+            </div>
+          )}
+          <p aria-live="polite" aria-atomic="true" className="sr-only">
+            {announcement}
+          </p>
+        </NavbarDropdownSurface>
       </PopoverContent>
     </Popover>
   );

@@ -3,6 +3,7 @@
 import { LogOut, Palette, UserRound } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
+import { NavbarDropdownSurface } from "@/components/nav/navbar-dropdown-surface";
 import { UserAvatar } from "@/components/social/user-avatar";
 import {
   NavigationMenu,
@@ -23,8 +24,10 @@ interface NavbarAccountMenuProps {
   theme?: ThemeName | null;
 }
 
+// Matches the navbar dropdown item recipe: body-role text (14/400) on a square,
+// dead-flat row inside the chamfered panel, with the inset-outline focus idiom.
 const accountItemStyles =
-  "text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm";
+  "text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus flex w-full items-center gap-2 px-3 py-2 text-sm";
 
 export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
   const displayName = user.username || user.name || "Pirate";
@@ -56,44 +59,46 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
               {displayName}
             </span>
           </NavigationMenuTrigger>
-          <NavigationMenuContent className="border-border bg-surface-nav right-0 left-auto border ring-0">
-            <ul className="flex w-48 flex-col gap-1 p-1">
-              <li>
-                <NavigationMenuLink asChild>
-                  <DeckNavigationGuardLink
-                    href="/onboarding"
-                    className={accountItemStyles}
+          <NavigationMenuContent className="right-0 left-auto">
+            <NavbarDropdownSurface>
+              <ul className="flex w-48 flex-col p-1">
+                <li>
+                  <NavigationMenuLink asChild>
+                    <DeckNavigationGuardLink
+                      href="/onboarding"
+                      className={accountItemStyles}
+                    >
+                      <UserRound className="size-4" aria-hidden="true" />
+                      Profile
+                    </DeckNavigationGuardLink>
+                  </NavigationMenuLink>
+                </li>
+                <li>
+                  <div
+                    aria-label={`Theme: ${themeLabel}`}
+                    className="text-content-primary flex items-center gap-2 px-3 py-2 text-sm"
                   >
-                    <UserRound className="size-4" aria-hidden="true" />
-                    Profile
-                  </DeckNavigationGuardLink>
-                </NavigationMenuLink>
-              </li>
-              <li>
-                <div
-                  aria-label={`Theme: ${themeLabel}`}
-                  className="text-content-primary flex items-center gap-2 rounded-md px-3 py-2 text-sm"
-                >
-                  <Palette className="size-4" aria-hidden="true" />
-                  <span>Theme</span>
-                  <span className="text-content-tertiary ml-auto text-xs">
-                    {themeLabel}
-                  </span>
-                </div>
-              </li>
-              <li>
-                <NavigationMenuLink asChild>
-                  <button
-                    type="button"
-                    onClick={() => void signOut({ callbackUrl: "/" })}
-                    className={accountItemStyles}
-                  >
-                    <LogOut className="size-4" aria-hidden="true" />
-                    Sign Out
-                  </button>
-                </NavigationMenuLink>
-              </li>
-            </ul>
+                    <Palette className="size-4" aria-hidden="true" />
+                    <span>Theme</span>
+                    <span className="text-content-tertiary ml-auto text-xs">
+                      {themeLabel}
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <NavigationMenuLink asChild>
+                    <button
+                      type="button"
+                      onClick={() => void signOut({ callbackUrl: "/" })}
+                      className={accountItemStyles}
+                    >
+                      <LogOut className="size-4" aria-hidden="true" />
+                      Sign Out
+                    </button>
+                  </NavigationMenuLink>
+                </li>
+              </ul>
+            </NavbarDropdownSurface>
           </NavigationMenuContent>
         </NavigationMenuItem>
       </NavigationMenuList>

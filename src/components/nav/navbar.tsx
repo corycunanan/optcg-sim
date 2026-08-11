@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
 import { NavbarAccountMenu } from "@/components/nav/navbar-account-menu";
+import { NavbarDropdownSurface } from "@/components/nav/navbar-dropdown-surface";
 import { NavbarNotificationPanel } from "@/components/nav/navbar-notification-panel";
 import {
   NavigationMenu,
@@ -52,8 +53,13 @@ export function Navbar() {
   const activeTriggerStyles =
     "bg-surface-2 text-gold-600 hover:text-gold-600 focus:text-gold-600 data-popup-open:text-gold-600 data-open:text-gold-600";
 
+  // Dropdown menu items are body-role text (Public Sans 14/400 — the
+  // `DropdownMenuItem` default in docs/design/TYPOGRAPHY.md §5), not navbar
+  // links: `.font-nav` is reserved for the global navbar link row itself
+  // (§1), and the same role is shared by the account menu and the notification
+  // rows so all four dropdowns read as one family.
   const linkStyles =
-    "font-nav rounded-md px-2 py-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus sm:px-3";
+    "text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus w-full px-3 py-2 text-sm";
 
   return (
     <nav className="bg-surface-nav border-border-accent sticky top-0 z-40 h-16 shrink-0 border-b">
@@ -116,28 +122,30 @@ export function Navbar() {
                   Decks
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <ul className="flex w-48 flex-col gap-1 p-1">
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <DeckNavigationGuardLink
-                          href="/decks"
-                          className={linkStyles}
-                        >
-                          My Decks
-                        </DeckNavigationGuardLink>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <DeckNavigationGuardLink
-                          href="/decks/new"
-                          className={linkStyles}
-                        >
-                          + New Deck
-                        </DeckNavigationGuardLink>
-                      </NavigationMenuLink>
-                    </li>
-                  </ul>
+                  <NavbarDropdownSurface>
+                    <ul className="flex w-48 flex-col p-1">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <DeckNavigationGuardLink
+                            href="/decks"
+                            className={linkStyles}
+                          >
+                            My Decks
+                          </DeckNavigationGuardLink>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <DeckNavigationGuardLink
+                            href="/decks/new"
+                            className={linkStyles}
+                          >
+                            + New Deck
+                          </DeckNavigationGuardLink>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavbarDropdownSurface>
                 </NavigationMenuContent>
               </NavigationMenuItem>
 
@@ -154,28 +162,30 @@ export function Navbar() {
                   Cards
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <ul className="flex w-48 flex-col gap-1 p-1">
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <DeckNavigationGuardLink
-                          href="/cards"
-                          className={linkStyles}
-                        >
-                          All Cards
-                        </DeckNavigationGuardLink>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <DeckNavigationGuardLink
-                          href="/sets"
-                          className={linkStyles}
-                        >
-                          Sets
-                        </DeckNavigationGuardLink>
-                      </NavigationMenuLink>
-                    </li>
-                  </ul>
+                  <NavbarDropdownSurface>
+                    <ul className="flex w-48 flex-col p-1">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <DeckNavigationGuardLink
+                            href="/cards"
+                            className={linkStyles}
+                          >
+                            All Cards
+                          </DeckNavigationGuardLink>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <DeckNavigationGuardLink
+                            href="/sets"
+                            className={linkStyles}
+                          >
+                            Sets
+                          </DeckNavigationGuardLink>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavbarDropdownSurface>
                 </NavigationMenuContent>
               </NavigationMenuItem>
             </NavigationMenuList>
