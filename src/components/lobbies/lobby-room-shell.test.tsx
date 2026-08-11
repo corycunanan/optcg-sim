@@ -380,10 +380,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(joinButton?.props.variant).toBe("outline");
 
     const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
-    expect(frame.props.className).toContain("overflow-y-auto");
-    expect(frame.props.className).toContain(
-      "xl:[@media(min-height:50rem)]:overflow-hidden"
-    );
+    expect(frame.props.className).toContain("overflow-hidden");
+    expect(frame.props.className).not.toContain("overflow-y-auto");
 
     const pageHeader = renderer!.root.findByProps({
       "data-lobby-header": true,
@@ -395,9 +393,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
       "data-lobby-content": true,
     });
     expect(pageContent.props.className).toContain("flex-1");
-    expect(pageContent.props.className).toContain(
-      "xl:[@media(min-height:50rem)]:min-h-0"
-    );
+    expect(pageContent.props.className).toContain("min-h-0");
+    expect(pageContent.props.className).toContain("overflow-hidden");
 
     const actionBar = renderer!.root.findByProps({
       "data-lobby-action-bar": true,
@@ -1223,9 +1220,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(text).not.toContain("Solitaire");
     expect(text).not.toContain("Spectate Match");
     const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
-    expect(frame.props.className).toContain(
-      "xl:[@media(min-height:50rem)]:overflow-hidden"
-    );
+    expect(frame.props.className).toContain("overflow-hidden");
+    expect(frame.props.className).not.toContain("overflow-y-auto");
     expect(
       renderer!.root.findByProps({ "data-lobby-header": true }).props.className
     ).not.toContain("border-b");

@@ -73,7 +73,7 @@ export function LobbySeatCard({
   return (
     <section
       className={cn(
-        "flex min-w-0 flex-col items-start gap-5",
+        "flex min-w-0 flex-col items-start gap-4 lg:gap-5",
         dimmed && "opacity-60"
       )}
       aria-label={`${role} seat — ${playerName}`}
@@ -286,7 +286,7 @@ function LeaderSlot({
   onPreview: (deckId: string) => void;
 }) {
   const caption = (
-    <div className="w-48 min-w-0">
+    <div className="w-32 min-w-0 lg:w-48">
       <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
         Leader
       </p>
@@ -322,7 +322,7 @@ function LeaderSlot({
           <button
             type="button"
             onClick={onChangeDeck}
-            className="border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3 focus-visible:outline-border-focus aspect-card w-48 rounded-md border border-dashed transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
+            className="border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3 focus-visible:outline-border-focus aspect-card w-32 rounded-md border border-dashed transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 lg:w-48"
             aria-label="Choose a deck"
             data-deck-leader-action="change"
           >
@@ -330,7 +330,7 @@ function LeaderSlot({
           </button>
         ) : (
           <div
-            className="border-border bg-surface-2 aspect-card w-48 rounded-md border border-dashed"
+            className="border-border bg-surface-2 aspect-card w-32 rounded-md border border-dashed lg:w-48"
             aria-hidden="true"
           >
             {placeholder}
@@ -346,7 +346,7 @@ function LeaderSlot({
       <button
         type="button"
         onClick={() => (deckEditable ? onChangeDeck() : onPreview(deck.id))}
-        className="bg-surface-2 border-border focus-visible:outline-border-focus aspect-card relative w-48 overflow-hidden rounded-md border shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:-outline-offset-2"
+        className="bg-surface-2 border-border focus-visible:outline-border-focus aspect-card relative w-32 overflow-hidden rounded-md border shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:-outline-offset-2 lg:w-48"
         aria-label={
           deckEditable ? `Change deck — ${deck.name}` : `Preview ${deck.name}`
         }

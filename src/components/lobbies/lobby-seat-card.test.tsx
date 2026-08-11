@@ -246,6 +246,8 @@ describe("LobbySeatCard composition", () => {
     renderSeat();
 
     const section = seatSection();
+    expect(section.className).toContain("gap-4");
+    expect(section.className).toContain("lg:gap-5");
     expect(section.className).not.toMatch(/(^|\s)(border|rounded|bg-)/);
     // The internal dividers went with the panel.
     const dividers = [...section.querySelectorAll("*")].filter((node) =>
@@ -281,6 +283,17 @@ describe("LobbySeatCard composition", () => {
 
     expect(screen.getByText("Leader")).toBeDefined();
     expect(screen.getByText("Monkey.D.Luffy")).toBeDefined();
+    const leader = screen.getByRole("button", {
+      name: "Preview Straw Hat Rush",
+    });
+    expect(leader.className).toContain("w-32");
+    expect(leader.className).toContain("lg:w-48");
+    expect(screen.getByText("Leader").parentElement?.className).toContain(
+      "w-32"
+    );
+    expect(screen.getByText("Leader").parentElement?.className).toContain(
+      "lg:w-48"
+    );
   });
 
   it("stacks the player name above the role eyebrow", () => {

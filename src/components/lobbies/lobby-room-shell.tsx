@@ -381,7 +381,7 @@ export function LobbyRoomShell({
 
     return (
       <div
-        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden"
         data-lobby-frame
       >
         <div className="mx-auto max-w-3xl px-6 py-10">
@@ -404,7 +404,7 @@ export function LobbyRoomShell({
   if (loading && !lobby) {
     return (
       <div
-        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden"
         data-lobby-frame
       >
         <div className="text-content-secondary mx-auto flex max-w-7xl items-center gap-2 px-6 py-10 text-sm">
@@ -418,7 +418,7 @@ export function LobbyRoomShell({
   if (!lobby) {
     return (
       <div
-        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden"
         data-lobby-frame
       >
         <div className="mx-auto max-w-3xl px-6 py-10">
@@ -484,7 +484,7 @@ export function LobbyRoomShell({
   return (
     <TooltipProvider>
       <div
-        className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+        className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden"
         data-lobby-frame
       >
         <header className="shrink-0" data-lobby-header>
@@ -590,7 +590,7 @@ export function LobbyRoomShell({
         </header>
 
         <main
-          className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-6 py-8 xl:[@media(min-height:50rem)]:min-h-0 xl:[@media(min-height:50rem)]:overflow-hidden"
+          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-hidden px-6 py-8"
           data-lobby-content
         >
           {joinError && (
@@ -611,7 +611,7 @@ export function LobbyRoomShell({
             </div>
           )}
 
-          <div className="grid flex-1 gap-6 lg:grid-cols-2 xl:[@media(min-height:50rem)]:min-h-0">
+          <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2">
             <LobbySeatCard
               role="Host"
               player={
@@ -901,7 +901,7 @@ function SpectatorRoom({
 
   return (
     <div
-      className="bg-background flex min-h-0 flex-1 flex-col overflow-y-auto xl:[@media(min-height:50rem)]:overflow-hidden"
+      className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden"
       data-lobby-frame
     >
       <header className="shrink-0" data-lobby-header>
@@ -917,7 +917,7 @@ function SpectatorRoom({
       </header>
 
       <main
-        className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-6 py-8 xl:[@media(min-height:50rem)]:min-h-0 xl:[@media(min-height:50rem)]:overflow-hidden"
+        className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-hidden px-6 py-8"
         data-lobby-content
       >
         <div className="grid gap-6 lg:grid-cols-2">
@@ -1193,7 +1193,7 @@ export function InvitePanel({
     return (
       <section
         aria-label="Guest seat — invite pending"
-        className="border-border bg-surface-1 flex min-h-96 flex-col rounded-lg border"
+        className="border-border bg-surface-1 flex min-h-0 flex-1 flex-col rounded-lg border"
       >
         <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
           <div className="ring-gold-500/30 animate-pulse rounded-full ring-2">
@@ -1234,7 +1234,7 @@ export function InvitePanel({
   }
 
   return (
-    <section className="border-border-strong bg-surface-1 flex min-h-96 flex-col rounded-lg border border-dashed">
+    <section className="border-border-strong bg-surface-1 flex min-h-0 flex-1 flex-col rounded-lg border border-dashed">
       <header className="border-border flex min-h-20 items-center gap-3 border-b border-dashed px-5 py-4 text-left">
         <div
           className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded-full border border-dashed"
@@ -1289,7 +1289,7 @@ function SolitaireSeat({
   return (
     <section
       className={cn(
-        "border-border bg-surface-1 relative flex min-h-96 flex-col overflow-hidden rounded-lg border",
+        "border-border bg-surface-1 relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border",
         disabled && "pointer-events-none opacity-50"
       )}
       aria-label="Solitaire second deck"
