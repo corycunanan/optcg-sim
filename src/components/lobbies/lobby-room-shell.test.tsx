@@ -380,10 +380,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(joinButton?.props.variant).toBe("outline");
 
     const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
-    expect(frame.props.className).toContain("overflow-y-auto");
-    expect(frame.props.className).toContain(
-      "xl:[@media(min-height:50rem)]:overflow-hidden"
-    );
+    expect(frame.props.className).toContain("overflow-hidden");
+    expect(frame.props.className).not.toContain("overflow-y-auto");
 
     const pageHeader = renderer!.root.findByProps({
       "data-lobby-header": true,
@@ -395,9 +393,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
       "data-lobby-content": true,
     });
     expect(pageContent.props.className).toContain("flex-1");
-    expect(pageContent.props.className).toContain(
-      "xl:[@media(min-height:50rem)]:min-h-0"
-    );
+    expect(pageContent.props.className).toContain("min-h-0");
+    expect(pageContent.props.className).toContain("overflow-hidden");
 
     const actionBar = renderer!.root.findByProps({
       "data-lobby-action-bar": true,
@@ -442,6 +439,124 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(startButton?.props.title).toBe("You need an opponent first");
     expect(startButton?.props.className).toContain("disabled:bg-surface-3");
     expect(startButton?.props.className).toContain("disabled:opacity-100");
+  });
+
+  it("spends vertical rhythm only where the viewport can afford it", async () => {
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The frame is fixed to the viewport, so the header and content bands run
+    // compressed by default and only pay full padding when the viewport is
+    // both wide and tall. Height, not width, is the binding constraint here.
+    const headerLayout = renderer!.root.find(
+      (node) =>
+        typeof node.props.className === "string" &&
+        node.props.className.includes("max-w-7xl") &&
+        node.props.className.includes("lg:flex-row")
+    );
+    expect(headerLayout.props.className).toContain("py-4");
+    expect(headerLayout.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:py-8"
+    );
+
+    const pageContent = renderer!.root.findByProps({
+      "data-lobby-content": true,
+    });
+    // Below `lg` the content well gives up a spacing step before the seats
+    // have to give up a row.
+    expect(pageContent.props.className).toContain("py-3");
+    expect(pageContent.props.className).toContain("lg:py-4");
+    expect(pageContent.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:py-8"
+    );
+    expect(pageContent.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:gap-6"
+    );
+
+    // One column stacks at natural heights; from `lg` the single row is
+    // pinned to the space left over so neither seat can grow the frame.
+    const seats = renderer!.root.findByProps({ "data-lobby-seats": true });
+    expect(seats.props.className).toContain("min-h-0");
+    expect(seats.props.className).toContain("flex-col");
+    expect(seats.props.className).toContain("lg:grid");
+    expect(seats.props.className).toContain("lg:auto-rows-fr");
+    expect(seats.props.className).not.toContain("min-h-96");
+  });
+
+  it.each(["PVP", "SOLITAIRE"] as const)(
+    "scrolls the %s seats region rather than letting a panel overrun its neighbour",
+    async (mode) => {
+      mocks.apiGet.mockImplementation(async (url: string) =>
+        url === "/api/decks" ? { data: [] } : { data: lobbyState({ mode }) }
+      );
+
+      await act(async () => {
+        renderer = create(
+          <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // The page and the frame stay locked. Below `lg` the fixed chrome can
+      // leave less room than the stacked panels need, and the release valve is
+      // this region alone — the panels themselves refuse to be compressed,
+      // because a compressed panel paints its controls over the next one.
+      const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
+      expect(frame.props.className).toContain("overflow-hidden");
+      expect(frame.props.className).not.toContain("overflow-y-auto");
+
+      const seats = renderer!.root.findByProps({ "data-lobby-seats": true });
+      expect(seats.props.className).toContain("overflow-y-auto");
+      expect(seats.props.className).toContain("lg:overflow-visible");
+
+      const panels = renderer!.root.findAll(
+        (node) =>
+          node.type === "section" &&
+          typeof node.props.className === "string" &&
+          typeof node.props["aria-label"] === "string" &&
+          /seat|Solitaire second deck/.test(node.props["aria-label"] as string)
+      );
+      expect(panels.length).toBeGreaterThan(0);
+      for (const panel of panels) {
+        expect(panel.props.className).toContain("shrink-0");
+      }
+    }
+  );
+
+  it("keeps the solitaire panel's tilted card inside its own band", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : { data: lobbyState({ mode: "SOLITAIRE" }) }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The tilt paints outside the card's layout box, so the compact thumbnail
+    // buys that swing its own room instead of borrowing it from the seat above.
+    const compactArt = renderer!.root.find(
+      (node) =>
+        node.type === "button" &&
+        typeof node.props.className === "string" &&
+        node.props.className.includes("lg:hidden") &&
+        node.props.className.includes("-rotate-6")
+    );
+    expect(compactArt.props.className).toContain("h-20");
+    expect(compactArt.props.className).toContain("w-auto");
+    expect(compactArt.props.className).toContain("self-center");
+    expect(compactArt.props.className).toContain("m-1");
   });
 
   it("mounts real match settings and persists the host selection", async () => {
@@ -1223,9 +1338,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(text).not.toContain("Solitaire");
     expect(text).not.toContain("Spectate Match");
     const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
-    expect(frame.props.className).toContain(
-      "xl:[@media(min-height:50rem)]:overflow-hidden"
-    );
+    expect(frame.props.className).toContain("overflow-hidden");
+    expect(frame.props.className).not.toContain("overflow-y-auto");
     expect(
       renderer!.root.findByProps({ "data-lobby-header": true }).props.className
     ).not.toContain("border-b");

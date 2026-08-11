@@ -22,6 +22,32 @@ import { ChangeDeckModal, type LobbyDeckOption } from "./change-deck-modal";
  * dividers. The deck itself is not listed here: the leader card is the door to
  * it (change-deck modal on your own seat, deck preview on the other one), so
  * the seat stays a glance-readable summary of *who* and *what they brought*.
+ *
+ * The lobby frame never scrolls, so the seat has to survive on a height budget
+ * it does not control. Two responses, both keyed off the same groups, and both
+ * obeying one rule: **the leader art is sized by the seat, never the reverse.**
+ *
+ * - From `lg` the stack keeps OPT-650's order and the leader is the *only*
+ *   flexible member. Everything else is fixed chrome, so the leader absorbs
+ *   whatever height is left and derives its width from the card ratio.
+ * - Below `lg` a single column cannot hold four stacked groups next to a second
+ *   panel, so a grid re-flows them into a row: leader thumbnail down the left,
+ *   identity / leader caption / readiness beside it, overflow menu on the
+ *   identity row. Only placement changes — the DOM stays in the reading and tab
+ *   order the stacked layout paints, and the placement properties simply stop
+ *   applying once the seat is a flex column at `lg`.
+ *
+ * The compact art is height-first too (`h-24`, width from the ratio), so the
+ * rows are sized entirely by the text column and the art can never paint past
+ * the bottom of the section that contains it. That was the failure the earlier
+ * fixed-width thumbnail hid: a grid box whose painted content ran longer than
+ * the box the parent had agreed to give it.
+ *
+ * Readiness then folds up beside the caption once the seat is wide enough to
+ * seat both, trading 52px of height for 160px of width. That trade is keyed off
+ * a *container* query rather than the viewport: a fixed social rail takes 280px
+ * out of every page, so viewport width says nothing useful about how much room
+ * this seat actually got.
  */
 export function LobbySeatCard({
   role,
@@ -73,15 +99,23 @@ export function LobbySeatCard({
   return (
     <section
       className={cn(
-        "flex min-w-0 flex-col items-start gap-5",
+        // `shrink-0` is load-bearing below `lg`: the seats column is a flex
+        // column on a height budget, and a shrinkable seat would be handed a
+        // box shorter than the rows it just laid out — painting its ready
+        // control on top of whatever follows.
+        "@container grid min-h-0 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-3",
+        "lg:flex lg:flex-col lg:gap-4 lg:[@media(min-height:50rem)]:gap-5",
         dimmed && "opacity-60"
       )}
       aria-label={`${role} seat — ${playerName}`}
     >
-      {/* Pulls the ghost button's own padding out so the glyph reads on the
-          same left edge as the avatar, leader card, and ready control. */}
+      {/* The trailing column is as wide as the ready control below it, so the
+          menu is pinned to that column's end rather than stretched across it —
+          the two controls then share one right edge. At `lg` the seat is a
+          stack with nothing beside it, so the ghost button's own padding comes
+          back out and the glyph reads on the shared left spine instead. */}
       <SeatOverflowMenu
-        className="-ml-3"
+        className="col-start-3 row-start-1 justify-self-end lg:-ml-3"
         seatLabel={`${role} seat — ${playerName}`}
       >
         {deckEditable ? (
@@ -98,7 +132,7 @@ export function LobbySeatCard({
         {menuItems}
       </SeatOverflowMenu>
 
-      <div className="flex min-w-0 max-w-full items-center gap-3">
+      <div className="col-start-2 row-start-1 flex min-w-0 max-w-full items-center gap-3">
         <UserAvatar
           user={player}
           size="md"
@@ -115,18 +149,39 @@ export function LobbySeatCard({
         </div>
       </div>
 
-      <LeaderSlot
-        deck={deck}
-        deckEditable={deckEditable}
-        onChangeDeck={() => setChangeDeckOpen(true)}
-        onPreview={onPreview}
-      />
+      {/* Placement uses explicit end lines rather than `row-span`/`col-span`:
+          the span utilities compile to the `grid-row`/`grid-column` shorthand,
+          which resets the start line, so a span declared inside the container
+          query would silently unpin whatever the base classes placed. */}
+      <div
+        className="max-lg:contents lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3"
+        data-leader-art-caption-group
+      >
+        <LeaderArt
+          deck={deck}
+          deckEditable={deckEditable}
+          onChangeDeck={() => setChangeDeckOpen(true)}
+          onPreview={onPreview}
+          className="col-start-1 row-start-1 row-end-4 @min-[26rem]:row-end-3"
+        />
 
+        <LeaderCaption
+          deck={deck}
+          deckEditable={deckEditable}
+          className="col-start-2 col-end-4 row-start-2 @min-[26rem]:col-end-3"
+        />
+      </div>
+
+      {/* Its own row while the seat is narrow — a 10rem control and a truncating
+          identity cannot share 20rem without one of them disappearing. Past
+          26rem it moves up beside the caption, under the overflow menu it now
+          shares a column edge with, and the strip loses a whole row. */}
       <ReadyControl
         ready={ready}
         editable={readyEditable}
         disabled={readyDisabled}
         onChange={onReadyChange}
+        className="col-start-2 col-end-4 row-start-3 justify-self-start @min-[26rem]:col-start-3 @min-[26rem]:row-start-2 @min-[26rem]:justify-self-end"
       />
 
       {deckEditable && (
@@ -221,11 +276,13 @@ function ReadyControl({
   editable,
   disabled,
   onChange,
+  className,
 }: {
   ready: boolean;
   editable: boolean;
   disabled: boolean;
   onChange: (ready: boolean) => void;
+  className?: string;
 }) {
   const dot = (
     <span
@@ -241,8 +298,9 @@ function ReadyControl({
     return (
       <p
         className={cn(
-          "flex min-h-10 items-center gap-2 text-xs font-semibold tracking-widest uppercase",
-          ready ? "text-success" : "text-content-tertiary"
+          "flex min-h-10 shrink-0 items-center gap-2 text-xs font-semibold tracking-widest uppercase",
+          ready ? "text-success" : "text-content-tertiary",
+          className
         )}
         data-seat-ready-status
       >
@@ -259,8 +317,9 @@ function ReadyControl({
       disabled={disabled}
       aria-pressed={ready}
       className={cn(
-        "min-w-40",
-        ready && "border-success/40 text-success hover:border-success/60"
+        "min-w-40 shrink-0",
+        ready && "border-success/40 text-success hover:border-success/60",
+        className
       )}
     >
       {dot}
@@ -270,23 +329,135 @@ function ReadyControl({
 }
 
 /**
+ * Sizing shared by every leader-art state so the filled card, the "choose a
+ * deck" affordance, and the inert placeholder occupy exactly the same box.
+ *
+ * Height drives width in both regimes — the art never states a width of its
+ * own, so it can never be the thing that decides how tall its container is.
+ *
+ * Below `lg` the art is a thumbnail pinned to `h-24`: shorter than the shortest
+ * text column it can sit beside, so the strip's height is always the text
+ * column's and the art always lands inside it. (A fixed *width* here was the
+ * OPT-658 defect — `w-24` implies a 134px card against a text column the seat
+ * had no obligation to make that tall.) From `lg` it is the seat's one flexible
+ * member: `flex-1` hands it whatever height the fixed groups leave and the cap
+ * holds it at OPT-650's hero size (16.75rem is 12rem — `w-48` — at the 600/838
+ * card ratio). `w-auto` lets `aspect-card` derive the width from the height in
+ * both cases, so the art scales without ever being cropped.
+ */
+const LEADER_ART_CLASS =
+  "aspect-card h-24 w-auto shrink-0 rounded-md lg:h-auto lg:max-h-[16.75rem] lg:min-h-0 lg:w-auto lg:flex-1";
+
+/**
  * The leader art is the seat's hero and its only route into the deck: the
  * viewer's own seat opens the change-deck modal (which shows the full
  * contents), every other seat opens the read-only preview.
  */
-function LeaderSlot({
+function LeaderArt({
   deck,
   deckEditable,
   onChangeDeck,
   onPreview,
+  className,
 }: {
   deck: LobbyRoomDeck | null;
   deckEditable: boolean;
   onChangeDeck: () => void;
   onPreview: (deckId: string) => void;
+  className?: string;
 }) {
-  const caption = (
-    <div className="w-48 min-w-0">
+  if (!deck) {
+    const placeholder = (
+      <span className="text-content-tertiary flex h-full items-center justify-center">
+        {deckEditable ? (
+          <Plus className="size-8" />
+        ) : (
+          <UserRound className="size-8" />
+        )}
+      </span>
+    );
+
+    if (!deckEditable) {
+      return (
+        <div
+          className={cn(
+            "border-border bg-surface-2 border border-dashed",
+            LEADER_ART_CLASS,
+            className
+          )}
+          aria-hidden="true"
+        >
+          {placeholder}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={onChangeDeck}
+        className={cn(
+          "border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3 focus-visible:outline-border-focus border border-dashed transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
+          LEADER_ART_CLASS,
+          className
+        )}
+        aria-label="Choose a deck"
+        data-deck-leader-action="change"
+      >
+        {placeholder}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => (deckEditable ? onChangeDeck() : onPreview(deck.id))}
+      className={cn(
+        "bg-surface-2 border-border focus-visible:outline-border-focus relative overflow-hidden border shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:-outline-offset-2",
+        LEADER_ART_CLASS,
+        className
+      )}
+      aria-label={
+        deckEditable ? `Change deck — ${deck.name}` : `Preview ${deck.name}`
+      }
+      data-deck-leader-action={deckEditable ? "change" : "preview"}
+    >
+      {deck.leaderImageUrl ? (
+        <Image
+          src={deck.leaderImageUrl}
+          alt={deck.leaderName ?? deck.name}
+          fill
+          sizes="192px"
+          unoptimized
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span className="text-content-tertiary flex h-full items-center justify-center">
+          <UserRound className="size-8" />
+        </span>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Names what the art is showing. It sits with the identity column while the
+ * seat is a row and slides under the art once the seat stacks at `lg`, where
+ * its width caps at the art's hero width so long leader names truncate rather
+ * than widening the stack.
+ */
+function LeaderCaption({
+  deck,
+  deckEditable,
+  className,
+}: {
+  deck: LobbyRoomDeck | null;
+  deckEditable: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("w-full min-w-0 shrink-0 lg:w-48", className)}>
       <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
         Leader
       </p>
@@ -302,72 +473,6 @@ function LeaderSlot({
             ? "Choose a deck"
             : "Waiting on their deck"}
       </p>
-    </div>
-  );
-
-  if (!deck) {
-    const placeholder = (
-      <span className="text-content-tertiary flex h-full items-center justify-center">
-        {deckEditable ? (
-          <Plus className="size-8" />
-        ) : (
-          <UserRound className="size-8" />
-        )}
-      </span>
-    );
-
-    return (
-      <div className="flex flex-col gap-3">
-        {deckEditable ? (
-          <button
-            type="button"
-            onClick={onChangeDeck}
-            className="border-border bg-surface-2 hover:border-border-strong hover:bg-surface-3 focus-visible:outline-border-focus aspect-card w-48 rounded-md border border-dashed transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
-            aria-label="Choose a deck"
-            data-deck-leader-action="change"
-          >
-            {placeholder}
-          </button>
-        ) : (
-          <div
-            className="border-border bg-surface-2 aspect-card w-48 rounded-md border border-dashed"
-            aria-hidden="true"
-          >
-            {placeholder}
-          </div>
-        )}
-        {caption}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        onClick={() => (deckEditable ? onChangeDeck() : onPreview(deck.id))}
-        className="bg-surface-2 border-border focus-visible:outline-border-focus aspect-card relative w-48 overflow-hidden rounded-md border shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:-outline-offset-2"
-        aria-label={
-          deckEditable ? `Change deck — ${deck.name}` : `Preview ${deck.name}`
-        }
-        data-deck-leader-action={deckEditable ? "change" : "preview"}
-      >
-        {deck.leaderImageUrl ? (
-          <Image
-            src={deck.leaderImageUrl}
-            alt={deck.leaderName ?? deck.name}
-            fill
-            sizes="192px"
-            unoptimized
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span className="text-content-tertiary flex h-full items-center justify-center">
-            <UserRound className="size-8" />
-          </span>
-        )}
-      </button>
-      {caption}
     </div>
   );
 }
