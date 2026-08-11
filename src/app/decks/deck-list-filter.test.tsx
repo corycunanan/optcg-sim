@@ -53,30 +53,54 @@ const DECKS = [
 afterEach(cleanup);
 
 describe("DeckListFilter", () => {
-  it("toggles color chips and combines selections with OR semantics", async () => {
+  it("commits color filters on Apply and combines selections with OR semantics", async () => {
     const user = userEvent.setup();
     render(<DeckListFilter decks={DECKS} />);
 
+    await user.click(screen.getByRole("button", { name: "Filter" }));
     const blue = screen.getByRole("button", { name: "Blue" });
     const red = screen.getByRole("button", { name: "Red" });
     expect(blue.getAttribute("aria-pressed")).toBe("false");
 
     await user.click(blue);
     expect(blue.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Red Deck")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Apply Filters" }));
     expect(screen.getByText("Blue Deck")).toBeTruthy();
     expect(screen.queryByText("Red Deck")).toBeNull();
     expect(screen.queryByText("Mixed Deck")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Filter — 1 applied" })
+    ).toBeTruthy();
 
-    await user.click(red);
+    await user.click(
+      screen.getByRole("button", { name: "Filter — 1 applied" })
+    );
+    await user.click(screen.getByRole("button", { name: "Red" }));
+    await user.click(screen.getByRole("button", { name: "Apply Filters" }));
     expect(screen.getByText("Blue Deck")).toBeTruthy();
     expect(screen.getByText("Red Deck")).toBeTruthy();
     expect(screen.getByText("Mixed Deck")).toBeTruthy();
+  });
 
-    await user.click(blue);
-    await user.click(red);
+  it("discards draft changes on Cancel", async () => {
+    const user = userEvent.setup();
+    render(<DeckListFilter decks={DECKS} />);
+
+    await user.click(screen.getByRole("button", { name: "Filter" }));
+    await user.click(screen.getByRole("button", { name: "Red" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
     expect(screen.getByText("Blue Deck")).toBeTruthy();
     expect(screen.getByText("Red Deck")).toBeTruthy();
     expect(screen.getByText("Mixed Deck")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Filter" })).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Filter" }));
+    expect(
+      screen.getByRole("button", { name: "Red" }).getAttribute("aria-pressed")
+    ).toBe("false");
   });
 
   it("shows a filter-specific empty state and clears the selection", async () => {
@@ -86,7 +110,9 @@ describe("DeckListFilter", () => {
     expect(screen.queryByText("No decks match")).toBeNull();
     expect(screen.queryByText("No decks yet")).toBeNull();
 
+    await user.click(screen.getByRole("button", { name: "Filter" }));
     await user.click(screen.getByRole("button", { name: "Yellow" }));
+    await user.click(screen.getByRole("button", { name: "Apply Filters" }));
     expect(screen.getByText("No decks match")).toBeTruthy();
     expect(screen.queryByText("No decks yet")).toBeNull();
 
@@ -95,10 +121,18 @@ describe("DeckListFilter", () => {
     expect(screen.getByText("Red Deck")).toBeTruthy();
     expect(screen.getByText("Blue Deck")).toBeTruthy();
     expect(screen.getByText("Mixed Deck")).toBeTruthy();
-    expect(
-      screen
-        .getByRole("button", { name: "Yellow" })
-        .getAttribute("aria-pressed")
-    ).toBe("false");
+    expect(screen.getByRole("button", { name: "Filter" })).toBeTruthy();
+  });
+
+  it("renders selected color options with the shared card Badge variants", async () => {
+    const user = userEvent.setup();
+    render(<DeckListFilter decks={DECKS} />);
+
+    await user.click(screen.getByRole("button", { name: "Filter" }));
+    const red = screen.getByRole("button", { name: "Red" });
+    expect(red.getAttribute("data-variant")).toBe("outline");
+
+    await user.click(red);
+    expect(red.getAttribute("data-variant")).toBe("card-red");
   });
 });

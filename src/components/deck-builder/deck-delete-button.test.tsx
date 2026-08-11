@@ -127,7 +127,7 @@ afterEach(() => {
 });
 
 describe("DeckDeleteButton", () => {
-  it("renders 48px menu touch targets and keeps the trigger keyboard reachable", async () => {
+  it("keeps the standard ghost trigger visible and menu touch targets large", async () => {
     await renderDeleteButton();
 
     const trigger = renderer!.root
@@ -140,9 +140,10 @@ describe("DeckDeleteButton", () => {
     expect(trigger).toBeDefined();
     expect(trigger?.props.type).toBe("button");
     expect(trigger?.props.tabIndex).not.toBe(-1);
-    expect(trigger?.props.className).toContain("size-12");
-    expect(trigger?.props.className).toContain("opacity-100");
-    expect(trigger?.props.className).toContain("focus-visible:opacity-100");
+    expect(trigger?.props["data-variant"]).toBe("ghost");
+    expect(trigger?.props.className).toContain("size-10");
+    expect(trigger?.props.className).not.toContain("size-12");
+    expect(trigger?.props.className).not.toContain("opacity-0");
 
     const deleteItem = buttonWithText("Delete deck");
     expect(deleteItem?.props.className).toContain("min-h-12");

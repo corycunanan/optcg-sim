@@ -17,7 +17,7 @@ export function DeckColorIndicators({ colors }: DeckColorIndicatorsProps) {
           key={color}
           role="img"
           aria-label={`${color} deck color`}
-          className="text-content-tertiary inline-flex items-center gap-1 text-xs"
+          className="text-content-tertiary inline-flex items-center gap-1 text-sm"
         >
           <span
             aria-hidden="true"

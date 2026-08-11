@@ -106,6 +106,36 @@ describe("DeckList row", () => {
     ).toBeTruthy();
   });
 
+  it("uses only text-base for the title and text-sm for row labels", () => {
+    render(<DeckList decks={[DECK]} />);
+
+    expect(
+      within(row()).getByText("Straw Hat Aggro").parentElement!.className
+    ).toContain("text-base");
+    for (const label of ["Roronoa Zoro", "47/50", "Apr 29, 2026"]) {
+      expect(within(row()).getByText(label).className).toContain("text-sm");
+      expect(within(row()).getByText(label).className).not.toContain("text-xs");
+    }
+    for (const color of ["Red", "Green"]) {
+      const indicator = within(row())
+        .getByText(color)
+        .closest<HTMLElement>('[role="img"]')!;
+      expect(indicator.className).toContain("text-sm");
+      expect(indicator.className).not.toContain("text-xs");
+    }
+  });
+
+  it("keeps the ghost kebab visible at rest without a size override", () => {
+    render(<DeckList decks={[DECK]} />);
+
+    const kebab = within(row()).getByRole("button", {
+      name: "More actions for Straw Hat Aggro",
+    });
+    expect(kebab.getAttribute("data-variant")).toBe("ghost");
+    expect(kebab.className).not.toContain("opacity-0");
+    expect(kebab.className).not.toContain("size-12");
+  });
+
   it("renders the leader's selected art variant, not the base printing", () => {
     render(<DeckList decks={[DECK]} />);
 
@@ -130,9 +160,7 @@ describe("DeckList row", () => {
     expect(frame.dataset.cut).toBe("lg");
     // `interactive` is what draws the chamfered focus ring for the row.
     expect(frame.className).toContain("chamfer-focusable");
-    expect(
-      frame.querySelector('[data-slot="chamfer-focus"]')
-    ).not.toBeNull();
+    expect(frame.querySelector('[data-slot="chamfer-focus"]')).not.toBeNull();
 
     const surface = row().querySelector<HTMLElement>(
       '[data-slot="chamfer-surface"]'
@@ -199,9 +227,9 @@ describe("DeckList row", () => {
       "Leader details for Roronoa Zoro",
       "More actions for Straw Hat Aggro",
     ]) {
-      expect(
-        within(row()).getByRole("button", { name }).className
-      ).toContain("z-10");
+      expect(within(row()).getByRole("button", { name }).className).toContain(
+        "z-10"
+      );
     }
   });
 
