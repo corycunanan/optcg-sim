@@ -133,6 +133,12 @@
       "minimum": 4.5
     },
     {
+      "name": "success/page",
+      "foreground": "--success",
+      "background": "--surface-page",
+      "minimum": 4.5
+    },
+    {
       "name": "warning/warning-soft",
       "foreground": "--warning",
       "background": "--warning-soft",
