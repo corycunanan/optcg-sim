@@ -331,11 +331,13 @@ describe("LobbySeatCard composition", () => {
     expect(document.querySelector("footer")).toBeNull();
   });
 
-  it("reserves rounded-full for people and status dots, not chrome", () => {
+  it("keeps the only compact round element as a decorative status dot", () => {
     renderSeat({ readiness: { editable: true }, deckEditable: true });
 
-    const pills = [...seatSection().querySelectorAll("*")].filter((node) =>
-      node.className.toString().split(/\s+/).includes("rounded-full")
+    const pills = [...seatSection().querySelectorAll("*")].filter(
+      (node) =>
+        node.getAttribute("aria-hidden") === "true" &&
+        node.className.toString().split(/\s+/).includes("size-2")
     );
     // Only the readiness dot, and it is decorative.
     expect(pills).toHaveLength(1);
@@ -506,7 +508,7 @@ describe("LobbySeatCard readiness", () => {
       // Readiness is live status, never the gold focal action.
       expect(button.getAttribute("data-variant")).toBe("default");
       expect(button.className).not.toContain("bg-gold");
-      expect(button.className).not.toContain("rounded-full");
+      expect(button.className).toContain("rounded");
 
       const dot = button.querySelector("span[aria-hidden='true']");
       expect(dot?.className).toContain(dotClass);

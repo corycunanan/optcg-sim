@@ -98,7 +98,7 @@ export default async function CardDetailPage({
                 <Badge
                   key={c}
                   variant={COLOR_TO_VARIANT[c] || "secondary"}
-                  className="rounded-full px-3 py-1"
+                  className="rounded px-3 py-1"
                 >
                   {c}
                 </Badge>
@@ -187,7 +187,7 @@ export default async function CardDetailPage({
                       {cs.setName}
                     </span>
                     {cs.isOrigin && (
-                      <Badge variant="warning" className="rounded-full">
+                      <Badge variant="warning" className="rounded">
                         Origin
                       </Badge>
                     )}

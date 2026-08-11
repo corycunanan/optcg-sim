@@ -81,8 +81,8 @@ export function DeckBuilderLoadingSkeleton({ label }: { label: string }) {
               ))}
             </div>
             <div className="mt-6 space-y-2">
-              <Skeleton className="h-6 w-16 rounded-full" />
-              <Skeleton className="h-6 w-40 rounded-full" />
+              <Skeleton className="h-6 w-16 rounded" />
+              <Skeleton className="h-6 w-40 rounded" />
             </div>
           </div>
         </div>
