@@ -40,7 +40,11 @@ export type EffectNotationFamily =
   | "trigger";
 
 export type EffectSegment =
-  /** Verbatim run of effect text, including any unrecognized bracket token. */
+  /**
+   * Run of effect text carried through unchanged, including any unrecognized
+   * bracket token and any interior run of spaces. Only whitespace at a line's
+   * two edges is dropped — see `parseEffectText`.
+   */
   | { kind: "text"; text: string }
   /** A recognized bracket token, brackets stripped. */
   | { kind: "notation"; family: EffectNotationFamily; label: string }
@@ -93,8 +97,14 @@ export const PRINTED_NOTATION_TOKENS = {
  */
 const DON_MODIFIER = /^don!! x\d+$/;
 
-/** Bracket token or brace trait, whichever comes first. */
-const NOTATION_PATTERN = /\[([^[\]]+)\]|\{([^{}]+)\}/g;
+/** Delimiter pairs the notation uses, opener → closer. */
+const DELIMITERS: Record<string, string> = { "[": "]", "{": "}" };
+
+/**
+ * A delimiter inside a candidate token means the delimiters are nested or
+ * interleaved. No printed token contains one, so the span is malformed.
+ */
+const NESTED_DELIMITER = /[[\]{}]/;
 
 function normalizeToken(token: string): string {
   return token.trim().replace(/\s+/g, " ").toLowerCase();
@@ -116,38 +126,75 @@ export function classifyNotationToken(
   return DON_MODIFIER.test(normalized) ? "modifier" : null;
 }
 
-/** Splits one printed effect into notation, trait, and verbatim text runs. */
+/**
+ * Resolves one well-formed delimiter pair, or `null` when its contents are not
+ * something this renderer recognizes (a referenced card name, an empty pair).
+ */
+function toSegment(opener: string, inner: string): EffectSegment | null {
+  if (opener === "{") {
+    const label = inner.trim();
+    // A brace pair with nothing but whitespace inside is not a trait; leaving
+    // it as text keeps it exactly as printed rather than showing an empty chip.
+    return label.length > 0 ? { kind: "trait", label } : null;
+  }
+
+  const family = classifyNotationToken(inner);
+  return family ? { kind: "notation", family, label: inner.trim() } : null;
+}
+
+/**
+ * Splits one printed effect into notation, trait, and verbatim text runs.
+ *
+ * Malformed delimiters degrade to plain text as a whole span, never as a
+ * partially interpreted fragment: `[Sabo [Rush]` prints exactly as written
+ * rather than dropping `[Sabo ` next to a Rush badge, and an opener that
+ * nothing closes is just punctuation, so a well-formed token later on the same
+ * line still renders.
+ */
 export function parseEffectLine(line: string): EffectParagraph {
   const segments: EffectSegment[] = [];
-  let cursor = 0;
+  let pending = "";
+  let index = 0;
 
-  const pushText = (text: string): void => {
-    if (text.length === 0) return;
-    const previous = segments.at(-1);
-    if (previous?.kind === "text") previous.text += text;
-    else segments.push({ kind: "text", text });
+  const flush = (): void => {
+    if (pending.length === 0) return;
+    segments.push({ kind: "text", text: pending });
+    pending = "";
   };
 
-  for (const match of line.matchAll(NOTATION_PATTERN)) {
-    const [raw, bracket, brace] = match;
-    pushText(line.slice(cursor, match.index));
-    cursor = match.index + raw.length;
+  while (index < line.length) {
+    const opener = line[index];
+    const closer = DELIMITERS[opener];
 
-    if (brace !== undefined) {
-      const label = brace.trim();
-      // A brace pair with nothing but whitespace inside is not a trait; leave
-      // it exactly as printed rather than rendering an empty chip.
-      if (label.length > 0) segments.push({ kind: "trait", label });
-      else pushText(raw);
+    if (closer === undefined) {
+      pending += opener;
+      index += 1;
       continue;
     }
 
-    const family = classifyNotationToken(bracket);
-    if (family) segments.push({ kind: "notation", family, label: bracket.trim() });
-    else pushText(raw);
+    const end = line.indexOf(closer, index + 1);
+    if (end === -1) {
+      pending += opener;
+      index += 1;
+      continue;
+    }
+
+    const inner = line.slice(index + 1, end);
+    const segment = NESTED_DELIMITER.test(inner)
+      ? null
+      : toSegment(opener, inner);
+
+    if (segment) {
+      flush();
+      segments.push(segment);
+    } else {
+      pending += line.slice(index, end + 1);
+    }
+
+    index = end + 1;
   }
 
-  pushText(line.slice(cursor));
+  flush();
   return segments;
 }
 
@@ -157,6 +204,12 @@ export function parseEffectLine(line: string): EffectParagraph {
  * The pipeline stores each effect on its own line (`shared/effect-text.ts`
  * turns the source `<br>` into `\n`), so a line break in the data is an effect
  * boundary, not a soft wrap. Blank lines carry no content and are dropped.
+ *
+ * Whitespace contract: each line is trimmed at its two edges, because edge
+ * whitespace in this data is a formatting artifact of the `<br>` conversion and
+ * would otherwise indent a paragraph or hang a space past its last word.
+ * Whitespace *inside* a line is carried through byte for byte, which is what
+ * the renderer's `whitespace-pre-wrap` preserves.
  */
 export function parseEffectText(effectText: string): EffectParagraph[] {
   if (typeof effectText !== "string") return [];

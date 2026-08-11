@@ -19,9 +19,9 @@ import {
  * therefore sit on the same baseline grid, before and after a wrap.
  *
  * Spacing between a chip and its neighboring words comes from the source text's
- * own spaces (preserved by `whitespace-pre-wrap`) plus the chip's internal
- * padding — the chips carry no margins, so nothing shifts when a paragraph
- * rewraps at a different width.
+ * own interior spacing (carried through by the parser and preserved by
+ * `whitespace-pre-wrap`) plus the chip's internal padding — the chips carry no
+ * margins, so nothing shifts when a paragraph rewraps at a different width.
  */
 
 /**

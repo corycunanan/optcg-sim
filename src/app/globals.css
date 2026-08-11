@@ -235,14 +235,16 @@
      is part of the game's notation, so — like the six TCG card colors above —
      these are a feature contract, never overridden by a data-theme selector.
 
-     The four chromatic fills share one lightness (46%) so a chip row reads as a
-     single system with hue as the only variable, and all sit well below the
-     accent in lightness so notation never competes with the focal action or
-     with card art (docs/design/COLOR-LANGUAGE.md, salience hierarchy). The
-     modifier fill drops to a near-neutral navy: modifiers qualify an effect
-     that another chip has already timed, so they sit one step quieter than the
-     notation they attach to. [Trigger] keeps its printed ink-and-yellow
-     treatment, which the white keyline separates from the panel behind it. */
+     The three chromatic fills — timing, keyword, counter — share one lightness
+     (46%) so a chip row reads as a single system with hue as the only variable,
+     and every fill sits well below the accent in lightness so notation never
+     competes with the focal action or with card art
+     (docs/design/COLOR-LANGUAGE.md, salience hierarchy). The modifier fill sits
+     deliberately outside that trio, at a lower lightness (40%) and near-zero
+     chroma: modifiers qualify an effect that another chip has already timed, so
+     they read one step quieter than the notation they attach to. [Trigger]
+     keeps its printed ink-and-yellow treatment, which the white keyline
+     separates from the panel behind it. */
   --effect-timing: oklch(46% 0.16 25); /* [On Play], [When Attacking], [Main] */
   --effect-keyword: oklch(46% 0.12 62); /* [Rush], [Blocker], [Banish] */
   --effect-counter: oklch(46% 0.1 215); /* [Counter] */
