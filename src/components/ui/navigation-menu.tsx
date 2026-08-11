@@ -94,7 +94,18 @@ function NavigationMenuContent({
         // class (`focus:ring-0`, `focus:outline-none` on every descendant link)
         // are gone with them — they defeated the inset-outline focus idiom the
         // dropdown items now use.
-        "top-0 left-0 w-full ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:mt-4 group-data-[viewport=false]/navigation-menu:duration-300 data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 data-[motion^=from-]:animate-in data-[motion^=from-]:fade-in data-[motion^=to-]:animate-out data-[motion^=to-]:fade-out md:absolute md:w-auto group-data-[viewport=false]/navigation-menu:data-open:animate-in group-data-[viewport=false]/navigation-menu:data-open:fade-in-0 group-data-[viewport=false]/navigation-menu:data-open:zoom-in-95 group-data-[viewport=false]/navigation-menu:data-closed:animate-out group-data-[viewport=false]/navigation-menu:data-closed:fade-out-0 group-data-[viewport=false]/navigation-menu:data-closed:zoom-out-95",
+        //
+        // `pt-4` — NOT `mt-4` — supplies the visual gap below the navbar. These
+        // menus open on hover: leaving the trigger starts Radix's 150ms close
+        // timer, which only cancels once the pointer enters the content (or,
+        // in viewport mode, the viewport). A margin would put dead space
+        // between the two, so a pointer crossing it at ordinary speed hits the
+        // timeout and the panel closes on the way to the rows. As padding the
+        // gap is *inside* the content's own box, so the shell bridges it and
+        // cancels the timer the moment the pointer leaves the trigger. In
+        // viewport mode the height var is measured from this element's
+        // offsetHeight, so the viewport box grows to cover the gap too.
+        "top-0 left-0 w-full pt-4 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:duration-300 data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 data-[motion^=from-]:animate-in data-[motion^=from-]:fade-in data-[motion^=to-]:animate-out data-[motion^=to-]:fade-out md:absolute md:w-auto group-data-[viewport=false]/navigation-menu:data-open:animate-in group-data-[viewport=false]/navigation-menu:data-open:fade-in-0 group-data-[viewport=false]/navigation-menu:data-open:zoom-in-95 group-data-[viewport=false]/navigation-menu:data-closed:animate-out group-data-[viewport=false]/navigation-menu:data-closed:fade-out-0 group-data-[viewport=false]/navigation-menu:data-closed:zoom-out-95",
         className
       )}
       {...props}
@@ -119,8 +130,11 @@ function NavigationMenuViewport({
           // Same split as the content (OPT-648): the viewport is a transparent
           // measuring/animating box — `overflow-hidden` clips the height
           // transition and nothing else — and the visible panel is the
-          // `NavbarDropdownSurface` inside the content it hosts.
-          "origin-top-center relative mt-4 h-(--radix-navigation-menu-viewport-height) w-full overflow-hidden duration-100 md:w-(--radix-navigation-menu-viewport-width) data-open:animate-in data-open:zoom-in-90 data-closed:animate-out data-closed:zoom-out-90",
+          // `NavbarDropdownSurface` inside the content it hosts. No margin
+          // here: the gap below the navbar is the content's `pt-4`, so this
+          // box stays flush against the trigger row and bridges the pointer
+          // across (see the note on `NavigationMenuContent`).
+          "origin-top-center relative h-(--radix-navigation-menu-viewport-height) w-full overflow-hidden duration-100 md:w-(--radix-navigation-menu-viewport-width) data-open:animate-in data-open:zoom-in-90 data-closed:animate-out data-closed:zoom-out-90",
           className
         )}
         {...props}

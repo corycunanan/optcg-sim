@@ -311,6 +311,37 @@ describe("Navbar", () => {
     expect(hasAnchor(decks)).toBe(false);
   });
 
+  it("renders every navigation dropdown through the shared chamfered surface", () => {
+    render(<Navbar />);
+
+    // Decks, Cards, and the account menu must all route through
+    // NavbarDropdownSurface rather than painting their own panel, so the
+    // navbar's dropdowns cannot drift apart in shape or material.
+    const surfaces = document.querySelectorAll(
+      '[data-slot="navbar-dropdown-surface"]'
+    );
+    expect(surfaces).toHaveLength(3);
+    for (const surface of surfaces) {
+      expect(surface.getAttribute("data-cut")).toBe("md");
+      expect(surface.getAttribute("data-edge")).toBe("neutral");
+    }
+  });
+
+  it("gives dropdown rows the body type role rather than the navbar link treatment", () => {
+    render(<Navbar />);
+
+    // `.font-nav` (uppercase Erode 700) is reserved for the global navbar link
+    // row; menu items take the `body` role per TYPOGRAPHY.md §5.
+    const item = screen.getByRole("link", { name: "My Decks" });
+    const classes = item.className.split(/\s+/);
+
+    expect(classes).toContain("text-sm");
+    expect(classes).not.toContain("font-nav");
+    expect(classes).not.toContain("text-base");
+    expect(classes).toContain("focus-visible:outline-2");
+    expect(classes).not.toContain("focus-visible:ring-2");
+  });
+
   it("caps the inner nav content while keeping the full-width bar separate", () => {
     const { container } = render(<Navbar />);
     const nav = container.querySelector("nav");

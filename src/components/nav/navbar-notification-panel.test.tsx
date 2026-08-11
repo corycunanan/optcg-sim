@@ -159,6 +159,41 @@ describe("NavbarNotificationPanel", () => {
     ).toHaveLength(22);
   });
 
+  it("renders through the shared chamfered surface with inset focus outlines", async () => {
+    mocks.notifications = [notification("1", "2026-01-01T00:00:00.000Z")];
+    render(<NavbarNotificationPanel />);
+
+    await openPanel();
+
+    const surface = document.querySelector(
+      '[data-slot="navbar-dropdown-surface"]'
+    );
+    expect(surface).not.toBeNull();
+    expect(surface?.getAttribute("data-cut")).toBe("md");
+    expect(surface?.getAttribute("data-edge")).toBe("neutral");
+
+    // The popover is a positioning shell: the chamfered surface inside it is
+    // the only painted material.
+    const shell = screen
+      .getByRole("dialog", { name: "Notifications" })
+      .className.split(/\s+/);
+    expect(shell).toContain("rounded-none");
+    expect(shell).toContain("border-0");
+    expect(shell).toContain("shadow-none");
+    expect(shell).toContain("bg-transparent");
+
+    const row = within(
+      screen.getByRole("list", { name: "Recent notifications" })
+    )
+      .getAllByRole("listitem")[0]
+      ?.className.split(/\s+/);
+    expect(row).toContain("focus-visible:outline-2");
+    expect(row).toContain("focus-visible:-outline-offset-2");
+    // Tailwind v4: `outline-none` would permanently defeat those utilities.
+    expect(row).not.toContain("outline-none");
+    expect(row).not.toContain("focus-visible:ring-2");
+  });
+
   it("announces the reachable empty state", async () => {
     render(<NavbarNotificationPanel />);
 
