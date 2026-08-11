@@ -345,7 +345,7 @@ export function DeckBuilderSearch({
                     </TooltipTrigger>
                     <TooltipContent
                       side="top"
-                      className="w-72 max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
+                      className="w-72 max-w-none border-0 bg-transparent p-0"
                     >
                       <CardInfoPanel
                         name={card.name}

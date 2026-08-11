@@ -650,9 +650,9 @@ textarea:focus-visible,
 
 /* Paints the neutral 1px perimeter with the top-left → bottom-right lighting
    gradient. `border-image` needs no radius cooperation, which is exactly why
-   the Tier-5 spec makes these surfaces square-cornered. Pair with
-   `bg-surface-info rounded-none shadow-none border` at the call site so the
-   surface, corners, and glow removal all resolve through tailwind-merge. */
+   the Tier-5 spec makes these surfaces square-cornered. TooltipContent adopts
+   the complete Tier-5 treatment by default; `edge-info` remains reusable for
+   other information surfaces such as CardInfoPanel. */
 @utility edge-info {
   border-image-source: var(--edge-info);
   border-image-slice: 1;
