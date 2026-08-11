@@ -22,6 +22,11 @@ import { CardBrowser } from "./card-browser";
 import { CardBrowserLoading } from "./card-browser-loading";
 
 let renderer: ReactTestRenderer | null = null;
+const sets = [
+  { setLabel: "OP15", setName: "Example Set", packId: "569115" },
+  { setLabel: "OP16", setName: "Latest Set", packId: "569116" },
+];
+const latestSet = sets.at(-1)!.setLabel;
 
 beforeEach(() => {
   mocks.push.mockReset();
@@ -46,12 +51,12 @@ describe("CardBrowser filters", () => {
           total={0}
           page={1}
           totalPages={0}
-          sets={[{ setLabel: "OP15", setName: "Example Set", packId: "OP15" }]}
+          sets={sets}
           currentFilters={{
             q: "",
             color: "",
             type: "",
-            set: "OP15-EB04",
+            set: latestSet,
             block: "",
             originOnly: "",
           }}
@@ -71,7 +76,9 @@ describe("CardBrowser filters", () => {
 
     await act(async () => redFilter!.props.onClick());
 
-    expect(mocks.push).toHaveBeenCalledWith("/cards?set=OP15-EB04&color=Red");
+    expect(mocks.push).toHaveBeenCalledWith(
+      `/cards?set=${latestSet}&color=Red`
+    );
   });
 
   it("toggles the existing filter panel and supports the All Sets view", async () => {
@@ -82,12 +89,12 @@ describe("CardBrowser filters", () => {
           total={0}
           page={1}
           totalPages={0}
-          sets={[{ setLabel: "OP15", setName: "Example Set", packId: "OP15" }]}
+          sets={sets}
           currentFilters={{
             q: "",
             color: "",
             type: "",
-            set: "OP15-EB04",
+            set: latestSet,
             block: "",
             originOnly: "",
           }}
