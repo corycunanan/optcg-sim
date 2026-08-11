@@ -161,15 +161,30 @@ describe("SocialSidebar", () => {
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
   });
 
-  it("pins the rail across the full viewport height", () => {
+  it("pins the rail from below the navbar down to the viewport floor", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector('[data-slot="sidebar"]');
+    const railClasses = rail?.className.split(/\s+/) ?? [];
     const content = container.querySelector('[data-slot="sidebar-content"]');
 
-    expect(rail?.className).toContain("fixed");
-    expect(rail?.className).toContain("inset-y-0");
-    expect(rail?.className).not.toContain("top-16");
-    expect(rail?.className).not.toContain("h-auto");
+    expect(railClasses).toContain("fixed");
+    // The full-width navbar owns the top of the app (OPT-649), so the rail
+    // starts at the shared `--spacing-navbar` height rather than at the top
+    // of the viewport. A literal `top-16` would drift from the navbar.
+    expect(railClasses).toContain("top-navbar");
+    expect(railClasses).toContain("bottom-0");
+    expect(railClasses).not.toContain("inset-y-0");
+    expect(railClasses).not.toContain("top-16");
+    expect(railClasses).not.toContain("top-0");
+    // `h-auto` is load-bearing: it drops the primitive's `h-full` so the
+    // top/bottom insets size the rail instead of a 100vh height overhanging
+    // the viewport by the navbar's height.
+    expect(railClasses).toContain("h-auto");
+    expect(railClasses).not.toContain("h-full");
+    // The rail stays under the navbar (z-40) and above page content.
+    expect(railClasses).toContain("z-30");
+    // Width comes from the same token as the in-flow spacer in SocialShell.
+    expect(railClasses).toContain("w-social-rail");
     expect(content?.className).toContain("min-h-0");
     expect(content?.className).toContain("flex-1");
     expect(content?.className).toContain("overflow-auto");

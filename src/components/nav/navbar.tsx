@@ -38,6 +38,10 @@ export function Navbar() {
   // previous one is only used once nothing is open.
   const anchoredMenu = activeMenu || lastMenu;
 
+  // Mirrors `SocialShell`'s own condition for mounting the friends rail.
+  const hasSocialRail =
+    sessionStatus === "authenticated" && Boolean(session?.user);
+
   const isRouteWithin = (route: string) =>
     pathname === route || pathname.startsWith(`${route}/`);
   const cardsActive =
@@ -62,7 +66,18 @@ export function Navbar() {
     "text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus w-full px-3 py-2 text-sm";
 
   return (
-    <nav className="bg-surface-nav border-border-accent sticky top-0 z-40 h-16 shrink-0 border-b">
+    // The bar itself is edge to edge (OPT-649) and sits above the friends
+    // rail. Reserving the rail's column as right padding keeps the capped
+    // inner content centred on the page's content column rather than on the
+    // viewport, so the nav links still line up with page content (OPT-631).
+    // The reservation tracks exactly when `SocialShell` renders the rail, so
+    // nav and page content shift together when the session resolves.
+    <nav
+      className={cn(
+        "bg-surface-nav border-border-accent h-navbar sticky top-0 z-40 shrink-0 border-b",
+        hasSocialRail && "pr-social-rail"
+      )}
+    >
       <div
         data-slot="navbar-content"
         className="mx-auto flex h-full w-full max-w-7xl items-center px-2 sm:px-6"

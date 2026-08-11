@@ -352,6 +352,39 @@ describe("Navbar", () => {
     expect(nav?.className.split(/\s+/)).not.toContain("max-w-7xl");
   });
 
+  it("takes its height from the shared navbar token the friends rail offsets from", () => {
+    const { container } = render(<Navbar />);
+    const classes = container.querySelector("nav")?.className.split(/\s+/);
+
+    // `--spacing-navbar` is the single source for the bar height and the
+    // rail's `top-navbar` offset; a literal `h-16` would let them drift.
+    expect(classes).toContain("h-navbar");
+    expect(classes).not.toContain("h-16");
+  });
+
+  it("reserves the friends rail column exactly when the rail is mounted", () => {
+    const { container, rerender } = render(<Navbar />);
+    const railReserved = () =>
+      container
+        .querySelector("nav")
+        ?.className.split(/\s+/)
+        .includes("pr-social-rail") ?? false;
+
+    // Authenticated: SocialShell mounts the rail, so the capped nav content
+    // has to centre on the content column rather than the whole viewport.
+    expect(railReserved()).toBe(true);
+
+    // Loading and signed out render no rail — reserving its column would
+    // shift the nav content away from the page content underneath it.
+    mocks.sessionStatus = "loading";
+    rerender(<Navbar />);
+    expect(railReserved()).toBe(false);
+
+    mocks.sessionStatus = "unauthenticated";
+    rerender(<Navbar />);
+    expect(railReserved()).toBe(false);
+  });
+
   it("reflects realtime unread counts, caps at 9+, and omits a zero badge", () => {
     mocks.unreadCount = 4;
     const { rerender } = render(<Navbar />);
