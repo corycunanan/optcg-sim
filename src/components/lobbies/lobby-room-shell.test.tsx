@@ -167,7 +167,13 @@ vi.mock("@/components/ui/tabs", () => {
 });
 vi.mock("@/components/ui/tooltip", () => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
-  return { Tooltip: Wrapper, TooltipProvider: Wrapper };
+  return {
+    Tooltip: Wrapper,
+    TooltipContent: Wrapper,
+    TooltipProvider: Wrapper,
+    TooltipRoot: Wrapper,
+    TooltipTrigger: Wrapper,
+  };
 });
 vi.mock("@/components/ui/page-header", () => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
@@ -428,12 +434,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
     ).toBeDefined();
     expect(renderedText()).toContain("Open seat");
     expect(renderedText()).toContain("Waiting for a challenger");
-    expect(renderedText()).toContain("You need an opponent first");
     expect(renderedText()).toContain("Start Match");
     const startButton = renderer!.root
       .findAllByType("button")
       .find((button) => button.children.includes("Start Match"));
     expect(startButton?.props.disabled).toBe(true);
+    expect(startButton?.props.title).toBe("You need an opponent first");
     expect(startButton?.props.className).toContain("disabled:bg-surface-3");
     expect(startButton?.props.className).toContain("disabled:opacity-100");
   });
@@ -451,17 +457,20 @@ describe("LobbyRoomShell redesign scenarios", () => {
 
     const settingsButton = renderer!.root
       .findAllByType("button")
-      .find((button) => button.children.includes("Match settings"));
-    expect(settingsButton?.props.variant).toBe("outline");
+      .find((button) => button.props["aria-label"] === "Match settings");
+    expect(settingsButton?.props.variant).toBe("ghost");
+    expect(settingsButton?.props.size).toBe("icon");
     expect(settingsButton?.props.disabled).toBe(false);
+    const actionBarLayout = renderer!.root.find(
+      (node) =>
+        typeof node.props.className === "string" &&
+        node.props.className.includes("lg:grid-cols-[1fr_auto_1fr]")
+    );
+    expect(actionBarLayout.props.className).toContain("grid-cols-1");
     expect(
       renderer!.root.findByProps({ "data-lobby-match-actions": true }).props
         .className
-    ).toContain("flex-col");
-    expect(
-      renderer!.root.findByProps({ "data-lobby-match-actions": true }).props
-        .className
-    ).toContain("lg:flex-row");
+    ).toContain("lg:justify-center");
 
     await act(async () => {
       settingsButton?.props.onClick();
@@ -473,22 +482,18 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(settingsDialog.props["data-dialog-size"]).toBe("lg");
     expect(settingsDialog.props.className).toBeUndefined();
 
-    const pregameRadios = renderer!.root
-      .findAllByType("input")
-      .filter((input) => input.props.name === "pregame-mode");
-    expect(pregameRadios).toHaveLength(4);
-    expect(
-      pregameRadios.find((radio) => radio.props.value === "PRIORITY_ROLL")
-        ?.props.checked
-    ).toBe(true);
-    expect(pregameRadios.every((radio) => radio.props.disabled === false)).toBe(
-      true
+    const radioGroup = renderer!.root.findByProps({
+      "data-slot": "radio-group",
+    });
+    const pregameRadios = renderer!.root.findAll(
+      (node) => node.type === "button" && node.props.role === "radio"
     );
+    expect(pregameRadios).toHaveLength(4);
+    expect(radioGroup.props.value).toBe("PRIORITY_ROLL");
+    expect(radioGroup.props.disabled).toBe(false);
 
     await act(async () => {
-      pregameRadios
-        .find((radio) => radio.props.value === "GUEST_FIRST")
-        ?.props.onChange();
+      radioGroup.props.onValueChange("GUEST_FIRST");
       await Promise.resolve();
     });
 
@@ -545,20 +550,21 @@ describe("LobbyRoomShell redesign scenarios", () => {
     await act(async () => {
       renderer!.root
         .findAllByType("button")
-        .find((button) => button.children.includes("Match settings"))
+        .find((button) => button.props["aria-label"] === "Match settings")
         ?.props.onClick();
     });
     expect(renderedText()).toContain("Host controlled");
-    const pregameRadios = renderer!.root
-      .findAllByType("input")
-      .filter((input) => input.props.name === "pregame-mode");
+    const radioGroup = renderer!.root.findByProps({
+      "data-slot": "radio-group",
+    });
+    const pregameRadios = renderer!.root.findAll(
+      (node) => node.type === "button" && node.props.role === "radio"
+    );
     expect(pregameRadios).toHaveLength(4);
-    expect(pregameRadios.every((input) => input.props.disabled)).toBe(true);
+    expect(radioGroup.props.disabled).toBe(true);
 
     await act(async () => {
-      pregameRadios
-        .find((radio) => radio.props.value === "GUEST_FIRST")
-        ?.props.onChange();
+      radioGroup.props.onValueChange("GUEST_FIRST");
       await Promise.resolve();
     });
 
@@ -579,27 +585,23 @@ describe("LobbyRoomShell redesign scenarios", () => {
     await act(async () => {
       renderer!.root
         .findAllByType("button")
-        .find((button) => button.children.includes("Match settings"))
+        .find((button) => button.props["aria-label"] === "Match settings")
         ?.props.onClick();
     });
 
-    const pregameRadios = renderer!.root
-      .findAllByType("input")
-      .filter((input) => input.props.name === "pregame-mode");
+    const radioGroup = renderer!.root.findByProps({
+      "data-slot": "radio-group",
+    });
 
     await act(async () => {
-      pregameRadios
-        .find((radio) => radio.props.value === "GUEST_FIRST")
-        ?.props.onChange();
+      radioGroup.props.onValueChange("GUEST_FIRST");
       await Promise.resolve();
     });
 
     expect(mocks.toastError).toHaveBeenCalledWith("Lobby update failed");
     expect(
-      renderer!.root
-        .findAllByType("input")
-        .find((radio) => radio.props.value === "PRIORITY_ROLL")?.props.checked
-    ).toBe(true);
+      renderer!.root.findByProps({ "data-slot": "radio-group" }).props.value
+    ).toBe("PRIORITY_ROLL");
   });
 
   it("renders an interactive host spectator toggle and keeps the empty count available", async () => {
@@ -915,7 +917,10 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Guest");
     expect(renderedText()).toContain("Leave lobby");
     expect(renderedText()).toContain("Leave the party to play solitaire");
-    expect(renderedText()).toContain("The host starts the match");
+    const startButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Start Match"));
+    expect(startButton?.props.title).toBe("The host starts the match");
   });
 
   it("renders both selected decks and the ready state", async () => {
@@ -979,11 +984,14 @@ describe("LobbyRoomShell redesign scenarios", () => {
 
     expect(renderedText()).toContain("Straw Hat Rush");
     expect(renderedText()).toContain("Three Sword Style");
-    expect(renderedText()).toContain("Everything is set");
     // The seat is a leader summary now — the deck list moved behind the
     // leader card (change-deck modal / deck preview).
     expect(renderedText()).not.toContain("Deck list");
     expect(renderedText()).not.toContain("Characters");
+    const startButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Start Match"));
+    expect(startButton?.props.title).toBeUndefined();
     const seats = renderer!.root.findAll(
       (node) =>
         node.type === "section" &&
@@ -1036,21 +1044,24 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(renderedText()).toContain("Solitaire");
     expect(renderedText()).toContain("Your second deck");
     expect(renderedText()).toContain("Play both sides");
-    expect(renderedText()).toContain("Both players need a deck");
+    const startButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Start Match"));
+    expect(startButton?.props.title).toBe("Both players need a deck");
     await act(async () => {
       renderer!.root
         .findAllByType("button")
-        .find((button) => button.children.includes("Match settings"))
+        .find((button) => button.props["aria-label"] === "Match settings")
         ?.props.onClick();
     });
-    const pregameRadios = renderer!.root
-      .findAllByType("input")
-      .filter((input) => input.props.name === "pregame-mode");
+    const radioGroup = renderer!.root.findByProps({
+      "data-slot": "radio-group",
+    });
+    const pregameRadios = renderer!.root.findAll(
+      (node) => node.type === "button" && node.props.role === "radio"
+    );
     expect(pregameRadios).toHaveLength(3);
-    expect(
-      pregameRadios.find((radio) => radio.props.value === "SOLITAIRE_RANDOM")
-        ?.props.checked
-    ).toBe(true);
+    expect(radioGroup.props.value).toBe("SOLITAIRE_RANDOM");
   });
 
   it("replaces Start Match with Rejoin Game while a match is active", async () => {
@@ -1077,11 +1088,11 @@ describe("LobbyRoomShell redesign scenarios", () => {
 
     expect(renderedText()).toContain("Rejoin Game");
     expect(renderedText()).not.toContain("Start Match");
-    expect(renderedText()).toContain("Your match is already in progress");
+    expect(renderedText()).not.toContain("Your match is already in progress");
     expect(
       renderer!.root
         .findAllByType("button")
-        .find((button) => button.children.includes("Match settings"))?.props
+        .find((button) => button.props["aria-label"] === "Match settings")?.props
         .disabled
     ).toBe(true);
 
