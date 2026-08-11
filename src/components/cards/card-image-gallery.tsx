@@ -88,6 +88,7 @@ export function CardImageGallery({
                 <button
                   key={art.id}
                   type="button"
+                  aria-pressed={isSelected}
                   onClick={() => handleSelect(art.imageUrl)}
                   className={cn(
                     "group cursor-pointer overflow-hidden rounded text-left transition-all hover:shadow-md",
