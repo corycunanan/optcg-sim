@@ -29,8 +29,8 @@ interface DeckDeleteButtonProps {
   deckId: string;
   deckName: string;
   /**
-   * Placement is the caller's job — the trigger owns only its size, its
-   * hover/focus reveal, and its menu. `/decks` drops it into the row's
+   * Placement is the caller's job — the trigger owns only its size and menu.
+   * `/decks` drops it into the row's
    * metadata cluster; other surfaces may position it absolutely.
    */
   className?: string;
@@ -67,12 +67,10 @@ export function DeckDeleteButton({
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
+            variant="ghost"
             size="icon"
             aria-label={`More actions for ${deckName}`}
-            className={cn(
-              "size-12 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:data-[state=open]:opacity-100",
-              className
-            )}
+            className={cn(className)}
           >
             <EllipsisVertical />
           </Button>

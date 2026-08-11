@@ -1,16 +1,7 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { collectDeckColors } from "@/lib/decks/colors";
-import {
-  PageHeader,
-  PageHeaderContent,
-  PageHeaderTitle,
-  PageHeaderDescription,
-  PageHeaderActions,
-} from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import type { DeckListItem } from "./deck-list";
 import { DeckListFilter } from "./deck-list-filter";
 
@@ -95,40 +86,7 @@ export default async function DecksPage() {
 
   return (
     <div className="bg-background flex-1 overflow-y-auto">
-      <PageHeader>
-        <PageHeaderContent>
-          <PageHeaderTitle>My Decks</PageHeaderTitle>
-          <PageHeaderDescription>
-            Build and manage your OPTCG decks.
-          </PageHeaderDescription>
-        </PageHeaderContent>
-        <PageHeaderActions>
-          <Button asChild>
-            <Link href="/decks/new">+ New Deck</Link>
-          </Button>
-        </PageHeaderActions>
-      </PageHeader>
-
-      <div className="mx-auto w-full max-w-7xl px-6 py-8">
-        {items.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-content-tertiary text-sm">
-              No decks yet
-            </p>
-            <p className="text-content-tertiary mt-1 text-sm">
-              Create your first deck to get started
-            </p>
-            <Link
-              href="/decks/new"
-              className="bg-primary text-primary-foreground hover:bg-gold-400 mt-6 inline-block rounded px-6 py-2 text-sm font-semibold transition-colors"
-            >
-              + New Deck
-            </Link>
-          </div>
-        ) : (
-          <DeckListFilter decks={items} />
-        )}
-      </div>
+      <DeckListFilter decks={items} />
     </div>
   );
 }

@@ -8,7 +8,9 @@ const deckFindManyMock = vi.fn();
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
-  prisma: { deck: { findMany: (...args: unknown[]) => deckFindManyMock(...args) } },
+  prisma: {
+    deck: { findMany: (...args: unknown[]) => deckFindManyMock(...args) },
+  },
 }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -71,9 +73,11 @@ describe("DecksPage", () => {
 
     const headings = screen.getAllByRole("heading", { level: 1 });
     expect(headings).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "My Decks" })
-    ).toBe(headings[0]);
+    expect(screen.getByRole("heading", { level: 1, name: "My Decks" })).toBe(
+      headings[0]
+    );
+    expect(screen.getByRole("button", { name: "Filter" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "+ New Deck" })).toBeTruthy();
   });
 
   it("loads the leader through the Deck.leader relation in one query", async () => {
@@ -96,7 +100,9 @@ describe("DecksPage", () => {
 
   it("renders the leader's chosen art variant over the base printing", async () => {
     deckFindManyMock.mockResolvedValue([
-      deckRecord({ leaderArtUrl: "https://cdn.example/variant/OP01-001_p2.png" }),
+      deckRecord({
+        leaderArtUrl: "https://cdn.example/variant/OP01-001_p2.png",
+      }),
     ]);
 
     await renderPage();
@@ -148,6 +154,7 @@ describe("DecksPage", () => {
 
     expect(screen.getByText("No decks yet")).toBeTruthy();
     expect(screen.queryByRole("listitem")).toBeNull();
+    expect(screen.getByRole("button", { name: "Filter" })).toBeTruthy();
   });
 
   it("redirects signed-out visitors to login", async () => {
