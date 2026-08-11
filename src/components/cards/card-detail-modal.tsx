@@ -156,7 +156,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                       <Badge
                         key={c}
                         variant={COLOR_TO_VARIANT[c] || "secondary"}
-                        className="rounded-full px-3 py-1"
+                        className="rounded px-3 py-1"
                       >
                         {c}
                       </Badge>
@@ -241,7 +241,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                           <span className="text-content-tertiary">—</span>
                           <span className="text-content-secondary">{cs.setName}</span>
                           {cs.isOrigin && (
-                            <Badge variant="warning" className="rounded-full">
+                            <Badge variant="warning" className="rounded">
                               Origin
                             </Badge>
                           )}

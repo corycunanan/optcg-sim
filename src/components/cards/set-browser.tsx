@@ -67,7 +67,7 @@ export async function SetBrowser({ cardsRoute }: SetBrowserProps) {
                   </div>
                   <Badge
                     variant="secondary"
-                    className="rounded-full tabular-nums"
+                    className="rounded tabular-nums"
                   >
                     {set._count.cardId}
                   </Badge>

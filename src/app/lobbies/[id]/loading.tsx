@@ -78,7 +78,7 @@ export default function LobbyRoomLoading() {
         aria-hidden="true"
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <Skeleton className="h-10 w-48 rounded-full" />
+          <Skeleton className="h-10 w-48 rounded" />
           <Skeleton className="h-12 w-40 rounded-md" />
           <Skeleton className="size-10 rounded-md" />
         </div>

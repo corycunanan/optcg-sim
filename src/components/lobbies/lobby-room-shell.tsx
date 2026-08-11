@@ -1122,7 +1122,7 @@ function SpectatorPill({
 
   return (
     <div
-      className="border-border bg-surface-3 flex min-h-10 items-center gap-3 rounded-full border p-1 pl-3"
+      className="border-border bg-surface-3 flex min-h-10 items-center gap-3 rounded border p-1 pl-3"
       data-spectator-control
     >
       {isHost ? (
@@ -1135,13 +1135,13 @@ function SpectatorPill({
             disabled={toggling}
             onClick={() => onToggle(!allowSpectators)}
             className={cn(
-              "focus-visible:ring-border-focus relative h-6 w-10 shrink-0 rounded-full p-1 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-wait",
+              "focus-visible:ring-border-focus relative h-6 w-10 shrink-0 rounded p-1 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-wait",
               allowSpectators ? "bg-gold-500" : "bg-content-tertiary"
             )}
           >
             <span
               className={cn(
-                "block size-4 rounded-full transition-transform",
+                "block size-4 rounded transition-transform",
                 allowSpectators ? "bg-navy-900 translate-x-4" : "bg-surface-1"
               )}
             />
@@ -1166,7 +1166,7 @@ function SpectatorPill({
         type="button"
         aria-label={`View spectators (${spectatorCount})`}
         onClick={onOpenSpectators}
-        className="border-border bg-surface-1 text-content-primary hover:border-border-strong focus-visible:ring-border-focus inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="border-border bg-surface-1 text-content-primary hover:border-border-strong focus-visible:ring-border-focus inline-flex size-8 shrink-0 items-center justify-center rounded border text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
       >
         {spectatorCount}
       </button>
@@ -1270,7 +1270,7 @@ export function InvitePanel({
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 lg:flex-col lg:[@media(min-height:50rem)]:gap-5">
-            <p className="border-border bg-surface-3 text-content-primary rounded-full border px-4 py-2 text-sm font-semibold tabular-nums">
+            <p className="border-border bg-surface-3 text-content-primary rounded border px-4 py-2 text-sm font-semibold tabular-nums">
               Expires in {formatInviteCountdown(timing.remainingMs)}
             </p>
             {showInviteFriend && (
@@ -1288,7 +1288,7 @@ export function InvitePanel({
     <section className="border-border-strong bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border border-dashed">
       <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b border-dashed px-5 py-3 text-left lg:min-h-20 lg:py-4">
         <div
-          className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded-full border border-dashed"
+          className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded border border-dashed"
           aria-hidden="true"
         >
           <Plus className="text-content-tertiary size-5" />

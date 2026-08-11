@@ -48,7 +48,7 @@ export const NavbarNotificationBell = forwardRef<
         <Badge
           data-slot="notification-unread-badge"
           aria-hidden="true"
-          className="bg-error text-navy-900 absolute -top-1 -right-1 size-5 rounded-full p-0 text-xs font-semibold"
+          className="bg-error text-navy-900 absolute -top-1 -right-1 size-5 rounded p-0 text-xs font-semibold"
         >
           {badgeLabel}
         </Badge>
@@ -61,7 +61,7 @@ export const NavbarNotificationBell = forwardRef<
       <span
         role="status"
         aria-label={accessibleName}
-        className="text-content-secondary relative flex size-10 items-center justify-center rounded-full"
+        className="text-content-secondary relative flex size-10 items-center justify-center rounded"
       >
         {content}
       </span>

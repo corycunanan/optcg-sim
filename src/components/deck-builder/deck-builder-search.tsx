@@ -325,7 +325,7 @@ export function DeckBuilderSearch({
                             loading="lazy"
                           />
                           {qtyInDeck > 0 && (
-                            <div className="bg-primary text-primary-foreground absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold">
+                            <div className="bg-primary text-primary-foreground absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded text-xs font-semibold">
                               {qtyInDeck}
                             </div>
                           )}

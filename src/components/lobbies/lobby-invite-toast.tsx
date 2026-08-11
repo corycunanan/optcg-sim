@@ -272,7 +272,7 @@ function InviteCard({
         </Button>
       </div>
       <div
-        className="bg-secondary mt-3 h-1 overflow-hidden rounded-full"
+        className="bg-secondary mt-3 h-1 overflow-hidden rounded"
         aria-label={`Expires in ${remainingSec} seconds`}
       >
         <div
