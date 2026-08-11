@@ -331,6 +331,89 @@ describe("POST /api/lobbies/[id]/start", () => {
     );
   });
 
+  it("starts a Solitaire lobby that was never readied", async () => {
+    // Both sides belong to the host, so the room has no ready control at all
+    // (OPT-657) and the mode switch that created this lobby cleared
+    // `hostReady`. Deck presence on each side is the whole prerequisite.
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        pregameMode: "SOLITAIRE_RANDOM",
+        status: "READY",
+        hostReady: false,
+        guest: {
+          userId: "host-user",
+          deckId: "side-b-deck",
+          guestReady: false,
+        },
+      }),
+    );
+
+    const res = await POST(buildRequest(), params);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ data: { gameId: "game-1" } });
+    expect(gameSessionCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          player1DeckId: "host-deck",
+          player2DeckId: "side-b-deck",
+          mode: "SOLITAIRE",
+        }),
+      }),
+    );
+  });
+
+  it("still requires a deck on each Solitaire side", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        pregameMode: "SOLITAIRE_RANDOM",
+        status: "READY",
+        hostReady: false,
+        guest: {
+          userId: "host-user",
+          deckId: null,
+          guestReady: false,
+        },
+      }),
+    );
+
+    const res = await POST(buildRequest(), params);
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body).toEqual({
+      error: "Lobby is not ready to start",
+      code: "LOBBY_NOT_READY",
+      // `hostReady` is no longer part of the Solitaire contract.
+      details: { missing: ["guestDeckId"] },
+    });
+    expect(requirePlayableDeckMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the PVP start gated on both seats being ready", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({ hostReady: true, guest: {
+        userId: "guest-user",
+        deckId: "guest-deck",
+        guestReady: false,
+      } }),
+    );
+
+    const res = await POST(buildRequest(), params);
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body).toEqual({
+      error: "Lobby is not ready to start",
+      code: "LOBBY_NOT_READY",
+      details: { missing: ["guestReady"] },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("rejects non-host callers", async () => {
     authMock.mockResolvedValueOnce({ user: { id: "guest-user" } });
 
