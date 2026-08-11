@@ -74,11 +74,11 @@ export function ChangeDeckModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size="xl"
+        size="2xl"
         // The grid owns the only scroll region; the dialog frame stays fixed
         // so the rail and the commit buttons never scroll away. `overflow-y-
         // hidden` overrides the primitive's default `overflow-y-auto`.
-        className="flex max-h-[80vh] flex-col gap-5 overflow-y-hidden sm:max-w-6xl"
+        className="flex max-h-[80vh] flex-col gap-5 overflow-y-hidden"
         data-change-deck-modal
       >
         <DialogHeader>
