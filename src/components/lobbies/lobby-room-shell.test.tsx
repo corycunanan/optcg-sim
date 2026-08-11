@@ -441,6 +441,50 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(startButton?.props.className).toContain("disabled:opacity-100");
   });
 
+  it("spends vertical rhythm only where the viewport can afford it", async () => {
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The frame is fixed to the viewport, so the header and content bands run
+    // compressed by default and only pay full padding when the viewport is
+    // both wide and tall. Height, not width, is the binding constraint here.
+    const headerLayout = renderer!.root.find(
+      (node) =>
+        typeof node.props.className === "string" &&
+        node.props.className.includes("max-w-7xl") &&
+        node.props.className.includes("lg:flex-row")
+    );
+    expect(headerLayout.props.className).toContain("py-4");
+    expect(headerLayout.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:py-8"
+    );
+
+    const pageContent = renderer!.root.findByProps({
+      "data-lobby-content": true,
+    });
+    expect(pageContent.props.className).toContain("py-4");
+    expect(pageContent.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:py-8"
+    );
+    expect(pageContent.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:gap-6"
+    );
+
+    // One column stacks at natural heights; from `lg` the single row is
+    // pinned to the space left over so neither seat can grow the frame.
+    const seats = renderer!.root.findByProps({ "data-lobby-seats": true });
+    expect(seats.props.className).toContain("min-h-0");
+    expect(seats.props.className).toContain("flex-col");
+    expect(seats.props.className).toContain("lg:grid");
+    expect(seats.props.className).toContain("lg:auto-rows-fr");
+    expect(seats.props.className).not.toContain("min-h-96");
+  });
+
   it("mounts real match settings and persists the host selection", async () => {
     mocks.apiPatch.mockResolvedValue({ success: true });
 

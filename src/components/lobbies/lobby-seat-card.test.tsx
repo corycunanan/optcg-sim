@@ -246,8 +246,8 @@ describe("LobbySeatCard composition", () => {
     renderSeat();
 
     const section = seatSection();
-    expect(section.className).toContain("gap-4");
-    expect(section.className).toContain("lg:gap-5");
+    expect(section.className).toContain("gap-y-3");
+    expect(section.className).toContain("lg:gap-4");
     expect(section.className).not.toMatch(/(^|\s)(border|rounded|bg-)/);
     // The internal dividers went with the panel.
     const dividers = [...section.querySelectorAll("*")].filter((node) =>
@@ -286,13 +286,70 @@ describe("LobbySeatCard composition", () => {
     const leader = screen.getByRole("button", {
       name: "Preview Straw Hat Rush",
     });
-    expect(leader.className).toContain("w-32");
-    expect(leader.className).toContain("lg:w-48");
-    expect(screen.getByText("Leader").parentElement?.className).toContain(
-      "w-32"
-    );
+    // A fixed thumbnail in the compact row; the stack's one flexible member
+    // from `lg`, where height drives width through the card ratio.
+    expect(leader.className).toContain("w-24");
+    expect(leader.className).toContain("lg:w-auto");
+    expect(leader.className).toContain("lg:flex-1");
+    expect(leader.className).toContain("lg:max-h-[16.75rem]");
+    expect(leader.className).toContain("aspect-card");
     expect(screen.getByText("Leader").parentElement?.className).toContain(
       "lg:w-48"
+    );
+  });
+
+  it("gives every leader-art state the same flexible box", () => {
+    const boxes = ["w-24", "lg:w-auto", "lg:flex-1", "lg:max-h-[16.75rem]"];
+
+    renderSeat({ deck: null, deckEditable: true });
+    const picker = screen.getByRole("button", { name: "Choose a deck" });
+    for (const box of boxes) expect(picker.className).toContain(box);
+    cleanup();
+
+    // The other seat's empty slot is inert, so it is asserted through the DOM
+    // rather than a role.
+    renderSeat({ deck: null, deckEditable: false });
+    const placeholder = seatSection().querySelector(
+      "[aria-hidden='true'].aspect-card"
+    );
+    expect(placeholder).not.toBeNull();
+    for (const box of boxes)
+      expect(placeholder!.className).toContain(box);
+  });
+
+  it("re-flows the seat without disturbing its reading order", () => {
+    renderSeat({ deckEditable: true, readyEditable: true });
+
+    // Placement only: the grid moves the groups into a row below `lg` while
+    // the DOM stays in the order the stacked layout paints, and the placement
+    // properties stop applying once the seat is a flex column.
+    const section = seatSection();
+    expect(section.className).toContain("grid-cols-[auto_minmax(0,1fr)_auto]");
+    expect(section.className).toContain("lg:flex");
+    expect(section.className).toContain("lg:flex-col");
+
+    expect(
+      screen.getByRole("button", { name: /More actions for/ }).className
+    ).toContain("col-start-3");
+    expect(
+      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
+        .className
+    ).toContain("col-start-1");
+    expect(screen.getByText("Leader").parentElement?.className).toContain(
+      "row-start-2"
+    );
+    expect(
+      screen.getByRole("button", { name: /Ready/ }).className
+    ).toContain("row-start-3");
+  });
+
+  it("spends its rhythm only where the viewport can afford it", () => {
+    renderSeat();
+
+    // The frame never scrolls, so the stack's full spacing is gated on height
+    // as well as width.
+    expect(seatSection().className).toContain(
+      "lg:[@media(min-height:50rem)]:gap-5"
     );
   });
 
@@ -457,10 +514,12 @@ describe("LobbySeatCard overflow menu", () => {
       screen.queryByRole("button", { name: /More actions for/ })
     ).toBeNull();
 
-    // The four-group rhythm survives, so this seat still lines up with the
-    // one beside it.
+    // The group rhythm survives, so this seat still lines up with the one
+    // beside it. Five children: the leader's art and its caption are placed
+    // separately so the caption can travel with the identity column in the
+    // compact row.
     const section = seatSection();
-    expect(section.children).toHaveLength(4);
+    expect(section.children).toHaveLength(5);
 
     const placeholder = section.firstElementChild!;
     expect(placeholder.hasAttribute("data-seat-menu-placeholder")).toBe(true);
@@ -472,7 +531,7 @@ describe("LobbySeatCard overflow menu", () => {
     expect(placeholder.textContent).toBe("");
   });
 
-  it("keeps the same four-group rhythm whether or not the menu renders", () => {
+  it("keeps the same group rhythm whether or not the menu renders", () => {
     renderSeat({ deck: null, deckEditable: false });
     const withoutMenu = seatSection().children.length;
     cleanup();

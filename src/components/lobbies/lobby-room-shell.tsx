@@ -488,7 +488,11 @@ export function LobbyRoomShell({
         data-lobby-frame
       >
         <header className="shrink-0" data-lobby-header>
-          <div className="mx-auto flex max-w-7xl flex-col items-start gap-4 px-6 py-8 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+          {/* The frame never scrolls, so vertical padding is the first thing to
+              give: full rhythm only once the viewport is both wide and tall
+              enough to spend it, compressed everywhere else so the seats keep
+              their height. */}
+          <div className="mx-auto flex max-w-7xl flex-col items-start gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:[@media(min-height:50rem)]:py-8">
             <div className="w-full min-w-0 lg:w-auto">
               <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
                 Game mode
@@ -590,7 +594,7 @@ export function LobbyRoomShell({
         </header>
 
         <main
-          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-hidden px-6 py-8"
+          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:py-8"
           data-lobby-content
         >
           {joinError && (
@@ -611,7 +615,13 @@ export function LobbyRoomShell({
             </div>
           )}
 
-          <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2">
+          {/* Side by side from `lg`, where `auto-rows-fr` pins the single row
+              to the available height so neither cell can grow the frame. In one
+              column the cells keep their natural heights and stack. */}
+          <div
+            className="flex min-h-0 flex-1 flex-col gap-4 lg:grid lg:auto-rows-fr lg:grid-cols-2 lg:[@media(min-height:50rem)]:gap-6"
+            data-lobby-seats
+          >
             <LobbySeatCard
               role="Host"
               player={
@@ -706,7 +716,7 @@ export function LobbyRoomShell({
           </div>
 
           {decks.length === 0 && (
-            <p className="text-content-tertiary text-center text-sm">
+            <p className="text-content-tertiary shrink-0 text-center text-sm">
               You can wait here now, but you&apos;ll need a playable deck before
               the match can start.{" "}
               <button
@@ -720,7 +730,7 @@ export function LobbyRoomShell({
           )}
 
           {ownDeck && ownDeck.totalCards < 50 && (
-            <p className="text-content-tertiary text-center text-xs">
+            <p className="text-content-tertiary shrink-0 text-center text-xs">
               Deck legality is checked when Start is clicked, so unfinished
               decks can stay selected while players coordinate.
             </p>
@@ -905,7 +915,7 @@ function SpectatorRoom({
       data-lobby-frame
     >
       <header className="shrink-0" data-lobby-header>
-        <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mx-auto max-w-7xl px-6 py-4 lg:[@media(min-height:50rem)]:py-8">
           <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
             Watching party
           </p>
@@ -917,10 +927,10 @@ function SpectatorRoom({
       </header>
 
       <main
-        className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-hidden px-6 py-8"
+        className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:py-8"
         data-lobby-content
       >
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid min-h-0 gap-4 lg:grid-cols-2 lg:[@media(min-height:50rem)]:gap-6">
           <SpectatorSeat
             role="Host"
             player={lobby.host ?? { username: null, name: "Host", image: null }}
@@ -937,7 +947,7 @@ function SpectatorRoom({
           />
         </div>
 
-        <div className="border-border bg-surface-1 rounded-lg border p-6 text-center">
+        <div className="border-border bg-surface-1 shrink-0 rounded-lg border p-4 text-center lg:[@media(min-height:50rem)]:p-6">
           <Eye className="text-gold-600 mx-auto size-6" aria-hidden="true" />
           <p className="text-content-primary mt-3 text-lg font-semibold">
             {activeGameId
@@ -1010,10 +1020,10 @@ function SpectatorSeat({
 
   return (
     <section
-      className="border-border bg-surface-1 flex min-h-48 flex-col rounded-lg border"
+      className="border-border bg-surface-1 flex min-h-0 flex-col overflow-hidden rounded-lg border"
       aria-label={`${role} seat — ${playerName}`}
     >
-      <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
+      <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b px-5 py-3 lg:min-h-20 lg:py-4">
         <UserAvatar user={player} size="md" variant="dark" />
         <div className="min-w-0">
           <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
@@ -1024,7 +1034,7 @@ function SpectatorSeat({
           </h2>
         </div>
       </header>
-      <div className="flex flex-1 flex-col justify-center px-5 py-6">
+      <div className="flex min-h-0 flex-1 flex-col justify-center px-5 py-4 lg:[@media(min-height:50rem)]:py-6">
         <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
           Deck
         </p>
@@ -1193,13 +1203,13 @@ export function InvitePanel({
     return (
       <section
         aria-label="Guest seat — invite pending"
-        className="border-border bg-surface-1 flex min-h-0 flex-1 flex-col rounded-lg border"
+        className="border-border bg-surface-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border"
       >
-        <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
-          <div className="ring-gold-500/30 animate-pulse rounded-full ring-2">
+        <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b px-5 py-3 lg:min-h-20 lg:py-4">
+          <div className="ring-gold-500/30 shrink-0 animate-pulse rounded-full ring-2">
             <UserAvatar user={pendingInvite.user} size="md" variant="dark" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
               Guest
             </p>
@@ -1208,34 +1218,37 @@ export function InvitePanel({
             </h2>
           </div>
         </header>
-        <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 py-10 text-center">
-          <div>
-            <h3 className="font-display text-content-primary text-2xl">
+        {/* The waiting state is a countdown and a way out. On short and narrow
+            viewports everything else — the display heading, the reassurance
+            line, the column arrangement — yields so those two never leave the
+            frame. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 px-6 py-4 text-center lg:gap-4 lg:[@media(min-height:50rem)]:gap-5 lg:[@media(min-height:50rem)]:py-10">
+          <div className="w-full min-w-0">
+            <h3 className="font-display text-content-primary truncate text-base lg:[@media(min-height:50rem)]:text-2xl">
               Invite sent to {pendingInviteName}
             </h3>
-            <p className="text-content-secondary mt-2 text-sm">
+            <p className="text-content-secondary mt-2 hidden text-sm lg:[@media(min-height:50rem)]:block">
               Their seat is reserved until the invitation expires.
             </p>
           </div>
-          <p className="border-border bg-surface-3 text-content-primary rounded-full border px-4 py-2 text-sm font-semibold tabular-nums">
-            Expires in {formatInviteCountdown(timing.remainingMs)}
-          </p>
-          {showInviteFriend && (
-            <Button
-              onClick={onCancelInvite}
-              disabled={cancelingInvite}
-            >
-              {cancelingInvite ? "Canceling..." : "Cancel invite"}
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center justify-center gap-3 lg:flex-col lg:[@media(min-height:50rem)]:gap-5">
+            <p className="border-border bg-surface-3 text-content-primary rounded-full border px-4 py-2 text-sm font-semibold tabular-nums">
+              Expires in {formatInviteCountdown(timing.remainingMs)}
+            </p>
+            {showInviteFriend && (
+              <Button onClick={onCancelInvite} disabled={cancelingInvite}>
+                {cancelingInvite ? "Canceling..." : "Cancel invite"}
+              </Button>
+            )}
+          </div>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="border-border-strong bg-surface-1 flex min-h-0 flex-1 flex-col rounded-lg border border-dashed">
-      <header className="border-border flex min-h-20 items-center gap-3 border-b border-dashed px-5 py-4 text-left">
+    <section className="border-border-strong bg-surface-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-dashed">
+      <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b border-dashed px-5 py-3 text-left lg:min-h-20 lg:py-4">
         <div
           className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded-full border border-dashed"
           aria-hidden="true"
@@ -1251,7 +1264,7 @@ export function InvitePanel({
           </h2>
         </div>
       </header>
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-8 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 py-4 text-center lg:[@media(min-height:50rem)]:py-8">
         {pendingInvite && pendingInviteName && timing?.kind === "expired" && (
           <p className="text-content-secondary text-sm">
             {pendingInvite && pendingInviteName && timing?.kind === "expired"
@@ -1286,92 +1299,120 @@ function SolitaireSeat({
   onDeckChange: (deckId: string) => void;
   onPreview: (deckId: string) => void;
 }) {
+  const art = (className: string) => (
+    <button
+      type="button"
+      disabled={!deck}
+      onClick={() => deck && onPreview(deck.id)}
+      className={cn(
+        "bg-surface-3 border-border aspect-card focus-visible:outline-border-focus relative shrink-0 -rotate-6 overflow-hidden rounded-md border shadow-[var(--shadow-lg)] transition-transform hover:-rotate-3 focus-visible:outline-2 focus-visible:outline-offset-2",
+        className
+      )}
+      aria-label={deck ? `Preview ${deck.name}` : "No second deck chosen"}
+    >
+      {deck?.leaderImageUrl ? (
+        <Image
+          src={deck.leaderImageUrl}
+          alt={deck.leaderName ?? deck.name}
+          fill
+          sizes="128px"
+          unoptimized
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span className="text-content-tertiary flex h-full items-center justify-center">
+          <Layers3 className="size-8" />
+        </span>
+      )}
+    </button>
+  );
+
   return (
     <section
       className={cn(
-        "border-border bg-surface-1 relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border",
+        "relative flex min-h-0 items-start gap-4",
+        // A bordered panel from `lg`. In one column that chrome costs more
+        // height than the frame can spare, so the panel dissolves into the same
+        // compact row the seats use: art on the left, identity and deck select
+        // stacked beside it. `lg:contents` keeps it one DOM — the row wrapper
+        // disappears and the three bands become the panel again.
+        "lg:border-border lg:bg-surface-1 lg:flex-1 lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-hidden lg:rounded-lg lg:border",
         disabled && "pointer-events-none opacity-50"
       )}
       aria-label="Solitaire second deck"
     >
-      <header className="border-border flex min-h-20 items-center gap-3 border-b px-5 py-4">
-        <div className="bg-gold-100 text-gold-600 flex size-10 items-center justify-center rounded-full">
-          <Layers3 className="size-5" />
-        </div>
-        <div>
-          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-            Solitaire
-          </p>
-          <h2 className="text-content-primary text-lg font-semibold">
-            Your second deck
-          </h2>
-        </div>
-      </header>
+      {art("w-24 lg:hidden")}
 
-      <div className="relative flex flex-1 items-center gap-8 overflow-hidden px-8 py-10">
-        <button
-          type="button"
-          disabled={!deck}
-          onClick={() => deck && onPreview(deck.id)}
-          className="bg-surface-3 border-border aspect-card focus-visible:outline-border-focus relative w-32 shrink-0 -rotate-6 overflow-hidden rounded-md border shadow-[var(--shadow-lg)] transition-transform hover:-rotate-3 focus-visible:outline-2 focus-visible:outline-offset-2"
-          aria-label={deck ? `Preview ${deck.name}` : "No second deck chosen"}
-        >
-          {deck?.leaderImageUrl ? (
-            <Image
-              src={deck.leaderImageUrl}
-              alt={deck.leaderName ?? deck.name}
-              fill
-              sizes="128px"
-              unoptimized
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="text-content-tertiary flex h-full items-center justify-center">
-              <Layers3 className="size-8" />
-            </span>
-          )}
-        </button>
-        <div className="relative z-10 max-w-sm">
-          <h3 className="font-display text-content-primary text-2xl">
-            Play both sides
-          </h3>
-          <p className="text-content-secondary mt-3 text-sm leading-relaxed">
-            Test matchups at your own pace. You&apos;ll control each side of the
-            table and switch perspective between turns.
-          </p>
-          {deck && (
-            <div className="mt-5">
-              <p className="text-content-primary text-sm font-semibold">
-                {deck.name}
-              </p>
-              <p className="text-content-tertiary mt-1 font-mono text-xs font-semibold">
-                {deck.leaderName ?? deck.leaderId}
+      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:contents">
+        <header className="border-border flex min-w-0 items-center gap-3 lg:order-1 lg:min-h-20 lg:shrink-0 lg:border-b lg:px-5 lg:py-4">
+          <div className="bg-gold-100 text-gold-600 hidden size-10 shrink-0 items-center justify-center rounded-full lg:flex">
+            <Layers3 className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+              Solitaire
+            </p>
+            <h2 className="text-content-primary truncate text-lg font-semibold">
+              Your second deck
+            </h2>
+          </div>
+        </header>
+
+        {/* The panel's body is chrome the compact row cannot afford: below `lg`
+            the art already leads the row and the deck select names the deck, so
+            the whole band steps aside. */}
+        <div className="relative hidden min-h-0 items-center gap-8 overflow-hidden px-8 py-4 lg:order-2 lg:flex lg:flex-1 lg:[@media(min-height:50rem)]:py-10">
+          {/* Tracks the band it sits in the same way the seat's leader tracks
+              its stack: height first, width from the card ratio. */}
+          {art("hidden lg:block lg:h-full lg:max-h-44 lg:w-auto")}
+          <div className="relative z-10 max-w-sm min-w-0">
+            {/* Marketing copy is the panel's most compressible asset: it
+                explains a mode the viewer has already chosen, so it steps aside
+                on short viewports rather than pushing the deck select out of
+                the frame. */}
+            <div className="hidden [@media(min-height:50rem)]:block">
+              <h3 className="font-display text-content-primary text-2xl">
+                Play both sides
+              </h3>
+              <p className="text-content-secondary mt-3 text-sm leading-relaxed">
+                Test matchups at your own pace. You&apos;ll control each side of
+                the table and switch perspective between turns.
               </p>
             </div>
-          )}
-        </div>
-      </div>
-
-      <footer className="border-border mt-auto border-t p-4">
-        {editable ? (
-          <Select value={deck?.id ?? ""} onValueChange={onDeckChange}>
-            <SelectTrigger className="bg-surface-3 w-full">
-              <SelectValue placeholder="Choose your second deck" />
-            </SelectTrigger>
-            <SelectContent>
-              {decks.map((deckOption) => (
-                <SelectItem key={deckOption.id} value={deckOption.id}>
-                  {deckOption.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <div className="border-border bg-surface-3 text-content-secondary flex min-h-10 items-center rounded-md border px-3 text-sm">
-            {deck?.name ?? "Choose a second deck"}
+            {deck && (
+              <div className="[@media(min-height:50rem)]:mt-5">
+                <p className="text-content-primary truncate text-sm font-semibold">
+                  {deck.name}
+                </p>
+                <p className="text-content-tertiary mt-1 truncate font-mono text-xs font-semibold">
+                  {deck.leaderName ?? deck.leaderId}
+                </p>
+              </div>
+            )}
           </div>
-        )}
-      </footer>
+        </div>
+
+        <footer className="border-border lg:order-3 lg:mt-auto lg:shrink-0 lg:border-t lg:p-4">
+          {editable ? (
+            <Select value={deck?.id ?? ""} onValueChange={onDeckChange}>
+              <SelectTrigger className="bg-surface-3 w-full">
+                <SelectValue placeholder="Choose your second deck" />
+              </SelectTrigger>
+              <SelectContent>
+                {decks.map((deckOption) => (
+                  <SelectItem key={deckOption.id} value={deckOption.id}>
+                    {deckOption.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="border-border bg-surface-3 text-content-secondary flex min-h-10 items-center rounded-md border px-3 text-sm">
+              {deck?.name ?? "Choose a second deck"}
+            </div>
+          )}
+        </footer>
+      </div>
     </section>
   );
 }
