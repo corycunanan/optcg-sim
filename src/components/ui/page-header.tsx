@@ -12,8 +12,15 @@ import { cn } from "@/lib/utils";
  * the header's (`pt-8`, or the header's own override) and the measured
  * header→content gap equals the header's top padding instead of doubling it.
  *
+ * Narrow widths stack: title above actions below `sm`, side by side from `sm`.
+ * A title and a row of `whitespace-nowrap` CTAs cannot share 272px of content
+ * box at 320px without one of them being crushed, and stacking costs the
+ * rhythm nothing — the header still emits no bottom padding, so the gap below
+ * it is still exactly the content well's top padding.
+ *
  * `className` passes through so height-gated surfaces (the no-scroll lobby
- * frame) can swap the vertical step while keeping every other token.
+ * frame) can swap the vertical step, or move the stacking breakpoint, while
+ * keeping every other token.
  */
 function PageHeader({
   children,
@@ -23,7 +30,7 @@ function PageHeader({
   return (
     <header
       className={cn(
-        "mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 pt-8",
+        "mx-auto flex w-full max-w-7xl flex-col items-start justify-between gap-4 px-6 pt-8 sm:flex-row sm:items-center",
         className
       )}
       {...props}
@@ -102,8 +109,13 @@ function PageHeaderActions({
   children: React.ReactNode;
   className?: string;
 }) {
+  // Wraps rather than clips: CTA labels are `whitespace-nowrap`, so a row of
+  // them that cannot fit has to break onto a second line or crush its
+  // neighbours.
   return (
-    <div className={cn("flex items-center gap-2", className)}>{children}</div>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      {children}
+    </div>
   );
 }
 

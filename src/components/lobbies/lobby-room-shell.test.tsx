@@ -1479,6 +1479,41 @@ describe("LobbyRoomShell redesign scenarios", () => {
     );
   });
 
+  it("truncates a spectated host's name instead of widening the fixed frame", async () => {
+    // Usernames are user-controlled, and the spectator frame never scrolls, so
+    // an unbroken name has to be clipped rather than allowed to set the width.
+    const longName = "A".repeat(200);
+    mocks.apiGet.mockImplementation(async (url: string) => ({
+      data:
+        url === "/api/decks"
+          ? []
+          : lobbyState({
+              viewerRole: "spectator",
+              host: { username: longName, name: null, image: null },
+            }),
+    }));
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="spectator-1" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain(longName);
+
+    const title = renderer!.root.findByType("h1");
+    expect(title.props.className).toContain("truncate");
+
+    // `truncate` only clips against a definite width, so the column the title
+    // sits in has to fill the header and be allowed to shrink below content.
+    let content = title.parent!;
+    while (typeof content.type !== "string") content = content.parent!;
+    expect(content.props.className).toContain("w-full");
+    expect(content.props.className).toContain("min-w-0");
+  });
+
   it.each([
     ["host", "Start Match"],
     ["guest", "Leave lobby"],

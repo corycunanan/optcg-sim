@@ -1,4 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  PageHeader,
+  PageHeaderActions,
+  PageHeaderContent,
+} from "@/components/ui/page-header";
 
 /**
  * Mirrors the seat's live composition rather than its own box: a leader block
@@ -36,21 +41,29 @@ export default function LobbyRoomLoading() {
       aria-label="Loading lobby room"
       data-lobby-frame
     >
-      <div className="shrink-0" aria-hidden="true">
-        <div className="mx-auto flex w-full max-w-7xl flex-col items-start gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:[@media(min-height:50rem)]:py-8">
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-8 w-40" />
-          </div>
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-12 w-48 rounded-md" />
-            <Skeleton className="h-12 w-32 rounded-md" />
-          </div>
-        </div>
-      </div>
+      {/* The real header primitive on the live room's exact override: top
+          padding only, at the live room's height gates and stacking point. A
+          hand-rolled `py-*` here paid the gap twice and spent 16-32px more of
+          a frame that is never allowed to scroll. */}
+      <PageHeader
+        className="shrink-0 flex-col items-start gap-3 pt-4 sm:flex-col sm:items-start lg:flex-row lg:items-center lg:gap-6 lg:[@media(min-height:50rem)]:pt-8"
+        aria-hidden="true"
+        data-lobby-header
+      >
+        <PageHeaderContent className="w-full gap-1 lg:w-auto">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-8 w-40" />
+        </PageHeaderContent>
+        <PageHeaderActions className="w-full gap-3 lg:w-auto lg:justify-end">
+          <Skeleton className="h-12 w-48 rounded-md" />
+          <Skeleton className="h-12 w-32 rounded-md" />
+        </PageHeaderActions>
+      </PageHeader>
 
+      {/* Top padding matches the header's at every gate, exactly as the live
+          room's well does. */}
       <div
-        className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:py-8"
+        className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 pt-4 pb-3 lg:pb-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:pt-8 lg:[@media(min-height:50rem)]:pb-8"
         aria-hidden="true"
         data-lobby-content
       >

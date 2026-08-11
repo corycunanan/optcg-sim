@@ -4,6 +4,7 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
   PageHeader,
+  PageHeaderActions,
   PageHeaderContent,
   PageHeaderEyebrow,
   PageHeaderTitle,
@@ -70,6 +71,35 @@ describe("PageHeader", () => {
     expect(header.className).not.toMatch(/(?:^|\s)pt-8(?:\s|$)/);
     expect(header.className).toContain("px-6");
     expect(header.className).toContain("max-w-7xl");
+  });
+
+  it("stacks title above actions on narrow viewports", () => {
+    const { container } = render(
+      <PageHeader>
+        <PageHeaderContent>
+          <PageHeaderTitle>My Decks</PageHeaderTitle>
+        </PageHeaderContent>
+        <PageHeaderActions>
+          <button type="button">Filter</button>
+          <button type="button">+ New Deck</button>
+        </PageHeaderActions>
+      </PageHeader>
+    );
+
+    const header = container.querySelector("header")!;
+
+    // A title and a row of nowrap CTAs cannot share 272px of content box at
+    // 320px, so the row stacks below `sm` and only pairs up from `sm`.
+    expect(header.className).toContain("flex-col");
+    expect(header.className).toContain("items-start");
+    expect(header.className).toContain("sm:flex-row");
+    expect(header.className).toContain("sm:items-center");
+    // Stacking must not reintroduce bottom padding — the gap stays single.
+    expect(header.className).not.toMatch(/(?:^|\s)p[by]-/);
+
+    // And the CTAs themselves wrap rather than crush each other.
+    const actions = header.lastElementChild!;
+    expect(actions.className).toContain("flex-wrap");
   });
 
   it("titles on the page surface rather than an inverted band", () => {

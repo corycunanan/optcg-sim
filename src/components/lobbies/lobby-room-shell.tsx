@@ -496,8 +496,12 @@ export function LobbyRoomShell({
             enough to spend it, compressed everywhere else so the seats keep
             their height. The header carries top padding only — the content
             well below owns the whole header→content gap. */}
+        {/* The actions row here is a mode toggle, a party code and a join
+            dialog, so it needs the full `lg` width before it can sit beside
+            the title — the primitive's `sm` stacking point is pushed out
+            rather than inherited. */}
         <PageHeader
-          className="shrink-0 flex-col items-start gap-3 pt-4 lg:flex-row lg:items-center lg:gap-6 lg:[@media(min-height:50rem)]:pt-8"
+          className="shrink-0 flex-col items-start gap-3 pt-4 sm:flex-col sm:items-start lg:flex-row lg:items-center lg:gap-6 lg:[@media(min-height:50rem)]:pt-8"
           data-lobby-header
         >
           <PageHeaderContent className="w-full gap-1 lg:w-auto">
@@ -507,7 +511,7 @@ export function LobbyRoomShell({
             </PageHeaderTitle>
           </PageHeaderContent>
 
-          <PageHeaderActions className="w-full flex-wrap gap-3 lg:w-auto lg:justify-end">
+          <PageHeaderActions className="w-full gap-3 lg:w-auto lg:justify-end">
             <div className="min-w-0">
               <div
                 className="border-border bg-surface-3 inline-flex h-12 w-fit rounded-md border p-1"
@@ -949,12 +953,15 @@ function SpectatorRoom({
         className="shrink-0 pt-4 lg:[@media(min-height:50rem)]:pt-8"
         data-lobby-header
       >
-        <PageHeaderContent className="gap-1">
+        {/* The host's display name is user-controlled, so this title truncates
+            like the regular room's does — an unbroken 200-character username
+            would otherwise widen the fixed frame. */}
+        <PageHeaderContent className="w-full gap-1">
           <PageHeaderEyebrow>Watching party</PageHeaderEyebrow>
-          <PageHeaderTitle>
+          <PageHeaderTitle className="truncate">
             {displayName(lobby.host, "Host")}&apos;s party
           </PageHeaderTitle>
-          <PageHeaderDescription className="mt-1">
+          <PageHeaderDescription className="mt-1 truncate">
             {lobby.format}
           </PageHeaderDescription>
         </PageHeaderContent>

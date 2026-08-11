@@ -58,6 +58,44 @@ describe("lobby room loading state", () => {
     expect(names.some((name) => /\bmin-h-(?!0\b)\w/.test(name))).toBe(false);
   });
 
+  /**
+   * The loading state used to hand-roll its own header with `py-*` on both the
+   * header and the well, so the gap below the title was twice the header's own
+   * inset and the fixed frame paid 16-32px more here than in any live state.
+   */
+  it("renders the shared header primitive, not a copy of its classes", () => {
+    const container = renderLoading();
+
+    const header = container.querySelector<HTMLElement>("[data-lobby-header]")!;
+
+    expect(header).not.toBeNull();
+    expect(header.tagName).toBe("HEADER");
+    expect(header.className).toContain("max-w-7xl");
+    expect(header.className).toContain("px-6");
+    expect(header.className).not.toContain("border-b");
+    expect(header.className).not.toContain("bg-navy-900");
+  });
+
+  it("spends the header rhythm once, at the live room's gates", () => {
+    const container = renderLoading();
+
+    const header = container.querySelector<HTMLElement>("[data-lobby-header]")!;
+    const content = container.querySelector<HTMLElement>(
+      "[data-lobby-content]"
+    )!;
+
+    // Top padding only: a `pb-*`/`py-*` on the header would double the gap.
+    expect(header.className).toContain("pt-4");
+    expect(header.className).toContain("lg:[@media(min-height:50rem)]:pt-8");
+    expect(header.className).not.toMatch(/(?:^|\s|:)p[by]-/);
+
+    // The well's top padding IS the header→content gap, and it matches the
+    // header's own step at both height gates.
+    expect(content.className).toContain("pt-4");
+    expect(content.className).toContain("lg:[@media(min-height:50rem)]:pt-8");
+    expect(content.className).not.toMatch(/(?:^|\s|:)py-/);
+  });
+
   it("mirrors the seat's flexible leader and compact row", () => {
     const names = classNames(renderLoading());
     const leader = names.find((name) => name.includes("aspect-card"));
