@@ -51,8 +51,6 @@ export function Navbar() {
     "font-nav relative bg-transparent px-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse sm:px-3";
   const activeTriggerStyles =
     "bg-surface-2 text-gold-600 hover:text-gold-600 focus:text-gold-600 data-popup-open:text-gold-600 data-open:text-gold-600";
-  const playTriggerStyles =
-    "bg-gold-500 text-navy-900 hover:bg-gold-400 hover:text-navy-900 focus:bg-gold-400 focus:text-navy-900";
 
   const linkStyles =
     "font-nav rounded-md px-2 py-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus sm:px-3";
@@ -76,22 +74,6 @@ export function Navbar() {
               <NavigationMenuItem>
                 <NavigationMenuLink asChild>
                   <DeckNavigationGuardLink
-                    href="/lobbies"
-                    aria-current={playActive ? "page" : undefined}
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      triggerStyles,
-                      playActive ? activeTriggerStyles : playTriggerStyles
-                    )}
-                  >
-                    Play
-                  </DeckNavigationGuardLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <DeckNavigationGuardLink
                     href="/"
                     aria-current={pathname === "/" ? "page" : undefined}
                     className={cn(
@@ -101,6 +83,22 @@ export function Navbar() {
                     )}
                   >
                     Home
+                  </DeckNavigationGuardLink>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <DeckNavigationGuardLink
+                    href="/lobbies"
+                    aria-current={playActive ? "page" : undefined}
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      triggerStyles,
+                      playActive && activeTriggerStyles
+                    )}
+                  >
+                    Play
                   </DeckNavigationGuardLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>

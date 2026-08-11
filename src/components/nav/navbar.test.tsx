@@ -192,22 +192,25 @@ describe("Navbar", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders Play, Home, Decks, Cards and emphasizes inactive Play", () => {
+  it("renders Home, Play, Decks, Cards with matching plain-link styles", () => {
     const { container } = render(<Navbar />);
     const navText = container.querySelector("nav")?.textContent ?? "";
     const play = screen.getByRole("link", { name: "Play" });
+    const home = screen.getByRole("link", { name: "Home" });
 
-    expect(navText.indexOf("Play")).toBeLessThan(navText.indexOf("Home"));
-    expect(navText.indexOf("Home")).toBeLessThan(navText.indexOf("Decks"));
+    expect(navText.indexOf("Home")).toBeLessThan(navText.indexOf("Play"));
+    expect(navText.indexOf("Play")).toBeLessThan(navText.indexOf("Decks"));
     expect(navText.indexOf("Decks")).toBeLessThan(navText.indexOf("Cards"));
-    expect(play.className).toContain("bg-gold-500");
-    expect(screen.getByRole("link", { name: "Home" })).toBeDefined();
+    expect(play.className).toBe(home.className);
+    expect(play.className).not.toContain("bg-gold-500");
+    expect(home).toBeDefined();
     expect(screen.getByRole("button", { name: "Decks" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Cards" })).toBeDefined();
   });
 
   it.each([
     ["/lobbies", "link", "Play"],
+    ["/game", "link", "Play"],
     ["/", "link", "Home"],
     ["/cards", "button", "Cards"],
     ["/decks", "button", "Decks"],
