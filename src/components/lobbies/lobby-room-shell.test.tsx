@@ -175,16 +175,10 @@ vi.mock("@/components/ui/tooltip", () => {
     TooltipTrigger: Wrapper,
   };
 });
-vi.mock("@/components/ui/page-header", () => {
-  const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
-  return {
-    PageHeader: Wrapper,
-    PageHeaderActions: Wrapper,
-    PageHeaderContent: Wrapper,
-    PageHeaderDescription: Wrapper,
-    PageHeaderTitle: Wrapper,
-  };
-});
+// `@/components/ui/page-header` is intentionally NOT mocked: the lobby header
+// IS the shared primitive now, so the classes these tests assert on
+// (`data-lobby-header`, the no-band/no-border contract, the height-gated
+// padding) are the primitive's real output merged with the lobby's override.
 vi.mock("@/components/ui/badge", () => ({
   Badge: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
@@ -453,26 +447,33 @@ describe("LobbyRoomShell redesign scenarios", () => {
     // The frame is fixed to the viewport, so the header and content bands run
     // compressed by default and only pay full padding when the viewport is
     // both wide and tall. Height, not width, is the binding constraint here.
-    const headerLayout = renderer!.root.find(
-      (node) =>
-        typeof node.props.className === "string" &&
-        node.props.className.includes("max-w-7xl") &&
-        node.props.className.includes("lg:flex-row")
-    );
-    expect(headerLayout.props.className).toContain("py-4");
+    const headerLayout = renderer!.root.findByProps({
+      "data-lobby-header": true,
+    });
+    // Top padding only. The header contributes nothing below its own content,
+    // so the content well's top padding IS the whole header→content gap.
+    expect(headerLayout.props.className).toContain("pt-4");
     expect(headerLayout.props.className).toContain(
-      "lg:[@media(min-height:50rem)]:py-8"
+      "lg:[@media(min-height:50rem)]:pt-8"
     );
+    expect(headerLayout.props.className).not.toMatch(/(?:^|\s|:)pb-/);
+    expect(headerLayout.props.className).not.toMatch(/(?:^|\s|:)py-/);
 
     const pageContent = renderer!.root.findByProps({
       "data-lobby-content": true,
     });
-    // Below `lg` the content well gives up a spacing step before the seats
-    // have to give up a row.
-    expect(pageContent.props.className).toContain("py-3");
-    expect(pageContent.props.className).toContain("lg:py-4");
+    // Equal-rhythm invariant: the well's top padding matches the header's top
+    // padding at every height gate, so the gap reads as one step, not two.
+    expect(pageContent.props.className).toContain("pt-4");
     expect(pageContent.props.className).toContain(
-      "lg:[@media(min-height:50rem)]:py-8"
+      "lg:[@media(min-height:50rem)]:pt-8"
+    );
+    // Below `lg` the content well gives up a spacing step at the bottom before
+    // the seats have to give up a row.
+    expect(pageContent.props.className).toContain("pb-3");
+    expect(pageContent.props.className).toContain("lg:pb-4");
+    expect(pageContent.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:pb-8"
     );
     expect(pageContent.props.className).toContain(
       "lg:[@media(min-height:50rem)]:gap-6"

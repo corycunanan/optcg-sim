@@ -139,6 +139,7 @@ export { Textarea } from "./textarea";
 export {
   PageHeader,
   PageHeaderContent,
+  PageHeaderEyebrow,
   PageHeaderTitle,
   PageHeaderDescription,
   PageHeaderActions,

@@ -176,7 +176,7 @@ export function CardBrowser({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Page header — fixed to top */}
-      <PageHeader className="z-20 shrink-0">
+      <PageHeader className="shrink-0">
         <PageHeaderContent>
           <PageHeaderTitle>Card Database</PageHeaderTitle>
           <PageHeaderDescription>
@@ -185,7 +185,7 @@ export function CardBrowser({
               <span>
                 {" "}
                 matching &ldquo;
-                <strong className="text-content-inverse">
+                <strong className="text-content-primary">
                   {currentFilters.q}
                 </strong>
                 &rdquo;
@@ -218,7 +218,7 @@ export function CardBrowser({
       {/* Scrollable content area */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Search bar */}
-        <div className="mx-auto w-full max-w-7xl px-6 py-6">
+        <div className="mx-auto w-full max-w-7xl px-6 py-8">
           <form onSubmit={handleSearch}>
             <div className="flex gap-2">
               <Input
@@ -247,7 +247,7 @@ export function CardBrowser({
         <div
           className={cn(
             "mx-auto w-full max-w-7xl px-6",
-            totalPages <= 1 && "pb-6"
+            totalPages <= 1 && "pb-8"
           )}
         >
           {initialCards.length === 0 ? (
@@ -263,7 +263,7 @@ export function CardBrowser({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="mx-auto w-full max-w-7xl px-6 pb-6">
+          <div className="mx-auto w-full max-w-7xl px-6 pb-8">
             <Pagination
               page={page}
               totalPages={totalPages}

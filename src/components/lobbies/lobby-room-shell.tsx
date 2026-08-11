@@ -34,6 +34,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  PageHeader,
+  PageHeaderActions,
+  PageHeaderContent,
+  PageHeaderDescription,
+  PageHeaderEyebrow,
+  PageHeaderTitle,
+} from "@/components/ui/page-header";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -487,118 +495,118 @@ export function LobbyRoomShell({
         className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden"
         data-lobby-frame
       >
-        <header className="shrink-0" data-lobby-header>
-          {/* The frame never scrolls, so vertical padding is the first thing to
-              give: full rhythm only once the viewport is both wide and tall
-              enough to spend it, compressed everywhere else so the seats keep
-              their height. */}
-          <div className="mx-auto flex max-w-7xl flex-col items-start gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:[@media(min-height:50rem)]:py-8">
-            <div className="w-full min-w-0 lg:w-auto">
-              <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
-                Game mode
-              </p>
-              <h1 className="font-display text-content-primary mt-1 truncate text-3xl">
-                {lobby.format}
-              </h1>
-            </div>
+        {/* The frame never scrolls, so vertical padding is the first thing to
+            give: full rhythm only once the viewport is both wide and tall
+            enough to spend it, compressed everywhere else so the seats keep
+            their height. The header carries top padding only — the content
+            well below owns the whole header→content gap. */}
+        <PageHeader
+          className="shrink-0 flex-col items-start gap-3 pt-4 lg:flex-row lg:items-center lg:gap-6 lg:[@media(min-height:50rem)]:pt-8"
+          data-lobby-header
+        >
+          <PageHeaderContent className="w-full gap-1 lg:w-auto">
+            <PageHeaderEyebrow>Game mode</PageHeaderEyebrow>
+            <PageHeaderTitle className="truncate">
+              {lobby.format}
+            </PageHeaderTitle>
+          </PageHeaderContent>
 
-            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto lg:justify-end">
-              <div className="min-w-0">
-                <div
-                  className="border-border bg-surface-3 inline-flex h-12 w-fit rounded-md border p-1"
-                  role="group"
-                  aria-label="Game mode"
+          <PageHeaderActions className="w-full flex-wrap gap-3 lg:w-auto lg:justify-end">
+            <div className="min-w-0">
+              <div
+                className="border-border bg-surface-3 inline-flex h-12 w-fit rounded-md border p-1"
+                role="group"
+                aria-label="Game mode"
+              >
+                <button
+                  type="button"
+                  onClick={() => void onModeChange("PVP")}
+                  disabled={!isHost || mutating || isInGame}
+                  className={cn(
+                    "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                    lobby.mode === "PVP"
+                      ? "bg-accent text-accent-foreground disabled:opacity-100"
+                      : "text-content-secondary hover:text-content-primary disabled:opacity-50"
+                  )}
+                  aria-pressed={lobby.mode === "PVP"}
                 >
-                  <button
-                    type="button"
-                    onClick={() => void onModeChange("PVP")}
-                    disabled={!isHost || mutating || isInGame}
-                    className={cn(
-                      "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
-                      lobby.mode === "PVP"
-                        ? "bg-accent text-accent-foreground disabled:opacity-100"
-                        : "text-content-secondary hover:text-content-primary disabled:opacity-50"
-                    )}
-                    aria-pressed={lobby.mode === "PVP"}
-                  >
-                    Versus
-                  </button>
-                  <Tooltip
-                    content={
-                      solitaireBlockedReason ??
-                      (!isHost
-                        ? "Only the host can change game mode"
-                        : undefined)
-                    }
-                  >
-                    <span className="h-full">
-                      <button
-                        type="button"
-                        onClick={() => void onModeChange("SOLITAIRE")}
-                        disabled={
-                          !isHost ||
-                          mutating ||
-                          isInGame ||
-                          Boolean(solitaireBlockedReason)
-                        }
-                        className={cn(
-                          "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
-                          lobby.mode === "SOLITAIRE"
-                            ? "bg-accent text-accent-foreground disabled:opacity-100"
-                            : "text-content-secondary hover:text-content-primary disabled:opacity-50"
-                        )}
-                        aria-pressed={lobby.mode === "SOLITAIRE"}
-                        aria-describedby={
-                          solitaireBlockedReason
-                            ? "solitaire-mode-blocked-reason"
-                            : undefined
-                        }
-                      >
-                        Solitaire
-                      </button>
-                    </span>
-                  </Tooltip>
-                </div>
-
-                {solitaireBlockedReason && (
-                  <p
-                    id="solitaire-mode-blocked-reason"
-                    className="text-content-tertiary mt-1 max-w-xs text-xs"
-                  >
-                    {solitaireBlockedReason}
-                  </p>
-                )}
+                  Versus
+                </button>
+                <Tooltip
+                  content={
+                    solitaireBlockedReason ??
+                    (!isHost ? "Only the host can change game mode" : undefined)
+                  }
+                >
+                  <span className="h-full">
+                    <button
+                      type="button"
+                      onClick={() => void onModeChange("SOLITAIRE")}
+                      disabled={
+                        !isHost ||
+                        mutating ||
+                        isInGame ||
+                        Boolean(solitaireBlockedReason)
+                      }
+                      className={cn(
+                        "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
+                        lobby.mode === "SOLITAIRE"
+                          ? "bg-accent text-accent-foreground disabled:opacity-100"
+                          : "text-content-secondary hover:text-content-primary disabled:opacity-50"
+                      )}
+                      aria-pressed={lobby.mode === "SOLITAIRE"}
+                      aria-describedby={
+                        solitaireBlockedReason
+                          ? "solitaire-mode-blocked-reason"
+                          : undefined
+                      }
+                    >
+                      Solitaire
+                    </button>
+                  </span>
+                </Tooltip>
               </div>
 
-              <PartyCode
-                code={lobby.joinCode}
-                copied={copied}
-                onCopy={() => void copyInvite()}
-              />
-              <Tooltip
-                content={
-                  hasActiveMatch
-                    ? "Rejoin your active match before switching parties"
-                    : undefined
-                }
-              >
-                <span>
-                  <JoinPartyDialog
-                    disabled={mutating || starting || closing || hasActiveMatch}
-                    initialCode={initialJoinCode}
-                  />
-                </span>
-              </Tooltip>
+              {solitaireBlockedReason && (
+                <p
+                  id="solitaire-mode-blocked-reason"
+                  className="text-content-tertiary mt-1 max-w-xs text-xs"
+                >
+                  {solitaireBlockedReason}
+                </p>
+              )}
             </div>
-          </div>
-        </header>
 
-        {/* Below `lg` the fixed chrome — a wrapped header above, a stacked
-            action bar below — already spends most of a short viewport, so the
-            content well gives up a spacing step before the seats have to give
-            up a row. */}
+            <PartyCode
+              code={lobby.joinCode}
+              copied={copied}
+              onCopy={() => void copyInvite()}
+            />
+            <Tooltip
+              content={
+                hasActiveMatch
+                  ? "Rejoin your active match before switching parties"
+                  : undefined
+              }
+            >
+              <span>
+                <JoinPartyDialog
+                  disabled={mutating || starting || closing || hasActiveMatch}
+                  initialCode={initialJoinCode}
+                />
+              </span>
+            </Tooltip>
+          </PageHeaderActions>
+        </PageHeader>
+
+        {/* The content well's top padding matches the header's top padding at
+            every height gate, so the header→content gap reads as the same step
+            as the header's own inset instead of doubling it. Below `lg` the
+            fixed chrome — a wrapped header above, a stacked action bar below —
+            already spends most of a short viewport, so the well gives up a
+            step at the bottom before the seats have to give up a row. */}
         <main
-          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-3 lg:py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:py-8"
+          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 pt-4 pb-3 lg:pb-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:pt-8 lg:[@media(min-height:50rem)]:pb-8"
           data-lobby-content
         >
           {joinError && (
@@ -924,20 +932,24 @@ function SpectatorRoom({
       className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden"
       data-lobby-frame
     >
-      <header className="shrink-0" data-lobby-header>
-        <div className="mx-auto max-w-7xl px-6 py-4 lg:[@media(min-height:50rem)]:py-8">
-          <p className="text-gold-600 text-xs font-semibold tracking-widest uppercase">
-            Watching party
-          </p>
-          <h1 className="font-display text-content-primary mt-1 text-3xl">
+      <PageHeader
+        className="shrink-0 pt-4 lg:[@media(min-height:50rem)]:pt-8"
+        data-lobby-header
+      >
+        <PageHeaderContent className="gap-1">
+          <PageHeaderEyebrow>Watching party</PageHeaderEyebrow>
+          <PageHeaderTitle>
             {displayName(lobby.host, "Host")}&apos;s party
-          </h1>
-          <p className="text-content-secondary mt-2 text-sm">{lobby.format}</p>
-        </div>
-      </header>
+          </PageHeaderTitle>
+          <PageHeaderDescription className="mt-1">
+            {lobby.format}
+          </PageHeaderDescription>
+        </PageHeaderContent>
+      </PageHeader>
 
+      {/* Top padding matches the header's at every height gate. */}
       <main
-        className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:py-8"
+        className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:pt-8 lg:[@media(min-height:50rem)]:pb-8"
         data-lobby-content
       >
         <div className="grid min-h-0 gap-4 lg:grid-cols-2 lg:[@media(min-height:50rem)]:gap-6">
@@ -976,11 +988,7 @@ function SpectatorRoom({
         data-lobby-action-bar
       >
         <div className="mx-auto flex max-w-7xl flex-col justify-end gap-3 px-6 py-4 sm:flex-row">
-          <Button
-            size="lg"
-            disabled={stopping}
-            onClick={onStop}
-          >
+          <Button size="lg" disabled={stopping} onClick={onStop}>
             {stopping ? "Stopping..." : "Stop spectating"}
           </Button>
           {activeGameId && (

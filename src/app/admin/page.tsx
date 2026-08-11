@@ -1,5 +1,11 @@
 import { prisma } from "@/lib/db";
 import Link from "next/link";
+import {
+  PageHeader,
+  PageHeaderContent,
+  PageHeaderDescription,
+  PageHeaderTitle,
+} from "@/components/ui/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -25,82 +31,89 @@ export default async function AdminPage() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 py-8">
-      <h1 className="mb-8 font-display text-3xl text-content-primary">
-        Dashboard
-      </h1>
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <PageHeader>
+        <PageHeaderContent>
+          <PageHeaderTitle>Dashboard</PageHeaderTitle>
+          <PageHeaderDescription>
+            Card, variant, and set totals across the database.
+          </PageHeaderDescription>
+        </PageHeaderContent>
+      </PageHeader>
 
-      {/* Stats */}
-      <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatBox label="Cards" value={cardCount} href="/admin/cards" />
-        <StatBox label="Art Variants" value={variantCount} />
-        <StatBox label="Sets" value={setCount.length} href="/admin/sets" />
-        <StatBox label="Blocks" value={blockDistribution.length} />
-      </div>
-
-      {/* Distribution */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-            By Type
-          </h2>
-          <div className="space-y-3">
-            {typeDistribution.map((t) => {
-              const pct = Math.round((t._count / cardCount) * 100);
-              return (
-                <div key={t.type}>
-                  <div className="mb-1 flex items-center justify-between">
-                    <Link
-                      href={`/admin/cards?type=${t.type}`}
-                      className="text-sm font-medium text-content-secondary transition-colors hover:underline"
-                    >
-                      {t.type}
-                    </Link>
-                    <span className="text-sm font-semibold tabular-nums text-content-primary">
-                      {t._count.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      <div className="mx-auto w-full max-w-7xl px-6 py-8">
+        {/* Stats */}
+        <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatBox label="Cards" value={cardCount} href="/admin/cards" />
+          <StatBox label="Art Variants" value={variantCount} />
+          <StatBox label="Sets" value={setCount.length} href="/admin/sets" />
+          <StatBox label="Blocks" value={blockDistribution.length} />
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
-            By Block
-          </h2>
-          <div className="space-y-3">
-            {blockDistribution.map((b) => {
-              const pct = Math.round((b._count / cardCount) * 100);
-              return (
-                <div key={b.blockNumber}>
-                  <div className="mb-1 flex items-center justify-between">
-                    <Link
-                      href={`/admin/cards?block=${b.blockNumber}`}
-                      className="text-sm font-medium text-content-secondary transition-colors hover:underline"
-                    >
-                      Block {b.blockNumber}
-                    </Link>
-                    <span className="text-sm font-semibold tabular-nums text-content-primary">
-                      {b._count.toLocaleString()}
-                    </span>
+        {/* Distribution */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="border-border bg-card rounded-lg border p-5">
+            <h2 className="text-content-tertiary mb-4 text-xs font-semibold tracking-widest uppercase">
+              By Type
+            </h2>
+            <div className="space-y-3">
+              {typeDistribution.map((t) => {
+                const pct = Math.round((t._count / cardCount) * 100);
+                return (
+                  <div key={t.type}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <Link
+                        href={`/admin/cards?type=${t.type}`}
+                        className="text-content-secondary text-sm font-medium transition-colors hover:underline"
+                      >
+                        {t.type}
+                      </Link>
+                      <span className="text-content-primary text-sm font-semibold tabular-nums">
+                        {t._count.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="bg-muted h-1 overflow-hidden rounded-full">
+                      <div
+                        className="bg-primary h-full rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-gold-500 transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-border bg-card rounded-lg border p-5">
+            <h2 className="text-content-tertiary mb-4 text-xs font-semibold tracking-widest uppercase">
+              By Block
+            </h2>
+            <div className="space-y-3">
+              {blockDistribution.map((b) => {
+                const pct = Math.round((b._count / cardCount) * 100);
+                return (
+                  <div key={b.blockNumber}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <Link
+                        href={`/admin/cards?block=${b.blockNumber}`}
+                        className="text-content-secondary text-sm font-medium transition-colors hover:underline"
+                      >
+                        Block {b.blockNumber}
+                      </Link>
+                      <span className="text-content-primary text-sm font-semibold tabular-nums">
+                        {b._count.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="bg-muted h-1 overflow-hidden rounded-full">
+                      <div
+                        className="bg-gold-500 h-full rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -119,12 +132,12 @@ function StatBox({
 }) {
   const content = (
     <div
-      className={`rounded-lg border border-border bg-card p-5 transition-colors ${href ? "cursor-pointer hover:bg-secondary" : ""}`}
+      className={`border-border bg-card rounded-lg border p-5 transition-colors ${href ? "hover:bg-secondary cursor-pointer" : ""}`}
     >
-      <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+      <div className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
         {label}
       </div>
-      <div className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-content-primary">
+      <div className="text-content-primary mt-2 text-3xl font-semibold tracking-tight tabular-nums">
         {value.toLocaleString()}
       </div>
     </div>
