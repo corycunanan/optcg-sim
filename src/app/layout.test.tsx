@@ -87,12 +87,13 @@ describe("RootLayout theme stamping", () => {
 });
 
 describe("RootLayout shell geometry", () => {
-  it("renders the navbar inside the content column beside the social shell", async () => {
+  it("renders the navbar as a full-width band above the content row and social shell", async () => {
     const html = renderToStaticMarkup(
       await RootLayout({ children: <div>content</div> })
     );
     const document = new DOMParser().parseFromString(html, "text/html");
     const appShell = document.querySelector('[data-slot="app-shell"]');
+    const contentRow = document.querySelector('[data-slot="app-content-row"]');
     const contentColumn = document.querySelector(
       '[data-slot="app-content-column"]'
     );
@@ -100,11 +101,18 @@ describe("RootLayout shell geometry", () => {
     const main = document.querySelector("main");
     const socialShell = document.querySelector('[data-testid="social-shell"]');
 
-    expect(contentColumn?.parentElement).toBe(appShell);
-    expect(navbar?.parentElement).toBe(contentColumn);
+    // The navbar is a direct child of the shell, ahead of the row that holds
+    // page content and the friends rail — that is what makes the bar span the
+    // full app width and the rail start beneath it (OPT-649).
+    expect(navbar?.parentElement).toBe(appShell);
+    expect(contentRow?.parentElement).toBe(appShell);
+    expect(navbar?.nextElementSibling).toBe(contentRow);
+    expect(appShell?.className.split(/\s+/)).toContain("flex-col");
+
+    expect(contentColumn?.parentElement).toBe(contentRow);
     expect(main?.parentElement).toBe(contentColumn);
-    expect(socialShell?.parentElement).toBe(appShell);
+    expect(socialShell?.parentElement).toBe(contentRow);
     expect(socialShell?.previousElementSibling).toBe(contentColumn);
-    expect(document.querySelector('[data-slot="app-content-row"]')).toBeNull();
+    expect(contentColumn?.contains(navbar as Node)).toBe(false);
   });
 });

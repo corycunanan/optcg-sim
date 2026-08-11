@@ -70,20 +70,28 @@ export default async function RootLayout({
           <UserChannelProvider>
             <DeckNavigationGuardProvider>
               <SidebarProvider>
+                {/* The navbar is a full-width band above everything; the
+                    friends rail is a column of the row beneath it, so the rail
+                    starts exactly at the bar's lower edge at any width. */}
                 <div
                   data-slot="app-shell"
-                  className="flex h-screen w-full overflow-hidden"
+                  className="flex h-screen w-full flex-col overflow-hidden"
                 >
+                  <Navbar />
                   <div
-                    data-slot="app-content-column"
-                    className="flex min-w-0 flex-1 flex-col"
+                    data-slot="app-content-row"
+                    className="flex min-h-0 min-w-0 flex-1"
                   >
-                    <Navbar />
-                    <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                      {children}
-                    </main>
+                    <div
+                      data-slot="app-content-column"
+                      className="flex min-w-0 flex-1 flex-col"
+                    >
+                      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                        {children}
+                      </main>
+                    </div>
+                    <SocialShell />
                   </div>
-                  <SocialShell />
                 </div>
               </SidebarProvider>
             </DeckNavigationGuardProvider>

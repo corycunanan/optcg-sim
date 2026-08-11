@@ -318,7 +318,12 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
       <Sidebar
         side="right"
         collapsible="none"
-        className="social-rail bg-surface-nav fixed inset-y-0 right-0 z-30 w-[280px] border-l"
+        // The rail hangs below the full-width navbar: `top-navbar` is the
+        // navbar's own height token, so the two cannot drift apart, and z-30
+        // keeps the rail under the nav (z-40) rather than over it. `h-auto`
+        // replaces the primitive's `h-full` so the top/bottom insets — not a
+        // 100vh height that would overhang the viewport — size the rail.
+        className="social-rail bg-surface-nav w-social-rail top-navbar fixed right-0 bottom-0 z-30 h-auto border-l"
       >
         <SidebarHeader className="border-border-accent border-b px-4 py-4">
           <div className="flex items-center justify-between gap-3">

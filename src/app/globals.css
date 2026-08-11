@@ -102,6 +102,15 @@
 
   /* Chrome dimensions */
   --chrome-navbar-actions-width: 7rem;
+  /* The global navbar spans the full app width and the friends rail hangs
+     below it, so the bar's height is shared geometry: the rail's top offset
+     and the navbar's own height must never drift apart. */
+  --chrome-navbar-height: 4rem;
+  /* The friends rail width is read by the rail itself, by the in-flow spacer
+     that reserves its column, by the navbar's right inset (so the capped nav
+     content stays centred on the page content, not the viewport), and by the
+     chat dock's right offset. */
+  --chrome-social-rail-width: 17.5rem;
 
   /* Overlay values */
   --overlay-strong-value: oklch(5% 0.004 260 / 0.76);
@@ -199,6 +208,8 @@
 
   /* Component dimensions */
   --navbar-actions-width: var(--chrome-navbar-actions-width);
+  --navbar-height: var(--chrome-navbar-height);
+  --social-rail-width: var(--chrome-social-rail-width);
 
   /* Overlays */
   --overlay: var(--overlay-strong-value);
@@ -390,6 +401,8 @@
 
   /* Component dimensions */
   --spacing-navbar-actions: var(--navbar-actions-width);
+  --spacing-navbar: var(--navbar-height);
+  --spacing-social-rail: var(--social-rail-width);
 
   /* Semantic */
   --color-success: var(--success);
@@ -554,7 +567,7 @@
 }
 
 .social-chat-dock {
-  right: calc(17.5rem + 1rem);
+  right: calc(var(--social-rail-width) + 1rem);
 }
 
 /* ─── Base Styles ────────────────────────────────────────────── */

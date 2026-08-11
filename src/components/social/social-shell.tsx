@@ -38,7 +38,9 @@ export function SocialShell() {
       <LobbyInviteToasts />
       {!isGame && (
         <>
-          <div className="w-[280px] shrink-0" aria-hidden="true" />
+          {/* In-flow spacer reserving the fixed rail's column. Both read
+              --social-rail-width, so they cannot drift apart. */}
+          <div className="w-social-rail shrink-0" aria-hidden="true" />
           <SocialSidebar onOpenChat={setChatUser} />
           {chatUser && (
             <ChatWidget
