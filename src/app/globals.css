@@ -384,6 +384,10 @@
   --color-border-focus: var(--border-focus);
   --color-border-accent: var(--accent-border);
 
+  /* Soft accent surface — selected chrome that must not spend the full gold
+     fill reserved for the focal action. */
+  --color-accent-soft: var(--accent-soft);
+
   /* Component dimensions */
   --spacing-navbar-actions: var(--navbar-actions-width);
 

@@ -88,11 +88,6 @@ const INLINE_STYLE_FILE_EXEMPTIONS = new Map(
     "src/app/admin/cards/[id]/page.tsx": ["borderLeft"],
     "src/app/admin/cards/new/page.tsx": ["background", "borderColor", "color"],
     "src/app/decks/deck-list-filter.tsx": ["background"],
-    "src/components/cards/card-filters.tsx": [
-      "background",
-      "borderColor",
-      "color",
-    ],
     "src/components/deck-builder/deck-builder-search.tsx": ["background"],
     // Fixed map-art treatments.
     "src/app/page.tsx": ["backgroundImage", "filter"],

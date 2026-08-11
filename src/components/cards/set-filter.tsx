@@ -1,15 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Command,
   CommandInput,
@@ -30,180 +21,58 @@ interface SetFilterProps {
   sets: Set[];
   selectedSets: string[];
   onChange: (sets: string[]) => void;
+  className?: string;
 }
 
-export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
-  const [open, setOpen] = useState(false);
-
-  // draft = in-progress selections while popover is open.
-  // We update draft locally on every click (instant), and only call onChange
-  // (which triggers router.push + Neon query) when the user commits.
-  const [draft, setDraft] = useState<string[]>(selectedSets);
-  const draftRef = useRef(draft);
-  const selectedSetsRef = useRef(selectedSets);
-
-  // Keep refs in sync
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
-  useEffect(() => {
-    selectedSetsRef.current = selectedSets;
-  }, [selectedSets]);
-
-  // Sync draft when selectedSets changes from outside (e.g., "Clear all filters")
-  const selectedSetsKey = selectedSets.join(",");
-  useEffect(() => {
-    queueMicrotask(() => {
-      setDraft(selectedSets);
-      draftRef.current = selectedSets;
-    });
-  }, [selectedSetsKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Commit draft → call onChange only if something actually changed
-  const commit = useCallback(
-    (next: string[]) => {
-      if (next.join(",") !== selectedSetsRef.current.join(",")) {
-        onChange(next);
-      }
-    },
-    [onChange]
-  );
-
-  // Toggle in draft only — no onChange, no navigation
-  const toggleDraft = (label: string) => {
-    setDraft((prev) => {
-      const next = prev.includes(label)
-        ? prev.filter((s) => s !== label)
-        : [...prev, label];
-      draftRef.current = next;
-      return next;
-    });
-  };
-
-  // Badge ✕ and clear-all: apply immediately (explicit single-action removal)
-  const removeOne = (label: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = draft.filter((s) => s !== label);
-    setDraft(next);
-    draftRef.current = next;
-    commit(next);
-  };
-
-  const clearAll = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDraft([]);
-    draftRef.current = [];
-    commit([]);
-  };
-
-  const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen);
-    if (!isOpen) {
-      commit(draftRef.current);
-    }
+/**
+ * Searchable set list. Fully controlled: the filter dialog owns the draft, so
+ * this component never commits anything on its own — it reports toggles and
+ * renders the selection it is given.
+ */
+export function SetFilter({
+  sets,
+  selectedSets,
+  onChange,
+  className,
+}: SetFilterProps) {
+  const toggle = (label: string) => {
+    onChange(
+      selectedSets.includes(label)
+        ? selectedSets.filter((s) => s !== label)
+        : [...selectedSets, label]
+    );
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <div
-          role="button"
-          tabIndex={0}
-          className={cn(
-            "bg-surface-2 flex min-h-9 w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border px-3 py-1 text-left text-sm transition-colors",
-            open
-              ? "border-border-focus ring-border-focus/20 ring-2"
-              : "border-border hover:border-border-strong"
-          )}
-        >
-          {draft.length === 0 ? (
-            <span className="text-content-tertiary py-1">All Sets</span>
-          ) : (
-            draft.map((label) => (
-              <Badge
-                key={label}
-                variant="default"
-                className="border-border-strong bg-surface-interactive text-content-primary gap-1"
+    <Command
+      label="Sets"
+      className={cn("border-border h-auto border", className)}
+    >
+      <CommandInput placeholder="Search sets..." />
+      <CommandList className="max-h-56">
+        <CommandEmpty>No sets match that search.</CommandEmpty>
+        <CommandGroup>
+          {sets.map((s) => {
+            const selected = selectedSets.includes(s.setLabel);
+            return (
+              <CommandItem
+                key={s.packId}
+                value={`${s.setLabel} ${s.setName}`}
+                onSelect={() => toggle(s.setLabel)}
+                className={cn("gap-3", selected && "bg-surface-2")}
               >
-                {label}
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={(e) => removeOne(label, e)}
-                  className="opacity-70 transition-opacity hover:opacity-100"
-                >
-                  <X className="size-3" />
-                </button>
-              </Badge>
-            ))
-          )}
-
-          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
-            {draft.length > 0 && (
-              <button
-                type="button"
-                tabIndex={-1}
-                onClick={clearAll}
-                className="text-content-tertiary hover:text-content-secondary rounded p-1 transition-colors"
-                title="Clear selection"
-              >
-                <X className="size-3" />
-              </button>
-            )}
-            <ChevronDown
-              className={cn(
-                "text-content-tertiary size-3 transition-transform",
-                open && "rotate-180"
-              )}
-            />
-          </span>
-        </div>
-      </PopoverTrigger>
-
-      <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] p-0"
-        align="start"
-      >
-        <Command>
-          <CommandInput placeholder="Search sets..." />
-          <CommandList className="max-h-64">
-            <CommandEmpty>No sets found</CommandEmpty>
-            <CommandGroup>
-              {sets.map((s) => {
-                const selected = draft.includes(s.setLabel);
-                return (
-                  <CommandItem
-                    key={s.packId}
-                    value={`${s.setLabel} ${s.setName}`}
-                    onSelect={() => toggleDraft(s.setLabel)}
-                    className="gap-3"
-                  >
-                    <Checkbox
-                      checked={selected}
-                      className="pointer-events-none"
-                    />
-                    <span className="shrink-0 font-mono text-xs font-semibold">
-                      {s.setLabel}
-                    </span>
-                    <span className="text-content-secondary truncate text-xs">
-                      {s.setName}
-                    </span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-
-          {/* Footer: Apply */}
-          <div className="border-border border-t px-2 py-2">
-            <Button className="w-full" onClick={() => handleOpenChange(false)}>
-              {draft.length === 0
-                ? "Show All Sets"
-                : `Apply ${draft.length} Set${draft.length > 1 ? "s" : ""}`}
-            </Button>
-          </div>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                <Checkbox checked={selected} className="pointer-events-none" />
+                <span className="text-content-primary shrink-0 font-mono text-xs font-semibold">
+                  {s.setLabel}
+                </span>
+                <span className="text-content-secondary truncate text-xs">
+                  {s.setName}
+                </span>
+              </CommandItem>
+            );
+          })}
+        </CommandGroup>
+      </CommandList>
+    </Command>
   );
 }
