@@ -40,7 +40,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/social/user-avatar";
 import { useUserChannelEvents } from "@/components/realtime/user-channel-provider";
 import { DeckPreviewModal } from "./deck-preview-modal";
@@ -725,8 +731,8 @@ export function LobbyRoomShell({
           className="border-border bg-surface-1 sticky bottom-0 z-20 shrink-0 border-t shadow-[var(--shadow-lg)]"
           data-lobby-action-bar
         >
-          <div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-6 py-4 md:flex-row md:items-center">
-            <div className="flex items-center gap-3">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-6 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+            <div className="flex justify-start">
               <SpectatorPill
                 allowSpectators={lobby.allowSpectators}
                 spectatorCount={lobby.spectatorCount}
@@ -738,11 +744,10 @@ export function LobbyRoomShell({
                 onOpenSpectators={handleOpenSpectators}
                 countButtonRef={spectatorCountButtonRef}
               />
-              <p className="text-content-tertiary text-xs">{startHint}</p>
             </div>
 
             <div
-              className="flex flex-col gap-3 lg:flex-row lg:items-center"
+              className="flex justify-start lg:justify-center"
               data-lobby-match-actions
             >
               {activeGameId ? (
@@ -760,6 +765,7 @@ export function LobbyRoomShell({
                   disabled={
                     !canStart || mutating || starting || closing || isInGame
                   }
+                  title={!canStart ? startHint : undefined}
                 >
                   {starting ? (
                     <Loader2
@@ -772,18 +778,25 @@ export function LobbyRoomShell({
                   Start Match
                 </Button>
               )}
+            </div>
 
+            <div className="flex justify-start lg:justify-end">
               <Dialog>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    disabled={settingsDisabled}
-                  >
-                    <Settings data-icon="inline-start" />
-                    Match settings
-                  </Button>
-                </DialogTrigger>
+                <TooltipRoot>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Match settings"
+                        disabled={settingsDisabled}
+                      >
+                        <Settings aria-hidden="true" />
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Match settings</TooltipContent>
+                </TooltipRoot>
                 <DialogContent size="lg">
                   <DialogTitle className="sr-only">Match settings</DialogTitle>
                   <PregameSettings
