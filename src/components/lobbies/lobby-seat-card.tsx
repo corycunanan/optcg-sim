@@ -16,12 +16,38 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChangeDeckModal, type LobbyDeckOption } from "./change-deck-modal";
 
+/** Who this seat speaks for. Solitaire seats are two sides of one player. */
+export type LobbySeatRole = "Host" | "Guest" | "Side 1" | "Side 2";
+
+/**
+ * A seat's readiness state, or `undefined` when the mode has no such concept.
+ *
+ * The four values only ever mean anything together, so they travel together:
+ * a seat either has a readiness group or it does not, and solitaire — where
+ * one player owns both sides and there is nobody to signal to — does not.
+ */
+export type LobbySeatReadiness = {
+  ready: boolean;
+  /** This viewer owns the seat: a toggle rather than a read-only status line. */
+  editable: boolean;
+  disabled: boolean;
+  onChange: (ready: boolean) => void;
+};
+
 /**
  * A seat is four stacked groups on the bare page surface — overflow menu,
  * identity, leader, readiness — with no wrapping panel and no internal
  * dividers. The deck itself is not listed here: the leader card is the door to
  * it (change-deck modal on your own seat, deck preview on the other one), so
  * the seat stays a glance-readable summary of *who* and *what they brought*.
+ *
+ * Readiness is the one optional group. Solitaire drops it — both sides belong
+ * to the same player, so there is no one to declare readiness *to* — and the
+ * seat becomes three groups. Nothing is reserved in its place: an empty slot
+ * would be holding space for a concept the mode does not have. Solitaire
+ * renders the same seat twice, so the two sides stay aligned by construction
+ * in every regime, and the height the group would have cost goes to the leader
+ * art, which is the stack's only flexible member.
  *
  * The lobby frame never scrolls, so the seat has to survive on a height budget
  * it does not control. Two responses, both keyed off the same groups, and both
@@ -54,18 +80,15 @@ export function LobbySeatCard({
   player,
   online,
   deck,
-  ready,
-  readyEditable,
-  readyDisabled,
+  readiness,
   deckEditable,
   decks,
   onDeckChange,
-  onReadyChange,
   onPreview,
   menuItems,
   dimmed = false,
 }: {
-  role: "Host" | "Guest";
+  role: LobbySeatRole;
   player: {
     username: string | null;
     name: string | null;
@@ -74,27 +97,34 @@ export function LobbySeatCard({
   /** Realtime presence for this seat; renders the avatar's green dot. */
   online?: boolean;
   deck: LobbyRoomDeck | null;
-  ready: boolean;
-  readyEditable: boolean;
-  readyDisabled: boolean;
+  /** Omitted in solitaire, where readiness is not a state the mode has. */
+  readiness?: LobbySeatReadiness;
   deckEditable: boolean;
   decks: LobbyDeckOption[];
   onDeckChange: (deckId: string) => void;
-  onReadyChange: (ready: boolean) => void;
   onPreview: (deckId: string) => void;
   /** Extra `DropdownMenuItem`s appended to this seat's overflow menu. */
   menuItems?: ReactNode;
   /**
    * Recedes the seat while the match owns the table. Purely visual — every
-   * mutating control is already gated by `deckEditable` / `readyEditable` /
-   * `readyDisabled`, and suppressing pointer events here would also kill the
-   * read-only affordances (deck preview, the overflow menu) that stay
-   * meaningful mid-match.
+   * mutating control is already gated by `deckEditable` and the readiness
+   * group's own `editable` / `disabled`, and suppressing pointer events here
+   * would also kill the read-only affordances (deck preview, the overflow
+   * menu) that stay meaningful mid-match.
    */
   dimmed?: boolean;
 }) {
   const playerName = displayName(player);
   const [changeDeckOpen, setChangeDeckOpen] = useState(false);
+  // Without the readiness row the compact grid is two rows, not three. The art
+  // and caption have to stop reaching for a third line that no longer exists,
+  // or the seat pays a trailing `gap-y-3` for an empty row.
+  const compactArtRows = readiness
+    ? "row-end-4 @min-[26rem]:row-end-3"
+    : "row-end-3";
+  const compactCaptionColumns = readiness
+    ? "col-end-4 @min-[26rem]:col-end-3"
+    : "col-end-4";
 
   return (
     <section
@@ -162,13 +192,13 @@ export function LobbySeatCard({
           deckEditable={deckEditable}
           onChangeDeck={() => setChangeDeckOpen(true)}
           onPreview={onPreview}
-          className="col-start-1 row-start-1 row-end-4 @min-[26rem]:row-end-3"
+          className={cn("col-start-1 row-start-1", compactArtRows)}
         />
 
         <LeaderCaption
           deck={deck}
           deckEditable={deckEditable}
-          className="col-start-2 col-end-4 row-start-2 @min-[26rem]:col-end-3"
+          className={cn("col-start-2 row-start-2", compactCaptionColumns)}
         />
       </div>
 
@@ -176,13 +206,15 @@ export function LobbySeatCard({
           identity cannot share 20rem without one of them disappearing. Past
           26rem it moves up beside the caption, under the overflow menu it now
           shares a column edge with, and the strip loses a whole row. */}
-      <ReadyControl
-        ready={ready}
-        editable={readyEditable}
-        disabled={readyDisabled}
-        onChange={onReadyChange}
-        className="col-start-2 col-end-4 row-start-3 justify-self-start @min-[26rem]:col-start-3 @min-[26rem]:row-start-2 @min-[26rem]:justify-self-end"
-      />
+      {readiness && (
+        <ReadyControl
+          ready={readiness.ready}
+          editable={readiness.editable}
+          disabled={readiness.disabled}
+          onChange={readiness.onChange}
+          className="col-start-2 col-end-4 row-start-3 justify-self-start @min-[26rem]:col-start-3 @min-[26rem]:row-start-2 @min-[26rem]:justify-self-end"
+        />
+      )}
 
       {deckEditable && (
         <ChangeDeckModal

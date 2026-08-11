@@ -66,25 +66,43 @@ const deckOptions = [
   },
 ];
 
-function renderSeat(
-  overrides: Partial<Parameters<typeof LobbySeatCard>[0]> = {}
-) {
-  const props = {
+type SeatProps = Parameters<typeof LobbySeatCard>[0];
+type Readiness = NonNullable<SeatProps["readiness"]>;
+
+/**
+ * `readiness` is spread over a ready PVP default so cases can name only the
+ * bit they care about. `readiness: null` is the solitaire shape — the seat
+ * renders without the group at all.
+ */
+function renderSeat({
+  readiness,
+  ...overrides
+}: Partial<Omit<SeatProps, "readiness">> & {
+  readiness?: Partial<Readiness> | null;
+} = {}) {
+  const onReadyChange = vi.fn();
+  const props: SeatProps = {
     role: "Host" as const,
     player: { username: "strawhat", name: "Luffy", image: null },
     deck,
-    ready: true,
-    readyEditable: false,
-    readyDisabled: false,
+    readiness:
+      readiness === null
+        ? undefined
+        : {
+            ready: true,
+            editable: false,
+            disabled: false,
+            onChange: onReadyChange,
+            ...readiness,
+          },
     deckEditable: false,
     decks: deckOptions,
     onDeckChange: vi.fn(),
-    onReadyChange: vi.fn(),
     onPreview: vi.fn(),
     ...overrides,
   };
   render(<LobbySeatCard {...props} />);
-  return props;
+  return { ...props, onReadyChange };
 }
 
 async function openSeatMenu(user: ReturnType<typeof userEvent.setup>) {
@@ -228,7 +246,7 @@ afterEach(() => cleanup());
 
 describe("LobbySeatCard composition", () => {
   it("stacks menu, identity, leader, and readiness in that order", () => {
-    renderSeat({ deckEditable: true, readyEditable: true });
+    renderSeat({ deckEditable: true, readiness: { editable: true } });
 
     const menu = screen.getByRole("button", { name: /More actions for/ });
     const name = screen.getByRole("heading", { name: "strawhat" });
@@ -286,7 +304,7 @@ describe("LobbySeatCard composition", () => {
   });
 
   it("places the compact grid with end lines, never span shorthands", () => {
-    renderSeat({ deckEditable: true, readyEditable: true });
+    renderSeat({ deckEditable: true, readiness: { editable: true } });
 
     // `row-span-*`/`col-span-*` compile to the `grid-row`/`grid-column`
     // shorthand, which resets the start line. A span declared inside the
@@ -314,7 +332,7 @@ describe("LobbySeatCard composition", () => {
   });
 
   it("reserves rounded-full for people and status dots, not chrome", () => {
-    renderSeat({ readyEditable: true, deckEditable: true });
+    renderSeat({ readiness: { editable: true }, deckEditable: true });
 
     const pills = [...seatSection().querySelectorAll("*")].filter((node) =>
       node.className.toString().split(/\s+/).includes("rounded-full")
@@ -373,7 +391,7 @@ describe("LobbySeatCard composition", () => {
   });
 
   it("re-flows the seat without disturbing its reading order", () => {
-    renderSeat({ deckEditable: true, readyEditable: true });
+    renderSeat({ deckEditable: true, readiness: { editable: true } });
 
     // Placement only: the grid moves the groups into a row below `lg` while
     // the DOM stays in the order the stacked layout paints, and the placement
@@ -400,7 +418,7 @@ describe("LobbySeatCard composition", () => {
   });
 
   it("cannot be squeezed shorter than the rows it just laid out", () => {
-    renderSeat({ deckEditable: true, readyEditable: true });
+    renderSeat({ deckEditable: true, readiness: { editable: true } });
 
     // The seats column is a flex column on a height budget below `lg`. A
     // shrinkable seat is handed a box shorter than its own content and paints
@@ -409,7 +427,7 @@ describe("LobbySeatCard composition", () => {
   });
 
   it("folds readiness up beside the caption on its own width, not the viewport's", () => {
-    renderSeat({ deckEditable: true, readyEditable: true });
+    renderSeat({ deckEditable: true, readiness: { editable: true } });
 
     // A fixed 280px social rail sits on every page, so viewport width says
     // nothing about how much room this seat got. The seat is its own query
@@ -481,7 +499,7 @@ describe("LobbySeatCard readiness", () => {
   ])(
     "renders a ready-up button carrying the status dot (ready=%s)",
     (ready, label, dotClass) => {
-      renderSeat({ ready, readyEditable: true });
+      renderSeat({ readiness: { ready, editable: true } });
 
       const button = screen.getByRole("button", { name: label });
       expect(button.getAttribute("aria-pressed")).toBe(String(ready));
@@ -497,7 +515,7 @@ describe("LobbySeatCard readiness", () => {
 
   it("toggles readiness for the seat owner", async () => {
     const user = userEvent.setup();
-    const props = renderSeat({ ready: false, readyEditable: true });
+    const props = renderSeat({ readiness: { ready: false, editable: true } });
 
     await user.click(screen.getByRole("button", { name: "Ready up" }));
 
@@ -506,7 +524,7 @@ describe("LobbySeatCard readiness", () => {
 
   it("toggles readiness back off from the ready state", async () => {
     const user = userEvent.setup();
-    const props = renderSeat({ ready: true, readyEditable: true });
+    const props = renderSeat({ readiness: { ready: true, editable: true } });
 
     await user.click(screen.getByRole("button", { name: "Ready" }));
 
@@ -516,9 +534,7 @@ describe("LobbySeatCard readiness", () => {
   it("blocks the toggle while the seat cannot act", async () => {
     const user = userEvent.setup();
     const props = renderSeat({
-      ready: false,
-      readyEditable: true,
-      readyDisabled: true,
+      readiness: { ready: false, editable: true, disabled: true },
     });
 
     const button = screen.getByRole("button", { name: "Ready up" });
@@ -534,7 +550,7 @@ describe("LobbySeatCard readiness", () => {
   ])(
     "reads the other seat's readiness as status, not a control (ready=%s)",
     (ready, label) => {
-      renderSeat({ ready, readyEditable: false });
+      renderSeat({ readiness: { ready, editable: false } });
 
       expect(screen.queryByRole("button", { name: /Ready/ })).toBeNull();
       const status = screen.getByText(label);
@@ -542,6 +558,72 @@ describe("LobbySeatCard readiness", () => {
       expect(status.className).toContain("uppercase");
     }
   );
+});
+
+describe("LobbySeatCard without readiness", () => {
+  it("drops the readiness group entirely rather than reserving its slot", () => {
+    renderSeat({ role: "Side 1", deckEditable: true, readiness: null });
+
+    // No control and no status line: solitaire has nobody to declare
+    // readiness to, so the seat does not hold space for the idea either.
+    expect(screen.queryByRole("button", { name: /Ready/ })).toBeNull();
+    expect(screen.queryByText("Not ready")).toBeNull();
+    const section = seatSection();
+    expect(section.querySelector("[data-seat-ready-status]")).toBeNull();
+    // Menu, identity, leader group — three, where a PVP seat has four.
+    expect(section.children).toHaveLength(3);
+  });
+
+  it("stops the art and caption reaching for a row that no longer exists", () => {
+    renderSeat({ role: "Side 1", deckEditable: true, readiness: null });
+
+    // The compact grid is two rows now. Reaching to line 4 would leave the
+    // seat paying a trailing `gap-y-3` for an empty third row, and the two
+    // sides sit in a `lg:auto-rows-fr` pair where that shows up as drift.
+    const leader = screen.getByRole("button", { name: /Change deck/ });
+    expect(leader.className).toContain("row-end-3");
+    expect(leader.className).not.toContain("row-end-4");
+    expect(leader.className).not.toContain("@min-[26rem]:row-end-3");
+
+    const caption = screen.getByText("Leader").parentElement;
+    expect(caption?.className).toContain("col-end-4");
+    expect(caption?.className).not.toContain("@min-[26rem]:col-end-3");
+  });
+
+  it("keeps both solitaire sides structurally identical", () => {
+    const side = (role: "Side 1" | "Side 2") => {
+      renderSeat({ role, deckEditable: true, readiness: null });
+      const section = seatSection();
+      const shape = {
+        label: section.getAttribute("aria-label"),
+        className: section.className,
+        children: [...section.children].map((child) => child.className),
+      };
+      cleanup();
+      return shape;
+    };
+
+    const one = side("Side 1");
+    const two = side("Side 2");
+
+    expect(one.className).toBe(two.className);
+    expect(one.children).toEqual(two.children);
+    expect(one.label).toBe("Side 1 seat — strawhat");
+    expect(two.label).toBe("Side 2 seat — strawhat");
+  });
+
+  it("keeps the deck affordances the seat is now the only route to", async () => {
+    const user = userEvent.setup();
+    renderSeat({ role: "Side 2", deckEditable: true, readiness: null });
+
+    expect(screen.getByText("Side 2")).toBeDefined();
+    await user.click(
+      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
+    );
+
+    expect(await screen.findByRole("dialog")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Change deck" })).toBeDefined();
+  });
 });
 
 describe("LobbySeatCard overflow menu", () => {
@@ -628,7 +710,7 @@ describe("LobbySeatCard overflow menu", () => {
     const withoutMenu = seatSection().children.length;
     cleanup();
 
-    renderSeat({ deckEditable: true, readyEditable: true });
+    renderSeat({ deckEditable: true, readiness: { editable: true } });
     expect(seatSection().children).toHaveLength(withoutMenu);
   });
 });
