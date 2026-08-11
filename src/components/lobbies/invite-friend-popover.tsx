@@ -97,7 +97,7 @@ export function InviteFriendPopover({
         {triggerVariant === "open-seat" ? (
           <Button
             type="button"
-            variant="ghost"
+            variant="default"
             size="icon"
             aria-label="Invite a friend"
             className="size-16 rounded"

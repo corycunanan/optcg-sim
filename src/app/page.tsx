@@ -35,7 +35,12 @@ export default async function Home() {
 
       {/* Bottom right — single CTA */}
       <div className="relative z-10 mt-auto ml-auto">
-        <Button variant="gold" size="lg" asChild className="px-12">
+        <Button
+          variant="gold"
+          size="lg"
+          asChild
+          className="btn-ornamental px-12 [--btn-ornamental-color:var(--accent)] hover:[--btn-ornamental-color:var(--accent-hover)]"
+        >
           <Link href={session ? "/lobbies" : "/login"}>Play Now</Link>
         </Button>
       </div>
