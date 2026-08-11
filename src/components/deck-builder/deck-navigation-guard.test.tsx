@@ -730,8 +730,8 @@ describe("deck builder navigation guard", () => {
 
     const links = renderer!.root.findAllByType("a");
     expect(links.map((link) => link.props.href)).toEqual([
-      "/lobbies",
       "/",
+      "/lobbies",
       "/decks",
       "/decks/new",
       "/cards",
@@ -759,8 +759,8 @@ describe("deck builder navigation guard", () => {
 
     const links = renderer!.root.findAllByType("a");
     expect(links.map((link) => link.props.href)).toEqual([
-      "/lobbies",
       "/",
+      "/lobbies",
       "/decks",
       "/decks/new",
       "/cards",
