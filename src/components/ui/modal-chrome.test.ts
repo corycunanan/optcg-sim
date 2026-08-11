@@ -27,7 +27,7 @@ describe("modal chrome contracts", () => {
   it("keeps command radii on scale without important overrides", () => {
     const source = readComponent("command.tsx");
 
-    expect(source).not.toContain("rounded-xl");
-    expect(source).not.toMatch(/rounded-[^\s\"]+!/);
+    expect(source).not.toContain(["rounded", "xl"].join("-"));
+    expect(source).not.toMatch(new RegExp("rounded-" + "[^\\s\\\"]+!"));
   });
 });

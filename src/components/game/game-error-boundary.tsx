@@ -27,7 +27,10 @@ export class GameErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="flex h-full w-full items-center justify-center bg-gb-board">
-          <Card className="max-w-[400px] w-full bg-gb-surface border-gb-border-strong text-center mx-4">
+          <Card
+            className="mx-4 w-full max-w-[400px]"
+            surfaceClassName="bg-gb-surface text-center"
+          >
             <CardHeader>
               <CardTitle className="text-xs font-semibold text-gb-text-subtle tracking-widest">
                 RENDERING ERROR

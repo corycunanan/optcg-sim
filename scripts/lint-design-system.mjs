@@ -36,6 +36,13 @@ const ALLOWED_SPACING_STEPS = new Set([
 // exemptions; add a design-system token instead of extending this list.
 const SPACING_EXEMPT_PATH_PREFIXES = ["src/components/ui/"];
 
+// Radius is not vendored-policy-exempt: the sanctioned rounded/rounded-md/
+// rounded-lg scale applies to every component, including src/components/ui/.
+// `rounded-none` remains available as a reset, and `rounded-full` is governed
+// by semantic review because source-text lint cannot identify people imagery.
+// Do not add a radius path allowlist; migrate a component to the nearest scale
+// step or document a deliberately separate shape vocabulary instead.
+
 // Inline styles are reserved for values Tailwind cannot know at build time:
 // measured geometry, board coordinates, and animation transforms. Visual design
 // properties fail unless an exact file/property pair is documented below.
@@ -185,6 +192,13 @@ const RULES = [
     regex: /\[(?:[-\w]+:)?(?:#[0-9a-f]{3,8}|oklch\([^\]\r\n]+\))\]/gi,
     describe: (match) =>
       `raw color ${JSON.stringify(match[0])}; define a token in src/app/globals.css`,
+  },
+  {
+    name: "border-radius",
+    regex:
+      /(?<![\w-])rounded(?:-[trbl](?:-[se])?)?-(?:xs|sm|xl|2xl|3xl|\[[^\]\r\n]+\])/g,
+    describe: (match) =>
+      `off-scale radius ${JSON.stringify(match[0])}; use rounded/rounded-md/rounded-lg or an approved shape primitive`,
   },
 ];
 const SPACING_RE =

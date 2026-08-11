@@ -16,7 +16,10 @@ export default function AdminError({
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <Card className="max-w-[400px] w-full text-center">
+      <Card
+        className="w-full max-w-[400px]"
+        surfaceClassName="text-center"
+      >
         <CardHeader>
           <CardTitle className="text-xs font-semibold text-content-secondary tracking-widest">
             ADMIN ERROR
