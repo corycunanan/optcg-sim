@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiGet } from "@/lib/api-client";
 import { CsrfTokenResponseSchema } from "@/lib/validators/auth";
 import { ApiError } from "@/lib/api-client";
+import { Button } from "@/components/ui/button";
 import { AuthUnavailableAlert } from "./auth-unavailable-alert";
 
 /**
@@ -78,19 +79,10 @@ export function GoogleSignInButton({ callbackUrl }: { callbackUrl: string }) {
       )}
       <input type="hidden" name="csrfToken" value={csrfToken} />
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
-      <button
-        type="submit"
-        disabled={!csrfToken}
-        className="flex w-full items-center justify-center gap-3 rounded px-4 py-3 text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-50"
-        style={{
-          background: "var(--surface-raised)",
-          border: "1px solid var(--border-subtle)",
-          color: "var(--text-primary)",
-        }}
-      >
+      <Button type="submit" size="lg" disabled={!csrfToken} className="w-full">
         <GoogleIcon />
         Continue with Google
-      </button>
+      </Button>
     </form>
   );
 }

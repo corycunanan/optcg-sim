@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { CardColumns } from "@/components/home/CardColumns";
+import { Button } from "@/components/ui/button";
 
 export default async function Home() {
   const session = await auth();
@@ -34,12 +35,9 @@ export default async function Home() {
 
       {/* Bottom right — single CTA */}
       <div className="relative z-10 mt-auto ml-auto">
-        <Link
-          href={session ? "/lobbies" : "/login"}
-          className="btn-ornamental inline-block rounded-md bg-gold-500 px-12 py-5 text-xl font-semibold text-navy-900 transition-colors hover:bg-gold-400 [--btn-ornamental-color:var(--accent)] hover:[--btn-ornamental-color:var(--accent-hover)]"
-        >
-          Play Now
-        </Link>
+        <Button variant="gold" size="lg" asChild className="px-12">
+          <Link href={session ? "/lobbies" : "/login"}>Play Now</Link>
+        </Button>
       </div>
     </main>
   );

@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { SLEEVE_OPTIONS } from "@/lib/deck-builder/customization";
+import { CustomizationPicker } from "./customization-picker";
 
 interface SleevePickerProps {
   selectedUrl: string | null;
@@ -10,49 +10,14 @@ interface SleevePickerProps {
 
 export function SleevePicker({ selectedUrl, onSelect }: SleevePickerProps) {
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <h3 className="text-content-primary text-sm font-semibold tracking-widest uppercase">
-        Card Sleeves
-      </h3>
-      <div className="grid grid-cols-3 gap-3">
-        <button
-          type="button"
-          aria-label="Use default card sleeve"
-          aria-pressed={selectedUrl === null}
-          onClick={() => onSelect(null)}
-          className={cn(
-            "bg-card text-content-secondary aspect-card focus-visible:ring-border-focus flex items-center justify-center overflow-hidden rounded-md border-2 text-xs font-semibold tracking-widest uppercase transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-            selectedUrl === null
-              ? "border-border-focus ring-border-focus ring-2"
-              : "border-border hover:border-content-tertiary"
-          )}
-        >
-          Default
-        </button>
-        {SLEEVE_OPTIONS.map((option, index) => (
-          <button
-            key={option.imageUrl}
-            type="button"
-            aria-label={`Use card sleeve option ${index + 1}`}
-            aria-pressed={selectedUrl === option.imageUrl}
-            onClick={() => onSelect(option.imageUrl)}
-            className={cn(
-              "aspect-card focus-visible:ring-border-focus overflow-hidden rounded-md border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-              selectedUrl === option.imageUrl
-                ? "border-border-focus ring-border-focus ring-2"
-                : "border-border hover:border-content-tertiary"
-            )}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={option.imageUrl}
-              alt="Sleeve design"
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
-          </button>
-        ))}
-      </div>
-    </div>
+    <CustomizationPicker
+      heading="Card Sleeves"
+      defaultLabel="Default"
+      defaultAriaLabel="Use default card sleeve"
+      optionAriaLabel={(index) => `Use card sleeve option ${index + 1}`}
+      options={SLEEVE_OPTIONS}
+      selectedUrl={selectedUrl}
+      onSelect={onSelect}
+    />
   );
 }

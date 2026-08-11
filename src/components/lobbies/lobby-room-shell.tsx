@@ -1161,15 +1161,16 @@ function SpectatorPill({
         </span>
       )}
 
-      <button
+      <Button
         ref={countButtonRef}
         type="button"
+        size="icon-sm"
         aria-label={`View spectators (${spectatorCount})`}
         onClick={onOpenSpectators}
-        className="border-border bg-surface-1 text-content-primary hover:border-border-strong focus-visible:ring-border-focus inline-flex size-8 shrink-0 items-center justify-center rounded border text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="shrink-0"
       >
         {spectatorCount}
-      </button>
+      </Button>
     </div>
   );
 }

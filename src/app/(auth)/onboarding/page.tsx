@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui";
+import { Button, Label } from "@/components/ui";
 import { apiPost } from "@/lib/api-client";
 import { SetUsernameResponseSchema } from "@/lib/validators/user";
 
@@ -99,13 +99,14 @@ export default function OnboardingPage() {
               </p>
             </div>
 
-            <button
+            <Button
               type="submit"
+              size="lg"
               disabled={saving || !username.trim()}
-              className="bg-primary text-primary-foreground hover:bg-gold-400 w-full rounded px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98] disabled:opacity-50"
+              className="w-full"
             >
               {saving ? "Setting up…" : "Set Username"}
-            </button>
+            </Button>
           </form>
         </div>
       </div>

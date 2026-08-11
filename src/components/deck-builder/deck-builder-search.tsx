@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { DeckCardEntry, DeckLeaderEntry } from "@/lib/deck-builder/state";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { DeckBuilderCardModal } from "./deck-builder-card-modal";
 import { cn } from "@/lib/utils";
 import { apiGet } from "@/lib/api-client";
@@ -267,7 +268,14 @@ export function DeckBuilderSearch({
               </p>
               <button
                 onClick={() =>
-                  fetchCards(query, page, activeColors, activeType, costMin, costMax)
+                  fetchCards(
+                    query,
+                    page,
+                    activeColors,
+                    activeType,
+                    costMin,
+                    costMax
+                  )
                 }
                 className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary mt-4 rounded border px-3 py-1 text-xs font-medium transition-colors"
               >
@@ -275,16 +283,17 @@ export function DeckBuilderSearch({
               </button>
             </div>
           )}
-          {!queryTooShort && !loadFailed && !isLoading && results.length === 0 && (
-            <div className="py-10 text-center">
-              <p className="text-content-tertiary text-sm">
-                No cards match
-              </p>
-              <p className="text-content-tertiary mt-1 text-xs">
-                Try a different search or clear some filters.
-              </p>
-            </div>
-          )}
+          {!queryTooShort &&
+            !loadFailed &&
+            !isLoading &&
+            results.length === 0 && (
+              <div className="py-10 text-center">
+                <p className="text-content-tertiary text-sm">No cards match</p>
+                <p className="text-content-tertiary mt-1 text-xs">
+                  Try a different search or clear some filters.
+                </p>
+              </div>
+            )}
           <TooltipProvider delayDuration={200} disableHoverableContent>
             <div className="grid grid-cols-3 gap-2">
               {results.map((card) => {
@@ -371,25 +380,29 @@ export function DeckBuilderSearch({
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="mt-3 flex items-center justify-center gap-1">
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 aria-label="Previous page"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="border-border text-content-secondary hover:bg-secondary flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
               >
                 ←
-              </button>
+              </Button>
               <span className="text-content-tertiary px-2 text-xs tabular-nums">
                 {page} / {totalPages}
               </span>
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
                 aria-label="Next page"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="border-border text-content-secondary hover:bg-secondary flex h-9 w-9 items-center justify-center rounded border text-sm transition-colors disabled:opacity-30"
               >
                 →
-              </button>
+              </Button>
             </div>
           )}
         </div>

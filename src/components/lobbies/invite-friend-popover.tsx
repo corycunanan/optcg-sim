@@ -95,13 +95,15 @@ export function InviteFriendPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {triggerVariant === "open-seat" ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Invite a friend"
-            className="bg-gold-500 text-navy-900 hover:bg-gold-400 focus-visible:ring-border-focus flex size-16 items-center justify-center rounded transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="size-16 rounded"
           >
-            <Plus className="size-6" aria-hidden="true" />
-          </button>
+            <Plus aria-hidden="true" />
+          </Button>
         ) : (
           <Button variant="ghost" className="group">
             <span className="bg-gold-500 text-navy-900 group-hover:bg-gold-400 flex size-8 items-center justify-center rounded transition-colors">

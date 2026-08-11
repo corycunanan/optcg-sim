@@ -13,6 +13,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
   TooltipContent,
+  Button,
 } from "@/components/ui";
 
 interface DeckBuilderListProps {
@@ -188,26 +189,30 @@ export function DeckBuilderList({
                   {/* Quantity controls — below the stack */}
                   {!group.isLeader && (
                     <div className="mt-2 flex items-center gap-1">
-                      <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
                         aria-label="Remove one"
                         onClick={() => onDecrement(group.cardId)}
-                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-semibold transition-colors"
                       >
                         −
-                      </button>
+                      </Button>
                       <span className="text-content-primary min-w-4 text-center text-xs font-semibold tabular-nums">
                         {group.count}
                       </span>
-                      <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
                         aria-label="Add one"
                         onClick={() => onIncrement(group.cardId)}
                         disabled={
                           group.count >= group.copyLimit || totalCards >= 50
                         }
-                        className="text-content-tertiary hover:bg-secondary hover:text-content-primary flex h-5 w-5 items-center justify-center rounded text-xs font-semibold transition-colors disabled:opacity-30"
                       >
                         +
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
