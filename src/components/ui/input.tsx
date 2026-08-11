@@ -13,7 +13,7 @@ function Input({
       type={type}
       data-slot="input"
       className={cn(
-        "h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-content-primary transition-colors outline-none placeholder:text-content-tertiary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        "h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-content-primary transition-colors placeholder:text-content-tertiary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
         error && "border-error",
         className
       )}
