@@ -131,7 +131,7 @@ export function LobbySeatCard({
       </div>
 
       <div
-        className="col-start-1 row-span-3 row-start-1 flex min-h-0 flex-col gap-3 lg:flex-1 lg:min-h-0"
+        className="max-lg:contents lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3"
         data-leader-art-caption-group
       >
         <LeaderArt
@@ -139,9 +139,14 @@ export function LobbySeatCard({
           deckEditable={deckEditable}
           onChangeDeck={() => setChangeDeckOpen(true)}
           onPreview={onPreview}
+          className="col-start-1 row-span-3 row-start-1"
         />
 
-        <LeaderCaption deck={deck} deckEditable={deckEditable} />
+        <LeaderCaption
+          deck={deck}
+          deckEditable={deckEditable}
+          className="col-span-2 col-start-2 row-start-2"
+        />
       </div>
 
       <ReadyControl

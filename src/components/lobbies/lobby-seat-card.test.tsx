@@ -257,18 +257,32 @@ describe("LobbySeatCard composition", () => {
     expect(section.querySelector("header")).toBeNull();
   });
 
-  it("keeps the leader caption inside its gap-3 art group", () => {
+  it("dissolves the gap-3 art group below lg so its children keep grid placement", () => {
     renderSeat();
 
     const section = seatSection();
     const group = section.querySelector("[data-leader-art-caption-group]");
+    const leader = screen.getByRole("button", {
+      name: "Preview Straw Hat Rush",
+    });
     const caption = screen.getByText("Leader").parentElement;
 
     expect(group).not.toBeNull();
-    expect(group?.classList).toContain("gap-3");
+    expect(group?.classList).toContain("max-lg:contents");
+    expect(group?.classList).toContain("lg:flex");
+    expect(group?.classList).toContain("lg:min-h-0");
+    expect(group?.classList).toContain("lg:flex-1");
+    expect(group?.classList).toContain("lg:flex-col");
+    expect(group?.classList).toContain("lg:gap-3");
     expect(group?.contains(caption)).toBe(true);
     expect(caption?.parentElement).toBe(group);
     expect(caption?.parentElement).not.toBe(section);
+    expect(leader.classList).toContain("col-start-1");
+    expect(leader.classList).toContain("row-span-3");
+    expect(leader.classList).toContain("row-start-1");
+    expect(caption?.classList).toContain("col-span-2");
+    expect(caption?.classList).toContain("col-start-2");
+    expect(caption?.classList).toContain("row-start-2");
   });
 
   it("keeps the deck list out of the seat", () => {
@@ -345,11 +359,14 @@ describe("LobbySeatCard composition", () => {
     expect(
       screen.getByRole("button", { name: /More actions for/ }).className
     ).toContain("col-start-3");
-    const leaderGroup = section.querySelector(
-      "[data-leader-art-caption-group]"
-    );
-    expect(leaderGroup?.className).toContain("col-start-1");
-    expect(leaderGroup?.className).toContain("row-start-1");
+    const leader = screen.getByRole("button", { name: /Change deck/ });
+    expect(leader.className).toContain("col-start-1");
+    expect(leader.className).toContain("row-span-3");
+    expect(leader.className).toContain("row-start-1");
+    const caption = screen.getByText("Leader").parentElement;
+    expect(caption?.className).toContain("col-span-2");
+    expect(caption?.className).toContain("col-start-2");
+    expect(caption?.className).toContain("row-start-2");
     expect(
       screen.getByRole("button", { name: /Ready/ }).className
     ).toContain("row-start-3");
