@@ -69,7 +69,7 @@ export function CardGrid({ cards, onCardClick }: CardGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
       {cards.map((card) => (
         <CardGridItem key={card.id} card={card} onCardClick={onCardClick} />
       ))}
@@ -79,7 +79,7 @@ export function CardGrid({ cards, onCardClick }: CardGridProps) {
 
 export function CardGridSkeleton({ count = 20 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="bg-surface-1 overflow-hidden rounded-lg">
           <Skeleton className="aspect-card w-full rounded-none" />

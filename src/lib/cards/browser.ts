@@ -10,6 +10,7 @@ import {
   parseCardBrowserPage,
 } from "@/lib/cards/browser-params";
 import { CARD_BROWSER_SELECT } from "@/lib/cards/card-select";
+import { getLatestBoosterSet } from "@/lib/cards/latest-set";
 import type { CardBrowserProps } from "@/components/cards/card-browser";
 
 export type CardBrowserSearchParams = Record<
@@ -51,7 +52,7 @@ export async function getCardBrowserData(
     browseAllSets || q || color || type || set || block || originOnly;
   const effectiveSet = browseAllSets
     ? ""
-    : set || (!hasAnyFilter ? "OP15-EB04" : "");
+    : set || (!hasAnyFilter ? await getLatestBoosterSet() : "");
   const where: Prisma.CardWhereInput = {};
 
   if (q) {

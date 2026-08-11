@@ -4,6 +4,7 @@ import { CARD_BROWSER_SELECT } from "./card-select";
 const cardFindManyMock = vi.fn();
 const cardCountMock = vi.fn();
 const setFindManyMock = vi.fn();
+const setFindFirstMock = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -13,6 +14,7 @@ vi.mock("@/lib/db", () => ({
     },
     cardSet: {
       findMany: (...args: unknown[]) => setFindManyMock(...args),
+      findFirst: (...args: unknown[]) => setFindFirstMock(...args),
     },
   },
 }));
@@ -23,13 +25,24 @@ beforeEach(() => {
   cardFindManyMock.mockReset();
   cardCountMock.mockReset();
   setFindManyMock.mockReset();
+  setFindFirstMock.mockReset();
 
   cardFindManyMock.mockResolvedValue([]);
   cardCountMock.mockResolvedValue(45);
   setFindManyMock.mockResolvedValue([]);
+  setFindFirstMock.mockResolvedValue({ setLabel: "OP16" });
 });
 
 describe("getCardBrowserData", () => {
+  it("defaults an unfiltered browser to the latest booster set", async () => {
+    const data = await getCardBrowserData({});
+
+    expect(data.currentFilters.set).toBe("OP16");
+    expect(cardCountMock).toHaveBeenCalledWith({
+      where: { cardSets: { some: { setLabel: "OP16" } } },
+    });
+  });
+
   it.each(["0", "-1", "abc", "1.5"])(
     "defaults invalid page %s to the first page",
     async (requestedPage) => {
