@@ -79,6 +79,42 @@
       "minimum": 4.5
     },
     {
+      "name": "white-on-card-red",
+      "foreground": "--text-inverse",
+      "background": "--card-red",
+      "minimum": 4.5
+    },
+    {
+      "name": "white-on-card-blue",
+      "foreground": "--text-inverse",
+      "background": "--card-blue",
+      "minimum": 4.5
+    },
+    {
+      "name": "white-on-card-green",
+      "foreground": "--text-inverse",
+      "background": "--card-green",
+      "minimum": 4.5
+    },
+    {
+      "name": "white-on-card-purple",
+      "foreground": "--text-inverse",
+      "background": "--card-purple",
+      "minimum": 4.5
+    },
+    {
+      "name": "white-on-card-black",
+      "foreground": "--text-inverse",
+      "background": "--card-black",
+      "minimum": 4.5
+    },
+    {
+      "name": "card-yellow-fg-on-card-yellow",
+      "foreground": "--card-yellow-fg",
+      "background": "--card-yellow",
+      "minimum": 4.5
+    },
+    {
       "name": "gold-text/page",
       "foreground": "--accent-text",
       "background": "--surface-page",

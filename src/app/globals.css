@@ -352,6 +352,7 @@
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-inset);
   --color-surface-info: var(--surface-info);
+  --color-surface-interactive: var(--surface-interactive);
 
   /* Legacy utility names routed through semantic roles */
   --color-navy-900: var(--accent-fg);
@@ -405,6 +406,7 @@
   --color-card-purple: var(--card-purple);
   --color-card-black: var(--card-black);
   --color-card-yellow: var(--card-yellow);
+  --color-card-yellow-fg: var(--card-yellow-fg);
 
   /* Shadows */
   --shadow-sm: var(--shadow-sm);
