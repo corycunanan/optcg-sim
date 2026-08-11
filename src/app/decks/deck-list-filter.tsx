@@ -72,12 +72,9 @@ export function DeckListFilter({ decks }: { decks: DeckListItem[] }) {
             <p className="text-content-tertiary mt-1 text-sm">
               Create your first deck to get started
             </p>
-            <Link
-              href="/decks/new"
-              className="bg-primary text-primary-foreground hover:bg-gold-400 mt-6 inline-block rounded px-6 py-2 text-sm font-semibold transition-colors"
-            >
-              + New Deck
-            </Link>
+            <Button asChild className="mt-6">
+              <Link href="/decks/new">+ New Deck</Link>
+            </Button>
           </div>
         ) : filteredDecks.length === 0 ? (
           <div className="py-16 text-center">
