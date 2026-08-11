@@ -12,7 +12,6 @@ const meta = {
       control: { type: "select" },
       options: [
         "default",
-        "secondary",
         "outline",
         "ghost",
         "destructive",
@@ -35,10 +34,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-
-export const Secondary: Story = {
-  args: { variant: "secondary" },
-};
 
 export const Outline: Story = {
   args: { variant: "outline" },

@@ -4,7 +4,6 @@ import { Bell } from "lucide-react";
 import { forwardRef, type ComponentProps, type MouseEventHandler } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface NavbarNotificationBellProps extends Omit<
   ComponentProps<"button">,
@@ -84,10 +83,7 @@ export const NavbarNotificationBell = forwardRef<
         onClick?.(event);
         if (!event.defaultPrevented) onActivate();
       }}
-      className={cn(
-        "text-content-secondary hover:bg-surface-2 hover:text-content-primary relative rounded-full",
-        "focus-visible:ring-border-focus focus-visible:ring-2 focus-visible:outline-none"
-      )}
+      className="text-content-secondary relative"
     >
       {content}
     </Button>

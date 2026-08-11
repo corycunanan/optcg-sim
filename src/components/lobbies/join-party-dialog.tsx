@@ -146,7 +146,6 @@ export function JoinPartyDialog({
             <DialogFooter>
               <Button
                 type="button"
-                variant="secondary"
                 disabled={busy}
                 onClick={() => setOpen(false)}
               >

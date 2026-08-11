@@ -211,7 +211,6 @@ export default function CardPreviewPage() {
           <Section title="Board simulation — active ↔ rest toggle">
             <div className="flex items-center gap-6">
               <Button
-                variant="secondary"
                 onClick={() => setResting((r) => !r)}
                 aria-pressed={resting}
               >

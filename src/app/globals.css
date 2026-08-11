@@ -584,17 +584,11 @@ body {
 
 /* ─── Focus Visible ──────────────────────────────────────────── */
 
-:focus-visible {
-  outline: 2px solid color-mix(in oklch, var(--border-focus) 40%, transparent);
-  outline-offset: 2px;
-}
-
-/* Inputs handle their own focus styles via border + ring — remove the global outline */
-input:focus-visible,
-textarea:focus-visible,
-[data-slot="command-input"]:focus-visible,
-[cmdk-input]:focus-visible {
-  outline: none;
+@layer base {
+  :focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--border-focus) 40%, transparent);
+    outline-offset: 2px;
+  }
 }
 
 /* ─── Navbar dropdown positioning ───────────────────────────── */
