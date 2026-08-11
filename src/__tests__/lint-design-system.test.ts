@@ -32,6 +32,9 @@ const SHOULD_FLAG = [
   { syntax: "end-[7px]", rule: "spacing" },
   { syntax: "translate-x-0.5", rule: "spacing" },
   { syntax: "hover:-translate-y-[7px]", rule: "spacing" },
+  { syntax: "rounded-sm", rule: "border-radius" },
+  { syntax: "rounded-t-xl", rule: "border-radius" },
+  { syntax: "rounded-[4px]", rule: "border-radius" },
 ] as const;
 
 const SHOULD_PASS = [
@@ -48,6 +51,11 @@ const SHOULD_PASS = [
   "top-16",
   "inset-y-0",
   "-translate-x-2",
+  "rounded",
+  "rounded-md",
+  "rounded-lg",
+  "rounded-none",
+  "rounded-full",
 ] as const;
 
 describe("design-system text rules", () => {
