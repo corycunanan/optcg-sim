@@ -120,7 +120,11 @@ export function SetFilter({ sets, selectedSets, onChange }: SetFilterProps) {
             <span className="text-content-tertiary py-1">All Sets</span>
           ) : (
             draft.map((label) => (
-              <Badge key={label} variant="default" className="gap-1">
+              <Badge
+                key={label}
+                variant="default"
+                className="border-border-strong bg-surface-interactive text-content-primary gap-1"
+              >
                 {label}
                 <button
                   type="button"

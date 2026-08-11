@@ -405,6 +405,7 @@
   --color-card-purple: var(--card-purple);
   --color-card-black: var(--card-black);
   --color-card-yellow: var(--card-yellow);
+  --color-card-yellow-fg: var(--card-yellow-fg);
 
   /* Shadows */
   --shadow-sm: var(--shadow-sm);

@@ -38,7 +38,7 @@ function CardGridItem({
         />
         {/* Variant badge */}
         {loaded && card._count.artVariants > 0 && (
-          <Badge className="absolute top-2 right-2 backdrop-blur-sm">
+          <Badge className="bg-surface-interactive text-content-primary border-border-strong absolute top-2 right-2 backdrop-blur-sm">
             +{card._count.artVariants} art
           </Badge>
         )}

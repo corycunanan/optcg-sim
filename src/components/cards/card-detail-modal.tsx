@@ -207,7 +207,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                 {/* Effect */}
                 <Row label="Effect">
                   {card.effectText ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-secondary">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-primary">
                       {card.effectText}
                     </p>
                   ) : (
@@ -218,7 +218,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                 {/* Trigger Effect */}
                 <Row label="Trigger Effect">
                   {card.triggerText ? (
-                    <p className="text-sm leading-relaxed text-content-secondary">{card.triggerText}</p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-primary">{card.triggerText}</p>
                   ) : (
                     <span className="text-sm text-content-tertiary">—</span>
                   )}
