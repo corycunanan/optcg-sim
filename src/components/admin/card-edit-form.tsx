@@ -179,7 +179,7 @@ export function CardEditForm({ card }: { card: Card }) {
             <Button
               key={t}
               type="button"
-              variant={form.type === t ? "default" : "secondary"}
+              variant={form.type === t ? "outline" : "default"}
               size="sm"
               onClick={() => update("type", t)}
             >
@@ -377,7 +377,6 @@ export function CardEditForm({ card }: { card: Card }) {
         </Button>
         <Button
           type="button"
-          variant="secondary"
           onClick={() => router.back()}
         >
           Cancel

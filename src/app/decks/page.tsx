@@ -103,7 +103,7 @@ export default async function DecksPage() {
           </PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
-          <Button variant="secondary" asChild>
+          <Button asChild>
             <Link href="/decks/new">+ New Deck</Link>
           </Button>
         </PageHeaderActions>

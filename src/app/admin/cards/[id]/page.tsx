@@ -204,7 +204,7 @@ export default async function CardDetailPage({
                 Edit Card
               </Link>
             </Button>
-            <Button variant="secondary" asChild>
+            <Button asChild>
               <Link href="/admin/cards">
                 Back to Cards
               </Link>

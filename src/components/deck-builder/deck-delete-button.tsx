@@ -67,7 +67,6 @@ export function DeckDeleteButton({
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
-            variant="secondary"
             size="icon"
             aria-label={`More actions for ${deckName}`}
             className={cn(
