@@ -16,9 +16,9 @@ const buttonVariants = cva(
         ghost:
           "bg-transparent text-content-secondary border border-transparent hover:bg-secondary hover:text-content-primary",
         destructive:
-          "bg-red-600 text-navy-900 border border-red-600 hover:bg-red-500 hover:border-red-500",
+          "bg-red-600 text-navy-900 border border-red-600 hover:bg-red-500 hover:border-red-500 focus-visible:outline-navy-900",
         gold:
-          "bg-gold-500 text-navy-900 border border-gold-500 hover:bg-gold-400 hover:border-gold-400",
+          "bg-gold-500 text-navy-900 border border-gold-500 hover:bg-gold-400 hover:border-gold-400 focus-visible:outline-navy-900",
         link: "text-gold-500 underline-offset-4 hover:text-gold-400 hover:underline",
       },
       size: {

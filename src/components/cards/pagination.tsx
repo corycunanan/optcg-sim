@@ -62,7 +62,7 @@ export function Pagination({
                 size="icon"
                 onClick={() => onPageChange(p)}
                 aria-current={p === page ? "page" : undefined}
-                className="tabular-nums"
+                className="tabular-nums aria-[current=page]:bg-secondary aria-[current=page]:text-content-primary"
               >
                 {p}
               </Button>
