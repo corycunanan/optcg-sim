@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -9,7 +10,6 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface Set {
   setLabel: string;
@@ -61,13 +61,28 @@ export function SetFilter({
                 onSelect={() => toggle(s.setLabel)}
                 className={cn("gap-3", selected && "bg-surface-2")}
               >
-                <Checkbox checked={selected} className="pointer-events-none" />
+                {/* Decorative only: an interactive control here would put a
+                    nameless button inside every option row's tab order and give
+                    AT conflicting option/checkbox semantics. Selection is
+                    carried by the row itself. */}
+                <span
+                  aria-hidden
+                  className={cn(
+                    "flex size-4 shrink-0 items-center justify-center rounded border",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input"
+                  )}
+                >
+                  {selected && <Check className="size-3" />}
+                </span>
                 <span className="text-content-primary shrink-0 font-mono text-xs font-semibold">
                   {s.setLabel}
                 </span>
                 <span className="text-content-secondary truncate text-xs">
                   {s.setName}
                 </span>
+                {selected && <span className="sr-only">selected</span>}
               </CommandItem>
             );
           })}

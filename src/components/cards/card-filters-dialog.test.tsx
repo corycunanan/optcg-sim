@@ -156,6 +156,26 @@ describe("CardFiltersDialog", () => {
     );
   });
 
+  it("keeps option rows free of nested controls and names their state", () => {
+    renderDialog({ set: "OP16" });
+
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(sets.length);
+    for (const option of options) {
+      // A control inside an option row lands in the tab order between the
+      // list and the footer, and gives AT conflicting semantics.
+      expect(
+        option.querySelectorAll(
+          'a[href], button, input, select, textarea, [contenteditable], [tabindex]:not([tabindex="-1"])'
+        )
+      ).toHaveLength(0);
+    }
+
+    // The check mark is decorative, so selection is carried by the row's name.
+    expect(screen.getByRole("option", { name: /OP16.*selected/ })).toBeDefined();
+    expect(screen.queryByRole("option", { name: /OP15.*selected/ })).toBeNull();
+  });
+
   it("filters the set list and explains an empty search", async () => {
     const user = userEvent.setup();
     renderDialog();
