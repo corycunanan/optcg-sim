@@ -57,9 +57,9 @@ export function DeckPreviewModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size="xl"
+        size="2xl"
         showCloseButton
-        className="flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-6xl"
+        className="flex max-h-[85vh] flex-col overflow-hidden p-0"
       >
         <VisuallyHidden.Root>
           <DialogTitle>
