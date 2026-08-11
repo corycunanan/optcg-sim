@@ -621,7 +621,6 @@ export function LobbyRoomShell({
               onDeckChange={(deckId) => void runPatch({ hostDeckId: deckId })}
               onReadyChange={(ready) => void runPatch({ ready })}
               onPreview={setPreviewDeckId}
-              previewSide="left"
               dimmed={isInGame}
               menuItems={
                 canDisband ? (
@@ -651,7 +650,6 @@ export function LobbyRoomShell({
                   }
                   onReadyChange={(ready) => void runPatch({ ready })}
                   onPreview={setPreviewDeckId}
-                  previewSide="right"
                   dimmed={isInGame}
                   menuItems={
                     isHost ? (

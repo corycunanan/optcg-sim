@@ -979,20 +979,21 @@ describe("LobbyRoomShell redesign scenarios", () => {
 
     expect(renderedText()).toContain("Straw Hat Rush");
     expect(renderedText()).toContain("Three Sword Style");
-    expect(renderedText()).toContain("Deck list");
-    expect(renderedText()).toContain("Characters");
     expect(renderedText()).toContain("Everything is set");
-    const deckLists = renderer!.root.findAll(
+    // The seat is a leader summary now — the deck list moved behind the
+    // leader card (change-deck modal / deck preview).
+    expect(renderedText()).not.toContain("Deck list");
+    expect(renderedText()).not.toContain("Characters");
+    const seats = renderer!.root.findAll(
       (node) =>
-        typeof node.props.className === "string" &&
-        node.props.className.includes("overflow-y-auto") &&
-        node.props.className.includes("bg-surface-3")
+        node.type === "section" &&
+        typeof node.props["aria-label"] === "string" &&
+        node.props["aria-label"].includes(" seat — ")
     );
-    expect(deckLists).toHaveLength(2);
-    for (const deckList of deckLists) {
-      expect(deckList.props.className).toContain("min-h-0");
-      expect(deckList.props.className).toContain("flex-1");
-      expect(deckList.props.className).not.toContain("h-64");
+    expect(seats).toHaveLength(2);
+    for (const seat of seats) {
+      // Bare column on the page surface: no panel fill, border, or radius.
+      expect(seat.props.className).not.toMatch(/(^|\s)(border|rounded|bg-)/);
     }
     expect(
       mocks.apiGet.mock.calls.some(

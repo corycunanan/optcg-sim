@@ -81,7 +81,6 @@ function renderSeat(
     onDeckChange: vi.fn(),
     onReadyChange: vi.fn(),
     onPreview: vi.fn(),
-    previewSide: "left" as const,
     ...overrides,
   };
   render(<LobbySeatCard {...props} />);
@@ -93,6 +92,15 @@ async function openSeatMenu(user: ReturnType<typeof userEvent.setup>) {
   trigger.focus();
   await user.keyboard("{Enter}");
   return trigger;
+}
+
+function seatSection() {
+  return screen.getByRole("region", { name: /seat —/ });
+}
+
+/** Document-order index of an element within the seat's subtree. */
+function orderOf(element: Element) {
+  return [...seatSection().querySelectorAll("*")].indexOf(element);
 }
 
 /** `GET /api/decks/:id` payload shaped like `DeckDetailResponseSchema`. */
@@ -218,16 +226,70 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-describe("LobbySeatCard header", () => {
+describe("LobbySeatCard composition", () => {
+  it("stacks menu, identity, leader, and readiness in that order", () => {
+    renderSeat({ deckEditable: true, readyEditable: true });
+
+    const menu = screen.getByRole("button", { name: /More actions for/ });
+    const name = screen.getByRole("heading", { name: "strawhat" });
+    const leader = screen.getByRole("button", {
+      name: "Change deck — Straw Hat Rush",
+    });
+    const readyControl = screen.getByRole("button", { name: /Ready/ });
+
+    expect(orderOf(menu)).toBeLessThan(orderOf(name));
+    expect(orderOf(name)).toBeLessThan(orderOf(leader));
+    expect(orderOf(leader)).toBeLessThan(orderOf(readyControl));
+  });
+
+  it("sits directly on the page surface with no wrapping panel", () => {
+    renderSeat();
+
+    const section = seatSection();
+    expect(section.className).not.toMatch(/(^|\s)(border|rounded|bg-)/);
+    // The internal dividers went with the panel.
+    const dividers = [...section.querySelectorAll("*")].filter((node) =>
+      node.classList.contains("border-b")
+    );
+    expect(dividers).toHaveLength(0);
+    expect(section.querySelector("header")).toBeNull();
+  });
+
+  it("keeps the deck list out of the seat", () => {
+    renderSeat();
+
+    expect(screen.queryByText("Deck list")).toBeNull();
+    expect(screen.queryByText("Characters")).toBeNull();
+    expect(screen.queryByText(/Roronoa Zoro/)).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(document.querySelector("footer")).toBeNull();
+  });
+
+  it("reserves rounded-full for people and status dots, not chrome", () => {
+    renderSeat({ readyEditable: true, deckEditable: true });
+
+    const pills = [...seatSection().querySelectorAll("*")].filter((node) =>
+      node.className.toString().split(/\s+/).includes("rounded-full")
+    );
+    // Only the readiness dot, and it is decorative.
+    expect(pills).toHaveLength(1);
+    expect(pills[0].getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("labels the leader slot and names the leader card", () => {
+    renderSeat();
+
+    expect(screen.getByText("Leader")).toBeDefined();
+    expect(screen.getByText("Monkey.D.Luffy")).toBeDefined();
+  });
+
   it("stacks the player name above the role eyebrow", () => {
     renderSeat();
 
     const name = screen.getByRole("heading", { name: "strawhat" });
     const eyebrow = screen.getByText("Host");
 
-    expect(
-      name.compareDocumentPosition(eyebrow) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(orderOf(name)).toBeLessThan(orderOf(eyebrow));
     expect(eyebrow.className).toContain("text-gold-600");
     expect(eyebrow.className).toContain("uppercase");
   });
@@ -247,31 +309,76 @@ describe("LobbySeatCard header", () => {
       document.querySelector("[data-avatar]")?.getAttribute("data-online")
     ).toBe("false");
   });
+});
 
+describe("LobbySeatCard readiness", () => {
   it.each([
     [true, "Ready", "bg-success"],
-    [false, "Not ready", "bg-content-tertiary"],
+    [false, "Ready up", "bg-content-tertiary"],
   ])(
-    "renders an uppercase status-dot ready pill (ready=%s)",
+    "renders a ready-up button carrying the status dot (ready=%s)",
     (ready, label, dotClass) => {
-      renderSeat({ ready });
+      renderSeat({ ready, readyEditable: true });
 
-      const pill = screen.getByText(label);
-      expect(pill.className).toContain("uppercase");
-      const dot = pill.querySelector("span[aria-hidden='true']");
+      const button = screen.getByRole("button", { name: label });
+      expect(button.getAttribute("aria-pressed")).toBe(String(ready));
+      // Readiness is live status, never the gold focal action.
+      expect(button.getAttribute("data-variant")).toBe("default");
+      expect(button.className).not.toContain("bg-gold");
+      expect(button.className).not.toContain("rounded-full");
+
+      const dot = button.querySelector("span[aria-hidden='true']");
       expect(dot?.className).toContain(dotClass);
-      expect(dot?.className).toContain("rounded-full");
     }
   );
 
-  it("keeps the ready pill interactive when the viewer owns the seat", async () => {
+  it("toggles readiness for the seat owner", async () => {
     const user = userEvent.setup();
     const props = renderSeat({ ready: false, readyEditable: true });
 
-    await user.click(screen.getByRole("button", { name: /Not ready/ }));
+    await user.click(screen.getByRole("button", { name: "Ready up" }));
 
     expect(props.onReadyChange).toHaveBeenCalledWith(true);
   });
+
+  it("toggles readiness back off from the ready state", async () => {
+    const user = userEvent.setup();
+    const props = renderSeat({ ready: true, readyEditable: true });
+
+    await user.click(screen.getByRole("button", { name: "Ready" }));
+
+    expect(props.onReadyChange).toHaveBeenCalledWith(false);
+  });
+
+  it("blocks the toggle while the seat cannot act", async () => {
+    const user = userEvent.setup();
+    const props = renderSeat({
+      ready: false,
+      readyEditable: true,
+      readyDisabled: true,
+    });
+
+    const button = screen.getByRole("button", { name: "Ready up" });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    await user.click(button);
+
+    expect(props.onReadyChange).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [true, "Ready"],
+    [false, "Not ready"],
+  ])(
+    "reads the other seat's readiness as status, not a control (ready=%s)",
+    (ready, label) => {
+      renderSeat({ ready, readyEditable: false });
+
+      expect(screen.queryByRole("button", { name: /Ready/ })).toBeNull();
+      const status = screen.getByText(label);
+      expect(status.hasAttribute("data-seat-ready-status")).toBe(true);
+      expect(status.className).toContain("uppercase");
+    }
+  );
 });
 
 describe("LobbySeatCard overflow menu", () => {
@@ -314,8 +421,8 @@ describe("LobbySeatCard overflow menu", () => {
     // The in-game shape: dimmed, nothing editable, preview still meaningful.
     const props = renderSeat({ dimmed: true, deckEditable: false });
 
-    const section = screen.getByRole("region", { name: /Host seat/ });
-    expect(section.className).toContain("opacity-50");
+    const section = seatSection();
+    expect(section.className).toContain("opacity-60");
     expect(section.className).not.toContain("pointer-events-none");
 
     await user.click(
@@ -337,14 +444,29 @@ describe("LobbySeatCard overflow menu", () => {
   });
 });
 
-describe("LobbySeatCard deck switching", () => {
-  it("no longer renders a footer deck selector", () => {
-    renderSeat({ deckEditable: true });
+describe("LobbySeatCard empty leader slot", () => {
+  it("turns the empty slot into the deck picker on your own seat", async () => {
+    const user = userEvent.setup();
+    renderSeat({ deck: null, deckEditable: true });
 
-    expect(screen.queryByRole("combobox")).toBeNull();
-    expect(document.querySelector("footer")).toBeNull();
+    expect(screen.getByText("Leader")).toBeDefined();
+    expect(screen.getByText("Choose a deck")).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "Choose a deck" }));
+
+    expect(await screen.findByRole("dialog")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Change deck" })).toBeDefined();
   });
 
+  it("waits quietly on the other seat's deck", () => {
+    renderSeat({ deck: null, deckEditable: false });
+
+    expect(screen.getByText("Waiting on their deck")).toBeDefined();
+    expect(screen.queryByRole("button", { name: /deck/i })).toBeNull();
+  });
+});
+
+describe("LobbySeatCard deck switching", () => {
   it("opens the change-deck modal from the leader card when editable", async () => {
     const user = userEvent.setup();
     renderSeat({ deckEditable: true });
@@ -408,7 +530,6 @@ describe("LobbySeatCard deck switching", () => {
     // No rail eyebrow and no pane header — the rail keeps its accessible name.
     expect(pane.queryByText("Decks")).toBeNull();
     expect(pane.queryByText(/cards$/)).toBeNull();
-    expect(pane.queryByText(/Monkey\.D\.Luffy$/)).toBeNull();
     expect(pane.getByRole("group", { name: "Your decks" })).toBeDefined();
 
     // The grid keeps its own scroll region; no panel chrome around it.
@@ -678,59 +799,4 @@ describe("LobbySeatCard deck switching", () => {
     expect(props.onDeckChange).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
-});
-
-describe("LobbySeatCard card preview", () => {
-  it("renders full card information after hover details load", async () => {
-    const user = userEvent.setup();
-    renderSeat();
-
-    await user.hover(screen.getByRole("button", { name: /Roronoa Zoro/ }));
-
-    expect(
-      await screen.findByText("This Character gains +1000 power.")
-    ).toBeDefined();
-    expect(screen.getByText("Character · OP01-025")).toBeDefined();
-    expect(screen.getByText("Red · Straw Hat Crew · Slash")).toBeDefined();
-    expect(mocks.apiGet).toHaveBeenCalledWith(
-      "/api/cards/OP01-025",
-      expect.anything()
-    );
-  });
-
-  it.each(["left", "right"] as const)(
-    "portals the %s-side preview outside an overflow-hidden frame",
-    async (previewSide) => {
-      const user = userEvent.setup();
-
-      render(
-        <main data-overflow-ancestor className="overflow-hidden">
-          <LobbySeatCard
-            role={previewSide === "left" ? "Host" : "Guest"}
-            player={{ username: "strawhat", name: "Luffy", image: null }}
-            deck={deck}
-            ready
-            readyEditable={false}
-            readyDisabled={false}
-            deckEditable={false}
-            decks={[]}
-            onDeckChange={vi.fn()}
-            onReadyChange={vi.fn()}
-            onPreview={vi.fn()}
-            previewSide={previewSide}
-          />
-        </main>
-      );
-
-      await user.hover(screen.getByRole("button", { name: /Roronoa Zoro/ }));
-
-      await waitFor(() => {
-        const preview = document.querySelector<HTMLElement>(
-          `[data-lobby-card-preview="${previewSide}"]`
-        );
-        expect(preview).not.toBeNull();
-        expect(preview?.closest("[data-overflow-ancestor]")).toBeNull();
-      });
-    }
-  );
 });
