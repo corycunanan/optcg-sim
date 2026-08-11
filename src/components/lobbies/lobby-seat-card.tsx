@@ -130,19 +130,19 @@ export function LobbySeatCard({
         </div>
       </div>
 
-      <LeaderArt
-        deck={deck}
-        deckEditable={deckEditable}
-        onChangeDeck={() => setChangeDeckOpen(true)}
-        onPreview={onPreview}
-        className="col-start-1 row-span-3 row-start-1"
-      />
+      <div
+        className="col-start-1 row-span-3 row-start-1 flex min-h-0 flex-col gap-3 lg:flex-1 lg:min-h-0"
+        data-leader-art-caption-group
+      >
+        <LeaderArt
+          deck={deck}
+          deckEditable={deckEditable}
+          onChangeDeck={() => setChangeDeckOpen(true)}
+          onPreview={onPreview}
+        />
 
-      <LeaderCaption
-        deck={deck}
-        deckEditable={deckEditable}
-        className="col-span-2 col-start-2 row-start-2"
-      />
+        <LeaderCaption deck={deck} deckEditable={deckEditable} />
+      </div>
 
       <ReadyControl
         ready={ready}

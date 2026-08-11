@@ -257,6 +257,20 @@ describe("LobbySeatCard composition", () => {
     expect(section.querySelector("header")).toBeNull();
   });
 
+  it("keeps the leader caption inside its gap-3 art group", () => {
+    renderSeat();
+
+    const section = seatSection();
+    const group = section.querySelector("[data-leader-art-caption-group]");
+    const caption = screen.getByText("Leader").parentElement;
+
+    expect(group).not.toBeNull();
+    expect(group?.classList).toContain("gap-3");
+    expect(group?.contains(caption)).toBe(true);
+    expect(caption?.parentElement).toBe(group);
+    expect(caption?.parentElement).not.toBe(section);
+  });
+
   it("keeps the deck list out of the seat", () => {
     renderSeat();
 
@@ -331,13 +345,11 @@ describe("LobbySeatCard composition", () => {
     expect(
       screen.getByRole("button", { name: /More actions for/ }).className
     ).toContain("col-start-3");
-    expect(
-      screen.getByRole("button", { name: "Change deck — Straw Hat Rush" })
-        .className
-    ).toContain("col-start-1");
-    expect(screen.getByText("Leader").parentElement?.className).toContain(
-      "row-start-2"
+    const leaderGroup = section.querySelector(
+      "[data-leader-art-caption-group]"
     );
+    expect(leaderGroup?.className).toContain("col-start-1");
+    expect(leaderGroup?.className).toContain("row-start-1");
     expect(
       screen.getByRole("button", { name: /Ready/ }).className
     ).toContain("row-start-3");
@@ -515,11 +527,10 @@ describe("LobbySeatCard overflow menu", () => {
     ).toBeNull();
 
     // The group rhythm survives, so this seat still lines up with the one
-    // beside it. Five children: the leader's art and its caption are placed
-    // separately so the caption can travel with the identity column in the
-    // compact row.
+    // beside it. Four children: the leader's art and caption share one group
+    // so their spacing remains fixed while the art absorbs free space.
     const section = seatSection();
-    expect(section.children).toHaveLength(5);
+    expect(section.children).toHaveLength(4);
 
     const placeholder = section.firstElementChild!;
     expect(placeholder.hasAttribute("data-seat-menu-placeholder")).toBe(true);
