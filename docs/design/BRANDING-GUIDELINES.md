@@ -230,7 +230,9 @@ The user's registered theme is stored in the database. The `optcg-theme` cookie 
 
 ### Non-themable feature palettes
 
-Theme selectors must not override the six TCG card colors, `--card-yellow-fg`, `--card-accent-fallback`, the complete `--holo-*` holofoil palette, or the game-board `--gb-*` context. These are direct feature contracts with independent accessibility and visual requirements.
+Theme selectors must not override the six TCG card colors, `--card-yellow-fg`, `--card-accent-fallback`, the complete `--holo-*` holofoil palette, the `--effect-*` effect-text notation palette, or the game-board `--gb-*` context. These are direct feature contracts with independent accessibility and visual requirements.
+
+The `--effect-*` family colors the inline badges that `EffectText` (`src/components/cards/effect-text.tsx`) sets for the bracketed tokens printed in a card's rules text: timing markers, keywords, modifiers, `[Counter]`, and `[Trigger]`. The token-family mapping is part of the game's printed notation rather than a theme decision, which is why it sits with the card colors. All four chromatic fills share one lightness so a row of badges reads as a single system with hue as the only variable, and all sit below the accent so notation never competes with the focal action or with card art.
 
 ---
 

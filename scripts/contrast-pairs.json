@@ -329,6 +329,66 @@
       "foreground": "--error",
       "background": "--surface-nav",
       "minimum": 3
+    },
+    {
+      "name": "effect-notation-label/timing",
+      "foreground": "--effect-notation-fg",
+      "background": "--effect-timing",
+      "minimum": 4.5
+    },
+    {
+      "name": "effect-notation-label/keyword",
+      "foreground": "--effect-notation-fg",
+      "background": "--effect-keyword",
+      "minimum": 4.5
+    },
+    {
+      "name": "effect-notation-label/counter",
+      "foreground": "--effect-notation-fg",
+      "background": "--effect-counter",
+      "minimum": 4.5
+    },
+    {
+      "name": "effect-notation-label/modifier",
+      "foreground": "--effect-notation-fg",
+      "background": "--effect-modifier",
+      "minimum": 4.5
+    },
+    {
+      "name": "effect-notation-label/trigger",
+      "foreground": "--effect-trigger-fg",
+      "background": "--effect-trigger",
+      "minimum": 4.5
+    },
+    {
+      "name": "effect-notation-keyline/timing",
+      "foreground": "--effect-notation-edge",
+      "background": "--effect-timing",
+      "minimum": 3
+    },
+    {
+      "name": "effect-notation-keyline/keyword",
+      "foreground": "--effect-notation-edge",
+      "background": "--effect-keyword",
+      "minimum": 3
+    },
+    {
+      "name": "effect-notation-keyline/counter",
+      "foreground": "--effect-notation-edge",
+      "background": "--effect-counter",
+      "minimum": 3
+    },
+    {
+      "name": "effect-notation-keyline/modifier",
+      "foreground": "--effect-notation-edge",
+      "background": "--effect-modifier",
+      "minimum": 3
+    },
+    {
+      "name": "effect-notation-keyline/trigger",
+      "foreground": "--effect-notation-edge",
+      "background": "--effect-trigger",
+      "minimum": 3
     }
   ]
 }

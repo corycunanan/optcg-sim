@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardImageGallery } from "./card-image-gallery";
+import { EffectText } from "./effect-text";
 import { apiGet } from "@/lib/api-client";
 import {
   CardDetailResponseSchema,
@@ -207,9 +208,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                 {/* Effect */}
                 <Row label="Effect">
                   {card.effectText ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-primary">
-                      {card.effectText}
-                    </p>
+                    <EffectText text={card.effectText} />
                   ) : (
                     <span className="text-sm text-content-tertiary">—</span>
                   )}
@@ -218,7 +217,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                 {/* Trigger Effect */}
                 <Row label="Trigger Effect">
                   {card.triggerText ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-content-primary">{card.triggerText}</p>
+                    <EffectText text={card.triggerText} />
                   ) : (
                     <span className="text-sm text-content-tertiary">—</span>
                   )}
