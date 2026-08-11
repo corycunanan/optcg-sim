@@ -529,11 +529,25 @@ describe("LobbyRoomShell redesign scenarios", () => {
     }
   );
 
-  it("keeps the solitaire panel's tilted card inside its own band", async () => {
+  it("seats solitaire as two identical sides of the same player", async () => {
     mocks.apiGet.mockImplementation(async (url: string) =>
       url === "/api/decks"
         ? { data: [] }
-        : { data: lobbyState({ mode: "SOLITAIRE" }) }
+        : {
+            data: lobbyState({
+              mode: "SOLITAIRE",
+              guest: {
+                guestReady: false,
+                user: {
+                  id: "host-user",
+                  username: "strawhat",
+                  name: "Luffy",
+                  image: null,
+                },
+                deck: null,
+              },
+            }),
+          }
     );
 
     await act(async () => {
@@ -544,19 +558,33 @@ describe("LobbyRoomShell redesign scenarios", () => {
       await Promise.resolve();
     });
 
-    // The tilt paints outside the card's layout box, so the compact thumbnail
-    // buys that swing its own room instead of borrowing it from the seat above.
-    const compactArt = renderer!.root.find(
+    // One player at both ends of the table: the same seat twice, labelled by
+    // the side it plays rather than by Host/Guest.
+    const seats = renderer!.root.findAll(
       (node) =>
-        node.type === "button" &&
-        typeof node.props.className === "string" &&
-        node.props.className.includes("lg:hidden") &&
-        node.props.className.includes("-rotate-6")
+        node.type === "section" &&
+        typeof node.props["aria-label"] === "string" &&
+        node.props["aria-label"].includes(" seat — ")
     );
-    expect(compactArt.props.className).toContain("h-20");
-    expect(compactArt.props.className).toContain("w-auto");
-    expect(compactArt.props.className).toContain("self-center");
-    expect(compactArt.props.className).toContain("m-1");
+    expect(seats.map((seat) => seat.props["aria-label"])).toEqual([
+      "Side 1 seat — strawhat",
+      "Side 2 seat — strawhat",
+    ]);
+    expect(seats[0].props.className).toBe(seats[1].props.className);
+    // The bespoke solitaire panel is gone along with its chrome.
+    const text = renderedText();
+    expect(text).not.toContain("Your second deck");
+    expect(text).not.toContain("Play both sides");
+    expect(text).not.toContain("Host");
+    expect(text).not.toContain("Guest");
+
+    // No ready-up on either side, and no read-only status line standing in
+    // for one either.
+    expect(text).not.toContain("Ready up");
+    expect(text).not.toContain("Not ready");
+    expect(
+      renderer!.root.findAll((node) => node.props["data-seat-ready-status"])
+    ).toHaveLength(0);
   });
 
   it("mounts real match settings and persists the host selection", async () => {
@@ -1157,12 +1185,12 @@ describe("LobbyRoomShell redesign scenarios", () => {
     });
 
     expect(renderedText()).toContain("Solitaire");
-    expect(renderedText()).toContain("Your second deck");
-    expect(renderedText()).toContain("Play both sides");
+    expect(renderedText()).toContain("Side 1");
+    expect(renderedText()).toContain("Side 2");
     const startButton = renderer!.root
       .findAllByType("button")
       .find((button) => button.children.includes("Start Match"));
-    expect(startButton?.props.title).toBe("Both players need a deck");
+    expect(startButton?.props.title).toBe("Both sides need a deck");
     await act(async () => {
       renderer!.root
         .findAllByType("button")
@@ -1177,6 +1205,99 @@ describe("LobbyRoomShell redesign scenarios", () => {
     );
     expect(pregameRadios).toHaveLength(3);
     expect(radioGroup.props.value).toBe("SOLITAIRE_RANDOM");
+  });
+
+  it("enables solitaire Start Match on two decks alone, with no ready state", async () => {
+    const sideDeck = (id: string, name: string) => ({
+      id,
+      name,
+      leaderId: "OP01-001",
+      leaderName: "Monkey.D.Luffy",
+      leaderImageUrl: null,
+    });
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              mode: "SOLITAIRE",
+              pregameMode: "SOLITAIRE_RANDOM",
+              // Switching into solitaire clears `hostReady` and nothing can set
+              // it again, so the start gate cannot depend on it.
+              hostReady: false,
+              hostDeck: sideDeck("deck-1", "Straw Hat Rush"),
+              guest: {
+                guestReady: false,
+                user: {
+                  id: "host-user",
+                  username: "strawhat",
+                  name: "Luffy",
+                  image: null,
+                },
+                deck: sideDeck("deck-2", "Three Sword Style"),
+              },
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const startButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Start Match"));
+    expect(startButton?.props.disabled).toBe(false);
+    expect(startButton?.props.title).toBeUndefined();
+  });
+
+  it("holds solitaire Start Match until the second side has a deck", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              mode: "SOLITAIRE",
+              pregameMode: "SOLITAIRE_RANDOM",
+              hostReady: false,
+              hostDeck: {
+                id: "deck-1",
+                name: "Straw Hat Rush",
+                leaderId: "OP01-001",
+                leaderName: "Monkey.D.Luffy",
+                leaderImageUrl: null,
+              },
+              guest: {
+                guestReady: false,
+                user: {
+                  id: "host-user",
+                  username: "strawhat",
+                  name: "Luffy",
+                  image: null,
+                },
+                deck: null,
+              },
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const startButton = renderer!.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("Start Match"));
+    expect(startButton?.props.disabled).toBe(true);
+    expect(startButton?.props.title).toBe("Both sides need a deck");
   });
 
   it("replaces Start Match with Rejoin Game while a match is active", async () => {

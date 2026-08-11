@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Eye, Layers3, Loader2, Play, Plus, Settings } from "lucide-react";
+import { Eye, Loader2, Play, Plus, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { resolvePregameMode } from "@shared/game-init";
 import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
@@ -33,13 +32,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -211,6 +203,7 @@ export function LobbyRoomShell({
   const isHost = lobby?.viewerRole === "host";
   const isGuest = lobby?.viewerRole === "guest";
   const isSpectator = lobby?.viewerRole === "spectator";
+  const isSolitaire = lobby?.mode === "SOLITAIRE";
   const isInGame = lobby?.status === "IN_GAME";
   const activeGameId = lobby ? rejoinGameId(lobby) : null;
   const hasActiveMatch = Boolean(isInGame || activeGameId);
@@ -233,7 +226,10 @@ export function LobbyRoomShell({
       );
     }
     if (lobby.mode === "SOLITAIRE") {
-      return Boolean(lobby.hostDeck && lobby.guest?.deck && lobby.hostReady);
+      // Both sides belong to the host, so readiness has no one to signal to:
+      // a deck on each side is the whole prerequisite. `POST
+      // /api/lobbies/[id]/start` applies the same rule server-side.
+      return Boolean(lobby.hostDeck && lobby.guest?.deck);
     }
     return false;
   }, [isHost, lobby]);
@@ -633,19 +629,25 @@ export function LobbyRoomShell({
             data-lobby-seats
           >
             <LobbySeatCard
-              role="Host"
+              role={isSolitaire ? "Side 1" : "Host"}
               player={
                 lobby.host ?? { username: null, name: "Host", image: null }
               }
               online={seatOnline(lobby.hostUserId)}
               deck={lobby.hostDeck}
-              ready={lobby.hostReady}
-              readyEditable={Boolean(isHost && !isInGame)}
-              readyDisabled={!lobby.hostDeck || mutating}
+              readiness={
+                isSolitaire
+                  ? undefined
+                  : {
+                      ready: lobby.hostReady,
+                      editable: Boolean(isHost && !isInGame),
+                      disabled: !lobby.hostDeck || mutating,
+                      onChange: (ready) => void runPatch({ ready }),
+                    }
+              }
               deckEditable={Boolean(isHost && !isInGame)}
               decks={decks}
               onDeckChange={(deckId) => void runPatch({ hostDeckId: deckId })}
-              onReadyChange={(ready) => void runPatch({ ready })}
               onPreview={setPreviewDeckId}
               dimmed={isInGame}
               menuItems={
@@ -666,15 +668,17 @@ export function LobbyRoomShell({
                   player={lobby.guest.user}
                   online={seatOnline(lobby.guest.user.id)}
                   deck={lobby.guest.deck}
-                  ready={lobby.guest.guestReady}
-                  readyEditable={Boolean(isGuest && !isInGame)}
-                  readyDisabled={!lobby.guest.deck || mutating}
+                  readiness={{
+                    ready: lobby.guest.guestReady,
+                    editable: Boolean(isGuest && !isInGame),
+                    disabled: !lobby.guest.deck || mutating,
+                    onChange: (ready) => void runPatch({ ready }),
+                  }}
                   deckEditable={Boolean(isGuest && !isInGame)}
                   decks={decks}
                   onDeckChange={(deckId) =>
                     void runPatch({ guestDeckId: deckId })
                   }
-                  onReadyChange={(ready) => void runPatch({ ready })}
                   onPreview={setPreviewDeckId}
                   dimmed={isInGame}
                   menuItems={
@@ -712,15 +716,24 @@ export function LobbyRoomShell({
                 />
               )
             ) : (
-              <SolitaireSeat
+              /* Solitaire is one player at both ends of the table, so the
+                 second side is the same seat again — same person, same
+                 composition, same deck mechanics — distinguished only by the
+                 role it is playing. */
+              <LobbySeatCard
+                role="Side 2"
+                player={
+                  lobby.host ?? { username: null, name: "Host", image: null }
+                }
+                online={seatOnline(lobby.hostUserId)}
                 deck={lobby.guest?.deck ?? null}
+                deckEditable={Boolean(isHost && !isInGame)}
                 decks={decks}
-                editable={Boolean(isHost && !isInGame)}
-                disabled={mutating || isInGame}
                 onDeckChange={(deckId) =>
                   void runPatch({ guestDeckId: deckId })
                 }
                 onPreview={setPreviewDeckId}
+                dimmed={isInGame}
               />
             )}
           </div>
@@ -1294,145 +1307,6 @@ export function InvitePanel({
   );
 }
 
-function SolitaireSeat({
-  deck,
-  decks,
-  editable,
-  disabled,
-  onDeckChange,
-  onPreview,
-}: {
-  deck: LobbyRoomDeck | null;
-  decks: DeckOption[];
-  editable: boolean;
-  disabled: boolean;
-  onDeckChange: (deckId: string) => void;
-  onPreview: (deckId: string) => void;
-}) {
-  const art = (className: string) => (
-    <button
-      type="button"
-      disabled={!deck}
-      onClick={() => deck && onPreview(deck.id)}
-      className={cn(
-        "bg-surface-3 border-border aspect-card focus-visible:outline-border-focus relative shrink-0 -rotate-6 overflow-hidden rounded-md border shadow-[var(--shadow-lg)] transition-transform hover:-rotate-3 focus-visible:outline-2 focus-visible:outline-offset-2",
-        className
-      )}
-      aria-label={deck ? `Preview ${deck.name}` : "No second deck chosen"}
-    >
-      {deck?.leaderImageUrl ? (
-        <Image
-          src={deck.leaderImageUrl}
-          alt={deck.leaderName ?? deck.name}
-          fill
-          sizes="128px"
-          unoptimized
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <span className="text-content-tertiary flex h-full items-center justify-center">
-          <Layers3 className="size-8" />
-        </span>
-      )}
-    </button>
-  );
-
-  return (
-    <section
-      className={cn(
-        "relative flex min-h-0 shrink-0 items-start gap-4",
-        // A bordered panel from `lg`. In one column that chrome costs more
-        // height than the frame can spare, so the panel dissolves into the same
-        // compact row the seats use: art on the left, identity and deck select
-        // stacked beside it. `lg:contents` keeps it one DOM — the row wrapper
-        // disappears and the three bands become the panel again.
-        "lg:border-border lg:bg-surface-1 lg:flex-1 lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-hidden lg:rounded-lg lg:border",
-        disabled && "pointer-events-none opacity-50"
-      )}
-      aria-label="Solitaire second deck"
-    >
-      {/* The tilt is drawn outside the card's layout box, so the compact
-          thumbnail buys the rotation its own room instead of borrowing it from
-          the neighbours: `h-20` keeps the rotated corners inside the band the
-          text column defines, `self-center` centres them in it, and `m-1` is
-          the sliver the corners swing out to on each side. Height-first here
-          too, so the card can never be what makes this panel tall. */}
-      {art("m-1 h-20 w-auto self-center lg:hidden")}
-
-      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:contents">
-        <header className="border-border flex min-w-0 items-center gap-3 lg:order-1 lg:min-h-20 lg:shrink-0 lg:border-b lg:px-5 lg:py-4">
-          <div className="bg-gold-100 text-gold-600 hidden size-10 shrink-0 items-center justify-center rounded-full lg:flex">
-            <Layers3 className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-              Solitaire
-            </p>
-            <h2 className="text-content-primary truncate text-lg font-semibold">
-              Your second deck
-            </h2>
-          </div>
-        </header>
-
-        {/* The panel's body is chrome the compact row cannot afford: below `lg`
-            the art already leads the row and the deck select names the deck, so
-            the whole band steps aside. */}
-        <div className="relative hidden min-h-0 items-center gap-8 overflow-hidden px-8 py-4 lg:order-2 lg:flex lg:flex-1 lg:[@media(min-height:50rem)]:py-10">
-          {/* Tracks the band it sits in the same way the seat's leader tracks
-              its stack: height first, width from the card ratio. */}
-          {art("hidden lg:block lg:h-full lg:max-h-44 lg:w-auto")}
-          <div className="relative z-10 max-w-sm min-w-0">
-            {/* Marketing copy is the panel's most compressible asset: it
-                explains a mode the viewer has already chosen, so it steps aside
-                on short viewports rather than pushing the deck select out of
-                the frame. */}
-            <div className="hidden [@media(min-height:50rem)]:block">
-              <h3 className="font-display text-content-primary text-2xl">
-                Play both sides
-              </h3>
-              <p className="text-content-secondary mt-3 text-sm leading-relaxed">
-                Test matchups at your own pace. You&apos;ll control each side of
-                the table and switch perspective between turns.
-              </p>
-            </div>
-            {deck && (
-              <div className="[@media(min-height:50rem)]:mt-5">
-                <p className="text-content-primary truncate text-sm font-semibold">
-                  {deck.name}
-                </p>
-                <p className="text-content-tertiary mt-1 truncate font-mono text-xs font-semibold">
-                  {deck.leaderName ?? deck.leaderId}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <footer className="border-border lg:order-3 lg:mt-auto lg:shrink-0 lg:border-t lg:p-4">
-          {editable ? (
-            <Select value={deck?.id ?? ""} onValueChange={onDeckChange}>
-              <SelectTrigger className="bg-surface-3 w-full">
-                <SelectValue placeholder="Choose your second deck" />
-              </SelectTrigger>
-              <SelectContent>
-                {decks.map((deckOption) => (
-                  <SelectItem key={deckOption.id} value={deckOption.id}>
-                    {deckOption.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="border-border bg-surface-3 text-content-secondary flex min-h-10 items-center rounded-md border px-3 text-sm">
-              {deck?.name ?? "Choose a second deck"}
-            </div>
-          )}
-        </footer>
-      </div>
-    </section>
-  );
-}
-
 function getStartHint({
   lobby,
   isHost,
@@ -1449,11 +1323,13 @@ function getStartHint({
   if (!isHost) return "The host starts the match";
   if (lobby.mode === "PVP" && !realGuestPresent)
     return "You need an opponent first";
-  if (!lobby.hostDeck || !lobby.guest?.deck) return "Both players need a deck";
+  if (!lobby.hostDeck || !lobby.guest?.deck) {
+    return lobby.mode === "SOLITAIRE"
+      ? "Both sides need a deck"
+      : "Both players need a deck";
+  }
   if (lobby.mode === "PVP" && (!lobby.hostReady || !lobby.guest.guestReady))
     return "Both players must be ready";
-  if (lobby.mode === "SOLITAIRE" && !lobby.hostReady)
-    return "Ready up when both decks are set";
   return "Everything is set";
 }
 

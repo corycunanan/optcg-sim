@@ -314,12 +314,15 @@ function validateStartPrerequisites(lobby: {
     };
   }
 
+  // Solitaire seats both ends of the table with the host, so readiness has no
+  // second party to signal to and the room never surfaces a ready control
+  // (OPT-657). A deck on each side is the whole prerequisite; `hostReady` is
+  // deliberately ignored here and stays whatever the last mode switch left.
   if (!lobby.hostDeckId) missing.push("hostDeckId");
   if (!lobby.guest || lobby.guest.userId !== lobby.hostUserId) {
     missing.push("hostGuestSeat");
   }
   if (!lobby.guest?.deckId) missing.push("guestDeckId");
-  if (!lobby.hostReady) missing.push("hostReady");
 
   if (
     missing.length > 0 ||
