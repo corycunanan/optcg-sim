@@ -1,5 +1,10 @@
 import { ChamferFrame } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  PageHeader,
+  PageHeaderActions,
+  PageHeaderContent,
+} from "@/components/ui/page-header";
 
 export default function DecksLoading() {
   return (
@@ -9,15 +14,19 @@ export default function DecksLoading() {
       aria-busy="true"
       aria-label="Loading decks"
     >
-      <div className="bg-navy-900 w-full">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-12">
-          <div className="flex flex-col gap-2">
-            <Skeleton className="bg-navy-700 h-8 w-40" />
-            <Skeleton className="bg-navy-700 h-4 w-64" />
-          </div>
-          <div className="h-10 w-28" aria-hidden="true" />
-        </div>
-      </div>
+      {/* The real header primitive, filled with skeletons. Hand-copying its
+          classes here is what made the skeleton stream a navy band and then
+          swap to the bannerless header on hydration. */}
+      <PageHeader aria-hidden="true">
+        <PageHeaderContent>
+          <Skeleton className="bg-navy-700 h-8 w-40" />
+          <Skeleton className="bg-navy-700 h-4 w-64" />
+        </PageHeaderContent>
+        <PageHeaderActions>
+          <div className="h-10 w-24" />
+          <div className="h-10 w-28" />
+        </PageHeaderActions>
+      </PageHeader>
 
       {/* Mirrors the row list: same chamfer, same surface step, same gap. */}
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-8">

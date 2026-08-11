@@ -175,16 +175,10 @@ vi.mock("@/components/ui/tooltip", () => {
     TooltipTrigger: Wrapper,
   };
 });
-vi.mock("@/components/ui/page-header", () => {
-  const Wrapper = ({ children }: { children?: ReactNode }) => <>{children}</>;
-  return {
-    PageHeader: Wrapper,
-    PageHeaderActions: Wrapper,
-    PageHeaderContent: Wrapper,
-    PageHeaderDescription: Wrapper,
-    PageHeaderTitle: Wrapper,
-  };
-});
+// `@/components/ui/page-header` is intentionally NOT mocked: the lobby header
+// IS the shared primitive now, so the classes these tests assert on
+// (`data-lobby-header`, the no-band/no-border contract, the height-gated
+// padding) are the primitive's real output merged with the lobby's override.
 vi.mock("@/components/ui/badge", () => ({
   Badge: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
@@ -453,26 +447,33 @@ describe("LobbyRoomShell redesign scenarios", () => {
     // The frame is fixed to the viewport, so the header and content bands run
     // compressed by default and only pay full padding when the viewport is
     // both wide and tall. Height, not width, is the binding constraint here.
-    const headerLayout = renderer!.root.find(
-      (node) =>
-        typeof node.props.className === "string" &&
-        node.props.className.includes("max-w-7xl") &&
-        node.props.className.includes("lg:flex-row")
-    );
-    expect(headerLayout.props.className).toContain("py-4");
+    const headerLayout = renderer!.root.findByProps({
+      "data-lobby-header": true,
+    });
+    // Top padding only. The header contributes nothing below its own content,
+    // so the content well's top padding IS the whole header→content gap.
+    expect(headerLayout.props.className).toContain("pt-4");
     expect(headerLayout.props.className).toContain(
-      "lg:[@media(min-height:50rem)]:py-8"
+      "lg:[@media(min-height:50rem)]:pt-8"
     );
+    expect(headerLayout.props.className).not.toMatch(/(?:^|\s|:)pb-/);
+    expect(headerLayout.props.className).not.toMatch(/(?:^|\s|:)py-/);
 
     const pageContent = renderer!.root.findByProps({
       "data-lobby-content": true,
     });
-    // Below `lg` the content well gives up a spacing step before the seats
-    // have to give up a row.
-    expect(pageContent.props.className).toContain("py-3");
-    expect(pageContent.props.className).toContain("lg:py-4");
+    // Equal-rhythm invariant: the well's top padding matches the header's top
+    // padding at every height gate, so the gap reads as one step, not two.
+    expect(pageContent.props.className).toContain("pt-4");
     expect(pageContent.props.className).toContain(
-      "lg:[@media(min-height:50rem)]:py-8"
+      "lg:[@media(min-height:50rem)]:pt-8"
+    );
+    // Below `lg` the content well gives up a spacing step at the bottom before
+    // the seats have to give up a row.
+    expect(pageContent.props.className).toContain("pb-3");
+    expect(pageContent.props.className).toContain("lg:pb-4");
+    expect(pageContent.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:pb-8"
     );
     expect(pageContent.props.className).toContain(
       "lg:[@media(min-height:50rem)]:gap-6"
@@ -1476,6 +1477,41 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(mocks.apiGet.mock.calls.some(([url]) => url === "/api/decks")).toBe(
       false
     );
+  });
+
+  it("truncates a spectated host's name instead of widening the fixed frame", async () => {
+    // Usernames are user-controlled, and the spectator frame never scrolls, so
+    // an unbroken name has to be clipped rather than allowed to set the width.
+    const longName = "A".repeat(200);
+    mocks.apiGet.mockImplementation(async (url: string) => ({
+      data:
+        url === "/api/decks"
+          ? []
+          : lobbyState({
+              viewerRole: "spectator",
+              host: { username: longName, name: null, image: null },
+            }),
+    }));
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="spectator-1" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderedText()).toContain(longName);
+
+    const title = renderer!.root.findByType("h1");
+    expect(title.props.className).toContain("truncate");
+
+    // `truncate` only clips against a definite width, so the column the title
+    // sits in has to fill the header and be allowed to shrink below content.
+    let content = title.parent!;
+    while (typeof content.type !== "string") content = content.parent!;
+    expect(content.props.className).toContain("w-full");
+    expect(content.props.className).toContain("min-w-0");
   });
 
   it.each([

@@ -263,9 +263,10 @@ describe("CardBrowser layout", () => {
       renderer = create(<CardBrowserLoading />);
     });
 
-    const paddedSections = renderer!.root
-      .findAllByType("div")
-      .filter((node) => classList(node).includes("px-6"));
+    const paddedSections = renderer!.root.findAll(
+      (node) =>
+        typeof node.type === "string" && classList(node).includes("px-6")
+    );
 
     // The skeleton renders at route level with no padded parent, so each of its
     // bands must carry the container itself or it will jump on load.
@@ -275,6 +276,14 @@ describe("CardBrowser layout", () => {
       expect(classes).toContain("max-w-7xl");
       expect(classes).not.toContain("-mx-6");
     }
+
+    // The skeleton's header IS the shared primitive, not a copy of its classes:
+    // it is the `<header>` element and it carries the primitive's top-only
+    // padding, so the skeleton cannot drift from the loaded header.
+    const skeletonHeader = renderer!.root.findByType("header");
+    expect(classList(skeletonHeader)).toContain("pt-8");
+    expect(classList(skeletonHeader)).not.toContain("border-b");
+    expect(classList(skeletonHeader)).not.toContain("bg-navy-900");
   });
 });
 
