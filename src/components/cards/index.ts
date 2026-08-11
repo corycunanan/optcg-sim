@@ -1,7 +1,7 @@
 export { CardBrowser } from "./card-browser";
 export type { CardBrowserProps, CardWithRelations } from "./card-browser";
 export { CardBrowserLoading } from "./card-browser-loading";
-export { CardFilters } from "./card-filters";
+export { CardFiltersDialog } from "./card-filters-dialog";
 export { CardGrid, CardGridSkeleton } from "./card-grid";
 export { CardDetailModal } from "./card-detail-modal";
 export type { CardDetail, ArtVariant, CardSet } from "./card-detail-modal";

@@ -1,20 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import {
+  act,
+  create,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from "react-test-renderer";
+import type { CardFilterDraft } from "@/lib/cards/browser-params";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  setFilterProps: vi.fn(),
+  searchParams: new URLSearchParams(),
+  filtersDialogProps: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mocks.searchParams,
 }));
 
-vi.mock("./set-filter", () => ({
-  SetFilter: (props: { onChange: (sets: string[]) => void }) => {
-    mocks.setFilterProps(props);
-    return <div data-set-filter />;
+// The dialog itself is covered by card-filters-dialog.test.tsx; here we only
+// care that the browser opens it and commits its draft exactly once.
+vi.mock("./card-filters-dialog", () => ({
+  CARD_FILTERS_DIALOG_ID: "card-filters",
+  CardFiltersDialog: (props: {
+    open: boolean;
+    onApply: (draft: CardFilterDraft) => void;
+  }) => {
+    mocks.filtersDialogProps(props);
+    return props.open ? <div id="card-filters" /> : null;
   },
 }));
 
@@ -28,9 +41,51 @@ const sets = [
 ];
 const latestSet = sets.at(-1)!.setLabel;
 
+const noFilters = {
+  q: "",
+  color: "",
+  type: "",
+  set: latestSet,
+  block: "",
+  originOnly: "",
+};
+
+async function renderBrowser(
+  currentFilters: Partial<typeof noFilters> = {},
+  overrides: { totalPages?: number } = {}
+) {
+  await act(async () => {
+    renderer = create(
+      <CardBrowser
+        initialCards={[]}
+        total={0}
+        page={1}
+        totalPages={overrides.totalPages ?? 0}
+        sets={sets}
+        currentFilters={{ ...noFilters, ...currentFilters }}
+        routePath="/cards"
+      />
+    );
+  });
+  return renderer!;
+}
+
+function filterButton() {
+  return renderer!.root.findByProps({ "aria-controls": "card-filters" });
+}
+
+function latestDialogProps() {
+  return mocks.filtersDialogProps.mock.calls.at(-1)![0];
+}
+
+async function openFilters() {
+  await act(async () => filterButton().props.onClick());
+}
+
 beforeEach(() => {
   mocks.push.mockReset();
-  mocks.setFilterProps.mockReset();
+  mocks.filtersDialogProps.mockReset();
+  mocks.searchParams = new URLSearchParams();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 });
 
@@ -43,131 +98,163 @@ afterEach(async () => {
 });
 
 describe("CardBrowser filters", () => {
-  it("preserves the implicit default set when another filter changes", async () => {
-    await act(async () => {
-      renderer = create(
-        <CardBrowser
-          initialCards={[]}
-          total={0}
-          page={1}
-          totalPages={0}
-          sets={sets}
-          currentFilters={{
-            q: "",
-            color: "",
-            type: "",
-            set: latestSet,
-            block: "",
-            originOnly: "",
-          }}
-          routePath="/cards"
-        />
-      );
-    });
+  it("opens the filter dialog from the header button", async () => {
+    await renderBrowser();
 
-    await act(async () =>
-      renderer!.root
-        .findByProps({ "aria-controls": "card-filters" })
-        .props.onClick()
-    );
-    const redFilter = renderer!.root
-      .findAllByType("button")
-      .find((candidate) => candidate.props.children === "Red");
+    expect(filterButton().props["aria-expanded"]).toBe(false);
+    expect(latestDialogProps().open).toBe(false);
 
-    await act(async () => redFilter!.props.onClick());
+    await openFilters();
 
-    expect(mocks.push).toHaveBeenCalledWith(
-      `/cards?set=${latestSet}&color=Red`
-    );
+    expect(filterButton().props["aria-expanded"]).toBe(true);
+    expect(latestDialogProps().open).toBe(true);
+    expect(renderer!.root.findByProps({ id: "card-filters" })).toBeDefined();
+    // Opening the dialog must not touch the URL — the draft lives in the modal.
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
-  it("toggles the existing filter panel and supports the All Sets view", async () => {
-    await act(async () => {
-      renderer = create(
-        <CardBrowser
-          initialCards={[]}
-          total={0}
-          page={1}
-          totalPages={0}
-          sets={sets}
-          currentFilters={{
-            q: "",
-            color: "",
-            type: "",
-            set: latestSet,
-            block: "",
-            originOnly: "",
-          }}
-          routePath="/cards"
-        />
-      );
-    });
+  it("commits a whole draft in a single navigation", async () => {
+    await renderBrowser();
+    await openFilters();
 
-    const filterButton = renderer!.root.findByProps({
-      "aria-controls": "card-filters",
-    });
-    expect(filterButton.props["aria-expanded"]).toBe(false);
+    await act(async () =>
+      latestDialogProps().onApply({
+        colors: ["Red", "Blue"],
+        types: ["Leader"],
+        blocks: ["2"],
+        sets: [latestSet],
+        originOnly: true,
+      })
+    );
 
-    await act(async () => filterButton.props.onClick());
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith(
+      `/cards?set=${latestSet}&color=Red%2CBlue&type=Leader&block=2&originOnly=true`
+    );
+    // Applying closes the dialog.
+    expect(latestDialogProps().open).toBe(false);
+  });
 
-    expect(
-      renderer!.root.findByProps({ "aria-controls": "card-filters" }).props[
-        "aria-expanded"
-      ]
-    ).toBe(true);
-    expect(renderer!.root.findByProps({ id: "card-filters" })).toBeDefined();
+  it("preserves the effective set when only another filter changes", async () => {
+    await renderBrowser();
+    await openFilters();
 
-    const setFilterProps = mocks.setFilterProps.mock.calls.at(-1)?.[0];
-    await act(async () => setFilterProps.onChange([]));
+    await act(async () =>
+      latestDialogProps().onApply({
+        colors: ["Red"],
+        types: [],
+        blocks: [],
+        sets: [latestSet],
+        originOnly: false,
+      })
+    );
+
+    expect(mocks.push).toHaveBeenCalledWith(`/cards?set=${latestSet}&color=Red`);
+  });
+
+  it("switches to the All Sets view when the draft clears every set", async () => {
+    await renderBrowser();
+    await openFilters();
+
+    await act(async () =>
+      latestDialogProps().onApply({
+        colors: [],
+        types: [],
+        blocks: [],
+        sets: [],
+        originOnly: false,
+      })
+    );
 
     expect(mocks.push).toHaveBeenCalledWith("/cards?set=all");
+  });
+
+  it("does not navigate when the applied draft matches the current filters", async () => {
+    await renderBrowser({ color: "Red" });
+    await openFilters();
+
+    await act(async () =>
+      latestDialogProps().onApply({
+        colors: ["Red"],
+        types: [],
+        blocks: [],
+        sets: [latestSet],
+        originOnly: false,
+      })
+    );
+
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(latestDialogProps().open).toBe(false);
+  });
+
+  it("counts every narrowing in force on the Filter button", async () => {
+    await renderBrowser({ color: "Red,Blue", block: "1" });
+
+    // 2 colors + 1 block + the set the results are scoped to.
+    expect(
+      renderer!.root.findByProps({ "data-slot": "badge" }).props.children
+    ).toBe(4);
+  });
+
+  it("omits the count badge when nothing narrows the results", async () => {
+    await renderBrowser({ set: "" });
+
+    expect(renderer!.root.findAllByProps({ "data-slot": "badge" })).toHaveLength(
+      0
+    );
+  });
+});
+
+describe("CardBrowser zero results", () => {
+  it("offers a way back into the filters and a full reset", async () => {
+    await renderBrowser({ color: "Red" });
+
+    const emptyState = renderer!.root.findByProps({
+      children: "No cards match these filters",
+    });
+    expect(emptyState).toBeDefined();
+
+    const editFilters = renderer!.root
+      .findAllByType("button")
+      .find((node) => nodeText(node).includes("Edit filters"));
+    await act(async () => editFilters!.props.onClick());
+    expect(latestDialogProps().open).toBe(true);
+
+    const clearAll = renderer!.root
+      .findAllByType("button")
+      .find((node) => nodeText(node).includes("Clear all"));
+    await act(async () => clearAll!.props.onClick());
+
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith("/cards?set=all");
+  });
+
+  it("keeps the reset actions out of an unfiltered empty result", async () => {
+    await renderBrowser({ set: "" });
+
+    expect(
+      renderer!.root
+        .findAllByType("button")
+        .some((node) => nodeText(node).includes("Edit filters"))
+    ).toBe(false);
   });
 });
 
 describe("CardBrowser layout", () => {
   it("aligns every content section to the app-wide container", async () => {
-    await act(async () => {
-      renderer = create(
-        <CardBrowser
-          initialCards={[]}
-          total={0}
-          page={1}
-          totalPages={3}
-          sets={[{ setLabel: "OP15", setName: "Example Set", packId: "OP15" }]}
-          currentFilters={{
-            q: "",
-            color: "",
-            type: "",
-            set: "OP15",
-            block: "",
-            originOnly: "",
-          }}
-          routePath="/cards"
-        />
-      );
-    });
+    await renderBrowser({ set: "OP15" }, { totalPages: 3 });
 
-    await act(async () =>
-      renderer!.root
-        .findByProps({ "aria-controls": "card-filters" })
-        .props.onClick()
-    );
-
-    // Every horizontally padded section must share the max-w-7xl container so
-    // the header, filters, grid, and pagination keep the same left edge.
+    // Every horizontally padded section must sit in the max-w-7xl container so
+    // the header, search, grid, and pagination keep the same left edge.
     const paddedSections = renderer!.root
       .findAllByType("div")
-      .filter((node) =>
-        String(node.props.className ?? "")
-          .split(/\s+/)
-          .includes("px-6")
-      );
+      .filter((node) => classList(node).includes("px-6"));
 
-    expect(paddedSections.length).toBeGreaterThanOrEqual(4);
+    expect(paddedSections.length).toBeGreaterThanOrEqual(3);
     for (const section of paddedSections) {
-      expect(String(section.props.className).split(/\s+/)).toContain(
-        "max-w-7xl"
-      );
+      expect(
+        classList(section).includes("max-w-7xl") || hasContainerAncestor(section)
+      ).toBe(true);
     }
   });
 
@@ -178,19 +265,35 @@ describe("CardBrowser layout", () => {
 
     const paddedSections = renderer!.root
       .findAllByType("div")
-      .filter((node) =>
-        String(node.props.className ?? "")
-          .split(/\s+/)
-          .includes("px-6")
-      );
+      .filter((node) => classList(node).includes("px-6"));
 
     // The skeleton renders at route level with no padded parent, so each of its
     // bands must carry the container itself or it will jump on load.
     expect(paddedSections.length).toBeGreaterThanOrEqual(3);
     for (const section of paddedSections) {
-      const classes = String(section.props.className).split(/\s+/);
+      const classes = classList(section);
       expect(classes).toContain("max-w-7xl");
       expect(classes).not.toContain("-mx-6");
     }
   });
 });
+
+function classList(node: ReactTestInstance): string[] {
+  return String(node.props.className ?? "").split(/\s+/);
+}
+
+function hasContainerAncestor(node: ReactTestInstance): boolean {
+  let current = node.parent;
+  while (current) {
+    if (classList(current).includes("max-w-7xl")) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function nodeText(node: ReactTestInstance): string {
+  const children = node.props.children;
+  return (Array.isArray(children) ? children : [children])
+    .filter((value: unknown): value is string => typeof value === "string")
+    .join(" ");
+}

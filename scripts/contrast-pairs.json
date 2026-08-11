@@ -73,6 +73,18 @@
       "minimum": 4.5
     },
     {
+      "name": "primary/accent-soft",
+      "foreground": "--text-primary",
+      "background": "--accent-soft",
+      "minimum": 4.5
+    },
+    {
+      "name": "secondary/raised-state",
+      "foreground": "--text-secondary",
+      "background": "--surface-2",
+      "minimum": 4.5
+    },
+    {
       "name": "gold-text/panel",
       "foreground": "--accent-text",
       "background": "--surface-panel",

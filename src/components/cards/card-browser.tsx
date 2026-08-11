@@ -11,8 +11,20 @@ import {
   type CardDetail,
 } from "@/components/cards/card-detail-modal";
 import { isSubstringSearchQueryTooShort } from "@/lib/search-query";
+import { Badge } from "@/components/ui/badge";
+import {
+  ALL_CARD_SETS_FILTER,
+  countCardFilterDraft,
+  parseCardFilterDraft,
+  serializeCardFilterDraft,
+  type CardBrowserFilters,
+  type CardFilterDraft,
+} from "@/lib/cards/browser-params";
 import { CardGrid } from "./card-grid";
-import { CardFilters } from "./card-filters";
+import {
+  CardFiltersDialog,
+  CARD_FILTERS_DIALOG_ID,
+} from "./card-filters-dialog";
 import { Pagination } from "./pagination";
 import {
   PageHeader,
@@ -28,14 +40,7 @@ export interface CardBrowserProps {
   page: number;
   totalPages: number;
   sets: { setLabel: string; setName: string; packId: string }[];
-  currentFilters: {
-    q: string;
-    color: string;
-    type: string;
-    set: string;
-    block: string;
-    originOnly: string;
-  };
+  currentFilters: CardBrowserFilters;
   routePath: string;
   renderDetailActions?: (card: CardDetail | null) => React.ReactNode;
 }
@@ -134,6 +139,40 @@ export function CardBrowser({
 
   const searchTooShort = isSubstringSearchQueryTooShort(search);
 
+  const activeFilterCount = countCardFilterDraft(
+    parseCardFilterDraft(currentFilters)
+  );
+
+  // Draft-then-commit: the dialog hands back one draft and this is the only
+  // navigation the whole filter surface performs.
+  const handleApplyFilters = useCallback(
+    (draft: CardFilterDraft) => {
+      setFiltersOpen(false);
+      const updates = serializeCardFilterDraft(draft);
+      const applied = serializeCardFilterDraft(
+        parseCardFilterDraft(currentFilters)
+      );
+      const unchanged = Object.keys(updates).every(
+        (key) => updates[key] === applied[key]
+      );
+      if (unchanged) return;
+      updateFilters(updates);
+    },
+    [currentFilters, updateFilters]
+  );
+
+  const clearAllFilters = useCallback(() => {
+    setSearch("");
+    updateFilters({
+      q: "",
+      set: ALL_CARD_SETS_FILTER,
+      color: "",
+      type: "",
+      block: "",
+      originOnly: "",
+    });
+  }, [updateFilters]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Page header — fixed to top */}
@@ -157,30 +196,27 @@ export function CardBrowser({
         <PageHeaderActions>
           <Button
             type="button"
-            onClick={() => setFiltersOpen((open) => !open)}
+            onClick={() => setFiltersOpen(true)}
+            aria-haspopup="dialog"
             aria-expanded={filtersOpen}
-            aria-controls="card-filters"
+            aria-controls={CARD_FILTERS_DIALOG_ID}
+            aria-label={
+              activeFilterCount > 0
+                ? `Filter — ${activeFilterCount} applied`
+                : undefined
+            }
           >
             <Filter data-icon="inline-start" />
             Filter
+            {activeFilterCount > 0 && (
+              <Badge aria-hidden>{activeFilterCount}</Badge>
+            )}
           </Button>
         </PageHeaderActions>
       </PageHeader>
 
       {/* Scrollable content area */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {filtersOpen && (
-          <div id="card-filters" className="border-border border-b">
-            <div className="mx-auto w-full max-w-7xl px-6 py-6">
-              <CardFilters
-                sets={sets}
-                currentFilters={currentFilters}
-                onFilterChange={updateFilters}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Search bar */}
         <div className="mx-auto w-full max-w-7xl px-6 py-6">
           <form onSubmit={handleSearch}>
@@ -214,7 +250,15 @@ export function CardBrowser({
             totalPages <= 1 && "pb-6"
           )}
         >
-          <CardGrid cards={initialCards} onCardClick={setModalCardId} />
+          {initialCards.length === 0 ? (
+            <NoCardsFound
+              hasFilters={activeFilterCount > 0 || Boolean(currentFilters.q)}
+              onEditFilters={() => setFiltersOpen(true)}
+              onClearAll={clearAllFilters}
+            />
+          ) : (
+            <CardGrid cards={initialCards} onCardClick={setModalCardId} />
+          )}
         </div>
 
         {/* Pagination */}
@@ -230,6 +274,15 @@ export function CardBrowser({
           </div>
         )}
       </div>
+
+      {/* Every filter lives here — nothing filter-related renders inline. */}
+      <CardFiltersDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        sets={sets}
+        filters={currentFilters}
+        onApply={handleApplyFilters}
+      />
 
       {/* Card detail modal */}
       {modalCardId && (
@@ -250,6 +303,44 @@ export function CardBrowser({
           onClose={() => setModalCardId(null)}
           renderActions={renderDetailActions}
         />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Zero-result affordance. With filters behind a dialog the visitor cannot see
+ * what excluded everything, so the empty state carries the way back in.
+ */
+function NoCardsFound({
+  hasFilters,
+  onEditFilters,
+  onClearAll,
+}: {
+  hasFilters: boolean;
+  onEditFilters: () => void;
+  onClearAll: () => void;
+}) {
+  return (
+    <div className="border-border bg-surface-1 flex flex-col items-center gap-4 rounded-lg border px-6 py-16 text-center">
+      <p className="text-content-primary text-base font-semibold">
+        No cards match these filters
+      </p>
+      <p className="text-content-secondary max-w-prose text-sm">
+        {hasFilters
+          ? "Widen the set selection or drop a color, type, or block to bring cards back."
+          : "The database returned nothing for this page."}
+      </p>
+      {hasFilters && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button type="button" onClick={onEditFilters}>
+            <Filter data-icon="inline-start" />
+            Edit filters
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClearAll}>
+            Clear all
+          </Button>
+        </div>
       )}
     </div>
   );
