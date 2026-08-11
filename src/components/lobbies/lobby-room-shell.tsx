@@ -593,8 +593,12 @@ export function LobbyRoomShell({
           </div>
         </header>
 
+        {/* Below `lg` the fixed chrome — a wrapped header above, a stacked
+            action bar below — already spends most of a short viewport, so the
+            content well gives up a spacing step before the seats have to give
+            up a row. */}
         <main
-          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:py-8"
+          className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden px-6 py-3 lg:py-4 lg:[@media(min-height:50rem)]:gap-6 lg:[@media(min-height:50rem)]:py-8"
           data-lobby-content
         >
           {joinError && (
@@ -617,9 +621,15 @@ export function LobbyRoomShell({
 
           {/* Side by side from `lg`, where `auto-rows-fr` pins the single row
               to the available height so neither cell can grow the frame. In one
-              column the cells keep their natural heights and stack. */}
+              column the cells keep their natural heights and stack — they are
+              `shrink-0`, because a cell squeezed below the height it just laid
+              out paints its own controls over the cell beneath it.
+              `overflow-y-auto` is the release valve for that rigidity: the page
+              and the frame stay locked, and on viewports where the fixed chrome
+              leaves less room than two compact panels need, this region — and
+              only this region — scrolls instead of overlapping. */}
           <div
-            className="flex min-h-0 flex-1 flex-col gap-4 lg:grid lg:auto-rows-fr lg:grid-cols-2 lg:[@media(min-height:50rem)]:gap-6"
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:grid lg:auto-rows-fr lg:grid-cols-2 lg:overflow-visible lg:[@media(min-height:50rem)]:gap-6"
             data-lobby-seats
           >
             <LobbySeatCard
@@ -1203,7 +1213,7 @@ export function InvitePanel({
     return (
       <section
         aria-label="Guest seat — invite pending"
-        className="border-border bg-surface-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border"
+        className="border-border bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border"
       >
         <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b px-5 py-3 lg:min-h-20 lg:py-4">
           <div className="ring-gold-500/30 shrink-0 animate-pulse rounded-full ring-2">
@@ -1247,7 +1257,7 @@ export function InvitePanel({
   }
 
   return (
-    <section className="border-border-strong bg-surface-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-dashed">
+    <section className="border-border-strong bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border border-dashed">
       <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b border-dashed px-5 py-3 text-left lg:min-h-20 lg:py-4">
         <div
           className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded-full border border-dashed"
@@ -1330,7 +1340,7 @@ function SolitaireSeat({
   return (
     <section
       className={cn(
-        "relative flex min-h-0 items-start gap-4",
+        "relative flex min-h-0 shrink-0 items-start gap-4",
         // A bordered panel from `lg`. In one column that chrome costs more
         // height than the frame can spare, so the panel dissolves into the same
         // compact row the seats use: art on the left, identity and deck select
@@ -1341,7 +1351,13 @@ function SolitaireSeat({
       )}
       aria-label="Solitaire second deck"
     >
-      {art("w-24 lg:hidden")}
+      {/* The tilt is drawn outside the card's layout box, so the compact
+          thumbnail buys the rotation its own room instead of borrowing it from
+          the neighbours: `h-20` keeps the rotated corners inside the band the
+          text column defines, `self-center` centres them in it, and `m-1` is
+          the sliver the corners swing out to on each side. Height-first here
+          too, so the card can never be what makes this panel tall. */}
+      {art("m-1 h-20 w-auto self-center lg:hidden")}
 
       <div className="flex min-w-0 flex-1 flex-col gap-3 lg:contents">
         <header className="border-border flex min-w-0 items-center gap-3 lg:order-1 lg:min-h-20 lg:shrink-0 lg:border-b lg:px-5 lg:py-4">

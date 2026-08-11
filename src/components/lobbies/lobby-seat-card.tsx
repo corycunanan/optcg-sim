@@ -24,7 +24,8 @@ import { ChangeDeckModal, type LobbyDeckOption } from "./change-deck-modal";
  * the seat stays a glance-readable summary of *who* and *what they brought*.
  *
  * The lobby frame never scrolls, so the seat has to survive on a height budget
- * it does not control. Two responses, both keyed off the same groups:
+ * it does not control. Two responses, both keyed off the same groups, and both
+ * obeying one rule: **the leader art is sized by the seat, never the reverse.**
  *
  * - From `lg` the stack keeps OPT-650's order and the leader is the *only*
  *   flexible member. Everything else is fixed chrome, so the leader absorbs
@@ -35,6 +36,18 @@ import { ChangeDeckModal, type LobbyDeckOption } from "./change-deck-modal";
  *   identity row. Only placement changes — the DOM stays in the reading and tab
  *   order the stacked layout paints, and the placement properties simply stop
  *   applying once the seat is a flex column at `lg`.
+ *
+ * The compact art is height-first too (`h-24`, width from the ratio), so the
+ * rows are sized entirely by the text column and the art can never paint past
+ * the bottom of the section that contains it. That was the failure the earlier
+ * fixed-width thumbnail hid: a grid box whose painted content ran longer than
+ * the box the parent had agreed to give it.
+ *
+ * Readiness then folds up beside the caption once the seat is wide enough to
+ * seat both, trading 52px of height for 160px of width. That trade is keyed off
+ * a *container* query rather than the viewport: a fixed social rail takes 280px
+ * out of every page, so viewport width says nothing useful about how much room
+ * this seat actually got.
  */
 export function LobbySeatCard({
   role,
@@ -86,17 +99,23 @@ export function LobbySeatCard({
   return (
     <section
       className={cn(
-        "grid min-h-0 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-3",
+        // `shrink-0` is load-bearing below `lg`: the seats column is a flex
+        // column on a height budget, and a shrinkable seat would be handed a
+        // box shorter than the rows it just laid out — painting its ready
+        // control on top of whatever follows.
+        "@container grid min-h-0 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-3",
         "lg:flex lg:flex-col lg:gap-4 lg:[@media(min-height:50rem)]:gap-5",
         dimmed && "opacity-60"
       )}
       aria-label={`${role} seat — ${playerName}`}
     >
-      {/* Pulls the ghost button's own padding out so the glyph reads on the
-          same edge as the rest of the seat — the row's right edge while the
-          seat is a row, the shared left edge once it stacks at `lg`. */}
+      {/* The trailing column is as wide as the ready control below it, so the
+          menu is pinned to that column's end rather than stretched across it —
+          the two controls then share one right edge. At `lg` the seat is a
+          stack with nothing beside it, so the ghost button's own padding comes
+          back out and the glyph reads on the shared left spine instead. */}
       <SeatOverflowMenu
-        className="col-start-3 row-start-1 -mr-3 lg:-ml-3 lg:mr-0"
+        className="col-start-3 row-start-1 justify-self-end lg:-ml-3"
         seatLabel={`${role} seat — ${playerName}`}
       >
         {deckEditable ? (
@@ -130,6 +149,10 @@ export function LobbySeatCard({
         </div>
       </div>
 
+      {/* Placement uses explicit end lines rather than `row-span`/`col-span`:
+          the span utilities compile to the `grid-row`/`grid-column` shorthand,
+          which resets the start line, so a span declared inside the container
+          query would silently unpin whatever the base classes placed. */}
       <div
         className="max-lg:contents lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3"
         data-leader-art-caption-group
@@ -139,22 +162,26 @@ export function LobbySeatCard({
           deckEditable={deckEditable}
           onChangeDeck={() => setChangeDeckOpen(true)}
           onPreview={onPreview}
-          className="col-start-1 row-span-3 row-start-1"
+          className="col-start-1 row-start-1 row-end-4 @min-[26rem]:row-end-3"
         />
 
         <LeaderCaption
           deck={deck}
           deckEditable={deckEditable}
-          className="col-span-2 col-start-2 row-start-2"
+          className="col-start-2 col-end-4 row-start-2 @min-[26rem]:col-end-3"
         />
       </div>
 
+      {/* Its own row while the seat is narrow — a 10rem control and a truncating
+          identity cannot share 20rem without one of them disappearing. Past
+          26rem it moves up beside the caption, under the overflow menu it now
+          shares a column edge with, and the strip loses a whole row. */}
       <ReadyControl
         ready={ready}
         editable={readyEditable}
         disabled={readyDisabled}
         onChange={onReadyChange}
-        className="col-span-2 col-start-2 row-start-3 justify-self-start"
+        className="col-start-2 col-end-4 row-start-3 justify-self-start @min-[26rem]:col-start-3 @min-[26rem]:row-start-2 @min-[26rem]:justify-self-end"
       />
 
       {deckEditable && (
@@ -305,15 +332,21 @@ function ReadyControl({
  * Sizing shared by every leader-art state so the filled card, the "choose a
  * deck" affordance, and the inert placeholder occupy exactly the same box.
  *
- * Below `lg` the art is a fixed thumbnail set beside the seat's identity
- * column. From `lg` it is the seat's one flexible member: `flex-1` hands it
- * whatever height the fixed groups leave, `w-auto` lets `aspect-card` derive
- * the width from that height, and the cap holds it at OPT-650's hero size
- * (16.75rem is 12rem — `w-48` — at the 600/838 card ratio). Height drives
- * width rather than the reverse, so the art scales without ever being cropped.
+ * Height drives width in both regimes — the art never states a width of its
+ * own, so it can never be the thing that decides how tall its container is.
+ *
+ * Below `lg` the art is a thumbnail pinned to `h-24`: shorter than the shortest
+ * text column it can sit beside, so the strip's height is always the text
+ * column's and the art always lands inside it. (A fixed *width* here was the
+ * OPT-658 defect — `w-24` implies a 134px card against a text column the seat
+ * had no obligation to make that tall.) From `lg` it is the seat's one flexible
+ * member: `flex-1` hands it whatever height the fixed groups leave and the cap
+ * holds it at OPT-650's hero size (16.75rem is 12rem — `w-48` — at the 600/838
+ * card ratio). `w-auto` lets `aspect-card` derive the width from the height in
+ * both cases, so the art scales without ever being cropped.
  */
 const LEADER_ART_CLASS =
-  "aspect-card w-24 shrink-0 rounded-md lg:max-h-[16.75rem] lg:min-h-0 lg:w-auto lg:flex-1";
+  "aspect-card h-24 w-auto shrink-0 rounded-md lg:h-auto lg:max-h-[16.75rem] lg:min-h-0 lg:w-auto lg:flex-1";
 
 /**
  * The leader art is the seat's hero and its only route into the deck: the

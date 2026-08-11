@@ -278,11 +278,29 @@ describe("LobbySeatCard composition", () => {
     expect(caption?.parentElement).toBe(group);
     expect(caption?.parentElement).not.toBe(section);
     expect(leader.classList).toContain("col-start-1");
-    expect(leader.classList).toContain("row-span-3");
     expect(leader.classList).toContain("row-start-1");
-    expect(caption?.classList).toContain("col-span-2");
+    expect(leader.classList).toContain("row-end-4");
     expect(caption?.classList).toContain("col-start-2");
+    expect(caption?.classList).toContain("col-end-4");
     expect(caption?.classList).toContain("row-start-2");
+  });
+
+  it("places the compact grid with end lines, never span shorthands", () => {
+    renderSeat({ deckEditable: true, readyEditable: true });
+
+    // `row-span-*`/`col-span-*` compile to the `grid-row`/`grid-column`
+    // shorthand, which resets the start line. A span declared inside the
+    // container query would therefore unpin whatever the base classes placed —
+    // that is exactly how the art once auto-flowed into a phantom fourth row.
+    const placed = [
+      screen.getByRole("button", { name: /More actions for/ }),
+      screen.getByRole("button", { name: /Change deck/ }),
+      screen.getByText("Leader").parentElement!,
+      screen.getByRole("button", { name: /Ready/ }),
+    ];
+    for (const node of placed) {
+      expect(node.className).not.toMatch(/(^|\s|:)(row|col)-span-/);
+    }
   });
 
   it("keeps the deck list out of the seat", () => {
@@ -314,9 +332,12 @@ describe("LobbySeatCard composition", () => {
     const leader = screen.getByRole("button", {
       name: "Preview Straw Hat Rush",
     });
-    // A fixed thumbnail in the compact row; the stack's one flexible member
-    // from `lg`, where height drives width through the card ratio.
-    expect(leader.className).toContain("w-24");
+    // Height drives width in both regimes, so the art is never what decides
+    // how tall its container is: a capped thumbnail in the compact row, the
+    // stack's one flexible member from `lg`.
+    expect(leader.className).toContain("h-24");
+    expect(leader.className).toContain("w-auto");
+    expect(leader.className).not.toMatch(/(^|\s)w-\d/);
     expect(leader.className).toContain("lg:w-auto");
     expect(leader.className).toContain("lg:flex-1");
     expect(leader.className).toContain("lg:max-h-[16.75rem]");
@@ -327,7 +348,13 @@ describe("LobbySeatCard composition", () => {
   });
 
   it("gives every leader-art state the same flexible box", () => {
-    const boxes = ["w-24", "lg:w-auto", "lg:flex-1", "lg:max-h-[16.75rem]"];
+    const boxes = [
+      "h-24",
+      "w-auto",
+      "lg:w-auto",
+      "lg:flex-1",
+      "lg:max-h-[16.75rem]",
+    ];
 
     renderSeat({ deck: null, deckEditable: true });
     const picker = screen.getByRole("button", { name: "Choose a deck" });
@@ -361,15 +388,52 @@ describe("LobbySeatCard composition", () => {
     ).toContain("col-start-3");
     const leader = screen.getByRole("button", { name: /Change deck/ });
     expect(leader.className).toContain("col-start-1");
-    expect(leader.className).toContain("row-span-3");
     expect(leader.className).toContain("row-start-1");
+    expect(leader.className).toContain("row-end-4");
     const caption = screen.getByText("Leader").parentElement;
-    expect(caption?.className).toContain("col-span-2");
     expect(caption?.className).toContain("col-start-2");
+    expect(caption?.className).toContain("col-end-4");
     expect(caption?.className).toContain("row-start-2");
     expect(
       screen.getByRole("button", { name: /Ready/ }).className
     ).toContain("row-start-3");
+  });
+
+  it("cannot be squeezed shorter than the rows it just laid out", () => {
+    renderSeat({ deckEditable: true, readyEditable: true });
+
+    // The seats column is a flex column on a height budget below `lg`. A
+    // shrinkable seat is handed a box shorter than its own content and paints
+    // its ready control over whatever follows — the OPT-658 defect.
+    expect(seatSection().className).toContain("shrink-0");
+  });
+
+  it("folds readiness up beside the caption on its own width, not the viewport's", () => {
+    renderSeat({ deckEditable: true, readyEditable: true });
+
+    // A fixed 280px social rail sits on every page, so viewport width says
+    // nothing about how much room this seat got. The seat is its own query
+    // container and the fold is keyed off that.
+    const section = seatSection();
+    expect(section.className).toContain("@container");
+
+    const ready = screen.getByRole("button", { name: /Ready/ });
+    // Narrow: its own row, spanning the identity and menu columns.
+    expect(ready.className).toContain("col-start-2");
+    expect(ready.className).toContain("col-end-4");
+    expect(ready.className).toContain("row-start-3");
+    expect(ready.className).toContain("justify-self-start");
+    // Wide: up into the caption's row, sharing the menu's column edge.
+    expect(ready.className).toContain("@min-[26rem]:col-start-3");
+    expect(ready.className).toContain("@min-[26rem]:row-start-2");
+    expect(ready.className).toContain("@min-[26rem]:justify-self-end");
+    // The art and caption give up their third-row reach on the same threshold.
+    expect(
+      screen.getByRole("button", { name: /Change deck/ }).className
+    ).toContain("@min-[26rem]:row-end-3");
+    expect(screen.getByText("Leader").parentElement?.className).toContain(
+      "@min-[26rem]:col-end-3"
+    );
   });
 
   it("spends its rhythm only where the viewport can afford it", () => {
