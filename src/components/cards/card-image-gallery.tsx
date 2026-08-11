@@ -91,7 +91,13 @@ export function CardImageGallery({
                   aria-pressed={isSelected}
                   onClick={() => handleSelect(art.imageUrl)}
                   className={cn(
-                    "group cursor-pointer overflow-hidden rounded text-left transition-all hover:shadow-md",
+                    // A stretched grid-cell button vertically centres its
+                    // content, so any height slack would paint as padding
+                    // above the art; a top-aligned flex column pushes the
+                    // slack below the label instead, and `aspect-card` keeps
+                    // every scan the same height regardless of its intrinsic
+                    // ratio.
+                    "group flex cursor-pointer flex-col overflow-hidden rounded text-left transition-all hover:shadow-md",
                     isSelected
                       ? "border border-border-strong"
                       : "border border-border",
@@ -102,7 +108,7 @@ export function CardImageGallery({
                     src={art.imageUrl}
                     alt={`${cardName} — ${art.label}`}
                     className={cn(
-                      "w-full transition-opacity",
+                      "aspect-card w-full object-cover transition-opacity",
                       isSelected ? "opacity-100" : "opacity-70 group-hover:opacity-100",
                     )}
                     loading="lazy"

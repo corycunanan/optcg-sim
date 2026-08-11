@@ -246,20 +246,22 @@
      is part of the game's notation, so — like the six TCG card colors above —
      these are a feature contract, never overridden by a data-theme selector.
 
-     The three chromatic fills — timing, keyword, counter — share one lightness
+     Hues follow the printed cards: activation timings are blue ([Counter] is
+     a play-timing marker, so it shares the timing blue), constraints are red,
+     and evergreen keywords are orange. The chromatic fills share one lightness
      (46%) so a chip row reads as a single system with hue as the only variable,
      and every fill sits well below the accent in lightness so notation never
      competes with the focal action or with card art
-     (docs/design/COLOR-LANGUAGE.md, salience hierarchy). The modifier fill sits
-     deliberately outside that trio, at a lower lightness (40%) and near-zero
-     chroma: modifiers qualify an effect that another chip has already timed, so
-     they read one step quieter than the notation they attach to. [Trigger]
-     keeps its printed ink-and-yellow treatment, which the white keyline
-     separates from the panel behind it. */
-  --effect-timing: oklch(46% 0.16 25); /* [On Play], [When Attacking], [Main] */
+     (docs/design/COLOR-LANGUAGE.md, salience hierarchy). The DON!! fill sits
+     deliberately outside that set, at a lower lightness (40%) and near-zero
+     chroma, matching the printed badge's dark ink. [Trigger] keeps its printed
+     ink-and-yellow treatment, which the white keyline separates from the panel
+     behind it. */
+  --effect-timing: oklch(46% 0.1 215); /* [On Play], [When Attacking], [Main] */
   --effect-keyword: oklch(46% 0.12 62); /* [Rush], [Blocker], [Banish] */
   --effect-counter: oklch(46% 0.1 215); /* [Counter] */
-  --effect-modifier: oklch(40% 0.04 245); /* [Once Per Turn], [DON!! xN] */
+  --effect-modifier: oklch(46% 0.16 25); /* [Once Per Turn], [Your Turn] */
+  --effect-don: oklch(40% 0.04 245); /* [DON!! xN] */
   --effect-trigger: oklch(24% 0.03 90); /* [Trigger] */
   --effect-trigger-fg: oklch(86% 0.16 90);
   --effect-notation-fg: #ffffff;
@@ -455,6 +457,7 @@
   --color-effect-keyword: var(--effect-keyword);
   --color-effect-counter: var(--effect-counter);
   --color-effect-modifier: var(--effect-modifier);
+  --color-effect-don: var(--effect-don);
   --color-effect-trigger: var(--effect-trigger);
   --color-effect-trigger-fg: var(--effect-trigger-fg);
   --color-effect-notation-fg: var(--effect-notation-fg);

@@ -36,8 +36,8 @@ describe("classifyNotationToken", () => {
     ["Once Per Turn", "modifier"],
     ["Your Turn", "modifier"],
     ["Opponent's Turn", "modifier"],
-    ["DON!! x1", "modifier"],
-    ["DON!! x2", "modifier"],
+    ["DON!! x1", "don"],
+    ["DON!! x2", "don"],
     ["Trigger", "trigger"],
     ["Counter", "counter"],
   ] satisfies [string, EffectNotationFamily][])(
@@ -52,7 +52,7 @@ describe("classifyNotationToken", () => {
   });
 
   it("badges DON!! costs beyond those printed today", () => {
-    expect(classifyNotationToken("DON!! x9")).toBe("modifier");
+    expect(classifyNotationToken("DON!! x9")).toBe("don");
   });
 
   it.each(["Monkey.D.Luffy", "Sanji", "Enel", "Onigashima Island", "Monster"])(
@@ -143,7 +143,7 @@ describe("parseEffectLine segments", () => {
     ).toEqual([
       ["timing", "Activate: Main"],
       ["modifier", "Once Per Turn"],
-      ["modifier", "DON!! x2"],
+      ["don", "DON!! x2"],
     ]);
   });
 

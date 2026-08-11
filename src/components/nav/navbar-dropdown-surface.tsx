@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-import { ChamferFrame } from "@/components/ui/chamfer-frame";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,11 +9,10 @@ import { cn } from "@/lib/utils";
  * account menu, and the notification panel — renders through this component so
  * the treatment cannot drift between them:
  *
- * - **Shape:** chamfered polygon, 8px cut, top-left + bottom-right. Chrome is
- *   angular so the rounded card silhouette stays unique
- *   (`docs/design/SHAPE-LANGUAGE.md`). 8px is the control step, which is the
- *   scale these menus actually read at, and it leaves the diagonal clear of the
- *   first and last row's inset focus outline.
+ * - **Shape:** a plain rectangle with square corners. Action menus are chrome,
+ *   not content: the chamfered silhouette is reserved for cards sitting on
+ *   page surfaces, and rounding is reserved for the sanctioned radius scale's
+ *   content shapes, so menu chrome stays unornamented.
  * - **Material:** flat, opaque `--surface-overlay` interior with a single
  *   neutral 1px edge. No ring, no blur, no shadow stack — the perimeter is the
  *   only ornament and the interior is dead flat
@@ -28,24 +26,22 @@ export function NavbarDropdownSurface({
   surfaceClassName,
   children,
 }: {
-  /** Layout classes for the rectangular frame root. */
+  /** Layout classes for the frame root. */
   className?: string;
-  /** Classes for the clipped surface — sizing and inner padding go here. */
+  /** Classes for the surface — sizing and inner padding go here. */
   surfaceClassName?: string;
   children: ReactNode;
 }) {
   return (
-    <ChamferFrame
+    <div
       data-slot="navbar-dropdown-surface"
-      cut="md"
-      edge="neutral"
-      className={className}
-      surfaceClassName={cn(
-        "bg-popover text-popover-foreground",
+      className={cn(
+        "border-border bg-popover text-popover-foreground overflow-hidden border",
+        className,
         surfaceClassName
       )}
     >
       {children}
-    </ChamferFrame>
+    </div>
   );
 }

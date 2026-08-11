@@ -77,7 +77,7 @@ describe("PageHeader", () => {
     const { container } = render(
       <PageHeader>
         <PageHeaderContent>
-          <PageHeaderTitle>My Decks</PageHeaderTitle>
+          <PageHeaderTitle>Decks</PageHeaderTitle>
         </PageHeaderContent>
         <PageHeaderActions>
           <button type="button">Filter</button>

@@ -33,6 +33,7 @@ const NOTATION_CHIP_STYLES: Record<EffectNotationFamily, string> = {
   keyword: "bg-effect-keyword text-effect-notation-fg",
   counter: "bg-effect-counter text-effect-notation-fg",
   modifier: "bg-effect-modifier text-effect-notation-fg",
+  don: "bg-effect-don text-effect-notation-fg",
   trigger: "bg-effect-trigger text-effect-trigger-fg",
 };
 

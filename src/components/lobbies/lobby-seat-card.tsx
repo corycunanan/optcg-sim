@@ -2,7 +2,7 @@
 
 import { Children, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { EllipsisVertical, Eye, Plus, Replace, UserRound } from "lucide-react";
+import { Ellipsis, Eye, Plus, Replace, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LobbyRoomDeck } from "@/lib/lobbies/state";
 import { UserAvatar } from "@/components/social/user-avatar";
@@ -134,7 +134,10 @@ export function LobbySeatCard({
         // box shorter than the rows it just laid out — painting its ready
         // control on top of whatever follows.
         "@container grid min-h-0 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-3",
-        "lg:flex lg:flex-col lg:gap-4 lg:[@media(min-height:50rem)]:gap-5",
+        // From `lg` the seat is a fixed-width centered column: every group
+        // hangs off the column's vertical center line and the stack floats on
+        // the height budget instead of hugging the top — the LoL-lobby read.
+        "lg:flex lg:w-72 lg:flex-col lg:items-center lg:justify-center lg:gap-4 lg:[@media(min-height:50rem)]:gap-5",
         dimmed && "opacity-60"
       )}
       aria-label={`${role} seat — ${playerName}`}
@@ -142,10 +145,10 @@ export function LobbySeatCard({
       {/* The trailing column is as wide as the ready control below it, so the
           menu is pinned to that column's end rather than stretched across it —
           the two controls then share one right edge. At `lg` the seat is a
-          stack with nothing beside it, so the ghost button's own padding comes
-          back out and the glyph reads on the shared left spine instead. */}
+          centered stack, so the menu pins to the column's top-right corner
+          instead of joining the centered spine. */}
       <SeatOverflowMenu
-        className="col-start-3 row-start-1 justify-self-end lg:-ml-3"
+        className="col-start-3 row-start-1 justify-self-end lg:self-end"
         seatLabel={`${role} seat — ${playerName}`}
       >
         {deckEditable ? (
@@ -184,7 +187,7 @@ export function LobbySeatCard({
           which resets the start line, so a span declared inside the container
           query would silently unpin whatever the base classes placed. */}
       <div
-        className="max-lg:contents lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3"
+        className="max-lg:contents lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:items-center lg:gap-3"
         data-leader-art-caption-group
       >
         <LeaderArt
@@ -267,7 +270,7 @@ function SeatOverflowMenu({
           className={className}
           aria-label={`More actions for ${seatLabel}`}
         >
-          <EllipsisVertical />
+          <Ellipsis />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
@@ -489,7 +492,9 @@ function LeaderCaption({
   className?: string;
 }) {
   return (
-    <div className={cn("w-full min-w-0 shrink-0 lg:w-48", className)}>
+    <div
+      className={cn("w-full min-w-0 shrink-0 lg:w-48 lg:text-center", className)}
+    >
       <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
         Leader
       </p>

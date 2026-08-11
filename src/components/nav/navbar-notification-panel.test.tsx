@@ -159,7 +159,7 @@ describe("NavbarNotificationPanel", () => {
     ).toHaveLength(22);
   });
 
-  it("renders through the shared chamfered surface with inset focus outlines", async () => {
+  it("renders through the shared rectangular surface with inset focus outlines", async () => {
     mocks.notifications = [notification("1", "2026-01-01T00:00:00.000Z")];
     render(<NavbarNotificationPanel />);
 
@@ -169,10 +169,13 @@ describe("NavbarNotificationPanel", () => {
       '[data-slot="navbar-dropdown-surface"]'
     );
     expect(surface).not.toBeNull();
-    expect(surface?.getAttribute("data-cut")).toBe("md");
-    expect(surface?.getAttribute("data-edge")).toBe("neutral");
+    // Square corners: menu chrome takes no chamfer and no radius.
+    expect(surface?.getAttribute("data-cut")).toBeNull();
+    const surfaceClasses = (surface?.getAttribute("class") ?? "").split(/\s+/);
+    expect(surfaceClasses).toContain("border");
+    expect(surfaceClasses.some((c) => c.startsWith("rounded"))).toBe(false);
 
-    // The popover is a positioning shell: the chamfered surface inside it is
+    // The popover is a positioning shell: the rectangular surface inside it is
     // the only painted material.
     const shell = screen
       .getByRole("dialog", { name: "Notifications" })

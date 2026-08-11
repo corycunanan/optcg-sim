@@ -6,7 +6,7 @@ import type { DeckListItem } from "./deck-list";
 import { DeckListFilter } from "./deck-list-filter";
 
 export const metadata = {
-  title: "My Decks — OPTCG Simulator",
+  title: "Decks — OPTCG Simulator",
 };
 
 /**

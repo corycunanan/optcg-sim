@@ -784,9 +784,11 @@ describe("deck builder navigation guard", () => {
       mocks.pathname = pathname;
       await renderGuard(<Navbar />, false);
 
+      // Triggers first: the Decks dropdown now contains a link that shares
+      // the trigger's own label, and the active marker lives on the trigger.
       const item = [
-        ...renderer!.root.findAllByType("a"),
         ...renderer!.root.findAllByType("button"),
+        ...renderer!.root.findAllByType("a"),
       ].find((candidate) => candidate.children.includes(label));
 
       expect(item?.props[activeProp]).toBeTruthy();

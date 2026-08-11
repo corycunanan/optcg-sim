@@ -479,13 +479,14 @@ describe("LobbyRoomShell redesign scenarios", () => {
       "lg:[@media(min-height:50rem)]:gap-6"
     );
 
-    // One column stacks at natural heights; from `lg` the single row is
-    // pinned to the space left over so neither seat can grow the frame.
+    // One column stacks at natural heights; from `lg` the seats become a
+    // centered pair of fixed-width columns whose stretch height is the space
+    // left over, so neither seat can grow the frame.
     const seats = renderer!.root.findByProps({ "data-lobby-seats": true });
     expect(seats.props.className).toContain("min-h-0");
     expect(seats.props.className).toContain("flex-col");
-    expect(seats.props.className).toContain("lg:grid");
-    expect(seats.props.className).toContain("lg:auto-rows-fr");
+    expect(seats.props.className).toContain("lg:flex-row");
+    expect(seats.props.className).toContain("lg:justify-center");
     expect(seats.props.className).not.toContain("min-h-96");
   });
 
