@@ -36,6 +36,7 @@ export type EffectNotationFamily =
   | "timing"
   | "keyword"
   | "modifier"
+  | "don"
   | "counter"
   | "trigger";
 
@@ -86,16 +87,20 @@ export const PRINTED_NOTATION_TOKENS = {
   "once per turn": "modifier",
   "your turn": "modifier",
   "opponent's turn": "modifier",
-  "don!! x1": "modifier",
-  "don!! x2": "modifier",
-  "don!! x3": "modifier",
+
+  // Attached-DON!! conditions keep the printed badge's own dark treatment, so
+  // they are their own family rather than sharing the constraint chip.
+  "don!! x1": "don",
+  "don!! x2": "don",
+  "don!! x3": "don",
 } as const satisfies Record<string, EffectNotationFamily>;
 
 /**
  * Forward tolerance for DON!! costs beyond those printed today: `[DON!! x4]`
- * should badge as a modifier the day a set prints it, not render as a bracket.
+ * should badge as a DON!! condition the day a set prints it, not render as a
+ * bracket.
  */
-const DON_MODIFIER = /^don!! x\d+$/;
+const DON_CONDITION = /^don!! x\d+$/;
 
 /** Delimiter pairs the notation uses, opener → closer. */
 const DELIMITERS: Record<string, string> = { "[": "]", "{": "}" };
@@ -123,7 +128,7 @@ export function classifyNotationToken(
   )[normalized];
 
   if (printed) return printed;
-  return DON_MODIFIER.test(normalized) ? "modifier" : null;
+  return DON_CONDITION.test(normalized) ? "don" : null;
 }
 
 /**

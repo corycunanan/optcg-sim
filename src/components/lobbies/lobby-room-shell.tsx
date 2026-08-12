@@ -627,17 +627,21 @@ export function LobbyRoomShell({
             </div>
           )}
 
-          {/* Side by side from `lg`, where `auto-rows-fr` pins the single row
-              to the available height so neither cell can grow the frame. In one
-              column the cells keep their natural heights and stack — they are
-              `shrink-0`, because a cell squeezed below the height it just laid
-              out paints its own controls over the cell beneath it.
-              `overflow-y-auto` is the release valve for that rigidity: the page
-              and the frame stay locked, and on viewports where the fixed chrome
-              leaves less room than two compact panels need, this region — and
-              only this region — scrolls instead of overlapping. */}
+          {/* Side by side from `lg` as a centered pair of fixed-width columns
+              — the LoL-lobby read: seats cluster on the screen's center line
+              instead of spreading to the well's edges. Default cross-axis
+              stretch hands both columns the full row height, so the leader art
+              (the seat's one flexible member) still sizes off the height
+              budget. In one column the cells keep their natural heights and
+              stack — they are `shrink-0`, because a cell squeezed below the
+              height it just laid out paints its own controls over the cell
+              beneath it. `overflow-y-auto` is the release valve for that
+              rigidity: the page and the frame stay locked, and on viewports
+              where the fixed chrome leaves less room than two compact panels
+              need, this region — and only this region — scrolls instead of
+              overlapping. */}
           <div
-            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:grid lg:auto-rows-fr lg:grid-cols-2 lg:overflow-visible lg:[@media(min-height:50rem)]:gap-6"
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:flex-row lg:justify-center lg:gap-8 lg:overflow-visible lg:[@media(min-height:50rem)]:gap-10"
             data-lobby-seats
           >
             <LobbySeatCard
@@ -1242,7 +1246,7 @@ export function InvitePanel({
     return (
       <section
         aria-label="Guest seat — invite pending"
-        className="border-border bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border"
+        className="border-border bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border lg:w-72 lg:grow-0"
       >
         <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b px-5 py-3 lg:min-h-20 lg:py-4">
           <div className="ring-gold-500/30 shrink-0 animate-pulse rounded-full ring-2">
@@ -1286,7 +1290,7 @@ export function InvitePanel({
   }
 
   return (
-    <section className="border-border-strong bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border border-dashed">
+    <section className="border-border-strong bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border border-dashed lg:w-72 lg:grow-0">
       <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b border-dashed px-5 py-3 text-left lg:min-h-20 lg:py-4">
         <div
           className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded border border-dashed"

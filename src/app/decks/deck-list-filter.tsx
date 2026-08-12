@@ -35,7 +35,7 @@ export function DeckListFilter({ decks }: { decks: DeckListItem[] }) {
     <>
       <PageHeader>
         <PageHeaderContent>
-          <PageHeaderTitle>My Decks</PageHeaderTitle>
+          <PageHeaderTitle>Decks</PageHeaderTitle>
           <PageHeaderDescription>
             Build and manage your OPTCG decks.
           </PageHeaderDescription>

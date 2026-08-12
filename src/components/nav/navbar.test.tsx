@@ -275,7 +275,7 @@ describe("Navbar", () => {
       '[data-slot="navigation-menu-viewport"]'
     );
     const dropdownContent = screen
-      .getByText("My Decks")
+      .getByRole("link", { name: "Decks" })
       .closest('[data-slot="navigation-menu-content"]');
 
     expect(linksScroller).not.toBeNull();
@@ -311,7 +311,7 @@ describe("Navbar", () => {
     expect(hasAnchor(decks)).toBe(false);
   });
 
-  it("renders every navigation dropdown through the shared chamfered surface", () => {
+  it("renders every navigation dropdown through the shared rectangular surface", () => {
     render(<Navbar />);
 
     // Decks, Cards, and the account menu must all route through
@@ -322,8 +322,11 @@ describe("Navbar", () => {
     );
     expect(surfaces).toHaveLength(3);
     for (const surface of surfaces) {
-      expect(surface.getAttribute("data-cut")).toBe("md");
-      expect(surface.getAttribute("data-edge")).toBe("neutral");
+      const classes = (surface.getAttribute("class") ?? "").split(/\s+/);
+      // Square corners: menu chrome takes no chamfer and no radius.
+      expect(surface.getAttribute("data-cut")).toBeNull();
+      expect(classes).toContain("border");
+      expect(classes.some((c) => c.startsWith("rounded"))).toBe(false);
     }
   });
 
@@ -332,7 +335,7 @@ describe("Navbar", () => {
 
     // `.font-nav` (uppercase Erode 700) is reserved for the global navbar link
     // row; menu items take the `body` role per TYPOGRAPHY.md §5.
-    const item = screen.getByRole("link", { name: "My Decks" });
+    const item = screen.getByRole("link", { name: "Decks" });
     const classes = item.className.split(/\s+/);
 
     expect(classes).toContain("text-sm");
@@ -342,14 +345,16 @@ describe("Navbar", () => {
     expect(classes).not.toContain("focus-visible:ring-2");
   });
 
-  it("caps the inner nav content while keeping the full-width bar separate", () => {
+  it("spans the nav content edge to edge so the actions pin to the viewport", () => {
     const { container } = render(<Navbar />);
     const nav = container.querySelector("nav");
     const navContent = document.querySelector('[data-slot="navbar-content"]');
 
-    expect(navContent?.className.split(/\s+/)).toContain("max-w-7xl");
+    // Links hug the left edge and the account cluster hugs the right edge —
+    // no content cap and no column reservation may pull them back in.
+    expect(navContent?.className.split(/\s+/)).not.toContain("max-w-7xl");
+    expect(navContent?.className.split(/\s+/)).not.toContain("mx-auto");
     expect(navContent?.parentElement).toBe(nav);
-    expect(nav?.className.split(/\s+/)).not.toContain("max-w-7xl");
   });
 
   it("takes its height from the shared navbar token the friends rail offsets from", () => {
@@ -362,7 +367,7 @@ describe("Navbar", () => {
     expect(classes).not.toContain("h-16");
   });
 
-  it("reserves the friends rail column exactly when the rail is mounted", () => {
+  it("never reserves the friends rail column — the actions sit above the rail", () => {
     const { container, rerender } = render(<Navbar />);
     const railReserved = () =>
       container
@@ -370,12 +375,10 @@ describe("Navbar", () => {
         ?.className.split(/\s+/)
         .includes("pr-social-rail") ?? false;
 
-    // Authenticated: SocialShell mounts the rail, so the capped nav content
-    // has to centre on the content column rather than the whole viewport.
-    expect(railReserved()).toBe(true);
+    // The rail starts below the bar (`top-navbar`), so even with the rail
+    // mounted the account cluster keeps the viewport's right edge.
+    expect(railReserved()).toBe(false);
 
-    // Loading and signed out render no rail — reserving its column would
-    // shift the nav content away from the page content underneath it.
     mocks.sessionStatus = "loading";
     rerender(<Navbar />);
     expect(railReserved()).toBe(false);

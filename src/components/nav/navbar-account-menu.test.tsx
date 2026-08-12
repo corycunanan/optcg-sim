@@ -107,7 +107,7 @@ describe("NavbarAccountMenu", () => {
     expect(content?.className).toContain("left-auto");
   });
 
-  it("renders through the shared chamfered surface with body-role rows", async () => {
+  it("renders through the shared rectangular surface with body-role rows", async () => {
     const user = userEvent.setup();
     render(<NavbarAccountMenu user={{ username: "luffy" }} />);
 
@@ -121,8 +121,11 @@ describe("NavbarAccountMenu", () => {
       '[data-slot="navbar-dropdown-surface"]'
     );
     expect(surface).not.toBeNull();
-    expect(surface?.getAttribute("data-cut")).toBe("md");
-    expect(surface?.getAttribute("data-edge")).toBe("neutral");
+    // Square corners: menu chrome takes no chamfer and no radius.
+    expect(surface?.getAttribute("data-cut")).toBeNull();
+    const surfaceClasses = (surface?.getAttribute("class") ?? "").split(/\s+/);
+    expect(surfaceClasses).toContain("border");
+    expect(surfaceClasses.some((c) => c.startsWith("rounded"))).toBe(false);
 
     // The content is a bare positioning shell — it paints no panel of its own.
     const content = document.querySelector(

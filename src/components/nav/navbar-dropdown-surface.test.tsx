@@ -47,7 +47,7 @@ function MenuHarness({ viewport = true }: { viewport?: boolean }) {
               <ul className="flex w-48 flex-col p-1">
                 <li>
                   <NavigationMenuLink href="/decks">
-                    My Decks
+                    Decks
                   </NavigationMenuLink>
                 </li>
               </ul>
@@ -63,7 +63,7 @@ const classesOf = (element: Element | null) =>
   (element?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
 
 describe("NavbarDropdownSurface", () => {
-  it("paints the chamfered, neutral-edged panel the shape and material languages specify", () => {
+  it("paints the square-cornered, neutral-edged panel the material language specifies", () => {
     render(
       <NavbarDropdownSurface>
         <span>Row</span>
@@ -74,18 +74,17 @@ describe("NavbarDropdownSurface", () => {
       '[data-slot="navbar-dropdown-surface"]'
     );
     expect(root).not.toBeNull();
-    // 8px cut, top-left + bottom-right, one neutral hairline — the treatment is
-    // declared once here so the four navbar panels cannot drift apart.
-    expect(root?.getAttribute("data-cut")).toBe("md");
-    expect(root?.getAttribute("data-corners")).toBe("outer");
-    expect(root?.getAttribute("data-edge")).toBe("neutral");
-    expect(root?.querySelector('[data-slot="chamfer-edge"]')).not.toBeNull();
+    // A plain rectangle with one neutral hairline — the chamfered silhouette
+    // is reserved for cards on page surfaces, never menu chrome. Declared once
+    // here so the four navbar panels cannot drift apart.
+    expect(root?.getAttribute("data-cut")).toBeNull();
+    expect(root?.querySelector('[data-slot="chamfer-surface"]')).toBeNull();
 
-    const surface = classesOf(
-      root?.querySelector('[data-slot="chamfer-surface"]') ?? null
-    );
+    const surface = classesOf(root);
     // Flat, opaque overlay interior. No ring, no shadow, no blur, no radius.
     expect(surface).toContain("bg-popover");
+    expect(surface).toContain("border");
+    expect(surface).toContain("border-border");
     expect(
       surface.some((c) => /^(ring|shadow|backdrop-blur|rounded)/.test(c))
     ).toBe(false);
@@ -129,7 +128,7 @@ describe("NavbarDropdownSurface", () => {
         vi.advanceTimersByTime(400);
       });
 
-      expect(screen.getByRole("link", { name: "My Decks" })).toBeDefined();
+      expect(screen.getByRole("link", { name: "Decks" })).toBeDefined();
     } finally {
       vi.useRealTimers();
     }
@@ -146,7 +145,7 @@ describe("NavbarDropdownSurface", () => {
         vi.advanceTimersByTime(400);
       });
 
-      expect(screen.queryByRole("link", { name: "My Decks" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Decks" })).toBeNull();
     } finally {
       vi.useRealTimers();
     }
@@ -173,15 +172,15 @@ describe("NavbarDropdownSurface", () => {
       )
     ).toBe(false);
 
-    const link = classesOf(screen.getByRole("link", { name: "My Decks" }));
+    const link = classesOf(screen.getByRole("link", { name: "Decks" }));
     expect(link).toContain("focus-visible:outline-2");
     expect(link).toContain("focus-visible:-outline-offset-2");
     expect(link).toContain("focus-visible:outline-border-focus");
     // Tailwind v4: `outline-none` sets --tw-outline-style:none and would defeat
     // the outline utilities above for good.
     expect(link).not.toContain("outline-none");
-    // Rows square off inside the chamfered panel — ornament sits on the
-    // panel's perimeter, never on the rows within it.
+    // Rows square off inside the panel — ornament sits on the panel's
+    // perimeter, never on the rows within it.
     expect(link).toContain(
       "in-data-[slot=navigation-menu-content]:rounded-none"
     );

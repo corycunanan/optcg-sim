@@ -355,6 +355,12 @@
       "minimum": 4.5
     },
     {
+      "name": "effect-notation-label/don",
+      "foreground": "--effect-notation-fg",
+      "background": "--effect-don",
+      "minimum": 4.5
+    },
+    {
       "name": "effect-notation-label/trigger",
       "foreground": "--effect-trigger-fg",
       "background": "--effect-trigger",
@@ -382,6 +388,12 @@
       "name": "effect-notation-keyline/modifier",
       "foreground": "--effect-notation-edge",
       "background": "--effect-modifier",
+      "minimum": 3
+    },
+    {
+      "name": "effect-notation-keyline/don",
+      "foreground": "--effect-notation-edge",
+      "background": "--effect-don",
       "minimum": 3
     },
     {
