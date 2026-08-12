@@ -145,10 +145,10 @@ export function LobbySeatCard({
       {/* The trailing column is as wide as the ready control below it, so the
           menu is pinned to that column's end rather than stretched across it —
           the two controls then share one right edge. At `lg` the seat is a
-          centered stack, so the menu pins to the column's top-right corner
-          instead of joining the centered spine. */}
+          centered stack and the menu joins it: centered on the column's own
+          axis, at the top of the stack. */}
       <SeatOverflowMenu
-        className="col-start-3 row-start-1 justify-self-end lg:self-end"
+        className="col-start-3 row-start-1 justify-self-end lg:self-center"
         seatLabel={`${role} seat — ${playerName}`}
       >
         {deckEditable ? (
