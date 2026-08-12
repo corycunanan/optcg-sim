@@ -98,7 +98,7 @@ export default async function CardDetailPage({
                 <Badge
                   key={c}
                   variant={COLOR_TO_VARIANT[c] || "secondary"}
-                  className="rounded px-3 py-1"
+                  className="rounded-md px-3 py-1"
                 >
                   {c}
                 </Badge>

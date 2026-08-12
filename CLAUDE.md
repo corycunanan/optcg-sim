@@ -204,7 +204,7 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 2. **No hardcoded oklch/hex values in component files** — define themeable raw values as primitives in `globals.css`, map them to semantic roles, and consume only semantic roles from components; theme selectors override primitives only
 3. **No custom font sizes** — `text-[9px]`, `text-[10px]`, `text-[11px]` are banned. Use `text-xs` (12px) minimum
 4. **Spacing scale only** — only Tailwind steps 1/2/3/4/5/6/8/10/12/16. No `p-2.5`, `px-3 py-1.5`, etc.
-5. **Three border-radius values** — `rounded` (4px, badges), `rounded-md` (8px, inputs/buttons), `rounded-lg` (12px, panels/modals), `rounded-full` (pills). Nothing else.
+5. **Chrome radius scale** — `rounded` (4px, badges only), `rounded-md`/`rounded-lg` (2px, chrome), `rounded-full` (avatars/presence dots only). Nothing else.
 6. **No JS style manipulation** — no `element.style.X =` or `onMouseOver` setting inline properties. Use CSS state (Tailwind `group-hover:`, `data-[state]:`)
 7. **`cn()` for all conditional classes** — use clsx + tailwind-merge, never string concatenation
 8. **Inside-board floor (scaled game board)** — anything rendered inside `<ScaledBoard>` / `BoardLayout`'s transformed subtree (zones, on-board cards, in-board CTAs, on-board overlays) lifts the floor: **`text-base` (16px)** for labels/counters/badges, **`text-lg` (18px)** for body text, **`ring-4`** for focus indicators. Chrome (navbar, modals, tooltips, popovers, side panels — anything portaled or outside the scaled wrapper) keeps `text-xs`/`ring-2`. Background: at the 1280×640 floor viewport the board scales to ~0.59, which collapses chrome's defaults below the legibility floor. Full table in `docs/design/BRANDING-GUIDELINES.md` §13.

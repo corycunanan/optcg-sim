@@ -94,7 +94,7 @@ describe("shape-language allowance", () => {
     ).toEqual([]);
   });
 
-  it("leaves the three-radius vocabulary untouched", () => {
+  it("leaves the chrome radius vocabulary untouched", () => {
     expect(findTextViolations('className="rounded-md border p-4"')).toEqual([]);
   });
 
@@ -102,7 +102,7 @@ describe("shape-language allowance", () => {
     const declared = collectDeclaredShapeUtilities(
       "@utility chamfer-outer { clip-path: polygon(0 0); }\n" +
         ".chamfer-focus-layer { opacity: 0; }\n" +
-        ".rounded-lg { border-radius: 12px; }"
+        ".rounded-lg { border-radius: 2px; }"
     );
 
     expect([...declared].sort()).toEqual([

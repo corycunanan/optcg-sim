@@ -189,7 +189,7 @@ export function DeckBuilderSearch({
                   key={c}
                   onClick={() => toggleColor(c)}
                   className={cn(
-                    "rounded px-2 py-1 text-xs font-medium transition-all",
+                    "rounded-md px-2 py-1 text-xs font-medium transition-all",
                     active
                       ? c === "Yellow"
                         ? "text-navy-900"
@@ -209,7 +209,7 @@ export function DeckBuilderSearch({
             <select
               value={activeType}
               onChange={(e) => setActiveType(e.target.value)}
-              className="border-border bg-card text-content-secondary focus:border-border-focus rounded border px-2 py-1 text-xs focus:outline-none"
+              className="border-border bg-card text-content-secondary focus:border-border-focus rounded-md border px-2 py-1 text-xs focus:outline-none"
             >
               <option value="">All Types</option>
               {TYPES.map((t) => (
@@ -277,7 +277,7 @@ export function DeckBuilderSearch({
                     costMax
                   )
                 }
-                className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary mt-4 rounded border px-3 py-1 text-xs font-medium transition-colors"
+                className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary mt-4 rounded-md border px-3 py-1 text-xs font-medium transition-colors"
               >
                 Retry
               </button>
@@ -317,7 +317,7 @@ export function DeckBuilderSearch({
                         aria-label={`Inspect ${card.name}`}
                         onClick={() => setInspectCard(card)}
                         className={cn(
-                          "group bg-card relative overflow-hidden rounded border text-left transition-all duration-150 active:scale-[0.97]",
+                          "group bg-card relative overflow-hidden rounded-md border text-left transition-all duration-150 active:scale-[0.97]",
                           qtyInDeck > 0
                             ? "border-border-focus"
                             : "border-border",

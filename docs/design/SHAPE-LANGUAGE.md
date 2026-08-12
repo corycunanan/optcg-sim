@@ -144,8 +144,7 @@ region**. If two pennants compete, neither is featured.
    (gated on the canvas-treatment go-ahead — see MATERIAL-LANGUAGE.md).
 4. **App chrome** migrates opportunistically as surfaces are redesigned (navbar refresh, decks
    redesign, lobby cohesion work), each migration amending the radius rule's allowlist.
-5. **Contract amendment:** once adoption reaches critical mass, styling rule #5 (three-radius set)
-   in CLAUDE.md / BRANDING-GUIDELINES.md is rewritten to this doc's semantics table, and
-   `scripts/lint-design-system.mjs` goes from *allowing* chamfers (step 1) to *requiring* them on
-   chrome — the point at which `rounded-*` on a non-card surface becomes a violation. Until then the
-   three-radius rule remains fully in force.
+5. **Contract amendment enacted (2026-08-12):** styling rule #5 now gives all chrome 2px corners;
+   `rounded-md` and `rounded-lg` both resolve to 2px. Badges alone keep `rounded` (4px), while
+   `rounded-full` is reserved for avatars and presence dots. The chamfer lint remains an allowance
+   for adopted angular surfaces rather than a requirement on all chrome.

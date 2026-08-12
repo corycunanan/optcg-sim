@@ -31,7 +31,7 @@ describe("CardInfoPanel", () => {
     // Flat, opaque, square, unglowing — Tier 5 opts out of panel treatment.
     expect(classes).toContain("bg-surface-info");
     expect(classes).toContain("edge-info");
-    expect(classes).toContain("rounded-none");
+    expect(classes).toContain("rounded-md");
     expect(classes).toContain("shadow-none");
     // Exactly one perimeter: the border utility, and no internal rules.
     expect(classes).toContain("border");

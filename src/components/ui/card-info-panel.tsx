@@ -121,7 +121,7 @@ export function CardInfoPanel({
       data-tier5-surface
       className={cn(
         "bg-surface-info edge-info flex flex-col gap-3 border p-3",
-        "rounded-none shadow-none",
+        "rounded-md shadow-none",
         className
       )}
     >

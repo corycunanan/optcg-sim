@@ -138,7 +138,7 @@ export function DeckBuilderList({
 
   if (!leader && cards.length === 0) {
     return (
-      <div className="border-border bg-card rounded border p-8 text-center">
+      <div className="border-border bg-card rounded-md border p-8 text-center">
         <p className="text-content-tertiary text-sm">
           No cards in deck yet
         </p>

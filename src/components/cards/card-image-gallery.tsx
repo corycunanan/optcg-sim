@@ -97,7 +97,7 @@ export function CardImageGallery({
                     // slack below the label instead, and `aspect-card` keeps
                     // every scan the same height regardless of its intrinsic
                     // ratio.
-                    "group flex cursor-pointer flex-col overflow-hidden rounded text-left transition-all hover:shadow-md",
+                    "group flex cursor-pointer flex-col overflow-hidden rounded-md text-left transition-all hover:shadow-md",
                     isSelected
                       ? "border border-border-strong"
                       : "border border-border",

@@ -295,13 +295,13 @@ export function DeckBuilderShell({ deckId }: DeckBuilderShellProps) {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowImport(true)}
-                  className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary rounded border px-3 py-1 text-xs font-medium transition-colors"
+                  className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary rounded-md border px-3 py-1 text-xs font-medium transition-colors"
                 >
                   Import
                 </button>
                 <button
                   onClick={() => setShowExport(true)}
-                  className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary rounded border px-3 py-1 text-xs font-medium transition-colors"
+                  className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary rounded-md border px-3 py-1 text-xs font-medium transition-colors"
                 >
                   Export
                 </button>
