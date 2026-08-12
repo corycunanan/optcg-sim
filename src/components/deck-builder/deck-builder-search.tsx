@@ -189,7 +189,7 @@ export function DeckBuilderSearch({
                   key={c}
                   onClick={() => toggleColor(c)}
                   className={cn(
-                    "rounded-md px-2 py-1 text-xs font-medium transition-all",
+                    "rounded px-2 py-1 text-xs font-medium transition-all",
                     active
                       ? c === "Yellow"
                         ? "text-navy-900"

@@ -156,7 +156,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                       <Badge
                         key={c}
                         variant={COLOR_TO_VARIANT[c] || "secondary"}
-                        className="rounded-md px-3 py-1"
+                        className="rounded px-3 py-1"
                       >
                         {c}
                       </Badge>
