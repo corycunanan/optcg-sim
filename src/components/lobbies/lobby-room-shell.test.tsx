@@ -371,7 +371,9 @@ describe("LobbyRoomShell redesign scenarios", () => {
     const joinButton = renderer!.root
       .findAllByType("button")
       .find((button) => button.children.includes("Join lobby"));
-    expect(joinButton?.props.variant).toBe("outline");
+    // The page's standard outlined-navy control (Button default variant) —
+    // gold stays reserved for the focal Start Match action.
+    expect(joinButton?.props.variant).toBeUndefined();
 
     const frame = renderer!.root.findByProps({ "data-lobby-frame": true });
     expect(frame.props.className).toContain("overflow-hidden");
