@@ -13,7 +13,7 @@ interface FirstOrSecondChoiceProps {
  */
 export function FirstOrSecondChoice({ onAction }: FirstOrSecondChoiceProps) {
   return (
-    <div className="bg-gb-surface border-gb-border-strong flex flex-col items-center gap-3 rounded-lg border-2 px-6 py-5 shadow-xl">
+    <div className="bg-gb-surface border-gb-border-strong flex flex-col items-center gap-3 rounded-lg border-2 px-6 py-5 shadow-lg">
       <h3 className="text-gb-text-bright text-base font-semibold">
         Choose first or second
       </h3>

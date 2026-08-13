@@ -339,11 +339,23 @@ Chrome uses 2px corners. Badges alone retain 4px corners; avatars and presence d
 
 ### Shadow Scale
 
+**No blurred drop shadows.** A raised surface reads as raised through a hard, non-blurred offset cast down-right — the printed-card feel of the DON!! card shadow (`--gb-shadow-don: 3px 3px 0px 0px rgba(0,0,0,0.25)`), never a soft ambient bloom. One layer per tier; a hard shadow has no falloff to fake.
+
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px oklch(5% 0.004 260 / 0.32), 0 1px 3px oklch(5% 0.004 260 / 0.22)` | Cards at rest, subtle lift |
-| `--shadow-md` | `0 4px 6px oklch(5% 0.004 260 / 0.38), 0 2px 4px oklch(5% 0.004 260 / 0.26)` | Hovered cards, dropdowns |
-| `--shadow-lg` | `0 10px 15px oklch(5% 0.004 260 / 0.48), 0 4px 6px oklch(5% 0.004 260 / 0.30)` | Modals, popovers |
+| `--shadow-sm` | `2px 2px 0 0 oklch(5% 0.004 260 / 0.45)` | Cards at rest, subtle lift |
+| `--shadow-md` | `4px 4px 0 0 oklch(5% 0.004 260 / 0.55)` | Hovered cards, dropdowns, popovers |
+| `--shadow-lg` | `6px 6px 0 0 oklch(5% 0.004 260 / 0.65)` | Modals, sheets, sticky action bars |
+
+Offsets step 2 → 4 → 6px so the three tiers stay separable at a glance. Alphas run higher than the blurred tokens they replaced because the deep navy ground swallows a faint near-black cast, and a hard edge shows its alpha honestly instead of averaging it away across a blur radius.
+
+Rules:
+
+- Consume the ladder through `shadow-sm` / `shadow-md` / `shadow-lg` (or `shadow-[var(--shadow-*)]`). The stock Tailwind steps — `shadow-xs`, `shadow-xl`, `shadow-2xl`, every `drop-shadow-*` — are blurred and unbacked by a token; `scripts/lint-design-system.mjs` fails them.
+- An arbitrary `shadow-[…]` is allowed only when it carries no blur. Lint reads the value structurally, so a hairline like `shadow-[0_0_0_1px_…]` passes and `shadow-[0_8px_16px_…]` does not.
+- **Glows are exempt** — `shadow-[0_0_18px_var(--gb-signal-*)]` is a semantic signal, not elevation, and a zero-offset halo is not a drop shadow. See [INTERACTION-GRAMMAR.md §3.2](INTERACTION-GRAMMAR.md).
+- Flat surfaces stay flat: tooltips and the card info panel use `shadow-none` plus an `edge-*` hairline. Do not give them an elevation token.
+- Lint only scans `.tsx`, so the token values themselves are guarded by review against this table.
 
 ### Elevation Hierarchy
 
@@ -420,8 +432,8 @@ All buttons: `transition: color 0.2s ease-out, background-color 0.2s ease-out, b
 ┌──────────────┐
 │              │ aspect-ratio: 63/88 (standard OPTCG)
 │   Card Art   │ border-radius: rounded-md (2px)
-│              │ shadow: --shadow-sm at rest
-│              │ hover: --shadow-md + scale(1.03)
+│              │ shadow: --shadow-sm at rest (hard 2px offset)
+│              │ hover: --shadow-md (hard 4px) + scale(1.03)
 │              │ transition: 0.2s ease-out
 └──────────────┘
 ```
@@ -477,7 +489,7 @@ Dark surface, consistent across all pages:
 
 ```
 Overlay: var(--overlay) — oklch(5% 0.004 260 / 0.76)
-Panel:   var(--surface-panel), rounded-lg (2px), shadow-lg
+Panel:   var(--surface-panel), rounded-lg (2px), shadow-lg (hard 6px offset)
 Enter:   fade overlay 0.2s + scale panel from 0.95→1.0, 0.2s ease-out
 Exit:    fade out 0.15s (exit faster than enter)
 Close:   X button top-right, keyboard Escape

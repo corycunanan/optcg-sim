@@ -179,6 +179,60 @@ const SHAPE_CLASS_TOKEN_RE = /^chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?$/;
 const SHAPE_FRAGMENT_RE = /(?:^|\s)(chamfer-[a-z0-9-]*)/;
 const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
 
+// Elevation shadows are hard, non-blurred offsets (globals.css, "Shadow
+// values"). The `shadow` rules therefore fail three things.
+//
+// 1. Every stock Tailwind shadow utility that is not backed by an elevation
+//    token. Only `--shadow-sm/md/lg` are retokenized to hard offsets, so
+//    `shadow-sm/md/lg` (and the `*-none` resets) are the whole allowed set.
+//    Everything else in the stock ramps still resolves to Tailwind's own
+//    blurred values — including the bare `shadow`, `drop-shadow`, and
+//    `shadow-inner` compat keys that tailwindcss/theme.css keeps in its
+//    "Deprecated" block, and the separate `--inset-shadow-*` namespace, which
+//    this project never retokenizes.
+// 2. An arbitrary `shadow-[…]` whose value actually carries blur.
+// 3. The bare `shadow` class. `shadow` is also an ordinary English word, so it
+//    is matched only in a real class position (see findClassTokenViolations)
+//    rather than by a text scan that would fire on prose and on class-name
+//    string fixtures in tests. The hyphenated bare forms are unambiguous and
+//    stay in the text rules.
+//
+// An arbitrary value is read structurally rather than allowlisted by path. Each
+// comma-separated layer drops `inset` and a leading/trailing <color> — a
+// *proven* color, either a literal or a color function; an unresolved
+// `calc()`/`var()` is not assumed to be one and keeps its slot — leaving
+// <offset-x> <offset-y> <blur> <spread> positions, and passes only when:
+//
+// - No position holds a literal length (`shadow-[var(--shadow-lg)]`) — a token
+//   reference. Lint only scans .tsx, so token *values* are guarded by review
+//   and docs/design/BRANDING-GUIDELINES.md §7, not by this rule.
+// - There is no third position at all, so the layer cannot carry blur.
+// - Both offsets are literal zero (`shadow-[0_0_18px_var(--gb-signal-*)]`) — a
+//   glow, which is a semantic signal and not elevation. Documented intentional
+//   in docs/design/INTERACTION-GRAMMAR.md §3.2; a glow is not a drop shadow, so
+//   the exemption is the shape of the value itself and needs no file list.
+// - The blur position holds a literal zero (`shadow-[0_0_0_1px_…]`) — a hard
+//   cast or a hairline.
+//
+// Anything else is a blurred drop shadow. That deliberately includes a blur
+// position occupied by a `calc()`/`var()` this linter cannot resolve: an
+// unreadable blur is an unproven blur, so the rule fails closed and the author
+// writes the zero out (`0_0_0_var(--x)`) to say a cast is hard.
+const SHADOW_LENGTH_RE =
+  /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|vh|vw|ch)?$/i;
+const SHADOW_COLOR_FUNCTION_RE =
+  /^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/i;
+const SHADOW_COLOR_LITERAL_RE = /^(?:#[0-9a-f]{3,8}|[a-z]+)$/i;
+// Stock ramp steps outside the retokenized `shadow-sm/md/lg`, and the bare
+// hyphenated compat utilities. `*-none` and `*-[…]` are excluded on purpose:
+// the reset is inert and the arbitrary form is owned by the structural rule.
+const BLURRED_STOCK_SHADOW_RE =
+  /(?<![\w-])(?:shadow-(?:2xs|xs|xl|2xl|inner)|inset-shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl))?)(?![\w-])/g;
+const BLURRED_DROP_SHADOW_RE =
+  /(?<![\w-])drop-shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl))?(?![\w-])/g;
+// Bare class names that only a class-position scan may judge.
+const BLURRED_STOCK_SHADOW_CLASS_TOKENS = new Set(["shadow"]);
+
 const RULES = [
   {
     name: "font-size",
@@ -199,6 +253,25 @@ const RULES = [
       /(?<![\w-])rounded(?:-[trbl](?:-[se])?)?-(?:xs|sm|xl|2xl|3xl|\[[^\]\r\n]+\])/g,
     describe: (match) =>
       `off-scale radius ${JSON.stringify(match[0])}; use rounded/rounded-md/rounded-lg or an approved shape primitive`,
+  },
+  {
+    name: "shadow",
+    regex: BLURRED_STOCK_SHADOW_RE,
+    describe: (match) =>
+      `blurred stock shadow ${JSON.stringify(match[0])}; use the hard elevation tokens shadow-sm/md/lg`,
+  },
+  {
+    name: "shadow",
+    regex: BLURRED_DROP_SHADOW_RE,
+    describe: (match) =>
+      `blurred drop-shadow filter ${JSON.stringify(match[0])}; use the hard elevation tokens shadow-sm/md/lg`,
+  },
+  {
+    name: "shadow",
+    regex: /(?<![\w-])(?:inset-)?(?:drop-)?shadow-\[([^\]\r\n]+)\]/g,
+    skip: (match) => firstBlurredShadowLayer(match[1]) === null,
+    describe: (match) =>
+      `blurred shadow layer ${JSON.stringify(firstBlurredShadowLayer(match[1]))} in ${JSON.stringify(match[0])}; elevation shadows are hard offsets — use shadow-sm/md/lg or shadow-[var(--shadow-*)]`,
   },
 ];
 const SPACING_RE =
@@ -236,6 +309,16 @@ if (IS_MAIN) {
     for (const violation of findTextViolations(source, {
       includeSpacing: !spacingExempt,
     })) {
+      addViolation(
+        path,
+        sourceFile,
+        violation.index,
+        violation.rule,
+        violation.message
+      );
+    }
+
+    for (const violation of findClassTokenViolations(source)) {
       addViolation(
         path,
         sourceFile,
@@ -316,6 +399,7 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
   for (const rule of RULES) {
     rule.regex.lastIndex = 0;
     for (const match of scanSource.matchAll(rule.regex)) {
+      if (rule.skip?.(match)) continue;
       matches.push({
         index: match.index,
         rule: rule.name,
@@ -364,6 +448,68 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
  *   names, so this is always a violation.
  */
 export function findShapeVocabularyUsages(source) {
+  const usages = [];
+
+  forEachClassPosition(source, {
+    onLiteral: (node, index) => {
+      for (const token of classTokenNames(node.text)) {
+        if (!SHAPE_CLASS_TOKEN_RE.test(token)) continue;
+        usages.push({ index, utility: token, kind: "class" });
+      }
+    },
+    onDynamic: (node, index) => {
+      // Only a finding when it actually carries chamfer text; plain identifiers
+      // stay silent.
+      const fragment = firstShapeFragment(node);
+      if (fragment) usages.push({ index, utility: fragment, kind: "dynamic" });
+    },
+  });
+
+  return usages;
+}
+
+/**
+ * Whole class tokens banned outright by name, as `{ index, rule, message }`.
+ *
+ * Text rules cannot own these: `shadow` is an ordinary English word, and a
+ * class-name string fixture (`expect(classes).not.toContain("shadow")`) is not
+ * a class position, so only the AST walk can tell a real usage from prose.
+ */
+export function findClassTokenViolations(source) {
+  const violations = [];
+
+  const report = (token, index) => {
+    if (!BLURRED_STOCK_SHADOW_CLASS_TOKENS.has(token)) return;
+    violations.push({
+      index,
+      rule: "shadow",
+      message: `blurred stock shadow ${JSON.stringify(token)}; use the hard elevation tokens shadow-sm/md/lg`,
+    });
+  };
+
+  forEachClassPosition(source, {
+    onLiteral: (node, index) => {
+      for (const token of classTokenNames(node.text)) report(token, index);
+    },
+    // A class list assembled around interpolations still contributes its static
+    // halves verbatim, so `` className={`shadow ${extra}`} `` is a real `shadow`.
+    onStaticToken: report,
+    onDynamic: () => {},
+  });
+
+  return violations;
+}
+
+/**
+ * Walks every class position in a .tsx source, calling `onLiteral(node, index)`
+ * for a static class string, `onStaticToken(token, index)` for a whole class
+ * name found in the static text of an interpolated template, and
+ * `onDynamic(node, index)` for an expression composed at runtime.
+ */
+function forEachClassPosition(
+  source,
+  { onLiteral, onDynamic, onStaticToken = () => {} }
+) {
   const sourceFile = ts.createSourceFile(
     "scan.tsx",
     source,
@@ -371,15 +517,17 @@ export function findShapeVocabularyUsages(source) {
     true,
     ts.ScriptKind.TSX
   );
-  const usages = [];
   const scanned = new Set();
+  const shadowedHelpers = locallyShadowedHelperNames(sourceFile);
+  const isHelperCall = (node) =>
+    isClassHelperCall(node) && !shadowedHelpers.has(node.expression.text);
 
-  const record = (node, utility, kind) => {
-    usages.push({ index: node.getStart(sourceFile), utility, kind });
-  };
-
-  /** Walks one class-position expression. */
-  const scanClassExpression = (node) => {
+  /**
+   * Walks one class-position expression. `keysAreClasses` is true wherever an
+   * object literal's own keys are class names (`clsx`/`cn`) and false inside a
+   * `cva` config, whose keys are variant group and option names.
+   */
+  const scanClassExpression = (node, keysAreClasses = true) => {
     if (!node || scanned.has(node)) return;
     scanned.add(node);
 
@@ -390,20 +538,28 @@ export function findShapeVocabularyUsages(source) {
       ts.isNonNullExpression(node) ||
       ts.isJsxExpression(node)
     ) {
-      scanClassExpression(node.expression);
+      scanClassExpression(node.expression, keysAreClasses);
       return;
     }
 
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      for (const utility of shapeClassTokens(node.text)) {
-        record(node, utility, "class");
+      onLiteral(node, node.getStart(sourceFile));
+      return;
+    }
+
+    if (ts.isTemplateExpression(node)) {
+      // The substitutions are runtime values and stay out of scope, but the
+      // static text around them is class source Tailwind reads verbatim.
+      for (const { token, index } of templateStaticTokens(node, sourceFile)) {
+        onStaticToken(token, index);
       }
+      onDynamic(node, node.getStart(sourceFile));
       return;
     }
 
     if (ts.isConditionalExpression(node)) {
-      scanClassExpression(node.whenTrue);
-      scanClassExpression(node.whenFalse);
+      scanClassExpression(node.whenTrue, keysAreClasses);
+      scanClassExpression(node.whenFalse, keysAreClasses);
       return;
     }
 
@@ -411,43 +567,59 @@ export function findShapeVocabularyUsages(source) {
       ts.isBinaryExpression(node) &&
       CLASS_LOGICAL_OPERATORS.has(node.operatorToken.kind)
     ) {
-      scanClassExpression(node.left);
-      scanClassExpression(node.right);
+      scanClassExpression(node.left, keysAreClasses);
+      scanClassExpression(node.right, keysAreClasses);
       return;
     }
 
     if (ts.isArrayLiteralExpression(node)) {
-      for (const element of node.elements) scanClassExpression(element);
+      for (const element of node.elements) {
+        scanClassExpression(element, keysAreClasses);
+      }
       return;
     }
 
     if (ts.isObjectLiteralExpression(node)) {
       // clsx keys its classes; cva nests them as variant values.
       for (const property of node.properties) {
-        if (!ts.isPropertyAssignment(property)) continue;
-        const name = property.name;
-        if (
-          ts.isStringLiteral(name) ||
-          ts.isNoSubstitutionTemplateLiteral(name)
-        ) {
-          scanClassExpression(name);
-        } else if (ts.isComputedPropertyName(name)) {
-          scanClassExpression(name.expression);
+        if (ts.isShorthandPropertyAssignment(property)) {
+          // `clsx({ shadow })` toggles the class named by the key.
+          if (keysAreClasses) scanPropertyKey(property.name);
+          continue;
         }
-        scanClassExpression(property.initializer);
+        if (!ts.isPropertyAssignment(property)) continue;
+        if (keysAreClasses) scanPropertyKey(property.name);
+        scanClassExpression(property.initializer, keysAreClasses);
       }
       return;
     }
 
-    if (isClassHelperCall(node)) {
-      for (const argument of node.arguments) scanClassExpression(argument);
+    if (isHelperCall(node)) {
+      for (const argument of node.arguments) {
+        scanClassExpression(argument, helperKeysAreClasses(node));
+      }
       return;
     }
 
-    // Anything else here is composed at runtime. It is only a finding when it
-    // actually carries chamfer text; plain identifiers stay silent.
-    const fragment = firstShapeFragment(node);
-    if (fragment) record(node, fragment, "dynamic");
+    // Anything else here is composed at runtime.
+    onDynamic(node, node.getStart(sourceFile));
+  };
+
+  /**
+   * One object-literal key in a class position. A quoted key and a bare
+   * identifier key name the same class — `{ "shadow": on }` and `{ shadow: on }`
+   * are the same clsx call — so both are read as class tokens.
+   */
+  const scanPropertyKey = (name) => {
+    if (ts.isIdentifier(name)) {
+      onLiteral(name, name.getStart(sourceFile));
+      return;
+    }
+    if (ts.isComputedPropertyName(name)) {
+      scanClassExpression(name.expression);
+      return;
+    }
+    scanClassExpression(name);
   };
 
   const visit = (node) => {
@@ -457,16 +629,177 @@ export function findShapeVocabularyUsages(source) {
       node.initializer
     ) {
       scanClassExpression(node.initializer);
-    } else if (isClassHelperCall(node) && !scanned.has(node)) {
+    } else if (isHelperCall(node) && !scanned.has(node)) {
       scanned.add(node);
-      for (const argument of node.arguments) scanClassExpression(argument);
+      for (const argument of node.arguments) {
+        scanClassExpression(argument, helperKeysAreClasses(node));
+      }
     }
 
     ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
-  return usages;
+}
+
+/**
+ * Whole class names in the static text of an interpolated template, as
+ * `{ token, index }`.
+ *
+ * A fragment that touches a substitution is only half a class name, so the
+ * chunk on that side is dropped: `` `shadow-${size}` `` never produces the
+ * class `shadow-`, and `` `${scope}shadow` `` never produces `shadow`. Only
+ * text fenced off by whitespace — or by the template's own boundary — is a
+ * complete class. The dropped halves stay the dynamic rule's business.
+ */
+function templateStaticTokens(node, sourceFile) {
+  const spans = node.templateSpans;
+  const fragments = [
+    { node: node.head, atStart: true, atEnd: false },
+    ...spans.map((span, position) => ({
+      node: span.literal,
+      atStart: false,
+      atEnd: position === spans.length - 1,
+    })),
+  ];
+  const tokens = [];
+
+  for (const fragment of fragments) {
+    // `split` leaves an empty entry wherever the text begins or ends with
+    // whitespace, which is exactly the "fenced off" signal needed here.
+    const chunks = fragment.node.text.split(/\s+/);
+    if (!fragment.atStart) chunks.shift();
+    if (!fragment.atEnd) chunks.pop();
+
+    const index = fragment.node.getStart(sourceFile);
+    for (const chunk of chunks) {
+      const token = normalizeClassToken(chunk);
+      if (token) tokens.push({ token, index });
+    }
+  }
+
+  return tokens;
+}
+
+/** `cva` keys its variant groups, not its classes; every other helper keys classes. */
+function helperKeysAreClasses(node) {
+  return node.expression.text !== "cva";
+}
+
+/**
+ * Class-helper names this file declares for itself.
+ *
+ * Helper recognition is by name, so an unrelated local `classNames(container)`
+ * in a test would otherwise be walked as `clsx`. A name the file defines is not
+ * the imported helper, so it is dropped from recognition — for that file only.
+ */
+function locallyShadowedHelperNames(sourceFile) {
+  const shadowed = new Set();
+
+  const visit = (node) => {
+    const name =
+      ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)
+        ? node.name
+        : ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+          ? node.name
+          : null;
+    if (name && CLASS_HELPER_NAMES.has(name.text)) shadowed.add(name.text);
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return shadowed;
+}
+
+/** Splits on a separator, ignoring separators nested inside `(…)`. */
+function splitTopLevel(value, isSeparator) {
+  const parts = [];
+  let depth = 0;
+  let current = "";
+
+  for (const character of value) {
+    if (character === "(") depth += 1;
+    else if (character === ")") depth -= 1;
+
+    if (depth === 0 && isSeparator(character)) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+
+    current += character;
+  }
+
+  parts.push(current);
+  return parts;
+}
+
+/** A `<color>`, which CSS allows on either side of a box-shadow's lengths. */
+function isShadowColor(part) {
+  return (
+    SHADOW_COLOR_LITERAL_RE.test(part) || SHADOW_COLOR_FUNCTION_RE.test(part)
+  );
+}
+
+/** A length that is provably zero; an unresolved `calc()`/`var()` never is. */
+function isZeroShadowLength(part) {
+  return SHADOW_LENGTH_RE.test(part) && Number.parseFloat(part) === 0;
+}
+
+/**
+ * The `<offset-x> <offset-y> <blur> <spread>` slots of one box-shadow layer.
+ *
+ * Functions are kept: a `calc()`/`var()` occupies its position like any other
+ * component, so dropping it would silently slide a blur out of slot three. Only
+ * `inset` and a `<color>` — which is not positional — are removed.
+ */
+function shadowPositionalComponents(layer) {
+  const parts = splitTopLevel(
+    layer,
+    (character) => character === "_" || character === " "
+  )
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && part.toLowerCase() !== "inset");
+
+  if (parts.length > 1 && isShadowColor(parts[0])) parts.shift();
+  // Trailing `<color>`: only a *proven* color is non-positional. An unresolved
+  // `calc()`/`var()` keeps its slot, so `2px_2px_calc(4px)` still reads as a
+  // blur rather than losing its third position to a color that isn't there.
+  if (parts.length > 1 && isShadowColor(parts.at(-1))) parts.pop();
+
+  return parts;
+}
+
+/**
+ * The first blurred-drop-shadow layer inside an arbitrary `shadow-[…]` value,
+ * or `null` when every layer is compliant. Tailwind writes the spaces in an
+ * arbitrary value as underscores, so both separators are honored.
+ *
+ * Fails closed: a blur position this linter cannot resolve counts as blur. See
+ * the SHADOW_LENGTH_RE comment block for the full pass list.
+ */
+export function firstBlurredShadowLayer(value) {
+  for (const layer of splitTopLevel(value, (character) => character === ",")) {
+    const trimmed = layer.trim();
+    if (!trimmed) continue;
+
+    const positions = shadowPositionalComponents(trimmed);
+
+    // A layer with no literal length anywhere is a token reference.
+    if (!positions.some((part) => SHADOW_LENGTH_RE.test(part))) continue;
+    // Without a third position the layer has no blur slot to fill.
+    if (positions.length < 3) continue;
+
+    const [offsetX, offsetY, blur] = positions;
+    // A cast with no offset is a glow, not elevation.
+    if (isZeroShadowLength(offsetX) && isZeroShadowLength(offsetY)) continue;
+    if (isZeroShadowLength(blur)) continue;
+
+    return trimmed;
+  }
+
+  return null;
 }
 
 function isClassHelperCall(node) {
@@ -477,12 +810,14 @@ function isClassHelperCall(node) {
   );
 }
 
-/** Whole `chamfer-*` class tokens in a literal, ignoring variant prefixes. */
-function shapeClassTokens(text) {
-  return text
-    .split(/\s+/)
-    .map((token) => token.replace(/^!/, "").split(":").at(-1))
-    .filter((token) => SHAPE_CLASS_TOKEN_RE.test(token));
+/** One class token, stripped of its variant chain and `!` prefixes. */
+function normalizeClassToken(token) {
+  return token.replace(/^!/, "").replace(/!$/, "").split(":").at(-1);
+}
+
+/** Whole class tokens in a literal, stripped of variant and `!` prefixes. */
+function classTokenNames(text) {
+  return text.split(/\s+/).map(normalizeClassToken).filter(Boolean);
 }
 
 /** The first `chamfer-` fragment in any string part of an expression tree. */

@@ -130,13 +130,20 @@
     rgba(255, 255, 255, 0.1)
   );
 
-  /* Shadow values */
-  --shadow-elevation-sm:
-    0 1px 2px oklch(5% 0.004 260 / 0.32), 0 1px 3px oklch(5% 0.004 260 / 0.22);
-  --shadow-elevation-md:
-    0 4px 6px oklch(5% 0.004 260 / 0.38), 0 2px 4px oklch(5% 0.004 260 / 0.26);
-  --shadow-elevation-lg:
-    0 10px 15px oklch(5% 0.004 260 / 0.48), 0 4px 6px oklch(5% 0.004 260 / 0.3);
+  /* Shadow values
+     No blurred drop shadows. A raised surface reads as raised through a hard,
+     non-blurred offset cast down-right, matching the DON!! card drop shadow
+     (`--gb-shadow-don`) that already ships on the board — the printed-card
+     feel, not a soft ambient bloom. One layer per tier: a hard shadow has no
+     falloff to fake, so the two-layer trick buys nothing.
+
+     Offsets step 2 → 4 → 6px so the three tiers stay separable at a glance.
+     Alphas run higher than the blurred tokens they replace because the deep
+     navy ground swallows a faint near-black cast, and a hard edge shows its
+     alpha honestly instead of averaging it away across a blur radius. */
+  --shadow-elevation-sm: 2px 2px 0 0 oklch(5% 0.004 260 / 0.45);
+  --shadow-elevation-md: 4px 4px 0 0 oklch(5% 0.004 260 / 0.55);
+  --shadow-elevation-lg: 6px 6px 0 0 oklch(5% 0.004 260 / 0.65);
 
   /* ── Semantic layer: stable component-facing roles ── */
 
