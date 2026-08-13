@@ -133,7 +133,7 @@ export function SpotlightOverlay({
             data-testid="card-spotlight"
             size="xl"
             showCloseButton={false}
-            className="border-gb-accent-amber/40 bg-gb-surface flex flex-col items-center gap-6 border px-10 py-8 shadow-2xl"
+            className="border-gb-accent-amber/40 bg-gb-surface flex flex-col items-center gap-6 border px-10 py-8 shadow-lg"
           >
             <div className="flex flex-col items-center gap-2 text-center">
               <span className="text-gb-accent-amber text-base font-semibold tracking-wider uppercase">

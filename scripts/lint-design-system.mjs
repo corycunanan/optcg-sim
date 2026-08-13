@@ -179,6 +179,26 @@ const SHAPE_CLASS_TOKEN_RE = /^chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?$/;
 const SHAPE_FRAGMENT_RE = /(?:^|\s)(chamfer-[a-z0-9-]*)/;
 const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
 
+// Elevation shadows are hard, non-blurred offsets (globals.css, "Shadow
+// values"). The `shadow` rule therefore fails two things: the stock Tailwind
+// ramp steps that are not backed by an elevation token (`shadow-xs`,
+// `shadow-xl`, …, plus every `drop-shadow-*` filter, which is blurred by
+// definition), and an arbitrary `shadow-[…]` whose value actually carries blur.
+//
+// An arbitrary value is read structurally rather than allowlisted by path:
+//
+// - No parseable lengths (`shadow-[var(--shadow-lg)]`) — a token reference.
+//   Lint only scans .tsx, so token *values* are guarded by review and
+//   docs/design/BRANDING-GUIDELINES.md §7, not by this rule.
+// - Blur radius of zero (`shadow-[0_0_0_1px_…]`) — a hard cast or a hairline.
+// - Blur with both offsets zero (`shadow-[0_0_18px_var(--gb-signal-*)]`) — a
+//   glow, which is a semantic signal and not elevation. Documented intentional
+//   in docs/design/INTERACTION-GRAMMAR.md §3.2; a glow is not a drop shadow, so
+//   the exemption is the shape of the value itself and needs no file list.
+//
+// Anything else — blur with a directional offset — is a blurred drop shadow.
+const SHADOW_LENGTH_RE = /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|vh|vw|ch)?$/;
+
 const RULES = [
   {
     name: "font-size",
@@ -199,6 +219,25 @@ const RULES = [
       /(?<![\w-])rounded(?:-[trbl](?:-[se])?)?-(?:xs|sm|xl|2xl|3xl|\[[^\]\r\n]+\])/g,
     describe: (match) =>
       `off-scale radius ${JSON.stringify(match[0])}; use rounded/rounded-md/rounded-lg or an approved shape primitive`,
+  },
+  {
+    name: "shadow",
+    regex: /(?<![\w-])(?:inset-)?shadow-(?:2xs|xs|xl|2xl)(?![\w-])/g,
+    describe: (match) =>
+      `blurred stock shadow ${JSON.stringify(match[0])}; use the hard elevation tokens shadow-sm/md/lg`,
+  },
+  {
+    name: "shadow",
+    regex: /(?<![\w-])drop-shadow-(?:2xs|xs|sm|md|lg|xl|2xl)(?![\w-])/g,
+    describe: (match) =>
+      `blurred drop-shadow filter ${JSON.stringify(match[0])}; use the hard elevation tokens shadow-sm/md/lg`,
+  },
+  {
+    name: "shadow",
+    regex: /(?<![\w-])(?:inset-)?(?:drop-)?shadow-\[([^\]\r\n]+)\]/g,
+    skip: (match) => firstBlurredShadowLayer(match[1]) === null,
+    describe: (match) =>
+      `blurred shadow layer ${JSON.stringify(firstBlurredShadowLayer(match[1]))} in ${JSON.stringify(match[0])}; elevation shadows are hard offsets — use shadow-sm/md/lg or shadow-[var(--shadow-*)]`,
   },
 ];
 const SPACING_RE =
@@ -316,6 +355,7 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
   for (const rule of RULES) {
     rule.regex.lastIndex = 0;
     for (const match of scanSource.matchAll(rule.regex)) {
+      if (rule.skip?.(match)) continue;
       matches.push({
         index: match.index,
         rule: rule.name,
@@ -467,6 +507,58 @@ export function findShapeVocabularyUsages(source) {
 
   visit(sourceFile);
   return usages;
+}
+
+/** Splits on a separator, ignoring separators nested inside `(…)`. */
+function splitTopLevel(value, isSeparator) {
+  const parts = [];
+  let depth = 0;
+  let current = "";
+
+  for (const character of value) {
+    if (character === "(") depth += 1;
+    else if (character === ")") depth -= 1;
+
+    if (depth === 0 && isSeparator(character)) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+
+    current += character;
+  }
+
+  parts.push(current);
+  return parts;
+}
+
+/**
+ * The first blurred-drop-shadow layer inside an arbitrary `shadow-[…]` value,
+ * or `null` when every layer is compliant. Tailwind writes the spaces in an
+ * arbitrary value as underscores, so both separators are honored.
+ */
+export function firstBlurredShadowLayer(value) {
+  for (const layer of splitTopLevel(value, (character) => character === ",")) {
+    const trimmed = layer.trim();
+    if (!trimmed) continue;
+
+    const lengths = splitTopLevel(
+      trimmed,
+      (character) => character === "_" || character === " "
+    ).filter((part) => SHADOW_LENGTH_RE.test(part));
+
+    // <offset-x> <offset-y> <blur> <spread>: fewer than three lengths cannot
+    // carry blur, and a token reference parses to no lengths at all.
+    if (lengths.length < 3) continue;
+
+    const [offsetX, offsetY, blur] = lengths.map(Number.parseFloat);
+    if (blur === 0) continue;
+    if (offsetX === 0 && offsetY === 0) continue; // glow, not elevation
+
+    return trimmed;
+  }
+
+  return null;
 }
 
 function isClassHelperCall(node) {

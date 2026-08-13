@@ -4,6 +4,7 @@ import {
   collectDeclaredShapeUtilities,
   findShapeVocabularyUsages,
   findTextViolations,
+  firstBlurredShadowLayer,
 } from "../../scripts/lint-design-system.mjs";
 
 const SHOULD_FLAG = [
@@ -35,6 +36,18 @@ const SHOULD_FLAG = [
   { syntax: "rounded-sm", rule: "border-radius" },
   { syntax: "rounded-t-xl", rule: "border-radius" },
   { syntax: "rounded-[4px]", rule: "border-radius" },
+  { syntax: "shadow-xl", rule: "shadow" },
+  { syntax: "shadow-2xl", rule: "shadow" },
+  { syntax: "shadow-xs", rule: "shadow" },
+  { syntax: "shadow-2xs", rule: "shadow" },
+  { syntax: "inset-shadow-xs", rule: "shadow" },
+  { syntax: "hover:shadow-xl", rule: "shadow" },
+  { syntax: "drop-shadow-md", rule: "shadow" },
+  { syntax: "drop-shadow-2xl", rule: "shadow" },
+  { syntax: "shadow-[0_4px_6px_var(--x)]", rule: "shadow" },
+  { syntax: "shadow-[2px_2px_4px_var(--x)]", rule: "shadow" },
+  { syntax: "shadow-[inset_0_2px_4px_var(--x)]", rule: "shadow" },
+  { syntax: "drop-shadow-[0_4px_6px_var(--x)]", rule: "shadow" },
 ] as const;
 
 const SHOULD_PASS = [
@@ -56,6 +69,16 @@ const SHOULD_PASS = [
   "rounded-lg",
   "rounded-none",
   "rounded-full",
+  "shadow-sm",
+  "shadow-md",
+  "shadow-lg",
+  "shadow-none",
+  "shadow-don",
+  "hover:shadow-md",
+  "shadow-[var(--shadow-lg)]",
+  "shadow-[0_0_0_1px_hsl(var(--sidebar-border))]",
+  "shadow-[3px_3px_0_0_var(--x)]",
+  "shadow-[0_0_18px_var(--gb-signal-selected)]",
 ] as const;
 
 describe("design-system text rules", () => {
@@ -82,6 +105,35 @@ describe("design-system text rules", () => {
     '/* className="top-1.5 text-[length:10px] [color:#fff]" */',
   ])("ignores commented source: %s", (source) => {
     expect(findTextViolations(source)).toEqual([]);
+  });
+});
+
+describe("elevation shadow analysis", () => {
+  it.each([
+    ["0_10px_15px_var(--x)", "straight-down blur"],
+    ["3px_3px_6px_var(--x)", "offset blur"],
+    ["inset_0_2px_4px_var(--x)", "inset blur"],
+    ["0 4px 6px var(--x)", "space-separated blur"],
+    ["0_1px_0_0_var(--x),0_4px_8px_var(--x)", "second layer blurs"],
+  ])("reports %s as blurred (%s)", (value) => {
+    expect(firstBlurredShadowLayer(value)).not.toBeNull();
+  });
+
+  it.each([
+    ["var(--shadow-lg)", "token reference"],
+    ["3px_3px_0_0_var(--x)", "hard offset"],
+    ["0_0_0_1px_hsl(var(--x))", "hairline ring"],
+    ["0_0_18px_var(--gb-signal-battle)", "zero-offset glow"],
+    ["0_0_18px_rgba(0,_0,_0,_0.5)", "glow with commas inside the color"],
+    ["2px_2px_0_0_var(--x),4px_4px_0_0_var(--y)", "two hard layers"],
+  ])("accepts %s (%s)", (value) => {
+    expect(firstBlurredShadowLayer(value)).toBeNull();
+  });
+
+  it("names the offending layer so the message points at it", () => {
+    expect(
+      firstBlurredShadowLayer("2px_2px_0_0_var(--x),0_8px_16px_var(--y)")
+    ).toBe("0_8px_16px_var(--y)");
   });
 });
 
