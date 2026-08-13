@@ -115,7 +115,14 @@ region**. If two pennants compete, neither is featured.
   tokens; the design-system lint treats that vocabulary as an **allowance**, not a
   requirement (see Rollout step 1), and fails only on a `chamfer-*` class with no matching
   declaration or one composed dynamically. Feature polygons (pennant, swallowtail, hex,
-  diamond) are **not** in the primitive and remain deferred.
+  diamond) are **not** in the primitive. Pennant, swallowtail and diamond remain deferred;
+  the elongated hexagon is the one implemented exception, shipped for keyword notation
+  chips (OPT-677) as the standalone `effect-hex`, `effect-hex-hairline` and
+  `effect-hex-inset` utilities in `globals.css` rather than as a `ChamferFrame` variant.
+  It is a worked example of the two-layer border technique and the miter compensation
+  below, applied to an apex instead of a 45° cut. Feature polygons entering the primitive
+  is still deferred; the next one should generalize these three utilities rather than
+  add a fourth bespoke set.
 - **CSS:** `clip-path: polygon(...)` for all cuts. Borders on clipped elements require the
   **two-layer technique**: outer element carries the edge color, inner element (inset by the
   hairline width) carries the surface. `border-*` properties do not follow clip-path.
