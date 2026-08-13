@@ -58,11 +58,15 @@ function Tooltip({
   side,
   delayDuration,
 }: {
-  content: React.ReactNode
+  content: React.ReactNode | null | undefined
   children: React.ReactNode
   side?: "top" | "right" | "bottom" | "left"
   delayDuration?: number
 }) {
+  if (content == null) {
+    return <>{children}</>
+  }
+
   return (
     <TooltipRoot delayDuration={delayDuration}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
