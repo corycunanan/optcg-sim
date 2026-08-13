@@ -241,9 +241,10 @@ const BLURRED_STOCK_SHADOW_CLASS_TOKENS = new Set(["shadow"]);
 // name appears in assertions that pin the floor
 // (`expect(className).not.toContain("text-xs")`) and in comments documenting
 // the sanctioned chip box — and a text scan cannot tell those from a real
-// utility. The residual gap is the same one the shadow rule carries: a class
-// list parked in a variable and passed as `className={LABEL}` is composed at
-// runtime and stays out of scope.
+// utility. A class list named before use — `const SECTION_LABEL = "…"` then
+// `className={SECTION_LABEL}` — is resolved through its same-file declaration
+// (localStringConstants); an imported one has no declaration to read and stays
+// out of scope, like any other runtime value.
 //
 // The exemption is by file, never by pattern. A new entry means a new badge
 // anatomy and belongs in review, not in a widened regex.
@@ -557,6 +558,7 @@ function forEachClassPosition(
     ts.ScriptKind.TSX
   );
   const scanned = new Set();
+  const localClassConstants = localStringConstants(sourceFile);
   const shadowedHelpers = locallyShadowedHelperNames(sourceFile);
   const isHelperCall = (node) =>
     isClassHelperCall(node) && !shadowedHelpers.has(node.expression.text);
@@ -638,6 +640,21 @@ function forEachClassPosition(
         scanClassExpression(argument, helperKeysAreClasses(node));
       }
       return;
+    }
+
+    // `className={SECTION_LABEL}` is a class list the file wrote down; the
+    // indirection is naming, not runtime composition. Every same-file literal
+    // declaration of the name is scanned in its own right, so the finding lands
+    // on the declaration and is reported once no matter how many elements use
+    // it.
+    if (ts.isIdentifier(node)) {
+      const declarations = localClassConstants.get(node.text);
+      if (declarations) {
+        for (const declaration of declarations) {
+          scanClassExpression(declaration, keysAreClasses);
+        }
+        return;
+      }
     }
 
     // Anything else here is composed at runtime.
@@ -723,6 +740,51 @@ function templateStaticTokens(node, sourceFile) {
 /** `cva` keys its variant groups, not its classes; every other helper keys classes. */
 function helperKeysAreClasses(node) {
   return node.expression.text !== "cva";
+}
+
+/**
+ * Every same-file `const NAME = "…"` string literal, as `Map<name, node[]>`.
+ *
+ * A class list is routinely named before it is used — `const SECTION_LABEL =
+ * "text-sm font-semibold …"` then `className={SECTION_LABEL}` — and without
+ * this the identifier reads as runtime composition and the class list escapes
+ * every by-name rule. Resolving it keeps the rules honest about how the
+ * codebase actually writes classes.
+ *
+ * Deliberately shallow, in both directions:
+ *
+ * - **Same file only.** An imported constant has no declaration here to read,
+ *   so it stays out of scope, exactly like any other runtime value. Shared
+ *   class vocabularies belong in a primitive (which the rules do scan), not in
+ *   a cross-module string.
+ * - **No scope analysis.** A name declared more than once contributes all of
+ *   its literal declarations, so a `text-xs` literal is judged wherever it was
+ *   written rather than being excused by a same-named sibling.
+ *
+ * Only string literals are collected. A computed initializer is composed at
+ * runtime and keeps its existing treatment.
+ */
+function localStringConstants(sourceFile) {
+  const constants = new Map();
+
+  const visit = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isStringLiteral(node.initializer) ||
+        ts.isNoSubstitutionTemplateLiteral(node.initializer))
+    ) {
+      const existing = constants.get(node.name.text);
+      if (existing) existing.push(node.initializer);
+      else constants.set(node.name.text, [node.initializer]);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return constants;
 }
 
 /**

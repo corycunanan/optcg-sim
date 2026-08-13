@@ -457,7 +457,7 @@ Adapted from Riftbound's article card pattern:
 │          16:9 image area            │ aspect-ratio: 16/9
 │     (hover: image scale 1.05)       │ overflow: hidden on container
 ├─────────────────────────────────────┤
-│ CATEGORY   |   Mar 30, 2026        │ caption / 12px / --text-secondary
+│ CATEGORY   |   Mar 30, 2026        │ caption / 14px / --text-secondary
 │                                     │
 │ Card Title Goes Here                │ heading / 20px / --text-primary / 600
 │                                     │
@@ -770,7 +770,7 @@ This keeps future board-specific customization (for example, a light beach or Wa
 
 ### Inside-Board Floor Overrides (Responsive Game Board, OPT-346)
 
-The game board is authored at a fixed 1920×1080 design resolution and uniformly scaled via CSS `transform: scale()` to fit the viewport (see [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). At the 1280×640 minimum viewport the scale floor is ~0.59, which compresses chrome's 12px text into ~7px effective and a 2px focus ring into ~1.2px — both below the legibility floor. Inside-board tokens are promoted one step so the effective floor stays close to the previous 1280×720 experience while preserving the fixed-composition architecture.
+The game board is authored at a fixed 1920×1080 design resolution and uniformly scaled via CSS `transform: scale()` to fit the viewport (see [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). At the 1280×640 minimum viewport the scale floor is ~0.59, which compresses chrome's 14px text into ~8.3px effective and a 2px focus ring into ~1.2px — both below the legibility floor. Inside-board tokens are promoted one step so the effective floor stays close to the previous 1280×720 experience while preserving the fixed-composition architecture.
 
 Inside the scaled subtree only — anything that renders within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers (zones, on-board cards, in-board CTAs, on-board overlays such as the DON redistribute bar) — apply these overrides:
 

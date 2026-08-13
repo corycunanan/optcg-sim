@@ -268,6 +268,55 @@ describe("type floor", () => {
     expect(findClassTokenViolations(source)).toEqual([]);
   });
 
+  it("resolves a class list named before use", () => {
+    expect(
+      findClassTokenViolations(
+        'const TINY = "text-xs";\n<div className={TINY} />;'
+      )
+    ).toEqual([expect.objectContaining({ rule: "type-floor" })]);
+  });
+
+  it("reads the declaration, not the name — a compliant constant is silent", () => {
+    expect(
+      findClassTokenViolations(
+        'const LABEL = "text-content-tertiary text-sm";\n<div className={LABEL} />;'
+      )
+    ).toEqual([]);
+  });
+
+  it("reports a shared constant once, however many elements use it", () => {
+    expect(
+      findClassTokenViolations(
+        'const TINY = "text-xs";\n<div className={TINY} />;\n<p className={TINY} />;\n<span className={cn(TINY, extra)} />;'
+      )
+    ).toHaveLength(1);
+  });
+
+  it("judges every same-file declaration of a reused name", () => {
+    expect(
+      findClassTokenViolations(
+        'function a() { const label = "text-xs"; return <i className={label} />; }\n' +
+          'function b() { const label = "text-sm"; return <i className={label} />; }'
+      )
+    ).toEqual([expect.objectContaining({ rule: "type-floor" })]);
+  });
+
+  it("leaves an imported constant out of scope — it has no declaration to read", () => {
+    expect(
+      findClassTokenViolations(
+        'import { TINY } from "./tokens";\n<div className={TINY} />;'
+      )
+    ).toEqual([]);
+  });
+
+  it("resolves constants for the shadow rule too — the machinery is shared", () => {
+    expect(
+      findClassTokenViolations(
+        'const RAISED = "border shadow";\n<div className={RAISED} />;'
+      )
+    ).toEqual([expect.objectContaining({ rule: "shadow" })]);
+  });
+
   it("exempts the badge-anatomy files that own the 12px box", () => {
     expect(
       findClassTokenViolations('<span className="rounded px-2 text-xs" />', {
