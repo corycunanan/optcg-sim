@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { ComponentProps, ReactNode } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -20,9 +20,6 @@ const mocks = vi.hoisted(() => ({
     | "authenticated"
     | "loading"
     | "unauthenticated",
-  // Captured from the navbar's own controlled NavigationMenu so tests can
-  // drive Radix's open/close value changes.
-  setMenuValue: null as ((value: string) => void) | null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -65,85 +62,60 @@ vi.mock("@/components/deck-builder/deck-navigation-guard", () => ({
   ),
 }));
 
-vi.mock("@/components/ui/navigation-menu", async () => {
-  const { createContext, useContext, useState } = await import("react");
-  const { createPortal } = await import("react-dom");
-  const ViewportContext = createContext<{
-    enabled: boolean;
-    element: HTMLDivElement | null;
-  }>({ enabled: false, element: null });
-
-  return {
-    NavigationMenu: ({
-      children,
-      className,
-      viewport = true,
-      onValueChange,
-    }: {
-      children: ReactNode;
-      className?: string;
-      viewport?: boolean;
-      onValueChange?: (value: string) => void;
-    }) => {
-      const [viewportElement, setViewportElement] =
-        useState<HTMLDivElement | null>(null);
-
-      // The account menu renders an uncontrolled NavigationMenu too, so only
-      // the controlled one is captured.
-      if (onValueChange) mocks.setMenuValue = onValueChange;
-
-      return (
-        <div
-          data-slot="navigation-menu"
-          data-viewport={viewport}
-          className={className}
-        >
-          <ViewportContext.Provider
-            value={{ enabled: viewport, element: viewportElement }}
-          >
-            {children}
-            {viewport && (
-              <div
-                ref={setViewportElement}
-                data-slot="navigation-menu-viewport"
-              />
-            )}
-          </ViewportContext.Provider>
-        </div>
-      );
-    },
-    NavigationMenuList: ({
-      children,
-      className,
-    }: {
-      children: ReactNode;
-      className?: string;
-    }) => (
-      <div data-slot="navigation-menu-list" className={className}>
-        {children}
-      </div>
-    ),
-    NavigationMenuItem: ({ children }: { children: ReactNode }) => (
-      <div>{children}</div>
-    ),
-    NavigationMenuTrigger: ({
-      children,
-      ...props
-    }: ComponentProps<"button">) => <button {...props}>{children}</button>,
-    NavigationMenuContent: ({ children }: { children: ReactNode }) => {
-      const viewportContext = useContext(ViewportContext);
-      const content = <div data-slot="navigation-menu-content">{children}</div>;
-
-      if (viewportContext.enabled && viewportContext.element) {
-        return createPortal(content, viewportContext.element);
-      }
-
-      return viewportContext.enabled ? null : content;
-    },
-    NavigationMenuLink: ({ children }: { children: ReactNode }) => children,
-    navigationMenuTriggerStyle: () => "navigation-trigger",
-  };
-});
+// The nav row no longer opens anything (OPT-680), so the mock only has to
+// render the primitives' structure: the one remaining menu in the bar is the
+// account menu, which runs in `viewport={false}` mode and renders its content
+// inline.
+vi.mock("@/components/ui/navigation-menu", () => ({
+  NavigationMenu: ({
+    children,
+    className,
+    viewport = true,
+  }: {
+    children: ReactNode;
+    className?: string;
+    viewport?: boolean;
+  }) => (
+    <div
+      data-slot="navigation-menu"
+      data-viewport={viewport}
+      className={className}
+    >
+      {children}
+      {viewport && <div data-slot="navigation-menu-viewport" />}
+    </div>
+  ),
+  NavigationMenuList: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => (
+    <div data-slot="navigation-menu-list" className={className}>
+      {children}
+    </div>
+  ),
+  NavigationMenuItem: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => (
+    <div data-slot="navigation-menu-item" className={className}>
+      {children}
+    </div>
+  ),
+  NavigationMenuTrigger: ({ children, ...props }: ComponentProps<"button">) => (
+    <button {...props}>{children}</button>
+  ),
+  NavigationMenuContent: ({ children }: { children: ReactNode }) => (
+    <div data-slot="navigation-menu-content">{children}</div>
+  ),
+  NavigationMenuLink: ({ children }: { children: ReactNode }) => children,
+  navigationMenuTriggerStyle: () => "navigation-trigger",
+}));
 
 import { Navbar } from "./navbar";
 
@@ -160,16 +132,9 @@ beforeEach(() => {
     theme: "default",
   };
   mocks.sessionStatus = "authenticated";
-  mocks.setMenuValue = null;
 });
 
 afterEach(() => cleanup());
-
-function setMenuValue(value: string) {
-  act(() => {
-    mocks.setMenuValue?.(value);
-  });
-}
 
 describe("Navbar", () => {
   it("renders the authed account cluster on a non-game route", () => {
@@ -192,35 +157,68 @@ describe("Navbar", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders Home, Play, Decks, Cards with matching plain-link styles", () => {
+  it("renders Home, Play, Decks, Cards as four plain links with matching styles", () => {
     const { container } = render(<Navbar />);
     const navText = container.querySelector("nav")?.textContent ?? "";
-    const play = screen.getByRole("link", { name: "Play" });
     const home = screen.getByRole("link", { name: "Home" });
+    const play = screen.getByRole("link", { name: "Play" });
+    const decks = screen.getByRole("link", { name: "Decks" });
+    const cards = screen.getByRole("link", { name: "Cards" });
 
     expect(navText.indexOf("Home")).toBeLessThan(navText.indexOf("Play"));
     expect(navText.indexOf("Play")).toBeLessThan(navText.indexOf("Decks"));
     expect(navText.indexOf("Decks")).toBeLessThan(navText.indexOf("Cards"));
+    expect(home.getAttribute("href")).toBe("/");
+    expect(play.getAttribute("href")).toBe("/lobbies");
+    expect(decks.getAttribute("href")).toBe("/decks");
+    expect(cards.getAttribute("href")).toBe("/cards");
+    // Decks is active on this pathname, so only the three inactive links share
+    // a class string.
     expect(play.className).toBe(home.className);
+    expect(cards.className).toBe(home.className);
     expect(play.className).not.toContain("bg-gold-500");
-    expect(home).toBeDefined();
-    expect(screen.getByRole("button", { name: "Decks" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Cards" })).toBeDefined();
+  });
+
+  it("leaves no dropdown trigger or menu panel in the link row (OPT-680)", () => {
+    render(<Navbar />);
+
+    const linksScroller = document.querySelector(
+      '[data-slot="navbar-links-scroller"]'
+    );
+
+    // Decks and Cards used to be `NavigationMenuTrigger` buttons with a
+    // chevron and a panel; the row is links only now.
+    expect(linksScroller?.querySelectorAll("button")).toHaveLength(0);
+    expect(
+      linksScroller?.querySelectorAll(
+        '[data-slot="navigation-menu-content"], svg'
+      )
+    ).toHaveLength(0);
+    expect(linksScroller?.querySelectorAll("a")).toHaveLength(4);
+    // Nothing in the bar anchors a menu any more, so the dead CSS anchor class
+    // must not survive on a link either.
+    for (const link of linksScroller?.querySelectorAll("a") ?? []) {
+      expect(link.className.split(/\s+/)).not.toContain(
+        "navbar-dropdown-anchor"
+      );
+    }
   });
 
   it.each([
-    ["/lobbies", "link", "Play"],
-    ["/game", "link", "Play"],
-    ["/", "link", "Home"],
-    ["/cards", "button", "Cards"],
-    ["/decks", "button", "Decks"],
+    ["/lobbies", "Play"],
+    ["/game", "Play"],
+    ["/", "Home"],
+    ["/cards", "Cards"],
+    ["/sets", "Cards"],
+    ["/decks", "Decks"],
+    ["/decks/new", "Decks"],
   ])(
-    "renders the sole active pill and aria-current for %s",
-    (pathname, role, accessibleName) => {
+    "renders the sole active section and aria-current for %s",
+    (pathname, accessibleName) => {
       mocks.pathname = pathname;
       render(<Navbar />);
 
-      const activeControl = screen.getByRole(role, { name: accessibleName });
+      const activeControl = screen.getByRole("link", { name: accessibleName });
 
       expect(activeControl.getAttribute("aria-current")).toBe("page");
       expect(activeControl.className).toContain("bg-surface-2");
@@ -229,8 +227,8 @@ describe("Navbar", () => {
       const inactiveControls = [
         screen.getByRole("link", { name: "Play" }),
         screen.getByRole("link", { name: "Home" }),
-        screen.getByRole("button", { name: "Decks" }),
-        screen.getByRole("button", { name: "Cards" }),
+        screen.getByRole("link", { name: "Decks" }),
+        screen.getByRole("link", { name: "Cards" }),
       ].filter((control) => control !== activeControl);
 
       for (const inactiveControl of inactiveControls) {
@@ -265,62 +263,32 @@ describe("Navbar", () => {
     );
   });
 
-  it("keeps dropdown content outside the overflow-clipping links scroller", () => {
+  it("mounts no navigation-menu viewport now that the link row opens nothing", () => {
     render(<Navbar />);
 
     const linksScroller = document.querySelector(
       '[data-slot="navbar-links-scroller"]'
     );
-    const viewport = document.querySelector(
-      '[data-slot="navigation-menu-viewport"]'
-    );
-    const dropdownContent = screen
-      .getByRole("link", { name: "Decks" })
-      .closest('[data-slot="navigation-menu-content"]');
 
     expect(linksScroller).not.toBeNull();
-    expect(viewport).not.toBeNull();
-    expect(viewport?.contains(dropdownContent)).toBe(true);
-    expect(linksScroller?.contains(dropdownContent)).toBe(false);
-    expect(linksScroller?.contains(viewport)).toBe(false);
+    // The bar's own NavigationMenu runs in `viewport={false}` mode, so there is
+    // no absolutely positioned measuring box left to keep out of the
+    // overflow-clipping scroller — and nothing to anchor to a trigger.
+    expect(
+      document.querySelector('[data-slot="navigation-menu-viewport"]')
+    ).toBeNull();
   });
 
-  it("keeps the dropdown anchor on the closing trigger and moves it when switching menus", () => {
+  it("renders the one remaining navbar menu through the shared rectangular surface", () => {
     render(<Navbar />);
 
-    const decks = screen.getByRole("button", { name: "Decks" });
-    const cards = screen.getByRole("button", { name: "Cards" });
-    const hasAnchor = (control: HTMLElement) =>
-      control.className.split(/\s+/).includes("navbar-dropdown-anchor");
-
-    expect(hasAnchor(decks)).toBe(false);
-    expect(hasAnchor(cards)).toBe(false);
-
-    setMenuValue("decks");
-    expect(hasAnchor(decks)).toBe(true);
-    expect(hasAnchor(cards)).toBe(false);
-
-    // Radix clears the value before its exit animation finishes; the closing
-    // panel has to stay anchored to the trigger it belongs to.
-    setMenuValue("");
-    expect(hasAnchor(decks)).toBe(true);
-    expect(hasAnchor(cards)).toBe(false);
-
-    setMenuValue("cards");
-    expect(hasAnchor(cards)).toBe(true);
-    expect(hasAnchor(decks)).toBe(false);
-  });
-
-  it("renders every navigation dropdown through the shared rectangular surface", () => {
-    render(<Navbar />);
-
-    // Decks, Cards, and the account menu must all route through
-    // NavbarDropdownSurface rather than painting their own panel, so the
-    // navbar's dropdowns cannot drift apart in shape or material.
+    // Only the account menu hangs off the bar now (OPT-680 removed Decks and
+    // Cards), and it must still route through NavbarDropdownSurface rather than
+    // painting its own panel.
     const surfaces = document.querySelectorAll(
       '[data-slot="navbar-dropdown-surface"]'
     );
-    expect(surfaces).toHaveLength(3);
+    expect(surfaces).toHaveLength(1);
     for (const surface of surfaces) {
       const classes = (surface.getAttribute("class") ?? "").split(/\s+/);
       // Square corners: menu chrome takes no chamfer and no radius.
@@ -335,7 +303,7 @@ describe("Navbar", () => {
 
     // `.font-nav` (uppercase Erode 700) is reserved for the global navbar link
     // row; menu items take the `body` role per TYPOGRAPHY.md §5.
-    const item = screen.getByRole("link", { name: "Decks" });
+    const item = screen.getByRole("link", { name: "Profile" });
     const classes = item.className.split(/\s+/);
 
     expect(classes).toContain("text-sm");
@@ -343,6 +311,59 @@ describe("Navbar", () => {
     expect(classes).not.toContain("text-base");
     expect(classes).toContain("focus-visible:outline-2");
     expect(classes).not.toContain("focus-visible:ring-2");
+  });
+
+  it("renders nav links as full-height square sections that meet both bar edges", () => {
+    render(<Navbar />);
+
+    const scroller = document.querySelector(
+      '[data-slot="navbar-links-scroller"]'
+    );
+    const list = document.querySelector('[data-slot="navigation-menu-list"]');
+    const item = document.querySelector('[data-slot="navigation-menu-item"]');
+    const link = screen.getByRole("link", { name: "Home" });
+    const linkClasses = link.className.split(/\s+/);
+
+    // OPT-681: the height chain has to be unbroken from the bar down to the
+    // link, or the hover/active fill floats inside the bar as a pill again.
+    for (const element of [scroller, list, item]) {
+      expect(element?.className.split(/\s+/)).toContain("h-full");
+    }
+    // Radix wraps the list's <ul> in an inline-styled indicator-track <div>
+    // that accepts no className; without this the chain breaks there and every
+    // h-full below resolves to auto.
+    expect(scroller?.className.split(/\s+/)).toContain("[&>div]:h-full");
+    expect(linkClasses).toContain("h-full");
+    expect(linkClasses).not.toContain("h-9");
+
+    // Square: a section that meets both edges has no corner left to round.
+    expect(linkClasses).toContain("rounded-none");
+    expect(linkClasses.some((c) => /^rounded-(?!none)/.test(c))).toBe(false);
+
+    // Exact vertical centering of the label inside the full-height block.
+    expect(linkClasses).toContain("flex");
+    expect(linkClasses).toContain("items-center");
+
+    // No gap between sections — the nav background must not show through as a
+    // seam between two adjacent blocks.
+    const listClasses = list?.className.split(/\s+/) ?? [];
+    expect(listClasses.some((c) => /^gap-(?!0$)/.test(c))).toBe(false);
+  });
+
+  it("keeps a focus indicator that survives inside a full-height section", () => {
+    render(<Navbar />);
+
+    const classes = screen
+      .getByRole("link", { name: "Home" })
+      .className.split(/\s+/);
+
+    // The inset outline from the shared trigger style draws inside the block,
+    // so it stays visible even where the section meets the bar's edges.
+    expect(classes).toContain("navigation-trigger");
+    // Tailwind v4: `outline-none` sets `--tw-outline-style: none` and would
+    // defeat every `focus-visible:outline-*` utility for good.
+    expect(classes).not.toContain("outline-none");
+    expect(classes).not.toContain("focus-visible:outline-none");
   });
 
   it("spans the nav content edge to edge so the actions pin to the viewport", () => {

@@ -18,6 +18,12 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => mocks.searchParams,
 }));
 
+vi.mock("next/link", () => ({
+  default: ({ children, ...props }: React.ComponentProps<"a">) => (
+    <a {...props}>{children}</a>
+  ),
+}));
+
 // The dialog itself is covered by card-filters-dialog.test.tsx; here we only
 // care that the browser opens it and commits its draft exactly once.
 vi.mock("./card-filters-dialog", () => ({
@@ -52,7 +58,7 @@ const noFilters = {
 
 async function renderBrowser(
   currentFilters: Partial<typeof noFilters> = {},
-  overrides: { totalPages?: number } = {}
+  overrides: { totalPages?: number; setsPath?: string } = {}
 ) {
   await act(async () => {
     renderer = create(
@@ -64,6 +70,7 @@ async function renderBrowser(
         sets={sets}
         currentFilters={{ ...noFilters, ...currentFilters }}
         routePath="/cards"
+        setsPath={overrides.setsPath}
       />
     );
   });
@@ -240,6 +247,48 @@ describe("CardBrowser zero results", () => {
   });
 });
 
+describe("CardBrowser set-browser wayfinding", () => {
+  // The navbar's Cards dropdown was the only inbound link to /sets (OPT-680);
+  // SetBrowser links outward only, so without this the set browser is
+  // unreachable from anywhere in the product.
+  it("links to the set browser from the page header", async () => {
+    await renderBrowser({}, { setsPath: "/sets" });
+
+    const anchors = setsAnchors(renderer!.root);
+    expect(anchors).toHaveLength(1);
+
+    const link = anchors[0];
+    const classes = classList(link);
+
+    // Body-role, quiet, neutral — a sibling wayfinding link, never a second
+    // CTA competing with Filter.
+    expect(classes).toContain("text-sm");
+    expect(classes).toContain("text-content-secondary");
+    expect(classes.some((c) => c.startsWith("bg-"))).toBe(false);
+    expect(classes.some((c) => c.includes("gold"))).toBe(false);
+
+    // It belongs to the header's identity column, not its actions row: the
+    // actions row (`PageHeaderActions`, the only `flex-wrap` band in the
+    // header) holds the Filter CTA and nothing else.
+    const header = renderer!.root.findByType("header");
+    expect(setsAnchors(header)).toHaveLength(1);
+
+    const actionsRow = header.find((node) =>
+      classList(node).includes("flex-wrap")
+    );
+    expect(
+      actionsRow.findAllByProps({ "aria-controls": "card-filters" }).length
+    ).toBeGreaterThan(0);
+    expect(setsAnchors(actionsRow)).toHaveLength(0);
+  });
+
+  it("omits the link where no set browser is configured", async () => {
+    await renderBrowser();
+
+    expect(setsAnchors(renderer!.root)).toHaveLength(0);
+  });
+});
+
 describe("CardBrowser layout", () => {
   it("aligns every content section to the app-wide container", async () => {
     await renderBrowser({ set: "OP15" }, { totalPages: 3 });
@@ -286,6 +335,14 @@ describe("CardBrowser layout", () => {
     expect(classList(skeletonHeader)).not.toContain("bg-navy-900");
   });
 });
+
+/** Rendered `<a href="/sets">` elements, not the `next/link` wrappers. */
+function setsAnchors(scope: ReactTestInstance): ReactTestInstance[] {
+  return scope.findAll(
+    (node) => node.type === "a" && node.props.href === "/sets",
+    { deep: true }
+  );
+}
 
 function classList(node: ReactTestInstance): string[] {
   return String(node.props.className ?? "").split(/\s+/);

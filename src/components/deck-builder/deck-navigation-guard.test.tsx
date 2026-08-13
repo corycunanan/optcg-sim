@@ -729,13 +729,14 @@ describe("deck builder navigation guard", () => {
     await renderGuard(<Navbar />);
 
     const links = renderer!.root.findAllByType("a");
+    // Four plain nav links plus the account menu's Profile row — OPT-680
+    // retired the Decks and Cards dropdowns that also listed /decks/new and
+    // /sets, and every remaining destination still routes through the guard.
     expect(links.map((link) => link.props.href)).toEqual([
       "/",
       "/lobbies",
       "/decks",
-      "/decks/new",
       "/cards",
-      "/sets",
       "/onboarding",
     ]);
 
@@ -758,42 +759,41 @@ describe("deck builder navigation guard", () => {
     await renderGuard(<Navbar />, false);
 
     const links = renderer!.root.findAllByType("a");
+    // Four plain nav links plus the account menu's Profile row — OPT-680
+    // retired the Decks and Cards dropdowns that also listed /decks/new and
+    // /sets, and every remaining destination still routes through the guard.
     expect(links.map((link) => link.props.href)).toEqual([
       "/",
       "/lobbies",
       "/decks",
-      "/decks/new",
       "/cards",
-      "/sets",
       "/onboarding",
     ]);
   });
 
   it.each([
-    ["/", "Home", "aria-current"],
-    ["/cards/OP01-001", "Cards", "data-active"],
-    ["/sets/OP01", "Cards", "data-active"],
-    ["/admin/cards/new", "Cards", "data-active"],
-    ["/admin/sets", "Cards", "data-active"],
-    ["/lobbies/lobby-1", "Play", "aria-current"],
-    ["/game", "Play", "aria-current"],
-    ["/decks/deck-1", "Decks", "data-active"],
-  ])(
-    "marks the matching nav item active for %s",
-    async (pathname, label, activeProp) => {
-      mocks.pathname = pathname;
-      await renderGuard(<Navbar />, false);
+    ["/", "Home"],
+    ["/cards/OP01-001", "Cards"],
+    ["/sets/OP01", "Cards"],
+    ["/admin/cards/new", "Cards"],
+    ["/admin/sets", "Cards"],
+    ["/lobbies/lobby-1", "Play"],
+    ["/game", "Play"],
+    ["/decks/deck-1", "Decks"],
+    ["/decks/new", "Decks"],
+  ])("marks the matching nav item active for %s", async (pathname, label) => {
+    mocks.pathname = pathname;
+    await renderGuard(<Navbar />, false);
 
-      // Triggers first: the Decks dropdown now contains a link that shares
-      // the trigger's own label, and the active marker lives on the trigger.
-      const item = [
-        ...renderer!.root.findAllByType("button"),
-        ...renderer!.root.findAllByType("a"),
-      ].find((candidate) => candidate.children.includes(label));
+    // Every nav item is a plain link now, so `aria-current` is the single
+    // active marker — the routes the retired dropdowns used to own (/sets,
+    // /admin/*, /decks/new) still light their section.
+    const item = renderer!.root
+      .findAllByType("a")
+      .find((candidate) => candidate.children.includes(label));
 
-      expect(item?.props[activeProp]).toBeTruthy();
-    }
-  );
+    expect(item?.props["aria-current"]).toBe("page");
+  });
 
   it("keeps dirty editor state on cancel and navigates only after confirmation", async () => {
     await renderGuard(

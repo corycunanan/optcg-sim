@@ -229,6 +229,12 @@
       "minimum": 3
     },
     {
+      "name": "focus-ring/raised",
+      "foreground": "--border-focus",
+      "background": "--surface-2",
+      "minimum": 3
+    },
+    {
       "name": "tier5-primary/info",
       "foreground": "--text-primary",
       "background": "--surface-info",
