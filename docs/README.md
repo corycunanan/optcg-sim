@@ -52,6 +52,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 - [Branding Guidelines](./design/BRANDING-GUIDELINES.md) — shipped design and theming contract: semantic tokens, Erode typography, motion, and component patterns
 - [Shape Language](./design/SHAPE-LANGUAGE.md) — adopted direction: angular/polygonal chrome so rounded geometry stays reserved for cards; closed shape vocabulary and rollout plan
 - [Material Language](./design/MATERIAL-LANGUAGE.md) — adopted direction (game-board scope): five-tier surface ladder, gold-premium materials, Tier-5 tooltip spec, theming roadmap
+- [Elevation Language](./design/ELEVATION-LANGUAGE.md) — adopted surface-stacking model: z-ladder ↔ elevation color ↔ hard-shadow mapping, the three treatments, glow exemption, anti-stacking rules
 - [Color Language](./design/COLOR-LANGUAGE.md) — adopted direction: salience hierarchy (card art wins), compressed surface contrast vs. untouchable accessibility contrast, palette authoring rules for both theming tracks
 - [Shape Specimens](./design/shape-specimens.html) — CSS-only builds of the shape vocabulary (open in a browser)
 - [Semantic Tokens Guide](./design/TOKENS-GUIDE.md) — choosing the current CSS/Tailwind token family by UI role

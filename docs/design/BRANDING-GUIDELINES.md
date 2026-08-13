@@ -345,6 +345,11 @@ Chrome uses 2px corners. Badges alone retain 4px corners; avatars and presence d
 
 ### Shadow Scale
 
+> The surface-stacking model — which surfaces cast, which stay flat, and how the z-ladder,
+> the elevation color steps, and the shadow tiers line up — lives in
+> [ELEVATION-LANGUAGE.md](ELEVATION-LANGUAGE.md), the way SHAPE-LANGUAGE.md owns radius and
+> chamfer. This section keeps the token values and their enforcement notes.
+
 **No blurred drop shadows.** A raised surface reads as raised through a hard, non-blurred offset cast down-right — the printed-card feel of the DON!! card shadow (`--gb-shadow-don: 3px 3px 0px 0px rgba(0,0,0,0.25)`), never a soft ambient bloom. One layer per tier; a hard shadow has no falloff to fake.
 
 | Token | Value | Usage |
@@ -374,6 +379,10 @@ z-40   Modals, sheets
 z-50   Toasts, notifications
 z-[100] Game board overlays
 ```
+
+Which of these tiers carries a shadow, which takes the flat `edge-*` treatment, and which
+separates by elevation color alone is specified tier-by-tier in
+[ELEVATION-LANGUAGE.md](ELEVATION-LANGUAGE.md).
 
 ---
 
