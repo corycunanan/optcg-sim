@@ -58,6 +58,9 @@ const SHOULD_FLAG = [
   { syntax: "shadow-[2PX_2PX_4PX_var(--x)]", rule: "shadow" },
   { syntax: "shadow-[2px_2px_calc(4px)_var(--x)]", rule: "shadow" },
   { syntax: "shadow-[2px_2px_var(--blur)_var(--x)]", rule: "shadow" },
+  { syntax: "shadow-[2px_2px_calc(4px)]", rule: "shadow" },
+  { syntax: "shadow-[2px_2px_var(--blur)]", rule: "shadow" },
+  { syntax: "shadow-[2px_2px_var(--x)]", rule: "shadow" },
   { syntax: "shadow-[inset_0_2px_4px_var(--x)]", rule: "shadow" },
   { syntax: "drop-shadow-[0_4px_6px_var(--x)]", rule: "shadow" },
 ] as const;
@@ -92,7 +95,8 @@ const SHOULD_PASS = [
   "shadow-[var(--shadow-lg)]",
   "shadow-[0_0_0_1px_hsl(var(--sidebar-border))]",
   "shadow-[3px_3px_0_0_var(--x)]",
-  "shadow-[2px_2px_var(--x)]",
+  "shadow-[2px_2px_black]",
+  "shadow-[2px_2px_0_black]",
   "shadow-[0_0_18px_var(--gb-signal-selected)]",
   "shadow-[0_0_calc(18px)_var(--x)]",
 ] as const;
@@ -138,6 +142,9 @@ describe("elevation shadow analysis", () => {
     ["2px_2px_calc(var(--b)_*_2)_0_var(--x)", "nested calc() blur with spread"],
     ["3px_3px_4px", "blur with no color"],
     ["red_2px_2px_4px", "leading color then blur"],
+    ["2px_2px_calc(4px)", "trailing calc() holds the blur slot, not a color"],
+    ["2px_2px_var(--blur)", "trailing var() holds the blur slot, not a color"],
+    ["2px_2px_var(--x)", "unresolved third position is an unproven blur"],
   ])("reports %s as blurred (%s)", (value) => {
     expect(firstBlurredShadowLayer(value)).not.toBeNull();
   });
@@ -146,7 +153,13 @@ describe("elevation shadow analysis", () => {
     ["var(--shadow-lg)", "token reference"],
     ["inset_var(--shadow-lg)", "inset token reference"],
     ["3px_3px_0_0_var(--x)", "hard offset"],
-    ["2px_2px_var(--x)", "hard offset with a var() color and no blur slot"],
+    ["2px_2px_black", "hard offset whose proven color leaves no blur slot"],
+    ["2px_2px_#0af", "hard offset with a hex color and no blur slot"],
+    ["2px_2px_0_black", "hard offset with an explicit zero blur"],
+    [
+      "2px_2px_0_rgba(0,_0,_0,_0.5)",
+      "explicit zero blur before a color function",
+    ],
     ["0_0_0_1px_hsl(var(--x))", "hairline ring"],
     ["0_0_18px_var(--gb-signal-battle)", "zero-offset glow"],
     ["0_0_calc(18px)_var(--x)", "zero-offset glow with an unresolved blur"],
@@ -173,6 +186,12 @@ describe("bare shadow class token", () => {
     ['cn("shadow")', "class helper argument"],
     ['cn(open && "shadow")', "logical class expression"],
     ['clsx({ "shadow": on })', "clsx object key"],
+    ["clsx({ shadow: on })", "unquoted clsx object key"],
+    ["clsx({ shadow })", "shorthand clsx property"],
+    ["<div className={`shadow ${extra}`} />", "interpolated class list"],
+    ["<div className={`${extra} shadow`} />", "static tail of a template"],
+    ["<div className={`${a} border shadow ${b}`} />", "static middle fragment"],
+    ["cn(`shadow ${extra}`)", "template inside a class helper"],
   ])("flags %s (%s)", (source) => {
     expect(findClassTokenViolations(source)).toEqual([
       expect.objectContaining({ rule: "shadow" }),
@@ -187,6 +206,25 @@ describe("bare shadow class token", () => {
     ['const painted = ["shadow", "ring-1"];', "plain array of class names"],
     ["/^(ring|shadow|rounded)/.test(name);", "regular expression literal"],
     ['<div data-slot="shadow" />', "non-class JSX attribute"],
+    ["<div className={`${shadowClass}`} />", "template with no static text"],
+    ["<div className={`shadow-${step}`} />", "interpolated class name prefix"],
+    ["<div className={`${scope}shadow`} />", "interpolated class name suffix"],
+    [
+      "<div className={`shadow-md ${extra}`} />",
+      "token-backed step in a template",
+    ],
+    [
+      "<div data-slot={`shadow ${kind}`} />",
+      "template in a non-class attribute",
+    ],
+    [
+      'cva("base", { variants: { shadow: { on: "shadow-md" } } })',
+      "cva variant group named shadow",
+    ],
+    [
+      "function classNames(el: HTMLElement) { return []; }\nclassNames({ shadow: on });",
+      "locally declared helper of the same name",
+    ],
   ])("leaves %s alone (%s)", (source) => {
     expect(findClassTokenViolations(source)).toEqual([]);
   });

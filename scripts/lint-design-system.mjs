@@ -198,7 +198,9 @@ const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
 //    stay in the text rules.
 //
 // An arbitrary value is read structurally rather than allowlisted by path. Each
-// comma-separated layer drops `inset` and a leading/trailing <color>, leaving
+// comma-separated layer drops `inset` and a leading/trailing <color> — a
+// *proven* color, either a literal or a color function; an unresolved
+// `calc()`/`var()` is not assumed to be one and keeps its slot — leaving
 // <offset-x> <offset-y> <blur> <spread> positions, and passes only when:
 //
 // - No position holds a literal length (`shadow-[var(--shadow-lg)]`) — a token
@@ -476,17 +478,22 @@ export function findShapeVocabularyUsages(source) {
 export function findClassTokenViolations(source) {
   const violations = [];
 
+  const report = (token, index) => {
+    if (!BLURRED_STOCK_SHADOW_CLASS_TOKENS.has(token)) return;
+    violations.push({
+      index,
+      rule: "shadow",
+      message: `blurred stock shadow ${JSON.stringify(token)}; use the hard elevation tokens shadow-sm/md/lg`,
+    });
+  };
+
   forEachClassPosition(source, {
     onLiteral: (node, index) => {
-      for (const token of classTokenNames(node.text)) {
-        if (!BLURRED_STOCK_SHADOW_CLASS_TOKENS.has(token)) continue;
-        violations.push({
-          index,
-          rule: "shadow",
-          message: `blurred stock shadow ${JSON.stringify(token)}; use the hard elevation tokens shadow-sm/md/lg`,
-        });
-      }
+      for (const token of classTokenNames(node.text)) report(token, index);
     },
+    // A class list assembled around interpolations still contributes its static
+    // halves verbatim, so `` className={`shadow ${extra}`} `` is a real `shadow`.
+    onStaticToken: report,
     onDynamic: () => {},
   });
 
@@ -495,10 +502,14 @@ export function findClassTokenViolations(source) {
 
 /**
  * Walks every class position in a .tsx source, calling `onLiteral(node, index)`
- * for a static class string and `onDynamic(node, index)` for an expression
- * composed at runtime.
+ * for a static class string, `onStaticToken(token, index)` for a whole class
+ * name found in the static text of an interpolated template, and
+ * `onDynamic(node, index)` for an expression composed at runtime.
  */
-function forEachClassPosition(source, { onLiteral, onDynamic }) {
+function forEachClassPosition(
+  source,
+  { onLiteral, onDynamic, onStaticToken = () => {} }
+) {
   const sourceFile = ts.createSourceFile(
     "scan.tsx",
     source,
@@ -507,9 +518,16 @@ function forEachClassPosition(source, { onLiteral, onDynamic }) {
     ts.ScriptKind.TSX
   );
   const scanned = new Set();
+  const shadowedHelpers = locallyShadowedHelperNames(sourceFile);
+  const isHelperCall = (node) =>
+    isClassHelperCall(node) && !shadowedHelpers.has(node.expression.text);
 
-  /** Walks one class-position expression. */
-  const scanClassExpression = (node) => {
+  /**
+   * Walks one class-position expression. `keysAreClasses` is true wherever an
+   * object literal's own keys are class names (`clsx`/`cn`) and false inside a
+   * `cva` config, whose keys are variant group and option names.
+   */
+  const scanClassExpression = (node, keysAreClasses = true) => {
     if (!node || scanned.has(node)) return;
     scanned.add(node);
 
@@ -520,7 +538,7 @@ function forEachClassPosition(source, { onLiteral, onDynamic }) {
       ts.isNonNullExpression(node) ||
       ts.isJsxExpression(node)
     ) {
-      scanClassExpression(node.expression);
+      scanClassExpression(node.expression, keysAreClasses);
       return;
     }
 
@@ -529,9 +547,19 @@ function forEachClassPosition(source, { onLiteral, onDynamic }) {
       return;
     }
 
+    if (ts.isTemplateExpression(node)) {
+      // The substitutions are runtime values and stay out of scope, but the
+      // static text around them is class source Tailwind reads verbatim.
+      for (const { token, index } of templateStaticTokens(node, sourceFile)) {
+        onStaticToken(token, index);
+      }
+      onDynamic(node, node.getStart(sourceFile));
+      return;
+    }
+
     if (ts.isConditionalExpression(node)) {
-      scanClassExpression(node.whenTrue);
-      scanClassExpression(node.whenFalse);
+      scanClassExpression(node.whenTrue, keysAreClasses);
+      scanClassExpression(node.whenFalse, keysAreClasses);
       return;
     }
 
@@ -539,41 +567,59 @@ function forEachClassPosition(source, { onLiteral, onDynamic }) {
       ts.isBinaryExpression(node) &&
       CLASS_LOGICAL_OPERATORS.has(node.operatorToken.kind)
     ) {
-      scanClassExpression(node.left);
-      scanClassExpression(node.right);
+      scanClassExpression(node.left, keysAreClasses);
+      scanClassExpression(node.right, keysAreClasses);
       return;
     }
 
     if (ts.isArrayLiteralExpression(node)) {
-      for (const element of node.elements) scanClassExpression(element);
+      for (const element of node.elements) {
+        scanClassExpression(element, keysAreClasses);
+      }
       return;
     }
 
     if (ts.isObjectLiteralExpression(node)) {
       // clsx keys its classes; cva nests them as variant values.
       for (const property of node.properties) {
-        if (!ts.isPropertyAssignment(property)) continue;
-        const name = property.name;
-        if (
-          ts.isStringLiteral(name) ||
-          ts.isNoSubstitutionTemplateLiteral(name)
-        ) {
-          scanClassExpression(name);
-        } else if (ts.isComputedPropertyName(name)) {
-          scanClassExpression(name.expression);
+        if (ts.isShorthandPropertyAssignment(property)) {
+          // `clsx({ shadow })` toggles the class named by the key.
+          if (keysAreClasses) scanPropertyKey(property.name);
+          continue;
         }
-        scanClassExpression(property.initializer);
+        if (!ts.isPropertyAssignment(property)) continue;
+        if (keysAreClasses) scanPropertyKey(property.name);
+        scanClassExpression(property.initializer, keysAreClasses);
       }
       return;
     }
 
-    if (isClassHelperCall(node)) {
-      for (const argument of node.arguments) scanClassExpression(argument);
+    if (isHelperCall(node)) {
+      for (const argument of node.arguments) {
+        scanClassExpression(argument, helperKeysAreClasses(node));
+      }
       return;
     }
 
     // Anything else here is composed at runtime.
     onDynamic(node, node.getStart(sourceFile));
+  };
+
+  /**
+   * One object-literal key in a class position. A quoted key and a bare
+   * identifier key name the same class — `{ "shadow": on }` and `{ shadow: on }`
+   * are the same clsx call — so both are read as class tokens.
+   */
+  const scanPropertyKey = (name) => {
+    if (ts.isIdentifier(name)) {
+      onLiteral(name, name.getStart(sourceFile));
+      return;
+    }
+    if (ts.isComputedPropertyName(name)) {
+      scanClassExpression(name.expression);
+      return;
+    }
+    scanClassExpression(name);
   };
 
   const visit = (node) => {
@@ -583,15 +629,87 @@ function forEachClassPosition(source, { onLiteral, onDynamic }) {
       node.initializer
     ) {
       scanClassExpression(node.initializer);
-    } else if (isClassHelperCall(node) && !scanned.has(node)) {
+    } else if (isHelperCall(node) && !scanned.has(node)) {
       scanned.add(node);
-      for (const argument of node.arguments) scanClassExpression(argument);
+      for (const argument of node.arguments) {
+        scanClassExpression(argument, helperKeysAreClasses(node));
+      }
     }
 
     ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
+}
+
+/**
+ * Whole class names in the static text of an interpolated template, as
+ * `{ token, index }`.
+ *
+ * A fragment that touches a substitution is only half a class name, so the
+ * chunk on that side is dropped: `` `shadow-${size}` `` never produces the
+ * class `shadow-`, and `` `${scope}shadow` `` never produces `shadow`. Only
+ * text fenced off by whitespace — or by the template's own boundary — is a
+ * complete class. The dropped halves stay the dynamic rule's business.
+ */
+function templateStaticTokens(node, sourceFile) {
+  const spans = node.templateSpans;
+  const fragments = [
+    { node: node.head, atStart: true, atEnd: false },
+    ...spans.map((span, position) => ({
+      node: span.literal,
+      atStart: false,
+      atEnd: position === spans.length - 1,
+    })),
+  ];
+  const tokens = [];
+
+  for (const fragment of fragments) {
+    // `split` leaves an empty entry wherever the text begins or ends with
+    // whitespace, which is exactly the "fenced off" signal needed here.
+    const chunks = fragment.node.text.split(/\s+/);
+    if (!fragment.atStart) chunks.shift();
+    if (!fragment.atEnd) chunks.pop();
+
+    const index = fragment.node.getStart(sourceFile);
+    for (const chunk of chunks) {
+      const token = normalizeClassToken(chunk);
+      if (token) tokens.push({ token, index });
+    }
+  }
+
+  return tokens;
+}
+
+/** `cva` keys its variant groups, not its classes; every other helper keys classes. */
+function helperKeysAreClasses(node) {
+  return node.expression.text !== "cva";
+}
+
+/**
+ * Class-helper names this file declares for itself.
+ *
+ * Helper recognition is by name, so an unrelated local `classNames(container)`
+ * in a test would otherwise be walked as `clsx`. A name the file defines is not
+ * the imported helper, so it is dropped from recognition — for that file only.
+ */
+function locallyShadowedHelperNames(sourceFile) {
+  const shadowed = new Set();
+
+  const visit = (node) => {
+    const name =
+      ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)
+        ? node.name
+        : ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+          ? node.name
+          : null;
+    if (name && CLASS_HELPER_NAMES.has(name.text)) shadowed.add(name.text);
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return shadowed;
 }
 
 /** Splits on a separator, ignoring separators nested inside `(…)`. */
@@ -645,8 +763,10 @@ function shadowPositionalComponents(layer) {
     .filter((part) => part.length > 0 && part.toLowerCase() !== "inset");
 
   if (parts.length > 1 && isShadowColor(parts[0])) parts.shift();
-  // Trailing `<color>`: anything that is not a length cannot be `<spread>`.
-  if (parts.length > 1 && !SHADOW_LENGTH_RE.test(parts.at(-1))) parts.pop();
+  // Trailing `<color>`: only a *proven* color is non-positional. An unresolved
+  // `calc()`/`var()` keeps its slot, so `2px_2px_calc(4px)` still reads as a
+  // blur rather than losing its third position to a color that isn't there.
+  if (parts.length > 1 && isShadowColor(parts.at(-1))) parts.pop();
 
   return parts;
 }
@@ -690,12 +810,14 @@ function isClassHelperCall(node) {
   );
 }
 
+/** One class token, stripped of its variant chain and `!` prefixes. */
+function normalizeClassToken(token) {
+  return token.replace(/^!/, "").replace(/!$/, "").split(":").at(-1);
+}
+
 /** Whole class tokens in a literal, stripped of variant and `!` prefixes. */
 function classTokenNames(text) {
-  return text
-    .split(/\s+/)
-    .map((token) => token.replace(/^!/, "").replace(/!$/, "").split(":").at(-1))
-    .filter(Boolean);
+  return text.split(/\s+/).map(normalizeClassToken).filter(Boolean);
 }
 
 /** The first `chamfer-` fragment in any string part of an expression tree. */
