@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectDeclaredShapeUtilities,
+  findClassTokenViolations,
   findShapeVocabularyUsages,
   findTextViolations,
   firstBlurredShadowLayer,
@@ -40,12 +41,23 @@ const SHOULD_FLAG = [
   { syntax: "shadow-2xl", rule: "shadow" },
   { syntax: "shadow-xs", rule: "shadow" },
   { syntax: "shadow-2xs", rule: "shadow" },
+  { syntax: "shadow-inner", rule: "shadow" },
   { syntax: "inset-shadow-xs", rule: "shadow" },
+  { syntax: "inset-shadow-2xs", rule: "shadow" },
+  { syntax: "inset-shadow-sm", rule: "shadow" },
+  { syntax: "inset-shadow-md", rule: "shadow" },
+  { syntax: "inset-shadow", rule: "shadow" },
   { syntax: "hover:shadow-xl", rule: "shadow" },
+  { syntax: "hover:inset-shadow-sm", rule: "shadow" },
+  { syntax: "drop-shadow", rule: "shadow" },
   { syntax: "drop-shadow-md", rule: "shadow" },
   { syntax: "drop-shadow-2xl", rule: "shadow" },
+  { syntax: "hover:drop-shadow", rule: "shadow" },
   { syntax: "shadow-[0_4px_6px_var(--x)]", rule: "shadow" },
   { syntax: "shadow-[2px_2px_4px_var(--x)]", rule: "shadow" },
+  { syntax: "shadow-[2PX_2PX_4PX_var(--x)]", rule: "shadow" },
+  { syntax: "shadow-[2px_2px_calc(4px)_var(--x)]", rule: "shadow" },
+  { syntax: "shadow-[2px_2px_var(--blur)_var(--x)]", rule: "shadow" },
   { syntax: "shadow-[inset_0_2px_4px_var(--x)]", rule: "shadow" },
   { syntax: "drop-shadow-[0_4px_6px_var(--x)]", rule: "shadow" },
 ] as const;
@@ -74,11 +86,15 @@ const SHOULD_PASS = [
   "shadow-lg",
   "shadow-none",
   "shadow-don",
+  "inset-shadow-none",
+  "drop-shadow-none",
   "hover:shadow-md",
   "shadow-[var(--shadow-lg)]",
   "shadow-[0_0_0_1px_hsl(var(--sidebar-border))]",
   "shadow-[3px_3px_0_0_var(--x)]",
+  "shadow-[2px_2px_var(--x)]",
   "shadow-[0_0_18px_var(--gb-signal-selected)]",
+  "shadow-[0_0_calc(18px)_var(--x)]",
 ] as const;
 
 describe("design-system text rules", () => {
@@ -115,17 +131,28 @@ describe("elevation shadow analysis", () => {
     ["inset_0_2px_4px_var(--x)", "inset blur"],
     ["0 4px 6px var(--x)", "space-separated blur"],
     ["0_1px_0_0_var(--x),0_4px_8px_var(--x)", "second layer blurs"],
+    ["2PX_2PX_4PX_var(--x)", "uppercase units"],
+    ["0_10PX_15Px_var(--x)", "mixed-case units"],
+    ["2px_2px_calc(4px)_var(--x)", "calc() in the blur position"],
+    ["2px_2px_var(--blur)_var(--x)", "var() in the blur position"],
+    ["2px_2px_calc(var(--b)_*_2)_0_var(--x)", "nested calc() blur with spread"],
+    ["3px_3px_4px", "blur with no color"],
+    ["red_2px_2px_4px", "leading color then blur"],
   ])("reports %s as blurred (%s)", (value) => {
     expect(firstBlurredShadowLayer(value)).not.toBeNull();
   });
 
   it.each([
     ["var(--shadow-lg)", "token reference"],
+    ["inset_var(--shadow-lg)", "inset token reference"],
     ["3px_3px_0_0_var(--x)", "hard offset"],
+    ["2px_2px_var(--x)", "hard offset with a var() color and no blur slot"],
     ["0_0_0_1px_hsl(var(--x))", "hairline ring"],
     ["0_0_18px_var(--gb-signal-battle)", "zero-offset glow"],
+    ["0_0_calc(18px)_var(--x)", "zero-offset glow with an unresolved blur"],
     ["0_0_18px_rgba(0,_0,_0,_0.5)", "glow with commas inside the color"],
     ["2px_2px_0_0_var(--x),4px_4px_0_0_var(--y)", "two hard layers"],
+    ["2PX_2PX_0_0_var(--x)", "uppercase units on a hard offset"],
   ])("accepts %s (%s)", (value) => {
     expect(firstBlurredShadowLayer(value)).toBeNull();
   });
@@ -134,6 +161,38 @@ describe("elevation shadow analysis", () => {
     expect(
       firstBlurredShadowLayer("2px_2px_0_0_var(--x),0_8px_16px_var(--y)")
     ).toBe("0_8px_16px_var(--y)");
+  });
+});
+
+describe("bare shadow class token", () => {
+  it.each([
+    ['<div className="shadow" />', "className attribute"],
+    ['<div className="border shadow rounded-md" />', "among other classes"],
+    ['<div className="hover:shadow" />', "behind a variant"],
+    ['<div className="shadow!" />', "with the important suffix"],
+    ['cn("shadow")', "class helper argument"],
+    ['cn(open && "shadow")', "logical class expression"],
+    ['clsx({ "shadow": on })', "clsx object key"],
+  ])("flags %s (%s)", (source) => {
+    expect(findClassTokenViolations(source)).toEqual([
+      expect.objectContaining({ rule: "shadow" }),
+    ]);
+  });
+
+  it.each([
+    ['<div className="shadow-md" />', "token-backed step"],
+    ['<div className="shadow-none" />', "reset"],
+    ['<div className="shadow-[var(--shadow-lg)]" />', "arbitrary token value"],
+    ['expect(classes).not.toContain("shadow");', "class-name string fixture"],
+    ['const painted = ["shadow", "ring-1"];', "plain array of class names"],
+    ["/^(ring|shadow|rounded)/.test(name);", "regular expression literal"],
+    ['<div data-slot="shadow" />', "non-class JSX attribute"],
+  ])("leaves %s alone (%s)", (source) => {
+    expect(findClassTokenViolations(source)).toEqual([]);
+  });
+
+  it("is not double-reported by the text rules", () => {
+    expect(findTextViolations('<div className="shadow" />')).toEqual([]);
   });
 });
 

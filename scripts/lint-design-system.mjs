@@ -180,24 +180,56 @@ const SHAPE_FRAGMENT_RE = /(?:^|\s)(chamfer-[a-z0-9-]*)/;
 const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
 
 // Elevation shadows are hard, non-blurred offsets (globals.css, "Shadow
-// values"). The `shadow` rule therefore fails two things: the stock Tailwind
-// ramp steps that are not backed by an elevation token (`shadow-xs`,
-// `shadow-xl`, …, plus every `drop-shadow-*` filter, which is blurred by
-// definition), and an arbitrary `shadow-[…]` whose value actually carries blur.
+// values"). The `shadow` rules therefore fail three things.
 //
-// An arbitrary value is read structurally rather than allowlisted by path:
+// 1. Every stock Tailwind shadow utility that is not backed by an elevation
+//    token. Only `--shadow-sm/md/lg` are retokenized to hard offsets, so
+//    `shadow-sm/md/lg` (and the `*-none` resets) are the whole allowed set.
+//    Everything else in the stock ramps still resolves to Tailwind's own
+//    blurred values — including the bare `shadow`, `drop-shadow`, and
+//    `shadow-inner` compat keys that tailwindcss/theme.css keeps in its
+//    "Deprecated" block, and the separate `--inset-shadow-*` namespace, which
+//    this project never retokenizes.
+// 2. An arbitrary `shadow-[…]` whose value actually carries blur.
+// 3. The bare `shadow` class. `shadow` is also an ordinary English word, so it
+//    is matched only in a real class position (see findClassTokenViolations)
+//    rather than by a text scan that would fire on prose and on class-name
+//    string fixtures in tests. The hyphenated bare forms are unambiguous and
+//    stay in the text rules.
 //
-// - No parseable lengths (`shadow-[var(--shadow-lg)]`) — a token reference.
-//   Lint only scans .tsx, so token *values* are guarded by review and
-//   docs/design/BRANDING-GUIDELINES.md §7, not by this rule.
-// - Blur radius of zero (`shadow-[0_0_0_1px_…]`) — a hard cast or a hairline.
-// - Blur with both offsets zero (`shadow-[0_0_18px_var(--gb-signal-*)]`) — a
+// An arbitrary value is read structurally rather than allowlisted by path. Each
+// comma-separated layer drops `inset` and a leading/trailing <color>, leaving
+// <offset-x> <offset-y> <blur> <spread> positions, and passes only when:
+//
+// - No position holds a literal length (`shadow-[var(--shadow-lg)]`) — a token
+//   reference. Lint only scans .tsx, so token *values* are guarded by review
+//   and docs/design/BRANDING-GUIDELINES.md §7, not by this rule.
+// - There is no third position at all, so the layer cannot carry blur.
+// - Both offsets are literal zero (`shadow-[0_0_18px_var(--gb-signal-*)]`) — a
 //   glow, which is a semantic signal and not elevation. Documented intentional
 //   in docs/design/INTERACTION-GRAMMAR.md §3.2; a glow is not a drop shadow, so
 //   the exemption is the shape of the value itself and needs no file list.
+// - The blur position holds a literal zero (`shadow-[0_0_0_1px_…]`) — a hard
+//   cast or a hairline.
 //
-// Anything else — blur with a directional offset — is a blurred drop shadow.
-const SHADOW_LENGTH_RE = /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|vh|vw|ch)?$/;
+// Anything else is a blurred drop shadow. That deliberately includes a blur
+// position occupied by a `calc()`/`var()` this linter cannot resolve: an
+// unreadable blur is an unproven blur, so the rule fails closed and the author
+// writes the zero out (`0_0_0_var(--x)`) to say a cast is hard.
+const SHADOW_LENGTH_RE =
+  /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|vh|vw|ch)?$/i;
+const SHADOW_COLOR_FUNCTION_RE =
+  /^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/i;
+const SHADOW_COLOR_LITERAL_RE = /^(?:#[0-9a-f]{3,8}|[a-z]+)$/i;
+// Stock ramp steps outside the retokenized `shadow-sm/md/lg`, and the bare
+// hyphenated compat utilities. `*-none` and `*-[…]` are excluded on purpose:
+// the reset is inert and the arbitrary form is owned by the structural rule.
+const BLURRED_STOCK_SHADOW_RE =
+  /(?<![\w-])(?:shadow-(?:2xs|xs|xl|2xl|inner)|inset-shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl))?)(?![\w-])/g;
+const BLURRED_DROP_SHADOW_RE =
+  /(?<![\w-])drop-shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl))?(?![\w-])/g;
+// Bare class names that only a class-position scan may judge.
+const BLURRED_STOCK_SHADOW_CLASS_TOKENS = new Set(["shadow"]);
 
 const RULES = [
   {
@@ -222,13 +254,13 @@ const RULES = [
   },
   {
     name: "shadow",
-    regex: /(?<![\w-])(?:inset-)?shadow-(?:2xs|xs|xl|2xl)(?![\w-])/g,
+    regex: BLURRED_STOCK_SHADOW_RE,
     describe: (match) =>
       `blurred stock shadow ${JSON.stringify(match[0])}; use the hard elevation tokens shadow-sm/md/lg`,
   },
   {
     name: "shadow",
-    regex: /(?<![\w-])drop-shadow-(?:2xs|xs|sm|md|lg|xl|2xl)(?![\w-])/g,
+    regex: BLURRED_DROP_SHADOW_RE,
     describe: (match) =>
       `blurred drop-shadow filter ${JSON.stringify(match[0])}; use the hard elevation tokens shadow-sm/md/lg`,
   },
@@ -275,6 +307,16 @@ if (IS_MAIN) {
     for (const violation of findTextViolations(source, {
       includeSpacing: !spacingExempt,
     })) {
+      addViolation(
+        path,
+        sourceFile,
+        violation.index,
+        violation.rule,
+        violation.message
+      );
+    }
+
+    for (const violation of findClassTokenViolations(source)) {
       addViolation(
         path,
         sourceFile,
@@ -404,6 +446,59 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
  *   names, so this is always a violation.
  */
 export function findShapeVocabularyUsages(source) {
+  const usages = [];
+
+  forEachClassPosition(source, {
+    onLiteral: (node, index) => {
+      for (const token of classTokenNames(node.text)) {
+        if (!SHAPE_CLASS_TOKEN_RE.test(token)) continue;
+        usages.push({ index, utility: token, kind: "class" });
+      }
+    },
+    onDynamic: (node, index) => {
+      // Only a finding when it actually carries chamfer text; plain identifiers
+      // stay silent.
+      const fragment = firstShapeFragment(node);
+      if (fragment) usages.push({ index, utility: fragment, kind: "dynamic" });
+    },
+  });
+
+  return usages;
+}
+
+/**
+ * Whole class tokens banned outright by name, as `{ index, rule, message }`.
+ *
+ * Text rules cannot own these: `shadow` is an ordinary English word, and a
+ * class-name string fixture (`expect(classes).not.toContain("shadow")`) is not
+ * a class position, so only the AST walk can tell a real usage from prose.
+ */
+export function findClassTokenViolations(source) {
+  const violations = [];
+
+  forEachClassPosition(source, {
+    onLiteral: (node, index) => {
+      for (const token of classTokenNames(node.text)) {
+        if (!BLURRED_STOCK_SHADOW_CLASS_TOKENS.has(token)) continue;
+        violations.push({
+          index,
+          rule: "shadow",
+          message: `blurred stock shadow ${JSON.stringify(token)}; use the hard elevation tokens shadow-sm/md/lg`,
+        });
+      }
+    },
+    onDynamic: () => {},
+  });
+
+  return violations;
+}
+
+/**
+ * Walks every class position in a .tsx source, calling `onLiteral(node, index)`
+ * for a static class string and `onDynamic(node, index)` for an expression
+ * composed at runtime.
+ */
+function forEachClassPosition(source, { onLiteral, onDynamic }) {
   const sourceFile = ts.createSourceFile(
     "scan.tsx",
     source,
@@ -411,12 +506,7 @@ export function findShapeVocabularyUsages(source) {
     true,
     ts.ScriptKind.TSX
   );
-  const usages = [];
   const scanned = new Set();
-
-  const record = (node, utility, kind) => {
-    usages.push({ index: node.getStart(sourceFile), utility, kind });
-  };
 
   /** Walks one class-position expression. */
   const scanClassExpression = (node) => {
@@ -435,9 +525,7 @@ export function findShapeVocabularyUsages(source) {
     }
 
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      for (const utility of shapeClassTokens(node.text)) {
-        record(node, utility, "class");
-      }
+      onLiteral(node, node.getStart(sourceFile));
       return;
     }
 
@@ -484,10 +572,8 @@ export function findShapeVocabularyUsages(source) {
       return;
     }
 
-    // Anything else here is composed at runtime. It is only a finding when it
-    // actually carries chamfer text; plain identifiers stay silent.
-    const fragment = firstShapeFragment(node);
-    if (fragment) record(node, fragment, "dynamic");
+    // Anything else here is composed at runtime.
+    onDynamic(node, node.getStart(sourceFile));
   };
 
   const visit = (node) => {
@@ -506,7 +592,6 @@ export function findShapeVocabularyUsages(source) {
   };
 
   visit(sourceFile);
-  return usages;
 }
 
 /** Splits on a separator, ignoring separators nested inside `(…)`. */
@@ -532,28 +617,64 @@ function splitTopLevel(value, isSeparator) {
   return parts;
 }
 
+/** A `<color>`, which CSS allows on either side of a box-shadow's lengths. */
+function isShadowColor(part) {
+  return (
+    SHADOW_COLOR_LITERAL_RE.test(part) || SHADOW_COLOR_FUNCTION_RE.test(part)
+  );
+}
+
+/** A length that is provably zero; an unresolved `calc()`/`var()` never is. */
+function isZeroShadowLength(part) {
+  return SHADOW_LENGTH_RE.test(part) && Number.parseFloat(part) === 0;
+}
+
+/**
+ * The `<offset-x> <offset-y> <blur> <spread>` slots of one box-shadow layer.
+ *
+ * Functions are kept: a `calc()`/`var()` occupies its position like any other
+ * component, so dropping it would silently slide a blur out of slot three. Only
+ * `inset` and a `<color>` — which is not positional — are removed.
+ */
+function shadowPositionalComponents(layer) {
+  const parts = splitTopLevel(
+    layer,
+    (character) => character === "_" || character === " "
+  )
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && part.toLowerCase() !== "inset");
+
+  if (parts.length > 1 && isShadowColor(parts[0])) parts.shift();
+  // Trailing `<color>`: anything that is not a length cannot be `<spread>`.
+  if (parts.length > 1 && !SHADOW_LENGTH_RE.test(parts.at(-1))) parts.pop();
+
+  return parts;
+}
+
 /**
  * The first blurred-drop-shadow layer inside an arbitrary `shadow-[…]` value,
  * or `null` when every layer is compliant. Tailwind writes the spaces in an
  * arbitrary value as underscores, so both separators are honored.
+ *
+ * Fails closed: a blur position this linter cannot resolve counts as blur. See
+ * the SHADOW_LENGTH_RE comment block for the full pass list.
  */
 export function firstBlurredShadowLayer(value) {
   for (const layer of splitTopLevel(value, (character) => character === ",")) {
     const trimmed = layer.trim();
     if (!trimmed) continue;
 
-    const lengths = splitTopLevel(
-      trimmed,
-      (character) => character === "_" || character === " "
-    ).filter((part) => SHADOW_LENGTH_RE.test(part));
+    const positions = shadowPositionalComponents(trimmed);
 
-    // <offset-x> <offset-y> <blur> <spread>: fewer than three lengths cannot
-    // carry blur, and a token reference parses to no lengths at all.
-    if (lengths.length < 3) continue;
+    // A layer with no literal length anywhere is a token reference.
+    if (!positions.some((part) => SHADOW_LENGTH_RE.test(part))) continue;
+    // Without a third position the layer has no blur slot to fill.
+    if (positions.length < 3) continue;
 
-    const [offsetX, offsetY, blur] = lengths.map(Number.parseFloat);
-    if (blur === 0) continue;
-    if (offsetX === 0 && offsetY === 0) continue; // glow, not elevation
+    const [offsetX, offsetY, blur] = positions;
+    // A cast with no offset is a glow, not elevation.
+    if (isZeroShadowLength(offsetX) && isZeroShadowLength(offsetY)) continue;
+    if (isZeroShadowLength(blur)) continue;
 
     return trimmed;
   }
@@ -569,12 +690,12 @@ function isClassHelperCall(node) {
   );
 }
 
-/** Whole `chamfer-*` class tokens in a literal, ignoring variant prefixes. */
-function shapeClassTokens(text) {
+/** Whole class tokens in a literal, stripped of variant and `!` prefixes. */
+function classTokenNames(text) {
   return text
     .split(/\s+/)
-    .map((token) => token.replace(/^!/, "").split(":").at(-1))
-    .filter((token) => SHAPE_CLASS_TOKEN_RE.test(token));
+    .map((token) => token.replace(/^!/, "").replace(/!$/, "").split(":").at(-1))
+    .filter(Boolean);
 }
 
 /** The first `chamfer-` fragment in any string part of an expression tree. */
