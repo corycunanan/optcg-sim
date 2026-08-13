@@ -338,7 +338,7 @@
     },
     {
       "name": "effect-notation-label/keyword",
-      "foreground": "--effect-notation-fg",
+      "foreground": "--effect-keyword-fg",
       "background": "--effect-keyword",
       "minimum": 4.5
     },

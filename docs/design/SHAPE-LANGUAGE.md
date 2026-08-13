@@ -74,7 +74,14 @@ shapes require amending this doc, not ad-hoc invention.
 5. **L-bracket corner marks** — from the material brief. Selection and hierarchy seams; sits *on*
    a perimeter, never floats.
 6. **Chevron pair** — directional emphasis on the premium CTA and progression moments only.
-7. **Elongated hexagon** — **drop targets only** (reserved, per the material brief).
+7. **Elongated hexagon** — drop targets, plus the printed-notation exception below.
+   *Amendment (2026-08-12, OPT-677):* evergreen keyword chips in card effect text
+   ([Rush], [Blocker], [Banish]) take this shape, because the printed card does. It is a
+   notation contract rather than a decorative choice, so it is exempt from the
+   one-feature-shape-per-region budget — a rules box prints as many keyword hexagons as the
+   card has keywords. It stays scoped to the `keyword` family; no other notation family
+   takes a polygon. Built from the `effect-hex*` utilities in `globals.css`, which are a
+   worked example of the two-layer border technique below.
 8. **Notched tab** — a chamfered tab protruding *outside* its parent's edge (trait tabs on object
    rows, per the material Object tier).
 9. **Hard diagonal** — 45° section divider / split. Layout-scale only (splitting regions, not
