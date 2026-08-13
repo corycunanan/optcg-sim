@@ -144,11 +144,20 @@ export function LobbySeatCard({
     >
       {/* The trailing column is as wide as the ready control below it, so the
           menu is pinned to that column's end rather than stretched across it —
-          the two controls then share one right edge. At `lg` the seat is a
-          centered stack and the menu joins it: centered on the column's own
-          axis, at the top of the stack. */}
+          the two controls then share one right edge.
+
+          At `lg` the menu takes the top slot of the centered stack, and it
+          takes it as a *row of its own*: the slot spans the column's full
+          width and centers the 40px control inside it. Every other group is a
+          shrink-to-fit block of a different width — identity, leader art,
+          caption, readiness — so leaning on the stack's own cross-axis
+          alignment made the control's position a consequence of its neighbours
+          rather than a decision. A full-width row states the axis outright:
+          the control's midpoint is the column's midpoint, whichever group
+          happens to be widest, and the inert placeholder inherits the same
+          slot so menu and no-menu seats stay aligned. */}
       <SeatOverflowMenu
-        className="col-start-3 row-start-1 justify-self-end lg:self-center"
+        className="col-start-3 row-start-1 justify-self-end lg:w-full lg:justify-center"
         seatLabel={`${role} seat — ${playerName}`}
       >
         {deckEditable ? (
@@ -233,12 +242,20 @@ export function LobbySeatCard({
 }
 
 /**
- * The seat's single `⋮` menu. When no action applies to the current seat state
+ * The seat's single `⋯` menu. When no action applies to the current seat state
  * the trigger is dropped — an empty menu is worse than no affordance — but its
  * box is held open by an inert placeholder. Two seats render side by side, so
  * collapsing the group would start one identity row a control-height above the
  * other; the placeholder is `aria-hidden`, unfocusable, and paints nothing, so
  * it costs the keyboard and screen-reader paths nothing.
+ *
+ * Both states hang off one slot element, which is what carries the seat's
+ * placement classes. That is the whole point of the wrapper: the trigger and
+ * the placeholder cannot drift apart, because neither one is ever positioned —
+ * the slot is. Below `lg` the slot shrink-wraps the control at the grid
+ * column's end; from `lg` it is the stack's full-width top row and centers the
+ * control on the column's axis. It is fixed chrome either way, so it never
+ * gives height back the way the leader art does.
  */
 function SeatOverflowMenu({
   seatLabel,
@@ -250,37 +267,37 @@ function SeatOverflowMenu({
   children: ReactNode;
 }) {
   const items = Children.toArray(children).filter(Boolean);
-  if (items.length === 0) {
-    return (
-      <span
-        aria-hidden="true"
-        className={cn("size-10", className)}
-        data-seat-menu-placeholder
-      />
-    );
-  }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={className}
-          aria-label={`More actions for ${seatLabel}`}
-        >
-          <Ellipsis />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {items.map((item, index) => (
-          <SeatMenuSection key={index} first={index === 0}>
-            {item}
-          </SeatMenuSection>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className={cn("flex shrink-0", className)} data-seat-menu-slot>
+      {items.length === 0 ? (
+        <span
+          aria-hidden="true"
+          className="size-10"
+          data-seat-menu-placeholder
+        />
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`More actions for ${seatLabel}`}
+            >
+              <Ellipsis />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {items.map((item, index) => (
+              <SeatMenuSection key={index} first={index === 0}>
+                {item}
+              </SeatMenuSection>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
   );
 }
 
