@@ -83,6 +83,18 @@ afterEach(() => {
 });
 
 describe("JoinPartyDialog active-match gating", () => {
+  it("uses the large button size for the join action", async () => {
+    await act(async () => {
+      renderer = create(<JoinPartyDialog />);
+    });
+
+    const joinButton = renderer?.root.find(
+      (node) => node.type === "button" && node.props.children
+    );
+    expect(joinButton?.props.size).toBe("lg");
+    expect(joinButton?.props.className).toBeUndefined();
+  });
+
   it("closes an open join dialog when the action becomes disabled", async () => {
     await act(async () => {
       renderer = create(
