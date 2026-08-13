@@ -120,7 +120,7 @@ describe("DeckBuilderList card tooltip", () => {
     const classes = panel.className.split(/\s+/);
     expect(classes).toContain("bg-surface-info");
     expect(classes).toContain("edge-info");
-    expect(classes).toContain("rounded-none");
+    expect(classes).toContain("rounded-md");
     expect(classes).toContain("shadow-none");
 
     expect(within(panel).getByText("Character · OP01-025")).toBeTruthy();
