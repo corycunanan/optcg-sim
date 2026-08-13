@@ -116,6 +116,14 @@ function seatSection() {
   return screen.getByRole("region", { name: /seat —/ });
 }
 
+/**
+ * The overflow menu's slot. Placement lives here rather than on the trigger,
+ * so the trigger and the inert placeholder cannot be positioned differently.
+ */
+function menuSlot() {
+  return seatSection().querySelector<HTMLElement>("[data-seat-menu-slot]")!;
+}
+
 /** Document-order index of an element within the seat's subtree. */
 function orderOf(element: Element) {
   return [...seatSection().querySelectorAll("*")].indexOf(element);
@@ -403,9 +411,7 @@ describe("LobbySeatCard composition", () => {
     expect(section.className).toContain("lg:flex");
     expect(section.className).toContain("lg:flex-col");
 
-    expect(
-      screen.getByRole("button", { name: /More actions for/ }).className
-    ).toContain("col-start-3");
+    expect(menuSlot().className).toContain("col-start-3");
     const leader = screen.getByRole("button", { name: /Change deck/ });
     expect(leader.className).toContain("col-start-1");
     expect(leader.className).toContain("row-start-1");
@@ -697,7 +703,10 @@ describe("LobbySeatCard overflow menu", () => {
     const section = seatSection();
     expect(section.children).toHaveLength(4);
 
-    const placeholder = section.firstElementChild!;
+    const slot = section.firstElementChild!;
+    expect(slot).toBe(menuSlot());
+
+    const placeholder = slot.firstElementChild!;
     expect(placeholder.hasAttribute("data-seat-menu-placeholder")).toBe(true);
     // Reserves the icon button's box without becoming a control.
     expect(placeholder.className).toContain("size-10");
@@ -705,6 +714,29 @@ describe("LobbySeatCard overflow menu", () => {
     expect(placeholder.tagName).toBe("SPAN");
     expect(placeholder.hasAttribute("tabindex")).toBe(false);
     expect(placeholder.textContent).toBe("");
+  });
+
+  it("centers the control on the column axis from `lg`, menu or not", () => {
+    // The stack's other groups are shrink-to-fit blocks of differing widths,
+    // so the slot states the axis itself: a full-width row that centers
+    // whatever it holds. Both seat states share the one slot, so the trigger
+    // and the placeholder land on the same line by construction.
+    const centered = ["lg:w-full", "lg:justify-center"];
+
+    renderSeat({ deckEditable: true });
+    expect(
+      menuSlot().contains(
+        screen.getByRole("button", { name: /More actions for/ })
+      )
+    ).toBe(true);
+    for (const rule of centered) expect(menuSlot().className).toContain(rule);
+    // The compact grid keeps its right-edge pin: only placement moves.
+    expect(menuSlot().className).toContain("justify-self-end");
+    cleanup();
+
+    renderSeat({ deck: null, deckEditable: false });
+    for (const rule of centered) expect(menuSlot().className).toContain(rule);
+    expect(menuSlot().className).toContain("justify-self-end");
   });
 
   it("keeps the same group rhythm whether or not the menu renders", () => {
