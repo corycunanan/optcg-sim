@@ -406,9 +406,10 @@ describe("LobbyRoomShell redesign scenarios", () => {
     const partyCodeControl = renderer!.root.findByProps({
       "aria-label": "Copy party link",
     });
-    for (const control of [modeControl, partyCodeControl, joinButton]) {
+    for (const control of [modeControl, partyCodeControl]) {
       expect(control?.props.className).toContain("h-12");
     }
+    expect(joinButton?.props.size).toBe("lg");
 
     const headerLayout = renderer!.root.find(
       (node) =>

@@ -100,7 +100,7 @@ What each primitive bakes in — components should rely on these, not re-specify
 
 | Primitive | Default | Role |
 |-----------|---------|------|
-| `Button` | `text-sm font-medium` (`sm` → `text-xs`, `lg` → `text-base`) | label |
+| `Button` | `text-sm font-semibold` (`sm` → `text-xs font-medium`, `lg` → `text-base font-semibold`) | label |
 | `Badge` | `text-xs font-medium` | badge |
 | `Label` | `text-sm font-medium text-content-secondary` | label |
 | `DialogTitle` / `AlertDialogTitle` / `SheetTitle` | `text-lg font-semibold text-content-primary` | heading |
