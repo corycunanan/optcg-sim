@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardImageGallery } from "@/components/cards/card-image-gallery";
+import { ColorChip } from "@/components/cards/color-chip";
 
 export const dynamic = "force-dynamic";
 
@@ -14,15 +15,6 @@ const COLOR_ACCENT: Record<string, string> = {
   Purple: "var(--card-purple)",
   Black: "var(--card-black)",
   Yellow: "var(--card-yellow)",
-};
-
-const COLOR_TO_VARIANT: Record<string, "card-red" | "card-blue" | "card-green" | "card-purple" | "card-black" | "card-yellow"> = {
-  Red: "card-red",
-  Blue: "card-blue",
-  Green: "card-green",
-  Purple: "card-purple",
-  Black: "card-black",
-  Yellow: "card-yellow",
 };
 
 export default async function CardDetailPage({
@@ -95,13 +87,7 @@ export default async function CardDetailPage({
             {/* Colors */}
             <div className="mt-3 flex flex-wrap gap-2">
               {card.color.map((c) => (
-                <Badge
-                  key={c}
-                  variant={COLOR_TO_VARIANT[c] || "secondary"}
-                  className="rounded px-3 py-1"
-                >
-                  {c}
-                </Badge>
+                <ColorChip key={c} color={c} />
               ))}
             </div>
           </div>

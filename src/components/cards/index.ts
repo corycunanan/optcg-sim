@@ -6,6 +6,7 @@ export { CardGrid, CardGridSkeleton } from "./card-grid";
 export { CardDetailModal } from "./card-detail-modal";
 export type { CardDetail, ArtVariant, CardSet } from "./card-detail-modal";
 export { CardImageGallery } from "./card-image-gallery";
+export { ColorChip, ColorChipToggle } from "./color-chip";
 export { EffectText } from "./effect-text";
 export { Pagination } from "./pagination";
 export { SetFilter } from "./set-filter";

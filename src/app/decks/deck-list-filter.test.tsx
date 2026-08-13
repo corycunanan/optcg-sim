@@ -124,15 +124,19 @@ describe("DeckListFilter", () => {
     expect(screen.getByRole("button", { name: "Filter" })).toBeTruthy();
   });
 
-  it("renders selected color options with the shared card Badge variants", async () => {
+  it("renders color options as the shared color chip, filled once selected", async () => {
     const user = userEvent.setup();
     render(<DeckListFilter decks={DECKS} />);
 
     await user.click(screen.getByRole("button", { name: "Filter" }));
     const red = screen.getByRole("button", { name: "Red" });
-    expect(red.getAttribute("data-variant")).toBe("outline");
+    expect(red.getAttribute("aria-pressed")).toBe("false");
+    expect(red.className).toContain("bg-surface-2");
+    expect(red.className).not.toContain("bg-card-red");
 
     await user.click(red);
-    expect(red.getAttribute("data-variant")).toBe("card-red");
+    expect(red.getAttribute("aria-pressed")).toBe("true");
+    expect(red.className).toContain("bg-card-red");
+    expect(red.className).toContain("border-card-red-border");
   });
 });

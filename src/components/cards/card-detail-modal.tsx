@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardImageGallery } from "./card-image-gallery";
+import { ColorChip } from "./color-chip";
 import { EffectText } from "./effect-text";
 import { apiGet } from "@/lib/api-client";
 import {
@@ -25,15 +26,6 @@ import {
 export type ArtVariant = CardArtVariant;
 export type CardSet = CardSetMembership;
 export type CardDetail = CardDetailContract;
-
-const COLOR_TO_VARIANT: Record<string, "card-red" | "card-blue" | "card-green" | "card-purple" | "card-black" | "card-yellow"> = {
-  Red: "card-red",
-  Blue: "card-blue",
-  Green: "card-green",
-  Purple: "card-purple",
-  Black: "card-black",
-  Yellow: "card-yellow",
-};
 
 function Row({ label, children, className }: { label?: string; children: React.ReactNode; className?: string }) {
   return (
@@ -153,13 +145,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
                 <Row className="pt-0">
                   <div className="flex flex-wrap gap-2">
                     {card.color.map((c) => (
-                      <Badge
-                        key={c}
-                        variant={COLOR_TO_VARIANT[c] || "secondary"}
-                        className="rounded px-3 py-1"
-                      >
-                        {c}
-                      </Badge>
+                      <ColorChip key={c} color={c} />
                     ))}
                     {card.banStatus !== "LEGAL" && (
                       <Badge variant="error" className="px-3 py-1 font-semibold">
