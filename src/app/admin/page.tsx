@@ -72,9 +72,9 @@ export default async function AdminPage() {
                         {t._count.toLocaleString()}
                       </span>
                     </div>
-                    <div className="bg-muted h-1 overflow-hidden rounded">
+                    <div className="bg-muted h-1 overflow-hidden rounded-md">
                       <div
-                        className="bg-primary h-full rounded transition-all"
+                        className="bg-primary h-full rounded-md transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -104,9 +104,9 @@ export default async function AdminPage() {
                         {b._count.toLocaleString()}
                       </span>
                     </div>
-                    <div className="bg-muted h-1 overflow-hidden rounded">
+                    <div className="bg-muted h-1 overflow-hidden rounded-md">
                       <div
-                        className="bg-gold-500 h-full rounded transition-all"
+                        className="bg-gold-500 h-full rounded-md transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </div>

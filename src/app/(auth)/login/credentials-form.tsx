@@ -112,7 +112,7 @@ export function CredentialsForm({
           type="button"
           onClick={() => switchMode("signin")}
           className={cn(
-            "flex-1 rounded py-2 text-sm font-semibold transition-colors",
+            "flex-1 rounded-md py-2 text-sm font-semibold transition-colors",
             mode === "signin"
               ? "bg-card text-content-primary shadow-sm"
               : "text-content-tertiary hover:text-content-secondary"
@@ -124,7 +124,7 @@ export function CredentialsForm({
           type="button"
           onClick={() => switchMode("signup")}
           className={cn(
-            "flex-1 rounded py-2 text-sm font-semibold transition-colors",
+            "flex-1 rounded-md py-2 text-sm font-semibold transition-colors",
             mode === "signup"
               ? "bg-card text-content-primary shadow-sm"
               : "text-content-tertiary hover:text-content-secondary"

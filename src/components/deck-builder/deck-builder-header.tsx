@@ -60,7 +60,7 @@ export function DeckBuilderHeader({
     <header className="border-border bg-card flex items-center gap-4 border-b px-4 py-3">
       <DeckNavigationGuardLink
         href="/decks"
-        className="text-content-tertiary hover:bg-secondary hover:text-content-secondary flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors"
+        className="text-content-tertiary hover:bg-secondary hover:text-content-secondary flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path
@@ -99,7 +99,7 @@ export function DeckBuilderHeader({
               setEditing(true);
             }}
             aria-label={`Edit deck name: ${name}`}
-            className="group text-content-primary hover:bg-secondary flex items-center gap-2 rounded px-2 py-1 text-lg leading-tight font-semibold transition-colors"
+            className="group text-content-primary hover:bg-secondary flex items-center gap-2 rounded-md px-2 py-1 text-lg leading-tight font-semibold transition-colors"
           >
             {name}
             <svg

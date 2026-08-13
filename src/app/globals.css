@@ -501,11 +501,11 @@
   /* Shadows */
   --shadow-don: var(--gb-shadow-don);
 
-  /* Border Radius — 4 values only, override Tailwind defaults */
+  /* Border Radius — 2px chrome, 4px badges, round avatars/dots */
   --radius: 0.25rem; /* 4px  — rounded      — badges, tags */
-  --radius-md: 0.5rem; /* 8px  — rounded-md   — inputs, buttons */
-  --radius-lg: 0.75rem; /* 12px — rounded-lg   — panels, modals */
-  /* rounded-full stays at 9999px — pills, avatars */
+  --radius-md: 0.125rem; /* 2px — rounded-md — inputs, buttons */
+  --radius-lg: 0.125rem; /* 2px — rounded-lg — panels, modals */
+  /* rounded-full stays at 9999px — avatars and presence dots only */
 
   /* ── shadcn/ui Tailwind theme mappings ──
      Required for shadcn components to resolve bg-primary, text-muted-foreground, etc. */
@@ -721,8 +721,9 @@ body {
 
 /* The 45° chamfer vocabulary from docs/design/SHAPE-LANGUAGE.md, consumed
    through the ChamferFrame primitive (src/components/ui/chamfer-frame.tsx).
-   These utilities are an *allowance*, not a requirement: the three-radius rule
-   still governs every surface that has not opted into the angular register.
+   These utilities are an *allowance*, not a requirement. Chrome uses 2px corners
+   (`rounded-md` and `rounded-lg` both resolve to 2px), badges use 4px (`rounded`),
+   and `rounded-full` is reserved for avatars and presence dots.
 
    `border-*` does not follow `clip-path`, so a hairline needs the two-layer
    technique — an outer layer painted with the edge color and an inner surface

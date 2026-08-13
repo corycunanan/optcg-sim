@@ -68,7 +68,7 @@ export function SetFilter({
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded border",
+                    "flex size-4 shrink-0 items-center justify-center rounded-md border",
                     selected
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-input"

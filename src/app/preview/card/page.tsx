@@ -216,7 +216,7 @@ export default function CardPreviewPage() {
               >
                 {resting ? "Rest" : "Active"}
               </Button>
-              <div className="flex h-28 w-28 items-center justify-center rounded bg-gb-surface/50">
+              <div className="flex h-28 w-28 items-center justify-center rounded-md bg-gb-surface/50">
                 <Card
                   data={{ card: ZORO_INSTANCE, cardDb: CARD_DB }}
                   variant="field"

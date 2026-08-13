@@ -100,13 +100,13 @@ export function InviteFriendPopover({
             variant="default"
             size="icon"
             aria-label="Invite a friend"
-            className="size-16 rounded"
+            className="size-16 rounded-md"
           >
             <Plus aria-hidden="true" />
           </Button>
         ) : (
           <Button variant="ghost" className="group">
-            <span className="bg-gold-500 text-navy-900 group-hover:bg-gold-400 flex size-8 items-center justify-center rounded transition-colors">
+            <span className="bg-gold-500 text-navy-900 group-hover:bg-gold-400 flex size-8 items-center justify-center rounded-md transition-colors">
               <Plus className="size-4" />
             </span>
             Invite a friend

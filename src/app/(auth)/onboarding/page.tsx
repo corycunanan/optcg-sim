@@ -71,10 +71,10 @@ export default function OnboardingPage() {
         </div>
 
         {/* Form card */}
-        <div className="border-border bg-card rounded border p-6">
+        <div className="border-border bg-card rounded-md border p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="border-error/20 bg-error-soft text-error rounded border p-3 text-sm font-medium">
+              <div className="border-error/20 bg-error-soft text-error rounded-md border p-3 text-sm font-medium">
                 {error}
               </div>
             )}

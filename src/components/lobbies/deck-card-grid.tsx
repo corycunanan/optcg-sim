@@ -87,7 +87,7 @@ export function DeckCardGrid({
               <button
                 type="button"
                 aria-label={stackLabel(group)}
-                className="focus-visible:ring-border-focus flex cursor-pointer rounded focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                className="focus-visible:ring-border-focus flex cursor-pointer rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 <CardFanStack
                   cardId={group.card.id}

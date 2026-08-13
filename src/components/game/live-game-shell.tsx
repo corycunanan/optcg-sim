@@ -623,7 +623,7 @@ function GameSessionView({
                 });
               }
             }}
-            className="bg-gb-surface-raised border-gb-border-strong text-gb-text-dim cursor-pointer rounded border px-2 py-1 font-mono text-xs"
+            className="bg-gb-surface-raised border-gb-border-strong text-gb-text-dim cursor-pointer rounded-md border px-2 py-1 font-mono text-xs"
           >
             <option value="" disabled>
               [dev] test modal…

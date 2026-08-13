@@ -31,8 +31,9 @@ Both resolve to the same `:root` tokens.
 ## Non-color tokens
 
 - Fonts map to `font-sans`, `font-mono`, and `font-display`.
-- Radius is limited to `rounded`, `rounded-md`, `rounded-lg`, and
-  `rounded-full`; `globals.css` overrides the first three values.
+- Radius is limited to `rounded` (4px, badges only), `rounded-md` and
+  `rounded-lg` (both 2px, chrome), and `rounded-full` (avatars and presence
+  dots only); `globals.css` overrides the first three values.
 - Responsive section spacing uses `--section-pad-x`, `--section-pad-y`, and
   `--content-gap` at the current 1024px and 600px breakpoints.
 - Do not hardcode design colors or use inline design styles in components. Add a

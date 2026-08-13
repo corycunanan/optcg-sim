@@ -876,8 +876,8 @@ describe("LobbySeatCard deck switching", () => {
 
     const tooltip = document.querySelector<HTMLElement>("[data-tier5-surface]");
     expect(tooltip).not.toBeNull();
-    // Square, flat, opaque, unglowing — Tier 5 opts out of panel treatment.
-    expect(tooltip?.className).toContain("rounded-none");
+    // 2px-cornered, flat, opaque, unglowing — Tier 5 opts out of panel treatment.
+    expect(tooltip?.className).toContain("rounded-md");
     expect(tooltip?.className).toContain("shadow-none");
     expect(tooltip?.className).toContain("bg-surface-info");
     expect(tooltip?.className).toContain("edge-info");

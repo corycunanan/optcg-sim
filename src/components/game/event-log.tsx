@@ -213,7 +213,7 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
             visibleEvents.map((entry) => (
               <div
                 key={entry.key}
-                className="flex items-start gap-1 px-2 py-1 rounded hover:bg-gb-surface-raised/50 transition-colors"
+                className="flex items-start gap-1 px-2 py-1 rounded-md hover:bg-gb-surface-raised/50 transition-colors"
               >
                 <span className="text-xs leading-5 shrink-0">{entry.icon}</span>
                 <span

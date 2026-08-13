@@ -324,14 +324,14 @@ Both display and body are self-hosted from `src/app/fonts/` through `next/font/l
 
 ## 6. Border Radius
 
-Three values only. No exceptions.
+Chrome uses 2px corners. Badges alone retain 4px corners; avatars and presence dots alone remain round.
 
 | Token | Value | Tailwind | Usage |
 |-------|-------|----------|-------|
-| `--radius` | 4px | `rounded` | Badges, tags, small elements |
-| `--radius-md` | 8px | `rounded-md` | Buttons, inputs, cards |
-| `--radius-lg` | 12px | `rounded-lg` | Panels, modals, sheets |
-| (built-in) | 9999px | `rounded-full` | Avatars, pills, circular buttons |
+| `--radius` | 4px | `rounded` | Badges, chips, tags |
+| `--radius-md` | 2px | `rounded-md` | Buttons, inputs, chrome |
+| `--radius-lg` | 2px | `rounded-lg` | Panels, modals, sheets |
+| (built-in) | 9999px | `rounded-full` | Avatars, presence dots |
 
 ---
 
@@ -419,7 +419,7 @@ All buttons: `transition: color 0.2s ease-out, background-color 0.2s ease-out, b
 ```
 ┌──────────────┐
 │              │ aspect-ratio: 63/88 (standard OPTCG)
-│   Card Art   │ border-radius: rounded-md (8px)
+│   Card Art   │ border-radius: rounded-md (2px)
 │              │ shadow: --shadow-sm at rest
 │              │ hover: --shadow-md + scale(1.03)
 │              │ transition: 0.2s ease-out
@@ -446,7 +446,7 @@ Adapted from Riftbound's article card pattern:
 │ Brief description text that         │ body-sm / 14px / --text-secondary
 │ explains the content...             │
 └─────────────────────────────────────┘
-  border-radius: rounded-lg (12px)
+  border-radius: rounded-lg (2px)
   background: var(--surface-panel)
   shadow: var(--shadow-sm)
   hover: var(--shadow-md)
@@ -477,7 +477,7 @@ Dark surface, consistent across all pages:
 
 ```
 Overlay: var(--overlay) — oklch(5% 0.004 260 / 0.76)
-Panel:   var(--surface-panel), rounded-lg (12px), shadow-lg
+Panel:   var(--surface-panel), rounded-lg (2px), shadow-lg
 Enter:   fade overlay 0.2s + scale panel from 0.95→1.0, 0.2s ease-out
 Exit:    fade out 0.15s (exit faster than enter)
 Close:   X button top-right, keyboard Escape
