@@ -9,18 +9,18 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground",
-        secondary: "bg-secondary text-secondary-foreground",
+        default: "bg-primary text-primary-foreground border-accent-fill-border",
+        secondary: "bg-secondary text-secondary-foreground border-border-strong",
         outline: "border-border text-content-primary bg-transparent",
         success: "bg-success-soft text-success border-success/20",
         warning: "bg-warning-soft text-warning border-warning/20",
         error: "bg-error-soft text-error border-error/20",
-        "card-red": "border-card-red bg-card-red text-white",
-        "card-blue": "border-card-blue bg-card-blue text-white",
-        "card-green": "border-card-green bg-card-green text-white",
-        "card-purple": "border-card-purple bg-card-purple text-white",
-        "card-black": "border-card-black bg-card-black text-white",
-        "card-yellow": "border-card-yellow bg-card-yellow text-card-yellow-fg",
+        "card-red": "border-card-red-border bg-card-red text-white",
+        "card-blue": "border-card-blue-border bg-card-blue text-white",
+        "card-green": "border-card-green-border bg-card-green text-white",
+        "card-purple": "border-card-purple-border bg-card-purple text-white",
+        "card-black": "border-card-black-border bg-card-black text-white",
+        "card-yellow": "border-card-yellow-border bg-card-yellow text-card-yellow-fg",
       },
     },
     defaultVariants: {

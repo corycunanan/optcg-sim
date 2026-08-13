@@ -61,6 +61,7 @@
   --gold-500: oklch(78% 0.14 75); /* primary CTA fills, highlights, focus */
   --gold-400: oklch(84% 0.12 75); /* hover on gold */
   --gold-100: oklch(30% 0.05 75); /* soft gold surface */
+  --gold-800: oklch(64% 0.13 75); /* keyline drawn on a gold fill */
   /* Redesign artifact border for navbar/social refreshes (OPT-534/OPT-535). */
   --gold-border: oklch(45% 0.06 75);
 
@@ -96,6 +97,7 @@
 
   /* State ramps */
   --green-600: oklch(70% 0.15 150);
+  --green-800: oklch(56% 0.14 150); /* keyline drawn on a solid green fill */
   --green-100: oklch(27% 0.04 150);
   --amber-600: oklch(80% 0.13 85);
   --amber-100: oklch(28% 0.04 85);
@@ -199,11 +201,18 @@
   --accent-text: var(--gold-600);
   --accent-soft: var(--gold-100);
   --accent-border: var(--gold-border);
+  /* Keyline drawn *on* the accent fill, not beside it. `--accent-border` is the
+     reserved decorative gold that sits on dark chrome; this role is its
+     counterpart for solid-gold surfaces (the default badge), one step darker
+     than the fill so the edge is legible without reading as an outline. */
+  --accent-fill-border: var(--gold-800);
   --accent-fg: var(--surface-step-ink);
 
   /* States */
   --success: var(--green-600);
   --success-soft: var(--green-100);
+  /* Counterpart to --accent-fill-border for the solid success fill. */
+  --success-fill-border: var(--green-800);
   --warning: var(--amber-600);
   --warning-soft: var(--amber-100);
   --destructive: var(--red-600);
@@ -246,6 +255,23 @@
   --card-yellow: oklch(78% 0.18 90);
   --card-yellow-fg: oklch(22% 0.04 245);
   --card-accent-fallback: oklch(22% 0.04 245);
+
+  /* Card-color keylines (OPT-675)
+     A solid card-color chip painted with its own color as the border reads
+     borderless, so each fill gets a same-hue keyline one step off the fill.
+     One rule generates all six: hue is held exactly, lightness moves 14 points
+     away from the fill — up for the five dark fills, down for the light yellow
+     — and chroma is pulled back to the nearest in-sRGB-gamut value at the new
+     lightness. That lands every pair at 1.7–1.8:1 against its own fill, which
+     is the register where the edge is legible at 100% zoom without reading as
+     an outline. Same feature contract as the fills above: never overridden by
+     a data-theme selector. */
+  --card-red-border: oklch(69% 0.18 25);
+  --card-blue-border: oklch(64% 0.16 250);
+  --card-green-border: oklch(66% 0.16 150);
+  --card-purple-border: oklch(62% 0.16 300);
+  --card-black-border: oklch(42% 0.012 245);
+  --card-yellow-border: oklch(64% 0.13 90);
 
   /* Effect-text notation (functional — inline badges in printed rules text)
      Printed cards set their bracketed rules tokens as solid chips with a white
@@ -428,6 +454,7 @@
   --color-border-strong: var(--border-strong);
   --color-border-focus: var(--border-focus);
   --color-border-accent: var(--accent-border);
+  --color-accent-fill-border: var(--accent-fill-border);
 
   /* Soft accent surface — selected chrome that must not spend the full gold
      fill reserved for the focal action. */
@@ -441,6 +468,7 @@
   /* Semantic */
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
+  --color-success-fill-border: var(--success-fill-border);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
   --color-error: var(--error);
@@ -458,6 +486,12 @@
   --color-card-black: var(--card-black);
   --color-card-yellow: var(--card-yellow);
   --color-card-yellow-fg: var(--card-yellow-fg);
+  --color-card-red-border: var(--card-red-border);
+  --color-card-blue-border: var(--card-blue-border);
+  --color-card-green-border: var(--card-green-border);
+  --color-card-purple-border: var(--card-purple-border);
+  --color-card-black-border: var(--card-black-border);
+  --color-card-yellow-border: var(--card-yellow-border);
 
   /* Effect-text notation */
   --color-effect-timing: var(--effect-timing);

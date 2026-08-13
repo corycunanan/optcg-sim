@@ -156,16 +156,18 @@ The primitive border steps are white alpha values at 0.10, 0.14, 0.16, and 0.18.
 
 #### TCG Card Colors (functional only)
 
-| Color | Token | Value |
-|-------|-------|-------|
-| Red | `--card-red` | `oklch(55% 0.20 25)` |
-| Blue | `--card-blue` | `oklch(50% 0.18 250)` |
-| Green | `--card-green` | `oklch(52% 0.18 150)` |
-| Purple | `--card-purple` | `oklch(48% 0.18 300)` |
-| Black | `--card-black` | `oklch(28% 0.01 245)` |
-| Yellow | `--card-yellow` | `oklch(78% 0.18 90)` |
+| Color | Token | Value | Keyline | Value |
+|-------|-------|-------|---------|-------|
+| Red | `--card-red` | `oklch(55% 0.20 25)` | `--card-red-border` | `oklch(69% 0.18 25)` |
+| Blue | `--card-blue` | `oklch(50% 0.18 250)` | `--card-blue-border` | `oklch(64% 0.16 250)` |
+| Green | `--card-green` | `oklch(52% 0.18 150)` | `--card-green-border` | `oklch(66% 0.16 150)` |
+| Purple | `--card-purple` | `oklch(48% 0.18 300)` | `--card-purple-border` | `oklch(62% 0.16 300)` |
+| Black | `--card-black` | `oklch(28% 0.01 245)` | `--card-black-border` | `oklch(42% 0.012 245)` |
+| Yellow | `--card-yellow` | `oklch(78% 0.18 90)` | `--card-yellow-border` | `oklch(64% 0.13 90)` |
 
 `--card-yellow-fg` (`oklch(22% 0.04 245)`) and `--card-accent-fallback` (`oklch(22% 0.04 245)`) complete this functional palette.
+
+The `--card-*-border` keylines exist because a solid card-color chip painted with its own color as the border reads borderless. One rule generates all six: hue is held exactly, lightness moves 14 points away from the fill (up for the five dark fills, down for the light yellow), and chroma is pulled back to the nearest in-sRGB-gamut value at the new lightness. Every pair lands at 1.7–1.8:1 against its own fill — legible at 100% zoom without reading as an outline. Like the fills, the keylines are a feature contract and are never overridden by a theme selector.
 
 #### Preset-ready desaturated primitives
 
@@ -230,7 +232,7 @@ The user's registered theme is stored in the database. The `optcg-theme` cookie 
 
 ### Non-themable feature palettes
 
-Theme selectors must not override the six TCG card colors, `--card-yellow-fg`, `--card-accent-fallback`, the complete `--holo-*` holofoil palette, the `--effect-*` effect-text notation palette, or the game-board `--gb-*` context. These are direct feature contracts with independent accessibility and visual requirements.
+Theme selectors must not override the six TCG card colors or their `--card-*-border` keylines, `--card-yellow-fg`, `--card-accent-fallback`, the complete `--holo-*` holofoil palette, the `--effect-*` effect-text notation palette, or the game-board `--gb-*` context. These are direct feature contracts with independent accessibility and visual requirements.
 
 The `--effect-*` family colors the inline badges that `EffectText` (`src/components/cards/effect-text.tsx`) sets for the bracketed tokens printed in a card's rules text: timing markers, keywords, modifiers, `[DON!! xN]`, `[Counter]`, and `[Trigger]`. The token-family mapping follows the printed cards rather than a theme decision, which is why it sits with the card colors: activation timings are blue (`[Counter]` is a play-timing marker and shares the timing blue), constraints such as `[Once Per Turn]` are red, and evergreen keywords such as `[Blocker]` and `[Rush]` are orange. The chromatic fills share one lightness (46%) so a row of badges reads as a single system with hue as the only variable, and every fill sits below the accent so notation never competes with the focal action or with card art. The `[DON!! xN]` fill sits outside that set on purpose, lower (40%) and near-neutral, matching the printed badge's dark ink.
 
