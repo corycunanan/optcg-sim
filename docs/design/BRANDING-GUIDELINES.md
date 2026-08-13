@@ -377,7 +377,7 @@ z-20   Dropdowns, select menus
 z-30   Fixed navbar
 z-40   Modals, sheets
 z-50   Toasts, notifications
-z-[100] Game board overlays
+z-[90..95] Game board pregame overlays
 ```
 
 Which of these tiers carries a shadow, which takes the flat `edge-*` treatment, and which

@@ -40,14 +40,14 @@ never stacks lift + shadow + glow (see Anti-stacking, below).
 | z tier | Typical surfaces | Elevation color | Shadow token |
 |---|---|---|---|
 | `z-0` | Page ground, panels, insets | `--elevation-page` 22% / `--elevation-panel` 27% / `--elevation-inset` 37% | none — color separates structure |
-| `z-0` (content) | Card art tiles at rest / hover | `--surface-panel` stage | `shadow-sm` rest → `shadow-md` hover (the one sanctioned hover lift) |
+| `z-0` (content) | Card art tiles at rest / hover | `--surface-panel` stage | **target:** `shadow-sm` rest → `shadow-md` hover. Shipped tiles vary (grid: none → `shadow-md`; deck-builder and lobby tiles: static `shadow-sm` + translate) — converge on the target as tiles are touched, one lift per hover either way |
 | `z-10` | Sticky headers, raised in-flow panels (lobby action bars, chat widget) | panel/raised step | `shadow-lg` when they overlap scrolling content; none when they only divide it |
 | `z-20` | Dropdowns, selects, popovers, hover cards | `--surface-raised` 32% (popover role) | `shadow-md` (4px 4px) |
 | `z-30` | Fixed navbar | `--elevation-nav` 18% | none — the darkest step reads as the page's frame, nothing sits under it |
 | `z-40` | Dialogs, alert dialogs, sheets | `--surface-panel` over `--overlay` | `shadow-lg` (6px 6px) |
-| `z-50` | Toasts | raised step | `shadow-lg` |
-| `z-50` (info) | Tooltips | `--surface-info` (near-opaque dark) | **none** — `edge-info` frame |
-| `z-[100]` | Game-board overlays (spotlight, pregame) | `--gb-*` context | `shadow-lg` on the overlay panel; board tooltips use `--gb-edge-info`, flat |
+| toasts | Sonner stack (library-managed z), custom lobby invite toast at `z-50` | raised step | custom toast: `shadow-md`; Sonner's own stack ships the library's blurred shadow — the one known vendored exception, outside the `.tsx` lint's reach (see Known exceptions) |
+| `z-50` (info) | Tooltips | `--surface-info` (opaque dark) | **none** — `edge-info` frame |
+| `z-[90..95]` | Game-board pregame overlays; the spotlight rides the `z-50` Dialog primitive | `--gb-*` context | `shadow-lg` on the overlay panel; board tooltips use `--gb-edge-info`, flat |
 
 Reading the table: **z position says when you can be covered; the shadow says you are
 covering someone right now.** A dropdown casts because it overlaps the page. The navbar
@@ -76,7 +76,8 @@ entering the scene.
 - Consume through `shadow-sm` / `shadow-md` / `shadow-lg` or `shadow-[var(--shadow-*)]`.
   Stock Tailwind steps (`shadow-xs/xl/2xl`, bare `shadow`, every `drop-shadow-*`,
   `inset-shadow-*`) are blurred and unbacked — lint fails them, including arbitrary
-  `shadow-[…]` values whose blur position carries anything but a literal zero.
+  `shadow-[…]` values whose blur position carries anything but a literal zero — unless
+  both offsets are literal zero, which is the glow shape and passes (next section).
 
 ## The glow exemption
 
@@ -91,11 +92,21 @@ not use elevation to fake a signal.
 
 1. **Does it overlap content transiently?** No → give it an elevation color step and stop.
 2. **Is it a read-constantly information layer?** Yes → Tier-5 treatment: `shadow-none` +
-   the `edge-*` frame, square-ish (2px chrome radius), near-opaque dark fill.
+   the `edge-*` frame on an opaque dark fill. App-side Tier-5 (tooltip, card-info-panel)
+   carries the 2px chrome radius per the OPT-670 amendment; board-side Tier-5 stays
+   `rounded-none` per [MATERIAL-LANGUAGE.md](./MATERIAL-LANGUAGE.md) — the two contexts
+   deliberately differ.
 3. **Otherwise pick the tier by weight**, not taste: menus/popovers `shadow-md`; anything
-   modal or sticky `shadow-lg`; only card tiles use `shadow-sm` and only at rest.
+   modal or sticky `shadow-lg`; `shadow-sm` is the resting register (card tiles at rest,
+   active tab lift) and never the answer for overlapping chrome.
 4. Match the z tier from the ladder above; if your surface needs a new z value, it needs a
    design conversation, not a bigger number.
+
+## Known exceptions
+
+- **Sonner's toast stack** ships the library's own blurred shadow and an extreme z-index
+  from vendored CSS, outside the `.tsx` lint's reach. Tracked as a follow-up (restyle via
+  Sonner's `toastOptions` or accept as vendored); do not copy it as precedent.
 
 ## Anti-stacking rules
 
