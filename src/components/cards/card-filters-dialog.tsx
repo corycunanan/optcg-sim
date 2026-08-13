@@ -19,53 +19,15 @@ import {
   type CardBrowserFilters,
   type CardFilterDraft,
 } from "@/lib/cards/browser-params";
+import { COLORS } from "@/lib/cards/colors-ui";
+import {
+  CHIP_TOGGLE_CLASS,
+  CHIP_TOGGLE_UNSELECTED_CLASS,
+  ColorChipToggle,
+} from "./color-chip";
 import { SetFilter } from "./set-filter";
 
 export const CARD_FILTERS_DIALOG_ID = "card-filters";
-
-/**
- * Selected chip fills for the six TCG colors. The card palette is a
- * non-themable feature contract and is exempt from the chroma reservation, so a
- * selected color chip becomes the color it filters by — the same solid fills
- * the `card-*` Badge variants ship.
- */
-const COLORS: {
-  value: string;
-  selectedClassName: string;
-  swatchClassName: string;
-}[] = [
-  {
-    value: "Red",
-    selectedClassName: "border-card-red bg-card-red text-content-inverse",
-    swatchClassName: "border-transparent bg-card-red",
-  },
-  {
-    value: "Blue",
-    selectedClassName: "border-card-blue bg-card-blue text-content-inverse",
-    swatchClassName: "border-transparent bg-card-blue",
-  },
-  {
-    value: "Green",
-    selectedClassName: "border-card-green bg-card-green text-content-inverse",
-    swatchClassName: "border-transparent bg-card-green",
-  },
-  {
-    value: "Purple",
-    selectedClassName: "border-card-purple bg-card-purple text-content-inverse",
-    swatchClassName: "border-transparent bg-card-purple",
-  },
-  {
-    value: "Black",
-    selectedClassName: "border-card-black bg-card-black text-content-inverse",
-    swatchClassName: "border-transparent bg-card-black",
-  },
-  {
-    value: "Yellow",
-    selectedClassName:
-      "border-card-yellow bg-card-yellow text-card-yellow-fg",
-    swatchClassName: "border-transparent bg-card-yellow",
-  },
-];
 
 const TYPES = ["Leader", "Character", "Event", "Stage"];
 const BLOCKS = ["1", "2", "3", "4"];
@@ -154,13 +116,11 @@ function CardFiltersForm({
         <FilterSection label="Color">
           <ChipRow>
             {COLORS.map((color) => (
-              <FilterChip
-                key={color.value}
-                label={color.value}
-                pressed={draft.colors.includes(color.value)}
-                onPressedChange={() => toggleValue("colors", color.value)}
-                selectedClassName={color.selectedClassName}
-                swatchClassName={color.swatchClassName}
+              <ColorChipToggle
+                key={color}
+                color={color}
+                pressed={draft.colors.includes(color)}
+                onPressedChange={() => toggleValue("colors", color)}
               />
             ))}
           </ChipRow>
@@ -289,22 +249,19 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Toggle chip. The leading 12px slot is constant across states — an outline box
- * or a color swatch when unselected, a check when selected — so selection never
+ * Toggle chip for the plain-value sections. It shares the canonical chip shell
+ * with `ColorChipToggle`: the leading 12px slot is constant across states — an
+ * outline box when unselected, a check when selected — so selection never
  * reflows the row and never rests on color alone.
  */
 function FilterChip({
   label,
   pressed,
   onPressedChange,
-  selectedClassName,
-  swatchClassName,
 }: {
   label: string;
   pressed: boolean;
   onPressedChange: () => void;
-  selectedClassName?: string;
-  swatchClassName?: string;
 }) {
   return (
     <button
@@ -312,11 +269,10 @@ function FilterChip({
       aria-pressed={pressed}
       onClick={onPressedChange}
       className={cn(
-        "focus-visible:outline-border-focus inline-flex cursor-pointer items-center gap-2 rounded border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2",
+        CHIP_TOGGLE_CLASS,
         pressed
-          ? (selectedClassName ??
-              "border-border-strong bg-accent-soft text-content-primary")
-          : "border-border bg-surface-2 text-content-secondary hover:border-border-strong hover:text-content-primary"
+          ? "border-border-strong bg-accent-soft text-content-primary"
+          : CHIP_TOGGLE_UNSELECTED_CLASS
       )}
     >
       {pressed ? (
@@ -324,10 +280,7 @@ function FilterChip({
       ) : (
         <span
           aria-hidden
-          className={cn(
-            "size-3 shrink-0 rounded border",
-            swatchClassName ?? "border-border-strong"
-          )}
+          className="border-border-strong size-3 shrink-0 rounded border"
         />
       )}
       {label}

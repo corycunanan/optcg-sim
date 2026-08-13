@@ -27,7 +27,8 @@ import {
   collectDeckRestrictionRules,
   isCardAllowedByDeckRestrictionRules,
 } from "@/lib/deck-builder/validation";
-import { COLORS, COLOR_BG } from "@/lib/cards/colors-ui";
+import { COLORS } from "@/lib/cards/colors-ui";
+import { ColorChipToggle } from "@/components/cards/color-chip";
 
 interface DeckBuilderSearchProps {
   onAddCard: (card: DeckCardEntry["card"]) => void;
@@ -181,27 +182,15 @@ export function DeckBuilderSearch({
         {/* Filters */}
         <div className="space-y-2 px-3 py-2">
           {/* Color filters */}
-          <div className="flex flex-wrap gap-1">
-            {COLORS.map((c) => {
-              const active = activeColors.includes(c);
-              return (
-                <button
-                  key={c}
-                  onClick={() => toggleColor(c)}
-                  className={cn(
-                    "rounded px-2 py-1 text-xs font-medium transition-all",
-                    active
-                      ? c === "Yellow"
-                        ? "text-navy-900"
-                        : "text-content-inverse"
-                      : "border-border bg-secondary text-content-tertiary hover:border-border-strong border"
-                  )}
-                  style={active ? { background: COLOR_BG[c] } : undefined}
-                >
-                  {c}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            {COLORS.map((c) => (
+              <ColorChipToggle
+                key={c}
+                color={c}
+                pressed={activeColors.includes(c)}
+                onPressedChange={() => toggleColor(c)}
+              />
+            ))}
           </div>
 
           {/* Type + Cost filters */}

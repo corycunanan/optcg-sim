@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
 import { apiPatch, ApiError } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,9 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ColorChipToggle } from "@/components/cards/color-chip";
+import { COLORS } from "@/lib/cards/colors-ui";
 
 const CARD_TYPES = ["Leader", "Character", "Event", "Stage"];
-const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const BAN_STATUSES = ["LEGAL", "BANNED", "RESTRICTED"];
 
 interface Card {
@@ -192,24 +192,14 @@ export function CardEditForm({ card }: { card: Card }) {
       {/* Color */}
       <Field label="Color" required>
         <div className="flex flex-wrap gap-2">
-          {COLORS.map((c) => {
-            const active = form.color.includes(c);
-            return (
-              <button
-                key={c}
-                type="button"
-                aria-pressed={active}
-                data-color={c.toLowerCase()}
-                onClick={() => toggleColor(c)}
-                className={cn(
-                  "admin-card-color-button rounded-md border px-3 py-1 text-xs font-medium transition-all",
-                  !active && "border-border bg-secondary text-content-tertiary hover:bg-muted",
-                )}
-              >
-                {c}
-              </button>
-            );
-          })}
+          {COLORS.map((c) => (
+            <ColorChipToggle
+              key={c}
+              color={c}
+              pressed={form.color.includes(c)}
+              onPressedChange={() => toggleColor(c)}
+            />
+          ))}
         </div>
       </Field>
 

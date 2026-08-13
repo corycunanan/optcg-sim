@@ -713,44 +713,6 @@ body {
   }
 }
 
-/* ─── Admin Card Color Buttons ───────────────────────────────── */
-
-.admin-card-color-button[aria-pressed="true"][data-color="red"] {
-  background-color: var(--card-red);
-  border-color: var(--card-red);
-  color: var(--text-inverse);
-}
-
-.admin-card-color-button[aria-pressed="true"][data-color="blue"] {
-  background-color: var(--card-blue);
-  border-color: var(--card-blue);
-  color: var(--text-inverse);
-}
-
-.admin-card-color-button[aria-pressed="true"][data-color="green"] {
-  background-color: var(--card-green);
-  border-color: var(--card-green);
-  color: var(--text-inverse);
-}
-
-.admin-card-color-button[aria-pressed="true"][data-color="purple"] {
-  background-color: var(--card-purple);
-  border-color: var(--card-purple);
-  color: var(--text-inverse);
-}
-
-.admin-card-color-button[aria-pressed="true"][data-color="black"] {
-  background-color: var(--card-black);
-  border-color: var(--card-black);
-  color: var(--text-inverse);
-}
-
-.admin-card-color-button[aria-pressed="true"][data-color="yellow"] {
-  background-color: var(--card-yellow);
-  border-color: var(--card-yellow);
-  color: var(--card-yellow-fg);
-}
-
 /* ─── Tier-5 Information Surface ────────────────────────────── */
 
 /* Paints the neutral 1px perimeter with the top-left → bottom-right lighting

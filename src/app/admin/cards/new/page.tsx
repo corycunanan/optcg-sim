@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -17,9 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ColorChipToggle } from "@/components/cards/color-chip";
+import { COLORS } from "@/lib/cards/colors-ui";
 
 const CARD_TYPES = ["Leader", "Character", "Event", "Stage"];
-const COLORS = ["Red", "Blue", "Green", "Purple", "Black", "Yellow"];
 const BAN_STATUSES = ["LEGAL", "BANNED", "RESTRICTED"];
 
 interface CardFormState {
@@ -193,35 +193,14 @@ export default function NewCardPage() {
         {/* Color */}
         <Field label="Color" required>
           <div className="flex flex-wrap gap-2">
-            {COLORS.map((c) => {
-              const active = form.color.includes(c);
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => toggleColor(c)}
-                  className={cn(
-                    "rounded-md border px-3 py-1 text-xs font-medium transition-all",
-                    !active &&
-                      "border-border bg-secondary text-content-tertiary hover:bg-muted"
-                  )}
-                  style={
-                    active
-                      ? {
-                          background: `var(--card-${c.toLowerCase()})`,
-                          color:
-                            c === "Yellow"
-                              ? "var(--card-yellow-fg)"
-                              : "var(--text-inverse)",
-                          borderColor: `var(--card-${c.toLowerCase()})`,
-                        }
-                      : undefined
-                  }
-                >
-                  {c}
-                </button>
-              );
-            })}
+            {COLORS.map((c) => (
+              <ColorChipToggle
+                key={c}
+                color={c}
+                pressed={form.color.includes(c)}
+                onPressedChange={() => toggleColor(c)}
+              />
+            ))}
           </div>
         </Field>
 

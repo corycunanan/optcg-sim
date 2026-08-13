@@ -116,12 +116,12 @@ describe("DeckList row", () => {
       expect(within(row()).getByText(label).className).toContain("text-sm");
       expect(within(row()).getByText(label).className).not.toContain("text-xs");
     }
+    // Color chips are badges, which the type floor sanctions at 12px.
     for (const color of ["Red", "Green"]) {
       const indicator = within(row())
         .getByText(color)
         .closest<HTMLElement>('[role="img"]')!;
-      expect(indicator.className).toContain("text-sm");
-      expect(indicator.className).not.toContain("text-xs");
+      expect(indicator.className).toContain("text-xs");
     }
   });
 

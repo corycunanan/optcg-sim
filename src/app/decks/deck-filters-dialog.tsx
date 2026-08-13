@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { ColorChipToggle } from "@/components/cards/color-chip";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,27 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { COLORS } from "@/lib/cards/colors-ui";
-import { cn } from "@/lib/utils";
 
 export const DECK_FILTERS_DIALOG_ID = "deck-filters";
-
-const COLOR_VARIANTS = {
-  Red: "card-red",
-  Blue: "card-blue",
-  Green: "card-green",
-  Purple: "card-purple",
-  Black: "card-black",
-  Yellow: "card-yellow",
-} as const;
-
-const COLOR_SWATCH_CLASSES = {
-  Red: "border-transparent bg-card-red",
-  Blue: "border-transparent bg-card-blue",
-  Green: "border-transparent bg-card-green",
-  Purple: "border-transparent bg-card-purple",
-  Black: "border-transparent bg-card-black",
-  Yellow: "border-transparent bg-card-yellow",
-} as const;
 
 interface DeckFiltersDialogProps {
   open: boolean;
@@ -98,36 +78,14 @@ function DeckFiltersForm({
           Color
         </h3>
         <div className="flex flex-wrap gap-2">
-          {COLORS.map((color) => {
-            const pressed = draft.includes(color);
-            return (
-              <Badge
-                key={color}
-                asChild
-                variant={pressed ? COLOR_VARIANTS[color] : "outline"}
-              >
-                <button
-                  type="button"
-                  aria-pressed={pressed}
-                  onClick={() => toggleColor(color)}
-                  className="focus-visible:outline-border-focus inline-flex cursor-pointer items-center gap-2 px-3 py-1 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
-                >
-                  {pressed ? (
-                    <Check className="size-3 shrink-0" aria-hidden />
-                  ) : (
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "size-3 shrink-0 rounded border",
-                        COLOR_SWATCH_CLASSES[color]
-                      )}
-                    />
-                  )}
-                  {color}
-                </button>
-              </Badge>
-            );
-          })}
+          {COLORS.map((color) => (
+            <ColorChipToggle
+              key={color}
+              color={color}
+              pressed={draft.includes(color)}
+              onPressedChange={() => toggleColor(color)}
+            />
+          ))}
         </div>
       </DialogBody>
 
