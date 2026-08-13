@@ -401,6 +401,60 @@
       "foreground": "--effect-notation-edge",
       "background": "--effect-trigger",
       "minimum": 3
+    },
+    {
+      "name": "badge-keyline/card-red",
+      "foreground": "--card-red-border",
+      "background": "--card-red",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/card-blue",
+      "foreground": "--card-blue-border",
+      "background": "--card-blue",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/card-green",
+      "foreground": "--card-green-border",
+      "background": "--card-green",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/card-purple",
+      "foreground": "--card-purple-border",
+      "background": "--card-purple",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/card-black",
+      "foreground": "--card-black-border",
+      "background": "--card-black",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/card-yellow",
+      "foreground": "--card-yellow-border",
+      "background": "--card-yellow",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/accent-fill",
+      "foreground": "--accent-fill-border",
+      "background": "--accent",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/success-fill",
+      "foreground": "--success-fill-border",
+      "background": "--success",
+      "minimum": 1.5
+    },
+    {
+      "name": "badge-keyline/secondary",
+      "foreground": "--border-strong",
+      "background": "--surface-raised",
+      "minimum": 1.5
     }
   ]
 }
