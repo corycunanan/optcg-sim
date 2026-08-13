@@ -338,11 +338,22 @@ describe("LobbyRoomShell redesign scenarios", () => {
     const roomHeadings = renderer!.root.findAllByType("h1");
     expect(roomHeadings).toHaveLength(1);
     expect(roomHeadings[0].children).toEqual(["Unlimited"]);
+    // OPT-686: the open seat is the invite affordance and nothing else — no
+    // heading, no overline, no panel chrome. The invite popover is mocked out
+    // in this suite, so the slot renders empty here; it still has to render to
+    // hold the seat width the row and the footer are centered against.
     expect(
       renderer!.root
         .findAllByType("h2")
         .some((heading) => heading.children.join("") === "Open seat")
-    ).toBe(true);
+    ).toBe(false);
+    const openSeat = renderer!.root.findByProps({
+      "aria-label": "Guest seat — open",
+    });
+    expect(openSeat.props.className).toContain("lg:w-72");
+    expect(openSeat.props.className).toContain("shrink-0");
+    expect(openSeat.props.className).not.toContain("border");
+    expect(openSeat.props.className).not.toContain("bg-surface-1");
 
     const modeButtons = renderer!.root
       .findAllByType("button")
@@ -426,8 +437,8 @@ describe("LobbyRoomShell redesign scenarios", () => {
           node.props.className.includes("lg:w-auto")
       )
     ).toBeDefined();
-    expect(renderedText()).toContain("Open seat");
-    expect(renderedText()).toContain("Waiting for a challenger");
+    expect(renderedText()).not.toContain("Open seat");
+    expect(renderedText()).not.toContain("Waiting for a challenger");
     expect(renderedText()).toContain("Start Match");
     const startButton = renderer!.root
       .findAllByType("button")

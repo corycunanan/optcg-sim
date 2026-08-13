@@ -82,15 +82,92 @@ describe("InvitePanel countdown lifecycle", () => {
       vi.advanceTimersByTime(2_000);
     });
 
-    expect(renderedText()).toContain("Open seat");
-    expect(renderedText()).toContain("Waiting for a challenger");
+    // OPT-686: reverting lands on the stripped seat — the invite affordance,
+    // and the expiry note beneath it. The panel chrome the countdown lived in
+    // does not come back with it.
+    expect(renderedText()).not.toContain("Open seat");
+    expect(renderedText()).not.toContain("Waiting for a challenger");
     expect(renderedText()).toContain("Invite to nami expired");
     expect(
       renderer?.root.findByProps({ "data-trigger-variant": "open-seat" })
     ).toBeDefined();
 
+    expect(
+      renderer!.root.findByProps({ "aria-label": "Guest seat — open" })
+    ).toBeDefined();
+    // The affordance leads and the expiry note follows it, so the note reads as
+    // a footnote to the invite rather than a caption above it. The whole render
+    // is this one panel, so tree order is the seat's order.
+    expect(renderedText().indexOf("Invite a friend")).toBeLessThan(
+      renderedText().indexOf("Invite to nami expired")
+    );
+
     act(() => renderer?.unmount());
     renderer = null;
     expect(clearIntervalSpy).toHaveBeenCalled();
+  });
+
+  it("keeps the open seat as bare negative space that still holds the slot", () => {
+    act(() => {
+      renderer = create(
+        <InvitePanel
+          lobbyId="lobby-1"
+          joinCode="ABCD"
+          copied={false}
+          onCopy={() => undefined}
+          showInviteFriend
+          pendingInvite={null}
+          cancelingInvite={false}
+          onInviteSent={() => undefined}
+          onCancelInvite={() => undefined}
+        />
+      );
+    });
+
+    const openSeat = renderer!.root.findByProps({
+      "aria-label": "Guest seat — open",
+    });
+    const className: string = openSeat.props.className;
+    // Geometry only: the matched seat width (OPT-666), the sub-`lg` no-shrink
+    // contract, and centering against the stretched row.
+    expect(className).toContain("lg:w-72");
+    expect(className).toContain("shrink-0");
+    expect(className).toContain("justify-center");
+    // Chrome: none of it.
+    expect(className).not.toContain("border");
+    expect(className).not.toContain("dashed");
+    expect(className).not.toContain("bg-surface-1");
+    expect(className).not.toContain("rounded");
+
+    expect(renderer!.root.findAllByType("header")).toHaveLength(0);
+    expect(renderer!.root.findAllByType("h2")).toHaveLength(0);
+    expect(renderedText()).toContain("Invite a friend");
+  });
+
+  it("still renders the slot for a viewer who cannot invite", () => {
+    act(() => {
+      renderer = create(
+        <InvitePanel
+          lobbyId="lobby-1"
+          joinCode="ABCD"
+          copied={false}
+          onCopy={() => undefined}
+          showInviteFriend={false}
+          pendingInvite={null}
+          cancelingInvite={false}
+          onInviteSent={() => undefined}
+          onCancelInvite={() => undefined}
+        />
+      );
+    });
+
+    // Nothing to offer a non-host, but the reserved seat width has to survive:
+    // the seats row centers itself, so losing the slot would slide the host
+    // column off the axis the footer's centered action is aligned to.
+    const openSeat = renderer!.root.findByProps({
+      "aria-label": "Guest seat — open",
+    });
+    expect(openSeat.props.className).toContain("lg:w-72");
+    expect(renderedText()).not.toContain("Invite a friend");
   });
 });

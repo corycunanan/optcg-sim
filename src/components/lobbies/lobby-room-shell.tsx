@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Loader2, Play, Plus, Settings } from "lucide-react";
+import { Eye, Loader2, Play, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { resolvePregameMode } from "@shared/game-init";
 import { ApiError, apiDelete, apiGet } from "@/lib/api-client";
@@ -1289,40 +1289,42 @@ export function InvitePanel({
     );
   }
 
+  /* An empty seat is negative space, not a panel: no border, no surface, no
+     heading — the gold plus and its label are the whole column. The seat beside
+     it is already chrome-less (see `lobby-seat-card`), so this slot only has to
+     borrow that seat's geometry:
+
+     - `lg:w-72` is the matched seat width from OPT-666. It is the reason this
+       element still renders when there is nothing to put in it (a non-host
+       viewer): the seats row is `lg:justify-center`, so dropping the slot would
+       slide the host column into the middle of the page and shift the footer's
+       centered action off the seat axis.
+     - `shrink-0` is the sub-`lg` contract the seats share — that column is a
+       scrolling height budget, and a shrinkable member gets painted a box
+       shorter than its content.
+     - Nothing sets a height. At `lg` the row's default `stretch` gives this
+       section the host seat's height and `justify-center` puts the affordance
+       on the same center line the host stack hangs off, so it stays centered as
+       the host card grows (deck chosen, readiness shown). Below `lg` the flex
+       direction flips to a column and the same classes collapse to a
+       content-height block — the minimal footprint the stacked flow wants. */
   return (
-    <section className="border-border-strong bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border border-dashed lg:w-72 lg:grow-0">
-      <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b border-dashed px-5 py-3 text-left lg:min-h-20 lg:py-4">
-        <div
-          className="border-content-tertiary flex size-12 shrink-0 items-center justify-center rounded border border-dashed"
-          aria-hidden="true"
-        >
-          <Plus className="text-content-tertiary size-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
-            Waiting for a challenger
-          </p>
-          <h2 className="text-content-primary mt-1 text-lg font-semibold">
-            Open seat
-          </h2>
-        </div>
-      </header>
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 py-4 text-center lg:[@media(min-height:50rem)]:py-8">
-        {pendingInvite && pendingInviteName && timing?.kind === "expired" && (
-          <p className="text-content-secondary text-sm">
-            {pendingInvite && pendingInviteName && timing?.kind === "expired"
-              ? `Invite to ${pendingInviteName} expired`
-              : null}
-          </p>
-        )}
-        {showInviteFriend && (
-          <InviteFriendPopover
-            lobbyId={lobbyId}
-            onInviteSent={onInviteSent}
-            triggerVariant="open-seat"
-          />
-        )}
-      </div>
+    <section
+      aria-label="Guest seat — open"
+      className="flex shrink-0 flex-col items-center justify-center gap-3 text-center lg:w-72"
+    >
+      {showInviteFriend && (
+        <InviteFriendPopover
+          lobbyId={lobbyId}
+          onInviteSent={onInviteSent}
+          triggerVariant="open-seat"
+        />
+      )}
+      {pendingInvite && pendingInviteName && timing?.kind === "expired" && (
+        <p className="text-content-secondary mt-1 text-sm">
+          {`Invite to ${pendingInviteName} expired`}
+        </p>
+      )}
     </section>
   );
 }
