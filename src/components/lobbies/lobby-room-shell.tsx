@@ -822,7 +822,7 @@ export function LobbyRoomShell({
                       className="animate-spin"
                     />
                   ) : (
-                    <Play data-icon="inline-start" />
+                    <Play data-icon="inline-start" fill="currentColor" strokeWidth={0} />
                   )}
                   Start Match
                 </Button>
