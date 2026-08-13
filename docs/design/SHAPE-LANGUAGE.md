@@ -74,7 +74,14 @@ shapes require amending this doc, not ad-hoc invention.
 5. **L-bracket corner marks** — from the material brief. Selection and hierarchy seams; sits *on*
    a perimeter, never floats.
 6. **Chevron pair** — directional emphasis on the premium CTA and progression moments only.
-7. **Elongated hexagon** — **drop targets only** (reserved, per the material brief).
+7. **Elongated hexagon** — drop targets, plus the printed-notation exception below.
+   *Amendment (2026-08-12, OPT-677):* evergreen keyword chips in card effect text
+   ([Rush], [Blocker], [Banish]) take this shape, because the printed card does. It is a
+   notation contract rather than a decorative choice, so it is exempt from the
+   one-feature-shape-per-region budget — a rules box prints as many keyword hexagons as the
+   card has keywords. It stays scoped to the `keyword` family; no other notation family
+   takes a polygon. Built from the `effect-hex*` utilities in `globals.css`, which are a
+   worked example of the two-layer border technique below.
 8. **Notched tab** — a chamfered tab protruding *outside* its parent's edge (trait tabs on object
    rows, per the material Object tier).
 9. **Hard diagonal** — 45° section divider / split. Layout-scale only (splitting regions, not
@@ -108,7 +115,14 @@ region**. If two pennants compete, neither is featured.
   tokens; the design-system lint treats that vocabulary as an **allowance**, not a
   requirement (see Rollout step 1), and fails only on a `chamfer-*` class with no matching
   declaration or one composed dynamically. Feature polygons (pennant, swallowtail, hex,
-  diamond) are **not** in the primitive and remain deferred.
+  diamond) are **not** in the primitive. Pennant, swallowtail and diamond remain deferred;
+  the elongated hexagon is the one implemented exception, shipped for keyword notation
+  chips (OPT-677) as the standalone `effect-hex`, `effect-hex-hairline` and
+  `effect-hex-inset` utilities in `globals.css` rather than as a `ChamferFrame` variant.
+  It is a worked example of the two-layer border technique and the miter compensation
+  below, applied to an apex instead of a 45° cut. Feature polygons entering the primitive
+  is still deferred; the next one should generalize these three utilities rather than
+  add a fourth bespoke set.
 - **CSS:** `clip-path: polygon(...)` for all cuts. Borders on clipped elements require the
   **two-layer technique**: outer element carries the edge color, inner element (inset by the
   hairline width) carries the surface. `border-*` properties do not follow clip-path.

@@ -281,17 +281,33 @@
 
      Hues follow the printed cards: activation timings are blue ([Counter] is
      a play-timing marker, so it shares the timing blue), constraints are red,
-     and evergreen keywords are orange. The chromatic fills share one lightness
-     (46%) so a chip row reads as a single system with hue as the only variable,
-     and every fill sits well below the accent in lightness so notation never
-     competes with the focal action or with card art
+     and evergreen keywords are orange. The timing, counter and modifier fills
+     share one lightness (46%) so that row reads as a single system with hue as
+     the only variable, and each sits well below the accent in lightness so
+     notation never competes with the focal action or with card art
      (docs/design/COLOR-LANGUAGE.md, salience hierarchy). The DON!! fill sits
      deliberately outside that set, at a lower lightness (40%) and near-zero
      chroma, matching the printed badge's dark ink. [Trigger] keeps its printed
      ink-and-yellow treatment, which the white keyline separates from the panel
-     behind it. */
+     behind it.
+
+     The keyword family (OPT-677) is the one deliberate exception to the shared
+     46% step. On a printed card an evergreen keyword is a bright orange
+     hexagon, not a muted plaque — it is the loudest mark in the rules box, and
+     matching that is the point of the family. White lettering cannot survive
+     the jump (it falls below AA above 58% lightness), so the family takes a
+     dark ink instead — the same trade the yellow card colour already makes
+     with --card-yellow-fg.
+
+     63%/0.14 is where the two contrast pairs this fill has to satisfy meet
+     with room to spare: the dark ink reads 4.75:1 and the white keyline 3.25:1
+     (scripts/contrast-pairs.json pins both). Lightness is what moves them —
+     past ~65% the keyline drops under 3:1 — and 0.14 chroma is the sRGB gamut
+     edge at this lightness and hue, so a larger figure would only be clipped
+     by the browser. */
   --effect-timing: oklch(46% 0.1 215); /* [On Play], [When Attacking], [Main] */
-  --effect-keyword: oklch(46% 0.12 62); /* [Rush], [Blocker], [Banish] */
+  --effect-keyword: oklch(63% 0.14 62); /* [Rush], [Blocker], [Banish] */
+  --effect-keyword-fg: oklch(22% 0.04 245);
   --effect-counter: oklch(46% 0.1 215); /* [Counter] */
   --effect-modifier: oklch(46% 0.16 25); /* [Once Per Turn], [Your Turn] */
   --effect-don: oklch(40% 0.04 245); /* [DON!! xN] */
@@ -299,6 +315,13 @@
   --effect-trigger-fg: oklch(86% 0.16 90);
   --effect-notation-fg: #ffffff;
   --effect-notation-edge: rgba(255, 255, 255, 0.9);
+
+  /* Keyword-chip hexagon geometry (see the effect-hex-* utilities below).
+     The chip box is a fixed 18px: a 16px `leading-4` line plus one hairline
+     of edge on each side. */
+  --effect-hex-box: 18px;
+  --effect-hex-hairline: 1px;
+  --effect-hex-apex: 6px;
 
   /* Holofoil spectrum (card inspection lighting) */
   --holo-red: oklch(76% 0.12 25);
@@ -500,6 +523,7 @@
   --color-effect-modifier: var(--effect-modifier);
   --color-effect-don: var(--effect-don);
   --color-effect-trigger: var(--effect-trigger);
+  --color-effect-keyword-fg: var(--effect-keyword-fg);
   --color-effect-trigger-fg: var(--effect-trigger-fg);
   --color-effect-notation-fg: var(--effect-notation-fg);
   --color-effect-notation-edge: var(--effect-notation-edge);
@@ -901,6 +925,57 @@ body {
     var(--chamfer-cut, var(--chamfer-md)) - 0.5857864 *
       var(--chamfer-focus-ring)
   );
+}
+
+/* ─── Effect-text notation chips ─────────────────────────────── */
+
+/* Inline chips centred on the paragraph's CAP band rather than its x-height
+   band (OPT-678). `vertical-align: middle` puts a box's midpoint on
+   `baseline + xHeight/2`, but the eye centres a chip against the capitals it
+   sits among, whose midpoint is `baseline + capHeight/2` — so a middle-aligned
+   chip reads (capHeight − xHeight)/2 too low. Measured in Public Sans at the
+   14px `text-sm` size EffectText renders: capHeight 10.13px, x-height 8.01px,
+   so the correction is 1.06px = 0.0757em. Held in `em` so it tracks the
+   paragraph's font-size instead of freezing one size's pixel. */
+@utility align-cap-middle {
+  vertical-align: middle;
+  position: relative;
+  top: -0.0757em;
+}
+
+/* The elongated hexagon a printed card gives an evergreen keyword: flat top
+   and bottom, a point at each end (OPT-677). `border-*` does not follow
+   `clip-path`, so the family's white keyline is reproduced with the two-layer
+   technique from docs/design/SHAPE-LANGUAGE.md — an outer layer painted with
+   the edge colour and clipped by `effect-hex`, and a fill layer inset by one
+   hairline (`effect-hex-hairline`) that carries `effect-hex effect-hex-inset`.
+
+   ── Miter compensation ──
+   Insetting the fill by one hairline `d` also pulls its left and right apex
+   points inward by `d`, so an equal apex depth would leave the two diagonals
+   non-parallel and the keyline would taper from tip to shoulder. The edges are
+   parallel exactly when the apex scales with the box height:
+   apex_inner = apex × (box − 2d) / box. That box is a known 18px here (a 16px
+   `leading-4` line plus a hairline top and bottom), so the ratio is 16/18 and
+   the perpendicular keyline lands at a uniform 0.87px for a 6px apex. */
+@utility effect-hex {
+  --effect-hex-clip: var(--effect-hex-clip-apex, var(--effect-hex-apex));
+  clip-path: polygon(
+    var(--effect-hex-clip) 0,
+    calc(100% - var(--effect-hex-clip)) 0,
+    100% 50%,
+    calc(100% - var(--effect-hex-clip)) 100%,
+    var(--effect-hex-clip) 100%,
+    0 50%
+  );
+}
+
+@utility effect-hex-hairline {
+  padding: var(--effect-hex-hairline);
+}
+
+@utility effect-hex-inset {
+  --effect-hex-clip-apex: calc(var(--effect-hex-apex) * 8 / 9);
 }
 
 /* ─── Card Utilities ────────────────────────────────────────── */

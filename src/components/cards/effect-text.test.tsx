@@ -44,6 +44,14 @@ function plainText(node: ReactTestRendererJSON | string): string {
     .join("");
 }
 
+/** Text of a rendered instance, flattening any layers a chip is built from. */
+type TestNode = ReactTestRenderer["root"];
+function instanceText(node: TestNode): string {
+  return node.children
+    .map((child) => (typeof child === "string" ? child : instanceText(child)))
+    .join("");
+}
+
 describe("EffectText", () => {
   it("renders one paragraph per printed effect", () => {
     const paragraphs = render(EB02_052).root.findAllByType("p");
@@ -53,7 +61,10 @@ describe("EffectText", () => {
   it("sets each recognized token as an inline chip of its family", () => {
     const chips = render(EB02_052)
       .root.findAll((node) => node.props["data-effect-notation"] !== undefined)
-      .map((node) => [node.props["data-effect-notation"], node.props.children]);
+      .map((node) => [
+        node.props["data-effect-notation"],
+        instanceText(node),
+      ]);
 
     expect(chips).toEqual([
       ["keyword", "Rush"],
@@ -66,8 +77,19 @@ describe("EffectText", () => {
       (node) => node.props["data-effect-notation"] !== undefined
     );
 
-    expect(keyword.props.className).toContain("bg-effect-keyword");
+    // The keyword hexagon is two layers: `clip-path` does not carry a border,
+    // so the frame paints the family keyline and the fill sits inside it.
+    expect(keyword.props.className).toContain("effect-hex");
+    expect(keyword.props.className).toContain("bg-effect-notation-edge");
+
+    const [fill] = keyword
+      .findAllByType("span")
+      .filter((node) => node !== keyword);
+    expect(fill.props.className).toContain("bg-effect-keyword");
+    expect(fill.props.className).toContain("text-effect-keyword-fg");
+
     expect(timing.props.className).toContain("bg-effect-timing");
+    expect(timing.props.className).not.toContain("effect-hex");
   });
 
   it("renders a trait as a quieter chip with no visible braces", () => {
