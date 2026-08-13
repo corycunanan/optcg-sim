@@ -120,9 +120,13 @@ function NavigationMenuViewport({
   return (
     <div
       data-slot="navigation-menu-viewport-position"
-      className={cn(
-        "navbar-dropdown-viewport-position absolute top-full isolate z-50 flex justify-center"
-      )}
+      // OPT-680 removed the last viewport-mode menu in the app, and with it the
+      // `.navbar-dropdown-viewport-position` CSS anchor rule this used to carry
+      // (`position-anchor` / `left: anchor(left)`). Nothing declares
+      // `anchor-name: --navbar-dropdown-trigger` any more, so the rule would
+      // resolve against nothing; the viewport falls back to the primitive's own
+      // centered placement.
+      className={cn("absolute top-full isolate z-50 flex justify-center")}
     >
       <NavigationMenuPrimitive.Viewport
         data-slot="navigation-menu-viewport"

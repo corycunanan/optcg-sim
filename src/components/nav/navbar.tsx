@@ -1,19 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
 import { NavbarAccountMenu } from "@/components/nav/navbar-account-menu";
-import { NavbarDropdownSurface } from "@/components/nav/navbar-dropdown-surface";
 import { NavbarNotificationPanel } from "@/components/nav/navbar-notification-panel";
 import {
   NavigationMenu,
   NavigationMenuList,
   NavigationMenuItem,
-  NavigationMenuTrigger,
-  NavigationMenuContent,
   NavigationMenuLink,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
@@ -21,45 +17,56 @@ import {
 export function Navbar() {
   const pathname = usePathname();
   const { data: session, status: sessionStatus } = useSession();
-  const [activeMenu, setActiveMenu] = useState("");
-  // Radix keeps painting the viewport through its exit animation after the
-  // value clears, so the just-closed trigger has to stay the CSS anchor or the
-  // closing panel snaps to the nav's left edge mid-fade.
-  const [lastMenu, setLastMenu] = useState("");
 
   if (pathname.startsWith("/game/")) return null;
 
-  const handleMenuChange = (value: string) => {
-    setActiveMenu(value);
-    if (value) setLastMenu(value);
-  };
-
-  // Exactly one trigger may carry `anchor-name`: the open menu wins, and the
-  // previous one is only used once nothing is open.
-  const anchoredMenu = activeMenu || lastMenu;
-
   const isRouteWithin = (route: string) =>
     pathname === route || pathname.startsWith(`${route}/`);
-  const cardsActive =
-    isRouteWithin("/cards") ||
-    isRouteWithin("/sets") ||
-    isRouteWithin("/admin/cards") ||
-    isRouteWithin("/admin/sets");
-  const decksActive = isRouteWithin("/decks");
-  const playActive = isRouteWithin("/lobbies") || isRouteWithin("/game");
 
-  const triggerStyles =
-    "font-nav relative bg-transparent px-2 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:ring-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-open:bg-surface-2 data-open:text-content-inverse sm:px-3";
-  const activeTriggerStyles =
-    "bg-surface-2 text-gold-600 hover:text-gold-600 focus:text-gold-600 data-popup-open:text-gold-600 data-open:text-gold-600";
+  // Four plain links, no menus (OPT-680). The destinations the dropdowns used
+  // to list are reached from the pages themselves — /decks/new from the deck
+  // list, /sets from the card browser — but they still light the section they
+  // belong to, so an active route never leaves the nav with nothing marked.
+  const navLinks = [
+    { href: "/", label: "Home", isActive: pathname === "/" },
+    {
+      href: "/lobbies",
+      label: "Play",
+      isActive: isRouteWithin("/lobbies") || isRouteWithin("/game"),
+    },
+    { href: "/decks", label: "Decks", isActive: isRouteWithin("/decks") },
+    {
+      href: "/cards",
+      label: "Cards",
+      isActive:
+        isRouteWithin("/cards") ||
+        isRouteWithin("/sets") ||
+        isRouteWithin("/admin/cards") ||
+        isRouteWithin("/admin/sets"),
+    },
+  ];
 
-  // Dropdown menu items are body-role text (Public Sans 14/400 — the
-  // `DropdownMenuItem` default in docs/design/TYPOGRAPHY.md §5), not navbar
-  // links: `.font-nav` is reserved for the global navbar link row itself
-  // (§1), and the same role is shared by the account menu and the notification
-  // rows so all four dropdowns read as one family.
-  const linkStyles =
-    "text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-border-focus w-full px-3 py-2 text-sm";
+  // OPT-681: a nav link is a full-height section of the bar, not a pill riding
+  // inside it. `h-full` — not a literal `h-navbar` — keeps the block inside the
+  // nav's border box, so the gold bottom rule stays unbroken beneath it.
+  // `rounded-none` squares it off: a block that meets both edges of the bar has
+  // no free corner left to round, and the 2px chrome radius applied to the two
+  // corners that remain would read as a rendering artifact rather than intent.
+  //
+  // The geometry is overridden here rather than in the shared
+  // `navigationMenuTriggerStyle()` because the account-menu trigger renders
+  // through that same style and must stay a compact control in the actions
+  // cluster.
+  //
+  // Focus: the shared style's inset outline (`focus-visible:outline-2
+  // -outline-offset-2 outline-border-focus`) is the navbar's standardized
+  // indicator and draws inside the block, so it survives at full height without
+  // a ring layered on top of it. Nothing here sets `outline-none` — in Tailwind
+  // v4 that sets `--tw-outline-style: none` and would defeat the indicator.
+  const navLinkStyles =
+    "font-nav flex h-full items-center justify-center rounded-none bg-transparent px-3 py-0 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse sm:px-4";
+  const activeNavLinkStyles =
+    "bg-surface-2 text-gold-600 hover:text-gold-600 focus:text-gold-600";
 
   return (
     // The bar itself is edge to edge (OPT-649) and sits above the friends
@@ -72,127 +79,48 @@ export function Navbar() {
         data-slot="navbar-content"
         className="flex h-full w-full items-center px-2 sm:px-6"
       >
+        {/* `viewport={false}`: with the menus gone there is no panel left for
+            Radix to measure, position, or animate — only the link row. */}
         <NavigationMenu
-          value={activeMenu}
-          onValueChange={handleMenuChange}
-          className="max-w-none min-w-0 flex-1 justify-start"
+          viewport={false}
+          className="h-full max-w-none min-w-0 flex-1 justify-start"
         >
           <div
             data-slot="navbar-links-scroller"
-            className="min-w-0 flex-1 overflow-x-auto"
+            // The height chain from the nav down to each link has to be
+            // unbroken, or the sections stop short of the bar's edges.
+            // `[&>div]:h-full` is the one link in that chain we cannot reach
+            // through a component prop: Radix wraps `NavigationMenuList`'s
+            // `<ul>` in an inline-styled indicator-track `<div>` that takes no
+            // className, and its auto height would make every `h-full` below it
+            // resolve to auto.
+            //
+            // The scrollbar is hidden rather than left to the global styling:
+            // at narrow widths a classic 8px horizontal bar would shorten this
+            // scroller's content box and lift every section off the nav's
+            // bottom edge.
+            className="h-full min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>div]:h-full"
           >
-            <NavigationMenuList className="w-max justify-start gap-1">
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <DeckNavigationGuardLink
-                    href="/"
-                    aria-current={pathname === "/" ? "page" : undefined}
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      triggerStyles,
-                      pathname === "/" && activeTriggerStyles
-                    )}
-                  >
-                    Home
-                  </DeckNavigationGuardLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <DeckNavigationGuardLink
-                    href="/lobbies"
-                    aria-current={playActive ? "page" : undefined}
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      triggerStyles,
-                      playActive && activeTriggerStyles
-                    )}
-                  >
-                    Play
-                  </DeckNavigationGuardLink>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-
-              <NavigationMenuItem value="decks">
-                <NavigationMenuTrigger
-                  data-active={decksActive || undefined}
-                  aria-current={decksActive ? "page" : undefined}
-                  className={cn(
-                    triggerStyles,
-                    decksActive && activeTriggerStyles,
-                    anchoredMenu === "decks" && "navbar-dropdown-anchor"
-                  )}
-                >
-                  Decks
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <NavbarDropdownSurface>
-                    <ul className="flex w-48 flex-col p-1">
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <DeckNavigationGuardLink
-                            href="/decks"
-                            className={linkStyles}
-                          >
-                            Decks
-                          </DeckNavigationGuardLink>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <DeckNavigationGuardLink
-                            href="/decks/new"
-                            className={linkStyles}
-                          >
-                            + New Deck
-                          </DeckNavigationGuardLink>
-                        </NavigationMenuLink>
-                      </li>
-                    </ul>
-                  </NavbarDropdownSurface>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-
-              <NavigationMenuItem value="cards">
-                <NavigationMenuTrigger
-                  data-active={cardsActive || undefined}
-                  aria-current={cardsActive ? "page" : undefined}
-                  className={cn(
-                    triggerStyles,
-                    cardsActive && activeTriggerStyles,
-                    anchoredMenu === "cards" && "navbar-dropdown-anchor"
-                  )}
-                >
-                  Cards
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <NavbarDropdownSurface>
-                    <ul className="flex w-48 flex-col p-1">
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <DeckNavigationGuardLink
-                            href="/cards"
-                            className={linkStyles}
-                          >
-                            All Cards
-                          </DeckNavigationGuardLink>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <DeckNavigationGuardLink
-                            href="/sets"
-                            className={linkStyles}
-                          >
-                            Sets
-                          </DeckNavigationGuardLink>
-                        </NavigationMenuLink>
-                      </li>
-                    </ul>
-                  </NavbarDropdownSurface>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
+            {/* No gap: adjacent sections have to touch, or the nav background
+                shows through between them as a seam. */}
+            <NavigationMenuList className="h-full w-max justify-start">
+              {navLinks.map(({ href, label, isActive }) => (
+                <NavigationMenuItem key={href} className="h-full">
+                  <NavigationMenuLink asChild>
+                    <DeckNavigationGuardLink
+                      href={href}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        navLinkStyles,
+                        isActive && activeNavLinkStyles
+                      )}
+                    >
+                      {label}
+                    </DeckNavigationGuardLink>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              ))}
             </NavigationMenuList>
           </div>
         </NavigationMenu>
