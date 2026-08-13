@@ -80,7 +80,7 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
                   >
                     <Palette className="size-4" aria-hidden="true" />
                     <span>Theme</span>
-                    <span className="text-content-tertiary ml-auto text-xs">
+                    <span className="text-content-tertiary ml-auto text-sm">
                       {themeLabel}
                     </span>
                   </div>

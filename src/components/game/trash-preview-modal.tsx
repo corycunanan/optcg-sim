@@ -51,7 +51,7 @@ export function TrashPreviewModal({
               Browse only
             </Badge>
           </div>
-          <p className="text-xs text-gb-text-dim">
+          <p className="text-sm text-gb-text-dim">
             Cards in this preview are not selectable.
           </p>
         </DialogHeader>

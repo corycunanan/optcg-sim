@@ -23,7 +23,7 @@ function formatPower(power: number): string {
 /** Inside-scaled-subtree override for the shared `GameButton` primitive
  *  (OPT-346). Lifts the button text to the in-board `text-base` floor and the
  *  focus ring to `ring-4` so both stay legible at the 1280×640 floor scale.
- *  Chrome consumers (modals) keep the primitive's `text-xs`/`ring-2`. */
+ *  Chrome consumers (modals) keep the primitive's `text-sm`/`ring-2`. */
 const IN_BOARD_BTN = "text-base focus-visible:ring-4";
 
 const BattleDisplay = React.memo(function BattleDisplay({

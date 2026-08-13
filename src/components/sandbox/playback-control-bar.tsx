@@ -107,7 +107,7 @@ export function PlaybackControlBar({
       {!isPlayground && (
         <div
           className={cn(
-            "ml-auto text-xs tabular-nums",
+            "ml-auto text-sm tabular-nums",
             isEnded ? "text-content-secondary" : "text-content-tertiary",
           )}
           data-testid="playback-step-counter"

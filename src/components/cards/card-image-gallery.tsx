@@ -115,7 +115,7 @@ export function CardImageGallery({
                   />
                   <div
                     className={cn(
-                      "p-1 text-center text-xs font-medium",
+                      "p-1 text-center text-sm font-medium",
                       isSelected
                         ? "bg-surface-interactive text-content-primary"
                         : "bg-card text-content-tertiary",

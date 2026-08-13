@@ -142,7 +142,7 @@ export function DeckBuilderList({
         <p className="text-content-tertiary text-sm">
           No cards in deck yet
         </p>
-        <p className="text-content-tertiary mt-1 text-xs">
+        <p className="text-content-tertiary mt-1 text-sm">
           Click cards from the search panel to add them
         </p>
       </div>
@@ -198,7 +198,7 @@ export function DeckBuilderList({
                       >
                         −
                       </Button>
-                      <span className="text-content-primary min-w-4 text-center text-xs font-semibold tabular-nums">
+                      <span className="text-content-primary min-w-4 text-center text-sm font-semibold tabular-nums">
                         {group.count}
                       </span>
                       <Button

@@ -259,8 +259,8 @@ Both display and body are self-hosted from `src/app/fonts/` through `next/font/l
 ### Core Rules (details in TYPOGRAPHY.md)
 
 1. Text picks a **role** from the TYPOGRAPHY.md ramp, not an ad-hoc size/weight combination.
-2. Strict size scale — no custom `text-[Xpx]` values in components. Minimum 12px (`text-xs`).
-   - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses chrome's 12px floor to ~7px effective. Inside `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body text. Chrome keeps the 12px floor. See §13.
+2. Strict size scale — no custom `text-[Xpx]` values in components. **The chrome floor is 14px (`text-sm`)** (OPT-671); `text-xs` (12px) is reserved for badge internals (`Badge`, the effect-notation chip, the color chip) and is enforced by the `type-floor` rule in `scripts/lint-design-system.mjs`.
+   - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses a 14px chrome size to ~8px effective. Inside `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body text. Chrome keeps the 14px floor. See §13.
 3. Public Sans renders only 400/500/600 — `font-bold`+ is not part of the sans system.
 4. Uppercase sans always carries tracking (`tracking-widest` ≤ `text-sm`, `tracking-wider` at `text-base`/`text-lg`); `.font-display` is atomic and never modified.
 5. Body text max line-length: 65-75 characters (`max-w-prose`).
@@ -776,17 +776,17 @@ Inside the scaled subtree only — anything that renders within `<ScaledBoard>` 
 
 | Element | Chrome floor | Inside-board floor | Rationale |
 |---------|--------------|--------------------|-----------|
-| Labels, counters, badges | `text-xs` (12px) | **`text-base` (16px)** | ~9.5px effective at floor scale |
-| Body / paragraph text | `text-xs` (12px) | **`text-lg` (18px)** | ~10.7px effective at floor scale |
+| Labels, counters, badges | `text-sm` (14px) | **`text-base` (16px)** | ~9.5px effective at floor scale |
+| Body / paragraph text | `text-sm` (14px) | **`text-lg` (18px)** | ~10.7px effective at floor scale |
 | Focus rings | `ring-2` (2px) | **`ring-4` (4px)** | ~2.4px effective at floor scale |
 
-**What stays as chrome (12px / `ring-2`):**
+**What stays as chrome (14px / `ring-2`):**
 
 - The board navbar (rendered at design pixels, not inside the scaled wrapper).
 - All Radix-portaled overlays — modals, tooltips, popovers, dropdown menus — because Radix `Portal` renders them outside the transformed parent (see `<PortalRoot>` in OPT-309).
 - Side panels and chat sidebars consumed by the `<LiveGameShell>`.
 
-**Primitive consumers (`GameButton`):** the `GameButton` primitive is shared between in-board (mid-zone, redistribute overlay) and chrome (modals, error boundaries) consumers. The primitive's defaults are tuned for chrome (`text-xs` / `ring-2`); in-board call sites pass `className="text-base focus-visible:ring-4"` (centralized as `IN_BOARD_BTN`) so chrome consumers stay unaffected.
+**Primitive consumers (`GameButton`):** the `GameButton` primitive is shared between in-board (mid-zone, redistribute overlay) and chrome (modals, error boundaries) consumers. The primitive's defaults are tuned for chrome (`text-sm` / `ring-2`); in-board call sites pass `className="text-base focus-visible:ring-4"` (centralized as `IN_BOARD_BTN`) so chrome consumers stay unaffected.
 
 ---
 

@@ -163,7 +163,7 @@ function SpectatorMatchComplete({
           aria-live="polite"
           className="flex flex-col items-center gap-3"
         >
-          <span className="text-gb-text-subtle text-xs font-semibold tracking-widest uppercase">
+          <span className="text-gb-text-subtle text-sm font-semibold tracking-widest uppercase">
             Match complete
           </span>
           <h2 className="text-gb-accent-amber font-display text-3xl">
@@ -207,7 +207,7 @@ function SpectatorPromptStatus({
           {describePromptDecision(prompt)}…
         </span>
         {timedDecision && (
-          <span className="text-gb-text-dim text-xs">
+          <span className="text-gb-text-dim text-sm">
             Timed decision in progress
           </span>
         )}
@@ -322,7 +322,7 @@ function PassiveRoll({
       >
         {value}
       </div>
-      <span className="text-gb-text-dim text-xs font-semibold tracking-widest uppercase">
+      <span className="text-gb-text-dim text-sm font-semibold tracking-widest uppercase">
         {name}
       </span>
     </div>

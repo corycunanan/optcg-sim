@@ -45,7 +45,7 @@ export default async function LoginPage({
               {/* Divider */}
               <div className="my-5 flex items-center gap-3">
                 <div className="border-border flex-1 border-t" />
-                <span className="text-content-tertiary text-xs">or</span>
+                <span className="text-content-tertiary text-sm">or</span>
                 <div className="border-border flex-1 border-t" />
               </div>
 
@@ -55,7 +55,7 @@ export default async function LoginPage({
             <AuthUnavailableAlert />
           )}
 
-          <p className="text-content-tertiary mt-4 text-center text-xs">
+          <p className="text-content-tertiary mt-4 text-center text-sm">
             By signing in, you agree to our terms of use
           </p>
         </div>

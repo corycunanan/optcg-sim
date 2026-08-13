@@ -246,7 +246,7 @@ export function SelectTargetModal({
         </TooltipProvider>
 
         <DialogFooter className="border-gb-border flex-row items-center justify-between border-t px-4 py-3 pt-3">
-          <span className="text-gb-text-dim text-xs">
+          <span className="text-gb-text-dim text-sm">
             {model.countLabel}
             {model.selectedCount > 0 && (
               <span className="text-gb-text-subtle ml-1">

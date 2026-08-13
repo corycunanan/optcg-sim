@@ -13,7 +13,7 @@ import { CardTooltip } from "../use-card-tooltip";
 import { CardTooltipContent } from "./card-tooltip-content";
 
 const EFFECT_WRAPPER_CLASS =
-  "text-gb-text flex flex-col gap-3 text-xs leading-relaxed";
+  "text-gb-text flex flex-col gap-3 text-sm leading-relaxed";
 const LEGACY_EFFECT_TEXT =
   "[On Play] Draw 1 card.  \n[Activate: Main] Rest this card. \t\n\nTrailing paragraph.  ";
 

@@ -94,7 +94,7 @@ export default function OnboardingPage() {
                 placeholder="pirate_king"
                 autoFocus
               />
-              <p className="text-content-tertiary mt-2 text-xs">
+              <p className="text-content-tertiary mt-2 text-sm">
                 3–20 characters. Letters, numbers, hyphens, underscores.
               </p>
             </div>

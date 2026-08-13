@@ -198,7 +198,7 @@ export function DeckBuilderSearch({
             <select
               value={activeType}
               onChange={(e) => setActiveType(e.target.value)}
-              className="border-border bg-card text-content-secondary focus:border-border-focus rounded-md border px-2 py-1 text-xs focus:outline-none"
+              className="border-border bg-card text-content-secondary focus:border-border-focus rounded-md border px-2 py-1 text-sm focus:outline-none"
             >
               <option value="">All Types</option>
               {TYPES.map((t) => (
@@ -216,9 +216,9 @@ export function DeckBuilderSearch({
                 placeholder="Min"
                 value={costMin}
                 onChange={(e) => setCostMin(e.target.value)}
-                className="h-7 w-14 px-2 text-xs"
+                className="h-7 w-14 px-2"
               />
-              <span className="text-content-tertiary text-xs">-</span>
+              <span className="text-content-tertiary text-sm">-</span>
               <Input
                 type="number"
                 min={0}
@@ -226,15 +226,15 @@ export function DeckBuilderSearch({
                 placeholder="Max"
                 value={costMax}
                 onChange={(e) => setCostMax(e.target.value)}
-                className="h-7 w-14 px-2 text-xs"
+                className="h-7 w-14 px-2"
               />
-              <span className="text-content-tertiary text-xs">Cost</span>
+              <span className="text-content-tertiary text-sm">Cost</span>
             </div>
           </div>
         </div>
 
         {/* Results count */}
-        <div className="text-content-tertiary px-3 pb-1 text-xs">
+        <div className="text-content-tertiary px-3 pb-1 text-sm">
           {queryTooShort
             ? `Enter at least ${MIN_SUBSTRING_SEARCH_LENGTH} characters`
             : isLoading
@@ -252,7 +252,7 @@ export function DeckBuilderSearch({
               <p className="text-sm font-medium text-error">
                 Couldn&rsquo;t load cards
               </p>
-              <p className="text-content-tertiary mt-1 text-xs">
+              <p className="text-content-tertiary mt-1 text-sm">
                 Check your connection, then retry.
               </p>
               <button
@@ -266,7 +266,7 @@ export function DeckBuilderSearch({
                     costMax
                   )
                 }
-                className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary mt-4 rounded-md border px-3 py-1 text-xs font-medium transition-colors"
+                className="border-border text-content-secondary hover:bg-secondary hover:text-content-primary mt-4 rounded-md border px-3 py-1 text-sm font-medium transition-colors"
               >
                 Retry
               </button>
@@ -278,7 +278,7 @@ export function DeckBuilderSearch({
             results.length === 0 && (
               <div className="py-10 text-center">
                 <p className="text-content-tertiary text-sm">No cards match</p>
-                <p className="text-content-tertiary mt-1 text-xs">
+                <p className="text-content-tertiary mt-1 text-sm">
                   Try a different search or clear some filters.
                 </p>
               </div>
@@ -323,18 +323,18 @@ export function DeckBuilderSearch({
                             loading="lazy"
                           />
                           {qtyInDeck > 0 && (
-                            <div className="bg-primary text-primary-foreground absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded text-xs font-semibold">
+                            <div className="bg-primary text-primary-foreground absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded text-sm font-semibold">
                               {qtyInDeck}
                             </div>
                           )}
                         </div>
                         {/* Mini info */}
                         <div className="px-2 py-1">
-                          <p className="text-content-primary truncate text-xs leading-tight font-semibold">
+                          <p className="text-content-primary truncate text-sm leading-tight font-semibold">
                             {card.name}
                           </p>
                           <div className="flex items-center gap-1">
-                            <span className="text-content-tertiary text-xs">
+                            <span className="text-content-tertiary text-sm">
                               {card.id}
                             </span>
                           </div>
@@ -379,7 +379,7 @@ export function DeckBuilderSearch({
               >
                 ←
               </Button>
-              <span className="text-content-tertiary px-2 text-xs tabular-nums">
+              <span className="text-content-tertiary px-2 text-sm tabular-nums">
                 {page} / {totalPages}
               </span>
               <Button

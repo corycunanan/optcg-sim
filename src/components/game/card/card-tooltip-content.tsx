@@ -73,7 +73,7 @@ function splitClauseBadges(line: string): ClauseParts {
 
 function TooltipBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="bg-gb-surface-raised inline-flex px-2 py-1 text-xs font-semibold tracking-widest uppercase">
+    <span className="bg-gb-surface-raised inline-flex px-2 py-1 text-sm font-semibold tracking-widest uppercase">
       {children}
     </span>
   );
@@ -99,7 +99,7 @@ function TooltipStat({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-gb-text-subtle text-xs font-semibold tracking-widest uppercase">
+      <span className="text-gb-text-subtle text-sm font-semibold tracking-widest uppercase">
         {label}
       </span>
       <span className="text-gb-text-bright flex items-center gap-1 text-sm font-semibold tabular-nums">
@@ -133,7 +133,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   const activeEffects = useActiveEffects();
   const { getCardAvailability, getEffectStatus } = useEffectAvailability();
 
-  if (!data) return <span className="text-gb-text-muted text-xs">Unknown card</span>;
+  if (!data) return <span className="text-gb-text-muted text-sm">Unknown card</span>;
   const isFieldCard = data.type === "Leader" || data.type === "Character";
   const donCount = attachedDonCount ?? card?.attachedDon.length ?? 0;
   const basePower = data.power ?? 0;
@@ -165,7 +165,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   return (
     <div className="flex flex-col gap-4 font-sans">
       {notice && (
-        <div className="bg-gb-surface-raised text-gb-accent-amber px-2 py-1 text-xs font-semibold">
+        <div className="bg-gb-surface-raised text-gb-accent-amber px-2 py-1 text-sm font-semibold">
           {notice}
         </div>
       )}
@@ -174,7 +174,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
         <div className="text-gb-text-bright text-base font-semibold">
           {data.name}
         </div>
-        <div className="text-gb-text-subtle text-xs font-semibold tracking-widest uppercase">
+        <div className="text-gb-text-subtle text-sm font-semibold tracking-widest uppercase">
           {data.type} &middot; {cardId}
         </div>
       </div>
@@ -230,7 +230,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
       )}
 
       {data.effectText && (
-        <div className="text-gb-text flex flex-col gap-3 text-xs leading-relaxed">
+        <div className="text-gb-text flex flex-col gap-3 text-sm leading-relaxed">
           {(() => {
             let clauseIndex = 0;
 

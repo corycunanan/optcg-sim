@@ -87,7 +87,7 @@ export function MulliganModal({
                       />
                     ) : (
                       <div className="bg-gb-surface-raised flex h-full w-full items-center justify-center p-2">
-                        <span className="text-gb-text-dim text-center text-xs">
+                        <span className="text-gb-text-dim text-center text-sm">
                           {data?.name ?? card.cardId}
                         </span>
                       </div>

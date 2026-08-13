@@ -185,7 +185,7 @@ export function LobbySeatCard({
           <h2 className="text-content-primary truncate text-lg font-semibold">
             {playerName}
           </h2>
-          <p className="text-gold-600 mt-1 text-xs font-semibold tracking-widest uppercase">
+          <p className="text-gold-600 mt-1 text-sm font-semibold tracking-widest uppercase">
             {role}
           </p>
         </div>
@@ -350,7 +350,7 @@ function ReadyControl({
     return (
       <p
         className={cn(
-          "flex min-h-10 shrink-0 items-center gap-2 text-xs font-semibold tracking-widest uppercase",
+          "flex min-h-10 shrink-0 items-center gap-2 text-sm font-semibold tracking-widest uppercase",
           ready ? "text-success" : "text-content-tertiary",
           className
         )}
@@ -512,7 +512,7 @@ function LeaderCaption({
     <div
       className={cn("w-full min-w-0 shrink-0 lg:w-48 lg:text-center", className)}
     >
-      <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+      <p className="text-content-tertiary text-sm font-semibold tracking-widest uppercase">
         Leader
       </p>
       <p

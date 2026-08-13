@@ -80,7 +80,7 @@ export function NavMenu({
         <DropdownMenuItem
           onClick={onLeave}
           disabled={leaving}
-          className="text-gb-text focus:bg-gb-surface-raised text-xs"
+          className="text-gb-text focus:bg-gb-surface-raised"
         >
           {spectator
             ? leaving
@@ -91,7 +91,7 @@ export function NavMenu({
         {!matchClosed && onConcede && (
           <DropdownMenuItem
             onClick={() => setConcedeOpen(true)}
-            className="text-gb-accent-red focus:bg-gb-surface-raised focus:text-gb-accent-red text-xs"
+            className="text-gb-accent-red focus:bg-gb-surface-raised focus:text-gb-accent-red"
           >
             Concede
           </DropdownMenuItem>

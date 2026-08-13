@@ -53,7 +53,7 @@ export default async function AdminPage() {
         {/* Distribution */}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="border-border bg-card rounded-lg border p-5">
-            <h2 className="text-content-tertiary mb-4 text-xs font-semibold tracking-widest uppercase">
+            <h2 className="text-content-tertiary mb-4 text-sm font-semibold tracking-widest uppercase">
               By Type
             </h2>
             <div className="space-y-3">
@@ -85,7 +85,7 @@ export default async function AdminPage() {
           </div>
 
           <div className="border-border bg-card rounded-lg border p-5">
-            <h2 className="text-content-tertiary mb-4 text-xs font-semibold tracking-widest uppercase">
+            <h2 className="text-content-tertiary mb-4 text-sm font-semibold tracking-widest uppercase">
               By Block
             </h2>
             <div className="space-y-3">
@@ -134,7 +134,7 @@ function StatBox({
     <div
       className={`border-border bg-card rounded-lg border p-5 transition-colors ${href ? "hover:bg-secondary cursor-pointer" : ""}`}
     >
-      <div className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+      <div className="text-content-tertiary text-sm font-semibold tracking-widest uppercase">
         {label}
       </div>
       <div className="text-content-primary mt-2 text-3xl font-semibold tracking-tight tabular-nums">

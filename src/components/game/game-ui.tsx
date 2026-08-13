@@ -18,13 +18,13 @@ export function TooltipStat({
       <div className={`flex items-center justify-center gap-1 font-semibold text-sm ${colorClass}`}>
         <span>{String(value)}</span>
         {modified === "up" && (
-          <span className="text-xs leading-none">&#x25B2;</span>
+          <span className="text-sm leading-none">&#x25B2;</span>
         )}
         {modified === "down" && (
-          <span className="text-xs leading-none">&#x25BC;</span>
+          <span className="text-sm leading-none">&#x25BC;</span>
         )}
       </div>
-      <div className="text-xs font-semibold text-gb-text-muted uppercase tracking-widest">
+      <div className="text-sm font-semibold text-gb-text-muted uppercase tracking-widest">
         {label}
       </div>
     </div>

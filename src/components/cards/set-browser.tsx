@@ -47,7 +47,7 @@ export async function SetBrowser({ cardsRoute }: SetBrowserProps) {
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         {Object.entries(grouped).map(([prefix, groupSets]) => (
           <div key={prefix} className="mb-10">
-            <h2 className="text-content-tertiary mb-4 text-xs font-semibold tracking-widest uppercase">
+            <h2 className="text-content-tertiary mb-4 text-sm font-semibold tracking-widest uppercase">
               {prefixLabels[prefix] || prefix}
             </h2>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -58,10 +58,10 @@ export async function SetBrowser({ cardsRoute }: SetBrowserProps) {
                   className="border-border bg-surface-1 flex items-center justify-between rounded-lg border p-4 transition-all hover:-translate-y-px hover:shadow-md"
                 >
                   <div>
-                    <span className="text-content-primary font-mono text-xs font-semibold">
+                    <span className="text-content-primary font-mono text-sm font-semibold">
                       {set.setLabel}
                     </span>
-                    <p className="text-content-tertiary mt-1 text-xs">
+                    <p className="text-content-tertiary mt-1 text-sm">
                       {set.setName}
                     </p>
                   </div>

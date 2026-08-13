@@ -19,7 +19,7 @@ Tailwind wiring (`globals.css` `@theme`): `--font-sans → --font-public-sans`, 
 ### Why these fonts
 
 - **Erode** carries the brand: an expressive serif whose uppercase 600 treatment reads adventurous without being pirate-kitsch. Self-hosted, `font-display: swap`.
-- **Public Sans** (USWDS, SIL OFL) replaced Geist Sans in 2026-08. Rationale: Geist's geometric neutrality read generic against Erode; Public Sans — a Libre Franklin descendant — has warmer, more editorial letterforms, a tall x-height that holds up at our 12px floor, true tabular figures, and a full variable range. Self-hosted like Erode, so builds have no font network dependency.
+- **Public Sans** (USWDS, SIL OFL) replaced Geist Sans in 2026-08. Rationale: Geist's geometric neutrality read generic against Erode; Public Sans — a Libre Franklin descendant — has warmer, more editorial letterforms, a tall x-height that holds up at small sizes, true tabular figures, and a full variable range. Self-hosted like Erode, so builds have no font network dependency.
 - **Geist Mono** stays: it is only used for machine-flavored strings (codes, digests) where its neutrality is a feature.
 
 ### The `.font-display` lock
@@ -32,7 +32,7 @@ Tailwind wiring (`globals.css` `@theme`): `--font-sans → --font-public-sans`, 
 
 ## 2. The Type Ramp (roles)
 
-Sizes come from the strict Tailwind scale — 12/14/16/18/20/24/30/36/48/60px. No `text-[Xpx]`, ever. Chrome roles first; §6 lifts the floor inside the scaled game board.
+Sizes come from the strict Tailwind scale — 12/14/16/18/20/24/30/36/48/60px. No `text-[Xpx]`, ever. **The chrome floor is `text-sm` (14px)** (OPT-671): 12px is reserved for badge internals and is the `badge` role's alone. Chrome roles first; §6 lifts the floor further inside the scaled game board.
 
 ### Display roles — Erode, uppercase (never below `text-xl`)
 
@@ -52,17 +52,17 @@ Sizes come from the strict Tailwind scale — 12/14/16/18/20/24/30/36/48/60px. N
 | `body` | `text-sm` | 14/400 | Default UI body — descriptions, table cells, chat, list rows. Multi-line prose adds `leading-relaxed` and caps line length with `max-w-prose`. |
 | `body-lg` | `text-base leading-relaxed` | 16/400 | Long-form or featured copy on content pages; the body floor inside the game board. |
 | `label` | `text-sm font-medium text-content-secondary` | 14/500 | Form field labels, menu labels, key–value keys. Canonical primitive: `Label` (`@/components/ui`). |
-| `overline` | `text-xs font-semibold uppercase tracking-widest text-content-tertiary` | 12/600 | Eyebrows, filter-group headers, zone/stat group titles, kicker text above headings. The only sanctioned uppercase sans treatment at 12px. |
-| `caption` | `text-xs text-content-tertiary` | 12/400 | Timestamps, metadata, helper/hint text. Use `text-content-secondary` when it must stay readable against adjacent body text. |
-| `badge` | `text-xs font-medium` | 12/500 | Badge/pill content. `Badge` primitive default; never uppercase a badge via the primitive — content may be user text. |
+| `overline` | `text-sm font-semibold uppercase tracking-widest text-content-tertiary` | 14/600 | Eyebrows, filter-group headers, zone/stat group titles, kicker text above headings. The only sanctioned uppercase sans treatment at the 14px floor. |
+| `caption` | `text-sm text-content-tertiary` | 14/400 | Timestamps, metadata, helper/hint text. Use `text-content-secondary` when it must stay readable against adjacent body text. |
+| `badge` | `text-xs font-medium` | 12/500 | Badge/pill content, and the **only** sanctioned 12px in the product (OPT-671). `Badge` primitive default; never uppercase a badge via the primitive — content may be user text. |
 
 ### Mono roles — Geist Mono
 
 | Role | Recipe | Usage |
 |------|--------|-------|
-| `code` | `font-mono text-xs font-semibold` | Card/set IDs (`OP01-001`), inline technical values. |
+| `code` | `font-mono text-sm font-semibold` | Card/set IDs (`OP01-001`), inline technical values. Inside a `text-sm` container the size class is omitted and inherited. |
 | `code-entry` | `font-mono text-sm font-semibold tracking-widest` | Lobby join codes and other human-transcribed codes. |
-| `code-block` | `font-mono text-xs break-all` | Error digests (already consistent app-wide); `font-mono text-sm` for deck import/export textareas. |
+| `code-block` | `font-mono text-sm break-all` | Error digests (already consistent app-wide) and deck import/export textareas. |
 
 ---
 
@@ -86,11 +86,11 @@ Tracking is a function of size — one rule, no judgment calls:
 
 | Context | Tracking |
 |---------|----------|
-| Uppercase sans at `text-xs` / `text-sm` | `tracking-widest` (0.1em) |
+| Uppercase sans at `text-sm` | `tracking-widest` (0.1em) |
 | Uppercase sans at `text-base` / `text-lg` | `tracking-wider` (0.05em) |
 | Uppercase sans above `text-lg` | Don't. Use a display role — Erode owns large uppercase. |
 | `.font-display` (any size) | Built-in 0.025em. Never add `tracking-*`. |
-| Mixed-case text | No tracking, with two exceptions: `code-entry` (above) and keyboard-shortcut hints (`text-xs tracking-widest` in menus). |
+| Mixed-case text | No tracking, with two exceptions: `code-entry` (above) and keyboard-shortcut hints (`text-sm tracking-widest` in menus). |
 
 Corollaries: **uppercase never ships without tracking**, and `tracking-widest` never appears above `text-sm`. `leading-none` is reserved for single-line display heroes; multi-line body always gets `leading-relaxed`.
 
@@ -100,7 +100,7 @@ What each primitive bakes in — components should rely on these, not re-specify
 
 | Primitive | Default | Role |
 |-----------|---------|------|
-| `Button` | `text-sm font-semibold` (`sm` → `text-xs font-medium`, `lg` → `text-base font-semibold`) | label |
+| `Button` | `text-sm font-semibold` (`sm` → `text-sm font-medium`, inherited from the base; `lg` → `text-base font-semibold`) | label |
 | `Badge` | `text-xs font-medium` | badge |
 | `Label` | `text-sm font-medium text-content-secondary` | label |
 | `DialogTitle` / `AlertDialogTitle` / `SheetTitle` | `text-lg font-semibold text-content-primary` | heading |
@@ -110,13 +110,13 @@ What each primitive bakes in — components should rely on these, not re-specify
 | `PageHeaderTitle` | `font-display text-3xl` | title-page |
 | `PageHeaderDescription` | `text-sm text-content-secondary` | body |
 | `TabsTrigger` | `text-sm font-medium` | label |
-| `TooltipContent` | `text-xs` (weight 400) | caption |
+| `TooltipContent` | `text-sm` (weight 400) | caption |
 | `Input` / `Select` / `DropdownMenuItem` / `CommandItem` / Popover / HoverCard | `text-sm` | body |
 | `DropdownMenuLabel` | `text-sm font-medium` | label |
-| `SelectLabel` / Command group heading | `text-xs` group heading (target: overline recipe — migration §7) | overline |
-| `DropdownMenuShortcut` / `CommandShortcut` | `text-xs tracking-widest` | (shortcut exception, §4) |
-| Toast (`sonner.tsx`) | title `text-sm font-medium`, description `text-xs text-content-secondary` | label / caption |
-| `AvatarFallback` | `text-sm` (`sm` → `text-xs`) | body |
+| `SelectLabel` / Command group heading | `text-sm` group heading (target: overline recipe — migration §7) | overline |
+| `DropdownMenuShortcut` / `CommandShortcut` | `text-sm tracking-widest` | (shortcut exception, §4) |
+| Toast (`sonner.tsx`) | title `text-sm font-medium`, description `text-sm text-content-secondary` | label / caption |
+| `AvatarFallback` | `text-sm` at every size | body |
 
 Known quirk: `Textarea` is the only primitive with responsive sizing (`text-base md:text-sm`, vendored shadcn iOS-zoom guard). Leave it.
 
@@ -132,7 +132,7 @@ Inside the `<ScaledBoard>` / `BoardLayout` scaled subtree the board renders at ~
 | heading (on-board overlays) | `text-base`–`text-lg` `font-semibold`; spotlight moments may use `font-display text-3xl` (deliberate hero exception) |
 
 Portaled content (tooltips, modals, popovers) is chrome and keeps chrome roles, even when triggered from the board. Full override table: `BRANDING-GUIDELINES.md` §13.
-`NavMenu` dropdown content is portaled outside `<ScaledBoard>` and keeps its chrome `text-xs` menu-item role.
+`NavMenu` dropdown content is portaled outside `<ScaledBoard>` and keeps the chrome floor — its items inherit `DropdownMenuItem`'s `text-sm`.
 `BoardNavbar` is native-size chrome rendered outside the `zoom: boardScale` wrappers (scope-doc decision #3; see the `ScaledBoard` OPT-349 comment) and keeps chrome roles and sizes.
 
 ## 7. Numbers, Prose, and Misc
@@ -147,13 +147,13 @@ Portaled content (tooltips, modals, popovers) is chrome and keeps chrome roles, 
 
 State of the codebase at audit time (2026-08-09): the documented ramp existed nowhere; the items below are ordered by visibility. Each maps existing treatments → a §2 role.
 
-1. **Modal titles** — 7 treatments spanning 12–30px. Target: bare `DialogTitle` (heading role) everywhere. Offenders: `trash-preview-modal`, `arrange-top-cards-modal`, `select-target-modal`, `player-choice-modal`, `life-preview-modal` (`text-sm font-bold`); `optional-effect-modal`, `reveal-trigger-modal` (`text-xs` overline-as-title); `mulligan-modal` (`text-2xl font-bold tracking-widest uppercase`); `card-detail-modal` (`text-xl font-bold tracking-tight`); `game-overlay-gate:107` (tracking without uppercase). `spotlight-overlay`'s `font-display text-3xl` is the sanctioned hero exception.
+1. **Modal titles** — ✅ done. Every dialog listed at audit time (`trash-preview-modal`, `arrange-top-cards-modal`, `select-target-modal`, `player-choice-modal`, `life-preview-modal`, `optional-effect-modal`, `reveal-trigger-modal`, `mulligan-modal`, `card-detail-modal`) now renders a bare `DialogTitle` (heading role) with at most a color class. `spotlight-overlay`'s `font-display text-3xl` remains the sanctioned hero exception.
 2. **Eyebrows/overlines** — canonize the dominant recipe (overline role, already ~25 sites). Fix the 6 deviant variants: `font-bold` (`scenario-info-panel`, `event-log:178`, `live-game-shell:420`, `preview/card:358`), `font-medium` (`test-order-editor`, `card-info-panel:52,164`), weightless (`game-ui:27`, `deck-preview-modal:74`, `deck-builder-list:116`, `priority-roll-display:97`, `game-overlay-gate:325`), tracking-less (`pregame-settings:113`). `card-info-panel` (Tier-5 surface, post-audit) also uses `font-bold` for stat values and its name row — target `font-semibold` per §3.
 3. **Page titles** — collapse 6 sizes onto `title-page` (text-3xl) via `PageHeader`; heroes stay per §2. Migrate `lobby-room-shell:429,826` + `onboarding` + `preview/card` (text-4xl → text-3xl), `admin/cards/[id]:81` (text-2xl → text-3xl). Give `min-viewport-gate:34` and `sandbox-shell:51` real h1 treatment or demote the element.
 4. **`font-bold`/`font-extrabold` sweep** — 98 sites → `font-semibold` (or a role change). Mechanical once 1–3 land.
 5. **Form labels** — adopt the `Label` primitive (`login/credentials-form`, `admin/card-edit-form`, `admin/cards/new`, `pregame-settings`). Filter-group headers in `card-filters` are overlines, not labels — already correct.
 6. **Large-size tracking** — remove `tracking-widest` at `text-2xl`/`text-3xl` (`priority-roll-display:31`, `game-overlay-gate:256`, `mulligan-modal:49`); per §4 these become display roles or drop to `tracking-wider`≤`text-lg`.
-7. **Board navbar floor violation** — `board-navbar.tsx` (8 sites) + `nav-menu.tsx` (2) use `text-xs` inside the scaled subtree; lift to `text-base` or document an exemption in §6.
+7. **Board navbar floor** — ✅ resolved as chrome, not as an inside-board exemption. §6 records that `BoardNavbar` renders outside the scaled wrappers and `NavMenu` portals out of them, so both are chrome; OPT-671 lifted their 10 sites to the `text-sm` chrome floor.
 8. **Card names** — 5 treatments → subheading (`text-base font-semibold`) in tooltips/previews/lists; detail-modal title is a modal title (item 1).
 9. **Empty states** — 4 treatments → `text-sm text-content-tertiary` (caption color at body size).
 10. **Card/set codes** — 3 combos → `code` role (`set-filter`, `set-browser`, `card-detail-modal`, `admin/cards/[id]`).
@@ -164,10 +164,11 @@ State of the codebase at audit time (2026-08-09): the documented ramp existed no
 
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| Public Sans replaces Geist Sans as body | Geist read generic/default-AI against Erode; Public Sans is warmer, editorial, self-hostable, strong at 12px | 2026-08-09 |
+| Public Sans replaces Geist Sans as body | Geist read generic/default-AI against Erode; Public Sans is warmer, editorial, self-hostable, strong at small sizes | 2026-08-09 |
 | Geist Mono retained | Only used for machine strings; neutrality is desirable there | 2026-08-09 |
 | Sans weight ceiling = 600 | Audit found 102 semibold vs 92 bold with no rule; one structural weight ends the coin flip; Erode owns "loud" | 2026-08-09 |
 | `.font-display` stays un-overridable (unlayered) | Treatment is atomic brand expression; overridability caused the drift it now prevents | 2026-08-09 |
 | Role-based ramp over named size tokens | BRANDING §4's token ramp (`display-xl`…`caption`) was never implemented; roles map 1:1 to existing Tailwind utilities so there is nothing new to build or drift from | 2026-08-09 |
 | Responsive type reduction dropped | The 3-breakpoint table was never implemented; app is desktop-first with a min-viewport gate, hero sizes may add responsive steps case-by-case | 2026-08-09 |
 | shadcn Typeset not adopted | Prose-wrapper system for rendered markdown; wrong tool for a product type ramp | 2026-08-09 |
+| Chrome floor raised to `text-sm`; 12px reserved for badge internals | 12px was the default reflex for anything secondary, so ~200 sites of real UI copy sat at the legibility floor. 14px is the floor; a genuine 12px need is a badge, and `Badge`/effect chip/color chip own that box. Enforced by the `type-floor` rule in `scripts/lint-design-system.mjs` (OPT-671) | 2026-08-12 |

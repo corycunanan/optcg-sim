@@ -395,7 +395,7 @@ export function ChatWidget({
           <div className="bg-surface-nav min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
             {loading && (
               <p
-                className="text-content-tertiary py-6 text-center text-xs"
+                className="text-content-tertiary py-6 text-center text-sm"
                 role="status"
               >
                 Loading messages…
@@ -406,7 +406,7 @@ export function ChatWidget({
                 className="flex flex-col items-center gap-3 py-6 text-center"
                 role="alert"
               >
-                <p className="text-content-tertiary text-xs">
+                <p className="text-content-tertiary text-sm">
                   Couldn&apos;t load messages.
                 </p>
                 <Button type="button" size="sm" onClick={loadHistory}>
@@ -431,7 +431,7 @@ export function ChatWidget({
                 >
                   <div
                     className={cn(
-                      "text-content-primary max-w-[75%] rounded-lg px-3 py-2 text-xs",
+                      "text-content-primary max-w-[75%] rounded-lg px-3 py-2 text-sm",
                       isMe ? "bg-surface-base" : "bg-surface-2"
                     )}
                   >
@@ -458,7 +458,7 @@ export function ChatWidget({
           </div>
 
           {showTyping && (
-            <div className="bg-surface-nav text-content-tertiary px-3 py-1 text-xs italic">
+            <div className="bg-surface-nav text-content-tertiary px-3 py-1 text-sm italic">
               {displayName} is typing…
             </div>
           )}
@@ -475,7 +475,7 @@ export function ChatWidget({
               onChange={handleBodyChange}
               disabled={sending}
               placeholder={`Message ${displayName}...`}
-              className="bg-surface-2 h-8 flex-1 text-xs"
+              className="bg-surface-2 h-8 flex-1"
             />
             <Button
               type="submit"

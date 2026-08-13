@@ -66,7 +66,6 @@ const SHOULD_FLAG = [
 ] as const;
 
 const SHOULD_PASS = [
-  "text-xs",
   "text-[var(--text-brand)]",
   "text-[color:var(--text-brand)]",
   "[color:var(--text-brand)]",
@@ -231,6 +230,62 @@ describe("bare shadow class token", () => {
 
   it("is not double-reported by the text rules", () => {
     expect(findTextViolations('<div className="shadow" />')).toEqual([]);
+  });
+});
+
+describe("type floor", () => {
+  it.each([
+    ['<div className="text-xs" />', "className attribute"],
+    ['<p className="text-content-tertiary text-xs" />', "among other classes"],
+    ['<div className="sm:text-xs" />', "behind a responsive variant"],
+    ['<div className="data-[size=sm]:text-xs" />', "behind a data variant"],
+    ['<div className="text-xs!" />', "with the important suffix"],
+    ['cn("text-xs")', "class helper argument"],
+    ['cn(compact && "text-xs")', "logical class expression"],
+    ['clsx({ "text-xs": compact })', "clsx object key"],
+    ["<div className={`text-xs ${extra}`} />", "interpolated class list"],
+    [
+      'cva("base", { variants: { size: { sm: "h-8 text-xs" } } })',
+      "cva variant value",
+    ],
+  ])("flags %s (%s)", (source) => {
+    expect(findClassTokenViolations(source)).toEqual([
+      expect.objectContaining({ rule: "type-floor" }),
+    ]);
+  });
+
+  it.each([
+    ['<div className="text-sm" />', "the chrome floor itself"],
+    ['<div className="max-w-xs" />', "an unrelated xs scale step"],
+    ['<div className="text-xs-legacy" />', "a longer class name"],
+    [
+      'expect(el.className).not.toContain("text-xs");',
+      "an assertion that pins the floor",
+    ],
+    ['<div data-slot="text-xs" />', "non-class JSX attribute"],
+    ["<div className={`text-${size}`} />", "interpolated class name prefix"],
+  ])("leaves %s alone (%s)", (source) => {
+    expect(findClassTokenViolations(source)).toEqual([]);
+  });
+
+  it("exempts the badge-anatomy files that own the 12px box", () => {
+    expect(
+      findClassTokenViolations('<span className="rounded px-2 text-xs" />', {
+        includeTypeFloor: false,
+      })
+    ).toEqual([]);
+  });
+
+  it("keeps judging shadows in an exempt file", () => {
+    expect(
+      findClassTokenViolations('<span className="text-xs shadow" />', {
+        includeTypeFloor: false,
+      })
+    ).toEqual([expect.objectContaining({ rule: "shadow" })]);
+  });
+
+  it("is not double-reported by the text rules", () => {
+    expect(findTextViolations('<div className="text-xs" />')).toEqual([]);
   });
 });
 

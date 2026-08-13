@@ -76,10 +76,10 @@ export function SetFilter({
                 >
                   {selected && <Check className="size-3" />}
                 </span>
-                <span className="text-content-primary shrink-0 font-mono text-xs font-semibold">
+                <span className="text-content-primary shrink-0 font-mono font-semibold">
                   {s.setLabel}
                 </span>
-                <span className="text-content-secondary truncate text-xs">
+                <span className="text-content-secondary truncate">
                   {s.setName}
                 </span>
                 {selected && <span className="sr-only">selected</span>}

@@ -51,7 +51,7 @@ export function UserAvatar({
       {user.image && <AvatarImage src={user.image} alt="" />}
       <AvatarFallback
         className={cn(
-          "text-xs font-semibold",
+          "font-semibold",
           variant === "dark"
             ? "bg-navy-700 text-content-inverse"
             : "bg-secondary text-secondary-foreground",

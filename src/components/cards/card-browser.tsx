@@ -259,7 +259,7 @@ export function CardBrowser({
             </div>
             <p
               id="card-search-help"
-              className="text-content-tertiary mt-2 text-xs"
+              className="text-content-tertiary mt-2 text-sm"
             >
               {searchTooShort
                 ? "Enter at least 3 characters to search by name."

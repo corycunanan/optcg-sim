@@ -30,8 +30,8 @@ const gameButtonVariants = cva(
           "bg-transparent text-gb-text-dim border border-transparent hover:text-gb-text hover:bg-gb-surface-raised",
       },
       size: {
-        default: "h-8 px-3 text-xs",
-        sm: "h-auto px-2 py-1 text-xs",
+        default: "h-8 px-3 text-sm",
+        sm: "h-auto px-2 py-1 text-sm",
         lg: "h-12 px-6 text-base",
       },
     },

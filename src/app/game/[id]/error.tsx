@@ -21,7 +21,7 @@ export default function GameError({
         surfaceClassName="bg-gb-surface text-center"
       >
         <CardHeader>
-          <CardTitle className="text-xs font-semibold text-gb-text-subtle tracking-widest">
+          <CardTitle className="text-sm font-semibold text-gb-text-subtle tracking-widest">
             GAME ERROR
           </CardTitle>
         </CardHeader>
@@ -34,7 +34,7 @@ export default function GameError({
             on the server — returning to lobbies will not forfeit the match.
           </p>
           {error.message && (
-            <p className="text-xs text-gb-text-dim font-mono break-all">
+            <p className="text-sm text-gb-text-dim font-mono break-all">
               {error.message}
             </p>
           )}

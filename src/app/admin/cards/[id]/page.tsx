@@ -165,7 +165,7 @@ export default async function CardDetailPage({
                     key={cs.id}
                     className="flex items-center gap-2 text-sm"
                   >
-                    <span className="font-mono text-xs font-semibold text-content-primary">
+                    <span className="font-mono font-semibold text-content-primary">
                       {cs.setLabel}
                     </span>
                     <span className="text-content-tertiary">—</span>
@@ -205,7 +205,7 @@ export default async function CardDetailPage({
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-card p-3 text-center">
-      <div className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+      <div className="text-sm font-semibold uppercase tracking-widest text-content-tertiary">
         {label}
       </div>
       <div className="mt-1 text-lg font-semibold tabular-nums text-content-primary">
@@ -224,7 +224,7 @@ function Section({
 }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-content-tertiary">
         {title}
       </h3>
       {children}

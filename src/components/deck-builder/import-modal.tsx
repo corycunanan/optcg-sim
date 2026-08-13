@@ -151,7 +151,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           <DialogTitle>Import Deck</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <p className="text-content-tertiary text-xs">
+          <p className="text-content-tertiary text-sm">
             Paste your deck list below. Supports{" "}
             <code className="bg-muted rounded px-1">
               4x OP01-004
@@ -195,7 +195,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           )}
 
           {preview && (
-            <div className="border-border bg-secondary text-content-secondary rounded-md border p-3 text-xs">
+            <div className="border-border bg-secondary text-content-secondary rounded-md border p-3 text-sm">
               {preview.leader && (
                 <span>
                   Leader: <strong>{preview.leader.card.name}</strong> ·{" "}

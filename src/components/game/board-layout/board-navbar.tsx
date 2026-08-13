@@ -77,7 +77,7 @@ export function BoardNavbar({
       className="bg-gb-navbar absolute inset-x-0 top-0 z-30 flex items-center px-4"
       style={{ height: NAVBAR_H }}
     >
-      <span className="text-gb-text-bright shrink-0 text-xs font-semibold tracking-widest">
+      <span className="text-gb-text-bright shrink-0 text-sm font-semibold tracking-widest">
         OPTCG SIM
       </span>
 
@@ -86,7 +86,7 @@ export function BoardNavbar({
         role="group"
         aria-label="Turn and phase status"
       >
-        <span className="text-gb-text-bright text-xs font-semibold tabular-nums">
+        <span className="text-gb-text-bright text-sm font-semibold tabular-nums">
           <span className="sr-only">
             {turnNumber === null ? "Turn unavailable" : `Turn ${turnNumber}`}
           </span>
@@ -101,14 +101,14 @@ export function BoardNavbar({
         />
         <span
           className={cn(
-            "text-xs font-semibold",
+            "text-sm font-semibold",
             isMyTurn ? "text-gb-accent-green" : "text-gb-text-dim"
           )}
         >
           <span className="sr-only">{turnLabel}</span>
           <span aria-hidden="true">{turnLabel}</span>
         </span>
-        <span className="text-gb-accent-blue text-xs font-semibold">
+        <span className="text-gb-accent-blue text-sm font-semibold">
           <span className="sr-only">Current phase: {phaseLabel}</span>
           <span aria-hidden="true">{phaseLabel}</span>
         </span>
@@ -124,7 +124,7 @@ export function BoardNavbar({
             data-testid="board-spectator-badge"
             role="note"
             aria-label="Spectator mode: viewing only"
-            className="bg-gb-accent-amber/20 text-gb-accent-amber border-gb-accent-amber/40 rounded border px-2 py-1 text-xs font-semibold tracking-widest uppercase"
+            className="bg-gb-accent-amber/20 text-gb-accent-amber border-gb-accent-amber/40 rounded border px-2 py-1 text-sm font-semibold tracking-widest uppercase"
           >
             Spectator Mode
           </span>
@@ -134,13 +134,13 @@ export function BoardNavbar({
             data-testid="board-respond-badge"
             role="note"
             aria-label="Response mode: respond to the current prompt"
-            className="bg-gb-accent-blue/20 text-gb-accent-blue border-gb-accent-blue/40 rounded border px-2 py-1 text-xs font-semibold tracking-widest uppercase"
+            className="bg-gb-accent-blue/20 text-gb-accent-blue border-gb-accent-blue/40 rounded border px-2 py-1 text-sm font-semibold tracking-widest uppercase"
           >
             Respond
           </span>
         )}
         {playerIndex !== null && (
-          <span className="text-gb-text-dim text-xs tabular-nums">
+          <span className="text-gb-text-dim text-sm tabular-nums">
             <span className="sr-only">You are Player {playerIndex + 1}</span>
             <span aria-hidden="true">P{playerIndex + 1}</span>
           </span>
@@ -154,7 +154,7 @@ export function BoardNavbar({
             aria-hidden="true"
             className={cn("h-2 w-2 rounded-full", statusDot)}
           />
-          <span className="text-gb-text-dim text-xs">{connectionStatus}</span>
+          <span className="text-gb-text-dim text-sm">{connectionStatus}</span>
         </div>
         <NavMenu
           onLeave={onLeave}

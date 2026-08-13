@@ -34,7 +34,7 @@ export function DelayedReconnectingStatus() {
     <div
       role="status"
       aria-live="polite"
-      className="flex items-center gap-2 rounded-md border border-gold-500/40 bg-gold-500/10 px-2 py-2 text-xs font-medium text-sidebar-foreground"
+      className="flex items-center gap-2 rounded-md border border-gold-500/40 bg-gold-500/10 px-2 py-2 text-sm font-medium text-sidebar-foreground"
     >
       <WifiOff className="size-4 shrink-0 text-gold-500" aria-hidden="true" />
       <span className="truncate">Reconnecting...</span>

@@ -143,7 +143,7 @@ export default function CardPreviewPage() {
             </h1>
             <p className="text-sm text-gb-text-subtle">
               Internal visual QA for the{" "}
-              <code className="rounded bg-gb-surface-raised px-1 text-xs">
+              <code className="rounded bg-gb-surface-raised px-1">
                 {"<Card>"}
               </code>{" "}
               primitive (OPT-266). Not linked from the app.
@@ -358,7 +358,7 @@ function Section({
 }) {
   return (
     <section className="space-y-4">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-gb-text-dim">
+      <h2 className="text-sm font-semibold uppercase tracking-widest text-gb-text-dim">
         {title}
       </h2>
       {children}
@@ -380,7 +380,7 @@ function Labeled({
   return (
     <div className="flex flex-col items-center gap-2">
       {children}
-      <span className="text-xs text-gb-text-subtle">{label}</span>
+      <span className="text-sm text-gb-text-subtle">{label}</span>
     </div>
   );
 }

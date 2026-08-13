@@ -137,7 +137,7 @@ export function DeckCardGrid({
           </HoverCard>
           {showCounts && (
             <span
-              className="text-content-tertiary text-xs font-semibold tabular-nums"
+              className="text-content-tertiary text-sm font-semibold tabular-nums"
               aria-hidden="true"
             >
               ×{group.count}

@@ -570,7 +570,7 @@ export function LobbyRoomShell({
               {solitaireBlockedReason && (
                 <p
                   id="solitaire-mode-blocked-reason"
-                  className="text-content-tertiary mt-1 max-w-xs text-xs"
+                  className="text-content-tertiary mt-1 max-w-xs text-sm"
                 >
                   {solitaireBlockedReason}
                 </p>
@@ -769,7 +769,7 @@ export function LobbyRoomShell({
           )}
 
           {ownDeck && ownDeck.totalCards < 50 && (
-            <p className="text-content-tertiary shrink-0 text-center text-xs">
+            <p className="text-content-tertiary shrink-0 text-center text-sm">
               Deck legality is checked when Start is clicked, so unfinished
               decks can stay selected while players coordinate.
             </p>
@@ -1068,7 +1068,7 @@ function SpectatorSeat({
       <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b px-5 py-3 lg:min-h-20 lg:py-4">
         <UserAvatar user={player} size="md" variant="dark" />
         <div className="min-w-0">
-          <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+          <p className="text-content-tertiary text-sm font-semibold tracking-widest uppercase">
             {role}
           </p>
           <h2 className="text-content-primary truncate text-lg font-semibold">
@@ -1077,7 +1077,7 @@ function SpectatorSeat({
         </div>
       </header>
       <div className="flex min-h-0 flex-1 flex-col justify-center px-5 py-4 lg:[@media(min-height:50rem)]:py-6">
-        <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+        <p className="text-content-tertiary text-sm font-semibold tracking-widest uppercase">
           Deck
         </p>
         <p className="text-content-primary mt-2 text-base font-semibold">
@@ -1150,7 +1150,7 @@ function SpectatorPill({
               )}
             />
           </button>
-          <span className="text-content-primary text-xs font-semibold tracking-widest uppercase">
+          <span className="text-content-primary text-sm font-semibold tracking-widest uppercase">
             Spectators
           </span>
           <span className="sr-only">
@@ -1159,7 +1159,7 @@ function SpectatorPill({
           </span>
         </>
       ) : (
-        <span className="text-content-primary flex items-center gap-2 text-xs font-semibold">
+        <span className="text-content-primary flex items-center gap-2 text-sm font-semibold">
           <Eye className="text-gold-600 size-4" aria-hidden="true" />
           Spectators {allowSpectators ? "on" : "off"} · {watchingLabel}
         </span>
@@ -1200,7 +1200,7 @@ function PartyCode({
       </span>
       <span
         className={cn(
-          "border-border bg-surface-1 rounded border px-3 py-2 text-xs font-semibold",
+          "border-border bg-surface-1 rounded border px-3 py-2 text-sm font-semibold",
           copied ? "text-success" : "text-content-secondary"
         )}
       >
@@ -1253,7 +1253,7 @@ export function InvitePanel({
             <UserAvatar user={pendingInvite.user} size="md" variant="dark" />
           </div>
           <div className="min-w-0">
-            <p className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+            <p className="text-content-tertiary text-sm font-semibold tracking-widest uppercase">
               Guest
             </p>
             <h2 className="text-content-primary text-lg font-semibold">

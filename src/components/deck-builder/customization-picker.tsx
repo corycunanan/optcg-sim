@@ -44,7 +44,7 @@ export function CustomizationPicker({
           onClick={() => onSelect(null)}
           className={cn(
             optionClassName(selectedUrl === null),
-            "bg-card text-content-secondary text-xs font-semibold tracking-widest uppercase"
+            "bg-card text-content-secondary text-sm font-semibold tracking-widest uppercase"
           )}
         >
           {defaultLabel}
