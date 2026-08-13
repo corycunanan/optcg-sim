@@ -35,7 +35,7 @@ export default async function CardsPage({
 
   return (
     <CardBrowserShell>
-      <CardBrowser {...browserData} routePath="/cards" />
+      <CardBrowser {...browserData} routePath="/cards" setsPath="/sets" />
     </CardBrowserShell>
   );
 }

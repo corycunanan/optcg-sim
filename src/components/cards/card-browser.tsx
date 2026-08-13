@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,13 @@ export interface CardBrowserProps {
   sets: { setLabel: string; setName: string; packId: string }[];
   currentFilters: CardBrowserFilters;
   routePath: string;
+  /**
+   * Route of the matching set browser. When supplied the header carries a
+   * wayfinding link to it — the only inbound route to the set browser now that
+   * the navbar's Cards dropdown is gone (OPT-680); `SetBrowser` itself only
+   * links outward, into filtered card views.
+   */
+  setsPath?: string;
   renderDetailActions?: (card: CardDetail | null) => React.ReactNode;
 }
 
@@ -75,6 +83,7 @@ export function CardBrowser({
   sets,
   currentFilters,
   routePath,
+  setsPath,
   renderDetailActions,
 }: CardBrowserProps) {
   const router = useRouter();
@@ -192,6 +201,21 @@ export function CardBrowser({
               </span>
             )}
           </PageHeaderDescription>
+          {/* Wayfinding, not a task: it sits in the header's identity column,
+              under the description, rather than beside the Filter CTA — a
+              visitor reaching for sets is navigating away from this page, not
+              narrowing it, and a second control in the actions row would
+              compete with the primary CTA. Quiet neutral link recipe (the one
+              `src/app/admin/page.tsx` uses), never gold. */}
+          {setsPath && (
+            <Link
+              href={setsPath}
+              className="text-content-secondary hover:text-content-primary inline-flex w-fit items-center gap-1 text-sm font-medium transition-colors hover:underline"
+            >
+              Browse sets
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          )}
         </PageHeaderContent>
         <PageHeaderActions>
           <Button
