@@ -40,6 +40,13 @@ function Row({ label, children, className }: { label?: string; children: React.R
   );
 }
 
+/**
+ * Every item in the header badge row normalizes to the canonical ColorChip's
+ * box (`px-3 py-1 text-xs` ≈ 26px). Badges default to `py-0.5`, so they are
+ * lifted here rather than shrinking the chip and its swatch.
+ */
+const HEADER_BADGE_CLASS = "py-1";
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1">
@@ -95,15 +102,34 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
         className="flex h-[90vh] flex-col overflow-hidden p-0"
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-4">
           {loading || !card ? (
-            <Skeleton className="h-6 w-48" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-6 w-64" />
+            </div>
           ) : (
-            <div>
+            <div className="min-w-0 flex-1">
               <DialogTitle>{card.name}</DialogTitle>
-              <p className="mt-1 text-xs text-content-tertiary">
-                {card.id} · {card.type} · {card.rarity}
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className={cn(HEADER_BADGE_CLASS, "font-mono")}>
+                  {card.id}
+                </Badge>
+                <Badge variant="outline" className={HEADER_BADGE_CLASS}>
+                  {card.type}
+                </Badge>
+                {card.color.map((c) => (
+                  <ColorChip key={c} color={c} accessibleLabel={`${c} card color`} />
+                ))}
+                <Badge variant="outline" className={HEADER_BADGE_CLASS}>
+                  {card.rarity}
+                </Badge>
+                {card.banStatus !== "LEGAL" && (
+                  <Badge variant="error" className={cn(HEADER_BADGE_CLASS, "font-semibold")}>
+                    {card.banStatus}
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
           <DialogClose asChild>
@@ -141,22 +167,8 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {/* Colors */}
-                <Row className="pt-0">
-                  <div className="flex flex-wrap gap-2">
-                    {card.color.map((c) => (
-                      <ColorChip key={c} color={c} />
-                    ))}
-                    {card.banStatus !== "LEGAL" && (
-                      <Badge variant="error" className="px-3 py-1 font-semibold">
-                        {card.banStatus}
-                      </Badge>
-                    )}
-                  </div>
-                </Row>
-
                 {/* Cost, Power, Counter */}
-                <Row>
+                <Row className="pt-0">
                   <div className={cn("grid gap-4", card.life !== null ? "grid-cols-4" : "grid-cols-3")}>
                     <Stat label="Cost" value={card.cost !== null ? String(card.cost) : "0"} />
                     <Stat label="Power" value={card.power !== null ? card.power.toLocaleString() : "0"} />
