@@ -58,7 +58,7 @@ export function PriorityRollDisplay({
             {youWon ? "You won the roll" : "Opponent won the roll"}
           </div>
           {!youWon && (
-            <div className="text-gb-text-dim text-xs">
+            <div className="text-gb-text-dim text-sm">
               Waiting for them to choose first or second…
             </div>
           )}
@@ -94,7 +94,7 @@ function Die({ value, highlight, reduceMotion, label }: DieProps) {
       >
         {value ?? "—"}
       </motion.div>
-      <span className="text-gb-text-dim text-xs font-semibold uppercase tracking-widest">{label}</span>
+      <span className="text-gb-text-dim text-sm font-semibold uppercase tracking-widest">{label}</span>
     </div>
   );
 }

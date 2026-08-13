@@ -53,7 +53,7 @@ export function DeckBuilderCardModal({
                 <Button variant="destructive" onClick={onRemoveLeader}>
                   Remove Leader
                 </Button>
-                <span className="text-content-tertiary text-xs">{copyLabel}</span>
+                <span className="text-content-tertiary text-sm">{copyLabel}</span>
               </>
             ) : quantityInDeck > 0 ? (
               <>
@@ -81,7 +81,7 @@ export function DeckBuilderCardModal({
                     +
                   </Button>
                 </div>
-                <span className="text-content-tertiary text-xs">{copyLabel}</span>
+                <span className="text-content-tertiary text-sm">{copyLabel}</span>
               </>
             ) : (
               <Button onClick={handleAdd} disabled={!card}>

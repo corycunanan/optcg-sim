@@ -21,7 +21,7 @@ export default function LobbiesError({
         surfaceClassName="text-center"
       >
         <CardHeader>
-          <CardTitle className="text-xs font-semibold text-content-secondary tracking-widest">
+          <CardTitle className="text-sm font-semibold text-content-secondary tracking-widest">
             LOBBY ERROR
           </CardTitle>
         </CardHeader>
@@ -33,7 +33,7 @@ export default function LobbiesError({
             The lobby page encountered an unexpected error. Please try again.
           </p>
           {error.message && (
-            <p className="text-xs text-content-tertiary font-mono break-all">
+            <p className="text-sm text-content-tertiary font-mono break-all">
               {error.message}
             </p>
           )}

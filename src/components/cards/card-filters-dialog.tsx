@@ -33,7 +33,7 @@ const TYPES = ["Leader", "Character", "Event", "Stage"];
 const BLOCKS = ["1", "2", "3", "4"];
 
 const SECTION_LABEL =
-  "text-content-tertiary text-xs font-semibold tracking-widest uppercase";
+  "text-content-tertiary text-sm font-semibold tracking-widest uppercase";
 
 interface CardFiltersDialogProps {
   open: boolean;
@@ -158,7 +158,7 @@ function CardFiltersForm({
           label="Set"
           action={
             <div className="flex items-center gap-3">
-              <span className="text-content-tertiary text-xs">
+              <span className="text-content-tertiary text-sm">
                 {draft.sets.length === 0
                   ? "All sets"
                   : `${draft.sets.length} selected`}
@@ -195,7 +195,7 @@ function CardFiltersForm({
               }
             />
           </ChipRow>
-          <p className="text-content-tertiary max-w-prose text-xs">
+          <p className="text-content-tertiary max-w-prose text-sm">
             Match a card only in the set it debuted in, hiding the reprints that
             carry it into later sets.
           </p>

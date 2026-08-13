@@ -374,7 +374,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                     value={searchQ}
                     onChange={(event) => search(event.target.value)}
                     placeholder="Search 3+ username characters..."
-                    className="h-8 text-xs"
+                    className="h-8"
                     autoFocus
                   />
                   {searchResults.length > 0 && (
@@ -393,15 +393,15 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                               {searchUser.username || searchUser.name}
                             </span>
                             {isFriend ? (
-                              <span className="text-content-tertiary text-xs">
+                              <span className="text-content-tertiary">
                                 Friends
                               </span>
                             ) : isSending ? (
-                              <span className="text-content-tertiary text-xs">
+                              <span className="text-content-tertiary">
                                 Sending…
                               </span>
                             ) : alreadySent ? (
-                              <span className="text-content-tertiary text-xs">
+                              <span className="text-content-tertiary">
                                 Request sent
                               </span>
                             ) : (
@@ -423,20 +423,20 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
                   )}
                   {normalizedSearchQ.length > 0 &&
                     normalizedSearchQ.length < MIN_SUBSTRING_SEARCH_LENGTH && (
-                      <p className="text-content-tertiary mt-2 text-center text-xs">
+                      <p className="text-content-tertiary mt-2 text-center text-sm">
                         Enter at least 3 characters
                       </p>
                     )}
                   {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
                     searchState === "loading" && (
-                      <p className="text-content-tertiary mt-2 text-center text-xs">
+                      <p className="text-content-tertiary mt-2 text-center text-sm">
                         Searching…
                       </p>
                     )}
                   {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
                     searchState === "error" && (
                       <div className="mt-2 flex items-center justify-center gap-2">
-                        <span className="text-error text-xs">
+                        <span className="text-error text-sm">
                           Search failed.
                         </span>
                         <Button
@@ -466,7 +466,7 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
             <SidebarGroup>
               <SidebarGroupLabel>Friends unavailable</SidebarGroupLabel>
               <SidebarGroupContent className="space-y-2 px-2">
-                <p className="text-xs opacity-60">
+                <p className="text-sm opacity-60">
                   We couldn&apos;t load all friendship data. Check your
                   connection and try again.
                 </p>
@@ -483,12 +483,12 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
           )}
 
           <SidebarGroup className="py-3">
-            <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+            <SidebarGroupLabel className="text-content-tertiary font-semibold tracking-widest uppercase">
               Online ({onlineCount})
             </SidebarGroupLabel>
             <SidebarGroupContent>
               {friendsLoadState === "loading" && friends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-xs">
+                <p className="text-content-tertiary px-2 text-sm">
                   Loading friends…
                 </p>
               ) : friendsLoadState === "error" &&
@@ -505,18 +505,18 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
           </SidebarGroup>
 
           <SidebarGroup className="py-3">
-            <SidebarGroupLabel className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+            <SidebarGroupLabel className="text-content-tertiary font-semibold tracking-widest uppercase">
               Offline ({offlineFriends.length})
             </SidebarGroupLabel>
             <SidebarGroupContent>
               {friendsLoadState !== "loading" &&
               friendsLoadState !== "error" &&
               friends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-xs">
+                <p className="text-content-tertiary px-2 text-sm">
                   Add friends to start a conversation.
                 </p>
               ) : offlineFriends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-xs">
+                <p className="text-content-tertiary px-2 text-sm">
                   Everyone is online.
                 </p>
               ) : (

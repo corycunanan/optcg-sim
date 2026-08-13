@@ -144,7 +144,7 @@ export function GameDeckPreviewModal({
                               />
                             ) : (
                               <div className="h-full w-full bg-gb-surface-raised flex items-center justify-center p-2">
-                                <span className="text-xs text-gb-text-dim text-center">
+                                <span className="text-sm text-gb-text-dim text-center">
                                   {group.name}
                                 </span>
                               </div>

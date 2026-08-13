@@ -35,7 +35,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const LABEL = "text-content-tertiary text-xs";
+const LABEL = "text-content-tertiary text-sm";
 
 /** The ratified default: borderless surface, one elevation step above page. */
 export const Default: Story = {};

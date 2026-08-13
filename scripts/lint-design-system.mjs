@@ -231,6 +231,30 @@ const BLURRED_DROP_SHADOW_RE =
 // Bare class names that only a class-position scan may judge.
 const BLURRED_STOCK_SHADOW_CLASS_TOKENS = new Set(["shadow"]);
 
+// Type floor (OPT-671). The chrome floor is `text-sm` (14px); `text-xs` (12px)
+// survives only as badge anatomy — the Badge primitive, the effect-notation
+// chip, and the canonical color chip. Every other 12px site moved to 14px, and
+// a new one is a regression rather than a local choice.
+//
+// Like `shadow`, this is judged in *class positions* only (see
+// findClassTokenViolations). `text-xs` is also legitimate prose — the class
+// name appears in assertions that pin the floor
+// (`expect(className).not.toContain("text-xs")`) and in comments documenting
+// the sanctioned chip box — and a text scan cannot tell those from a real
+// utility. A class list named before use — `const SECTION_LABEL = "…"` then
+// `className={SECTION_LABEL}` — is resolved through its same-file declaration
+// (localStringConstants); an imported one has no declaration to read and stays
+// out of scope, like any other runtime value.
+//
+// The exemption is by file, never by pattern. A new entry means a new badge
+// anatomy and belongs in review, not in a widened regex.
+const TYPE_FLOOR_CLASS_TOKENS = new Set(["text-xs"]);
+const TYPE_FLOOR_EXEMPT_PATHS = new Set([
+  "src/components/ui/badge.tsx",
+  "src/components/cards/effect-text.tsx",
+  "src/components/cards/color-chip.tsx",
+]);
+
 const RULES = [
   {
     name: "font-size",
@@ -285,6 +309,7 @@ const declaredShapeUtilities = IS_MAIN
 const violations = [];
 let buttonOverrideCount = 0;
 let exemptSpacingFileCount = 0;
+let exemptTypeFloorFileCount = 0;
 let shapeUtilityUsageCount = 0;
 
 if (IS_MAIN) {
@@ -316,7 +341,12 @@ if (IS_MAIN) {
       );
     }
 
-    for (const violation of findClassTokenViolations(source)) {
+    const typeFloorExempt = TYPE_FLOOR_EXEMPT_PATHS.has(path);
+    if (typeFloorExempt) exemptTypeFloorFileCount += 1;
+
+    for (const violation of findClassTokenViolations(source, {
+      includeTypeFloor: !typeFloorExempt,
+    })) {
       addViolation(
         path,
         sourceFile,
@@ -469,14 +499,26 @@ export function findShapeVocabularyUsages(source) {
 /**
  * Whole class tokens banned outright by name, as `{ index, rule, message }`.
  *
- * Text rules cannot own these: `shadow` is an ordinary English word, and a
- * class-name string fixture (`expect(classes).not.toContain("shadow")`) is not
- * a class position, so only the AST walk can tell a real usage from prose.
+ * Text rules cannot own these: `shadow` is an ordinary English word, `text-xs`
+ * is the subject of assertions that pin the type floor, and a class-name string
+ * fixture (`expect(classes).not.toContain("shadow")`) is not a class position,
+ * so only the AST walk can tell a real usage from prose.
+ *
+ * `includeTypeFloor` is false for the badge-anatomy files listed in
+ * TYPE_FLOOR_EXEMPT_PATHS, which own the sanctioned 12px box.
  */
-export function findClassTokenViolations(source) {
+export function findClassTokenViolations(source, { includeTypeFloor = true } = {}) {
   const violations = [];
 
   const report = (token, index) => {
+    if (includeTypeFloor && TYPE_FLOOR_CLASS_TOKENS.has(token)) {
+      violations.push({
+        index,
+        rule: "type-floor",
+        message: `${JSON.stringify(token)} is below the ${JSON.stringify("text-sm")} chrome floor; 12px is reserved for badge internals (Badge, effect chip, color chip)`,
+      });
+      return;
+    }
     if (!BLURRED_STOCK_SHADOW_CLASS_TOKENS.has(token)) return;
     violations.push({
       index,
@@ -516,6 +558,7 @@ function forEachClassPosition(
     ts.ScriptKind.TSX
   );
   const scanned = new Set();
+  const localClassConstants = localStringConstants(sourceFile);
   const shadowedHelpers = locallyShadowedHelperNames(sourceFile);
   const isHelperCall = (node) =>
     isClassHelperCall(node) && !shadowedHelpers.has(node.expression.text);
@@ -597,6 +640,21 @@ function forEachClassPosition(
         scanClassExpression(argument, helperKeysAreClasses(node));
       }
       return;
+    }
+
+    // `className={SECTION_LABEL}` is a class list the file wrote down; the
+    // indirection is naming, not runtime composition. Every same-file literal
+    // declaration of the name is scanned in its own right, so the finding lands
+    // on the declaration and is reported once no matter how many elements use
+    // it.
+    if (ts.isIdentifier(node)) {
+      const declarations = localClassConstants.get(node.text);
+      if (declarations) {
+        for (const declaration of declarations) {
+          scanClassExpression(declaration, keysAreClasses);
+        }
+        return;
+      }
     }
 
     // Anything else here is composed at runtime.
@@ -682,6 +740,51 @@ function templateStaticTokens(node, sourceFile) {
 /** `cva` keys its variant groups, not its classes; every other helper keys classes. */
 function helperKeysAreClasses(node) {
   return node.expression.text !== "cva";
+}
+
+/**
+ * Every same-file `const NAME = "…"` string literal, as `Map<name, node[]>`.
+ *
+ * A class list is routinely named before it is used — `const SECTION_LABEL =
+ * "text-sm font-semibold …"` then `className={SECTION_LABEL}` — and without
+ * this the identifier reads as runtime composition and the class list escapes
+ * every by-name rule. Resolving it keeps the rules honest about how the
+ * codebase actually writes classes.
+ *
+ * Deliberately shallow, in both directions:
+ *
+ * - **Same file only.** An imported constant has no declaration here to read,
+ *   so it stays out of scope, exactly like any other runtime value. Shared
+ *   class vocabularies belong in a primitive (which the rules do scan), not in
+ *   a cross-module string.
+ * - **No scope analysis.** A name declared more than once contributes all of
+ *   its literal declarations, so a `text-xs` literal is judged wherever it was
+ *   written rather than being excused by a same-named sibling.
+ *
+ * Only string literals are collected. A computed initializer is composed at
+ * runtime and keeps its existing treatment.
+ */
+function localStringConstants(sourceFile) {
+  const constants = new Map();
+
+  const visit = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isStringLiteral(node.initializer) ||
+        ts.isNoSubstitutionTemplateLiteral(node.initializer))
+    ) {
+      const existing = constants.get(node.name.text);
+      if (existing) existing.push(node.initializer);
+      else constants.set(node.name.text, [node.initializer]);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return constants;
 }
 
 /**
@@ -1006,6 +1109,9 @@ function toRepoPath(absolutePath) {
 function printInfo() {
   console.log(
     `Spacing exemption: ${SPACING_EXEMPT_PATH_PREFIXES.join(", ")} (${exemptSpacingFileCount} vendored .tsx files skipped).`
+  );
+  console.log(
+    `Type floor: text-sm chrome minimum; ${exemptTypeFloorFileCount}/${TYPE_FLOOR_EXEMPT_PATHS.size} badge-anatomy .tsx files exempt.`
   );
   console.log(
     `Inline-style exceptions: ${INLINE_STYLE_FILE_EXEMPTIONS.size} documented file/property allowlist entries.`

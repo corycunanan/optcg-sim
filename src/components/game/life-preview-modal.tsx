@@ -55,7 +55,7 @@ export function LifePreviewModal({
               {life.length} {life.length === 1 ? "card" : "cards"}
             </Badge>
           </div>
-          <p className="text-gb-text-dim text-xs">
+          <p className="text-gb-text-dim text-sm">
             Face-down cards stay hidden. Only face-up Life is shown.
           </p>
         </DialogHeader>

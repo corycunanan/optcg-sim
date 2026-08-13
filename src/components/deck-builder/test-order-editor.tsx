@@ -106,7 +106,7 @@ export function TestOrderEditor({
     <div className="space-y-6">
       <div className="space-y-2">
         <h3 className="text-sm font-medium text-content-primary">Test Deck Order</h3>
-        <p className="text-xs text-content-tertiary">
+        <p className="text-sm text-content-tertiary">
           Configure which cards appear in your life area and opening hand for testing.
           Remaining cards will be shuffled normally.
         </p>
@@ -117,7 +117,7 @@ export function TestOrderEditor({
         <div
           className={`size-2 rounded-full ${isComplete ? "bg-green-500" : "bg-content-tertiary"}`}
         />
-        <span className="text-xs text-content-secondary">
+        <span className="text-sm text-content-secondary">
           {isComplete
             ? "Test order active — will be used next game"
             : testOrder
@@ -128,7 +128,7 @@ export function TestOrderEditor({
 
       {/* Life section */}
       <section className="space-y-3">
-        <h4 className="text-xs font-semibold text-content-secondary uppercase tracking-widest">
+        <h4 className="text-sm font-semibold text-content-secondary uppercase tracking-widest">
           Life ({lifeSlots} cards)
         </h4>
         <div className="space-y-2">
@@ -147,7 +147,7 @@ export function TestOrderEditor({
 
       {/* Hand section */}
       <section className="space-y-3">
-        <h4 className="text-xs font-semibold text-content-secondary uppercase tracking-widest">
+        <h4 className="text-sm font-semibold text-content-secondary uppercase tracking-widest">
           Opening Hand (5 cards)
         </h4>
         <div className="space-y-2">
@@ -168,7 +168,7 @@ export function TestOrderEditor({
       {testOrder && (
         <button
           onClick={() => onChangeTestOrder(null)}
-          className="rounded-md border border-border px-3 py-2 text-xs font-medium text-content-secondary transition-colors hover:bg-secondary hover:text-content-primary"
+          className="rounded-md border border-border px-3 py-2 text-sm font-medium text-content-secondary transition-colors hover:bg-secondary hover:text-content-primary"
         >
           Clear Test Order
         </button>
@@ -192,7 +192,7 @@ function SlotSelect({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="w-16 shrink-0 text-xs text-content-tertiary">{label}</span>
+      <span className="w-16 shrink-0 text-sm text-content-tertiary">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}

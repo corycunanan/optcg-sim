@@ -250,7 +250,7 @@ function InviteCard({
           >
             {inviterName} invited you to a lobby
           </p>
-          <p className="text-content-secondary text-xs">
+          <p className="text-content-secondary text-sm">
             {invite.lobby.format} · {prettyMode(invite.lobby.mode)}
           </p>
         </div>

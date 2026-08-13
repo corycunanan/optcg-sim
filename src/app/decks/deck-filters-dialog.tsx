@@ -74,7 +74,7 @@ function DeckFiltersForm({
       </DialogHeader>
 
       <DialogBody className="flex flex-col gap-3 py-2">
-        <h3 className="text-content-tertiary text-xs font-semibold tracking-widest uppercase">
+        <h3 className="text-content-tertiary text-sm font-semibold tracking-widest uppercase">
           Color
         </h3>
         <div className="flex flex-wrap gap-2">

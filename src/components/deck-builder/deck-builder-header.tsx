@@ -124,12 +124,12 @@ export function DeckBuilderHeader({
       {/* Save status */}
       <div className="ml-auto flex items-center gap-2">
         {lastSavedAt && !isDirty && (
-          <span className="text-content-tertiary text-xs">
+          <span className="text-content-tertiary text-sm">
             Saved {lastSavedAt.toLocaleTimeString()}
           </span>
         )}
         {isDirty && (
-          <span className="text-warning text-xs">Unsaved changes</span>
+          <span className="text-warning text-sm">Unsaved changes</span>
         )}
       </div>
 

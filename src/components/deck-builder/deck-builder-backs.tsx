@@ -41,7 +41,7 @@ export function DeckBuilderBacks({ cards, leader, sleeveUrl }: DeckBuilderBacksP
     return (
       <div className="rounded-md border border-border bg-card p-8 text-center">
         <p className="text-sm text-content-tertiary">No cards in deck yet</p>
-        <p className="mt-1 text-xs text-content-tertiary">
+        <p className="mt-1 text-sm text-content-tertiary">
           Add cards to see their backs
         </p>
       </div>

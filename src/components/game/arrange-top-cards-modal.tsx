@@ -372,8 +372,8 @@ export function ArrangeTopCardsModal({
 
               {step === 2 && (
                 <div className="flex justify-between mt-3">
-                  <span className="text-xs text-gb-text-dim">← top of deck</span>
-                  <span className="text-xs text-gb-text-dim">bottom of deck →</span>
+                  <span className="text-sm text-gb-text-dim">← top of deck</span>
+                  <span className="text-sm text-gb-text-dim">bottom of deck →</span>
                 </div>
               )}
             </div>

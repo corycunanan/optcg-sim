@@ -270,14 +270,14 @@ function GameSessionView({
               attempts. This usually means something on your network is blocking
               the connection.
             </div>
-            <ul className="text-gb-text-subtle list-inside list-disc text-left text-xs leading-relaxed">
+            <ul className="text-gb-text-subtle list-inside list-disc text-left text-sm leading-relaxed">
               <li>Try a different network (mobile hotspot works well)</li>
               <li>Disable VPN, antivirus HTTPS scanning, or ad-blockers</li>
               <li>Check that your device clock is correct</li>
               <li>Try another browser or an incognito window</li>
             </ul>
             {game.lastError && (
-              <div className="text-gb-accent-red text-xs">{game.lastError}</div>
+              <div className="text-gb-accent-red text-sm">{game.lastError}</div>
             )}
             <div className="mt-2 flex gap-3">
               <GameButton
@@ -297,11 +297,11 @@ function GameSessionView({
             </div>
             {navigation.fallbackConcedeAvailable && (
               <div className="mt-2 flex flex-col items-center gap-2">
-                <div className="text-gb-text-subtle text-xs">
+                <div className="text-gb-text-subtle text-sm">
                   You can also concede this match without reconnecting.
                 </div>
                 {navigation.fallbackError && (
-                  <div className="text-gb-accent-red text-xs">
+                  <div className="text-gb-accent-red text-sm">
                     {navigation.fallbackError}
                   </div>
                 )}
@@ -334,16 +334,16 @@ function GameSessionView({
         }
       >
         {game.lastError && (
-          <div className="text-gb-accent-red text-xs">{game.lastError}</div>
+          <div className="text-gb-accent-red text-sm">{game.lastError}</div>
         )}
         {navigation.fallbackConcedeAvailable && (
           <div className="mt-4 flex flex-col items-center gap-3">
-            <div className="text-gb-text-subtle max-w-[420px] text-xs">
+            <div className="text-gb-text-subtle max-w-[420px] text-sm">
               Reconnect failed. You can still concede this match without
               restoring the websocket session.
             </div>
             {navigation.fallbackError && (
-              <div className="text-gb-accent-red text-xs">
+              <div className="text-gb-accent-red text-sm">
                 {navigation.fallbackError}
               </div>
             )}
@@ -417,7 +417,7 @@ function GameSessionView({
       {solitaire && (
         <div className="border-gb-border-strong bg-gb-surface fixed top-4 left-4 z-[70] flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg">
           <div className="flex flex-col gap-1">
-            <span className="text-gb-accent-amber text-xs font-semibold tracking-widest uppercase">
+            <span className="text-gb-accent-amber text-sm font-semibold tracking-widest uppercase">
               Solitaire
             </span>
             <span className="text-gb-text-bright text-sm font-semibold">
@@ -478,14 +478,14 @@ function GameSessionView({
             >
               {opponent.gamePausedForOpponent ? "GAME PAUSED" : "OPPONENT AWAY"}
             </span>
-            <span className="text-gb-text-dim text-xs">
+            <span className="text-gb-text-dim text-sm">
               {opponent.opponentAwayText}{" "}
               {opponent.gamePausedForOpponent
                 ? "The game will resume once they reconnect."
                 : "You can keep making moves until their input is required."}
             </span>
             {opponent.opponentDeadlineRemaining !== null && (
-              <span className="text-gb-accent-amber text-xs">
+              <span className="text-gb-accent-amber text-sm">
                 Rejoin window:{" "}
                 {formatCountdown(opponent.opponentDeadlineRemaining)}
               </span>
@@ -499,7 +499,7 @@ function GameSessionView({
           <div
             role="status"
             aria-live="polite"
-            className="border-gb-accent-amber/30 bg-gb-prompt-bg text-gb-accent-amber fixed inset-x-0 top-0 z-[60] flex min-h-12 items-center justify-center border-b px-4 py-2 text-xs font-semibold"
+            className="border-gb-accent-amber/30 bg-gb-prompt-bg text-gb-accent-amber fixed inset-x-0 top-0 z-[60] flex min-h-12 items-center justify-center border-b px-4 py-2 text-sm font-semibold"
           >
             Reconnecting to the live match…
           </div>
@@ -623,7 +623,7 @@ function GameSessionView({
                 });
               }
             }}
-            className="bg-gb-surface-raised border-gb-border-strong text-gb-text-dim cursor-pointer rounded-md border px-2 py-1 font-mono text-xs"
+            className="bg-gb-surface-raised border-gb-border-strong text-gb-text-dim cursor-pointer rounded-md border px-2 py-1 font-mono text-sm"
           >
             <option value="" disabled>
               [dev] test modal…

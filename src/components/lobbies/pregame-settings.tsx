@@ -92,7 +92,7 @@ export function PregameSettings({
           </p>
         </div>
         {!editable && (
-          <span className="text-text-tertiary flex items-center gap-2 text-xs font-semibold tracking-widest uppercase">
+          <span className="text-text-tertiary flex items-center gap-2 text-sm font-semibold tracking-widest uppercase">
             <Lock aria-hidden="true" className="size-4" />
             Host controlled
           </span>
@@ -127,7 +127,7 @@ export function PregameSettings({
                   <span className="text-text-primary block text-sm font-semibold">
                     {option.label}
                   </span>
-                  <span className="text-text-secondary mt-1 block text-xs">
+                  <span className="text-text-secondary mt-1 block text-sm">
                     {option.summary}
                   </span>
                 </span>

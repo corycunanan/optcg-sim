@@ -175,12 +175,12 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
         onClick={() => setCollapsed((v) => !v)}
         className="flex items-center justify-between px-3 py-2 cursor-pointer border-b border-gb-border-subtle hover:bg-gb-surface-raised transition-colors rounded-t-lg"
       >
-        <span className="text-xs font-semibold uppercase tracking-widest text-gb-text-dim">
+        <span className="text-sm font-semibold uppercase tracking-widest text-gb-text-dim">
           Event Log
         </span>
         <div className="flex items-center gap-2">
           {collapsed && displayEvents.length > 0 && (
-            <Badge variant="secondary" className="text-xs px-1 py-0 h-auto bg-gb-surface-raised text-gb-text-muted border-gb-border-strong">
+            <Badge variant="secondary" className="px-1 py-0 h-auto bg-gb-surface-raised text-gb-text-muted border-gb-border-strong">
               {displayEvents.length}
             </Badge>
           )}
@@ -206,7 +206,7 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
           className="overflow-y-auto max-h-[200px] px-1 py-1 scrollbar-thin"
         >
           {visibleEvents.length === 0 ? (
-            <p className="text-xs text-gb-text-dim px-2 py-3 text-center italic">
+            <p className="text-sm text-gb-text-dim px-2 py-3 text-center italic">
               No events yet
             </p>
           ) : (
@@ -215,10 +215,10 @@ export function EventLog({ events, cardDb, myIndex }: EventLogProps) {
                 key={entry.key}
                 className="flex items-start gap-1 px-2 py-1 rounded-md hover:bg-gb-surface-raised/50 transition-colors"
               >
-                <span className="text-xs leading-5 shrink-0">{entry.icon}</span>
+                <span className="text-sm leading-5 shrink-0">{entry.icon}</span>
                 <span
                   className={cn(
-                    "text-xs leading-5",
+                    "text-sm leading-5",
                     entry.accent ?? "text-gb-text",
                   )}
                 >

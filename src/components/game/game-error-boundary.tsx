@@ -32,7 +32,7 @@ export class GameErrorBoundary extends React.Component<Props, State> {
             surfaceClassName="bg-gb-surface text-center"
           >
             <CardHeader>
-              <CardTitle className="text-xs font-semibold text-gb-text-subtle tracking-widest">
+              <CardTitle className="text-sm font-semibold text-gb-text-subtle tracking-widest">
                 RENDERING ERROR
               </CardTitle>
             </CardHeader>
@@ -45,7 +45,7 @@ export class GameErrorBoundary extends React.Component<Props, State> {
                 the server — returning to lobbies will not forfeit the match.
               </p>
               {this.state.error && (
-                <p className="text-xs text-gb-text-dim font-mono break-all">
+                <p className="text-sm text-gb-text-dim font-mono break-all">
                   {this.state.error.message}
                 </p>
               )}

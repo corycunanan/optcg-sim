@@ -491,7 +491,7 @@ export function NavbarNotificationPanel() {
                       </div>
                       <time
                         dateTime={notification.createdAt}
-                        className="text-content-tertiary mt-1 block text-xs"
+                        className="text-content-tertiary mt-1 block text-sm"
                       >
                         {formatRelativeTime(notification.createdAt)}
                       </time>
@@ -525,7 +525,7 @@ export function NavbarNotificationPanel() {
                       {!resolved &&
                         !reconciling &&
                         !notification.referenceId && (
-                          <p className="text-content-secondary mt-3 text-xs">
+                          <p className="text-content-secondary mt-3 text-sm">
                             Friend request unavailable
                           </p>
                         )}

@@ -130,7 +130,7 @@ export function InviteFriendPopover({
           />
           <div className="max-h-64 overflow-y-auto">
             {loading && (
-              <p className="text-content-tertiary px-2 py-3 text-xs">
+              <p className="text-content-tertiary px-2 py-3 text-sm">
                 Loading friends...
               </p>
             )}
@@ -155,7 +155,7 @@ export function InviteFriendPopover({
                   <UserAvatar user={user} size="sm" />
                   <span className="flex-1 truncate">{displayName(user)}</span>
                   {alreadyInvited ? (
-                    <span className="text-content-tertiary text-xs">
+                    <span className="text-content-tertiary">
                       Invited
                     </span>
                   ) : (

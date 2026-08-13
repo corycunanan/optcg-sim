@@ -179,7 +179,7 @@ export function PlayerChoiceModal({
               })}
             </div>
             <div className="border-gb-border flex items-center justify-between gap-4 border-t px-4 py-3">
-              <span className="text-gb-text-dim text-xs">
+              <span className="text-gb-text-dim text-sm">
                 {selectedDonCount} of {donReturn.count} selected
               </span>
               <GameButton

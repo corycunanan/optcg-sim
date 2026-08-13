@@ -160,7 +160,7 @@ export function BoardScaffold() {
         className="absolute inset-x-0 top-0 z-20 flex items-center bg-neutral-700 px-6"
         style={{ height: NAVBAR_H }}
       >
-        <span className="text-xs font-semibold tracking-widest text-gb-text-bright">
+        <span className="text-sm font-semibold tracking-widest text-gb-text-bright">
           OPTCG SIM
         </span>
       </nav>

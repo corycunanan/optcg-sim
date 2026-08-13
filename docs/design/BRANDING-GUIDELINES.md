@@ -259,8 +259,8 @@ Both display and body are self-hosted from `src/app/fonts/` through `next/font/l
 ### Core Rules (details in TYPOGRAPHY.md)
 
 1. Text picks a **role** from the TYPOGRAPHY.md ramp, not an ad-hoc size/weight combination.
-2. Strict size scale — no custom `text-[Xpx]` values in components. Minimum 12px (`text-xs`).
-   - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses chrome's 12px floor to ~7px effective. Inside `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body text. Chrome keeps the 12px floor. See §13.
+2. Strict size scale — no custom `text-[Xpx]` values in components. **The chrome floor is 14px (`text-sm`)** (OPT-671); `text-xs` (12px) is reserved for badge internals (`Badge`, the effect-notation chip, the color chip) and is enforced by the `type-floor` rule in `scripts/lint-design-system.mjs`.
+   - **Inside-board exception (OPT-346):** the scaled game-board subtree renders at scale `0.59` at the 1280×640 floor viewport, which collapses a 14px chrome size to ~8px effective. Inside `<ScaledBoard>` / `BoardLayout`'s scaled wrappers, the floor lifts to **`text-base` (16px)** for labels/counters/badges and **`text-lg` (18px)** for body text. Chrome keeps the 14px floor. See §13.
 3. Public Sans renders only 400/500/600 — `font-bold`+ is not part of the sans system.
 4. Uppercase sans always carries tracking (`tracking-widest` ≤ `text-sm`, `tracking-wider` at `text-base`/`text-lg`); `.font-display` is atomic and never modified.
 5. Body text max line-length: 65-75 characters (`max-w-prose`).
@@ -457,7 +457,7 @@ Adapted from Riftbound's article card pattern:
 │          16:9 image area            │ aspect-ratio: 16/9
 │     (hover: image scale 1.05)       │ overflow: hidden on container
 ├─────────────────────────────────────┤
-│ CATEGORY   |   Mar 30, 2026        │ caption / 12px / --text-secondary
+│ CATEGORY   |   Mar 30, 2026        │ caption / 14px / --text-secondary
 │                                     │
 │ Card Title Goes Here                │ heading / 20px / --text-primary / 600
 │                                     │
@@ -770,23 +770,23 @@ This keeps future board-specific customization (for example, a light beach or Wa
 
 ### Inside-Board Floor Overrides (Responsive Game Board, OPT-346)
 
-The game board is authored at a fixed 1920×1080 design resolution and uniformly scaled via CSS `transform: scale()` to fit the viewport (see [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). At the 1280×640 minimum viewport the scale floor is ~0.59, which compresses chrome's 12px text into ~7px effective and a 2px focus ring into ~1.2px — both below the legibility floor. Inside-board tokens are promoted one step so the effective floor stays close to the previous 1280×720 experience while preserving the fixed-composition architecture.
+The game board is authored at a fixed 1920×1080 design resolution and uniformly scaled via CSS `transform: scale()` to fit the viewport (see [`docs/project/RESPONSIVE-GAME-BOARD-SCOPE.md`](../project/RESPONSIVE-GAME-BOARD-SCOPE.md)). At the 1280×640 minimum viewport the scale floor is ~0.59, which compresses chrome's 14px text into ~8.3px effective and a 2px focus ring into ~1.2px — both below the legibility floor. Inside-board tokens are promoted one step so the effective floor stays close to the previous 1280×720 experience while preserving the fixed-composition architecture.
 
 Inside the scaled subtree only — anything that renders within `<ScaledBoard>` / `BoardLayout`'s scaled wrappers (zones, on-board cards, in-board CTAs, on-board overlays such as the DON redistribute bar) — apply these overrides:
 
 | Element | Chrome floor | Inside-board floor | Rationale |
 |---------|--------------|--------------------|-----------|
-| Labels, counters, badges | `text-xs` (12px) | **`text-base` (16px)** | ~9.5px effective at floor scale |
-| Body / paragraph text | `text-xs` (12px) | **`text-lg` (18px)** | ~10.7px effective at floor scale |
+| Labels, counters, badges | `text-sm` (14px) | **`text-base` (16px)** | ~9.5px effective at floor scale |
+| Body / paragraph text | `text-sm` (14px) | **`text-lg` (18px)** | ~10.7px effective at floor scale |
 | Focus rings | `ring-2` (2px) | **`ring-4` (4px)** | ~2.4px effective at floor scale |
 
-**What stays as chrome (12px / `ring-2`):**
+**What stays as chrome (14px / `ring-2`):**
 
 - The board navbar (rendered at design pixels, not inside the scaled wrapper).
 - All Radix-portaled overlays — modals, tooltips, popovers, dropdown menus — because Radix `Portal` renders them outside the transformed parent (see `<PortalRoot>` in OPT-309).
 - Side panels and chat sidebars consumed by the `<LiveGameShell>`.
 
-**Primitive consumers (`GameButton`):** the `GameButton` primitive is shared between in-board (mid-zone, redistribute overlay) and chrome (modals, error boundaries) consumers. The primitive's defaults are tuned for chrome (`text-xs` / `ring-2`); in-board call sites pass `className="text-base focus-visible:ring-4"` (centralized as `IN_BOARD_BTN`) so chrome consumers stay unaffected.
+**Primitive consumers (`GameButton`):** the `GameButton` primitive is shared between in-board (mid-zone, redistribute overlay) and chrome (modals, error boundaries) consumers. The primitive's defaults are tuned for chrome (`text-sm` / `ring-2`); in-board call sites pass `className="text-base focus-visible:ring-4"` (centralized as `IN_BOARD_BTN`) so chrome consumers stay unaffected.
 
 ---
 

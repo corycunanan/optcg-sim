@@ -133,7 +133,7 @@ function ScenarioTile({ scenario }: { scenario: Scenario }) {
         </h3>
         <Badge variant="secondary">{CATEGORY_LABELS[scenario.category]}</Badge>
       </div>
-      <p className="text-content-tertiary text-xs">{scenario.description}</p>
+      <p className="text-content-tertiary text-sm">{scenario.description}</p>
     </Link>
   );
 }

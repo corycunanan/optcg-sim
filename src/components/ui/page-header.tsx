@@ -65,7 +65,7 @@ function PageHeaderEyebrow({
   return (
     <p
       className={cn(
-        "text-gold-600 text-xs font-semibold tracking-widest uppercase",
+        "text-gold-600 text-sm font-semibold tracking-widest uppercase",
         className
       )}
     >

@@ -31,7 +31,7 @@ export function ScenarioInfoPanel({ scenario, hint }: ScenarioInfoPanelProps) {
 
       {scenario.cardsUsed.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-content-tertiary">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-content-tertiary">
             Cards used
           </h2>
           <ul className="space-y-2">
@@ -68,7 +68,7 @@ function HintBanner({ hint }: { hint: ScenarioInputHint }) {
   return (
     <div
       data-testid="scenario-info-hint"
-      className={`rounded-md border px-3 py-2 text-xs font-semibold uppercase tracking-widest ${styles}`}
+      className={`rounded-md border px-3 py-2 text-sm font-semibold uppercase tracking-widest ${styles}`}
     >
       {hint.text}
     </div>
@@ -81,7 +81,7 @@ function CardListItem({ cardId }: { cardId: string }) {
     return (
       <li className="flex items-center gap-3 rounded-md border border-dashed border-border bg-card px-3 py-2">
         <div className="h-12 w-9 shrink-0 rounded bg-secondary" />
-        <div className="min-w-0 text-xs text-content-tertiary">
+        <div className="min-w-0 text-sm text-content-tertiary">
           <div className="truncate font-medium">{cardId}</div>
           <div className="truncate text-content-disabled">Not in sandbox bundle</div>
         </div>
@@ -102,7 +102,7 @@ function CardListItem({ cardId }: { cardId: string }) {
           />
         )}
       </div>
-      <div className="min-w-0 text-xs">
+      <div className="min-w-0 text-sm">
         <div className="truncate font-medium text-content-primary">{card.name}</div>
         <div className="truncate text-content-tertiary">
           {card.id} · {card.type}

@@ -49,7 +49,7 @@ export interface CardInfoPanelProps {
 function CardInfoStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-content-secondary text-xs font-semibold tracking-widest uppercase">
+      <span className="text-content-secondary text-sm font-semibold tracking-widest uppercase">
         {label}
       </span>
       <span className="text-content-primary text-sm font-semibold tabular-nums">
@@ -129,11 +129,11 @@ export function CardInfoPanel({
         <div className="text-content-primary text-sm font-semibold tracking-widest uppercase">
           {name}
         </div>
-        <div className="text-content-secondary text-xs">
+        <div className="text-content-secondary text-sm">
           {cardType} &middot; {cardId}
         </div>
         {descriptors && (
-          <div className="text-content-secondary text-xs">{descriptors}</div>
+          <div className="text-content-secondary text-sm">{descriptors}</div>
         )}
       </div>
 
@@ -150,7 +150,7 @@ export function CardInfoPanel({
       )}
 
       {effectParagraphs.length > 0 && (
-        <div className="text-content-secondary flex flex-col gap-2 text-xs leading-relaxed">
+        <div className="text-content-secondary flex flex-col gap-2 text-sm leading-relaxed">
           {effectParagraphs.map((paragraph, index) => (
             <p key={index} className="whitespace-pre-wrap">
               {paragraph}
@@ -161,10 +161,10 @@ export function CardInfoPanel({
 
       {trigger && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-secondary text-xs font-semibold tracking-widest uppercase">
+          <span className="text-content-secondary text-sm font-semibold tracking-widest uppercase">
             Trigger
           </span>
-          <p className="text-content-secondary text-xs leading-relaxed whitespace-pre-wrap">
+          <p className="text-content-secondary text-sm leading-relaxed whitespace-pre-wrap">
             {trigger}
           </p>
         </div>

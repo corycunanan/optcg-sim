@@ -79,7 +79,7 @@ export function CardActionMenuContent({
         <span className="block truncate text-base font-semibold">
           {data?.name ?? "Unknown Card"}
         </span>
-        <span className="text-gb-text-dim block text-xs font-normal">
+        <span className="text-gb-text-dim block font-normal">
           {data?.type}
         </span>
       </DropdownMenuLabel>
@@ -89,7 +89,7 @@ export function CardActionMenuContent({
           disabled
           className="text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised text-sm"
         >
-          <span className="shrink-0 text-xs">{"\u2014"}</span>
+          <span className="shrink-0">{"\u2014"}</span>
           <span>No [Main] effect</span>
         </DropdownMenuItem>
       ) : (
@@ -110,10 +110,10 @@ export function CardActionMenuContent({
               disabled={disabled}
               className="text-gb-text data-[disabled]:text-gb-text-dim focus:bg-gb-surface-raised text-sm"
             >
-              <span className="shrink-0 text-xs">{"\u26A1"}</span>
+              <span className="shrink-0">{"\u26A1"}</span>
               <span>Activate [Main] effect</span>
               {disabledReason && (
-                <span className="ml-auto text-xs">{disabledReason}</span>
+                <span className="ml-auto">{disabledReason}</span>
               )}
             </DropdownMenuItem>
           );
