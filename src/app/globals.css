@@ -288,9 +288,9 @@
      action or with card art
      (docs/design/COLOR-LANGUAGE.md, salience hierarchy). The DON!! fill sits
      deliberately outside that set, at a lower lightness (40%) and near-zero
-     chroma, matching the printed badge's dark ink. [Trigger] keeps its printed
-     ink-and-yellow treatment, which the white keyline separates from the panel
-     behind it.
+     chroma, matching the printed badge's dark ink. [Trigger] matches the
+     printed card's yellow banner: yellow background, dark ink, square corners,
+     and no border.
 
      The keyword family (OPT-677) is the one deliberate exception to the shared
      46% step. On a printed card an evergreen keyword is a bright orange
@@ -313,8 +313,8 @@
   --effect-counter: oklch(46% 0.1 215); /* [Counter] */
   --effect-modifier: oklch(46% 0.16 25); /* [Once Per Turn] */
   --effect-don: oklch(40% 0.04 245); /* [DON!! xN] */
-  --effect-trigger: oklch(24% 0.03 90); /* [Trigger] */
-  --effect-trigger-fg: oklch(86% 0.16 90);
+  --effect-trigger: oklch(86% 0.16 90); /* [Trigger] */
+  --effect-trigger-fg: oklch(22% 0.04 245);
   --effect-notation-fg: #ffffff;
   --effect-notation-edge: rgba(255, 255, 255, 0.9);
 

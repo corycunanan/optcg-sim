@@ -66,6 +66,9 @@ const NOTATION_CHIP_BASE = cn(
   "rounded border border-effect-notation-edge px-1"
 );
 
+/** [Trigger] matches the printed card's square, borderless yellow banner. */
+const TRIGGER_CHIP_BASE = cn(CHIP_BASE, NOTATION_LABEL, "px-1");
+
 /**
  * The keyword hexagon (OPT-677). `clip-path` clips borders, so the family's
  * white keyline is reproduced with the two-layer technique from
@@ -125,6 +128,18 @@ function renderSegments(segments: EffectSegment[]) {
           data-effect-notation="keyword"
         >
           <span className={KEYWORD_CHIP_FILL}>{segment.label}</span>
+        </span>
+      );
+    }
+
+    if (segment.family === "trigger") {
+      return (
+        <span
+          key={index}
+          className={cn(TRIGGER_CHIP_BASE, NOTATION_CHIP_STYLES.trigger)}
+          data-effect-notation="trigger"
+        >
+          {segment.label}
         </span>
       );
     }
