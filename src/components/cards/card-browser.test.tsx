@@ -254,38 +254,39 @@ describe("CardBrowser set-browser wayfinding", () => {
   it("links to the set browser from the page header", async () => {
     await renderBrowser({}, { setsPath: "/sets" });
 
-    const anchors = setsAnchors(renderer!.root);
-    expect(anchors).toHaveLength(1);
-
-    const link = anchors[0];
-    const classes = classList(link);
-
-    // Body-role, quiet, neutral — a sibling wayfinding link, never a second
-    // CTA competing with Filter.
-    expect(classes).toContain("text-sm");
-    expect(classes).toContain("text-content-secondary");
-    expect(classes.some((c) => c.startsWith("bg-"))).toBe(false);
-    expect(classes.some((c) => c.includes("gold"))).toBe(false);
-
-    // It belongs to the header's identity column, not its actions row: the
-    // actions row (`PageHeaderActions`, the only `flex-wrap` band in the
-    // header) holds the Filter CTA and nothing else.
     const header = renderer!.root.findByType("header");
     expect(setsAnchors(header)).toHaveLength(1);
 
     const actionsRow = header.find((node) =>
       classList(node).includes("flex-wrap")
     );
+    const contentColumn = header.find((node) =>
+      classList(node).includes("min-w-0")
+    );
+    const actionsLinks = setsAnchors(actionsRow);
+
+    expect(actionsLinks).toHaveLength(1);
+    expect(actionsLinks[0].type).toBe("a");
+    expect(actionsLinks[0].props.href).toBe("/sets");
+    expect(actionsLinks[0].props["data-variant"]).toBe("outline");
+    expect(setsAnchors(contentColumn)).toHaveLength(0);
     expect(
       actionsRow.findAllByProps({ "aria-controls": "card-filters" }).length
     ).toBeGreaterThan(0);
-    expect(setsAnchors(actionsRow)).toHaveLength(0);
   });
 
   it("omits the link where no set browser is configured", async () => {
     await renderBrowser();
 
-    expect(setsAnchors(renderer!.root)).toHaveLength(0);
+    const header = renderer!.root.findByType("header");
+    const actionsRow = header.find((node) =>
+      classList(node).includes("flex-wrap")
+    );
+
+    expect(setsAnchors(actionsRow)).toHaveLength(0);
+    expect(
+      actionsRow.findByProps({ "aria-controls": "card-filters" })
+    ).toBeDefined();
   });
 });
 

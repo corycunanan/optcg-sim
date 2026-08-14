@@ -19,10 +19,9 @@ export function CardBrowserLoading() {
         <PageHeaderContent>
           <Skeleton className="bg-navy-700 h-8 w-48" />
           <Skeleton className="bg-navy-700 h-4 w-64" />
-          {/* The header's "Browse sets" wayfinding link. */}
-          <Skeleton className="bg-navy-700 h-4 w-32" />
         </PageHeaderContent>
         <PageHeaderActions>
+          <div className="h-10 w-32" />
           <div className="h-10 w-28" />
         </PageHeaderActions>
       </PageHeader>
