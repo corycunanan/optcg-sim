@@ -322,21 +322,33 @@
      The keyword family (OPT-677) is the one deliberate exception to the shared
      46% step. On a printed card an evergreen keyword is a bright orange
      hexagon, not a muted plaque — it is the loudest mark in the rules box, and
-     matching that is the point of the family. White lettering cannot survive
-     the jump (it falls below AA above 58% lightness), so the family takes a
-     dark ink instead — the same trade the yellow card colour already makes
-     with --card-yellow-fg.
+     matching that is the point of the family. The printed hexagon also carries
+     white lettering, and OPT-690 restores that: the fill is darkened until
+     white clears AA on it, so --effect-keyword-fg is simply the shared
+     --effect-notation-fg and the family no longer needs an ink of its own.
 
-     63%/0.14 is where the two contrast pairs this fill has to satisfy meet
-     with room to spare: the dark ink reads 4.75:1 and the white keyline 3.25:1
-     (scripts/contrast-pairs.json pins both). Lightness is what moves them —
-     past ~65% the keyline drops under 3:1 — and 0.14 chroma is the sRGB gamut
-     edge at this lightness and hue, so a larger figure would only be clipped
-     by the browser. */
+     56%/0.125 is where both of this fill's pairs clear with real headroom:
+     white reads 4.82:1 and the white keyline 4.24:1
+     (scripts/contrast-pairs.json pins both). Lightness is what moves them, and
+     it only has one direction to go — white on this hue crosses AA at about
+     57% (4.62:1) and fails outright by 58% (4.44:1), so anything brighter than
+     56% is spending the entire margin on nothing. Below ~54% the chip stops
+     reading orange and starts reading rust, which is the other wall.
+
+     Chroma has to come *down* with lightness, not up: the sRGB gamut edge at
+     this hue falls from 0.145 at 63% to 0.129 at 56%. Over-asking does not
+     merely clip, it rotates the rendered hue away from the printed orange
+     (oklch(56% 0.14 62) renders at hue 58.6, visibly redder), so 0.125 sits
+     just inside the edge and holds hue 62 exactly.
+
+     The fill now reads 3.58:1 against the page navy rather than 4.75:1, so the
+     white keyline is doing more of the work of separating the hexagon from the
+     page, not less — it stays, and it now matches the lettering the way the
+     printed hexagon's outline does. */
   /* [On Play], [When Attacking], [Main], [Your Turn], [Opponent's Turn] */
   --effect-timing: oklch(46% 0.1 215);
-  --effect-keyword: oklch(63% 0.14 62); /* [Rush], [Blocker], [Banish] */
-  --effect-keyword-fg: oklch(22% 0.04 245);
+  --effect-keyword: oklch(56% 0.125 62); /* [Rush], [Blocker], [Banish] */
+  --effect-keyword-fg: var(--effect-notation-fg);
   --effect-counter: oklch(46% 0.1 215); /* [Counter] */
   --effect-modifier: oklch(46% 0.16 25); /* [Once Per Turn] */
   --effect-don: oklch(40% 0.04 245); /* [DON!! xN] */
