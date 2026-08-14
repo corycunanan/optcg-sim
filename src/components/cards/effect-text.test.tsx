@@ -156,6 +156,8 @@ describe("EffectText", () => {
     expect(chip.props["data-effect-notation"]).toBe("trigger");
     expect(chip.props.className).toContain("bg-effect-trigger");
     expect(chip.props.className).toContain("text-effect-trigger-fg");
+    expect(chip.props.className).not.toContain("rounded");
+    expect(chip.props.className).not.toContain("border-effect-notation-edge");
   });
 
   it("renders effect text with no notation as a single paragraph", () => {

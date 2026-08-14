@@ -403,12 +403,6 @@
       "minimum": 3
     },
     {
-      "name": "effect-notation-keyline/trigger",
-      "foreground": "--effect-notation-edge",
-      "background": "--effect-trigger",
-      "minimum": 3
-    },
-    {
       "name": "badge-keyline/card-red",
       "foreground": "--card-red-border",
       "background": "--card-red",
