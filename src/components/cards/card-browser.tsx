@@ -204,7 +204,7 @@ export function CardBrowser({
         </PageHeaderContent>
         <PageHeaderActions>
           {setsPath && (
-            <Button asChild variant="outline">
+            <Button asChild variant="default">
               <Link href={setsPath}>
                 Browse sets
                 <ArrowRight data-icon="inline-end" aria-hidden="true" />

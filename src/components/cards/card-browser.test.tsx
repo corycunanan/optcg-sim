@@ -268,7 +268,7 @@ describe("CardBrowser set-browser wayfinding", () => {
     expect(actionsLinks).toHaveLength(1);
     expect(actionsLinks[0].type).toBe("a");
     expect(actionsLinks[0].props.href).toBe("/sets");
-    expect(actionsLinks[0].props["data-variant"]).toBe("outline");
+    expect(actionsLinks[0].props["data-variant"]).toBe("default");
     expect(setsAnchors(contentColumn)).toHaveLength(0);
     expect(
       actionsRow.findAllByProps({ "aria-controls": "card-filters" }).length
