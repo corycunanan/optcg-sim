@@ -65,7 +65,7 @@ export const PRINTED_NOTATION_TOKENS = {
   trigger: "trigger",
   counter: "counter",
 
-  // When the effect happens.
+  // When the effect happens, including whose turn permits it.
   "on play": "timing",
   "activate: main": "timing",
   main: "timing",
@@ -74,6 +74,8 @@ export const PRINTED_NOTATION_TOKENS = {
   "on block": "timing",
   "on your opponent's attack": "timing",
   "end of your turn": "timing",
+  "your turn": "timing",
+  "opponent's turn": "timing",
 
   // Evergreen abilities the effect grants or the card has.
   blocker: "keyword",
@@ -83,10 +85,8 @@ export const PRINTED_NOTATION_TOKENS = {
   banish: "keyword",
   unblockable: "keyword",
 
-  // Constraints on an effect that is already timed by one of the above.
+  // How often an effect can be used within its timing window.
   "once per turn": "modifier",
-  "your turn": "modifier",
-  "opponent's turn": "modifier",
 
   // Attached-DON!! conditions keep the printed badge's own dark treatment, so
   // they are their own family rather than sharing the constraint chip.
