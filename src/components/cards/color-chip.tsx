@@ -24,6 +24,8 @@ const CHIP_CLASS =
 const CHIP_RESTING_CLASS =
   "border-border bg-surface-2 text-content-secondary";
 
+const CHIP_DISPLAY_CLASS = "border-border bg-transparent text-content-secondary";
+
 /** Shell for any chip that toggles — colors and plain values alike. */
 export const CHIP_TOGGLE_CLASS = cn(
   CHIP_CLASS,
@@ -85,7 +87,7 @@ export function ColorChip({
     <span
       role="img"
       aria-label={accessibleLabel ?? color}
-      className={cn(CHIP_CLASS, CHIP_RESTING_CLASS, className)}
+      className={cn(CHIP_CLASS, CHIP_DISPLAY_CLASS, className)}
     >
       <ColorSwatch color={color} />
       <span aria-hidden="true">{color}</span>
