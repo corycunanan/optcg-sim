@@ -279,12 +279,13 @@
      is part of the game's notation, so — like the six TCG card colors above —
      these are a feature contract, never overridden by a data-theme selector.
 
-     Hues follow the printed cards: activation timings are blue ([Counter] is
-     a play-timing marker, so it shares the timing blue), constraints are red,
-     and evergreen keywords are orange. The timing, counter and modifier fills
-     share one lightness (46%) so that row reads as a single system with hue as
-     the only variable, and each sits well below the accent in lightness so
-     notation never competes with the focal action or with card art
+     Hues follow the printed cards: activation timings and turn windows are blue
+     ([Counter] is a play-timing marker, so it shares the timing blue), usage
+     frequency constraints are red, and evergreen keywords are orange. The
+     timing, counter and modifier fills share one lightness (46%) so that row
+     reads as a single system with hue as the only variable, and each sits well
+     below the accent in lightness so notation never competes with the focal
+     action or with card art
      (docs/design/COLOR-LANGUAGE.md, salience hierarchy). The DON!! fill sits
      deliberately outside that set, at a lower lightness (40%) and near-zero
      chroma, matching the printed badge's dark ink. [Trigger] keeps its printed
@@ -305,11 +306,12 @@
      past ~65% the keyline drops under 3:1 — and 0.14 chroma is the sRGB gamut
      edge at this lightness and hue, so a larger figure would only be clipped
      by the browser. */
-  --effect-timing: oklch(46% 0.1 215); /* [On Play], [When Attacking], [Main] */
+  /* [On Play], [When Attacking], [Main], [Your Turn], [Opponent's Turn] */
+  --effect-timing: oklch(46% 0.1 215);
   --effect-keyword: oklch(63% 0.14 62); /* [Rush], [Blocker], [Banish] */
   --effect-keyword-fg: oklch(22% 0.04 245);
   --effect-counter: oklch(46% 0.1 215); /* [Counter] */
-  --effect-modifier: oklch(46% 0.16 25); /* [Once Per Turn], [Your Turn] */
+  --effect-modifier: oklch(46% 0.16 25); /* [Once Per Turn] */
   --effect-don: oklch(40% 0.04 245); /* [DON!! xN] */
   --effect-trigger: oklch(24% 0.03 90); /* [Trigger] */
   --effect-trigger-fg: oklch(86% 0.16 90);

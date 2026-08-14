@@ -92,6 +92,29 @@ describe("EffectText", () => {
     expect(timing.props.className).not.toContain("effect-hex");
   });
 
+  it.each(["Your Turn", "Opponent's Turn"])(
+    "renders [%s] as a timing-blue chip",
+    (label) => {
+      const chip = render(`[${label}] Draw 1 card.`).root.find(
+        (node) => node.props["data-effect-notation"] !== undefined
+      );
+
+      expect(chip.props["data-effect-notation"]).toBe("timing");
+      expect(chip.props.className).toContain("bg-effect-timing");
+      expect(chip.props.className).not.toContain("bg-effect-modifier");
+    }
+  );
+
+  it("keeps [Once Per Turn] as a modifier-red chip", () => {
+    const chip = render("[Once Per Turn] Draw 1 card.").root.find(
+      (node) => node.props["data-effect-notation"] !== undefined
+    );
+
+    expect(chip.props["data-effect-notation"]).toBe("modifier");
+    expect(chip.props.className).toContain("bg-effect-modifier");
+    expect(chip.props.className).not.toContain("bg-effect-timing");
+  });
+
   it("renders a trait as a quieter chip with no visible braces", () => {
     const trait = render(EB02_052).root.find(
       (node) => node.props["data-effect-trait"] !== undefined
