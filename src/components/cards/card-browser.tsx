@@ -201,23 +201,16 @@ export function CardBrowser({
               </span>
             )}
           </PageHeaderDescription>
-          {/* Wayfinding, not a task: it sits in the header's identity column,
-              under the description, rather than beside the Filter CTA — a
-              visitor reaching for sets is navigating away from this page, not
-              narrowing it, and a second control in the actions row would
-              compete with the primary CTA. Quiet neutral link recipe (the one
-              `src/app/admin/page.tsx` uses), never gold. */}
-          {setsPath && (
-            <Link
-              href={setsPath}
-              className="text-content-secondary hover:text-content-primary inline-flex w-fit items-center gap-1 text-sm font-medium transition-colors hover:underline"
-            >
-              Browse sets
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-          )}
         </PageHeaderContent>
         <PageHeaderActions>
+          {setsPath && (
+            <Button asChild variant="default">
+              <Link href={setsPath}>
+                Browse sets
+                <ArrowRight data-icon="inline-end" aria-hidden="true" />
+              </Link>
+            </Button>
+          )}
           <Button
             type="button"
             onClick={() => setFiltersOpen(true)}
