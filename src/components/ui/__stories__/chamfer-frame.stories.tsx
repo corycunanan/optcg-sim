@@ -20,6 +20,10 @@ const meta = {
       control: { type: "inline-radio" },
       options: ["none", "neutral", "gold", "lighting"],
     },
+    shadow: {
+      control: { type: "inline-radio" },
+      options: ["none", "sm", "md", "lg"],
+    },
     interactive: { control: { type: "boolean" } },
   },
   args: {
@@ -108,6 +112,61 @@ export const InteractiveFocus: Story = {
             edge={edge}
           >
             <button type="button">Start Match</button>
+          </ChamferFrame>
+        ))}
+      </div>
+    </div>
+  ),
+};
+
+/**
+ * The cast follows the cuts. `box-shadow` would paint square corners straight
+ * through both chamfers, so the frame translates a copy of its own polygon
+ * instead — check the top-left cut, where nothing should poke out, and the
+ * bottom-right cut, where the cast tracks the 45° edge.
+ */
+export const CastShadow: Story = {
+  name: "Cast Shadow",
+  render: (args) => (
+    <div className="bg-surface-base flex flex-wrap items-center gap-8 p-8">
+      {(["none", "sm", "md", "lg"] as const).map((shadow) => (
+        <div key={shadow} className="flex flex-col items-center gap-2">
+          <ChamferFrame {...args} cut="lg" shadow={shadow}>
+            {shadow === "none" ? "Flat" : "Raised"}
+          </ChamferFrame>
+          <span className={LABEL}>shadow=&quot;{shadow}&quot;</span>
+        </div>
+      ))}
+    </div>
+  ),
+};
+
+/** The decks-row register: one tier up on hover, color and cast together. */
+export const CardClassRow: Story = {
+  name: "Card Class Row",
+  render: (args) => (
+    <div className="bg-surface-base flex w-full max-w-2xl flex-col gap-4 p-8">
+      <p className={LABEL}>
+        Hover a row — it moves one full tier: `bg-surface-1` → `bg-surface-2`
+        and `shadow-sm` → `shadow-md`, which the elevation ladder pairs per
+        tier.
+      </p>
+      <div className="flex flex-col gap-3">
+        {["Straw Hat Aggro", "Enel Control"].map((name) => (
+          <ChamferFrame
+            {...args}
+            key={name}
+            interactive
+            cut="lg"
+            shadow="sm"
+            shadowHover="md"
+            className="group"
+            surfaceClassName="bg-surface-1 group-hover:bg-surface-2 flex items-center gap-4 p-4 transition-colors duration-200"
+          >
+            <div className="bg-surface-3 aspect-card w-card-thumb shrink-0 rounded-md" />
+            <span className="text-content-primary text-base font-semibold">
+              {name}
+            </span>
           </ChamferFrame>
         ))}
       </div>

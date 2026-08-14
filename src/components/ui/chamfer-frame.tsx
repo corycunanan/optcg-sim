@@ -13,13 +13,15 @@ import { cn } from "@/lib/utils";
  * Structure — DOM depth scales with the chosen edge, never beyond it:
  *
  * ```text
- * root            unclipped, rectangular  ← hit target, focus owner, `asChild`
- *  ├─ focus layer only when `interactive`; fills the root, painted behind
- *  ├─ edge layer  only when `edge !== "none"` (one hairline, clipped)
- *  └─ surface     clipped; carries `surfaceClassName` and the children
+ * root             unclipped, rectangular  ← hit target, focus owner, `asChild`
+ *  ├─ shadow layer only when `shadow`/`shadowHover` cast; the polygon again,
+ *  │               offset down-right behind everything
+ *  ├─ focus layer  only when `interactive`; fills the root, painted behind
+ *  ├─ edge layer   only when `edge !== "none"` (one hairline, clipped)
+ *  └─ surface      clipped; carries `surfaceClassName` and the children
  * ```
  *
- * Three rules drive that shape:
+ * Four rules drive that shape:
  *
  * - `clip-path` clips pointer events, so the interactive box stays rectangular
  *   and the clip applies to a child. The corner triangles remain clickable.
@@ -28,9 +30,15 @@ import { cn } from "@/lib/utils";
  *   outermost clipped layer shrinks its own clip to expose it. Nothing is
  *   painted outside the root, so an `overflow-hidden` ancestor cannot clip the
  *   focus indicator away.
- * - Two clipped layers are never given the same polygon. Insetting a layer
- *   widens its diagonal relative to its straight edges, so the inner cut is
- *   miter-compensated by `(2 − √2) × inset` (see `chamfer-hairline-inset`).
+ * - `box-shadow` is generated from the border box, so it cannot cast a
+ *   chamfered silhouette either: on the root it paints square corners through
+ *   both cuts, and on the clipped surface the clip erases it. The cast is a
+ *   third clipped layer instead — see `shadow` below.
+ * - Two clipped layers are never given the same polygon *when one is inset
+ *   inside the other*. Insetting a layer widens its diagonal relative to its
+ *   straight edges, so the inner cut is miter-compensated by `(2 − √2) × inset`
+ *   (see `chamfer-hairline-inset`). The shadow layer is translated rather than
+ *   inset, so it deliberately keeps the uncompensated polygon.
  *
  * Class routing: `className` lands on the rectangular root (layout, sizing,
  * and — with `asChild` — the interactive element itself); `surfaceClassName`
@@ -47,6 +55,10 @@ import { cn } from "@/lib/utils";
  *   surfaceClassName="bg-surface-1 px-4 py-3"
  * >
  *   <Link href="/decks/1">Straw Hat Aggro</Link>
+ * </ChamferFrame>
+ *
+ * <ChamferFrame shadow="sm" shadowHover="md" surfaceClassName="bg-surface-1 p-4">
+ *   Card-class surface
  * </ChamferFrame>
  * ```
  *
@@ -80,9 +92,30 @@ const CHAMFER_EDGE_CLASSES = {
   lighting: "chamfer-edge-lighting",
 } as const;
 
+/**
+ * Cast-shadow step, one per elevation tier in
+ * `docs/design/ELEVATION-LANGUAGE.md`. Each class only sets the offset and the
+ * color; `.chamfer-shadow-layer` reads both.
+ */
+const CHAMFER_SHADOW_CLASSES = {
+  none: "chamfer-shadow-none",
+  sm: "chamfer-shadow-sm",
+  md: "chamfer-shadow-md",
+  lg: "chamfer-shadow-lg",
+} as const;
+
+/** The same steps under `hover:`. Static literals — Tailwind scans names. */
+const CHAMFER_SHADOW_HOVER_CLASSES = {
+  none: "hover:chamfer-shadow-none",
+  sm: "hover:chamfer-shadow-sm",
+  md: "hover:chamfer-shadow-md",
+  lg: "hover:chamfer-shadow-lg",
+} as const;
+
 type ChamferCut = keyof typeof CHAMFER_CUT_CLASSES;
 type ChamferCorners = keyof typeof CHAMFER_CORNER_CLASSES;
 type ChamferEdge = keyof typeof CHAMFER_EDGE_CLASSES;
+type ChamferShadow = keyof typeof CHAMFER_SHADOW_CLASSES;
 
 interface ChamferFrameProps extends Omit<
   React.ComponentPropsWithRef<"div">,
@@ -99,6 +132,17 @@ interface ChamferFrameProps extends Omit<
   corners?: ChamferCorners;
   /** Hairline treatment. Defaults to `none` (borderless). */
   edge?: ChamferEdge;
+  /**
+   * Hard elevation cast at rest, following the chamfered silhouette rather
+   * than the root's rectangle. Defaults to `none`, which renders no layer at
+   * all — a flat frame stays exactly as many nodes as it was.
+   */
+  shadow?: ChamferShadow;
+  /**
+   * Cast while the frame is hovered. Setting it alone (with `shadow="none"`)
+   * casts only on hover.
+   */
+  shadowHover?: ChamferShadow;
   /** Draws the chamfered focus ring when the frame or its content is focused. */
   interactive?: boolean;
   /** Merges the frame's root props onto the single child element. */
@@ -194,6 +238,8 @@ function ChamferFrame({
   cut = "md",
   corners = "outer",
   edge = "none",
+  shadow = "none",
+  shadowHover,
   interactive = false,
   asChild = false,
   className,
@@ -205,10 +251,18 @@ function ChamferFrame({
   const clipClass = CHAMFER_CORNER_CLASSES[corners];
   const edgeClass = CHAMFER_EDGE_CLASSES[edge];
 
+  // A frame that never casts renders no shadow layer, so nothing changes for
+  // the flat surfaces that are most of the app. Once either state casts, both
+  // steps are pinned on the root: the rest class is what stops a nested frame
+  // from inheriting an ancestor frame's cast.
+  const casts = shadow !== "none" || (shadowHover ?? "none") !== "none";
+
   const rootClassName = cn(
     "relative isolate",
     CHAMFER_CUT_CLASSES[cut],
     interactive && "chamfer-focusable",
+    casts && CHAMFER_SHADOW_CLASSES[shadow],
+    casts && shadowHover && CHAMFER_SHADOW_HOVER_CLASSES[shadowHover],
     className
   );
 
@@ -242,6 +296,13 @@ function ChamferFrame({
 
     return (
       <>
+        {casts ? (
+          <span
+            aria-hidden="true"
+            data-slot="chamfer-shadow"
+            className={cn("chamfer-shadow-layer", clipClass)}
+          />
+        ) : null}
         {interactive ? (
           <span
             aria-hidden="true"
@@ -310,4 +371,10 @@ function ChamferFrame({
 }
 
 export { ChamferFrame };
-export type { ChamferFrameProps, ChamferCut, ChamferCorners, ChamferEdge };
+export type {
+  ChamferFrameProps,
+  ChamferCut,
+  ChamferCorners,
+  ChamferEdge,
+  ChamferShadow,
+};

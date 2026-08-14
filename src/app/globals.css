@@ -142,10 +142,26 @@
      Offsets step 2 → 4 → 6px so the three tiers stay separable at a glance.
      Alphas run higher than the blurred tokens they replace because the deep
      navy ground swallows a faint near-black cast, and a hard edge shows its
-     alpha honestly instead of averaging it away across a blur radius. */
-  --shadow-elevation-sm: 2px 2px 0 0 oklch(5% 0.004 260 / 0.45);
-  --shadow-elevation-md: 4px 4px 0 0 oklch(5% 0.004 260 / 0.55);
-  --shadow-elevation-lg: 6px 6px 0 0 oklch(5% 0.004 260 / 0.65);
+     alpha honestly instead of averaging it away across a blur radius.
+
+     Each tier is held as its offset and its color, then recomposed into the
+     `box-shadow` value. `box-shadow` traces the border box, so a clipped
+     surface (the chamfer vocabulary below) cannot use it and has to cast the
+     same step as a translated copy of its own polygon — which needs the offset
+     and the color as separate values. Composing the shadow from them keeps the
+     two consumers reading one source instead of two that can drift. */
+  --shadow-elevation-offset-sm: 2px;
+  --shadow-elevation-offset-md: 4px;
+  --shadow-elevation-offset-lg: 6px;
+  --shadow-elevation-color-sm: oklch(5% 0.004 260 / 0.45);
+  --shadow-elevation-color-md: oklch(5% 0.004 260 / 0.55);
+  --shadow-elevation-color-lg: oklch(5% 0.004 260 / 0.65);
+  --shadow-elevation-sm: var(--shadow-elevation-offset-sm)
+    var(--shadow-elevation-offset-sm) 0 0 var(--shadow-elevation-color-sm);
+  --shadow-elevation-md: var(--shadow-elevation-offset-md)
+    var(--shadow-elevation-offset-md) 0 0 var(--shadow-elevation-color-md);
+  --shadow-elevation-lg: var(--shadow-elevation-offset-lg)
+    var(--shadow-elevation-offset-lg) 0 0 var(--shadow-elevation-color-lg);
 
   /* ── Semantic layer: stable component-facing roles ── */
 
@@ -231,10 +247,21 @@
   --overlay: var(--overlay-strong-value);
   --overlay-light: var(--overlay-light-value);
 
-  /* Shadows */
+  /* Shadows
+     `--shadow-*` is the composed `box-shadow` rectangular chrome consumes.
+     `--shadow-offset-*` / `--shadow-color-*` are the same three tiers taken
+     apart, for a surface whose silhouette is a `clip-path` and therefore
+     cannot use `box-shadow` at all — it casts by translating a copy of its own
+     polygon (see the `chamfer-shadow-*` utilities). */
   --shadow-sm: var(--shadow-elevation-sm);
   --shadow-md: var(--shadow-elevation-md);
   --shadow-lg: var(--shadow-elevation-lg);
+  --shadow-offset-sm: var(--shadow-elevation-offset-sm);
+  --shadow-offset-md: var(--shadow-elevation-offset-md);
+  --shadow-offset-lg: var(--shadow-elevation-offset-lg);
+  --shadow-color-sm: var(--shadow-elevation-color-sm);
+  --shadow-color-md: var(--shadow-elevation-color-md);
+  --shadow-color-lg: var(--shadow-elevation-color-lg);
 
   /* Chart roles */
   --chart-1: var(--gold-500);
@@ -657,7 +684,8 @@
 
 /* Global navbar links use the locked Erode navigation treatment. */
 .font-nav {
-  font-family: var(--font-erode), var(--font-public-sans), system-ui, sans-serif;
+  font-family:
+    var(--font-erode), var(--font-public-sans), system-ui, sans-serif;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -846,6 +874,80 @@ body {
 /* Tier-5 lighting: brighter top-left falling to dimmer bottom-right. */
 @utility chamfer-edge-lighting {
   background-image: var(--edge-lighting);
+}
+
+/* ── Cast shadow ──
+   A chamfered surface cannot use `box-shadow`: `box-shadow` is generated from
+   the *border box*, so it paints a square-cornered rectangle that pokes out
+   through both cuts, and moving it onto the clipped layer instead deletes it —
+   the clip removes everything outside the polygon, and a cast shadow is by
+   definition outside it.
+
+   `filter: drop-shadow()` on the frame root traces the clipped silhouette
+   correctly, but a filter rasterizes the entire subtree it is applied to and
+   turns the root into a containing block for fixed descendants. That is a
+   heavy, action-at-a-distance price for a 2px offset.
+
+   So the frame casts the same step itself: one empty layer clipped to the same
+   polygon, filled with the shadow color, translated down-right by the shadow
+   offset, and painted behind the surface. A zero-blur `drop-shadow` *is* the
+   silhouette translated and recolored, so the two are geometrically identical
+   by construction.
+
+   Unlike the hairline and the focus ring, this layer takes **no miter
+   compensation**. Those two are strokes, and a stroke has to read at a uniform
+   perpendicular width. A shadow is a cast: the light direction is fixed, so an
+   edge oblique to it legitimately casts wider (a `d`-offset diagonal cast
+   measures `d·√2` perpendicular, exactly what `box-shadow` and `drop-shadow`
+   produce at a rounded or cut corner). Compensating it would be the bug.
+
+   The step is carried as two inherited custom properties, so rest and hover
+   are a class swap on the root that the layer follows — including the
+   transition, because the layer's own `translate` and `background-color`
+   computed values change with them. */
+@utility chamfer-shadow-none {
+  --chamfer-shadow-offset: 0px;
+  --chamfer-shadow-color: transparent;
+}
+
+@utility chamfer-shadow-sm {
+  --chamfer-shadow-offset: var(--shadow-offset-sm);
+  --chamfer-shadow-color: var(--shadow-color-sm);
+}
+
+@utility chamfer-shadow-md {
+  --chamfer-shadow-offset: var(--shadow-offset-md);
+  --chamfer-shadow-color: var(--shadow-color-md);
+}
+
+@utility chamfer-shadow-lg {
+  --chamfer-shadow-offset: var(--shadow-offset-lg);
+  --chamfer-shadow-color: var(--shadow-color-lg);
+}
+
+/* Sits below the focus layer (`z-index: -1`) so a focused frame still shows a
+   clean ring where the two overlap on the right and bottom edges. */
+.chamfer-shadow-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  translate: var(--chamfer-shadow-offset, 0px) var(--chamfer-shadow-offset, 0px);
+  background-color: var(--chamfer-shadow-color, transparent);
+  pointer-events: none;
+  transition-property: translate, background-color;
+  transition-duration: 200ms;
+  /* Tailwind's own default curve, so a frame whose surface animates its
+     elevation *color* with `transition-colors` moves in step with its cast. */
+  transition-timing-function: var(
+    --default-transition-timing-function,
+    cubic-bezier(0.4, 0, 0.2, 1)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chamfer-shadow-layer {
+    transition-duration: 0ms;
+  }
 }
 
 /* ── Keyboard focus ──

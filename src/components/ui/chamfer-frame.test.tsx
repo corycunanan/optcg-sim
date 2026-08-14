@@ -32,6 +32,10 @@ function edgeOf(container: HTMLElement) {
   return container.querySelector<HTMLElement>('[data-slot="chamfer-edge"]');
 }
 
+function castOf(container: HTMLElement) {
+  return container.querySelector<HTMLElement>('[data-slot="chamfer-shadow"]');
+}
+
 function classesOf(element: Element | null) {
   return element?.className.split(/\s+/) ?? [];
 }
@@ -184,6 +188,122 @@ describe("ChamferFrame hairline geometry", () => {
       "expected a miter factor on --chamfer-focus-ring"
     ).not.toBeNull();
     expect(Number(factor![1])).toBeCloseTo(MITER, 6);
+  });
+});
+
+describe("ChamferFrame cast shadow", () => {
+  it("casts nothing by default, so a flat frame keeps its node count", () => {
+    const { container } = render(<ChamferFrame>Panel</ChamferFrame>);
+
+    expect(castOf(container)).toBeNull();
+    expect(classesOf(frameOf(container))).not.toContain("chamfer-shadow-none");
+  });
+
+  it.each([
+    ["sm", "chamfer-shadow-sm"],
+    ["md", "chamfer-shadow-md"],
+    ["lg", "chamfer-shadow-lg"],
+  ] as const)("pins the %s step on the root", (shadow, shadowClass) => {
+    const { container } = render(
+      <ChamferFrame shadow={shadow}>Panel</ChamferFrame>
+    );
+
+    expect(classesOf(frameOf(container))).toContain(shadowClass);
+    expect(castOf(container)).not.toBeNull();
+  });
+
+  it("clips the cast to the frame's own polygon, uncompensated", () => {
+    const { container } = render(
+      <ChamferFrame corners="all" cut="lg" shadow="sm" interactive>
+        Panel
+      </ChamferFrame>
+    );
+    const cast = castOf(container)!;
+
+    expect(classesOf(cast)).toContain("chamfer-shadow-layer");
+    expect(classesOf(cast)).toContain("chamfer-all");
+    // A cast is not a stroke: the miter compensation that keeps the hairline
+    // and the focus ring uniform would be wrong here, and shrinking the clip
+    // on focus would pull the shadow in behind the ring.
+    expect(classesOf(cast)).not.toContain("chamfer-hairline-inset");
+    expect(classesOf(cast)).not.toContain("chamfer-focus-clip");
+    expect(cast.getAttribute("aria-hidden")).toBe("true");
+    // A direct child of the root, so nested frames stay independent.
+    expect(cast.parentElement).toBe(frameOf(container));
+  });
+
+  it("pins a rest step alongside the hover step", () => {
+    const { container } = render(
+      <ChamferFrame shadow="sm" shadowHover="md">
+        Panel
+      </ChamferFrame>
+    );
+
+    expect(classesOf(frameOf(container))).toEqual(
+      expect.arrayContaining(["chamfer-shadow-sm", "hover:chamfer-shadow-md"])
+    );
+  });
+
+  it("casts on hover only, without inheriting an ancestor frame's step", () => {
+    const { container } = render(
+      <ChamferFrame shadow="sm">
+        <ChamferFrame shadowHover="md">Panel</ChamferFrame>
+      </ChamferFrame>
+    );
+    const [outer, inner] = container.querySelectorAll<HTMLElement>(
+      '[data-slot="chamfer-frame"]'
+    );
+
+    expect(classesOf(outer)).toContain("chamfer-shadow-sm");
+    // The inherited custom properties are what an unset rest state would pick
+    // up, so the flat step is stated explicitly rather than left open.
+    expect(classesOf(inner)).toContain("chamfer-shadow-none");
+    expect(classesOf(inner)).toContain("hover:chamfer-shadow-md");
+    expect(castOf(inner)).not.toBeNull();
+  });
+
+  it("reads its offset and color from the elevation tokens", () => {
+    const layer = cssRule("chamfer-shadow-layer");
+
+    // Behind the surface *and* behind the focus ring, which overlaps it on
+    // the right and bottom edges.
+    expect(layer).toMatch(/z-index:\s*-2/);
+    expect(layer).toMatch(/position:\s*absolute/);
+    expect(layer).toMatch(/pointer-events:\s*none/);
+    expect(layer).toMatch(
+      /translate:\s*var\(--chamfer-shadow-offset[^)]*\)\s*var\(--chamfer-shadow-offset/
+    );
+    expect(layer).toMatch(/background-color:\s*var\(--chamfer-shadow-color/);
+
+    for (const step of ["sm", "md", "lg"] as const) {
+      const rule = cssRule(`chamfer-shadow-${step}`);
+      expect(rule).toContain(
+        `--chamfer-shadow-offset: var(--shadow-offset-${step})`
+      );
+      expect(rule).toContain(
+        `--chamfer-shadow-color: var(--shadow-color-${step})`
+      );
+    }
+  });
+
+  it("keeps the box-shadow tokens and their halves in agreement", () => {
+    // The composed `box-shadow` rectangular chrome uses and the halves the
+    // clipped cast uses have to be one source, or the two drift apart.
+    for (const step of ["sm", "md", "lg"] as const) {
+      expect(GLOBALS_CSS).toMatch(
+        new RegExp(
+          `--shadow-elevation-${step}:\\s*var\\(--shadow-elevation-offset-${step}\\)\\s*` +
+            `var\\(--shadow-elevation-offset-${step}\\)\\s*0\\s*0\\s*` +
+            `var\\(--shadow-elevation-color-${step}\\)`
+        )
+      );
+      expect(GLOBALS_CSS).toContain(
+        `--shadow-offset-${step}: var(--shadow-elevation-offset-${step})`
+      );
+      expect(GLOBALS_CSS).toContain(
+        `--shadow-color-${step}: var(--shadow-elevation-color-${step})`
+      );
+    }
   });
 });
 

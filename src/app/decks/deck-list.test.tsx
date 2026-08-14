@@ -87,7 +87,10 @@ describe("DeckList row", () => {
       name: "Straw Hat Aggro",
     });
     expect(link.getAttribute("href")).toBe("/decks/deck-1");
-    expect(within(listItem).getByText("Roronoa Zoro")).toBeTruthy();
+    // The subtitle names the leader *and* its printed ID: leaders are
+    // reprinted across sets, so the name alone does not identify the card.
+    expect(within(listItem).getByText("Roronoa Zoro (OP01-001)")).toBeTruthy();
+    expect(within(listItem).queryByText("Roronoa Zoro")).toBeNull();
     expect(within(listItem).getByText("47/50")).toBeTruthy();
 
     const updated = within(listItem).getByText("Apr 29, 2026");
@@ -112,7 +115,7 @@ describe("DeckList row", () => {
     expect(
       within(row()).getByText("Straw Hat Aggro").parentElement!.className
     ).toContain("text-base");
-    for (const label of ["Roronoa Zoro", "47/50", "Apr 29, 2026"]) {
+    for (const label of ["Roronoa Zoro (OP01-001)", "47/50", "Apr 29, 2026"]) {
       expect(within(row()).getByText(label).className).toContain("text-sm");
       expect(within(row()).getByText(label).className).not.toContain("text-xs");
     }
@@ -167,6 +170,34 @@ describe("DeckList row", () => {
     )!;
     expect(surface.className).toContain("bg-surface-1");
     expect(surface.className).toContain("group-hover:bg-surface-2");
+  });
+
+  it("casts the card-class hard shadow, sm at rest and md on hover", () => {
+    render(<DeckList decks={[DECK]} />);
+
+    const frame = row().querySelector<HTMLElement>(
+      '[data-slot="chamfer-frame"]'
+    )!;
+
+    // Art-bearing rows are card surfaces, not flat structural list rows
+    // (docs/design/ELEVATION-LANGUAGE.md §The three treatments).
+    expect(frame.className).toContain("chamfer-shadow-sm");
+    expect(frame.className).toContain("hover:chamfer-shadow-md");
+
+    // Cast through the frame's clipped layer, never `box-shadow`: a
+    // `box-shadow` is generated from the border box and would paint square
+    // corners straight through both 12px cuts.
+    expect(frame.querySelector('[data-slot="chamfer-shadow"]')).not.toBeNull();
+    expect(frame.className).not.toMatch(/(?:^|\s)(?:hover:)?shadow-/);
+
+    const shadowLayer = frame.querySelector<HTMLElement>(
+      '[data-slot="chamfer-shadow"]'
+    )!;
+    // The same polygon as the surface, translated rather than inset — so it
+    // deliberately takes no miter compensation and no focus-ring shrink.
+    expect(shadowLayer.className).toContain("chamfer-outer");
+    expect(shadowLayer.className).not.toContain("chamfer-focus-clip");
+    expect(shadowLayer.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("lets the metadata cluster wrap so a narrow row never overflows", () => {

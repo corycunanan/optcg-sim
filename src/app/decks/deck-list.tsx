@@ -58,6 +58,17 @@ const MAIN_DECK_SIZE = 50;
  * rectangle in the row, per the figure-ground rule in
  * `docs/design/SHAPE-LANGUAGE.md`.
  *
+ * Elevation: a **card surface**, not a structural list row — the row's subject
+ * is the leader's printed art, and the whole row is one object you pick up.
+ * `docs/design/ELEVATION-LANGUAGE.md` §The three treatments carves art-bearing
+ * rows out of the flat "list rows" bucket for exactly that reason, and puts
+ * them on the card register: `shadow-sm` at rest, `shadow-md` on hover, cast
+ * through `ChamferFrame`'s `shadow` layer so the cast follows the chamfered
+ * silhouette instead of a rectangle. Hover moves the row one full tier, so the
+ * elevation *color* step and the shadow step change together — the ladder in
+ * that doc pairs them per tier, which is why moving both is one change and not
+ * two (§Anti-stacking).
+ *
  * Interaction: the deck name carries the real link and stretches its hit area
  * over the whole row through an `::after` overlay, which keeps the row
  * single-click navigable *and* keeps the two nested controls — the leader
@@ -82,6 +93,8 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
       <ChamferFrame
         interactive
         cut="lg"
+        shadow="sm"
+        shadowHover="md"
         className="group"
         surfaceClassName="bg-surface-1 group-hover:bg-surface-2 relative flex items-center gap-4 p-4 transition-colors duration-200"
       >
@@ -155,8 +168,14 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
                 {deck.name}
               </Link>
             </h2>
+            {/*
+              Name *and* printed ID, because the name alone is ambiguous: a
+              leader is reprinted across sets, and players trade and talk in
+              IDs. `Card.id` is the printed ID (`prisma/schema.prisma`), so no
+              second lookup is needed — the row already has it for the panel.
+            */}
             <p className="text-content-tertiary mt-1 truncate text-sm">
-              {leader.name}
+              {leader.name} ({leader.id})
             </p>
           </div>
 

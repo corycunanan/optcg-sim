@@ -28,12 +28,16 @@ export default function DecksLoading() {
         </PageHeaderActions>
       </PageHeader>
 
-      {/* Mirrors the row list: same chamfer, same surface step, same gap. */}
+      {/* Mirrors the row list: same chamfer, same surface step, same resting
+          cast, same gap — so the rows do not visibly change altitude when the
+          real list swaps in. Only the hover step is absent, since a skeleton
+          has nothing to hover. */}
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-6 py-8">
         {Array.from({ length: 6 }).map((_, index) => (
           <ChamferFrame
             key={index}
             cut="lg"
+            shadow="sm"
             surfaceClassName="bg-surface-1 flex items-center gap-4 p-4"
             aria-hidden="true"
           >
