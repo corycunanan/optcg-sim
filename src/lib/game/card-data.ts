@@ -33,7 +33,12 @@ export function toCardData(card: Card): CardData {
     effectText: card.effectText,
     triggerText: card.triggerText ?? null,
     keywords: extractKeywords(card.effectText, card.triggerText ?? null),
-    effectSchema: card.effectSchema ?? null,
+    // Card.effectSchema holds only the deck-legality subset materialized by
+    // pipeline/sync-effect-schemas.ts ({ rule_modifications } with no
+    // `effects` array), which fails the engine's full-schema validation. The
+    // worker injects the authored registry at init and always prefers it, so
+    // never ship the DB column across the wire.
+    effectSchema: null,
     imageUrl: card.imageUrl,
   });
 }
