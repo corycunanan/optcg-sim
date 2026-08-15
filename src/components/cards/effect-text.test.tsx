@@ -160,6 +160,46 @@ describe("EffectText", () => {
     expect(chip.props.className).not.toContain("border-effect-notation-edge");
   });
 
+  it("sets the price of an effect in the body face's semibold cut", () => {
+    const [cost] = render(EB02_052).root.findAll(
+      (node) => node.props["data-effect-cost"] !== undefined
+    );
+
+    expect(instanceText(cost)).toBe("You may trash 1 card from your hand");
+    expect(cost.props.className).toBe("font-semibold");
+  });
+
+  it("keeps the colon and the effect it buys at the paragraph's own weight", () => {
+    const rendered = plainText(render(EB02_052).toJSON() as ReactTestRendererJSON);
+
+    expect(rendered).toContain("from your hand: If you have 1 or less Life");
+    expect(
+      renderer!.root.findAll(
+        (node) => node.props["data-effect-cost"] !== undefined
+      )
+    ).toHaveLength(1);
+  });
+
+  it("keeps a trait chip inside a cost rendered as a chip", () => {
+    const cost = render(
+      "[On Play] You may trash 1 {Navy} type card from your hand: Draw 1 card."
+    ).root.find((node) => node.props["data-effect-cost"] !== undefined);
+
+    const trait = cost.find(
+      (node) => node.props["data-effect-trait"] !== undefined
+    );
+    expect(trait.props["data-effect-trait"]).toBe("Navy");
+    expect(instanceText(cost)).toBe("You may trash 1 Navy type card from your hand");
+  });
+
+  it("leaves an unpriced option header at the paragraph's own weight", () => {
+    const tree = render("[On Play] Choose one:");
+
+    expect(
+      tree.root.findAll((node) => node.props["data-effect-cost"] !== undefined)
+    ).toHaveLength(0);
+  });
+
   it("renders effect text with no notation as a single paragraph", () => {
     const tree = render("Draw 1 card.");
     expect(tree.root.findAllByType("p")).toHaveLength(1);
