@@ -316,9 +316,12 @@ function containsEffectHeading(phrase: string): boolean {
  * the source from being emphasized end to end.
  *
  * The full stop has to be a real one: `K.O.` and `Monkey.D.Luffy` abbreviate
- * with periods, so only a period after a lowercase letter, a digit, or a closing
- * quote counts. Periods inside reminder text are skipped with the parentheses
- * that wrap it.
+ * with periods, so a period after a capital is not the end of anything. What
+ * does end a sentence is a period after a lowercase letter, a digit, a closing
+ * quote, or a closing delimiter — nothing abbreviates through `]` or `}`, so
+ * `You may play [Monkey.D.Luffy]. Then, choose one:` is two sentences and prices
+ * neither. Periods inside reminder text are skipped with the parentheses that
+ * wrap it.
  */
 function runsPastOneClause(phrase: string): boolean {
   let depth = 0;
@@ -333,7 +336,7 @@ function runsPastOneClause(phrase: string): boolean {
     else if (character === ".") {
       const before = phrase[index - 1] ?? "";
       const after = phrase.slice(index + 1);
-      if (/[a-z0-9)"']/.test(before) && (after === "" || /^[\s[]/.test(after)))
+      if (/[a-z0-9)\]}"']/.test(before) && (after === "" || /^[\s[]/.test(after)))
         return true;
     }
   }

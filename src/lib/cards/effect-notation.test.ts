@@ -321,6 +321,17 @@ describe("parseEffectLine costs", () => {
     ).toEqual([]);
   });
 
+  it.each([
+    "[On Play] You may play [Monkey.D.Luffy]. Then, choose one: Draw 1 card.",
+    "[On Play] You may trash 1 card that is a {Navy}. Then, choose one: Draw 1 card.",
+    "[Main] You may reveal 1 card with a type including \"CP\". Then, choose one: Draw 1 card.",
+  ])(
+    "ends the clause at a full stop that closes a bracket, brace, or quote: %s",
+    (line) => {
+      expect(costsOf(line)).toEqual([]);
+    }
+  );
+
   it("does not price across a semicolon", () => {
     expect(
       costsOf(
