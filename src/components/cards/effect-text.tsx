@@ -7,10 +7,11 @@ import {
 
 /**
  * Renders a card's printed rules text the way the card prints it: one paragraph
- * per effect, bracketed notation set as inline chips colored by family, and
- * `{Trait}` types set as a quieter inline chip. Everything the notation
- * vocabulary does not recognize — referenced card names such as
- * `[Monkey.D.Luffy]`, reminder text, plain prose — is passed through verbatim.
+ * per effect, bracketed notation set as inline chips colored by family,
+ * `{Trait}` types set as a quieter inline chip, and the price an effect asks for
+ * set in the body face's semibold cut. Everything the notation vocabulary does
+ * not recognize — referenced card names such as `[Monkey.D.Luffy]`, reminder
+ * text, plain prose — is passed through verbatim.
  *
  * Chip geometry is chosen so a chip never disturbs the paragraph's rhythm: at
  * `leading-4` plus a hairline the chip is 18px tall, which fits inside the
@@ -106,10 +107,31 @@ const TRAIT_CHIP = cn(
   "rounded bg-surface-2 px-1 text-sm font-medium text-content-secondary"
 );
 
+/**
+ * The price of an effect. Weight is the whole treatment — no size, color, or
+ * chip — because the cost is not a different *kind* of thing from the sentence
+ * it opens, it is the part of that sentence a player checks first. Public Sans
+ * carries 600, so this is a real cut rather than a synthesized one, and weight
+ * alone means the emphasis survives however the paragraph rewraps.
+ *
+ * `<span>` rather than `<strong>` on purpose: the cost boundary is recognized by
+ * a grammar over printed text, not read off structured data, so the markup does
+ * not claim more about the run than the parser actually knows.
+ */
+const COST = "font-semibold";
+
 function renderSegments(segments: EffectSegment[]) {
   return segments.map((segment, index) => {
     if (segment.kind === "text") {
       return <span key={index}>{segment.text}</span>;
+    }
+
+    if (segment.kind === "cost") {
+      return (
+        <span key={index} className={COST} data-effect-cost="">
+          {renderSegments(segment.segments)}
+        </span>
+      );
     }
 
     if (segment.kind === "trait") {
