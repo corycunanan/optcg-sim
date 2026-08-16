@@ -15,6 +15,14 @@ vi.mock("@/components/ui", () => ({
   DialogHeader: ({ children }: { children: React.ReactNode }) => children,
   DialogTitle: ({ children }: { children: React.ReactNode }) => children,
 }));
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children }: { children: React.ReactNode }) => (
+    <div role="dialog">{children}</div>
+  ),
+  DialogContent: ({ children }: { children: React.ReactNode }) => children,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => children,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock("../game-button", () => ({
   GameButton: ({
     children,
@@ -23,29 +31,6 @@ vi.mock("../game-button", () => ({
     children: React.ReactNode;
     onClick?: () => void;
   }) => <button onClick={onClick}>{children}</button>,
-}));
-vi.mock("./pregame-overlay", () => ({
-  PregameOverlay: ({
-    pregame,
-  }: {
-    pregame: NonNullable<GameState["pregame"]>;
-  }) => (
-    <div data-testid="interactive-pregame">
-      {pregame.phase === "MULLIGAN_DECISIONS" && (
-        <div role="dialog">
-          <button>Keep hand</button>
-          <button>Redraw</button>
-        </div>
-      )}
-      {pregame.phase === "PRIORITY_CHOICE" && (
-        <>
-          <span>You won the roll</span>
-          <span>Choose first or second</span>
-        </>
-      )}
-      {pregame.phase === "START_OF_GAME_FX" && <span>Preparing the game</span>}
-    </div>
-  ),
 }));
 import { GameOverlayGate } from "./game-overlay-gate";
 
@@ -284,10 +269,47 @@ describe("GameOverlayGate spectator policy", () => {
     const rendered = renderGate({
       viewerRole: "player",
       pregame: pregame({ phase: "MULLIGAN_DECISIONS" }),
+      activePrompt: {
+        promptType: "PLAYER_CHOICE",
+        choices: [],
+        effectDescription: "PREGAME_MULLIGAN",
+        source: "PREGAME",
+      },
+      promptRespondingPlayer: 0,
     });
     const root = rendered.root;
 
     expect(root.findAllByProps({ role: "dialog" })).toHaveLength(1);
     expect(JSON.stringify(rendered.toJSON())).toContain("Keep hand");
+  });
+
+  it("yields to a player's interactive start-of-game prompt", () => {
+    const rendered = renderGate({
+      viewerRole: "player",
+      pregame: pregame({
+        phase: "START_OF_GAME_FX",
+        firstPlayerIndex: 0,
+      }),
+      activePrompt: {
+        promptType: "ARRANGE_TOP_CARDS",
+        cards: [
+          {
+            instanceId: "imu-deck-top-1",
+            cardId: "OP13-097",
+            zone: "DECK",
+            state: "ACTIVE",
+            attachedDon: [],
+            turnPlayed: null,
+            controller: 0,
+            owner: 0,
+          },
+        ],
+        effectDescription: "Arrange the top cards",
+        canSendToBottom: true,
+      },
+      promptRespondingPlayer: 0,
+    });
+
+    expect(rendered.toJSON()).toBeNull();
   });
 });

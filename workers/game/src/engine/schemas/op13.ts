@@ -2757,9 +2757,8 @@ export const OP13_078_ORO_JACKSON: EffectSchema = {
 // [Activate: Main] [Once Per Turn] You may trash 1 of your {Celestial Dragons}
 // type Characters or 1 card from your hand: Draw 1 card.
 //
-// NOTE: START_OF_GAME_EFFECT schema is encoded but engine setup does not yet
-// process start-of-game rule modifications. The schema is ready for when that
-// support is added.
+// The START_OF_GAME_EFFECT schema below applies Imu's deck rule and resolves
+// the optional Mary Geoise placement during the pregame sequence.
 
 export const OP13_079_IMU: EffectSchema = {
   card_id: "OP13-079",
