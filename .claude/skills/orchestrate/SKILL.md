@@ -38,11 +38,14 @@ Confirm the resolved scope (issue list + proposed ordering/waves) with the user 
 
 For each issue, in wave order (one issue per dependency track in parallel; wide-surface sweeps run alone, last).
 
-**Queue discipline:** when a wave dispatches, every ratified-scope issue that is NOT part of the in-flight wave moves to Todo (queued for this run) — only actively dispatched issues sit In Progress. Apply at first dispatch (all later-wave issues → Todo) and re-assert at every wave boundary.
+**Queue discipline:** when a wave dispatches, every ratified-scope issue that is NOT part of the in-flight wave moves to Todo (queued for this run) — only actively dispatched issues sit In Progress. Apply at first dispatch (all later-wave issues → Todo) and re-assert at every wave boundary. Checked when: a `list_issues` over the scope shows exactly the in-flight wave In Progress and every other scope issue Todo or Done.
 
 1. Linear → In Progress.
 2. Fresh standalone clone: `git clone <local-repo> /private/tmp/optcg-opt<NNN>`, origin → GitHub URL, branch = the issue's `gitBranchName` from `origin/main`. Never git worktrees.
-3. Dispatch via the machine's runtime (see **Dispatch runtime**) from the clone. Prompt embeds: full ticket text, fresh-inventory instruction, behavior-preservation + scope-freeze rules, scope fences naming sibling tickets' surfaces, validation expectations (baseline + post-change in PR body), deliverable spec (commit suffix `(OPT-NNN)`, push, `gh pr create` ready-for-review NOT draft, no merge, no Linear writes).
+3. Dispatch via the machine's runtime (see **Dispatch runtime**) from the clone. Prompt embeds: full ticket text, fresh-inventory instruction, behavior-preservation + scope-freeze rules, scope fences naming sibling tickets' surfaces, validation expectations (baseline + post-change in PR body), deliverable spec (commit suffix `(OPT-NNN)`, push, `gh pr create` ready-for-review NOT draft, no merge, no Linear writes). Two standing prompt clauses:
+   - **Red-first (bugfix tickets):** author the regression test before the fix and run it — the PR body shows the test failing on the pre-fix code (red), then passing after (green). A bugfix PR whose test never went red has not demonstrated it covers the bug.
+   - **Tagged instrumentation:** any temporary debug output added while implementing carries a unique `[DEBUG-<tag>]` prefix; before committing, grep the tag and remove every hit. Untagged debug logs survive into PRs; tagged ones die.
+   - **PR prose style:** the PR body follows the user's writing rule (`~/.claude/rules/writing-style.md`): lead with the outcome, ~20-word sentences, active voice with a named actor, one name per thing used verbatim throughout, exact `file:line` for every claim. Embed this clause in the dispatch prompt.
 4. On completion: sync clone to PR head (`git branch main origin/main` for review base), run the runtime's adversarial review with a targeted hunt brief naming failure classes, plus your own orchestrator review of the diff.
 5. Findings → resume the implementation thread (runtime's resume mechanism) with the findings verbatim; re-verify the fix (delta review). Cap: 1 full + 1 delta; unresolved survivors stop the merge and surface to the user.
 6. Merge gate: CI green + adversarial approve + your review clean → `gh pr merge <N> --squash --match-head-commit <reviewed-sha>`. Conflicts: merge `origin/main` into the branch (never rebase/force-push an open PR).
@@ -59,6 +62,8 @@ For each issue, in wave order (one issue per dependency track in parallel; wide-
 3. Compile deferred Follow-ups from merged PR bodies into the handoff or new Linear issues (per ticket instructions).
 4. Clean up `/private/tmp/optcg-*` clones and any Codex-created working dirs for this scope.
 5. Report the final scoreboard to the user.
+
+Close-out is complete when every scope issue is Done in Linear with its merged PR attached, no `/private/tmp/optcg-*` directory for this scope remains (or its removal was denied and surfaced), and the scoreboard names every merged PR and every deferred follow-up by ticket.
 
 ## Hard rules
 
