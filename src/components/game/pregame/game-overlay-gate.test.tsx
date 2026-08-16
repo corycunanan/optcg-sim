@@ -312,4 +312,18 @@ describe("GameOverlayGate spectator policy", () => {
 
     expect(rendered.toJSON()).toBeNull();
   });
+
+  it("keeps preparing the game visible without a start-of-game prompt", () => {
+    const rendered = renderGate({
+      viewerRole: "player",
+      pregame: pregame({
+        phase: "START_OF_GAME_FX",
+        firstPlayerIndex: 0,
+      }),
+      activePrompt: null,
+      pendingPrompt: null,
+    });
+
+    expect(JSON.stringify(rendered.toJSON())).toContain("Preparing the game");
+  });
 });
