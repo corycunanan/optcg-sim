@@ -14,10 +14,11 @@
  *     · Shows the responding player's opening hand with Keep / Redraw buttons.
  *     · Other player sees a waiting state.
  *
- * Server-side phases (HAND_DEAL, LIFE_PLACEMENT, START_OF_GAME_FX) drain in
- * one tick on the worker so the overlay typically does not render them. If a
- * client briefly sees them (e.g. a slow network frame), it shows a generic
- * "preparing the game" placeholder.
+ * Server-side phases (HAND_DEAL, LIFE_PLACEMENT, START_OF_GAME_FX) usually
+ * drain in one tick on the worker. If a client briefly sees them (e.g. a slow
+ * network frame), it shows a generic "preparing the game" placeholder. An
+ * interactive START_OF_GAME_FX prompt is already owned by BoardModals, so the
+ * overlay yields until that prompt is resolved.
  */
 
 import type { CardDb, GameAction, GameState, PromptOptions } from "@shared/game-types";
@@ -79,6 +80,8 @@ export function PregameOverlay({
       />
     );
   }
+
+  if (phase === "START_OF_GAME_FX" && activePrompt) return null;
 
   // HAND_DEAL / START_OF_GAME_FX / LIFE_PLACEMENT / DONE — usually transient.
   return (
