@@ -919,23 +919,74 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
   });
 
-  it("rejects host readiness changes in Solitaire mode", async () => {
-    lobbyFindUniqueMock.mockResolvedValueOnce(
-      baseLobby({
-        mode: "SOLITAIRE",
-        pregameMode: "SOLITAIRE_RANDOM",
-        hostReady: false,
-      }),
-    );
+  describe("host ready changes across lobby mode transitions", () => {
+    it("rejects ready=true when a PVP lobby targets Solitaire mode", async () => {
+      const res = await PATCH(
+        buildRequest({ mode: "SOLITAIRE", ready: true }),
+        params,
+      );
 
-    const res = await PATCH(buildRequest({ ready: true }), params);
-
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({
-      error: "Ready cannot be changed in this lobby mode",
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Ready cannot be changed in this lobby mode",
+      });
+      expect(transactionMock).not.toHaveBeenCalled();
+      expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
     });
-    expect(transactionMock).not.toHaveBeenCalled();
-    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+
+    it("rejects ready=true on a Solitaire-to-PVP switch as a compound host-controlled change", async () => {
+      lobbyFindUniqueMock.mockResolvedValueOnce(
+        baseLobby({
+          mode: "SOLITAIRE",
+          pregameMode: "SOLITAIRE_RANDOM",
+          hostReady: false,
+        }),
+      );
+
+      const res = await PATCH(
+        buildRequest({ mode: "PVP", ready: true }),
+        params,
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Ready cannot be set while changing host-controlled settings",
+      });
+      expect(transactionMock).not.toHaveBeenCalled();
+      expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects ready=false while remaining in Solitaire mode", async () => {
+      lobbyFindUniqueMock.mockResolvedValueOnce(
+        baseLobby({
+          mode: "SOLITAIRE",
+          pregameMode: "SOLITAIRE_RANDOM",
+          hostReady: false,
+        }),
+      );
+
+      const res = await PATCH(buildRequest({ ready: false }), params);
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Ready cannot be changed in this lobby mode",
+      });
+      expect(transactionMock).not.toHaveBeenCalled();
+      expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+    });
+
+    it("still allows ready=true while remaining in PVP mode", async () => {
+      const res = await PATCH(buildRequest({ ready: true }), params);
+
+      expect(res.status).toBe(200);
+      expect(lobbyUpdateManyMock).toHaveBeenCalledWith({
+        where: { id: "lobby-1", status: "READY", mode: "PVP" },
+        data: {
+          hostReady: true,
+          revision: { increment: 1 },
+        },
+      });
+    });
   });
 
   it("clears hostReady when the host changes their deck", async () => {
