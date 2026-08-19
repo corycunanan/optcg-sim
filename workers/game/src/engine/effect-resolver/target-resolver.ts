@@ -405,11 +405,22 @@ export function computeAllValidTargets(
       if (target.filter && !matchesFilterForTarget(leader, target.filter, cardDb, state, _resultRefs)) return [];
       return [leader.instanceId];
     }
-    case "ALL_YOUR_CHARACTERS":
-      return state.players[controller].characters.filter(Boolean).map((c) => c!.instanceId);
+    case "ALL_YOUR_CHARACTERS": {
+      let candidates = state.players[controller].characters.filter(isPresent);
+      if (target.filter) candidates = candidates.filter((c) => {
+        if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
+        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
+      });
+      return candidates.map((c) => c.instanceId);
+    }
     case "ALL_OPPONENT_CHARACTERS": {
       const opp = controller === 0 ? 1 : 0;
-      return state.players[opp].characters.filter(Boolean).map((c) => c!.instanceId);
+      let candidates = state.players[opp].characters.filter(isPresent);
+      if (target.filter) candidates = candidates.filter((c) => {
+        if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
+        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
+      });
+      return candidates.map((c) => c.instanceId);
     }
     case "CHARACTER":
     case "LEADER_OR_CHARACTER":
@@ -594,6 +605,9 @@ export function autoSelectTargets(
   if (!target) return allValidIds;
   // dual_targets: return all provided IDs — they've already been validated by feasibility check
   if (target.dual_targets && target.dual_targets.length > 0) return allValidIds;
+  if (target.type === "ALL_YOUR_CHARACTERS" || target.type === "ALL_OPPONENT_CHARACTERS") {
+    return allValidIds;
+  }
   const count = target.count;
   if (!count) return allValidIds.slice(0, 1);
   if ("all" in count) return allValidIds;
