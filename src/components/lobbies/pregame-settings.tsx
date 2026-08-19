@@ -57,6 +57,8 @@ export const SOLITAIRE_PREGAME_MODE_OPTIONS: ReadonlyArray<{
   },
 ];
 
+export const PREGAME_SETTINGS_DESCRIPTION_ID = "pregame-settings-description";
+
 export function PregameSettings({
   mode = "PVP",
   value,
@@ -85,7 +87,7 @@ export function PregameSettings({
           >
             {solitaire ? "Side to go first" : "Pre-game"}
           </h2>
-          <p className="text-text-secondary mt-1 text-sm">
+          <p id={PREGAME_SETTINGS_DESCRIPTION_ID} className="text-text-secondary mt-1 text-sm">
             {solitaire
               ? "Skip the priority roll and choose which side leads the test."
               : "Choose how the first player is decided before setup begins."}

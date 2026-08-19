@@ -68,7 +68,10 @@ import {
   KickPlayerMenuItem,
 } from "./kick-player-action";
 import { LobbySeatCard } from "./lobby-seat-card";
-import { PregameSettings } from "./pregame-settings";
+import {
+  PREGAME_SETTINGS_DESCRIPTION_ID,
+  PregameSettings,
+} from "./pregame-settings";
 import { SpectatorsModal } from "./spectators-modal";
 
 interface DeckOption extends LobbyRoomDeck {
@@ -850,7 +853,7 @@ export function LobbyRoomShell({
                   </TooltipTrigger>
                   <TooltipContent>Match settings</TooltipContent>
                 </TooltipRoot>
-                <DialogContent size="lg">
+                <DialogContent aria-describedby={PREGAME_SETTINGS_DESCRIPTION_ID} size="lg">
                   <DialogTitle className="sr-only">Match settings</DialogTitle>
                   <PregameSettings
                     mode={lobby.mode}

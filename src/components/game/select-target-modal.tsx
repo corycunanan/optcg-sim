@@ -198,6 +198,7 @@ export function SelectTargetModal({
       }}
     >
       <DialogContent
+        aria-describedby={undefined}
         showCloseButton={false}
         onEscapeKeyDown={(event) => {
           if (selectedIds.size === 0) return;

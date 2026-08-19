@@ -58,7 +58,7 @@ export function ExportModal({ name, leader, cards, onClose }: ExportModalProps) 
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent size="md">
+      <DialogContent aria-describedby={undefined} size="md">
         <DialogHeader>
           <DialogTitle>Export Deck</DialogTitle>
         </DialogHeader>

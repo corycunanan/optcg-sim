@@ -301,6 +301,7 @@ export function ArrangeTopCardsModal({
   return (
     <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
       <DialogContent
+        aria-describedby={undefined}
         showCloseButton={false}
         onEscapeKeyDown={(event) => {
           const action = getArrangeEscapeAction(activeId, selectedId, step);

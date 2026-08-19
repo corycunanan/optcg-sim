@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { VisuallyHidden } from "radix-ui";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -97,6 +98,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
+        aria-describedby={undefined}
         size="xl"
         showCloseButton={false}
         className="flex h-[90vh] flex-col overflow-hidden p-0"
@@ -105,6 +107,9 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-4">
           {loading || !card ? (
             <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <VisuallyHidden.Root>
+                <DialogTitle>Loading card details</DialogTitle>
+              </VisuallyHidden.Root>
               <Skeleton className="h-6 w-48" />
               <Skeleton className="h-6 w-64" />
             </div>

@@ -146,12 +146,12 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent size="md">
+      <DialogContent aria-describedby="import-modal-description" size="md">
         <DialogHeader>
           <DialogTitle>Import Deck</DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <p className="text-content-tertiary text-sm">
+          <p id="import-modal-description" className="text-content-tertiary text-sm">
             Paste your deck list below. Supports{" "}
             <code className="bg-muted rounded px-1">
               4x OP01-004

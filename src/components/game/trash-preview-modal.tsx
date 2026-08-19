@@ -30,6 +30,7 @@ export function TrashPreviewModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        aria-describedby="trash-preview-modal-description"
         showCloseButton={false}
         className="bg-gb-surface border-gb-border-strong text-gb-text flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
       >
@@ -51,7 +52,7 @@ export function TrashPreviewModal({
               Browse only
             </Badge>
           </div>
-          <p className="text-sm text-gb-text-dim">
+          <p id="trash-preview-modal-description" className="text-sm text-gb-text-dim">
             Cards in this preview are not selectable.
           </p>
         </DialogHeader>

@@ -129,6 +129,10 @@ describe("CardDetailModal header", () => {
     mocks.apiGet.mockReturnValue(new Promise(() => {}));
     render(<CardDetailModal cardId="OP16-006" onClose={vi.fn()} />);
 
+    expect(
+      screen.getByRole("dialog", { name: "Loading card details" })
+    ).toBeTruthy();
+
     let skeletons: NodeListOf<Element> = document.querySelectorAll(
       '[data-slot="skeleton"]'
     );

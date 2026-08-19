@@ -11,7 +11,10 @@ vi.mock("@/components/ui", () => ({
   Dialog: ({ children }: { children: React.ReactNode }) => (
     <div role="dialog">{children}</div>
   ),
-  DialogContent: ({ children }: { children: React.ReactNode }) => children,
+  DialogContent: ({
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
   DialogHeader: ({ children }: { children: React.ReactNode }) => children,
   DialogTitle: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -103,6 +106,19 @@ function pregame(
 }
 
 describe("GameOverlayGate spectator policy", () => {
+  it("wires the completed match dialog to its reason", () => {
+    const rendered = renderGate({ matchClosed: true, viewerRole: "player" });
+    const description = rendered.root.findByProps({
+      id: "match-complete-dialog-description",
+    });
+    const content = rendered.root.findByProps({
+      "aria-describedby": "match-complete-dialog-description",
+    });
+
+    expect(description.children).toEqual(["Conceded"]);
+    expect(content).toBeDefined();
+  });
+
   it("renders mid-mulligan passively without a focus-trapping dialog", () => {
     const rendered = renderGate({
       pregame: pregame({

@@ -57,6 +57,7 @@ export function DeckPreviewModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        aria-describedby={undefined}
         size="2xl"
         showCloseButton
         className="flex max-h-[85vh] flex-col overflow-hidden p-0"

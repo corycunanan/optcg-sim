@@ -34,6 +34,7 @@ export function RevealTriggerModal({
   return (
     <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
       <DialogContent
+        aria-describedby="reveal-trigger-modal-description"
         showCloseButton={false}
         className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[400px] p-0 gap-0"
       >
@@ -56,7 +57,7 @@ export function RevealTriggerModal({
                 className="shrink-0"
               />
             )}
-            <p className="flex-1 text-sm text-gb-text leading-snug pt-1">
+            <p id="reveal-trigger-modal-description" className="flex-1 text-sm text-gb-text leading-snug pt-1">
               {effectDescription}
             </p>
           </div>

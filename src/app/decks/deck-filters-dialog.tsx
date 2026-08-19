@@ -32,7 +32,10 @@ export function DeckFiltersDialog({
 }: DeckFiltersDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent id={DECK_FILTERS_DIALOG_ID} size="sm">
+      <DialogContent
+        id={DECK_FILTERS_DIALOG_ID}
+        size="sm"
+      >
         {open && (
           <DeckFiltersForm
             selectedColors={selectedColors}
