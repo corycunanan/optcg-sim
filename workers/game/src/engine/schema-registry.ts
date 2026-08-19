@@ -594,6 +594,15 @@ function validateTargetController(target: Action["target"], prefix: string): str
   if (target?.type && !VALID_TARGET_TYPES.has(target.type)) {
     errors.push(`${prefix}.target: Unknown target type '${target.type}'`);
   }
+  if (
+    (target?.type === "ALL_YOUR_CHARACTERS" || target?.type === "ALL_OPPONENT_CHARACTERS") &&
+    target.count &&
+    !("all" in target.count)
+  ) {
+    errors.push(
+      `${prefix}.target.count: [C9] Target type '${target.type}' has implicit { all: true }; remove count or use { all: true }`,
+    );
+  }
   errors.push(...validateTargetFilterController(
     target?.filter as TargetFilter | undefined,
     `${prefix}.target`,
