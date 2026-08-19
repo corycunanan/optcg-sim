@@ -514,16 +514,17 @@ export function LobbyRoomShell({
           <PageHeaderActions className="w-full gap-3 lg:w-auto lg:justify-end">
             <div className="min-w-0">
               <div
-                className="border-border bg-surface-3 inline-flex h-12 w-fit rounded-md border p-1"
+                className="border-border bg-surface-3 inline-flex w-fit rounded-md border p-1"
                 role="group"
                 aria-label="Game mode"
               >
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="default"
                   onClick={() => void onModeChange("PVP")}
                   disabled={!isHost || mutating || isInGame}
                   className={cn(
-                    "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
                     lobby.mode === "PVP"
                       ? "bg-accent text-accent-foreground disabled:opacity-100"
                       : "text-content-secondary hover:text-content-primary disabled:opacity-50"
@@ -531,16 +532,18 @@ export function LobbyRoomShell({
                   aria-pressed={lobby.mode === "PVP"}
                 >
                   Versus
-                </button>
+                </Button>
                 <Tooltip
                   content={
                     solitaireBlockedReason ??
                     (!isHost ? "Only the host can change game mode" : undefined)
                   }
                 >
-                  <span className="h-full">
-                    <button
+                  <span>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="default"
                       onClick={() => void onModeChange("SOLITAIRE")}
                       disabled={
                         !isHost ||
@@ -549,7 +552,6 @@ export function LobbyRoomShell({
                         Boolean(solitaireBlockedReason)
                       }
                       className={cn(
-                        "focus-visible:outline-border-focus flex h-full items-center rounded px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed",
                         lobby.mode === "SOLITAIRE"
                           ? "bg-accent text-accent-foreground disabled:opacity-100"
                           : "text-content-secondary hover:text-content-primary disabled:opacity-50"
@@ -562,7 +564,7 @@ export function LobbyRoomShell({
                       }
                     >
                       Solitaire
-                    </button>
+                    </Button>
                   </span>
                 </Tooltip>
               </div>
@@ -1189,10 +1191,12 @@ function PartyCode({
   onCopy: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="default"
+      size="lg"
       onClick={onCopy}
-      className="border-border bg-surface-3 hover:border-border-strong focus-visible:outline-border-focus flex h-12 items-center gap-2 rounded-md border p-1 pl-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="gap-2 p-1 pl-3 text-left"
       aria-label={copied ? "Party link copied" : "Copy party link"}
     >
       <span className="text-content-primary font-mono text-sm font-semibold tracking-widest">
@@ -1206,7 +1210,7 @@ function PartyCode({
       >
         {copied ? "Copied!" : "Copy"}
       </span>
-    </button>
+    </Button>
   );
 }
 
