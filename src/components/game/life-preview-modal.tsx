@@ -40,6 +40,7 @@ export function LifePreviewModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        aria-describedby={undefined}
         showCloseButton={false}
         className="border-gb-border-strong bg-gb-surface text-gb-text flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
       >

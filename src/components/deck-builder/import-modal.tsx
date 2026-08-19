@@ -146,7 +146,7 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent size="md">
+      <DialogContent aria-describedby={undefined} size="md">
         <DialogHeader>
           <DialogTitle>Import Deck</DialogTitle>
         </DialogHeader>

@@ -53,6 +53,7 @@ export function CardFiltersDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        aria-describedby={undefined}
         id={CARD_FILTERS_DIALOG_ID}
         size="lg"
         className="grid-rows-[auto_minmax(0,1fr)_auto] overflow-y-hidden"

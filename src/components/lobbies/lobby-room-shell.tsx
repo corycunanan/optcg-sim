@@ -850,7 +850,7 @@ export function LobbyRoomShell({
                   </TooltipTrigger>
                   <TooltipContent>Match settings</TooltipContent>
                 </TooltipRoot>
-                <DialogContent size="lg">
+                <DialogContent aria-describedby={undefined} size="lg">
                   <DialogTitle className="sr-only">Match settings</DialogTitle>
                   <PregameSettings
                     mode={lobby.mode}

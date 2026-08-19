@@ -99,6 +99,7 @@ export function GameOverlayGate({
     return (
       <Dialog open>
         <DialogContent
+          aria-describedby={undefined}
           showCloseButton={false}
           className="bg-gb-surface border-gb-border-strong text-gb-text text-center sm:max-w-[400px]"
           onInteractOutside={(event) => event.preventDefault()}

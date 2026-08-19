@@ -116,6 +116,7 @@ export function PlayerChoiceModal({
       }}
     >
       <DialogContent
+        aria-describedby={undefined}
         showCloseButton={false}
         className="bg-gb-surface border-gb-border-strong text-gb-text flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[400px]"
       >
