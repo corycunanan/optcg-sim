@@ -2,8 +2,9 @@
 
 > **Status:** Adopted 2026-08-12 (Visual Polish Round 3, OPT-672/673); amended 2026-08-14
 > (OPT-695) to split structural list rows from art-bearing rows and to specify how a clipped
-> (chamfered) surface casts; amended 2026-08-19 (OPT-702) once every card tile shipped the
-> register, adding §The card register and §Non-interactive card previews. This doc owns the
+> (chamfered) surface casts; amended 2026-08-19 (OPT-702) once the card-tile treatment
+> converged across the app's list and grid surfaces, adding §The card register and
+> §Non-interactive card previews. This doc owns the
 > surface-stacking model: which surfaces may cast a shadow, which take the flat edge
 > treatment, and how the z-ladder, the elevation color steps, and the hard-shadow scale
 > line up. It consolidates guidance previously scattered through
@@ -61,19 +62,32 @@ avatar or a color chip is still structural. Ask whether the row is a _thing_ or 
 
 ### The card register
 
-Every surface that leads with printed card art and behaves as one pickable object ships
-`shadow-sm` at rest → `shadow-md` on hover:
+These sites converge on `shadow-sm` at rest → `shadow-md` on hover. Most lead with printed
+card art and behave as one pickable object; two don't cleanly fit that description and are
+called out rather than folded into a blanket rule:
 
 | Surface                                              | Site                                              | Hover                                                    |
 | ---------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
 | `/decks` art-bearing rows                            | `src/app/decks/deck-list.tsx`                     | `bg-surface-2` + `shadowHover="md"` on the `ChamferFrame` |
 | `/cards` grid tiles                                  | `src/components/cards/card-grid.tsx`              | `hover:shadow-md` + the Motion `handCardHover` preset     |
-| `/sets` tiles                                        | `src/components/cards/set-browser.tsx`            | `hover:shadow-md` + `hover:-translate-y-px`               |
-| Card-detail art-variant thumbnails                   | `src/components/cards/card-image-gallery.tsx`     | `hover:shadow-md`                                         |
+| `/sets` tiles¹                                       | `src/components/cards/set-browser.tsx`            | `hover:shadow-md` + `hover:-translate-y-px`               |
+| Card-detail art-variant thumbnails²                  | `src/components/cards/card-image-gallery.tsx`     | `hover:shadow-md`, alongside the existing selected-state opacity cross-fade |
 | Deck-builder search tiles                            | `src/components/deck-builder/deck-builder-search.tsx` | `hover:shadow-md`                                     |
 | Deck-builder deck-list fan stacks                    | `src/components/deck-builder/deck-builder-list.tsx`   | `group-hover/stack:shadow-md` + `-translate-y-2`      |
 | Lobby deck-preview fan stacks                        | `src/components/lobbies/deck-card-grid.tsx`       | `hover:shadow-md` + `hover:-translate-y-2`, per card       |
 | Lobby seat leader art                                | `src/components/lobbies/lobby-seat-card.tsx`      | `hover:shadow-md` + `hover:-translate-y-1`                |
+
+¹ `/sets` tiles are a text/stat row — set label, set name, card-count badge — with no
+printed card art at all. It's an arguable member of the register: it takes the same
+`shadow-sm`/`hover:shadow-md` step as its list-page neighbors for consistency, not because
+it leads with art.
+
+² `card-image-gallery.tsx` keeps its pre-existing selected-state hover: unselected
+thumbnails cross-fade from `opacity-70` to `opacity-100` on hover, and the `shadow-sm` →
+`shadow-md` step rides alongside that, not in place of it.
+
+Non-interactive card grids (the deck builder's Backs and DON tabs) are deliberately not in
+this table — see §Non-interactive card previews below.
 
 Two rules the table encodes:
 

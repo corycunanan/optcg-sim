@@ -311,7 +311,7 @@ export function DeckBuilderSearch({
                           // hover. The altitude step is the whole hover — the
                           // inner image zoom that used to run alongside it was
                           // a second register on the same interaction, the
-                          // same stack `CardGrid` unwound in OPT-673.
+                          // same stack `CardGrid` unwound in OPT-693.
                           "bg-card relative overflow-hidden rounded-md border text-left shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.97]",
                           qtyInDeck > 0
                             ? "border-border-focus"
