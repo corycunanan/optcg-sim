@@ -225,7 +225,8 @@ describe("OPT-698: OP13-082 Five Elders", () => {
     expect(player.hand).toHaveLength(handSizeBefore - 1);
   });
 
-  it("does not offer activation when the Leader is not Imu", () => {
+  // Engine contract today: unmet activate conditions are skipped inside resolveEffect; validation does not reject (runPipeline still returns valid: true). Tracked as OPT-701. This test pins the no-op: no prompt, empty stack, hand/DON/board untouched.
+  it("no-ops (does not pay costs, prompt, or trash) when the Leader is not Imu", () => {
     const { state, cardDb, fiveElders } = buildScenario(false);
     const playerBefore = state.players[0];
     const action: GameAction = {
@@ -236,6 +237,7 @@ describe("OPT-698: OP13-082 Five Elders", () => {
 
     const result = runPipeline(state, action, cardDb, 0);
 
+    expect(result.valid).toBe(true); // see OPT-701 — would become false once validation rejects unmet conditions
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.state.effectStack).toHaveLength(0);
     expect(result.state.players[0].hand).toEqual(playerBefore.hand);
