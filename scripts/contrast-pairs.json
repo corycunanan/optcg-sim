@@ -451,6 +451,12 @@
       "minimum": 1.5
     },
     {
+      "name": "badge-keyline/error-fill",
+      "foreground": "--error-fill-border",
+      "background": "--error",
+      "minimum": 1.5
+    },
+    {
       "name": "badge-keyline/secondary",
       "foreground": "--border-strong",
       "background": "--surface-raised",

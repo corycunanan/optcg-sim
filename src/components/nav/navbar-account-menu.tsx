@@ -41,7 +41,7 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
         <NavigationMenuItem>
           <NavigationMenuTrigger
             aria-label={`Account menu for ${displayName}`}
-            className="text-content-primary hover:bg-surface-2 focus:bg-surface-2 focus-visible:ring-border-focus data-popup-open:bg-surface-2 data-open:bg-surface-2 gap-2 bg-transparent px-1 focus-visible:ring-2"
+            className="text-content-primary hover:bg-surface-2 focus:bg-surface-2 data-popup-open:bg-surface-2 data-open:bg-surface-2 gap-2 bg-transparent px-1"
           >
             <UserAvatar
               user={{
