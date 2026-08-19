@@ -187,6 +187,7 @@ type CountMode =
 ### Implicit Counts
 
 - `ALL_YOUR_CHARACTERS` and `ALL_OPPONENT_CHARACTERS` have implicit `{ all: true }`.
+- Schema lint rejects any other explicit count on these `ALL_*` target types.
 - `SELF`, `YOUR_LEADER`, `OPPONENT_LEADER` have implicit `{ exact: 1 }`.
 - When `count` is omitted on `CHARACTER` or other multi-target types, the engine defaults to `{ up_to: 1 }`.
 

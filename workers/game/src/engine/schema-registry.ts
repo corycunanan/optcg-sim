@@ -476,6 +476,10 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
     }
   }
 
+  if ("target" in cost && cost.target) {
+    errors.push(...validateTargetController(cost.target, prefix));
+  }
+
   if (
     cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" &&
     (typeof cost.card_name !== "string" || cost.card_name.trim().length === 0)
@@ -594,6 +598,15 @@ function validateTargetController(target: Action["target"], prefix: string): str
   if (target?.type && !VALID_TARGET_TYPES.has(target.type)) {
     errors.push(`${prefix}.target: Unknown target type '${target.type}'`);
   }
+  if (
+    (target?.type === "ALL_YOUR_CHARACTERS" || target?.type === "ALL_OPPONENT_CHARACTERS") &&
+    target.count &&
+    (!("all" in target.count) || target.count.all !== true)
+  ) {
+    errors.push(
+      `${prefix}.target.count: [C9] Target type '${target.type}' has implicit { all: true }; remove count or use { all: true }`,
+    );
+  }
   errors.push(...validateTargetFilterController(
     target?.filter as TargetFilter | undefined,
     `${prefix}.target`,
@@ -614,6 +627,15 @@ function validateTargetController(target: Action["target"], prefix: string): str
     }
   }
   for (let i = 0; i < (target?.dual_targets?.length ?? 0); i++) {
+    const slotCount = target!.dual_targets![i].count;
+    if (
+      (target?.type === "ALL_YOUR_CHARACTERS" || target?.type === "ALL_OPPONENT_CHARACTERS") &&
+      (!("all" in slotCount) || slotCount.all !== true)
+    ) {
+      errors.push(
+        `${prefix}.dual_targets[${i}].count: [C9] Target type '${target.type}' has implicit { all: true }; remove count or use { all: true }`,
+      );
+    }
     const slotController = target!.dual_targets![i].controller;
     if (slotController !== undefined && !VALID_CONTROLLERS.has(slotController)) {
       errors.push(
