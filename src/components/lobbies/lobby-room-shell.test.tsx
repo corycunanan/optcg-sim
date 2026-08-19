@@ -373,7 +373,14 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(modeButtons[0]?.props.className).toContain(
       "bg-accent text-accent-foreground"
     );
+    expect(modeButtons[0]?.props.className).toContain("hover:bg-accent");
+    expect(modeButtons[0]?.props.className).toContain(
+      "focus-visible:outline-offset-2"
+    );
     expect(modeButtons[1]?.props["aria-pressed"]).toBe(false);
+    expect(modeButtons[1]?.props.className).toContain(
+      "focus-visible:outline-offset-2"
+    );
     expect(modeButtons.map((button) => button.children)).toEqual([
       ["Versus"],
       ["Solitaire"],
@@ -417,9 +424,18 @@ describe("LobbyRoomShell redesign scenarios", () => {
     const partyCodeControl = renderer!.root.findByProps({
       "aria-label": "Copy party link",
     });
-    for (const control of [modeControl, partyCodeControl]) {
-      expect(control?.props.className).toContain("h-12");
-    }
+    expect(modeControl.props.className).not.toContain("h-12");
+    expect(modeButtons.map((button) => button.props.variant)).toEqual([
+      "ghost",
+      "ghost",
+    ]);
+    expect(modeButtons.map((button) => button.props.size)).toEqual([
+      "default",
+      "default",
+    ]);
+    expect(partyCodeControl.props.variant).toBe("default");
+    expect(partyCodeControl.props.size).toBe("lg");
+    expect(partyCodeControl.props.className).not.toContain("h-12");
     expect(joinButton?.props.size).toBe("lg");
 
     const headerLayout = renderer!.root.find(
@@ -690,8 +706,10 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(versusButton?.props.disabled).toBe(true);
     expect(versusButton?.props["aria-pressed"]).toBe(true);
     expect(versusButton?.props.className).toContain(
-      "bg-accent text-accent-foreground disabled:opacity-100"
+      "bg-accent text-accent-foreground"
     );
+    expect(versusButton?.props.className).toContain("hover:bg-accent");
+    expect(versusButton?.props.className).toContain("disabled:opacity-100");
     expect(versusButton?.props.className).not.toContain("disabled:opacity-50");
     expect(solitaireButton?.props.disabled).toBe(true);
     expect(solitaireButton?.props.className).toContain("disabled:opacity-50");
