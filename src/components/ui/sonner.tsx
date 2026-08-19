@@ -16,6 +16,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       toastOptions={{
         classNames: {
+          toast:
+            "shadow-[var(--shadow-md)]! focus-visible:ring-2 focus-visible:ring-border-focus",
           title: "text-sm font-medium",
           description: "text-sm text-content-secondary",
         },
