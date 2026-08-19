@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardImageGallery } from "@/components/cards/card-image-gallery";
-import { ColorChip } from "@/components/cards/color-chip";
+import { CardHeaderBadgeRow } from "@/components/cards/card-header-badge-row";
 
 export const dynamic = "force-dynamic";
 
@@ -68,28 +68,16 @@ export default async function CardDetailPage({
             className="rounded-lg bg-card p-6"
             style={{ borderLeft: `3px solid ${accentColor}` }}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="font-display text-3xl text-content-primary">
-                  {card.name}
-                </h1>
-                <p className="mt-1 text-sm text-content-tertiary">
-                  {card.id} · {card.type} · {card.rarity}
-                </p>
-              </div>
-              {card.banStatus !== "LEGAL" && (
-                <Badge variant="error" className="font-semibold">
-                  {card.banStatus}
-                </Badge>
-              )}
-            </div>
-
-            {/* Colors */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {card.color.map((c) => (
-                <ColorChip key={c} color={c} />
-              ))}
-            </div>
+            <h1 className="font-display text-3xl text-content-primary">
+              {card.name}
+            </h1>
+            <CardHeaderBadgeRow
+              id={card.id}
+              type={card.type}
+              colors={card.color}
+              rarity={card.rarity}
+              banStatus={card.banStatus}
+            />
           </div>
 
           {/* Stats grid */}

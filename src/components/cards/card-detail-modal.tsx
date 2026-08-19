@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardImageGallery } from "./card-image-gallery";
-import { ColorChip } from "./color-chip";
+import { CardHeaderBadgeRow } from "./card-header-badge-row";
 import { EffectText } from "./effect-text";
 import { apiGet } from "@/lib/api-client";
 import {
@@ -39,13 +39,6 @@ function Row({ label, children, className }: { label?: string; children: React.R
     </div>
   );
 }
-
-/**
- * Every item in the header badge row normalizes to the canonical ColorChip's
- * box (`px-3 py-1 text-xs` ≈ 26px). Badges default to `py-0.5`, so they are
- * lifted here rather than shrinking the chip and its swatch.
- */
-const HEADER_BADGE_CLASS = "py-1";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -111,25 +104,13 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
           ) : (
             <div className="min-w-0 flex-1">
               <DialogTitle>{card.name}</DialogTitle>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={cn(HEADER_BADGE_CLASS, "font-mono")}>
-                  {card.id}
-                </Badge>
-                <Badge variant="outline" className={HEADER_BADGE_CLASS}>
-                  {card.type}
-                </Badge>
-                {card.color.map((c) => (
-                  <ColorChip key={c} color={c} accessibleLabel={`${c} card color`} />
-                ))}
-                <Badge variant="outline" className={HEADER_BADGE_CLASS}>
-                  {card.rarity}
-                </Badge>
-                {card.banStatus !== "LEGAL" && (
-                  <Badge variant="error" className={cn(HEADER_BADGE_CLASS, "font-semibold")}>
-                    {card.banStatus}
-                  </Badge>
-                )}
-              </div>
+              <CardHeaderBadgeRow
+                id={card.id}
+                type={card.type}
+                colors={card.color}
+                rarity={card.rarity}
+                banStatus={card.banStatus}
+              />
             </div>
           )}
           <DialogClose asChild>
