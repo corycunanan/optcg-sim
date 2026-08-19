@@ -28,5 +28,9 @@ describe("Toaster", () => {
     expect(toastElement?.classList.contains("shadow-[var(--shadow-md)]!")).toBe(
       true
     );
+    expect(toastElement?.classList.contains("focus-visible:ring-2")).toBe(true);
+    expect(
+      toastElement?.classList.contains("focus-visible:ring-border-focus")
+    ).toBe(true);
   });
 });
