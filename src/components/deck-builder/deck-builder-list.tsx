@@ -170,7 +170,14 @@ export function DeckBuilderList({
                       count={group.count}
                       className="relative cursor-pointer"
                       renderCard={(i) => (
-                        <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-transform duration-150 group-hover/stack:-translate-y-2">
+                        // Every card in the fan carries the register, not just
+                        // the top one: the stack lifts as one object, so the
+                        // cards that cast onto the page are its outer edges,
+                        // and the interior seams are a card resting on a card
+                        // — literally the model in ELEVATION-LANGUAGE §The
+                        // principle. Lift and shadow move together as one
+                        // tier, per §Anti-stacking.
+                        <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-[translate,box-shadow] duration-150 group-hover/stack:-translate-y-2 group-hover/stack:shadow-md">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={group.imageUrl}

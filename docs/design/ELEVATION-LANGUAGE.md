@@ -2,7 +2,8 @@
 
 > **Status:** Adopted 2026-08-12 (Visual Polish Round 3, OPT-672/673); amended 2026-08-14
 > (OPT-695) to split structural list rows from art-bearing rows and to specify how a clipped
-> (chamfered) surface casts. This doc owns the
+> (chamfered) surface casts; amended 2026-08-19 (OPT-702) once every card tile shipped the
+> register, adding §The card register and §Non-interactive card previews. This doc owns the
 > surface-stacking model: which surfaces may cast a shadow, which take the flat edge
 > treatment, and how the z-ladder, the elevation color steps, and the hard-shadow scale
 > line up. It consolidates guidance previously scattered through
@@ -58,12 +59,50 @@ change altitude when the real list swaps in.
 Adopting the register is a decision, not a default: a row that only happens to show a small
 avatar or a color chip is still structural. Ask whether the row is a _thing_ or a _band_.
 
+### The card register
+
+Every surface that leads with printed card art and behaves as one pickable object ships
+`shadow-sm` at rest → `shadow-md` on hover:
+
+| Surface                                              | Site                                              | Hover                                                    |
+| ---------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
+| `/decks` art-bearing rows                            | `src/app/decks/deck-list.tsx`                     | `bg-surface-2` + `shadowHover="md"` on the `ChamferFrame` |
+| `/cards` grid tiles                                  | `src/components/cards/card-grid.tsx`              | `hover:shadow-md` + the Motion `handCardHover` preset     |
+| `/sets` tiles                                        | `src/components/cards/set-browser.tsx`            | `hover:shadow-md` + `hover:-translate-y-px`               |
+| Card-detail art-variant thumbnails                   | `src/components/cards/card-image-gallery.tsx`     | `hover:shadow-md`                                         |
+| Deck-builder search tiles                            | `src/components/deck-builder/deck-builder-search.tsx` | `hover:shadow-md`                                     |
+| Deck-builder deck-list fan stacks                    | `src/components/deck-builder/deck-builder-list.tsx`   | `group-hover/stack:shadow-md` + `-translate-y-2`      |
+| Lobby deck-preview fan stacks                        | `src/components/lobbies/deck-card-grid.tsx`       | `hover:shadow-md` + `hover:-translate-y-2`, per card       |
+| Lobby seat leader art                                | `src/components/lobbies/lobby-seat-card.tsx`      | `hover:shadow-md` + `hover:-translate-y-1`                |
+
+Two rules the table encodes:
+
+- **A fanned stack carries the register per card, not on a wrapper.** The stack lifts as one
+  object, so its outer cards are what cast onto the page and the interior seams are a card
+  resting on a card — §The principle, literally. A `box-shadow` on the stack's wrapper would
+  paint a rectangle behind a fanned, rotated silhouette, the same mismatch §Casting from a
+  clipped surface describes. Where the lift is per card (the lobby fan) the shadow step is
+  per card too; where the whole stack lifts (the deck-builder fan) the whole stack steps.
+- **The lift and the shadow must share a transition.** Tailwind v4 compiles `-translate-y-*`
+  to the standalone `translate` property, which `transition-shadow` does not cover and
+  `transition-transform` covers without carrying `box-shadow`. Name both:
+  `transition-[translate,box-shadow]`.
+
+### Non-interactive card previews
+
+A grid of card art you cannot click, focus, or tooltip is still a card object, so it keeps
+the resting `shadow-sm` — but it takes **no hover step**. A lift on something that does not
+respond is a promise the surface never keeps. The shipped pair is the deck builder's Backs
+and DON tabs (`src/components/deck-builder/deck-builder-backs.tsx`,
+`deck-builder-don.tsx`): both are read-only sleeve/DON!! previews, both rest at `shadow-sm`,
+neither moves on hover.
+
 ## The ladder: z-index ↔ elevation color ↔ shadow
 
 | z tier          | Typical surfaces                                                             | Elevation color                                                            | Shadow token                                                                                                                                                                                                                                                             |
 | --------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `z-0`           | Page ground, panels, insets                                                  | `--elevation-page` 22% / `--elevation-panel` 27% / `--elevation-inset` 37% | none — color separates structure                                                                                                                                                                                                                                         |
-| `z-0` (content) | Card art tiles and art-bearing rows at rest / hover                          | `--surface-panel` stage                                                    | **target:** `shadow-sm` rest → `shadow-md` hover, shipped on the `/decks` rows. Shipped tiles vary (grid: none → `shadow-md`; deck-builder and lobby tiles: static `shadow-sm` + translate) — converge on the target as tiles are touched, one lift per hover either way |
+| `z-0` (content) | Card art tiles and art-bearing rows at rest / hover                          | `--surface-panel` stage                                                    | `shadow-sm` rest → `shadow-md` hover, shipped across the register (§The card register, below). A tile that pairs the step with a lift moves both together as one tier                                                                                                     |
 | `z-10`          | Sticky headers, raised in-flow panels (lobby action bars, chat widget)       | panel/raised step                                                          | `shadow-lg` when they overlap scrolling content; none when they only divide it                                                                                                                                                                                           |
 | `z-20`          | Dropdowns, selects, popovers, hover cards                                    | `--surface-raised` 32% (popover role)                                      | `shadow-md` (4px 4px)                                                                                                                                                                                                                                                    |
 | `z-30`          | Fixed navbar                                                                 | `--elevation-nav` 18%                                                      | none — the darkest step reads as the page's frame, nothing sits under it                                                                                                                                                                                                 |
@@ -152,7 +191,9 @@ not use elevation to fake a signal.
 1. **Does it overlap content transiently?** No → give it an elevation color step and stop.
    The one exception is the card register: a card tile, or an art-bearing row (§Structural
    rows vs. art-bearing rows), reads as an object resting on the page even though it never
-   moves over anything, and takes `shadow-sm` rest → `shadow-md` hover.
+   moves over anything, and takes `shadow-sm` rest → `shadow-md` hover. If it is a card the
+   user cannot act on, it rests at `shadow-sm` and stops there (§Non-interactive card
+   previews).
 2. **Is it a read-constantly information layer?** Yes → Tier-5 treatment: `shadow-none` +
    the `edge-*` frame on an opaque dark fill. App-side Tier-5 (tooltip, card-info-panel)
    carries the 2px chrome radius per the OPT-670 amendment; board-side Tier-5 stays

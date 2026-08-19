@@ -51,13 +51,19 @@ export function DeckBuilderBacks({ cards, leader, sleeveUrl }: DeckBuilderBacksP
   return (
     <div className="flex flex-wrap justify-start gap-4">
       {groups.map((group) => (
-        <div key={group.cardId} className="group/stack flex w-min flex-col items-center">
+        // A read-only sleeve preview: nothing here is clickable, focusable, or
+        // tooltipped. So it keeps the card register's resting `shadow-sm` and
+        // takes no hover step — a lift on an object you cannot pick up is a
+        // promise the surface does not keep (ELEVATION-LANGUAGE §When you add a
+        // surface). The DON grid next door is the same object and reads the
+        // same way.
+        <div key={group.cardId} className="flex w-min flex-col items-center">
           <CardFanStack
             cardId={group.cardId}
             count={group.count}
             className="relative"
             renderCard={(i) => (
-              <div className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card group-hover/stack:-translate-y-2 transition-transform duration-150">
+              <div className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card">
                 {sleeveUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
