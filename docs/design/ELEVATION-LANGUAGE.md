@@ -68,7 +68,7 @@ avatar or a color chip is still structural. Ask whether the row is a _thing_ or 
 | `z-20`          | Dropdowns, selects, popovers, hover cards                                    | `--surface-raised` 32% (popover role)                                      | `shadow-md` (4px 4px)                                                                                                                                                                                                                                                    |
 | `z-30`          | Fixed navbar                                                                 | `--elevation-nav` 18%                                                      | none — the darkest step reads as the page's frame, nothing sits under it                                                                                                                                                                                                 |
 | `z-40`          | Dialogs, alert dialogs, sheets                                               | `--surface-panel` over `--overlay`                                         | `shadow-lg` (6px 6px)                                                                                                                                                                                                                                                    |
-| toasts          | Sonner stack (library-managed z), custom lobby invite toast at `z-50`        | raised step                                                                | custom toast: `shadow-md`; Sonner's own stack ships the library's blurred shadow — the one known vendored exception, outside the `.tsx` lint's reach (see Known exceptions)                                                                                              |
+| toasts          | Sonner stack (library-managed z), custom lobby invite toast at `z-50`        | raised step                                                                | `shadow-md` for Sonner and custom lobby toasts                                                                                                                                                                                                                           |
 | `z-50` (info)   | Tooltips                                                                     | `--surface-info` (opaque dark)                                             | **none** — `edge-info` frame                                                                                                                                                                                                                                             |
 | `z-[90..95]`    | Game-board pregame overlays; the spotlight rides the `z-50` Dialog primitive | `--gb-*` context                                                           | `shadow-lg` on the overlay panel; board tooltips use `--gb-edge-info`, flat                                                                                                                                                                                              |
 
@@ -163,12 +163,6 @@ not use elevation to fake a signal.
    active tab lift) and never the answer for overlapping chrome.
 4. Match the z tier from the ladder above; if your surface needs a new z value, it needs a
    design conversation, not a bigger number.
-
-## Known exceptions
-
-- **Sonner's toast stack** ships the library's own blurred shadow and an extreme z-index
-  from vendored CSS, outside the `.tsx` lint's reach. Tracked as a follow-up (restyle via
-  Sonner's `toastOptions` or accept as vendored); do not copy it as precedent.
 
 ## Anti-stacking rules
 

@@ -16,6 +16,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       toastOptions={{
         classNames: {
+          toast: "shadow-[var(--shadow-md)]!",
           title: "text-sm font-medium",
           description: "text-sm text-content-secondary",
         },
