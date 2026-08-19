@@ -77,7 +77,10 @@ describe("DeckBuilderSearch card tooltip", () => {
     expect(
       within(panel!).getByText("Red · Supernovas / Straw Hat Crew · Slash")
     ).toBeTruthy();
-    expect(within(panel!).getByText("[On Play] Draw 1 card.")).toBeTruthy();
+    const timingChip = within(panel!).getByText("On Play");
+    expect(timingChip.dataset.effectNotation).toBe("timing");
+    expect(timingChip.className).toContain("bg-effect-timing");
+    expect(timingChip.parentElement?.textContent).toBe("On Play Draw 1 card.");
   });
 
   it("keeps the whole tile clickable for inspection", async () => {

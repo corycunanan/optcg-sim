@@ -133,7 +133,10 @@ describe("DeckBuilderList card tooltip", () => {
     expect(
       within(panel).getByText("Counter").nextElementSibling?.textContent
     ).toBe("+1000");
-    expect(within(panel).getByText("[On Play] Draw 1 card.")).toBeTruthy();
+    const timingChip = within(panel).getByText("On Play");
+    expect(timingChip.dataset.effectNotation).toBe("timing");
+    expect(timingChip.className).toContain("bg-effect-timing");
+    expect(timingChip.parentElement?.textContent).toBe("On Play Draw 1 card.");
 
     // Numerals are white — no per-stat hue competing with card art.
     expect(panel.innerHTML).not.toContain("text-gold-600");
