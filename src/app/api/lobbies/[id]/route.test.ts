@@ -919,6 +919,25 @@ describe("PATCH /api/lobbies/[id]", () => {
     });
   });
 
+  it("rejects host readiness changes in Solitaire mode", async () => {
+    lobbyFindUniqueMock.mockResolvedValueOnce(
+      baseLobby({
+        mode: "SOLITAIRE",
+        pregameMode: "SOLITAIRE_RANDOM",
+        hostReady: false,
+      }),
+    );
+
+    const res = await PATCH(buildRequest({ ready: true }), params);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Ready cannot be changed in this lobby mode",
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(lobbyUpdateManyMock).not.toHaveBeenCalled();
+  });
+
   it("clears hostReady when the host changes their deck", async () => {
     const res = await PATCH(buildRequest({ hostDeckId: null }), params);
 
