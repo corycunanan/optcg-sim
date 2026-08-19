@@ -117,6 +117,17 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   // is the shared owner of that open state.
   const { isMobile, openMobile, setOpenMobile } = useSidebar();
 
+  // The drawer's open flag outlives this component — it lives in
+  // `SidebarProvider`, up in the root layout. Left set, it reopens the drawer
+  // unbidden the next time the viewport crosses back under `md`.
+  useEffect(() => {
+    if (!isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
+
+  // Same flag, the other way it escapes: the rail is not rendered on /game/*,
+  // so leaving a game with the drawer open would bring it back open.
+  useEffect(() => () => setOpenMobile(false), [setOpenMobile]);
+
   const fetchFriendsData = useCallback(async () => {
     const epoch = fetchEpoch.current;
     setFriendsLoadState("loading");
@@ -580,9 +591,19 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
             // Radix hands focus back to its own `Dialog.Trigger`, and this
             // drawer has none — the control that opens it lives in the navbar,
             // a different subtree. Without this, Escape drops focus on <body>.
+            //
+            // Only take the handler over when the toggle actually accepts
+            // focus. It is `display: none` from `md` up and gone entirely on
+            // /game/*, and both of those are ways this drawer closes; asking a
+            // hidden element to focus is a silent no-op, so claim the event
+            // only once focus has landed. Otherwise Radix keeps its own
+            // restoration rather than being suppressed for nothing.
             onCloseAutoFocus={(event) => {
+              const toggle = document.getElementById(FRIENDS_DRAWER_TOGGLE_ID);
+              if (!toggle) return;
+              toggle.focus();
+              if (document.activeElement !== toggle) return;
               event.preventDefault();
-              document.getElementById(FRIENDS_DRAWER_TOGGLE_ID)?.focus();
             }}
           >
             {/* The visible "Friends" heading below is a plain `h2`, so the

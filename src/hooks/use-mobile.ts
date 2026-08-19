@@ -24,10 +24,13 @@ function getServerSnapshot() {
  * True below the `md` breakpoint (768px), the same width Tailwind's `md:`
  * variants switch at.
  *
- * `useSyncExternalStore` — not `useState` + `useEffect` — so the first client
- * render already knows the real width. Consumers that swap a whole subtree on
- * this value (the friends rail becomes a drawer) would otherwise mount the
- * desktop subtree, then throw it away one commit later.
+ * `useSyncExternalStore` is a subscription rather than an effect that copies
+ * the match into state: no stale value, no tearing, no second source of the
+ * breakpoint. It does not make the answer arrive earlier. React serves
+ * `getServerSnapshot` on the server AND through the hydration render, then
+ * flips to the live match right after hydration — so on a phone the desktop
+ * shape still mounts for one commit. Anything that must be right on the first
+ * paint splits on CSS (`hidden md:block`) instead of on this hook.
  */
 export function useIsMobile() {
   return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);

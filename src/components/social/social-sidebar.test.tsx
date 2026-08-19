@@ -122,18 +122,38 @@ function renderSidebar(
   return { ...view, onOpenChat };
 }
 
-function setMobileViewport(isMobile: boolean) {
+// One shared listener registry across every MediaQueryList the hook creates,
+// so `setMobileViewport` can move the breakpoint on a mounted tree the way a
+// real resize does.
+const mediaListeners = new Set<() => void>();
+let matchesMobile = false;
+
+function installMatchMedia() {
+  mediaListeners.clear();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: vi.fn(() => ({
-      matches: isMobile,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
+      get matches() {
+        return matchesMobile;
+      },
+      addEventListener: (_type: string, listener: () => void) => {
+        mediaListeners.add(listener);
+      },
+      removeEventListener: (_type: string, listener: () => void) => {
+        mediaListeners.delete(listener);
+      },
     })),
   });
+}
+
+function setMobileViewport(isMobile: boolean) {
+  matchesMobile = isMobile;
   Object.defineProperty(window, "innerWidth", {
     configurable: true,
     value: isMobile ? 390 : 1024,
+  });
+  act(() => {
+    mediaListeners.forEach((listener) => listener());
   });
 }
 
@@ -152,6 +172,12 @@ function DrawerOpener() {
   );
 }
 
+/** Surfaces the shared open flag the navbar toggle also reads. */
+function DrawerState() {
+  const { openMobile } = useSidebar();
+  return <span data-testid="drawer-open">{String(openMobile)}</span>;
+}
+
 function renderDrawer(onOpenChat = vi.fn()) {
   setMobileViewport(true);
   mocks.apiGet.mockImplementation((url: string) => {
@@ -159,12 +185,21 @@ function renderDrawer(onOpenChat = vi.fn()) {
     throw new Error(`Unexpected GET ${url}`);
   });
 
-  return render(
+  // `railMounted` stands in for SocialShell's `!isGame` gate: on /game/* the
+  // rail is not rendered at all.
+  const tree = (railMounted: boolean) => (
     <SidebarProvider>
       <DrawerOpener />
-      <SocialSidebar onOpenChat={onOpenChat} />
+      <DrawerState />
+      {railMounted && <SocialSidebar onOpenChat={onOpenChat} />}
     </SidebarProvider>
   );
+
+  const view = render(tree(true));
+  return {
+    ...view,
+    setRailMounted: (railMounted: boolean) => view.rerender(tree(railMounted)),
+  };
 }
 
 function emit<T extends EventType>(type: T, event: EventFor<T>) {
@@ -174,6 +209,7 @@ function emit<T extends EventType>(type: T, event: EventFor<T>) {
 }
 
 beforeEach(() => {
+  installMatchMedia();
   setMobileViewport(false);
   mocks.apiDelete.mockReset().mockResolvedValue({});
   mocks.apiGet.mockReset();
@@ -273,6 +309,46 @@ describe("SocialSidebar", () => {
     // Radix restores focus to its own `Dialog.Trigger`; the drawer has none,
     // so it restores by id instead — otherwise focus lands on <body>.
     await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it("closes the drawer when the viewport grows past md, and leaves it closed coming back", async () => {
+    renderDrawer();
+    await userEvent.click(screen.getByRole("button", { name: "open drawer" }));
+    await screen.findByRole("dialog");
+
+    setMobileViewport(false);
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("drawer-open").textContent).toBe("false");
+    // The docked rail takes the column back.
+    expect(document.querySelector('[data-slot="sidebar"]')).not.toBeNull();
+
+    setMobileViewport(true);
+
+    // Nothing reopens on the way back down: the flag lives in the provider and
+    // would otherwise still read true.
+    await waitFor(() =>
+      expect(document.querySelector('[data-slot="sidebar"]')).toBeNull()
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTestId("drawer-open").textContent).toBe("false");
+  });
+
+  it("clears the drawer when the rail unmounts, as it does on /game/*", async () => {
+    const { setRailMounted } = renderDrawer();
+    await userEvent.click(screen.getByRole("button", { name: "open drawer" }));
+    await screen.findByRole("dialog");
+    expect(screen.getByTestId("drawer-open").textContent).toBe("true");
+
+    setRailMounted(false);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("drawer-open").textContent).toBe("false")
+    );
+
+    setRailMounted(true);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("gives the drawer its own close control, which the docked rail omits", async () => {
