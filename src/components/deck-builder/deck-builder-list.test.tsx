@@ -156,3 +156,23 @@ describe("DeckBuilderList card tooltip", () => {
     expect(within(panel).queryByText("Counter")).toBeNull();
   });
 });
+
+describe("DeckBuilderList stack elevation", () => {
+  it("gives every card in the fan the card register, not just the top one", () => {
+    renderList();
+
+    const fan = screen
+      .getAllByAltText("Roronoa Zoro")
+      .map((img) => img.parentElement!);
+    expect(fan).toHaveLength(4);
+
+    for (const card of fan) {
+      expect(card.className).toContain("shadow-sm");
+      expect(card.className).toContain("group-hover/stack:shadow-md");
+      // Lift and shadow are one tier moving together, so the transition has
+      // to carry both (ELEVATION-LANGUAGE §Anti-stacking).
+      expect(card.className).toContain("group-hover/stack:-translate-y-2");
+      expect(card.className).toContain("transition-[translate,box-shadow]");
+    }
+  });
+});

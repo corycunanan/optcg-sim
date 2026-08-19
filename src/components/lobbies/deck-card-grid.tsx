@@ -93,7 +93,7 @@ export function DeckCardGrid({
                   cardId={group.card.id}
                   count={group.count}
                   renderCard={(i) => (
-                    <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-transform duration-150 hover:z-10 hover:-translate-y-2">
+                    <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-[translate,box-shadow] duration-150 hover:z-10 hover:-translate-y-2 hover:shadow-md">
                       <img
                         src={group.imageUrl}
                         alt=""

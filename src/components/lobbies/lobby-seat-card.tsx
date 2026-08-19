@@ -466,7 +466,11 @@ function LeaderArt({
       type="button"
       onClick={() => (deckEditable ? onChangeDeck() : onPreview(deck.id))}
       className={cn(
-        "bg-surface-2 border-border focus-visible:outline-border-focus relative overflow-hidden border shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-1 focus-visible:outline-2 focus-visible:-outline-offset-2",
+        // The art is the seat's hero and sits straight on the page ground —
+        // the seat column has no panel surface of its own to fight — so it
+        // takes the plain card register: `shadow-sm` → `shadow-md`, moving
+        // with the existing lift as one tier (ELEVATION-LANGUAGE).
+        "bg-surface-2 border-border focus-visible:outline-border-focus relative overflow-hidden border shadow-sm transition-[translate,box-shadow] hover:-translate-y-1 hover:shadow-md focus-visible:outline-2 focus-visible:-outline-offset-2",
         LEADER_ART_CLASS,
         className
       )}

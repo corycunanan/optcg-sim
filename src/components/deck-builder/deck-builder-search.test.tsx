@@ -110,3 +110,25 @@ describe("DeckBuilderSearch card tooltip", () => {
     });
   });
 });
+
+describe("DeckBuilderSearch tile elevation", () => {
+  it("rests at shadow-sm and hovers to shadow-md", async () => {
+    renderSearch();
+    const tile = await screen.findByRole("button", {
+      name: "Inspect Roronoa Zoro",
+    });
+
+    expect(tile.className).toContain("shadow-sm");
+    expect(tile.className).toContain("hover:shadow-md");
+  });
+
+  it("does not stack an inner image zoom on the altitude step", async () => {
+    renderSearch();
+    await screen.findByRole("button", { name: "Inspect Roronoa Zoro" });
+
+    // ELEVATION-LANGUAGE §Anti-stacking: the hover moves one tier, and a
+    // zoom inside the frame is a second register on the same interaction.
+    const art = screen.getByAltText("Roronoa Zoro");
+    expect(art.className).not.toContain("group-hover:scale");
+  });
+});
