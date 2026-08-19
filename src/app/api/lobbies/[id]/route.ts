@@ -174,6 +174,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const guestReadyActorIsValid =
     (targetMode === "PVP" && isGuest) || (targetMode === "SOLITAIRE" && isHost);
 
+  if (parsed.ready !== undefined && targetMode === "SOLITAIRE") {
+    return apiError("Ready cannot be changed in this lobby mode", 400);
+  }
+
   if (parsed.ready === true) {
     if (isHost) {
       if (hasHostControlledChange) {

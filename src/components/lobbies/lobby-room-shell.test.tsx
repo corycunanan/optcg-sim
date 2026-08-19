@@ -552,7 +552,7 @@ describe("LobbyRoomShell redesign scenarios", () => {
           node.type === "section" &&
           typeof node.props.className === "string" &&
           typeof node.props["aria-label"] === "string" &&
-          /seat|Solitaire second deck/.test(node.props["aria-label"] as string)
+          node.props["aria-label"].includes(" seat — ")
       );
       expect(panels.length).toBeGreaterThan(0);
       for (const panel of panels) {

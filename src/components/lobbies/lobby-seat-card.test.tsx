@@ -299,6 +299,7 @@ describe("LobbySeatCard composition", () => {
     expect(group?.classList).toContain("lg:min-h-0");
     expect(group?.classList).toContain("lg:flex-1");
     expect(group?.classList).toContain("lg:flex-col");
+    expect(group?.classList).toContain("lg:items-center");
     expect(group?.classList).toContain("lg:gap-3");
     expect(group?.contains(caption)).toBe(true);
     expect(caption?.parentElement).toBe(group);
@@ -306,6 +307,8 @@ describe("LobbySeatCard composition", () => {
     expect(leader.classList).toContain("col-start-1");
     expect(leader.classList).toContain("row-start-1");
     expect(leader.classList).toContain("row-end-4");
+    expect(leader.classList).toContain("w-auto");
+    expect(leader.classList).toContain("lg:w-auto");
     expect(caption?.classList).toContain("col-start-2");
     expect(caption?.classList).toContain("col-end-4");
     expect(caption?.classList).toContain("row-start-2");
