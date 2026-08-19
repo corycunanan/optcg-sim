@@ -2961,9 +2961,10 @@ export const OP13_082_FIVE_ELDERS: EffectSchema = {
       ],
       actions: [
         {
-          type: "KO",
+          type: "TRASH_CARD",
           target: {
             type: "ALL_YOUR_CHARACTERS",
+            count: { all: true },
           },
         },
         {
