@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
 import { NavbarAccountMenu } from "@/components/nav/navbar-account-menu";
 import { NavbarNotificationPanel } from "@/components/nav/navbar-notification-panel";
+import { FriendsDrawerToggle } from "@/components/social/friends-drawer-toggle";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -150,6 +151,10 @@ function NavbarActions({
   return (
     <>
       <NavbarNotificationPanel />
+      {/* Below `md` the friends rail has no column, so the bar carries the
+          control that opens it as a drawer. The toggle hides itself from `md`
+          up (OPT-663) — the cluster still reserves no rail column. */}
+      <FriendsDrawerToggle />
       <NavbarAccountMenu user={user} theme={user.theme} />
     </>
   );

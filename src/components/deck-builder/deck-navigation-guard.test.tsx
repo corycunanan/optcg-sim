@@ -79,6 +79,14 @@ vi.mock("@/components/social/user-avatar", () => ({
   UserAvatar: () => <span>Avatar</span>,
 }));
 
+// The real toggle reads the friends drawer's state from `SidebarProvider`,
+// which needs a viewport this renderer does not have. It opens a drawer rather
+// than navigating, so it has no destination for this suite to guard.
+vi.mock("@/components/social/friends-drawer-toggle", () => ({
+  FRIENDS_DRAWER_ID: "friends-drawer",
+  FriendsDrawerToggle: () => <button type="button">Friends</button>,
+}));
+
 vi.mock("sonner", () => ({
   toast: { error: mocks.toastError, info: mocks.toastInfo },
 }));

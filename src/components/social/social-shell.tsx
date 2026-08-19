@@ -4,6 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useSidebar } from "@/components/ui/sidebar";
 import type { SidebarUser } from "./social-sidebar";
 
 const SocialSidebar = dynamic(
@@ -26,6 +27,7 @@ export function SocialShell() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const isGame = pathname.startsWith("/game/");
+  const { isMobile, setOpenMobile } = useSidebar();
   const [chatUser, setChatUser] = useState<SidebarUser | null>(null);
 
   if (!session?.user) return null;
@@ -39,14 +41,31 @@ export function SocialShell() {
       {!isGame && (
         <>
           {/* In-flow spacer reserving the fixed rail's column. Both read
-              --social-rail-width, so they cannot drift apart. */}
-          <div className="w-social-rail shrink-0" aria-hidden="true" />
-          <SocialSidebar onOpenChat={setChatUser} />
+              --social-rail-width, so they cannot drift apart.
+
+              `hidden md:block` (OPT-663): below `md` the rail is a drawer over
+              the page, not a column beside it, so an unconditional 280px
+              spacer left ~110px of a 390px viewport for the page itself. The
+              split is CSS, not JS, so it is right on the first paint. */}
+          <div
+            data-slot="social-rail-spacer"
+            className="w-social-rail hidden shrink-0 md:block"
+            aria-hidden="true"
+          />
+          <SocialSidebar
+            onOpenChat={(user) => {
+              // The chat widget docks under the drawer's scrim, so a chat
+              // opened from the drawer would be invisible. Closing is a no-op
+              // at md and above, where the drawer never opens.
+              setOpenMobile(false);
+              setChatUser(user);
+            }}
+          />
           {chatUser && (
             <ChatWidget
               user={chatUser}
               currentUserId={session.user.id}
-              sidebarCollapsed={false}
+              sidebarCollapsed={isMobile}
               onClose={() => setChatUser(null)}
             />
           )}
