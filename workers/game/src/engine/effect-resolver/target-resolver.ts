@@ -407,13 +407,19 @@ export function computeAllValidTargets(
     }
     case "ALL_YOUR_CHARACTERS": {
       let candidates = state.players[controller].characters.filter(isPresent);
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
+      if (target.filter) candidates = candidates.filter((c) => {
+        if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
+        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
+      });
       return candidates.map((c) => c.instanceId);
     }
     case "ALL_OPPONENT_CHARACTERS": {
       const opp = controller === 0 ? 1 : 0;
       let candidates = state.players[opp].characters.filter(isPresent);
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
+      if (target.filter) candidates = candidates.filter((c) => {
+        if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
+        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
+      });
       return candidates.map((c) => c.instanceId);
     }
     case "CHARACTER":

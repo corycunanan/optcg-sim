@@ -139,6 +139,30 @@ describe("implicit-all character targets", () => {
     ).toEqual(["opponent-cost-2"]);
   });
 
+  it("excludes the source from ALL_YOUR_CHARACTERS when exclude_self is set", () => {
+    const cardDb = createTestCardDb();
+    let state = createBattleReadyState(cardDb);
+    const source = character(CARDS.VANILLA.id, 0, "source");
+    state = withPlayer(state, 0, {
+      characters: padChars([
+        source,
+        character(CARDS.BLOCKER.id, 0, "other-a"),
+        character(CARDS.RUSH.id, 0, "other-b"),
+      ]),
+    });
+
+    expect(
+      computeAllValidTargets(
+        state,
+        { type: "ALL_YOUR_CHARACTERS", filter: { exclude_self: true } },
+        0,
+        cardDb,
+        source.instanceId,
+        new Map(),
+      ),
+    ).toEqual(["other-a", "other-b"]);
+  });
+
   it("rests every opponent Character when The Ark Noah is played", () => {
     const cardDb = createTestCardDb();
     cardDb.set(ARK_NOAH.id, ARK_NOAH);
