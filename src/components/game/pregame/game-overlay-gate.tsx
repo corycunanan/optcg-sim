@@ -99,7 +99,7 @@ export function GameOverlayGate({
     return (
       <Dialog open>
         <DialogContent
-          aria-describedby={undefined}
+          aria-describedby="match-complete-dialog-description"
           showCloseButton={false}
           className="bg-gb-surface border-gb-border-strong text-gb-text text-center sm:max-w-[400px]"
           onInteractOutside={(event) => event.preventDefault()}
@@ -112,7 +112,7 @@ export function GameOverlayGate({
           <p className={cn("font-display text-3xl", endState.colorClass)}>
             {endState.title}
           </p>
-          <p className="text-gb-text text-sm leading-relaxed">
+          <p id="match-complete-dialog-description" className="text-gb-text text-sm leading-relaxed">
             {endState.reason}
           </p>
           <GameButton

@@ -62,6 +62,17 @@ function section(label: string) {
 }
 
 describe("CardFiltersDialog", () => {
+  it("wires the dialog to its generated description", () => {
+    renderDialog();
+
+    const dialog = screen.getByRole("dialog");
+    const description = screen.getByText(
+      "1 filter selected. Nothing changes until you apply."
+    );
+
+    expect(dialog.getAttribute("aria-describedby")).toBe(description.id);
+  });
+
   it("seeds the draft from the applied filters", () => {
     renderDialog({ color: "Red", type: "Leader", originOnly: "true" });
 

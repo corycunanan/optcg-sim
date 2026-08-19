@@ -40,7 +40,7 @@ export function LifePreviewModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        aria-describedby={undefined}
+        aria-describedby="life-preview-modal-description"
         showCloseButton={false}
         className="border-gb-border-strong bg-gb-surface text-gb-text flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
       >
@@ -56,7 +56,7 @@ export function LifePreviewModal({
               {life.length} {life.length === 1 ? "card" : "cards"}
             </Badge>
           </div>
-          <p className="text-gb-text-dim text-sm">
+          <p id="life-preview-modal-description" className="text-gb-text-dim text-sm">
             Face-down cards stay hidden. Only face-up Life is shown.
           </p>
         </DialogHeader>

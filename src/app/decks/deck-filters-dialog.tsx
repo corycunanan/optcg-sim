@@ -33,7 +33,6 @@ export function DeckFiltersDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        aria-describedby={undefined}
         id={DECK_FILTERS_DIALOG_ID}
         size="sm"
       >
