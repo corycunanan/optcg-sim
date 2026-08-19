@@ -525,8 +525,9 @@ export function LobbyRoomShell({
                   onClick={() => void onModeChange("PVP")}
                   disabled={!isHost || mutating || isInGame}
                   className={cn(
+                    "focus-visible:outline-offset-2",
                     lobby.mode === "PVP"
-                      ? "bg-accent text-accent-foreground disabled:opacity-100"
+                      ? "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-100"
                       : "text-content-secondary hover:text-content-primary disabled:opacity-50"
                   )}
                   aria-pressed={lobby.mode === "PVP"}
@@ -552,8 +553,9 @@ export function LobbyRoomShell({
                         Boolean(solitaireBlockedReason)
                       }
                       className={cn(
+                        "focus-visible:outline-offset-2",
                         lobby.mode === "SOLITAIRE"
-                          ? "bg-accent text-accent-foreground disabled:opacity-100"
+                          ? "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-100"
                           : "text-content-secondary hover:text-content-primary disabled:opacity-50"
                       )}
                       aria-pressed={lobby.mode === "SOLITAIRE"}
