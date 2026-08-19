@@ -15,12 +15,6 @@ const badgeVariants = cva(
         success: "bg-success-soft text-success border-success/20",
         warning: "bg-warning-soft text-warning border-warning/20",
         error: "bg-error-soft text-error border-error/20",
-        "card-red": "border-card-red-border bg-card-red text-white",
-        "card-blue": "border-card-blue-border bg-card-blue text-white",
-        "card-green": "border-card-green-border bg-card-green text-white",
-        "card-purple": "border-card-purple-border bg-card-purple text-white",
-        "card-black": "border-card-black-border bg-card-black text-white",
-        "card-yellow": "border-card-yellow-border bg-card-yellow text-card-yellow-fg",
       },
     },
     defaultVariants: {

@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   apiPatch: vi.fn(),
@@ -52,16 +52,6 @@ const CARD = {
 function colorChip(color: string) {
   return screen.getByRole("button", { name: color });
 }
-
-beforeAll(() => {
-  // The reprint Checkbox measures itself with a ResizeObserver, which jsdom
-  // does not implement. These cases assert form state, not layout.
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
-});
 
 beforeEach(() => {
   mocks.apiPatch.mockReset();

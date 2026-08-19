@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   NavigationMenu,
@@ -14,17 +14,6 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import { NavbarDropdownSurface } from "./navbar-dropdown-surface";
-
-// Radix measures the active content with a ResizeObserver to size the viewport;
-// jsdom has none. These cases assert structure and pointer wiring, not
-// measured geometry, so a no-op observer is enough to let the menu mount.
-beforeAll(() => {
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
-});
 
 afterEach(cleanup);
 

@@ -2,24 +2,13 @@
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 import { DeckList, type DeckListItem } from "./deck-list";
-
-// Radix's popper measures its trigger with a ResizeObserver, which jsdom does
-// not implement. These cases assert the tooltip's *content*, not its
-// placement, so a no-op observer is enough to let it mount.
-beforeAll(() => {
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
-});
 
 afterEach(cleanup);
 
