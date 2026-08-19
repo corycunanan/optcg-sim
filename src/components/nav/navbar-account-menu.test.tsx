@@ -97,6 +97,9 @@ describe("NavbarAccountMenu", () => {
     const trigger = screen.getByRole("button", {
       name: "Account menu for luffy",
     });
+    expect(trigger.className.split(/\s+/)).not.toContain(
+      "focus-visible:ring-2"
+    );
     trigger.focus();
     await user.keyboard("{Enter}");
 
