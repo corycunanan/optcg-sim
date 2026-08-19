@@ -277,11 +277,12 @@ describe("DeckList row", () => {
     expect(within(panel).getByText("5")).toBeTruthy();
     expect(within(panel).getByText("Power")).toBeTruthy();
     expect(within(panel).getByText("5,000")).toBeTruthy();
-    expect(
-      within(panel).getByText(
-        "[Activate: Main] Give up to 1 rested DON!! card to 1 Leader."
-      )
-    ).toBeTruthy();
+    const timingChip = within(panel).getByText("Activate: Main");
+    expect(timingChip.dataset.effectNotation).toBe("timing");
+    expect(timingChip.className).toContain("bg-effect-timing");
+    expect(timingChip.parentElement?.textContent).toBe(
+      "Activate: Main Give up to 1 rested DON!! card to 1 Leader."
+    );
   });
 
   it("opens the leader card panel from the keyboard", async () => {

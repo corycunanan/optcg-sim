@@ -166,23 +166,34 @@ describe("CardInfoPanel", () => {
     expect(within(panel).queryByText(/Slash/)).toBeNull();
   });
 
-  it("splits effect text on blank lines and keeps single newlines inline", () => {
+  it("renders effect lines with notation chips and keyword hexagons", () => {
     render(
       <CardInfoPanel
         name="Roronoa Zoro"
         cardType="Character"
         cardId="OP01-025"
-        effectText={"[On Play] Draw 1 card.\nThen, trash 1 card.\n\n[Rush]"}
+        effectText={"[Main] Draw 1 card.\nThen, trash 1 card.\n\n[Rush]"}
       />
     );
 
     const paragraphs = Array.from(document.querySelectorAll("p"));
-    expect(paragraphs).toHaveLength(2);
-    expect(paragraphs[0].textContent).toBe(
-      "[On Play] Draw 1 card.\nThen, trash 1 card."
-    );
+    expect(paragraphs).toHaveLength(3);
+    expect(paragraphs[0].textContent).toBe("Main Draw 1 card.");
     expect(paragraphs[0].className).toContain("whitespace-pre-wrap");
-    expect(paragraphs[1].textContent).toBe("[Rush]");
+    expect(paragraphs[1].textContent).toBe("Then, trash 1 card.");
+
+    const mainChip = document.querySelector<HTMLElement>(
+      '[data-effect-notation="timing"]'
+    );
+    expect(mainChip?.textContent).toBe("Main");
+    expect(mainChip?.className).toContain("bg-effect-timing");
+
+    const keyword = document.querySelector<HTMLElement>(
+      '[data-effect-notation="keyword"]'
+    );
+    expect(keyword?.textContent).toBe("Rush");
+    expect(keyword?.className).toContain("effect-hex");
+    expect(keyword?.firstElementChild?.className).toContain("bg-effect-keyword");
   });
 
   it("renders trigger text under its own label", () => {
@@ -198,6 +209,22 @@ describe("CardInfoPanel", () => {
     const label = screen.getByText("Trigger");
     expect(label.className).toContain("uppercase");
     expect(screen.getByText("Play this card.")).toBeTruthy();
+  });
+
+  it("uses a leading trigger chip as the trigger label", () => {
+    render(
+      <CardInfoPanel
+        name="Roronoa Zoro"
+        cardType="Character"
+        cardId="OP01-025"
+        triggerText="[Trigger] Play this card."
+      />
+    );
+
+    const labels = screen.getAllByText("Trigger");
+    expect(labels).toHaveLength(1);
+    expect(labels[0].dataset.effectNotation).toBe("trigger");
+    expect(labels[0].className).toContain("bg-effect-trigger");
   });
 
   it("omits the effect and trigger sections when the card has neither", () => {

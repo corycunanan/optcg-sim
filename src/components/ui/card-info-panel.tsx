@@ -1,5 +1,6 @@
 "use client";
 
+import { EffectText } from "@/components/cards/effect-text";
 import { cn } from "@/lib/utils";
 
 /**
@@ -59,11 +60,6 @@ function CardInfoStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Blank-line-delimited paragraphs; single newlines stay inside a paragraph. */
-function splitParagraphs(text: string): string[] {
-  return text.split(/\n{2,}/).filter((paragraph) => paragraph.trim().length > 0);
-}
-
 function joinList(values: string[] | null | undefined): string | null {
   if (!values) return null;
   const cleaned = values.map((value) => value.trim()).filter(Boolean);
@@ -113,8 +109,9 @@ export function CardInfoPanel({
     .filter((part): part is string => part != null)
     .join(" · ");
 
-  const effectParagraphs = effectText ? splitParagraphs(effectText) : [];
+  const effect = effectText?.trim() ? effectText : null;
   const trigger = triggerText?.trim() ? triggerText.trim() : null;
+  const triggerOwnsLabel = trigger ? /^\[Trigger\]/i.test(trigger) : false;
 
   return (
     <div
@@ -149,24 +146,16 @@ export function CardInfoPanel({
         </div>
       )}
 
-      {effectParagraphs.length > 0 && (
-        <div className="text-content-secondary flex flex-col gap-2 text-sm leading-relaxed">
-          {effectParagraphs.map((paragraph, index) => (
-            <p key={index} className="whitespace-pre-wrap">
-              {paragraph}
-            </p>
-          ))}
-        </div>
-      )}
+      {effect && <EffectText text={effect} />}
 
       {trigger && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-secondary text-sm font-semibold tracking-widest uppercase">
-            Trigger
-          </span>
-          <p className="text-content-secondary text-sm leading-relaxed whitespace-pre-wrap">
-            {trigger}
-          </p>
+          {!triggerOwnsLabel && (
+            <span className="text-content-secondary text-sm font-semibold tracking-widest uppercase">
+              Trigger
+            </span>
+          )}
+          <EffectText text={trigger} />
         </div>
       )}
     </div>
