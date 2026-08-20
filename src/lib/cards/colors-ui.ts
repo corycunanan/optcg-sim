@@ -12,8 +12,8 @@ export type CardColorName = (typeof COLORS)[number];
 /**
  * Solid fill for a color chip that is *selected*. The card palette is a
  * non-themable feature contract and is exempt from the chroma reservation, so a
- * selected chip becomes the color it stands for — the same fills the `card-*`
- * Badge variants ship, keyed off the same one-step-brighter `--card-*-border`
+ * selected chip becomes the color it stands for. These class maps are the sole
+ * owner of card-color fills, keyed off the one-step-brighter `--card-*-border`
  * keyline so a dark fill still reads as a shape against navy.
  */
 export const COLOR_CHIP_SELECTED_CLASSES: Readonly<

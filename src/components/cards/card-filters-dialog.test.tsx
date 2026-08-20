@@ -7,14 +7,7 @@ import type { CardFilterDraft } from "@/lib/cards/browser-params";
 import { CardFiltersDialog } from "./card-filters-dialog";
 
 beforeAll(() => {
-  // cmdk measures its list with a ResizeObserver and scrolls the active item
-  // into view; jsdom implements neither. These cases assert draft behavior, not
-  // layout, so no-op shims are enough to let the list mount.
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
+  // cmdk scrolls the active item into view, which jsdom does not implement.
   Element.prototype.scrollIntoView = vi.fn();
 });
 

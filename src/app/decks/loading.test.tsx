@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
@@ -11,17 +11,6 @@ import DecksLoading from "./loading";
 import { DeckList, type DeckListItem } from "./deck-list";
 
 afterEach(() => cleanup());
-
-// Radix's popper measures its trigger with a ResizeObserver, which jsdom does
-// not implement. The parity case only reads class names off the row frame, so
-// a no-op observer is enough to let `DeckList` mount.
-beforeAll(() => {
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
-});
 
 const DECK: DeckListItem = {
   id: "deck-1",
