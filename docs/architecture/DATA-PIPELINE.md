@@ -245,6 +245,14 @@ This is a transform step (~50–100 lines of code), not a scraper problem. The d
 - Coverage limited to what punk-records has (currently through OP-09)
 - Used for: if vegapull hits cookie issues, or for testing/development
 
+**Mode C: Scrape Limitless for pre-release boosters (interim)**
+- Use `pnpm pipeline:scrape-limitless -- --set <set-slug> --pack-id <pack-id>` only when a set appears on Limitless before the official OPTCG site. Return to vegapull after the official site publishes the set.
+- The scraper emits `RawVegapullCard` JSON under `data/vegapull-full/json/`. Pass `--pack-title <title>` to update `packs.json`; otherwise add the matching pack entry before importing.
+- The output keeps reminder text, flattens effect links, decodes HTML entities, preserves literal `<br>` separators, and separates `[Trigger]` text without removing its prefix. Empty effects become `-`; missing triggers remain `null`.
+- Rarities use vegapull's space-free names, Leaders use `Leader`, and alternate arts inherit their base rarity. Variant IDs come from CDN image filenames rather than `?v=N` query parameters.
+- Leaders store life in `cost` with a null counter. Events and Stages use null power and counter fields. Categories remain `Leader`, `Character`, `Event`, or `Stage`; colors and attributes split on `/`.
+- Booster pack IDs follow the extrapolated `5691NN` sequence. OP17 uses `569117`; verify every extrapolated ID against vegapull when the official site updates.
+
 ### Pipeline Steps (Detailed)
 
 ```
