@@ -248,15 +248,21 @@ export function parseCardPage(
     requestedId,
     "rarity"
   )[1].trim();
-  const blockNumber = Number.parseInt(
-    requiredMatch(
-      html,
-      /class="regulation-mark">[\s\S]*?Block\s+(\d+)/,
-      requestedId,
-      "block number"
-    )[1],
-    10
+  const regulationMarkMatch = html.match(
+    /class="regulation-mark">([\s\S]*?)<\/div>/
   );
+  const rawRegulationMark = regulationMarkMatch
+    ? cleanWhitespace(stripTags(regulationMarkMatch[1]))
+    : "(missing)";
+  const blockNumberMatch = rawRegulationMark.match(/\bBlock\s+(\d+)\b/i);
+  const blockNumber = blockNumberMatch
+    ? Number.parseInt(blockNumberMatch[1], 10)
+    : null;
+  if (blockNumber === null) {
+    console.warn(
+      `  ⚠ ${id}: regulation mark "${rawRegulationMark}" is not numeric; block_number set to null`
+    );
+  }
 
   return {
     id,
@@ -410,6 +416,44 @@ function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+export async function scrapeCardReferences(
+  references: LimitlessCardReference[],
+  packId: string,
+  fetchPage: (path: string) => Promise<string> = fetchHtml,
+  requestDelayMs = REQUEST_DELAY_MS
+): Promise<RawVegapullCard[]> {
+  const cards: RawVegapullCard[] = [];
+  const failures: string[] = [];
+
+  for (const [index, reference] of references.entries()) {
+    if (requestDelayMs > 0) await sleep(requestDelayMs);
+    try {
+      const card = parseCardPage(
+        await fetchPage(reference.path),
+        reference.path,
+        packId
+      );
+      cards.push(card);
+      console.log(`[${index + 1}/${references.length}] Fetched ${card.id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const failure = message.startsWith(`${reference.path}:`)
+        ? message
+        : `${reference.path}: ${message}`;
+      failures.push(failure);
+      console.error(`[${index + 1}/${references.length}] Failed ${failure}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      `Failed to scrape ${failures.length} card(s):\n${failures.map((failure) => `- ${failure}`).join("\n")}`
+    );
+  }
+
+  return cards;
+}
+
 function packLabel(setCode: string): string {
   return setCode.replace(/^([A-Z]+)(\d+)$/, "$1-$2");
 }
@@ -448,17 +492,7 @@ async function main(): Promise<void> {
   const setCode = references[0].baseId.split("-")[0];
   console.log(`Found ${references.length} ${setCode} card pages.`);
 
-  const parsedCards: RawVegapullCard[] = [];
-  for (const [index, reference] of references.entries()) {
-    await sleep(REQUEST_DELAY_MS);
-    const card = parseCardPage(
-      await fetchHtml(reference.path),
-      reference.path,
-      options.packId
-    );
-    parsedCards.push(card);
-    console.log(`[${index + 1}/${references.length}] Fetched ${card.id}`);
-  }
+  const parsedCards = await scrapeCardReferences(references, options.packId);
 
   const cards = inheritVariantRarities(parsedCards);
   validateCards(cards);

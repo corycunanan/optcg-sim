@@ -1,13 +1,14 @@
 import { readFile } from "fs/promises";
 import { join } from "path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RawVegapullCard } from "./load";
 import {
   inheritVariantRarities,
   parseCardPage,
   parseSetList,
+  scrapeCardReferences,
   validateCards,
 } from "./scrape-limitless";
 
@@ -15,6 +16,8 @@ const FIXTURES = join(process.cwd(), "pipeline", "fixtures");
 const PACK_ID = "569117";
 
 describe("Limitless scraper", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("enumerates base and variant pages for the selected set only", async () => {
     const html = await readFile(
       join(FIXTURES, "limitless-set-list.html"),
@@ -99,6 +102,39 @@ describe("Limitless scraper", () => {
 
     expect(card.effect).toBe("-");
     expect(card.trigger).toBe("[Trigger] Play this card.");
+  });
+
+  it("warns and returns null for a non-numeric regulation mark", async () => {
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    const html = await readFile(
+      join(FIXTURES, "limitless-block-x.html"),
+      "utf8"
+    );
+
+    const card = parseCardPage(html, "OP17-005", PACK_ID);
+
+    expect(card.block_number).toBeNull();
+    expect(warning).toHaveBeenCalledWith(
+      '  ⚠ OP17-005: regulation mark "Block X" is not numeric; block_number set to null'
+    );
+  });
+
+  it("reports every failed card after attempting the complete list", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const references = [
+      { baseId: "OP17-001", path: "OP17-001", variantNumber: null },
+      { baseId: "OP17-002", path: "OP17-002", variantNumber: null },
+    ];
+    const fetchPage = vi.fn().mockResolvedValue("<html></html>");
+
+    await expect(
+      scrapeCardReferences(references, PACK_ID, fetchPage, 0)
+    ).rejects.toThrow(
+      "Failed to scrape 2 card(s):\n- OP17-001: no card image found\n- OP17-002: no card image found"
+    );
+    expect(fetchPage).toHaveBeenCalledTimes(2);
   });
 
   it("uses the image filename for variant IDs and inherits base rarity", async () => {
