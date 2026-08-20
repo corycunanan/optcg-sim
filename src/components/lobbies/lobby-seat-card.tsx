@@ -398,7 +398,7 @@ function ReadyControl({
  * both cases, so the art scales without ever being cropped.
  */
 const LEADER_ART_CLASS =
-  "aspect-card h-24 w-auto shrink-0 rounded-md lg:h-auto lg:max-h-[16.75rem] lg:min-h-0 lg:w-auto lg:flex-1";
+  "aspect-card rounded-card h-24 w-auto shrink-0 lg:h-auto lg:max-h-[16.75rem] lg:min-h-0 lg:w-auto lg:flex-1";
 
 /**
  * The leader art is the seat's hero and its only route into the deck: the

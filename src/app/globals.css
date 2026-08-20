@@ -96,6 +96,14 @@
   --chamfer-step-hairline: 1px;
   --chamfer-step-focus-ring: 2px;
 
+  /* Card silhouette radius (docs/design/SHAPE-LANGUAGE.md §Shape semantics)
+     The printed OPTCG card is 63 × 88mm with a ~2.5mm corner, so its corner is
+     ~4% of the card's width — a ratio, not a length. Held as a percentage so
+     one value serves a 68px lobby thumbnail and a 400px detail scan the way
+     one physical card serves both: the corner scales with the object. See the
+     `rounded-card` utility for the vertical counterpart. */
+  --card-radius: 4%;
+
   /* State ramps */
   --green-600: oklch(70% 0.15 150);
   --green-800: oklch(56% 0.14 150); /* keyline drawn on a solid green fill */
@@ -1087,6 +1095,31 @@ body {
 
 @utility aspect-card {
   aspect-ratio: 600 / 838;
+}
+
+/* The card silhouette itself (docs/design/SHAPE-LANGUAGE.md §Shape semantics).
+   Rounded geometry is reserved for cards, so this is the one radius outside
+   the 2px chrome contract, and it is the shape a raw-card surface's hard cast
+   traces: `box-shadow` is generated from the border box, so a card clipped at
+   chrome radius casts a chrome-radius slab (ELEVATION-LANGUAGE.md §Casting
+   from a clipped surface).
+
+   ── Why the slash ──
+   A percentage `border-radius` resolves its horizontal radius against the
+   box's width and its vertical radius against its height. On the card's
+   600/838 box those are different lengths, so a single `4%` would paint a
+   1.4:1 ellipse at every corner. The vertical percentage is therefore scaled
+   by the same 600/838 the `aspect-card` utility above states, which makes both
+   radii the identical pixel length and the corner a true quarter-circle.
+
+   ── Where it applies ──
+   Boxes that ARE the card: a raw-art crop, a card face, a card-shaped slot,
+   and the skeleton standing in for one. The quarter-circle is exact only on a
+   600/838 box; a tile that adds a caption strip below the art carries the
+   silhouette because the tile is the object that casts, and its corner runs a
+   few percent tall. Chrome keeps `rounded-md`. */
+@utility rounded-card {
+  border-radius: var(--card-radius) / calc(var(--card-radius) * 600 / 838);
 }
 
 @utility w-card-thumb {

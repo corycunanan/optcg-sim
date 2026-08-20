@@ -346,7 +346,7 @@ export default function NewCardPage() {
 
         {/* Preview */}
         {form.imageUrl && (
-          <div className="border-border w-48 overflow-hidden rounded-md border">
+          <div className="border-border rounded-card w-48 overflow-hidden border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={form.imageUrl} alt="Preview" className="w-full" />
           </div>

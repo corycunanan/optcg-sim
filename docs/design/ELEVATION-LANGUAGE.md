@@ -91,6 +91,13 @@ thumbnails cross-fade from `opacity-70` to `opacity-100` on hover, and the `shad
 Non-interactive card grids (the deck builder's Backs and DON tabs) are deliberately not in
 this table — see §Non-interactive card previews below.
 
+Every surface in this table clips raw card art, so as of OPT-715 each one clips it at
+`rounded-card` ([SHAPE-LANGUAGE.md](./SHAPE-LANGUAGE.md) §The card radius) rather than at a chrome
+radius. That is a shape change with an elevation consequence: `box-shadow` is generated from the
+border box, so the register's `shadow-sm` → `shadow-md` step now traces the card's own corner
+instead of a 2px slab behind it. Nothing about the scale, the step, or the transitions changes —
+the cast was always correct for the box it was given, and the box was wrong.
+
 Two rules the table encodes:
 
 - **A fanned stack carries the register per card, not on a wrapper.** The stack lifts as one

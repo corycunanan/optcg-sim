@@ -177,7 +177,7 @@ export function DeckBuilderList({
                         // — literally the model in ELEVATION-LANGUAGE §The
                         // principle. Lift and shadow move together as one
                         // tier, per §Anti-stacking.
-                        <div className="w-card-thumb border-border aspect-card overflow-hidden rounded border shadow-sm transition-[translate,box-shadow] duration-150 group-hover/stack:-translate-y-2 group-hover/stack:shadow-md">
+                        <div className="w-card-thumb border-border aspect-card rounded-card overflow-hidden border shadow-sm transition-[translate,box-shadow] duration-150 group-hover/stack:-translate-y-2 group-hover/stack:shadow-md">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={group.imageUrl}

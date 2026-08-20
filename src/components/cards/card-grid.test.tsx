@@ -99,3 +99,26 @@ describe("CardGrid tile hover (OPT-714)", () => {
     expect(html).not.toContain("hover:shadow-md");
   });
 });
+
+// The tile clips raw card art, and its hard cast is generated from that border
+// box, so the corner the tile is clipped at is the corner the shadow traces
+// (docs/design/SHAPE-LANGUAGE.md §The card radius).
+describe("CardGrid card silhouette (OPT-715)", () => {
+  it("clips the tile at the card radius, not the chrome radius", () => {
+    const { className } = renderGrid();
+
+    expect(className).toContain("rounded-card");
+    expect(className).not.toContain("rounded-lg");
+    expect(className).toContain("overflow-hidden");
+  });
+
+  it("gives the skeleton the same silhouette so the tile keeps its shape", () => {
+    act(() => {
+      renderer = create(<CardGridSkeleton count={2} />);
+    });
+    const html = JSON.stringify(renderer!.toJSON());
+
+    expect(html).toContain("rounded-card");
+    expect(html).not.toContain("rounded-lg");
+  });
+});

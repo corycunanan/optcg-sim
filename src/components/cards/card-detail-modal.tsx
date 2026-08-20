@@ -149,7 +149,7 @@ export function CardDetailModal({ cardId, onClose, footer, controlledImage, onIm
           {/* Left: image gallery */}
           <div className="w-2/5 shrink-0 overflow-y-auto p-6 scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {loading || !card ? (
-              <Skeleton className="aspect-card w-full rounded-lg" />
+              <Skeleton className="aspect-card rounded-card w-full" />
             ) : (
               <CardImageGallery
                 cardName={card.name}

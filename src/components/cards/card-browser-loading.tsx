@@ -41,7 +41,7 @@ export function CardBrowserLoading() {
         <div className="mx-auto w-full max-w-7xl px-6 pb-8">
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {Array.from({ length: 20 }).map((_, i) => (
-              <div key={i} className="bg-surface-1 overflow-hidden rounded-lg">
+              <div key={i} className="bg-surface-1 rounded-card overflow-hidden">
                 <Skeleton className="aspect-card w-full rounded-none" />
               </div>
             ))}

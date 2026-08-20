@@ -428,3 +428,88 @@ describe("shape-language allowance", () => {
     expect(findShapeVocabularyUsages(source)).toEqual([]);
   });
 });
+
+// The card silhouette (docs/design/SHAPE-LANGUAGE.md §The card radius) is the
+// second documented vocabulary outside the chrome radius scale. These pin that
+// the rules are derived from the vocabulary itself rather than from a survey of
+// how the codebase happens to spell it today.
+describe("card silhouette vocabulary (OPT-715)", () => {
+  it("does not flag rounded-card under the chrome radius rule", () => {
+    expect(
+      findTextViolations('className="aspect-card rounded-card overflow-hidden"')
+    ).toEqual([]);
+  });
+
+  it("collects rounded-card declared as an @utility", () => {
+    const declared = collectDeclaredShapeUtilities(
+      "@utility aspect-card { aspect-ratio: 600 / 838; }\n" +
+        "@utility rounded-card { border-radius: var(--card-radius); }\n" +
+        "@utility chamfer-outer { clip-path: polygon(0 0); }"
+    );
+
+    expect([...declared].sort()).toEqual(["chamfer-outer", "rounded-card"]);
+  });
+
+  it("reports rounded-card usages so an undeclared name can be resolved", () => {
+    expect(
+      findShapeVocabularyUsages('<div className="rounded-card border" />')
+    ).toEqual([
+      expect.objectContaining({ utility: "rounded-card", kind: "class" }),
+    ]);
+  });
+
+  // The chrome radius rule only knows xs/sm/xl/2xl/3xl and arbitrary values, so
+  // a near-miss card name would otherwise compile to nothing and pass silently.
+  it("reads a near-miss name as vocabulary so it fails as undeclared", () => {
+    const usages = findShapeVocabularyUsages(
+      '<div className="rounded-card-lg" />'
+    );
+
+    expect(usages).toEqual([
+      expect.objectContaining({ utility: "rounded-card-lg", kind: "class" }),
+    ]);
+    expect(
+      collectDeclaredShapeUtilities(
+        "@utility rounded-card { border-radius: 4%; }"
+      ).has(usages[0].utility)
+    ).toBe(false);
+  });
+
+  it("reads through Tailwind variant and important prefixes", () => {
+    expect(
+      findShapeVocabularyUsages('<div className="hover:rounded-card" />')
+    ).toEqual([
+      expect.objectContaining({ utility: "rounded-card", kind: "class" }),
+    ]);
+  });
+
+  it.each([
+    ['cn("rounded-card", extra)', "cn argument"],
+    ['cn(on ? "rounded-card" : "rounded-md")', "conditional"],
+    ['cn(["rounded-card"])', "array"],
+  ])("reads a static class out of %s (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([
+      expect.objectContaining({ utility: "rounded-card", kind: "class" }),
+    ]);
+  });
+
+  it("flags a dynamically composed card radius", () => {
+    expect(
+      findShapeVocabularyUsages("<div className={`rounded-card-${size}`} />")
+    ).toEqual([expect.objectContaining({ kind: "dynamic" })]);
+  });
+
+  it.each([
+    ['<div data-testid="rounded-card" />', "non-class JSX attribute"],
+    ['const name = "rounded-card";', "plain string constant"],
+    ['root.querySelector(".rounded-card");', "selector argument"],
+  ])("does not treat %s as a class reference (%s)", (source) => {
+    expect(findShapeVocabularyUsages(source)).toEqual([]);
+  });
+
+  it("leaves the unrelated aspect-card utility alone", () => {
+    expect(
+      findShapeVocabularyUsages('<div className="aspect-card w-card-thumb" />')
+    ).toEqual([]);
+  });
+});

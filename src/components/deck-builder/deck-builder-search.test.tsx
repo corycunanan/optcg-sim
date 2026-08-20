@@ -122,6 +122,19 @@ describe("DeckBuilderSearch tile elevation", () => {
     expect(tile.className).toContain("hover:shadow-md");
   });
 
+  // The tile is the object that casts, so it carries the card silhouette even
+  // though its info strip makes it taller than a card — the cast is generated
+  // from the tile's border box (docs/design/SHAPE-LANGUAGE.md §The card radius).
+  it("clips the tile at the card radius, not the chrome radius", async () => {
+    renderSearch();
+    const tile = await screen.findByRole("button", {
+      name: "Inspect Roronoa Zoro",
+    });
+
+    expect(tile.className).toContain("rounded-card");
+    expect(tile.className).not.toContain("rounded-md");
+  });
+
   it("does not stack an inner image zoom on the altitude step", async () => {
     renderSearch();
     await screen.findByRole("button", { name: "Inspect Roronoa Zoro" });

@@ -22,7 +22,7 @@ function SeatSkeleton() {
           <Skeleton className="h-3 w-16" />
         </div>
       </div>
-      <Skeleton className="aspect-card col-start-1 row-span-3 row-start-1 w-24 rounded-md lg:max-h-[16.75rem] lg:min-h-0 lg:w-auto lg:flex-1" />
+      <Skeleton className="aspect-card rounded-card col-start-1 row-span-3 row-start-1 w-24 lg:max-h-[16.75rem] lg:min-h-0 lg:w-auto lg:flex-1" />
       <div className="col-start-2 row-start-2 flex w-full flex-col gap-2 lg:w-48">
         <Skeleton className="h-3 w-16" />
         <Skeleton className="h-4 w-32" />

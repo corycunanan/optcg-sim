@@ -36,4 +36,26 @@ describe("cn", () => {
       "hover:lift hover:shadow-md"
     );
   });
+
+  // `rounded-card` is declared in globals.css, and Tailwind emits it before
+  // `.rounded-md` in the utilities layer. Without the class-group registration
+  // both classes survive `cn()` and stylesheet order hands the win to chrome —
+  // a card silhouette passed to Button or Skeleton would silently stay at 2px.
+  it("lets the card radius override a primitive's chrome radius", () => {
+    expect(cn("rounded-md", "rounded-card")).toBe("rounded-card");
+    expect(cn("animate-pulse rounded-md bg-muted", "rounded-card")).toBe(
+      "animate-pulse bg-muted rounded-card"
+    );
+    expect(cn("rounded-lg", "rounded-card")).toBe("rounded-card");
+  });
+
+  it("lets a later chrome radius override the card radius", () => {
+    expect(cn("rounded-card", "rounded-md")).toBe("rounded-md");
+    expect(cn("rounded-card", "rounded-none")).toBe("rounded-none");
+  });
+
+  it("does not let the card radius collide with an unrelated property", () => {
+    expect(cn("rounded-card", "aspect-card")).toBe("rounded-card aspect-card");
+    expect(cn("rounded-card", "shadow-sm")).toBe("rounded-card shadow-sm");
+  });
 });

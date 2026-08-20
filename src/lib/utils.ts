@@ -21,11 +21,17 @@ export {
  * `lift` (the standardized hover lift, ELEVATION-LANGUAGE.md §The standardized
  * lift) writes the same `translate` property as `translate-y-*`, so it joins
  * that class group and a later `translate-y-0` correctly drops it.
+ *
+ * `rounded-card` (the card silhouette, SHAPE-LANGUAGE.md §Shape semantics)
+ * writes `border-radius`, so it joins the radius group and correctly replaces
+ * the `rounded-md` a primitive supplies — `cn("rounded-md", "rounded-card")`
+ * on a Button or a Skeleton must resolve to the card radius alone.
  */
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
       "translate-y": ["lift"],
+      rounded: [{ rounded: ["card"] }],
     },
   },
 });

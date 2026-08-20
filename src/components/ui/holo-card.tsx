@@ -18,8 +18,11 @@ interface HoloCardProps {
  * pass-through with no listeners attached — safe to mount unconditionally and
  * gate by rarity at the call site.
  *
- * Border-radius is inherited from `className` (e.g. `rounded`, `rounded-md`)
- * so the shine/glare layers and the inner clip stay in sync with the surface.
+ * Border-radius is inherited from `className` (`rounded-card` for a raw card
+ * face, per docs/design/SHAPE-LANGUAGE.md §The card radius) so the shine/glare
+ * layers and the inner clip stay in sync with the surface. `border-radius:
+ * inherit` copies the computed value, so the percentage travels and each
+ * inset-0 layer resolves it against its own identically sized box.
  */
 export function HoloCard({ effect = "none", className, children }: HoloCardProps) {
   const enabled = effect !== "none";

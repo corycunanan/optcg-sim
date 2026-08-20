@@ -68,7 +68,7 @@ export function CardImageGallery({
   return (
     <div>
       {/* Main image */}
-      <HoloCard effect={effect} className="overflow-hidden rounded-lg">
+      <HoloCard effect={effect} className="rounded-card overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={selectedImage}
@@ -97,7 +97,10 @@ export function CardImageGallery({
                     // slack below the label instead, and `aspect-card` keeps
                     // every scan the same height regardless of its intrinsic
                     // ratio.
-                    "group flex cursor-pointer flex-col overflow-hidden rounded-md text-left shadow-sm transition-all hover:shadow-md",
+                    // The tile is the object that casts, so it carries the
+                    // card silhouette even though the label strip makes it
+                    // taller than a card (SHAPE-LANGUAGE §Shape semantics).
+                    "rounded-card group flex cursor-pointer flex-col overflow-hidden text-left shadow-sm transition-all hover:shadow-md",
                     isSelected
                       ? "border border-border-strong"
                       : "border border-border",

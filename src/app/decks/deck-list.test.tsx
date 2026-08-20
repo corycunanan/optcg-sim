@@ -137,8 +137,9 @@ describe("DeckList row", () => {
     );
     // Decorative: the trigger button carries the accessible name for the pair.
     expect(art.getAttribute("alt")).toBe("");
-    // Figure-ground rule: the card silhouette keeps its radius.
-    expect(art.className).toContain("rounded");
+    // Figure-ground rule: the card silhouette keeps its radius, and since
+    // OPT-715 that is the card radius rather than the 4px badge step.
+    expect(art.className).toContain("rounded-card");
   });
 
   it("wraps the row in a borderless chamfered surface one step above the page", () => {

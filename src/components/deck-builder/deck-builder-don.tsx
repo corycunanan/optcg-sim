@@ -11,7 +11,7 @@ export function DeckBuilderDon({ donArtUrl }: DeckBuilderDonProps) {
         {Array.from({ length: 10 }, (_, i) => (
           <div
             key={`don-${i}`}
-            className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card"
+            className="w-card-thumb rounded-card overflow-hidden border border-border shadow-sm aspect-card"
           >
             {donArtUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

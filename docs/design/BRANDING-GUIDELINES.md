@@ -338,6 +338,13 @@ Chrome uses 2px corners. Badges alone retain 4px corners; avatars and presence d
 | `--radius-md` | 2px | `rounded-md` | Buttons, inputs, chrome |
 | `--radius-lg` | 2px | `rounded-lg` | Panels, modals, sheets |
 | (built-in) | 9999px | `rounded-full` | Avatars, presence dots |
+| `--card-radius` | 4% of card width | `rounded-card` | Card faces, thumbnails, art crops — **not chrome** |
+
+`rounded-card` is not a fifth chrome step. It is the card silhouette, owned by
+[SHAPE-LANGUAGE.md §The card radius](SHAPE-LANGUAGE.md#the-card-radius), which specifies why the
+value is a ratio rather than a length and where a surface may take it. The design-system lint
+recognizes it as vocabulary — declared in `globals.css`, never composed dynamically — the same way
+it recognizes `chamfer-*`.
 
 ---
 

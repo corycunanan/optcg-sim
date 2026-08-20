@@ -42,6 +42,11 @@ const SPACING_EXEMPT_PATH_PREFIXES = ["src/components/ui/"];
 // by semantic review because source-text lint cannot identify people imagery.
 // Do not add a radius path allowlist; migrate a component to the nearest scale
 // step or document a deliberately separate shape vocabulary instead.
+//
+// `rounded-card` is that second route, taken once (OPT-715): the card
+// silhouette is a documented vocabulary declared in globals.css, not a path
+// exemption, and it is policed by the shape-vocabulary rules below rather than
+// by widening this scale.
 
 // Inline styles are reserved for values Tailwind cannot know at build time:
 // measured geometry, board coordinates, and animation transforms. Visual design
@@ -141,28 +146,43 @@ const INLINE_STYLE_CUSTOM_PROPERTY_ALLOWLIST = new Map(
 );
 
 // ── Shape language allowance (docs/design/SHAPE-LANGUAGE.md) ──
-// The 45° chamfer vocabulary is ADDITIVE: the `chamfer-*` utilities and the
-// `--chamfer-*` / `--edge-*` tokens declared in globals.css are *permitted*
-// wherever a surface opts into the angular register. Nothing here makes a
-// chamfer required, and the three-radius rule stays in force everywhere else —
-// a component that keeps `rounded`/`rounded-md`/`rounded-lg` is still correct.
+// Two vocabularies live outside the three-radius chrome scale, and both are
+// declared in globals.css rather than allowlisted here:
 //
-// Two mechanical checks are scoped entirely to the new vocabulary:
+// - `chamfer-*` — the 45° angular register, consumed through `ChamferFrame`
+//   over the `--chamfer-*` / `--edge-*` tokens.
+// - `rounded-card` — the card silhouette, over `--card-radius`. §Shape
+//   semantics reserves rounded geometry for card faces, thumbnails, and art
+//   crops, so this is the one radius a raw-card surface may take, and it is
+//   what its hard cast traces (ELEVATION-LANGUAGE.md §Casting from a clipped
+//   surface).
 //
-// 1. Anti-rot — a `chamfer-*` class referenced from .tsx must actually be
+// Both are ADDITIVE: a surface may adopt either, none is required to, and the
+// three-radius rule stays in force everywhere else — a component that keeps
+// `rounded`/`rounded-md`/`rounded-lg` is still correct.
+//
+// The rules are derived from the *documented vocabulary*, not from a survey of
+// current usage, so a name this project has not written yet is judged the same
+// way as one it has. Two mechanical checks are scoped entirely to that
+// vocabulary:
+//
+// 1. Anti-rot — a vocabulary class referenced from .tsx must actually be
 //    declared in globals.css. Without it a renamed or deleted utility degrades
-//    silently into an unclipped rectangle, which is invisible in review.
+//    silently into an unclipped rectangle or a square-cornered card, which is
+//    invisible in review. This is also what catches a near-miss name:
+//    `rounded-card-lg` reads as vocabulary and fails as undeclared, where the
+//    chrome-radius rule below would never have looked at it.
 // 2. No dynamic composition — Tailwind's scanner only sees whole class names
-//    in the source, so `` `chamfer-cut-${cut}` `` compiles to nothing. Chamfer
+//    in the source, so `` `chamfer-cut-${cut}` `` compiles to nothing. These
 //    classes must come from static literal maps.
 //
 // Both checks are scoped to *class positions* — a `className`/`class` JSX
 // attribute, or an argument of `cn()` / `cva()` / `clsx()` — descending only
 // through the expression forms those helpers evaluate as classes (conditional,
-// logical, array, object). A `chamfer-` string anywhere else in a .tsx file is
-// not a class and is never inspected, so selector strings, `data-*` values,
-// identifiers, and module specifiers cannot produce a finding. No other
-// allowlist is widened by these rules.
+// logical, array, object). A `chamfer-` or `rounded-card` string anywhere else
+// in a .tsx file is not a class and is never inspected, so selector strings,
+// `data-*` values, identifiers, and module specifiers cannot produce a
+// finding. No other allowlist is widened by these rules.
 const GLOBALS_CSS_PATH = join(SOURCE_ROOT, "app", "globals.css");
 const CLASS_ATTRIBUTE_NAMES = new Set(["className", "class"]);
 const CLASS_HELPER_NAMES = new Set(["cn", "cva", "clsx", "classNames"]);
@@ -173,9 +193,14 @@ const CLASS_LOGICAL_OPERATORS = new Set([
 ]);
 // A complete class name never ends in a hyphen; a dangling `chamfer-cut-` is
 // the prefix half of a dynamic composition, reported by that rule instead.
-const SHAPE_CLASS_TOKEN_RE = /^chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?$/;
-const SHAPE_FRAGMENT_RE = /(?:^|\s)(chamfer-[a-z0-9-]*)/;
-const SHAPE_DECLARATION_RE = /(?:@utility\s+|\.)(chamfer-[a-z][a-z0-9-]*)/g;
+// `rounded-card` is a whole name on its own, so it is matched with an optional
+// suffix: a bare `rounded-card` is the vocabulary, and `rounded-card-…` is a
+// near miss that the declaration check turns into a finding.
+const SHAPE_CLASS_TOKEN_RE =
+  /^(?:chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?|rounded-card(?:-[a-z0-9]+)*)$/;
+const SHAPE_FRAGMENT_RE = /(?:^|\s)((?:chamfer-|rounded-card)[a-z0-9-]*)/;
+const SHAPE_DECLARATION_RE =
+  /(?:@utility\s+|\.)((?:chamfer-[a-z]|rounded-card)[a-z0-9-]*)/g;
 
 // Elevation shadows are hard, non-blurred offsets (globals.css, "Shadow
 // values"). The `shadow` rules therefore fail three things.
@@ -363,7 +388,7 @@ if (IS_MAIN) {
           sourceFile,
           usage.index,
           "shape-vocabulary",
-          `dynamically composed chamfer class ${JSON.stringify(`${usage.utility}\${…}`)}; Tailwind only sees whole class names, so select from a static literal map`
+          `dynamically composed shape class ${JSON.stringify(`${usage.utility}\${…}`)}; Tailwind only sees whole class names, so select from a static literal map`
         );
         continue;
       }
@@ -375,7 +400,7 @@ if (IS_MAIN) {
         sourceFile,
         usage.index,
         "shape-vocabulary",
-        `undeclared chamfer utility ${JSON.stringify(usage.utility)}; declare it in src/app/globals.css per docs/design/SHAPE-LANGUAGE.md`
+        `undeclared shape utility ${JSON.stringify(usage.utility)}; declare it in src/app/globals.css per docs/design/SHAPE-LANGUAGE.md`
       );
     }
 
@@ -457,8 +482,8 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
 }
 
 /**
- * Every `chamfer-*` class reference in a .tsx source, as
- * `{ index, utility, kind }`.
+ * Every shape-vocabulary class reference in a .tsx source — `chamfer-*` and
+ * `rounded-card` — as `{ index, utility, kind }`.
  *
  * Only *class positions* are inspected: a `className`/`class` JSX attribute, or
  * an argument of a class helper (`cn`/`cva`/`clsx`/`classNames`). Within one,
@@ -471,9 +496,9 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
  * - `kind: "class"` — a static literal class token. Always allowed; only a name
  *   missing from globals.css is a violation.
  * - `kind: "dynamic"` — a non-literal expression in a class position whose
- *   string parts contain a `chamfer-` token (template substitution, `+`
- *   concatenation, `[...].join()`, …). Tailwind only ever sees whole class
- *   names, so this is always a violation.
+ *   string parts contain a `chamfer-` or `rounded-card` token (template
+ *   substitution, `+` concatenation, `[...].join()`, …). Tailwind only ever
+ *   sees whole class names, so this is always a violation.
  */
 export function findShapeVocabularyUsages(source) {
   const usages = [];
@@ -486,7 +511,7 @@ export function findShapeVocabularyUsages(source) {
       }
     },
     onDynamic: (node, index) => {
-      // Only a finding when it actually carries chamfer text; plain identifiers
+      // Only a finding when it actually carries vocabulary text; plain identifiers
       // stay silent.
       const fragment = firstShapeFragment(node);
       if (fragment) usages.push({ index, utility: fragment, kind: "dynamic" });
@@ -921,7 +946,7 @@ function classTokenNames(text) {
   return text.split(/\s+/).map(normalizeClassToken).filter(Boolean);
 }
 
-/** The first `chamfer-` fragment in any string part of an expression tree. */
+/** The first shape-vocabulary fragment in any string part of an expression tree. */
 function firstShapeFragment(node) {
   let found = null;
 
@@ -951,7 +976,7 @@ function firstShapeFragment(node) {
   return found;
 }
 
-/** Chamfer utilities declared in globals.css, as `@utility` or a class rule. */
+/** Shape utilities declared in globals.css, as `@utility` or a class rule. */
 export function collectDeclaredShapeUtilities(css) {
   const declared = new Set();
 
@@ -1120,6 +1145,6 @@ function printInfo() {
     `Button className overrides: ${buttonOverrideCount} (informational).`
   );
   console.log(
-    `Shape language: ${declaredShapeUtilities.size} chamfer utilities declared in globals.css, ${shapeUtilityUsageCount} allowed usage(s) in .tsx.`
+    `Shape language: ${declaredShapeUtilities.size} chamfer/card utilities declared in globals.css, ${shapeUtilityUsageCount} allowed usage(s) in .tsx.`
   );
 }
