@@ -456,20 +456,28 @@ describe("Navbar", () => {
       .getByRole("button", { name: "Account menu for luffy" })
       .className.split(/\s+/);
 
-    // The account trigger already owned a `data-open` background; it now steps
-    // its text with it and survives the pointer, which the shared trigger
-    // style would otherwise repaint `bg-muted`.
+    // The account trigger owned a `data-open` background before OPT-712 and it
+    // never matched anything: Tailwind v4 compiles `data-open:` to the
+    // attribute-presence selector `[data-open]`, and Radix's trigger only ever
+    // carries `data-state="open"`. The explicit form is the live one.
     for (const openToken of [
-      "data-open:bg-surface-2",
-      "data-open:text-content-inverse",
-      "data-open:hover:bg-surface-2",
-      "data-popup-open:bg-surface-2",
-      "data-popup-open:text-content-inverse",
-      "data-popup-open:hover:bg-surface-2",
+      "data-[state=open]:bg-surface-2",
+      "data-[state=open]:text-content-inverse",
+      "data-[state=open]:hover:bg-surface-2",
+      "data-[state=open]:focus:bg-surface-2",
     ]) {
       expect(classes).toContain(openToken);
     }
-    expect(classes.some((c) => c.endsWith(":bg-muted"))).toBe(false);
+    // This suite mocks the navigation-menu primitive away, so the class string
+    // here is exactly what the component contributes — and none of it may lean
+    // on the dead short form.
+    expect(
+      classes.some(
+        (c) => c.startsWith("data-open:") || c.startsWith("data-popup-open:")
+      )
+    ).toBe(false);
+    // The attribute half of this contract needs the real Radix trigger, so it
+    // lives in navbar-account-menu.test.tsx rather than here.
   });
 
   it("keeps a focus indicator that survives inside a full-height section", () => {

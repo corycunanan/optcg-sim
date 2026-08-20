@@ -49,13 +49,22 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
           <NavigationMenuTrigger
             aria-label={`Account menu for ${displayName}`}
             // The trigger is a full-height square section of the bar, exactly
-            // like a nav link, and holds `bg-surface-2` while its menu is open —
-            // including under the pointer, which the shared trigger style would
-            // otherwise repaint `bg-muted`.
+            // like a nav link, and holds `bg-surface-2` for as long as its menu
+            // is open — under the pointer and under focus too.
+            //
+            // `data-[state=open]:`, NOT `data-open:`. Tailwind v4 compiles the
+            // short form to an attribute-presence selector, `[data-open]`, and
+            // `@radix-ui/react-navigation-menu` never writes that attribute —
+            // its trigger carries `data-state="open"` and nothing else. The
+            // `data-open:` / `data-popup-open:` classes this element used to
+            // carry, and the ones still inside `navigationMenuTriggerStyle()`,
+            // are dead selectors. The open slab is painted here explicitly so
+            // it owns its own color rather than inheriting whatever the shared
+            // cva's `bg-muted` happens to alias to.
             className={cn(
               navSlabStyles,
               "text-content-primary gap-2",
-              "data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-popup-open:hover:bg-surface-2 data-open:bg-surface-2 data-open:text-content-inverse data-open:hover:bg-surface-2 data-open:focus:bg-surface-2"
+              "data-[state=open]:bg-surface-2 data-[state=open]:text-content-inverse data-[state=open]:hover:bg-surface-2 data-[state=open]:focus:bg-surface-2"
             )}
           >
             <UserAvatar
