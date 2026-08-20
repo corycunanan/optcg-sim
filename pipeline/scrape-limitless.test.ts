@@ -77,6 +77,30 @@ describe("Limitless scraper", () => {
     });
   });
 
+  it("keeps an inline trigger reference inside the flowing effect", async () => {
+    const html = await readFile(
+      join(FIXTURES, "limitless-inline-trigger-reference.html"),
+      "utf8"
+    );
+    const card = parseCardPage(html, "OP17-112", PACK_ID);
+
+    expect(card.effect).toBe(
+      "[Your Turn] The base power of all of your Characters with a [Trigger] and 4000 base power becomes 8000.<br>[On Play] Draw 1 card, then choose one:<br>• Add up to 1 card from the top of your deck to the top of your Life cards.<br>• Add up to 1 card from the top of your opponent's Life cards to the owner's hand."
+    );
+    expect(card.trigger).toBeNull();
+  });
+
+  it("recognizes a single-block trigger-only card", async () => {
+    const html = await readFile(
+      join(FIXTURES, "limitless-trigger-only.html"),
+      "utf8"
+    );
+    const card = parseCardPage(html, "OP17-107", PACK_ID);
+
+    expect(card.effect).toBe("-");
+    expect(card.trigger).toBe("[Trigger] Play this card.");
+  });
+
   it("uses the image filename for variant IDs and inherits base rarity", async () => {
     const html = await readFile(
       join(FIXTURES, "limitless-character-with-trigger.html"),

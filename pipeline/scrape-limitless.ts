@@ -204,6 +204,7 @@ export function parseCardPage(
   const types = typesMatch ? splitValue(typesMatch[1]) : [];
 
   let effect = "";
+  let trigger: string | null = null;
   for (const section of html.matchAll(
     /<div class="card-text-section(?:\s[^"]*)?">([\s\S]*?)<\/div>/g
   )) {
@@ -215,17 +216,29 @@ export function parseCardPage(
     ) {
       continue;
     }
-    const text = cleanWhitespace(stripTags(body));
-    if (!text) continue;
-    effect = text.replaceAll("\n", "<br>");
-    break;
-  }
+    // Limitless also wraps inline [Trigger] icons in double breaks, so preserve
+    // those raw block boundaries until the final block is classified.
+    const blocks = body
+      .split(/(?:<br\s*\/?>\s*){2,}/i)
+      .map((block) => cleanWhitespace(stripTags(block)))
+      .filter(Boolean);
+    if (blocks.length === 0) continue;
 
-  let trigger: string | null = null;
-  const triggerMatch = effect.match(/\[Trigger\]\s*([\s\S]*)/);
-  if (triggerMatch?.index !== undefined) {
-    trigger = `[Trigger] ${triggerMatch[1].trim()}`;
-    effect = effect.slice(0, triggerMatch.index).trim().replace(/<br>$/, "");
+    const lastBlock = blocks[blocks.length - 1];
+    const triggerMatch = lastBlock.match(/^\[Trigger\]\s*(\S)/);
+    const precedingBlock = blocks[blocks.length - 2];
+    const precedingBlockEndsSentence =
+      precedingBlock !== undefined && /[.!?]["'”’]?$/.test(precedingBlock);
+    if (
+      triggerMatch &&
+      (!/[a-z]/.test(triggerMatch[1]) || precedingBlockEndsSentence)
+    ) {
+      trigger = lastBlock.replace(/^\[Trigger\]\s*/, "[Trigger] ");
+      blocks.pop();
+    }
+
+    effect = blocks.join(" ").replaceAll("\n", "<br>");
+    break;
   }
   if (!effect) effect = "-";
 
