@@ -1,6 +1,6 @@
 # OPT-717 OP-17 Schema-Gate Inventory
 
-> **Provisional source:** OP-17 effect text came from limitlesstcg.com, not the official OPTCG site. Revalidate this inventory after vegapull can pull the official set, expected around 2026-08-28. The inline-`[Trigger]`-reference classification corruption was found and corrected on 2026-08-20 before merge; OP17-105's corrected inputs still omit its final `[Trigger]` clause, so the card reference restores that clause from published card text.
+> **Provisional source:** OP-17 effect text came from limitlesstcg.com, not the official OPTCG site. Revalidate this inventory after vegapull can pull the official set, expected around 2026-08-28. Limitless's page truncates OP17-105 at the second inline `[Trigger]` icon. The full text was restored on 2026-08-20 from [OPDeckGuide](https://opdeckguide.com/cards-list/OP17/) and [The Orc's Lair](https://theorcslair.com/products/product_511b162em7bw58k44ca8346vsq), independently verified, and adopted into the canonical dataset before merge.
 
 ## Outcome
 
@@ -40,6 +40,8 @@ The authored-schema gate run completed 33 tests: 30 passed and 3 OPT-590 tests f
 | OP17-116 | Fulgora                                               | Missing authored Trigger schema; derived-keyword/schema mismatch; fixed-count ratchet |
 | OP17-117 | Maser Saber                                           | Missing authored Trigger schema; derived-keyword/schema mismatch; fixed-count ratchet |
 
+OP17-107 is trigger-only (`effect: "-"`). Its complete Trigger text is `[Trigger] Play this card.` Generator convention omits trigger-only cards from per-set card docs, as shown by OP16-105, OP15-103, and OP15-106, so schema authors must take OP17-107's text from this inventory or the canonical JSON.
+
 ## Holding-pattern evidence
 
 - `workers/game/src/engine/trigger-schema-coverage.ts:47` filters every manifest entry with `hasTriggerText`, then requires an authored direct `TRIGGER` block. It has no exclusion input.
@@ -52,7 +54,7 @@ The authored-schema gate run completed 33 tests: 30 passed and 3 OPT-590 tests f
 
 The `scripts/generate-card-docs.ts` history contains one introducing commit, `e99fb8679a5b65f2024eed4c4f43c7d6185f7599`. That version already emitted bare `**ID**` headers and selected no category or color fields. Every previously committed `docs/cards/*.md` file uses `**ID** · Category · Color` headers instead.
 
-This is longstanding generator drift, not a new regression. OPT-717 leaves the script unchanged and adds category and color metadata only to `docs/cards/OP-17.md`. Its 112 effect-bearing card sections retain the corrected provisioned text after removing the added header suffixes, except for the documented OP17-105 completion.
+This is longstanding generator drift, not a new regression. OPT-717 leaves the script unchanged and adds category and color metadata only to `docs/cards/OP-17.md`. Its 112 effect-bearing card sections carry the canonical effect text with the committed header metadata.
 
 ## Command results
 
