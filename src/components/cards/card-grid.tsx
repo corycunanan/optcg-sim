@@ -1,17 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { handCardHover } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { CardWithRelations } from "./card-browser";
-
-/** Hover-off tween for the grid tile. `handCardHover` springs *in*; without an
- *  element-level default the spring would also drive the return trip and the
- *  tile would bounce back. Mirrors the board card's interaction layer. */
-const HOVER_EXIT_TRANSITION = { duration: 0.15, ease: "easeOut" as const };
 
 interface CardGridProps {
   cards: CardWithRelations[];
@@ -26,23 +19,14 @@ function CardGridItem({
   onCardClick: (cardId: string) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
-  const reducedMotion = useReducedMotion() ?? false;
 
   return (
-    // The board's hand-card hover preset (pop + raise + one wiggle) is the
-    // whole hover treatment here — the tile no longer stacks a CSS translate
-    // and an inner image zoom on top of it (ELEVATION-LANGUAGE, Anti-stacking).
-    // Motion owns `transform`; CSS owns only `box-shadow`, so the two never
-    // fight over a property. Motion also manages `will-change` for the
-    // duration of each animation, which matters on a ~50-tile grid: a static
-    // `will-change-transform` would promote every tile to its own compositor
-    // layer for the entire page lifetime.
-    <motion.button
+    // Tailwind v4 uses standalone `scale`, so the register names it alongside
+    // box-shadow. `motion-safe:` disables transforms under reduced motion.
+    <button
       type="button"
       onClick={() => onCardClick(card.id)}
-      whileHover={reducedMotion ? undefined : handCardHover}
-      transition={HOVER_EXIT_TRANSITION}
-      className="bg-surface-1 relative overflow-hidden rounded-lg text-left shadow-sm transition-shadow duration-200 hover:shadow-md"
+      className="bg-surface-1 relative overflow-hidden rounded-lg text-left shadow-sm transition-[scale,box-shadow] duration-200 ease-out hover:shadow-md motion-safe:hover:scale-[1.03]"
     >
       {/* Card image */}
       <div className="aspect-card relative w-full overflow-hidden">
@@ -77,7 +61,7 @@ function CardGridItem({
           </Badge>
         )}
       </div>
-    </motion.button>
+    </button>
   );
 }
 

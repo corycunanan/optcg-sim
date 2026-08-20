@@ -69,7 +69,7 @@ called out rather than folded into a blanket rule:
 | Surface                                              | Site                                              | Hover                                                    |
 | ---------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
 | `/decks` art-bearing rows                            | `src/app/decks/deck-list.tsx`                     | `bg-surface-2` + `shadowHover="md"` on the `ChamferFrame` |
-| `/cards` grid tiles                                  | `src/components/cards/card-grid.tsx`              | `hover:shadow-md` + the Motion `handCardHover` preset     |
+| `/cards` grid tiles                                  | `src/components/cards/card-grid.tsx`              | `hover:shadow-md` + `motion-safe:hover:scale-[1.03]` (CSS, 200ms ease-out) |
 | `/sets` tiles¹                                       | `src/components/cards/set-browser.tsx`            | `hover:shadow-md` + `hover:-translate-y-px`               |
 | Card-detail art-variant thumbnails²                  | `src/components/cards/card-image-gallery.tsx`     | `hover:shadow-md`, alongside the existing selected-state opacity cross-fade |
 | Deck-builder search tiles                            | `src/components/deck-builder/deck-builder-search.tsx` | `hover:shadow-md`                                     |
