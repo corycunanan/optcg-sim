@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
 import { NavbarAccountMenu } from "@/components/nav/navbar-account-menu";
 import { NavbarNotificationPanel } from "@/components/nav/navbar-notification-panel";
+import { navSlabStyles } from "@/components/nav/navbar-slab";
 import { FriendsDrawerToggle } from "@/components/social/friends-drawer-toggle";
 import {
   NavigationMenu,
@@ -47,25 +48,21 @@ export function Navbar() {
     },
   ];
 
-  // OPT-681: a nav link is a full-height section of the bar, not a pill riding
-  // inside it. `h-full` — not a literal `h-navbar` — keeps the block inside the
-  // nav's border box, so the gold bottom rule stays unbroken beneath it.
-  // `rounded-none` squares it off: a block that meets both edges of the bar has
-  // no free corner left to round, and the 2px chrome radius applied to the two
-  // corners that remain would read as a rendering artifact rather than intent.
+  // OPT-681 made a nav link a full-height section of the bar rather than a pill
+  // riding inside it; OPT-712 lifted that geometry into `navSlabStyles` so the
+  // actions cluster on the right builds the identical section. A link adds only
+  // what is its own: the locked navigation type role and the primary text step.
   //
   // The geometry is overridden here rather than in the shared
-  // `navigationMenuTriggerStyle()` because the account-menu trigger renders
-  // through that same style and must stay a compact control in the actions
-  // cluster.
-  //
-  // Focus: the shared style's inset outline (`focus-visible:outline-2
-  // -outline-offset-2 outline-border-focus`) is the navbar's standardized
-  // indicator and draws inside the block, so it survives at full height without
-  // a ring layered on top of it. Nothing here sets `outline-none` — in Tailwind
-  // v4 that sets `--tw-outline-style: none` and would defeat the indicator.
-  const navLinkStyles =
-    "font-nav flex h-full items-center justify-center rounded-none bg-transparent px-3 py-0 text-base text-content-primary hover:bg-surface-2 hover:text-content-inverse focus:bg-surface-2 focus:text-content-inverse sm:px-4";
+  // `navigationMenuTriggerStyle()` because dropdown chrome elsewhere renders
+  // through that same style and must stay compact.
+  const navLinkStyles = cn(
+    navSlabStyles,
+    "font-nav text-base text-content-primary"
+  );
+  // Gold text on the section the route is in. The inset `focus-visible` outline
+  // still draws over `bg-surface-2`, so the gold label never has a gold outline
+  // sitting on a gold fill — the indicator stays visible on the active link.
   const activeNavLinkStyles =
     "bg-surface-2 text-gold-600 hover:text-gold-600 focus:text-gold-600";
 
@@ -131,7 +128,13 @@ export function Navbar() {
             data-slot="navbar-actions"
             data-state={sessionStatus === "loading" ? "loading" : "ready"}
             aria-hidden={sessionStatus === "loading" || undefined}
-            className="min-w-navbar-actions ml-2 flex h-10 shrink-0 items-center justify-end gap-2"
+            // `h-full` and no gap, for the same reason the link row runs that
+            // way (OPT-712): each action is a full-height section of the bar,
+            // and adjacent sections have to touch or the nav background shows
+            // through between them as a seam. The bar's own `px-2 sm:px-6` is
+            // the only inset — the last section stops where the first link
+            // starts on the other side, so the two clusters stay symmetric.
+            className="min-w-navbar-actions ml-2 flex h-full shrink-0 items-center justify-end"
           >
             {sessionStatus === "authenticated" && session?.user && (
               <NavbarActions user={session.user} />

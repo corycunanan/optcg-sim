@@ -4,6 +4,7 @@ import { LogOut, Palette, UserRound } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { DeckNavigationGuardLink } from "@/components/deck-builder/deck-navigation-guard";
 import { NavbarDropdownSurface } from "@/components/nav/navbar-dropdown-surface";
+import { navSlabStyles } from "@/components/nav/navbar-slab";
 import { UserAvatar } from "@/components/social/user-avatar";
 import {
   NavigationMenu,
@@ -14,6 +15,7 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import { resolveThemeName, type ThemeName } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 interface NavbarAccountMenuProps {
   user: {
@@ -36,12 +38,25 @@ export function NavbarAccountMenu({ user, theme }: NavbarAccountMenuProps) {
     resolvedTheme.charAt(0).toUpperCase() + resolvedTheme.slice(1);
 
   return (
-    <NavigationMenu viewport={false} className="flex-none">
-      <NavigationMenuList>
-        <NavigationMenuItem>
+    // The height chain has to be unbroken from the bar down to the trigger or
+    // the slab stops short of the nav's edges (OPT-712). `[&>div]:h-full` is the
+    // one link in that chain no prop reaches: Radix wraps `NavigationMenuList`'s
+    // `<ul>` in an inline-styled indicator-track `<div>` that takes no
+    // className, and its auto height would collapse every `h-full` below it.
+    <NavigationMenu viewport={false} className="h-full flex-none [&>div]:h-full">
+      <NavigationMenuList className="h-full">
+        <NavigationMenuItem className="h-full">
           <NavigationMenuTrigger
             aria-label={`Account menu for ${displayName}`}
-            className="text-content-primary hover:bg-surface-2 focus:bg-surface-2 data-popup-open:bg-surface-2 data-open:bg-surface-2 gap-2 bg-transparent px-1"
+            // The trigger is a full-height square section of the bar, exactly
+            // like a nav link, and holds `bg-surface-2` while its menu is open —
+            // including under the pointer, which the shared trigger style would
+            // otherwise repaint `bg-muted`.
+            className={cn(
+              navSlabStyles,
+              "text-content-primary gap-2",
+              "data-popup-open:bg-surface-2 data-popup-open:text-content-inverse data-popup-open:hover:bg-surface-2 data-open:bg-surface-2 data-open:text-content-inverse data-open:hover:bg-surface-2 data-open:focus:bg-surface-2"
+            )}
           >
             <UserAvatar
               user={{

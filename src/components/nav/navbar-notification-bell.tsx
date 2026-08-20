@@ -2,8 +2,13 @@
 
 import { Bell } from "lucide-react";
 import { forwardRef, type ComponentProps, type MouseEventHandler } from "react";
+import {
+  navSlabIconBoxStyles,
+  navSlabOpenStyles,
+  navSlabStyles,
+} from "@/components/nav/navbar-slab";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface NavbarNotificationBellProps extends Omit<
   ComponentProps<"button">,
@@ -27,6 +32,7 @@ export const NavbarNotificationBell = forwardRef<
     onClick,
     popupOpen = false,
     popupControls,
+    className,
     ...triggerProps
   },
   ref
@@ -43,7 +49,9 @@ export const NavbarNotificationBell = forwardRef<
   const accessibleName = `Notifications, ${unreadAnnouncement}`;
   const content = (
     <>
-      <Bell data-icon="icon-only" aria-hidden="true" />
+      {/* Sized here rather than inherited: the trigger is no longer a `Button`,
+          so nothing upstream normalizes a bare lucide glyph to 16px. */}
+      <Bell className="size-4" data-icon="icon-only" aria-hidden="true" />
       {normalizedUnreadCount > 0 && (
         <Badge
           data-slot="notification-unread-badge"
@@ -68,13 +76,20 @@ export const NavbarNotificationBell = forwardRef<
     );
   }
 
+  // A bare `<button>` rather than `Button variant="ghost" size="icon"`
+  // (OPT-712): the slab overrode that recipe's radius, height, width, padding,
+  // transition, and every hover color, leaving the shared primitive as a source
+  // of dead CSS. It shares one string with the nav links instead.
+  //
+  // Rest color stays `content-secondary` while the links rest at
+  // `content-primary` — the bell is a secondary control and should not compete
+  // with wayfinding — and both converge on `content-inverse` on hover, focus,
+  // and open, so the bar reads as one family the moment it is touched.
   return (
-    <Button
+    <button
       {...triggerProps}
       ref={ref}
       type="button"
-      variant="ghost"
-      size="icon"
       aria-label={accessibleName}
       aria-haspopup="dialog"
       aria-expanded={popupOpen}
@@ -83,9 +98,17 @@ export const NavbarNotificationBell = forwardRef<
         onClick?.(event);
         if (!event.defaultPrevented) onActivate();
       }}
-      className="text-content-secondary relative"
+      className={cn(
+        navSlabStyles,
+        "text-content-secondary",
+        // Held for as long as the panel is on screen, the way an active link
+        // holds its section. Driven by the prop that already owns the open
+        // state, so the paint cannot drift from the behavior.
+        popupOpen && navSlabOpenStyles,
+        className
+      )}
     >
-      {content}
-    </Button>
+      <span className={navSlabIconBoxStyles}>{content}</span>
+    </button>
   );
 });
