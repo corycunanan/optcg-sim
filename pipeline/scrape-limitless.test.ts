@@ -93,6 +93,19 @@ describe("Limitless scraper", () => {
     expect(card.trigger).toBeNull();
   });
 
+  it("keeps a comma after an inline trigger reference in the effect", async () => {
+    const html = await readFile(
+      join(FIXTURES, "limitless-inline-trigger-comma.html"),
+      "utf8"
+    );
+    const card = parseCardPage(html, "OP17-116", PACK_ID);
+
+    expect(card.effect).toBe(
+      "[Counter] If you have 2 or more Characters with a [Trigger], up to 1 of your Leader or Characters gains +4000 power during this battle."
+    );
+    expect(card.trigger).toBeNull();
+  });
+
   it("recognizes a single-block trigger-only card", async () => {
     const html = await readFile(
       join(FIXTURES, "limitless-trigger-only.html"),
@@ -135,6 +148,64 @@ describe("Limitless scraper", () => {
       "Failed to scrape 2 card(s):\n- OP17-001: no card image found\n- OP17-002: no card image found"
     );
     expect(fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports every post-parse validation failure in the final summary", async () => {
+    const [leaderHtml, characterHtml] = await Promise.all([
+      readFile(join(FIXTURES, "limitless-leader.html"), "utf8"),
+      readFile(join(FIXTURES, "limitless-character-with-trigger.html"), "utf8"),
+    ]);
+    const withoutStats = (html: string) =>
+      html.replace(/<p class="card-text-section">[\s\S]*?<\/p>/, "");
+    const pages: Record<string, string> = {
+      "OP17-001": withoutStats(leaderHtml),
+      "OP17-002": withoutStats(characterHtml),
+    };
+    const references = [
+      { baseId: "OP17-001", path: "OP17-001", variantNumber: null },
+      { baseId: "OP17-002", path: "OP17-002", variantNumber: null },
+    ];
+
+    await expect(
+      scrapeCardReferences(references, PACK_ID, async (path) => pages[path], 0)
+    ).rejects.toThrow(
+      "Failed to scrape 2 card(s):\n- OP17-001: Leader requires power; Leader requires at least one attribute\n- OP17-002: Character requires power; Character requires at least one attribute"
+    );
+  });
+
+  it("requires complete Leader and Character gameplay fields", async () => {
+    const html = await readFile(
+      join(FIXTURES, "limitless-leader.html"),
+      "utf8"
+    );
+    const leader = parseCardPage(html, "OP17-001", PACK_ID);
+
+    expect(() =>
+      validateCards([
+        { ...leader, cost: null, power: null, attributes: [], types: [] },
+      ])
+    ).toThrow(
+      "Failed to scrape 1 card(s):\n- OP17-001: Leader requires cost; Leader requires power; Leader requires at least one attribute; card requires at least one type"
+    );
+  });
+
+  it("warns when non-empty effect markup collapses to vanilla text", async () => {
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    const html = (
+      await readFile(join(FIXTURES, "limitless-leader.html"), "utf8")
+    ).replace(
+      /<div class="card-text-section">\s*\[On Your Opponent's Attack][\s\S]*?<\/div>/,
+      '<div class="card-text-section"><span class="effect-icon"></span></div>'
+    );
+
+    const card = parseCardPage(html, "OP17-001", PACK_ID);
+
+    expect(card.effect).toBe("-");
+    expect(warning).toHaveBeenCalledWith(
+      '  ⚠ OP17-001: non-empty effect section parsed to empty; effect set to "-"'
+    );
   });
 
   it("uses the image filename for variant IDs and inherits base rarity", async () => {

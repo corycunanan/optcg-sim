@@ -39,6 +39,8 @@ interface ScrapeOptions {
   packTitle: string | null;
 }
 
+type CardFailures = Map<string, string[]>;
+
 function requiredMatch(
   input: string,
   pattern: RegExp,
@@ -205,6 +207,7 @@ export function parseCardPage(
 
   let effect = "";
   let trigger: string | null = null;
+  let sawNonEmptyEffectSection = false;
   for (const section of html.matchAll(
     /<div class="card-text-section(?:\s[^"]*)?">([\s\S]*?)<\/div>/g
   )) {
@@ -216,6 +219,7 @@ export function parseCardPage(
     ) {
       continue;
     }
+    if (body.trim()) sawNonEmptyEffectSection = true;
     // Limitless also wraps inline [Trigger] icons in double breaks, so preserve
     // those raw block boundaries until the final block is classified.
     const blocks = body
@@ -228,10 +232,11 @@ export function parseCardPage(
     const triggerMatch = lastBlock.match(/^\[Trigger\]\s*(\S)/);
     const precedingBlock = blocks[blocks.length - 2];
     const precedingBlockEndsSentence =
-      precedingBlock !== undefined && /[.!?]["'”’]?$/.test(precedingBlock);
+      precedingBlock !== undefined && /[.!?)]["'”’]?$/.test(precedingBlock);
     if (
       triggerMatch &&
-      (!/[a-z]/.test(triggerMatch[1]) || precedingBlockEndsSentence)
+      /^[A-Z]$/.test(triggerMatch[1]) &&
+      (blocks.length === 1 || precedingBlockEndsSentence)
     ) {
       trigger = lastBlock.replace(/^\[Trigger\]\s*/, "[Trigger] ");
       blocks.pop();
@@ -240,7 +245,14 @@ export function parseCardPage(
     effect = blocks.join(" ").replaceAll("\n", "<br>");
     break;
   }
-  if (!effect) effect = "-";
+  if (!effect) {
+    if (sawNonEmptyEffectSection && trigger === null) {
+      console.warn(
+        `  ⚠ ${id}: non-empty effect section parsed to empty; effect set to "-"`
+      );
+    }
+    effect = "-";
+  }
 
   const rarityLabel = requiredMatch(
     html,
@@ -288,8 +300,29 @@ function baseCardId(id: string): string {
   return id.replace(/_[a-z]\d+$/, "");
 }
 
-export function inheritVariantRarities(
-  cards: RawVegapullCard[]
+function addCardFailure(
+  failures: CardFailures,
+  cardId: string,
+  message: string
+): void {
+  const messages = failures.get(cardId) ?? [];
+  if (!messages.includes(message)) messages.push(message);
+  failures.set(cardId, messages);
+}
+
+function formatCardFailures(failures: CardFailures): string {
+  return `Failed to scrape ${failures.size} card(s):\n${[...failures.entries()]
+    .map(([cardId, messages]) => `- ${cardId}: ${messages.join("; ")}`)
+    .join("\n")}`;
+}
+
+function throwCardFailures(failures: CardFailures): void {
+  if (failures.size > 0) throw new Error(formatCardFailures(failures));
+}
+
+function collectVariantRarityFailures(
+  cards: RawVegapullCard[],
+  failures: CardFailures
 ): RawVegapullCard[] {
   const baseRarities = new Map(
     cards
@@ -301,75 +334,137 @@ export function inheritVariantRarities(
     const baseId = baseCardId(card.id);
     if (card.id === baseId) return card;
     const rarity = baseRarities.get(baseId);
-    if (!rarity)
-      throw new Error(`${card.id}: no base rarity found for ${baseId}`);
+    if (!rarity) {
+      addCardFailure(failures, card.id, `no base rarity found for ${baseId}`);
+      return card;
+    }
     return { ...card, rarity };
   });
 }
 
-export function validateCards(cards: RawVegapullCard[]): void {
+export function inheritVariantRarities(
+  cards: RawVegapullCard[]
+): RawVegapullCard[] {
+  const failures: CardFailures = new Map();
+  const inherited = collectVariantRarityFailures(cards, failures);
+  throwCardFailures(failures);
+  return inherited;
+}
+
+function collectValidationFailures(
+  cards: RawVegapullCard[],
+  failures: CardFailures,
+  checkSetShape = true
+): void {
   const ids = new Set<string>();
   const baseCards = cards.filter((card) => card.id === baseCardId(card.id));
   const baseRarities = new Map(baseCards.map((card) => [card.id, card.rarity]));
 
   for (const card of cards) {
-    if (ids.has(card.id)) throw new Error(`duplicate card ID: ${card.id}`);
+    if (ids.has(card.id))
+      addCardFailure(failures, card.id, "duplicate card ID");
     ids.add(card.id);
 
     if (!CATEGORIES.has(card.category)) {
-      throw new Error(`${card.id}: invalid category ${card.category}`);
+      addCardFailure(failures, card.id, `invalid category ${card.category}`);
     }
     for (const color of card.colors) {
-      if (!COLORS.has(color))
-        throw new Error(`${card.id}: invalid color ${color}`);
+      if (!COLORS.has(color)) {
+        addCardFailure(failures, card.id, `invalid color ${color}`);
+      }
     }
     for (const attribute of card.attributes) {
       if (!ATTRIBUTES.has(attribute)) {
-        throw new Error(`${card.id}: invalid attribute ${attribute}`);
+        addCardFailure(failures, card.id, `invalid attribute ${attribute}`);
       }
     }
     if (!card.img_full_url.endsWith(`${card.id}_EN.webp`)) {
-      throw new Error(`${card.id}: image URL does not match the canonical ID`);
-    }
-    if (
-      card.category === "Leader" &&
-      (card.cost === null || card.counter !== null)
-    ) {
-      throw new Error(
-        `${card.id}: leader must store life in cost and have null counter`
+      addCardFailure(
+        failures,
+        card.id,
+        "image URL does not match the canonical ID"
       );
+    }
+    if (card.category === "Leader" || card.category === "Character") {
+      if (card.cost === null) {
+        addCardFailure(failures, card.id, `${card.category} requires cost`);
+      }
+      if (card.power === null) {
+        addCardFailure(failures, card.id, `${card.category} requires power`);
+      }
+      if (card.attributes.length === 0) {
+        addCardFailure(
+          failures,
+          card.id,
+          `${card.category} requires at least one attribute`
+        );
+      }
+    }
+    if (card.category === "Leader" && card.counter !== null) {
+      addCardFailure(failures, card.id, "Leader requires a null counter");
     }
     if (
       (card.category === "Event" || card.category === "Stage") &&
       (card.power !== null || card.counter !== null)
     ) {
-      throw new Error(
-        `${card.id}: ${card.category} must have null power and counter`
+      addCardFailure(
+        failures,
+        card.id,
+        `${card.category} requires null power and counter`
       );
+    }
+    if (card.types.length === 0) {
+      addCardFailure(failures, card.id, "card requires at least one type");
     }
 
     const baseId = baseCardId(card.id);
-    if (card.id !== baseId && card.rarity !== baseRarities.get(baseId)) {
-      throw new Error(`${card.id}: variant rarity does not match ${baseId}`);
+    const baseRarity = baseRarities.get(baseId);
+    if (card.id !== baseId && baseRarity && card.rarity !== baseRarity) {
+      addCardFailure(
+        failures,
+        card.id,
+        `variant rarity does not match ${baseId}`
+      );
     }
   }
 
+  if (!checkSetShape) return;
   const numberedBases = baseCards
-    .map((card) => {
+    .flatMap((card) => {
       const match = card.id.match(/^([A-Z0-9]+)-(\d+)$/);
-      if (!match) throw new Error(`${card.id}: invalid base card ID`);
-      return { prefix: match[1], number: Number.parseInt(match[2], 10) };
+      if (!match) {
+        addCardFailure(failures, card.id, "invalid base card ID");
+        return [];
+      }
+      return [{ cardId: card.id, prefix: match[1], number: Number(match[2]) }];
     })
     .sort((left, right) => left.number - right.number);
-  const prefixes = new Set(numberedBases.map((card) => card.prefix));
-  if (prefixes.size !== 1)
-    throw new Error("base cards must share one set prefix");
+  const expectedPrefix = numberedBases[0]?.prefix;
+  for (const card of numberedBases) {
+    if (card.prefix !== expectedPrefix) {
+      addCardFailure(
+        failures,
+        card.cardId,
+        "base card has a different set prefix"
+      );
+    }
+  }
   numberedBases.forEach((card, index) => {
     const expected = index + 1;
     if (card.number !== expected) {
-      throw new Error(`base numbering is not contiguous: expected ${expected}`);
+      addCardFailure(
+        failures,
+        card.cardId,
+        `base numbering is not contiguous: expected ${expected}`
+      );
     }
   });
+}
+
+export function validateCards(cards: RawVegapullCard[]): void {
+  const failures: CardFailures = new Map();
+  collectValidationFailures(cards, failures);
+  throwCardFailures(failures);
 }
 
 function parseArguments(args: string[]): ScrapeOptions {
@@ -423,7 +518,7 @@ export async function scrapeCardReferences(
   requestDelayMs = REQUEST_DELAY_MS
 ): Promise<RawVegapullCard[]> {
   const cards: RawVegapullCard[] = [];
-  const failures: string[] = [];
+  const failures: CardFailures = new Map();
 
   for (const [index, reference] of references.entries()) {
     if (requestDelayMs > 0) await sleep(requestDelayMs);
@@ -438,20 +533,19 @@ export async function scrapeCardReferences(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const failure = message.startsWith(`${reference.path}:`)
-        ? message
-        : `${reference.path}: ${message}`;
-      failures.push(failure);
-      console.error(`[${index + 1}/${references.length}] Failed ${failure}`);
+        ? message.slice(reference.path.length + 1).trim()
+        : message;
+      addCardFailure(failures, reference.path, failure);
+      console.error(
+        `[${index + 1}/${references.length}] Failed ${reference.path}: ${failure}`
+      );
     }
   }
 
-  if (failures.length > 0) {
-    throw new Error(
-      `Failed to scrape ${failures.length} card(s):\n${failures.map((failure) => `- ${failure}`).join("\n")}`
-    );
-  }
-
-  return cards;
+  const inherited = collectVariantRarityFailures(cards, failures);
+  collectValidationFailures(inherited, failures, failures.size === 0);
+  throwCardFailures(failures);
+  return inherited;
 }
 
 function packLabel(setCode: string): string {
@@ -494,8 +588,7 @@ async function main(): Promise<void> {
 
   const parsedCards = await scrapeCardReferences(references, options.packId);
 
-  const cards = inheritVariantRarities(parsedCards);
-  validateCards(cards);
+  const cards = parsedCards;
   await mkdir(OUTPUT_DIR, { recursive: true });
   const outputPath = join(OUTPUT_DIR, `cards_${options.packId}.json`);
   await writeFile(outputPath, `${JSON.stringify(cards, null, 2)}\n`, "utf8");
