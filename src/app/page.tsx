@@ -35,9 +35,14 @@ export default async function Home() {
 
       {/* Bottom right — single CTA */}
       <div className="relative z-10 mt-auto ml-auto">
+        {/* `elevation="flat"`: `btn-ornamental` is already this CTA's elevation
+            statement — a gold hairline at `outline-offset: 3px`. The solid-variant
+            cast would sit in that 3px gap at rest and cross the ring at
+            `shadow-md`, mixing two registers on one hover. */}
         <Button
           variant="gold"
           size="lg"
+          elevation="flat"
           asChild
           className="btn-ornamental px-12 [--btn-ornamental-color:var(--accent)] hover:[--btn-ornamental-color:var(--accent-hover)]"
         >

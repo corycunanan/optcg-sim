@@ -212,13 +212,16 @@ export function ImportModal({ onImport, onClose }: ImportModalProps) {
           </Button>
           {!preview ? (
             <Button
+              elevation="flat"
               onClick={handleParse}
               disabled={!text.trim() || isProcessing}
             >
               {isProcessing ? "Parsing…" : "Parse"}
             </Button>
           ) : (
-            <Button onClick={handleImport}>Import</Button>
+            <Button elevation="flat" onClick={handleImport}>
+              Import
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

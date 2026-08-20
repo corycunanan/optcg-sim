@@ -72,8 +72,11 @@ export function ExportModal({ name, leader, cards, onClose }: ExportModalProps) 
         </DialogBody>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Close</Button>
-          <Button onClick={handleDownload}>Download .txt</Button>
+          <Button elevation="flat" onClick={handleDownload}>
+            Download .txt
+          </Button>
           <Button
+            elevation="flat"
             onClick={handleCopy}
           >
             {copied ? "Copied!" : "Copy to Clipboard"}

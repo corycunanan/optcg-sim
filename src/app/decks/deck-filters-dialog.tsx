@@ -105,7 +105,12 @@ function DeckFiltersForm({
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="button" variant="gold" onClick={() => onApply(draft)}>
+          <Button
+            type="button"
+            variant="gold"
+            elevation="flat"
+            onClick={() => onApply(draft)}
+          >
             Apply Filters
           </Button>
         </div>

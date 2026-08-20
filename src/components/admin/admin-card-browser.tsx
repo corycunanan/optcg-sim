@@ -12,7 +12,9 @@ export function AdminCardBrowser(props: CardBrowserData) {
       routePath="/admin/cards"
       renderDetailActions={(card) =>
         card ? (
-          <Button asChild>
+          // Rendered into `CardDetailModal`'s footer, inside a `shadow-lg`
+          // dialog panel.
+          <Button asChild elevation="flat">
             <Link href={`/admin/cards/${card.id}/edit`}>Edit Card</Link>
           </Button>
         ) : null

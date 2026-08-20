@@ -500,6 +500,8 @@ export function NavbarNotificationPanel() {
                           <Button
                             type="button"
                             size="sm"
+                            // The popover panel already casts `shadow-md`.
+                            elevation="flat"
                             disabled={resolvingIds.has(notification.id)}
                             aria-label={`Accept friend request from ${name}`}
                             onClick={() =>

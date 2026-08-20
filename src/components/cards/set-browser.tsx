@@ -55,7 +55,7 @@ export async function SetBrowser({ cardsRoute }: SetBrowserProps) {
                 <Link
                   key={set.packId}
                   href={`${cardsRoute}?set=${encodeURIComponent(set.setLabel)}`}
-                  className="border-border bg-surface-1 flex items-center justify-between rounded-lg border p-4 shadow-sm transition-all hover:-translate-y-px hover:shadow-md"
+                  className="border-border bg-surface-1 flex items-center justify-between rounded-lg border p-4 shadow-sm transition-[translate,box-shadow] hover:shadow-md motion-safe:hover:lift"
                 >
                   <div>
                     <span className="text-content-primary font-mono text-sm font-semibold">

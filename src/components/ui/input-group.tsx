@@ -96,6 +96,10 @@ function InputGroupButton({
       type={type}
       data-size={size}
       variant={variant}
+      // The control sits flush inside the input's own surface, so it never
+      // casts — including at the solid variants, whose register would
+      // otherwise fight the `shadow-none` above.
+      elevation="flat"
       className={cn(inputGroupButtonVariants({ size }), className)}
       {...props}
     />

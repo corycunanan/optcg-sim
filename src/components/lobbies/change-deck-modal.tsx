@@ -183,6 +183,7 @@ export function ChangeDeckModal({
                 <Button
                   type="button"
                   size="sm"
+                  elevation="flat"
                   onClick={retry}
                 >
                   Retry
@@ -207,12 +208,14 @@ export function ChangeDeckModal({
         <DialogFooter>
           <Button
             type="button"
+            elevation="flat"
             onClick={() => onOpenChange(false)}
           >
             Cancel
           </Button>
           <Button
             type="button"
+            elevation="flat"
             disabled={commitDisabled}
             onClick={() => {
               if (!selectedId) return;

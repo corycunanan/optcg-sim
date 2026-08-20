@@ -360,6 +360,8 @@ Chrome uses 2px corners. Badges alone retain 4px corners; avatars and presence d
 
 Offsets step 2 → 4 → 6px so the three tiers stay separable at a glance. Alphas run higher than the blurred tokens they replaced because the deep navy ground swallows a faint near-black cast, and a hard edge shows its alpha honestly instead of averaging it away across a blur radius.
 
+A hover that steps a surface up a tier may also raise it. That rise is one value app-wide — `--lift-hover` (`-2px`, from `--lift-elevation-hover`), written as the `lift` utility and paired with `motion-safe:`. See [ELEVATION-LANGUAGE.md](ELEVATION-LANGUAGE.md) §The standardized lift.
+
 Rules:
 
 - Consume the ladder through `shadow-sm` / `shadow-md` / `shadow-lg` (or `shadow-[var(--shadow-*)]`). The stock Tailwind steps — `shadow-xs`, `shadow-xl`, `shadow-2xl`, every `drop-shadow-*` — are blurred and unbacked by a token; `scripts/lint-design-system.mjs` fails them.
@@ -406,11 +408,24 @@ Adapted from Riftbound's CTA system, mapped to our palette:
 #### States
 
 ```
-Default  → Hover (lighten bg or shift color) → Active (darken slightly)
+Default  → Hover (lighten bg or shift color, and lift one tier on the solid variants)
          → Focus (2px solid --border-focus, 2px offset)
          → Disabled (opacity 0.5, cursor not-allowed)
          → Loading (spinner icon, disabled interaction)
 ```
+
+Those four stages are what `src/components/ui/button.tsx` ships. A distinct pressed state is
+**specified but not implemented** — the component declares no `active:` treatment, so a press
+currently shows the hover state. Treat the press as an open design item, not as a contract
+this section describes.
+
+The solid variants — `default`, `outline`, `destructive`, and `gold` — rest at `--shadow-sm`
+and step to `--shadow-md` on hover, rising 2px as they do. `ghost`, `link`, and the two icon
+sizes stay flat at every state. A button on a surface that already casts takes
+`elevation="flat"` and stays flat too. Which button casts, why, and how the nesting opt-out
+works is specified in [ELEVATION-LANGUAGE.md](ELEVATION-LANGUAGE.md) §The solid-button
+register; the 2px rise is the one standardized lift in
+[ELEVATION-LANGUAGE.md](ELEVATION-LANGUAGE.md) §The standardized lift.
 
 #### Sizing
 
@@ -437,7 +452,19 @@ For hero sections and important CTAs only:
 
 #### Transition
 
-All buttons: `transition: color 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease-out`
+All buttons: `transition-[color,background-color,border-color,translate,box-shadow]`.
+
+`translate` and `box-shadow` join the list so the hover lift and the shadow step arrive
+together on the solid variants. Tailwind v4 compiles `-translate-y-*` and the `lift` utility
+to the standalone `translate` property, which neither `transition-colors` nor
+`transition-shadow` covers — the button base therefore names all five properties rather than
+using a shorthand group.
+
+The class declares no duration or easing of its own, so the shipped timing is Tailwind's
+default: **150ms** at `cubic-bezier(0.4, 0, 0.2, 1)`. That is the Micro row of the timing
+table above, not the 200ms `ease-out` Standard row a hover would normally take. The gap is
+pre-existing and deliberate to leave alone here; retiming the button is its own decision
+because it moves every variant's color transition at once.
 
 ### Cards
 
@@ -637,7 +664,7 @@ export const variants = {
 
 | Component | Enter | Exit | Interaction |
 |-----------|-------|------|-------------|
-| **Button** | — | — | `scale(0.97)` on press, 100ms |
+| **Button** | — | — | Solid variants lift 2px + `shadow-sm` → `shadow-md` on hover, 150ms. No press gesture ships — see §Buttons/States |
 | **Card hover** | — | — | `scale(1.03)` + shadow-md, 200ms ease-out |
 | **Modal** | `scaleIn` 300ms spring | `fadeOut` 150ms ease-in | — |
 | **Sheet** | Slide from edge, 300ms spring | Slide out, 200ms ease-in | — |

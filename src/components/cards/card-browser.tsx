@@ -425,6 +425,7 @@ function BrowserCardDetailModal({
           <div className="flex gap-2">
             <Button
               size="sm"
+              elevation="flat"
               onClick={goToPrev}
               disabled={!hasPrev}
             >
@@ -433,6 +434,7 @@ function BrowserCardDetailModal({
             </Button>
             <Button
               size="sm"
+              elevation="flat"
               onClick={goToNext}
               disabled={!hasNext}
             >
