@@ -816,6 +816,8 @@ export function LobbyRoomShell({
                 <Button
                   variant="gold"
                   size="lg"
+                  // The sticky action bar above already casts `shadow-lg`.
+                  elevation="flat"
                   className="disabled:border-border disabled:bg-surface-3 disabled:text-content-tertiary disabled:opacity-100"
                   onClick={() => void handleStart()}
                   disabled={
@@ -1019,7 +1021,13 @@ function SpectatorRoom({
         data-lobby-action-bar
       >
         <div className="mx-auto flex max-w-7xl flex-col justify-end gap-3 px-6 py-4 sm:flex-row">
-          <Button size="lg" disabled={stopping} onClick={onStop}>
+          <Button
+            size="lg"
+            // The sticky action bar above already casts `shadow-lg`.
+            elevation="flat"
+            disabled={stopping}
+            onClick={onStop}
+          >
             {stopping ? "Stopping..." : "Stop spectating"}
           </Button>
           {activeGameId && (
@@ -1045,7 +1053,14 @@ function ActiveMatchAction({
   onOpen: (gameId: string) => void;
 }) {
   return (
-    <Button variant="gold" size="lg" onClick={() => onOpen(gameId)}>
+    // Both call sites render this into a sticky action bar that already casts
+    // `shadow-lg`, so the control never casts on its own.
+    <Button
+      variant="gold"
+      size="lg"
+      elevation="flat"
+      onClick={() => onOpen(gameId)}
+    >
       <Play data-icon="inline-start" />
       {viewerRole === "spectator" ? "Spectate Match" : "Rejoin Game"}
     </Button>

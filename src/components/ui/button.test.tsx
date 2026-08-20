@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -38,45 +41,105 @@ describe("Button", () => {
     "motion-safe:hover:lift",
   ];
 
-  it.each(["default", "outline", "destructive", "gold"] as const)(
-    "casts and lifts on the %s variant",
-    (variant) => {
-      render(<Button variant={variant}>{variant}</Button>);
+  const RAISED_VARIANTS = ["default", "outline", "destructive", "gold"] as const;
+  const FLAT_VARIANTS = ["ghost", "link"] as const;
+  const RAISED_SIZES = ["default", "sm", "lg"] as const;
+  const ICON_SIZES = ["icon", "icon-sm"] as const;
 
-      const button = screen.getByRole("button", { name: variant });
-      for (const className of RAISED_CLASSES) {
-        expect(button.classList.contains(className)).toBe(true);
+  function elevationOf(name: string) {
+    const button = screen.getByRole("button", { name });
+    return RAISED_CLASSES.every((c) => button.classList.contains(c))
+      ? "raised"
+      : RAISED_CLASSES.every((c) => !button.classList.contains(c))
+        ? "flat"
+        : "mixed";
+  }
+
+  // The register is a compound of variant AND size, so the matrix is pinned in
+  // full rather than one axis at a time: a regression that drops the size half
+  // of the compound key passes any variant-only assertion.
+  describe("elevation matrix", () => {
+    const raisedCases = RAISED_VARIANTS.flatMap((variant) =>
+      RAISED_SIZES.map((size) => [variant, size] as const)
+    );
+
+    it.each(raisedCases)(
+      "casts and lifts on variant=%s size=%s",
+      (variant, size) => {
+        const name = `${variant}-${size}`;
+        render(
+          <Button variant={variant} size={size}>
+            {name}
+          </Button>
+        );
+
+        expect(elevationOf(name)).toBe("raised");
       }
-    }
-  );
+    );
 
-  it.each(["ghost", "link"] as const)(
-    "keeps the %s variant flat",
-    (variant) => {
-      render(<Button variant={variant}>{variant}</Button>);
+    const flatVariantCases = FLAT_VARIANTS.flatMap((variant) =>
+      RAISED_SIZES.map((size) => [variant, size] as const)
+    );
 
-      const button = screen.getByRole("button", { name: variant });
-      for (const className of RAISED_CLASSES) {
-        expect(button.classList.contains(className)).toBe(false);
+    it.each(flatVariantCases)(
+      "stays flat on variant=%s size=%s",
+      (variant, size) => {
+        const name = `${variant}-${size}`;
+        render(
+          <Button variant={variant} size={size}>
+            {name}
+          </Button>
+        );
+
+        expect(elevationOf(name)).toBe("flat");
       }
-    }
-  );
+    );
 
-  it.each(["icon", "icon-sm"] as const)(
-    "keeps the %s size flat even on a raised variant",
-    (size) => {
-      render(
-        <Button variant="gold" size={size}>
-          {size}
-        </Button>
-      );
+    // Icon exclusion is by size, so it must hold across variants that are
+    // otherwise on the register — not just the one variant a spot check picks.
+    const iconCases = [...RAISED_VARIANTS, ...FLAT_VARIANTS].flatMap((variant) =>
+      ICON_SIZES.map((size) => [variant, size] as const)
+    );
 
-      const button = screen.getByRole("button", { name: size });
-      for (const className of RAISED_CLASSES) {
-        expect(button.classList.contains(className)).toBe(false);
+    it.each(iconCases)(
+      "stays flat on variant=%s size=%s regardless of variant",
+      (variant, size) => {
+        const name = `${variant}-${size}`;
+        render(
+          <Button variant={variant} size={size}>
+            {name}
+          </Button>
+        );
+
+        expect(elevationOf(name)).toBe("flat");
       }
-    }
-  );
+    );
+
+    it.each(raisedCases)(
+      "drops the cast for variant=%s size=%s when elevation is flat",
+      (variant, size) => {
+        const name = `${variant}-${size}-flat`;
+        render(
+          <Button variant={variant} size={size} elevation="flat">
+            {name}
+          </Button>
+        );
+
+        expect(screen.getByRole("button", { name }).dataset.elevation).toBe(
+          "flat"
+        );
+        expect(elevationOf(name)).toBe("flat");
+      }
+    );
+  });
+
+  it("marks a raised button with data-elevation", () => {
+    render(<Button>raised</Button>);
+
+    expect(screen.getByRole("button", { name: "raised" }).dataset.elevation).toBe(
+      "raised"
+    );
+  });
 
   it("transitions the lift and the cast alongside the color properties", () => {
     render(<Button>transition</Button>);
@@ -88,14 +151,38 @@ describe("Button", () => {
       )
     ).toBe(true);
   });
+});
 
-  it("drops the cast when elevation is flat", () => {
-    render(<Button elevation="flat">flat</Button>);
+// The lift distance lives in CSS, so it is asserted at its source: jsdom never
+// loads globals.css, and a class-name assertion alone would still pass if the
+// token were retuned to some other value.
+describe("the lift token", () => {
+  const GLOBALS_CSS = readFileSync(
+    resolve(process.cwd(), "src/app/globals.css"),
+    "utf8"
+  );
 
-    const button = screen.getByRole("button", { name: "flat" });
-    expect(button.dataset.elevation).toBe("flat");
-    for (const className of RAISED_CLASSES) {
-      expect(button.classList.contains(className)).toBe(false);
-    }
+  it("declares the primitive at -2px", () => {
+    expect(GLOBALS_CSS).toMatch(/--lift-elevation-hover:\s*-2px;/);
+  });
+
+  it("matches the resting shadow offset it leaves behind", () => {
+    const lift = GLOBALS_CSS.match(/--lift-elevation-hover:\s*(-?\d+)px;/)?.[1];
+    const restOffset = GLOBALS_CSS.match(
+      /--shadow-elevation-offset-sm:\s*(\d+)px;/
+    )?.[1];
+
+    expect(lift).toBeDefined();
+    expect(restOffset).toBeDefined();
+    expect(Math.abs(Number(lift))).toBe(Number(restOffset));
+  });
+
+  it("routes the primitive through the semantic role into the utility", () => {
+    expect(GLOBALS_CSS).toMatch(
+      /--lift-hover:\s*var\(--lift-elevation-hover\);/
+    );
+    expect(GLOBALS_CSS).toMatch(
+      /@utility lift \{\s*translate:\s*0 var\(--lift-hover\);\s*\}/
+    );
   });
 });

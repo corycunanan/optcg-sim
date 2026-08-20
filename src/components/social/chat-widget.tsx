@@ -409,7 +409,12 @@ export function ChatWidget({
                 <p className="text-content-tertiary text-sm">
                   Couldn&apos;t load messages.
                 </p>
-                <Button type="button" size="sm" onClick={loadHistory}>
+                <Button
+                  type="button"
+                  size="sm"
+                  elevation="flat"
+                  onClick={loadHistory}
+                >
                   Try again
                 </Button>
               </div>
@@ -480,6 +485,8 @@ export function ChatWidget({
             <Button
               type="submit"
               size="sm"
+              // The chat panel already casts `shadow-lg`.
+              elevation="flat"
               disabled={!body.trim() || sending}
               className="bg-accent text-accent-foreground hover:bg-accent/90"
             >

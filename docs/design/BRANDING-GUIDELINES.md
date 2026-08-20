@@ -409,11 +409,15 @@ Adapted from Riftbound's CTA system, mapped to our palette:
 
 ```
 Default  → Hover (lighten bg or shift color, and lift one tier on the solid variants)
-         → Active (darken slightly)
          → Focus (2px solid --border-focus, 2px offset)
          → Disabled (opacity 0.5, cursor not-allowed)
          → Loading (spinner icon, disabled interaction)
 ```
+
+Those four stages are what `src/components/ui/button.tsx` ships. A distinct pressed state is
+**specified but not implemented** — the component declares no `active:` treatment, so a press
+currently shows the hover state. Treat the press as an open design item, not as a contract
+this section describes.
 
 The solid variants — `default`, `outline`, `destructive`, and `gold` — rest at `--shadow-sm`
 and step to `--shadow-md` on hover, rising 2px as they do. `ghost`, `link`, and the two icon
@@ -448,13 +452,19 @@ For hero sections and important CTAs only:
 
 #### Transition
 
-All buttons: `transition: color 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease-out, translate 0.2s ease-out, box-shadow 0.2s ease-out`
+All buttons: `transition-[color,background-color,border-color,translate,box-shadow]`.
 
 `translate` and `box-shadow` join the list so the hover lift and the shadow step arrive
 together on the solid variants. Tailwind v4 compiles `-translate-y-*` and the `lift` utility
 to the standalone `translate` property, which neither `transition-colors` nor
 `transition-shadow` covers — the button base therefore names all five properties rather than
 using a shorthand group.
+
+The class declares no duration or easing of its own, so the shipped timing is Tailwind's
+default: **150ms** at `cubic-bezier(0.4, 0, 0.2, 1)`. That is the Micro row of the timing
+table above, not the 200ms `ease-out` Standard row a hover would normally take. The gap is
+pre-existing and deliberate to leave alone here; retiming the button is its own decision
+because it moves every variant's color transition at once.
 
 ### Cards
 
@@ -654,7 +664,7 @@ export const variants = {
 
 | Component | Enter | Exit | Interaction |
 |-----------|-------|------|-------------|
-| **Button** | — | — | Solid variants lift 2px + `shadow-sm` → `shadow-md` on hover; `scale(0.97)` on press, 100ms |
+| **Button** | — | — | Solid variants lift 2px + `shadow-sm` → `shadow-md` on hover, 150ms. No press gesture ships — see §Buttons/States |
 | **Card hover** | — | — | `scale(1.03)` + shadow-md, 200ms ease-out |
 | **Modal** | `scaleIn` 300ms spring | `fadeOut` 150ms ease-in | — |
 | **Sheet** | Slide from edge, 300ms spring | Slide out, 200ms ease-in | — |

@@ -3,7 +3,7 @@
  */
 
 import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
 
 export {
   cardIdToOriginSet,
@@ -11,6 +11,24 @@ export {
   detectVariantType,
   stripVariantSuffix,
 } from "@shared/card-parsing";
+
+/**
+ * Custom utilities declared in `globals.css` are invisible to tailwind-merge —
+ * it only knows the classes stock Tailwind generates. An unregistered utility
+ * never conflicts with anything, so `cn()` keeps it alongside the class meant
+ * to replace it and stylesheet order decides the winner instead of call order.
+ *
+ * `lift` (the standardized hover lift, ELEVATION-LANGUAGE.md §The standardized
+ * lift) writes the same `translate` property as `translate-y-*`, so it joins
+ * that class group and a later `translate-y-0` correctly drops it.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "translate-y": ["lift"],
+    },
+  },
+});
 
 /**
  * Merge Tailwind CSS classes with conflict resolution.

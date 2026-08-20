@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,6 +53,14 @@ describe("SetBrowser", () => {
 
     expect(html).toContain("motion-safe:hover:lift");
     expect(html).not.toContain("hover:-translate-y-px");
+
+    // The class name alone would still pass if the token were retuned, so the
+    // 2px the tile actually rises is pinned at its source in globals.css.
+    const globalsCss = readFileSync(
+      resolve(process.cwd(), "src/app/globals.css"),
+      "utf8"
+    );
+    expect(globalsCss).toMatch(/--lift-elevation-hover:\s*-2px;/);
   });
 
   it("transitions the lift and the cast together", async () => {

@@ -508,6 +508,10 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
               <Button
                 variant="outline"
                 size="sm"
+                // `railBody` renders into the mobile `SheetContent`, which
+                // casts `shadow-lg`; the docked rail is a nav surface. Flat in
+                // both, so the control does not change altitude with viewport.
+                elevation="flat"
                 onClick={() => void fetchFriendsData()}
                 disabled={loadPending}
               >

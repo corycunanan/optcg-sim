@@ -72,7 +72,7 @@ called out rather than folded into a blanket rule:
 | ---------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
 | `/decks` art-bearing rows                            | `src/app/decks/deck-list.tsx`                     | `bg-surface-2` + `shadowHover="md"` on the `ChamferFrame` |
 | `/cards` grid tiles                                  | `src/components/cards/card-grid.tsx`              | `hover:shadow-md` + `motion-safe:hover:scale-[1.03]` (CSS, 200ms ease-out) |
-| `/sets` tiles¹                                       | `src/components/cards/set-browser.tsx`            | `hover:shadow-md` + `hover:-translate-y-px`               |
+| `/sets` tiles¹                                       | `src/components/cards/set-browser.tsx`            | `hover:shadow-md` + `motion-safe:hover:lift` (§The standardized lift) |
 | Card-detail art-variant thumbnails²                  | `src/components/cards/card-image-gallery.tsx`     | `hover:shadow-md`, alongside the existing selected-state opacity cross-fade |
 | Deck-builder search tiles                            | `src/components/deck-builder/deck-builder-search.tsx` | `hover:shadow-md`                                     |
 | Deck-builder deck-list fan stacks                    | `src/components/deck-builder/deck-builder-list.tsx`   | `group-hover/stack:shadow-md` + `-translate-y-2`      |
@@ -160,13 +160,22 @@ inside a `shadow-lg` dialog panel inverts the ladder — the smaller object clai
 nearer the viewer than the panel carrying it — and a hard offset inside an
 `overflow-hidden` parent is clipped to a stub along the edge it crosses.
 
-The opt-out is a variant on the button, `elevation="flat"`, and it is deliberately not a
-context. A context would make the exclusion invisible at the call site and would have to
-guess which ancestors count as casting; the app nests solid buttons inside casting surfaces
-at a countable number of places, and naming each one keeps the ladder auditable by reading
-the JSX. `elevation` defaults to `raised`, mirrors onto `data-elevation` for tests and VQA,
-and simply withholds the compound entry rather than overriding it — there is no
-`shadow-none` fighting a `shadow-sm` further up the class string.
+The opt-out is a variant on the button, `elevation="flat"`. It defaults to `raised`, mirrors
+onto `data-elevation` for tests and VQA, and simply withholds the compound entry rather than
+overriding it — there is no `shadow-none` fighting a `shadow-sm` further up the class string.
+
+It is a prop and not a context for one hard reason: `src/components/ui/button.tsx` carries
+no `"use client"` directive and is rendered from server components. A context would need a
+hook, the hook would need the directive, and the directive would move the app's most-used
+primitive across the client boundary — a far larger change than the problem.
+
+The cost is real and worth stating plainly: **a prop only protects the sites someone
+found.** Ancestry is not visible from the button, and the nesting arrives three different
+ways — direct JSX ancestry, a render prop handed into a panel (`CardDetailModal`'s
+`footer`), a JSX variable interpolated into a panel elsewhere (`social-sidebar.tsx`'s
+`railBody`), and a component rendered under a caster in another function
+(`lobby-room-shell.tsx`'s `ActiveMatchAction`). A grep for buttons under a `shadow-lg`
+element finds only the first. When auditing this, check all four shapes.
 
 Reach for it when the parent already casts, not when a cast merely looks busy. `ghost` and
 `link` footer buttons and every icon button need no opt-out, because the register never
@@ -266,6 +275,14 @@ names in `transition-[translate,box-shadow]`, so the rise and the shadow step ar
 together (§The card register). Pair it with `motion-safe:`: under
 `prefers-reduced-motion: reduce` the surface still steps its color and its cast, it just
 does not move, per [BRANDING-GUIDELINES.md](./BRANDING-GUIDELINES.md) §Reduced Motion.
+
+**A custom utility must be registered with tailwind-merge or `cn()` cannot override it.**
+tailwind-merge only knows the classes stock Tailwind generates, so an unregistered utility
+conflicts with nothing: `cn("motion-safe:hover:lift", "motion-safe:hover:translate-y-0")`
+keeps both, and stylesheet order — not the call site — picks the winner. `src/lib/utils.ts`
+therefore builds `cn()` from `extendTailwindMerge` with `lift` in the `translate-y` class
+group. Any future utility that writes a property stock Tailwind also writes needs the same
+registration.
 
 The larger lifts already shipped on the fanned card stacks (`-translate-y-2`) and the lobby
 seat art (`-translate-y-1`) are not this register: they are a card being drawn out of a
