@@ -10,9 +10,10 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import type { RealtimeServerEvent } from "@/types/realtime";
 import type { FriendEntry } from "./apply-friend-event";
+import { FRIENDS_DRAWER_TOGGLE_ID } from "./friends-drawer-toggle";
 
 type EventType = RealtimeServerEvent["type"];
 type EventFor<T extends EventType> = Extract<RealtimeServerEvent, { type: T }>;
@@ -121,6 +122,86 @@ function renderSidebar(
   return { ...view, onOpenChat };
 }
 
+// One shared listener registry across every MediaQueryList the hook creates,
+// so `setMobileViewport` can move the breakpoint on a mounted tree the way a
+// real resize does.
+const mediaListeners = new Set<() => void>();
+let matchesMobile = false;
+
+function installMatchMedia() {
+  mediaListeners.clear();
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn(() => ({
+      get matches() {
+        return matchesMobile;
+      },
+      addEventListener: (_type: string, listener: () => void) => {
+        mediaListeners.add(listener);
+      },
+      removeEventListener: (_type: string, listener: () => void) => {
+        mediaListeners.delete(listener);
+      },
+    })),
+  });
+}
+
+function setMobileViewport(isMobile: boolean) {
+  matchesMobile = isMobile;
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: isMobile ? 390 : 1024,
+  });
+  act(() => {
+    mediaListeners.forEach((listener) => listener());
+  });
+}
+
+/** Opens the drawer the way the navbar toggle does — through the provider. */
+function DrawerOpener() {
+  const { setOpenMobile } = useSidebar();
+  return (
+    <button
+      // The real toggle carries this id so the drawer can hand focus back.
+      id={FRIENDS_DRAWER_TOGGLE_ID}
+      type="button"
+      onClick={() => setOpenMobile(true)}
+    >
+      open drawer
+    </button>
+  );
+}
+
+/** Surfaces the shared open flag the navbar toggle also reads. */
+function DrawerState() {
+  const { openMobile } = useSidebar();
+  return <span data-testid="drawer-open">{String(openMobile)}</span>;
+}
+
+function renderDrawer(onOpenChat = vi.fn()) {
+  setMobileViewport(true);
+  mocks.apiGet.mockImplementation((url: string) => {
+    if (url === "/api/friends") return Promise.resolve({ data: [namiFriend] });
+    throw new Error(`Unexpected GET ${url}`);
+  });
+
+  // `railMounted` stands in for SocialShell's `!isGame` gate: on /game/* the
+  // rail is not rendered at all.
+  const tree = (railMounted: boolean) => (
+    <SidebarProvider>
+      <DrawerOpener />
+      <DrawerState />
+      {railMounted && <SocialSidebar onOpenChat={onOpenChat} />}
+    </SidebarProvider>
+  );
+
+  const view = render(tree(true));
+  return {
+    ...view,
+    setRailMounted: (railMounted: boolean) => view.rerender(tree(railMounted)),
+  };
+}
+
 function emit<T extends EventType>(type: T, event: EventFor<T>) {
   const handler = mocks.handlers.get(type) as EventHandler<T> | undefined;
   expect(handler, `subscription for ${type}`).toBeDefined();
@@ -128,18 +209,8 @@ function emit<T extends EventType>(type: T, event: EventFor<T>) {
 }
 
 beforeEach(() => {
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    value: vi.fn(() => ({
-      matches: false,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })),
-  });
-  Object.defineProperty(window, "innerWidth", {
-    configurable: true,
-    value: 1024,
-  });
+  installMatchMedia();
+  setMobileViewport(false);
   mocks.apiDelete.mockReset().mockResolvedValue({});
   mocks.apiGet.mockReset();
   mocks.apiPost.mockReset().mockResolvedValue({});
@@ -188,6 +259,109 @@ describe("SocialSidebar", () => {
     expect(content?.className).toContain("min-h-0");
     expect(content?.className).toContain("flex-1");
     expect(content?.className).toContain("overflow-auto");
+  });
+
+  it("hides the docked rail below md, where the drawer takes over", () => {
+    const { container } = renderSidebar();
+    const railClasses =
+      container
+        .querySelector('[data-slot="sidebar"]')
+        ?.className.split(/\s+/) ?? [];
+
+    // OPT-663: the CSS half of the split. It holds in the frame before any
+    // hook has read the viewport, so a narrow screen never flashes a 280px
+    // rail across the page.
+    expect(railClasses).toContain("hidden");
+    expect(railClasses).toContain("md:flex");
+  });
+
+  it("renders the rail as a drawer below md instead of a fixed column", async () => {
+    const { container } = renderDrawer();
+
+    // Nothing is docked: below md the rail exists only once opened.
+    expect(container.querySelector('[data-slot="sidebar"]')).toBeNull();
+    expect(document.querySelector("#friends-drawer")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "open drawer" }));
+
+    const drawer = await screen.findByRole("dialog");
+    expect(drawer.id).toBe("friends-drawer");
+    // Same width token as the docked rail, and the gold left edge that
+    // identifies it.
+    expect(drawer.className).toContain("data-[side=right]:w-social-rail");
+    expect(drawer.className).toContain("social-rail");
+    // The drawer shows the same list the rail does.
+    expect(await within(drawer).findByText("nami")).toBeDefined();
+    // Focus lands on the panel, not on the first control inside it — Radix's
+    // default would ring "Add friend" gold on open.
+    await waitFor(() => expect(document.activeElement).toBe(drawer));
+  });
+
+  it("closes the drawer on Escape and hands focus back to the toggle", async () => {
+    renderDrawer();
+    const opener = screen.getByRole("button", { name: "open drawer" });
+
+    await userEvent.click(opener);
+    await screen.findByRole("dialog");
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // Radix restores focus to its own `Dialog.Trigger`; the drawer has none,
+    // so it restores by id instead — otherwise focus lands on <body>.
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it("closes the drawer when the viewport grows past md, and leaves it closed coming back", async () => {
+    renderDrawer();
+    await userEvent.click(screen.getByRole("button", { name: "open drawer" }));
+    await screen.findByRole("dialog");
+
+    setMobileViewport(false);
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByTestId("drawer-open").textContent).toBe("false");
+    // The docked rail takes the column back.
+    expect(document.querySelector('[data-slot="sidebar"]')).not.toBeNull();
+
+    setMobileViewport(true);
+
+    // Nothing reopens on the way back down: the flag lives in the provider and
+    // would otherwise still read true.
+    await waitFor(() =>
+      expect(document.querySelector('[data-slot="sidebar"]')).toBeNull()
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTestId("drawer-open").textContent).toBe("false");
+  });
+
+  it("clears the drawer when the rail unmounts, as it does on /game/*", async () => {
+    const { setRailMounted } = renderDrawer();
+    await userEvent.click(screen.getByRole("button", { name: "open drawer" }));
+    await screen.findByRole("dialog");
+    expect(screen.getByTestId("drawer-open").textContent).toBe("true");
+
+    setRailMounted(false);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("drawer-open").textContent).toBe("false")
+    );
+
+    setRailMounted(true);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("gives the drawer its own close control, which the docked rail omits", async () => {
+    renderDrawer();
+    expect(screen.queryByRole("button", { name: "Close friends" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "open drawer" }));
+    const drawer = await screen.findByRole("dialog");
+    await userEvent.click(
+      within(drawer).getByRole("button", { name: "Close friends" })
+    );
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("does not fetch or render incoming friend requests", async () => {

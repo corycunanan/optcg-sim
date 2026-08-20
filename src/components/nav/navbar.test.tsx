@@ -2,6 +2,7 @@
 
 import type { ComponentProps, ReactNode } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -117,9 +118,30 @@ vi.mock("@/components/ui/navigation-menu", () => ({
   navigationMenuTriggerStyle: () => "navigation-trigger",
 }));
 
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { Navbar } from "./navbar";
 
+// The bar's friends toggle reads the drawer's open state from
+// `SidebarProvider`, which the root layout mounts around both (OPT-663).
+// `render`/`rerender` go through this wrapper so the tests compose the bar the
+// way production does.
+function renderNavbar() {
+  return render(<Navbar />, { wrapper: SidebarProvider });
+}
+
+function setViewportWidth(matchesMobile: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn(() => ({
+      matches: matchesMobile,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+}
+
 beforeEach(() => {
+  setViewportWidth(false);
   mocks.pathname = "/decks";
   mocks.unreadCount = 0;
   mocks.sessionUser = {
@@ -138,7 +160,7 @@ afterEach(() => cleanup());
 
 describe("Navbar", () => {
   it("renders the authed account cluster on a non-game route", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     expect(
       screen.getByRole("button", {
@@ -152,13 +174,15 @@ describe("Navbar", () => {
 
   it("returns null on game routes", () => {
     mocks.pathname = "/game/match-1";
-    const { container } = render(<Navbar />);
+    const { container } = renderNavbar();
 
-    expect(container.firstChild).toBeNull();
+    // The provider wrapper always renders, so the bar's absence is the
+    // absence of a <nav>, not an empty container.
+    expect(container.querySelector("nav")).toBeNull();
   });
 
   it("renders Home, Play, Decks, Cards as four plain links with matching styles", () => {
-    const { container } = render(<Navbar />);
+    const { container } = renderNavbar();
     const navText = container.querySelector("nav")?.textContent ?? "";
     const home = screen.getByRole("link", { name: "Home" });
     const play = screen.getByRole("link", { name: "Play" });
@@ -180,7 +204,7 @@ describe("Navbar", () => {
   });
 
   it("leaves no dropdown trigger or menu panel in the link row (OPT-680)", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     const linksScroller = document.querySelector(
       '[data-slot="navbar-links-scroller"]'
@@ -216,7 +240,7 @@ describe("Navbar", () => {
     "renders the sole active section and aria-current for %s",
     (pathname, accessibleName) => {
       mocks.pathname = pathname;
-      render(<Navbar />);
+      renderNavbar();
 
       const activeControl = screen.getByRole("link", { name: accessibleName });
 
@@ -246,7 +270,7 @@ describe("Navbar", () => {
 
   it("removes the gold CTA fill from Play while Play is active", () => {
     mocks.pathname = "/lobbies";
-    render(<Navbar />);
+    renderNavbar();
 
     const play = screen.getByRole("link", { name: "Play" });
 
@@ -256,7 +280,7 @@ describe("Navbar", () => {
   });
 
   it("uses the reserved gold border token for the nav divider", () => {
-    const { container } = render(<Navbar />);
+    const { container } = renderNavbar();
 
     expect(container.querySelector("nav")?.className).toContain(
       "border-border-accent"
@@ -264,7 +288,7 @@ describe("Navbar", () => {
   });
 
   it("mounts no navigation-menu viewport now that the link row opens nothing", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     const linksScroller = document.querySelector(
       '[data-slot="navbar-links-scroller"]'
@@ -280,7 +304,7 @@ describe("Navbar", () => {
   });
 
   it("renders the one remaining navbar menu through the shared rectangular surface", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     // Only the account menu hangs off the bar now (OPT-680 removed Decks and
     // Cards), and it must still route through NavbarDropdownSurface rather than
@@ -299,7 +323,7 @@ describe("Navbar", () => {
   });
 
   it("gives dropdown rows the body type role rather than the navbar link treatment", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     // `.font-nav` (uppercase Erode 700) is reserved for the global navbar link
     // row; menu items take the `body` role per TYPOGRAPHY.md §5.
@@ -314,7 +338,7 @@ describe("Navbar", () => {
   });
 
   it("renders nav links as full-height square sections that meet both bar edges", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     const scroller = document.querySelector(
       '[data-slot="navbar-links-scroller"]'
@@ -351,7 +375,7 @@ describe("Navbar", () => {
   });
 
   it("keeps a focus indicator that survives inside a full-height section", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     const classes = screen
       .getByRole("link", { name: "Home" })
@@ -367,7 +391,7 @@ describe("Navbar", () => {
   });
 
   it("spans the nav content edge to edge so the actions pin to the viewport", () => {
-    const { container } = render(<Navbar />);
+    const { container } = renderNavbar();
     const nav = container.querySelector("nav");
     const navContent = document.querySelector('[data-slot="navbar-content"]');
 
@@ -379,7 +403,7 @@ describe("Navbar", () => {
   });
 
   it("takes its height from the shared navbar token the friends rail offsets from", () => {
-    const { container } = render(<Navbar />);
+    const { container } = renderNavbar();
     const classes = container.querySelector("nav")?.className.split(/\s+/);
 
     // `--spacing-navbar` is the single source for the bar height and the
@@ -389,7 +413,7 @@ describe("Navbar", () => {
   });
 
   it("never reserves the friends rail column — the actions sit above the rail", () => {
-    const { container, rerender } = render(<Navbar />);
+    const { container, rerender } = renderNavbar();
     const railReserved = () =>
       container
         .querySelector("nav")
@@ -409,9 +433,36 @@ describe("Navbar", () => {
     expect(railReserved()).toBe(false);
   });
 
+  it("carries a friends toggle that only exists below the md breakpoint", async () => {
+    renderNavbar();
+
+    const toggle = screen.getByRole("button", { name: "Friends" });
+
+    // `md:hidden`, not a JS branch: at and above 768px the rail is docked in
+    // its own column, so a control that opens it would duplicate what is
+    // already on screen (OPT-663).
+    expect(toggle.className.split(/\s+/)).toContain("md:hidden");
+    expect(toggle.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(toggle.getAttribute("aria-controls")).toBe("friends-drawer");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("omits the friends toggle for signed-out visitors", () => {
+    mocks.sessionStatus = "unauthenticated";
+    renderNavbar();
+
+    expect(screen.queryByRole("button", { name: "Friends" })).toBeNull();
+  });
+
   it("reflects realtime unread counts, caps at 9+, and omits a zero badge", () => {
     mocks.unreadCount = 4;
-    const { rerender } = render(<Navbar />);
+    const { rerender } = renderNavbar();
     expect(screen.getByText("4")).toBeDefined();
 
     mocks.unreadCount = 15;
@@ -426,7 +477,7 @@ describe("Navbar", () => {
   });
 
   it("contains profile, theme, and sign-out account entries", () => {
-    render(<Navbar />);
+    renderNavbar();
 
     expect(screen.getByRole("link", { name: "Profile" })).toBeDefined();
     expect(screen.getByText("Theme")).toBeDefined();
@@ -434,7 +485,7 @@ describe("Navbar", () => {
   });
 
   it("renders the production bell as a popup trigger", () => {
-    render(<Navbar />);
+    renderNavbar();
     const bell = screen.getByRole("button", {
       name: "Notifications, No unread notifications",
     });
@@ -446,7 +497,7 @@ describe("Navbar", () => {
 
   it("keeps the same reserved action slot across auth resolution", () => {
     mocks.sessionStatus = "loading";
-    const { rerender } = render(<Navbar />);
+    const { rerender } = renderNavbar();
     const loadingSlot = document.querySelector('[data-slot="navbar-actions"]');
 
     expect(loadingSlot?.getAttribute("data-state")).toBe("loading");
@@ -464,7 +515,7 @@ describe("Navbar", () => {
 
   it("handles partial authenticated user data with a default theme", () => {
     mocks.sessionUser = { id: "user-1", isAdmin: false };
-    render(<Navbar />);
+    renderNavbar();
 
     expect(
       screen.getByRole("button", { name: "Account menu for Pirate" })
@@ -473,7 +524,7 @@ describe("Navbar", () => {
   });
 
   it("removes actions safely when an authenticated session expires", () => {
-    const { rerender } = render(<Navbar />);
+    const { rerender } = renderNavbar();
     expect(
       document.querySelector('[data-slot="navbar-actions"]')
     ).not.toBeNull();
@@ -493,7 +544,7 @@ describe("Navbar", () => {
 
   it("does not render account actions before authentication", () => {
     mocks.sessionStatus = "unauthenticated";
-    render(<Navbar />);
+    renderNavbar();
 
     expect(screen.queryByRole("button", { name: /notifications/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /account menu/i })).toBeNull();

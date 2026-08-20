@@ -12,6 +12,14 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -21,8 +29,19 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
-import { UserPlus, MoreHorizontal, Search, MessageCircle } from "lucide-react";
+import {
+  UserPlus,
+  MoreHorizontal,
+  Search,
+  MessageCircle,
+  X,
+} from "lucide-react";
+import {
+  FRIENDS_DRAWER_ID,
+  FRIENDS_DRAWER_TOGGLE_ID,
+} from "./friends-drawer-toggle";
 import { UserAvatar } from "./user-avatar";
 import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 import {
@@ -93,6 +112,21 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
   const pendingMutations = useRef(new Set<string>());
   const { subscribe, connectionStatus, presence, trackPresence } =
     useUserChannelEvents();
+  // OPT-663: below `md` the rail has no column of its own, so the same content
+  // renders inside a drawer the navbar opens. `SidebarProvider` (root layout)
+  // is the shared owner of that open state.
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+
+  // The drawer's open flag outlives this component — it lives in
+  // `SidebarProvider`, up in the root layout. Left set, it reopens the drawer
+  // unbidden the next time the viewport crosses back under `md`.
+  useEffect(() => {
+    if (!isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
+
+  // Same flag, the other way it escapes: the rail is not rendered on /game/*,
+  // so leaving a game with the drawer open would bring it back open.
+  useEffect(() => () => setOpenMobile(false), [setOpenMobile]);
 
   const fetchFriendsData = useCallback(async () => {
     const epoch = fetchEpoch.current;
@@ -313,223 +347,294 @@ export function SocialSidebar({ onOpenChat }: SocialSidebarProps) {
     );
   };
 
-  return (
-    <TooltipProvider>
-      <Sidebar
-        side="right"
-        collapsible="none"
-        // The rail hangs below the full-width navbar: `top-navbar` is the
-        // navbar's own height token, so the two cannot drift apart, and z-30
-        // keeps the rail under the nav (z-40) rather than over it. `h-auto`
-        // replaces the primitive's `h-full` so the top/bottom insets — not a
-        // 100vh height that would overhang the viewport — size the rail.
-        className="social-rail bg-surface-nav w-social-rail top-navbar fixed right-0 bottom-0 z-30 h-auto border-l"
-      >
-        <SidebarHeader className="border-border-accent border-b px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-content-primary text-xl">
-              Friends
-            </h2>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled
-                className="text-content-disabled size-8"
-                aria-label="Search friends"
-                title="Search friends"
-              >
-                <Search className="size-4" />
-              </Button>
-              <DropdownMenu
-                open={addOpen}
-                onOpenChange={(open) => {
-                  setAddOpen(open);
-                  if (!open) {
-                    searchRequestId.current += 1;
-                    setSearchQ("");
-                    setSearchResults([]);
-                    setSearchState("idle");
-                  }
-                }}
-              >
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-content-secondary hover:text-content-primary size-8"
-                    aria-label="Add friend"
-                    title="Add friend"
-                  >
-                    <UserPlus className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  side="bottom"
-                  align="end"
-                  className="w-72 p-2"
+  const railBody = (
+    <>
+      <SidebarHeader className="border-border-accent border-b px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-content-primary text-xl">Friends</h2>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled
+              className="text-content-disabled size-8"
+              aria-label="Search friends"
+              title="Search friends"
+            >
+              <Search className="size-4" />
+            </Button>
+            <DropdownMenu
+              open={addOpen}
+              onOpenChange={(open) => {
+                setAddOpen(open);
+                if (!open) {
+                  searchRequestId.current += 1;
+                  setSearchQ("");
+                  setSearchResults([]);
+                  setSearchState("idle");
+                }
+              }}
+            >
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-content-secondary hover:text-content-primary size-8"
+                  aria-label="Add friend"
+                  title="Add friend"
                 >
-                  <Input
-                    type="text"
-                    value={searchQ}
-                    onChange={(event) => search(event.target.value)}
-                    placeholder="Search 3+ username characters..."
-                    className="h-8"
-                    autoFocus
-                  />
-                  {searchResults.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {searchResults.map((searchUser) => {
-                        const isFriend = friendIds.has(searchUser.id);
-                        const alreadySent = pendingSent.has(searchUser.id);
-                        const isSending = sendingRequests.has(searchUser.id);
-                        return (
-                          <div
-                            key={searchUser.id}
-                            className="flex items-center gap-2 rounded-md px-2 py-2 text-sm"
-                          >
-                            <UserAvatar user={searchUser} size="sm" />
-                            <span className="flex-1 truncate">
-                              {searchUser.username || searchUser.name}
+                  <UserPlus className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="bottom"
+                align="end"
+                className="w-72 p-2"
+              >
+                <Input
+                  type="text"
+                  value={searchQ}
+                  onChange={(event) => search(event.target.value)}
+                  placeholder="Search 3+ username characters..."
+                  className="h-8"
+                  autoFocus
+                />
+                {searchResults.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {searchResults.map((searchUser) => {
+                      const isFriend = friendIds.has(searchUser.id);
+                      const alreadySent = pendingSent.has(searchUser.id);
+                      const isSending = sendingRequests.has(searchUser.id);
+                      return (
+                        <div
+                          key={searchUser.id}
+                          className="flex items-center gap-2 rounded-md px-2 py-2 text-sm"
+                        >
+                          <UserAvatar user={searchUser} size="sm" />
+                          <span className="flex-1 truncate">
+                            {searchUser.username || searchUser.name}
+                          </span>
+                          {isFriend ? (
+                            <span className="text-content-tertiary">
+                              Friends
                             </span>
-                            {isFriend ? (
-                              <span className="text-content-tertiary">
-                                Friends
-                              </span>
-                            ) : isSending ? (
-                              <span className="text-content-tertiary">
-                                Sending…
-                              </span>
-                            ) : alreadySent ? (
-                              <span className="text-content-tertiary">
-                                Request sent
-                              </span>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => sendRequest(searchUser.id)}
-                                disabled={isSending}
-                                aria-label={`Send friend request to ${searchUser.username || searchUser.name || "user"}`}
-                                className="size-8"
-                              >
-                                <UserPlus className="text-accent size-4" />
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
+                          ) : isSending ? (
+                            <span className="text-content-tertiary">
+                              Sending…
+                            </span>
+                          ) : alreadySent ? (
+                            <span className="text-content-tertiary">
+                              Request sent
+                            </span>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => sendRequest(searchUser.id)}
+                              disabled={isSending}
+                              aria-label={`Send friend request to ${searchUser.username || searchUser.name || "user"}`}
+                              className="size-8"
+                            >
+                              <UserPlus className="text-accent size-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {normalizedSearchQ.length > 0 &&
+                  normalizedSearchQ.length < MIN_SUBSTRING_SEARCH_LENGTH && (
+                    <p className="text-content-tertiary mt-2 text-center text-sm">
+                      Enter at least 3 characters
+                    </p>
+                  )}
+                {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
+                  searchState === "loading" && (
+                    <p className="text-content-tertiary mt-2 text-center text-sm">
+                      Searching…
+                    </p>
+                  )}
+                {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
+                  searchState === "error" && (
+                    <div className="mt-2 flex items-center justify-center gap-2">
+                      <span className="text-error text-sm">Search failed.</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void search(searchQ)}
+                      >
+                        Retry
+                      </Button>
                     </div>
                   )}
-                  {normalizedSearchQ.length > 0 &&
-                    normalizedSearchQ.length < MIN_SUBSTRING_SEARCH_LENGTH && (
-                      <p className="text-content-tertiary mt-2 text-center text-sm">
-                        Enter at least 3 characters
-                      </p>
-                    )}
-                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
-                    searchState === "loading" && (
-                      <p className="text-content-tertiary mt-2 text-center text-sm">
-                        Searching…
-                      </p>
-                    )}
-                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
-                    searchState === "error" && (
-                      <div className="mt-2 flex items-center justify-center gap-2">
-                        <span className="text-error text-sm">
-                          Search failed.
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void search(searchQ)}
-                        >
-                          Retry
-                        </Button>
-                      </div>
-                    )}
-                  {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
-                    searchState === "success" &&
-                    searchResults.length === 0 && (
-                      <p className="text-content-tertiary mt-2 text-center text-sm">
-                        No users found
-                      </p>
-                    )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </SidebarHeader>
-
-        <SidebarContent>
-          {loadFailed && (
-            <SidebarGroup>
-              <SidebarGroupLabel>Friends unavailable</SidebarGroupLabel>
-              <SidebarGroupContent className="space-y-2 px-2">
-                <p className="text-sm opacity-60">
-                  We couldn&apos;t load all friendship data. Check your
-                  connection and try again.
-                </p>
+                {normalizedSearchQ.length >= MIN_SUBSTRING_SEARCH_LENGTH &&
+                  searchState === "success" &&
+                  searchResults.length === 0 && (
+                    <p className="text-content-tertiary mt-2 text-center text-sm">
+                      No users found
+                    </p>
+                  )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Drawer only (OPT-663): the docked rail has no dismissed
+                  state, so there is nothing for a close control to do there. */}
+            {isMobile && (
+              <SheetClose asChild>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void fetchFriendsData()}
-                  disabled={loadPending}
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-content-secondary hover:text-content-primary size-8"
+                  aria-label="Close friends"
+                  title="Close friends"
                 >
-                  {loadPending ? "Retrying…" : "Retry"}
+                  <X className="size-4" />
                 </Button>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
+              </SheetClose>
+            )}
+          </div>
+        </div>
+      </SidebarHeader>
 
-          <SidebarGroup className="py-3">
-            <SidebarGroupLabel className="text-content-tertiary font-semibold tracking-widest uppercase">
-              Online ({onlineCount})
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              {friendsLoadState === "loading" && friends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-sm">
-                  Loading friends…
-                </p>
-              ) : friendsLoadState === "error" &&
-                friends.length === 0 ? null : onlineFriends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-sm">
-                  No friends online.
-                </p>
-              ) : (
-                <SidebarMenu className="gap-1">
-                  {onlineFriends.map((friend) => renderFriend(friend, true))}
-                </SidebarMenu>
-              )}
+      <SidebarContent>
+        {loadFailed && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Friends unavailable</SidebarGroupLabel>
+            <SidebarGroupContent className="space-y-2 px-2">
+              <p className="text-sm opacity-60">
+                We couldn&apos;t load all friendship data. Check your connection
+                and try again.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchFriendsData()}
+                disabled={loadPending}
+              >
+                {loadPending ? "Retrying…" : "Retry"}
+              </Button>
             </SidebarGroupContent>
           </SidebarGroup>
+        )}
 
-          <SidebarGroup className="py-3">
-            <SidebarGroupLabel className="text-content-tertiary font-semibold tracking-widest uppercase">
-              Offline ({offlineFriends.length})
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              {friendsLoadState !== "loading" &&
-              friendsLoadState !== "error" &&
-              friends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-sm">
-                  Add friends to start a conversation.
-                </p>
-              ) : offlineFriends.length === 0 ? (
-                <p className="text-content-tertiary px-2 text-sm">
-                  Everyone is online.
-                </p>
-              ) : (
-                <SidebarMenu className="gap-1">
-                  {offlineFriends.map((friend) => renderFriend(friend, false))}
-                </SidebarMenu>
-              )}
-            </SidebarGroupContent>
-          </SidebarGroup>
+        <SidebarGroup className="py-3">
+          <SidebarGroupLabel className="text-content-tertiary font-semibold tracking-widest uppercase">
+            Online ({onlineCount})
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            {friendsLoadState === "loading" && friends.length === 0 ? (
+              <p className="text-content-tertiary px-2 text-sm">
+                Loading friends…
+              </p>
+            ) : friendsLoadState === "error" &&
+              friends.length === 0 ? null : onlineFriends.length === 0 ? (
+              <p className="text-content-tertiary px-2 text-sm">
+                No friends online.
+              </p>
+            ) : (
+              <SidebarMenu className="gap-1">
+                {onlineFriends.map((friend) => renderFriend(friend, true))}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-          <UserChannelConnectionStatus connectionStatus={connectionStatus} />
-        </SidebarContent>
-      </Sidebar>
+        <SidebarGroup className="py-3">
+          <SidebarGroupLabel className="text-content-tertiary font-semibold tracking-widest uppercase">
+            Offline ({offlineFriends.length})
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            {friendsLoadState !== "loading" &&
+            friendsLoadState !== "error" &&
+            friends.length === 0 ? (
+              <p className="text-content-tertiary px-2 text-sm">
+                Add friends to start a conversation.
+              </p>
+            ) : offlineFriends.length === 0 ? (
+              <p className="text-content-tertiary px-2 text-sm">
+                Everyone is online.
+              </p>
+            ) : (
+              <SidebarMenu className="gap-1">
+                {offlineFriends.map((friend) => renderFriend(friend, false))}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <UserChannelConnectionStatus connectionStatus={connectionStatus} />
+      </SidebarContent>
+    </>
+  );
+
+  return (
+    <TooltipProvider>
+      {isMobile ? (
+        <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+          <SheetContent
+            id={FRIENDS_DRAWER_ID}
+            side="right"
+            // The header already carries a close control sized like its
+            // siblings; the primitive's floating X would land on top of them.
+            showCloseButton={false}
+            // `social-rail` keeps the gold edge the docked rail is known by.
+            // The width and max-width repeat the primitive's `data-[side]`
+            // modifier because an unmodified `w-*` loses to it on specificity.
+            className="social-rail bg-surface-nav data-[side=right]:w-social-rail gap-0 data-[side=right]:sm:max-w-none"
+            // Radix would focus the first control in the panel, ringing "Add
+            // friend" gold on open — an action nobody asked for. Focus the
+            // panel itself: the drawer is announced, and Tab still walks in.
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              document.getElementById(FRIENDS_DRAWER_ID)?.focus();
+            }}
+            // Radix hands focus back to its own `Dialog.Trigger`, and this
+            // drawer has none — the control that opens it lives in the navbar,
+            // a different subtree. Without this, Escape drops focus on <body>.
+            //
+            // Only take the handler over when the toggle actually accepts
+            // focus. It is `display: none` from `md` up and gone entirely on
+            // /game/*, and both of those are ways this drawer closes; asking a
+            // hidden element to focus is a silent no-op, so claim the event
+            // only once focus has landed. Otherwise Radix keeps its own
+            // restoration rather than being suppressed for nothing.
+            onCloseAutoFocus={(event) => {
+              const toggle = document.getElementById(FRIENDS_DRAWER_TOGGLE_ID);
+              if (!toggle) return;
+              toggle.focus();
+              if (document.activeElement !== toggle) return;
+              event.preventDefault();
+            }}
+          >
+            {/* The visible "Friends" heading below is a plain `h2`, so the
+                dialog still needs its own accessible name. */}
+            <SheetHeader className="sr-only">
+              <SheetTitle>Friends</SheetTitle>
+              <SheetDescription>
+                Your friends list, presence, and requests.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="flex min-h-0 flex-1 flex-col">{railBody}</div>
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Sidebar
+          side="right"
+          collapsible="none"
+          // The rail hangs below the full-width navbar: `top-navbar` is the
+          // navbar's own height token, so the two cannot drift apart, and z-30
+          // keeps the rail under the nav (z-40) rather than over it. `h-auto`
+          // replaces the primitive's `h-full` so the top/bottom insets — not a
+          // 100vh height that would overhang the viewport — size the rail.
+          //
+          // `hidden md:flex` is the CSS half of the OPT-663 split: it holds
+          // even in the frame before any hook has read the viewport, so a
+          // narrow screen never flashes a 280px rail over the page.
+          className="social-rail bg-surface-nav w-social-rail top-navbar fixed right-0 bottom-0 z-30 hidden h-auto border-l md:flex"
+        >
+          {railBody}
+        </Sidebar>
+      )}
 
       <AlertDialog
         open={Boolean(friendToRemove)}
