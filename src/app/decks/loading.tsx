@@ -42,7 +42,7 @@ export default function DecksLoading() {
             aria-hidden="true"
           >
             {/* The card silhouette keeps its radius; the rest stays square. */}
-            <Skeleton className="aspect-card w-14 shrink-0 rounded" />
+            <Skeleton className="aspect-card rounded-card w-14 shrink-0" />
             <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-4 w-2/5 rounded-none" />

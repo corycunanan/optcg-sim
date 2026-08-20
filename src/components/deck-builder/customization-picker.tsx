@@ -24,7 +24,7 @@ export function CustomizationPicker({
 }: CustomizationPickerProps) {
   const optionClassName = (selected: boolean) =>
     cn(
-      "aspect-card h-auto overflow-hidden rounded-md border-2 p-0",
+      "aspect-card rounded-card h-auto overflow-hidden border-2 p-0",
       selected
         ? "border-border-focus ring-border-focus ring-2"
         : "border-border hover:border-content-tertiary"

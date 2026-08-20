@@ -165,7 +165,7 @@ export function ChangeDeckModal({
                 {Array.from({ length: 8 }, (_, index) => (
                   <Skeleton
                     key={index}
-                    className="w-card-thumb aspect-card rounded"
+                    className="w-card-thumb aspect-card rounded-card"
                     aria-hidden="true"
                   />
                 ))}

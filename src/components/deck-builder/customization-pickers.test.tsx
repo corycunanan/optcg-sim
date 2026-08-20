@@ -89,4 +89,29 @@ describe("deck customization pickers", () => {
     expect(defaultButton.props["aria-pressed"]).toBe(true);
     expect(selectedButton()).toBe(defaultButton);
   });
+
+  // Each option is a raw sleeve or DON face, so it clips at the card radius
+  // rather than at the Button primitive's chrome radius
+  // (docs/design/SHAPE-LANGUAGE.md §The card radius). `cn()` has to resolve the
+  // two, which is what the `rounded` class-group registration in utils.ts buys.
+  it("clips every option at the card radius", () => {
+    function Harness() {
+      const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
+      return (
+        <SleevePicker selectedUrl={selectedUrl} onSelect={setSelectedUrl} />
+      );
+    }
+
+    act(() => {
+      renderer = create(<Harness />);
+    });
+
+    const buttons = renderer!.root.findAllByType("button");
+    expect(buttons.length).toBeGreaterThan(1);
+    for (const button of buttons) {
+      expect(button.props.className).toContain("rounded-card");
+      expect(button.props.className).toContain("aspect-card");
+      expect(button.props.className).not.toContain("rounded-md");
+    }
+  });
 });

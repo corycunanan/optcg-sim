@@ -75,7 +75,7 @@ export function MulliganModal({
                       rovingFocus.onKeyDown(event, card.instanceId)
                     }
                     className={cn(
-                      "border-gb-border-strong w-card-thumb aspect-card focus-visible:ring-gb-signal-eligible overflow-hidden rounded-md border-2 shadow-md focus-visible:ring-2 focus-visible:outline-none"
+                      "border-gb-border-strong w-card-thumb aspect-card rounded-card focus-visible:ring-gb-signal-eligible overflow-hidden border-2 shadow-md focus-visible:ring-2 focus-visible:outline-none"
                     )}
                   >
                     {data?.imageUrl ? (

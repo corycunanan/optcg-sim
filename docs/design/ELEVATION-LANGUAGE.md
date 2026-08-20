@@ -91,6 +91,25 @@ thumbnails cross-fade from `opacity-70` to `opacity-100` on hover, and the `shad
 Non-interactive card grids (the deck builder's Backs and DON tabs) are deliberately not in
 this table — see §Non-interactive card previews below.
 
+**What each member's cast traces (OPT-715).** `box-shadow` is generated from the border box, so
+the silhouette a surface casts is decided by what that surface is clipped at, not by the shadow
+token. The register's `shadow-sm` → `shadow-md` step is unchanged; which corner it draws is not,
+and it is not the same answer for every row:
+
+- **The cast is the card's own corner** at the four members whose casting box *is* a card:
+  `/cards` grid tiles, the deck-builder deck-list fan, the lobby deck-preview fan, and the lobby
+  seat leader art. Each takes `rounded-card` ([SHAPE-LANGUAGE.md](./SHAPE-LANGUAGE.md) §The card
+  radius).
+- **The cast stays the frame's corner** at the two members that are a framed panel *around* a
+  card: the deck-builder search tile and the card-detail art-variant thumbnails both add a caption
+  strip below the art, so the tile is chrome, keeps its 2px corner, and casts that. The card
+  silhouette sits on the art crop inside — which is the figure-ground rule working, not a
+  compromise: a rounded card in an angular frame.
+- **`/decks` art-bearing rows** cast from `ChamferFrame`, so their silhouette is the chamfer
+  polygon (§Casting from a clipped surface). Only the leader thumbnail *inside* the row takes
+  `rounded-card`, and it casts nothing.
+- **`/sets` tiles** have no card art at all — see footnote 1 — so nothing about them changes.
+
 Two rules the table encodes:
 
 - **A fanned stack carries the register per card, not on a wrapper.** The stack lifts as one

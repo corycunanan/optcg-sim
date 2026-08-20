@@ -99,3 +99,44 @@ describe("CardGrid tile hover (OPT-714)", () => {
     expect(html).not.toContain("hover:shadow-md");
   });
 });
+
+// The tile clips raw card art, and its hard cast is generated from that border
+// box, so the corner the tile is clipped at is the corner the shadow traces
+// (docs/design/SHAPE-LANGUAGE.md §The card radius).
+describe("CardGrid card silhouette (OPT-715)", () => {
+  it("clips the tile at the card radius, not the chrome radius", () => {
+    const { className } = renderGrid();
+
+    expect(className).toContain("rounded-card");
+    expect(className).not.toContain("rounded-lg");
+    expect(className).toContain("overflow-hidden");
+  });
+
+  // The radius is a percentage of the box, so the box has to be a card before
+  // the art arrives — otherwise the corner resolves against a zero height and
+  // then jumps.
+  it("reserves the card box on the element carrying the radius", () => {
+    const { className } = renderGrid();
+
+    expect(className).toContain("aspect-card");
+  });
+
+  it("gives the skeleton the same silhouette and the same reserved box", () => {
+    act(() => {
+      renderer = create(<CardGridSkeleton count={2} />);
+    });
+    const tile = renderer!.root.findAll(
+      (node) =>
+        typeof node.type === "string" &&
+        typeof node.props.className === "string" &&
+        node.props.className.includes("rounded-card")
+    );
+
+    expect(tile.length).toBe(2);
+    for (const node of tile) {
+      expect(node.props.className).toContain("aspect-card");
+      expect(node.props.className).toContain("overflow-hidden");
+      expect(node.props.className).not.toContain("rounded-lg");
+    }
+  });
+});

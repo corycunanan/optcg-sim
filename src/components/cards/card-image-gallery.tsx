@@ -68,12 +68,20 @@ export function CardImageGallery({
   return (
     <div>
       {/* Main image */}
-      <HoloCard effect={effect} className="overflow-hidden rounded-lg">
+      {/* `aspect-card` on both layers reserves the card box before the scan
+          loads, so the percentage radius resolves against a stable box from
+          first paint instead of against a zero-height one. HoloCard's own CSS
+          forces `height: auto` on its child, which is exactly what lets the
+          image's aspect ratio decide its height. */}
+      <HoloCard
+        effect={effect}
+        className="aspect-card rounded-card overflow-hidden"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={selectedImage}
           alt={cardName}
-          className="w-full"
+          className="aspect-card w-full object-cover"
           key={selectedImage}
         />
       </HoloCard>
@@ -97,6 +105,10 @@ export function CardImageGallery({
                     // slack below the label instead, and `aspect-card` keeps
                     // every scan the same height regardless of its intrinsic
                     // ratio.
+                    // The tile is a framed panel around a card — art plus a
+                    // label strip — so it is chrome and keeps the 2px corner
+                    // its cast traces. The card silhouette lives on the art
+                    // crop inside it (SHAPE-LANGUAGE §The card radius).
                     "group flex cursor-pointer flex-col overflow-hidden rounded-md text-left shadow-sm transition-all hover:shadow-md",
                     isSelected
                       ? "border border-border-strong"
@@ -108,7 +120,7 @@ export function CardImageGallery({
                     src={art.imageUrl}
                     alt={`${cardName} — ${art.label}`}
                     className={cn(
-                      "aspect-card w-full object-cover transition-opacity",
+                      "aspect-card rounded-card w-full object-cover transition-opacity",
                       isSelected ? "opacity-100" : "opacity-70 group-hover:opacity-100",
                     )}
                     loading="lazy"

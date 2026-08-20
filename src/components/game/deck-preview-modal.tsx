@@ -132,7 +132,7 @@ export function GameDeckPreviewModal({
                         count={group.count}
                         className="cursor-pointer"
                         renderCard={(i) => (
-                          <div className={cn("w-card-thumb overflow-hidden rounded-md border border-gb-border-strong shadow-sm aspect-card hover:-translate-y-2 hover:z-10 transition-transform duration-150")}>
+                          <div className={cn("w-card-thumb rounded-card overflow-hidden border border-gb-border-strong shadow-sm aspect-card hover:-translate-y-2 hover:z-10 transition-transform duration-150")}>
                             {data?.imageUrl ? (
                               <img
                                 src={data.imageUrl}

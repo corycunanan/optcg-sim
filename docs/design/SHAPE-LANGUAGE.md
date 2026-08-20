@@ -47,7 +47,7 @@ surfaces. Shape *is* a boundary treatment — the polygon is the perimeter. Inte
 
 | Geometry | Reserved for | Notes |
 |---|---|---|
-| **Rounded rectangle** (`aspect-card` radii) | Card faces, card thumbnails, art crops, sleeves, holofoil surfaces | The card silhouette. Nothing else may use it. |
+| **Rounded rectangle** (`rounded-card`) | Card faces, card thumbnails, art crops, sleeves, holofoil surfaces | The card silhouette. Nothing else may use it. See §The card radius. |
 | **Circle** | User avatars, presence dots | People, not objects. Distinct from both cards and chrome. |
 | **Square corners** (0 radius) | Tier-5 information surfaces (tooltips), dense data rows | Already adopted via the tooltip spec. The "quiet" end of angular. |
 | **Chamfered polygon** | Panels, buttons, tabs, badges — default chrome | The workhorse. See vocabulary. |
@@ -55,6 +55,56 @@ surfaces. Shape *is* a boundary treatment — the polygon is the perimeter. Inte
 
 Pills (`rounded-full`) are deprecated for chrome under this direction; existing pill badges migrate
 to chamfered or square forms as surfaces are touched.
+
+### The card radius
+
+*Shipped 2026-08-20 (OPT-715).* The table above named a radius the system did not have, so raw-card
+surfaces borrowed chrome's — `/cards` tiles clipped a 224px card at 2px and the deck-builder fan
+clipped a 100px card at 4px. `box-shadow` is generated from the border box, so each one's hard cast
+faithfully traced the wrong silhouette; that mismatch is what made the shadows read as "the same
+corner rounding as all other objects."
+
+The primitive is `--card-radius` (`4%`) and the `rounded-card` utility in `src/app/globals.css`.
+
+**It is a ratio, not a length.** A printed OPTCG card is 63 × 88mm with a ~2.5mm corner, so the
+corner is ~4% of the card's width at every size the card is ever seen at. One percentage therefore
+serves a 69px lobby thumbnail (2.8px), a 100px fan card (4px), a 224px `/cards` tile (9px), and a
+400px detail scan (16px) the way one physical card serves all of them — the corner scales with the
+object instead of being re-picked per surface. A fixed px step cannot: it reads square on the tile
+or blobby on the thumbnail, and picking one per site is how the 2px/4px disagreement started.
+
+**Why the slash.** A percentage `border-radius` resolves horizontally against width and vertically
+against height, which are different lengths on a 600/838 box, so a bare `4%` paints a 1.4:1 ellipse.
+`rounded-card` writes `var(--card-radius) / calc(var(--card-radius) * 600 / 838)`, scaling the
+vertical percentage by the same ratio `aspect-card` states. Both radii resolve to the identical
+pixel length and the corner is a true quarter-circle.
+
+**Where it goes: the box that *is* the card.** A raw-art crop, a card face, a card-shaped slot, and
+the skeleton standing in for one. A framed panel that merely *contains* a card is chrome and keeps
+`rounded-md` — including a tile that adds a caption strip below the art (the deck-builder search
+tile, the card-detail art-variant thumbnails). There the card silhouette sits on the art crop and
+the frame casts its own 2px corner, which is the figure-ground rule working rather than a
+compromise: a rounded card inside an angular frame is exactly the contrast this doc opens with.
+
+Two things force that split rather than merely recommending it. The quarter-circle above is exact
+only on a 600/838 box, so a caption makes the corner run tall in proportion to the caption's
+height. And a skeleton's caption is never the same height as the real one, so a tile carrying the
+radius would visibly change corner size as content streamed in. **The element carrying
+`rounded-card` must therefore also carry `aspect-card` or an explicitly reserved card-shaped box** —
+otherwise the percentage resolves against whatever height the content happens to have at that
+moment, including zero before an image loads.
+
+**Not the game board.** `card-front.tsx` / `card-back.tsx` render the same object but sit inside
+`ScaledBoard`'s ~0.59 transform, cast no shadow, and share their radius with several sibling layers
+(glow, focus ring, flip faces). They stay at `rounded` until a board-side ticket moves the whole
+stack together — the ScaledBoard note below is the reason to decide it there rather than here.
+
+**Lint.** The design-system lint derives its radius rules from this vocabulary rather than from a
+list of bad spellings. Every `rounded-*` class in a class position must resolve to either the
+documented chrome scale or a utility declared in `globals.css`, so `rounded-crad` and
+`rounded-card-lg` both fail as unknown; a class composed at runtime (`` `rounded-${kind}` ``,
+`` `${state}:rounded-card` ``) fails because Tailwind only ever sees whole names. Adding a shape
+utility to `globals.css` extends the accepted set; nothing else does.
 
 ## Vocabulary (closed set)
 
@@ -123,6 +173,10 @@ region**. If two pennants compete, neither is featured.
   below, applied to an apex instead of a 45° cut. Feature polygons entering the primitive
   is still deferred; the next one should generalize these three utilities rather than
   add a fourth bespoke set.
+- **Shipped primitive (OPT-715):** the card silhouette is `rounded-card` over `--card-radius`,
+  declared beside `aspect-card` in `src/app/globals.css`. It needs no cast machinery —
+  `box-shadow` follows `border-radius` natively, so a raw-card surface that clips at the card
+  radius casts the card's own corner. See §The card radius.
 - **CSS:** `clip-path: polygon(...)` for all cuts. Borders on clipped elements require the
   **two-layer technique**: outer element carries the edge color, inner element (inset by the
   hairline width) carries the surface. `border-*` properties do not follow clip-path.
@@ -162,3 +216,8 @@ region**. If two pennants compete, neither is featured.
    `rounded-md` and `rounded-lg` both resolve to 2px. Badges alone keep `rounded` (4px), while
    `rounded-full` is reserved for avatars and presence dots. The chamfer lint remains an allowance
    for adopted angular surfaces rather than a requirement on all chrome.
+6. **Card silhouette shipped (2026-08-20, OPT-715):** the 2026-08-12 amendment flattened chrome to
+   2px and swept card tiles along with it, because the rounded-rectangle row of the shape-semantics
+   table pointed at a primitive nobody had built. `rounded-card` is that primitive; every raw-card
+   art site now takes it and the chrome scale is untouched. The game board is deferred (§The card
+   radius).

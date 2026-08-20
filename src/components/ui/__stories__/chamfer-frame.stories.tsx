@@ -163,7 +163,7 @@ export const CardClassRow: Story = {
             className="group"
             surfaceClassName="bg-surface-1 group-hover:bg-surface-2 flex items-center gap-4 p-4 transition-colors duration-200"
           >
-            <div className="bg-surface-3 aspect-card w-card-thumb shrink-0 rounded-md" />
+            <div className="bg-surface-3 aspect-card rounded-card w-card-thumb shrink-0" />
             <span className="text-content-primary text-base font-semibold">
               {name}
             </span>
@@ -186,7 +186,7 @@ export const FigureGround: Story = {
         edge="neutral"
         surfaceClassName="bg-surface-1 flex items-center justify-center p-8"
       >
-        <div className="bg-surface-3 aspect-card w-card-thumb rounded-md" />
+        <div className="bg-surface-3 aspect-card rounded-card w-card-thumb" />
       </ChamferFrame>
     </div>
   ),

@@ -175,4 +175,19 @@ describe("DeckBuilderList stack elevation", () => {
       expect(card.className).toContain("transition-[translate,box-shadow]");
     }
   });
+
+  // The cast is generated from the border box, so the card's clip radius is
+  // the shadow's silhouette (docs/design/SHAPE-LANGUAGE.md §The card radius).
+  it("clips every card in the fan at the card radius", () => {
+    renderList();
+
+    for (const img of screen.getAllByAltText("Roronoa Zoro")) {
+      const card = img.parentElement!;
+      expect(card.className).toContain("rounded-card");
+      expect(card.className).toContain("overflow-hidden");
+      // The radius is a percentage, so the box it resolves against has to be a
+      // card whether or not the art has arrived.
+      expect(card.className).toContain("aspect-card");
+    }
+  });
 });

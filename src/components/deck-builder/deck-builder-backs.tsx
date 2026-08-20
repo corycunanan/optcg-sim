@@ -63,7 +63,7 @@ export function DeckBuilderBacks({ cards, leader, sleeveUrl }: DeckBuilderBacksP
             count={group.count}
             className="relative"
             renderCard={(i) => (
-              <div className="w-card-thumb overflow-hidden rounded border border-border shadow-sm aspect-card">
+              <div className="w-card-thumb rounded-card overflow-hidden border border-border shadow-sm aspect-card">
                 {sleeveUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

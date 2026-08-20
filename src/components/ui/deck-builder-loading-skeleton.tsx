@@ -44,7 +44,7 @@ export function DeckBuilderLoadingSkeleton({ label }: { label: string }) {
           <div className="grid flex-1 grid-cols-3 gap-2 overflow-hidden px-3 pb-3">
             {searchCards.map((_, index) => (
               <div key={index} className="bg-card overflow-hidden rounded-md">
-                <Skeleton className="aspect-card w-full rounded-none" />
+                <Skeleton className="aspect-card rounded-card w-full" />
                 <div className="space-y-1 p-1">
                   <Skeleton className="h-3 w-4/5" />
                   <Skeleton className="h-3 w-1/2" />
@@ -72,9 +72,9 @@ export function DeckBuilderLoadingSkeleton({ label }: { label: string }) {
               {deckCards.map((_, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex">
-                    <Skeleton className="aspect-card w-24 shrink-0 rounded" />
-                    <Skeleton className="aspect-card -ml-16 w-24 shrink-0 rounded" />
-                    <Skeleton className="aspect-card -ml-16 w-24 shrink-0 rounded" />
+                    <Skeleton className="aspect-card rounded-card w-24 shrink-0" />
+                    <Skeleton className="aspect-card rounded-card -ml-16 w-24 shrink-0" />
+                    <Skeleton className="aspect-card rounded-card -ml-16 w-24 shrink-0" />
                   </div>
                   <Skeleton className="mx-auto h-5 w-16" />
                 </div>

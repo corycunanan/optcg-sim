@@ -116,7 +116,7 @@ function DeckRow({ deck }: { deck: DeckListItem }) {
               <img
                 src={leader.imageUrl}
                 alt=""
-                className="aspect-card w-full rounded object-cover object-top"
+                className="aspect-card rounded-card w-full object-cover object-top"
                 loading="lazy"
               />
             </button>

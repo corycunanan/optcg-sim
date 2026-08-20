@@ -865,9 +865,33 @@ describe("LobbySeatCard deck switching", () => {
       expect(row.className).not.toMatch(/(^|\s)rounded/);
     }
 
-    // Card silhouettes keep their radius — that is the figure-ground point.
+    // Card silhouettes keep their radius — that is the figure-ground point —
+    // and since OPT-715 it is the card radius rather than chrome's 2px.
     const art = dialog.querySelector("img");
-    expect(art?.parentElement?.className).toMatch(/(^|\s)rounded/);
+    expect(art?.parentElement?.className).toMatch(/(^|\s)rounded-card(\s|$)/);
+  });
+
+  // The leader art is a raw card that casts `shadow-sm` → `shadow-md`, and
+  // `box-shadow` is generated from the border box, so the clip radius is the
+  // shadow's silhouette (docs/design/SHAPE-LANGUAGE.md §The card radius).
+  it("clips the filled leader art at the card radius", () => {
+    renderSeat({ deckEditable: false });
+
+    const filled = screen.getByRole("button", {
+      name: "Preview Straw Hat Rush",
+    });
+    expect(filled.className).toContain("rounded-card");
+    expect(filled.className).toContain("aspect-card");
+    expect(filled.className).not.toContain("rounded-md");
+  });
+
+  it("gives the empty leader slot the same silhouette", () => {
+    renderSeat({ deck: null, deckEditable: true });
+
+    const empty = screen.getByRole("button", { name: "Choose a deck" });
+    expect(empty.className).toContain("rounded-card");
+    expect(empty.className).toContain("aspect-card");
+    expect(empty.className).not.toContain("rounded-md");
   });
 
   it("steps the rail elevation one direction from rest to selected", async () => {
