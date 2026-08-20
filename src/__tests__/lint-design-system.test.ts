@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,7 +8,16 @@ import {
   findShapeVocabularyUsages,
   findTextViolations,
   firstBlurredShadowLayer,
+  shapeVocabulary,
 } from "../../scripts/lint-design-system.mjs";
+
+// The lint derives its vocabulary from globals.css at import time, so the tests
+// read the same file rather than a fixture. A rule that passes against a
+// hand-written stand-in proves nothing about the vocabulary that ships.
+const GLOBALS_CSS = readFileSync(
+  fileURLToPath(new URL("../app/globals.css", import.meta.url)),
+  "utf8"
+);
 
 const SHOULD_FLAG = [
   { syntax: "text-[10px]", rule: "font-size" },
@@ -458,23 +469,6 @@ describe("card silhouette vocabulary (OPT-715)", () => {
     ]);
   });
 
-  // The chrome radius rule only knows xs/sm/xl/2xl/3xl and arbitrary values, so
-  // a near-miss card name would otherwise compile to nothing and pass silently.
-  it("reads a near-miss name as vocabulary so it fails as undeclared", () => {
-    const usages = findShapeVocabularyUsages(
-      '<div className="rounded-card-lg" />'
-    );
-
-    expect(usages).toEqual([
-      expect.objectContaining({ utility: "rounded-card-lg", kind: "class" }),
-    ]);
-    expect(
-      collectDeclaredShapeUtilities(
-        "@utility rounded-card { border-radius: 4%; }"
-      ).has(usages[0].utility)
-    ).toBe(false);
-  });
-
   it("reads through Tailwind variant and important prefixes", () => {
     expect(
       findShapeVocabularyUsages('<div className="hover:rounded-card" />')
@@ -499,6 +493,19 @@ describe("card silhouette vocabulary (OPT-715)", () => {
     ).toEqual([expect.objectContaining({ kind: "dynamic" })]);
   });
 
+  it("resolves the vocabulary from the real globals.css declarations", () => {
+    const declared = collectDeclaredShapeUtilities(GLOBALS_CSS);
+    const vocabulary = shapeVocabulary(declared);
+
+    expect(declared.has("rounded-card")).toBe(true);
+    // The stock `rounded` namespace never becomes a shape prefix, or every
+    // legitimate `rounded-md` in the codebase would read as vocabulary.
+    expect([...vocabulary.namespacePrefixes]).toEqual(["chamfer-"]);
+    expect([...vocabulary.radiusValues]).toEqual(["card"]);
+    expect(vocabulary.stems.has("rounded-")).toBe(true);
+    expect(vocabulary.stems.has("chamfer-cut-")).toBe(true);
+  });
+
   it.each([
     ['<div data-testid="rounded-card" />', "non-class JSX attribute"],
     ['const name = "rounded-card";', "plain string constant"],
@@ -511,5 +518,114 @@ describe("card silhouette vocabulary (OPT-715)", () => {
     expect(
       findShapeVocabularyUsages('<div className="aspect-card w-card-thumb" />')
     ).toEqual([]);
+  });
+});
+
+// A rule shaped like the spellings someone thought of is blind to the ones
+// they did not. The radius rule is a membership test against the complete
+// world — the documented chrome scale plus whatever globals.css declares — so
+// it fails a name it has never seen. The first three cases are the probes the
+// cross-family review used to break the previous, pattern-shaped rule.
+describe("radius closed world (OPT-715)", () => {
+  it("fails a misspelled card radius", () => {
+    expect(
+      findClassTokenViolations('<div className="rounded-crad" />')
+    ).toEqual([
+      expect.objectContaining({
+        rule: "border-radius",
+        message: expect.stringContaining('unknown radius "rounded-crad"'),
+      }),
+    ]);
+  });
+
+  it("fails a radius composed at runtime, whatever it would resolve to", () => {
+    expect(
+      findShapeVocabularyUsages("<div className={`rounded-${kind}`} />")
+    ).toEqual([
+      expect.objectContaining({ utility: "rounded-", kind: "dynamic" }),
+    ]);
+  });
+
+  it("fails a card radius hidden behind a composed variant prefix", () => {
+    expect(
+      findShapeVocabularyUsages("<div className={`${state}:rounded-card`} />")
+    ).toEqual([
+      expect.objectContaining({ utility: "rounded-card", kind: "dynamic" }),
+    ]);
+  });
+
+  it("fails a near-miss suffix on the declared card name", () => {
+    expect(
+      findClassTokenViolations('<div className="rounded-card-lg" />')
+    ).toEqual([
+      expect.objectContaining({
+        rule: "border-radius",
+        message: expect.stringContaining('unknown radius "rounded-card-lg"'),
+      }),
+    ]);
+    // Reported once: the shape rule leaves the whole `rounded` namespace to
+    // the radius rule rather than claiming near misses of its own name.
+    expect(
+      findShapeVocabularyUsages('<div className="rounded-card-lg" />')
+    ).toEqual([]);
+  });
+
+  // The corner group used to accept only `-[trbl]` with an optional `-[se]`,
+  // so a two-letter corner made the whole class unparseable and it shipped.
+  it("fails a two-letter corner on an off-scale step", () => {
+    expect(findTextViolations('<div className="rounded-tl-sm" />')).toEqual([
+      expect.objectContaining({ rule: "border-radius" }),
+    ]);
+    // Owned by the text rule, so the closed-world rule stays quiet.
+    expect(
+      findClassTokenViolations('<div className="rounded-tl-sm" />')
+    ).toEqual([]);
+  });
+
+  it.each([
+    "rounded",
+    "rounded-md",
+    "rounded-lg",
+    "rounded-none",
+    "rounded-full",
+    "rounded-card",
+    "rounded-t-md",
+    "rounded-tl-md",
+    "rounded-l-lg",
+  ])("accepts the sanctioned class %s", (token) => {
+    expect(findClassTokenViolations(`<div className="${token}" />`)).toEqual([]);
+  });
+
+  it("does not read a complete chrome radius beside an interpolation as dynamic", () => {
+    expect(
+      findShapeVocabularyUsages("<div className={`rounded-md ${extra}`} />")
+    ).toEqual([]);
+  });
+
+  it("does not judge a radius outside a class position", () => {
+    expect(
+      findClassTokenViolations('const name = "rounded-crad";')
+    ).toEqual([]);
+    expect(
+      findClassTokenViolations('expect(cls).not.toContain("rounded-card-lg");')
+    ).toEqual([]);
+  });
+});
+
+// The utility is only correct if globals.css actually declares the token and
+// the slash form. A class-name assertion cannot see either.
+describe("card radius declaration (OPT-715)", () => {
+  it("declares the ratio primitive", () => {
+    expect(GLOBALS_CSS).toMatch(/--card-radius:\s*4%;/);
+  });
+
+  it("declares the utility as a slash pair scaled by the card aspect", () => {
+    expect(GLOBALS_CSS).toMatch(
+      /@utility rounded-card \{\s*border-radius:\s*var\(--card-radius\)\s*\/\s*calc\(var\(--card-radius\)\s*\*\s*600\s*\/\s*838\);\s*\}/
+    );
+  });
+
+  it("uses the same ratio the aspect-card utility states", () => {
+    expect(GLOBALS_CSS).toMatch(/@utility aspect-card \{\s*aspect-ratio:\s*600\s*\/\s*838;\s*\}/);
   });
 });

@@ -881,6 +881,7 @@ describe("LobbySeatCard deck switching", () => {
       name: "Preview Straw Hat Rush",
     });
     expect(filled.className).toContain("rounded-card");
+    expect(filled.className).toContain("aspect-card");
     expect(filled.className).not.toContain("rounded-md");
   });
 
@@ -889,6 +890,7 @@ describe("LobbySeatCard deck switching", () => {
 
     const empty = screen.getByRole("button", { name: "Choose a deck" });
     expect(empty.className).toContain("rounded-card");
+    expect(empty.className).toContain("aspect-card");
     expect(empty.className).not.toContain("rounded-md");
   });
 

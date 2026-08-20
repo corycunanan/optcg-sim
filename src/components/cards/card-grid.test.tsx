@@ -112,13 +112,31 @@ describe("CardGrid card silhouette (OPT-715)", () => {
     expect(className).toContain("overflow-hidden");
   });
 
-  it("gives the skeleton the same silhouette so the tile keeps its shape", () => {
+  // The radius is a percentage of the box, so the box has to be a card before
+  // the art arrives — otherwise the corner resolves against a zero height and
+  // then jumps.
+  it("reserves the card box on the element carrying the radius", () => {
+    const { className } = renderGrid();
+
+    expect(className).toContain("aspect-card");
+  });
+
+  it("gives the skeleton the same silhouette and the same reserved box", () => {
     act(() => {
       renderer = create(<CardGridSkeleton count={2} />);
     });
-    const html = JSON.stringify(renderer!.toJSON());
+    const tile = renderer!.root.findAll(
+      (node) =>
+        typeof node.type === "string" &&
+        typeof node.props.className === "string" &&
+        node.props.className.includes("rounded-card")
+    );
 
-    expect(html).toContain("rounded-card");
-    expect(html).not.toContain("rounded-lg");
+    expect(tile.length).toBe(2);
+    for (const node of tile) {
+      expect(node.props.className).toContain("aspect-card");
+      expect(node.props.className).toContain("overflow-hidden");
+      expect(node.props.className).not.toContain("rounded-lg");
+    }
   });
 });

@@ -342,9 +342,13 @@ export function CardEditForm({ card }: { card: Card }) {
 
       {/* Image Preview */}
       {form.imageUrl && (
-        <div className="rounded-card w-48 overflow-hidden border border-border">
+        <div className="aspect-card rounded-card w-48 overflow-hidden border border-border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={form.imageUrl} alt="Preview" className="w-full" />
+          <img
+            src={form.imageUrl}
+            alt="Preview"
+            className="h-full w-full object-cover"
+          />
         </div>
       )}
 

@@ -79,20 +79,32 @@ against height, which are different lengths on a 600/838 box, so a bare `4%` pai
 vertical percentage by the same ratio `aspect-card` states. Both radii resolve to the identical
 pixel length and the corner is a true quarter-circle.
 
-**Where it goes.** The box that *is* the card: a raw-art crop, a card face, a card-shaped slot, and
-the skeleton standing in for one. A tile that adds a caption strip below the art (the deck-builder
-search tile, the art-variant thumbnails) still takes it, because the tile is the object the user
-picks up and the object that casts; its corner runs a few percent tall, which is invisible at these
-radii. A framed panel that merely contains a card is chrome and keeps `rounded-md`.
+**Where it goes: the box that *is* the card.** A raw-art crop, a card face, a card-shaped slot, and
+the skeleton standing in for one. A framed panel that merely *contains* a card is chrome and keeps
+`rounded-md` — including a tile that adds a caption strip below the art (the deck-builder search
+tile, the card-detail art-variant thumbnails). There the card silhouette sits on the art crop and
+the frame casts its own 2px corner, which is the figure-ground rule working rather than a
+compromise: a rounded card inside an angular frame is exactly the contrast this doc opens with.
+
+Two things force that split rather than merely recommending it. The quarter-circle above is exact
+only on a 600/838 box, so a caption makes the corner run tall in proportion to the caption's
+height. And a skeleton's caption is never the same height as the real one, so a tile carrying the
+radius would visibly change corner size as content streamed in. **The element carrying
+`rounded-card` must therefore also carry `aspect-card` or an explicitly reserved card-shaped box** —
+otherwise the percentage resolves against whatever height the content happens to have at that
+moment, including zero before an image loads.
 
 **Not the game board.** `card-front.tsx` / `card-back.tsx` render the same object but sit inside
 `ScaledBoard`'s ~0.59 transform, cast no shadow, and share their radius with several sibling layers
 (glow, focus ring, flip faces). They stay at `rounded` until a board-side ticket moves the whole
 stack together — the ScaledBoard note below is the reason to decide it there rather than here.
 
-The design-system lint knows `rounded-card` the way it knows `chamfer-*`: as vocabulary, not as a
-widened radius scale. A `rounded-card…` class in a class position must be declared in `globals.css`
-and must not be composed dynamically, so a near-miss name like `rounded-card-lg` fails as undeclared.
+**Lint.** The design-system lint derives its radius rules from this vocabulary rather than from a
+list of bad spellings. Every `rounded-*` class in a class position must resolve to either the
+documented chrome scale or a utility declared in `globals.css`, so `rounded-crad` and
+`rounded-card-lg` both fail as unknown; a class composed at runtime (`` `rounded-${kind}` ``,
+`` `${state}:rounded-card` ``) fails because Tailwind only ever sees whole names. Adding a shape
+utility to `globals.css` extends the accepted set; nothing else does.
 
 ## Vocabulary (closed set)
 

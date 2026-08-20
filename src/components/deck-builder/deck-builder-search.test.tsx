@@ -122,17 +122,30 @@ describe("DeckBuilderSearch tile elevation", () => {
     expect(tile.className).toContain("hover:shadow-md");
   });
 
-  // The tile is the object that casts, so it carries the card silhouette even
-  // though its info strip makes it taller than a card — the cast is generated
-  // from the tile's border box (docs/design/SHAPE-LANGUAGE.md §The card radius).
-  it("clips the tile at the card radius, not the chrome radius", async () => {
+  // The tile is a framed panel around a card — art plus an info strip — so it
+  // is chrome and casts a chrome corner. The card silhouette belongs to the art
+  // crop, whose box is a card and stays one while the tile is not
+  // (docs/design/SHAPE-LANGUAGE.md §The card radius).
+  it("keeps the framed tile on the chrome radius", async () => {
     renderSearch();
     const tile = await screen.findByRole("button", {
       name: "Inspect Roronoa Zoro",
     });
 
-    expect(tile.className).toContain("rounded-card");
-    expect(tile.className).not.toContain("rounded-md");
+    expect(tile.className).toContain("rounded-md");
+    expect(tile.className).not.toContain("rounded-card");
+  });
+
+  it("clips the art crop inside it at the card radius", async () => {
+    renderSearch();
+    const tile = await screen.findByRole("button", {
+      name: "Inspect Roronoa Zoro",
+    });
+    const art = tile.querySelector("img")!.parentElement!;
+
+    expect(art.className).toContain("rounded-card");
+    expect(art.className).toContain("aspect-card");
+    expect(art.className).toContain("overflow-hidden");
   });
 
   it("does not stack an inner image zoom on the altitude step", async () => {

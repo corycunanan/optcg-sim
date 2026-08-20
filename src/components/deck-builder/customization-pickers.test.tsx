@@ -110,6 +110,7 @@ describe("deck customization pickers", () => {
     expect(buttons.length).toBeGreaterThan(1);
     for (const button of buttons) {
       expect(button.props.className).toContain("rounded-card");
+      expect(button.props.className).toContain("aspect-card");
       expect(button.props.className).not.toContain("rounded-md");
     }
   });

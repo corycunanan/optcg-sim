@@ -82,6 +82,10 @@ function FlippingCard({ initialCard }: { initialCard: number }) {
   }, []);  
 
   return (
+    // Both flip faces are raw card art, so they take the card silhouette
+    // (docs/design/SHAPE-LANGUAGE.md §The card radius). `inset-0` inside this
+    // fixed 100 × 140 box reserves the geometry from first paint, so the
+    // percentage radius never resolves against a transient box.
     <div
       className="relative shrink-0"
       style={{
@@ -97,7 +101,7 @@ function FlippingCard({ initialCard }: { initialCard: number }) {
         style={{ transformStyle: "preserve-3d" }}
       >
         <div
-          className="absolute inset-0 overflow-hidden rounded"
+          className="absolute inset-0 overflow-hidden rounded-card"
           style={{ backfaceVisibility: "hidden" }}
         >
           <Image
@@ -110,7 +114,7 @@ function FlippingCard({ initialCard }: { initialCard: number }) {
           />
         </div>
         <div
-          className="absolute inset-0 overflow-hidden rounded"
+          className="absolute inset-0 overflow-hidden rounded-card"
           style={{
             backfaceVisibility: "hidden",
             transform: "rotateY(180deg)",

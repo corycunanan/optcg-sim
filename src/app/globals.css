@@ -1114,10 +1114,12 @@ body {
 
    ── Where it applies ──
    Boxes that ARE the card: a raw-art crop, a card face, a card-shaped slot,
-   and the skeleton standing in for one. The quarter-circle is exact only on a
-   600/838 box; a tile that adds a caption strip below the art carries the
-   silhouette because the tile is the object that casts, and its corner runs a
-   few percent tall. Chrome keeps `rounded-md`. */
+   and the skeleton standing in for one. The element must also carry
+   `aspect-card`, or an explicitly reserved card-shaped box, because a
+   percentage resolves against whatever height the content happens to have —
+   including zero before an image loads. A framed panel that merely contains a
+   card (art plus a caption strip) is chrome, keeps `rounded-md`, and puts the
+   silhouette on the art crop inside it. */
 @utility rounded-card {
   border-radius: var(--card-radius) / calc(var(--card-radius) * 600 / 838);
 }

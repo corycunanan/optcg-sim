@@ -43,8 +43,8 @@ export function DeckBuilderLoadingSkeleton({ label }: { label: string }) {
           <Skeleton className="mx-3 mb-1 h-3 w-24" />
           <div className="grid flex-1 grid-cols-3 gap-2 overflow-hidden px-3 pb-3">
             {searchCards.map((_, index) => (
-              <div key={index} className="bg-card rounded-card overflow-hidden">
-                <Skeleton className="aspect-card w-full rounded-none" />
+              <div key={index} className="bg-card overflow-hidden rounded-md">
+                <Skeleton className="aspect-card rounded-card w-full" />
                 <div className="space-y-1 p-1">
                   <Skeleton className="h-3 w-4/5" />
                   <Skeleton className="h-3 w-1/2" />

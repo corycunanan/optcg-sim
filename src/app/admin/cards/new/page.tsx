@@ -346,9 +346,13 @@ export default function NewCardPage() {
 
         {/* Preview */}
         {form.imageUrl && (
-          <div className="border-border rounded-card w-48 overflow-hidden border">
+          <div className="border-border aspect-card rounded-card w-48 overflow-hidden border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={form.imageUrl} alt="Preview" className="w-full" />
+            <img
+              src={form.imageUrl}
+              alt="Preview"
+              className="h-full w-full object-cover"
+            />
           </div>
         )}
 

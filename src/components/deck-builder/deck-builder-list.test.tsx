@@ -185,6 +185,9 @@ describe("DeckBuilderList stack elevation", () => {
       const card = img.parentElement!;
       expect(card.className).toContain("rounded-card");
       expect(card.className).toContain("overflow-hidden");
+      // The radius is a percentage, so the box it resolves against has to be a
+      // card whether or not the art has arrived.
+      expect(card.className).toContain("aspect-card");
     }
   });
 });

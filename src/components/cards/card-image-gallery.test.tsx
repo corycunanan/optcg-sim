@@ -95,7 +95,7 @@ describe("CardImageGallery card silhouette (OPT-715)", () => {
     });
   }
 
-  it("clips the main scan at the card radius", () => {
+  it("clips the main scan at the card radius over a reserved card box", () => {
     renderGallery();
 
     const className = renderer!.root.findByProps({
@@ -103,17 +103,36 @@ describe("CardImageGallery card silhouette (OPT-715)", () => {
     }).props.className as string;
 
     expect(className).toContain("rounded-card");
+    expect(className).toContain("aspect-card");
     expect(className).not.toContain("rounded-lg");
   });
 
-  it("clips every variant thumbnail at the card radius", () => {
+  // The tile is a framed panel — art plus a label strip — so it stays chrome
+  // and casts a chrome corner; the silhouette belongs to the art inside it.
+  it("keeps the framed thumbnail tile on the chrome radius", () => {
     renderGallery();
 
     const buttons = renderer!.root.findAllByType("button");
     expect(buttons.length).toBeGreaterThan(0);
     for (const button of buttons) {
-      expect(button.props.className).toContain("rounded-card");
-      expect(button.props.className).not.toContain("rounded-md");
+      expect(button.props.className).toContain("rounded-md");
+      expect(button.props.className).not.toContain("rounded-card");
+    }
+  });
+
+  it("clips every variant art crop at the card radius", () => {
+    renderGallery();
+
+    // The variant scans are the ones labelled with their art name; the main
+    // scan is clipped by its HoloCard wrapper instead.
+    const images = renderer!.root
+      .findAllByType("img")
+      .filter((node) => node.props.alt !== "Monkey.D.Luffy");
+
+    expect(images.length).toBeGreaterThan(0);
+    for (const image of images) {
+      expect(image.props.className).toContain("rounded-card");
+      expect(image.props.className).toContain("aspect-card");
     }
   });
 });

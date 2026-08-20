@@ -191,16 +191,33 @@ const CLASS_LOGICAL_OPERATORS = new Set([
   ts.SyntaxKind.BarBarToken,
   ts.SyntaxKind.QuestionQuestionToken,
 ]);
-// A complete class name never ends in a hyphen; a dangling `chamfer-cut-` is
-// the prefix half of a dynamic composition, reported by that rule instead.
-// `rounded-card` is a whole name on its own, so it is matched with an optional
-// suffix: a bare `rounded-card` is the vocabulary, and `rounded-card-…` is a
-// near miss that the declaration check turns into a finding.
-const SHAPE_CLASS_TOKEN_RE =
-  /^(?:chamfer-[a-z](?:[a-z0-9-]*[a-z0-9])?|rounded-card(?:-[a-z0-9]+)*)$/;
-const SHAPE_FRAGMENT_RE = /(?:^|\s)((?:chamfer-|rounded-card)[a-z0-9-]*)/;
 const SHAPE_DECLARATION_RE =
   /(?:@utility\s+|\.)((?:chamfer-[a-z]|rounded-card)[a-z0-9-]*)/g;
+
+// ── The radius closed world ──
+// Every `rounded-*` class resolves to exactly one of two things: a documented
+// chrome step (BRANDING-GUIDELINES.md §6) or a shape utility declared in
+// globals.css. Nothing else exists, so the rule is a membership test against
+// those two sets rather than a list of bad spellings — which is the only way
+// it can catch a name nobody predicted. `rounded-crad` fails here; so does
+// `rounded-card-lg`, and so did `rounded-tl-sm`, a real off-scale corner the
+// old pattern-shaped rule stepped over for as long as it existed.
+//
+// Longer corner keys come first so `rounded-tl-sm` reads as corner `tl` value
+// `sm` rather than as the value `tl-sm`.
+const RADIUS_CORNER_KEYS = "tl|tr|bl|br|ss|se|es|ee|t|r|b|l|s|e";
+const RADIUS_CLASS_RE = new RegExp(
+  `^rounded(?:-(?:${RADIUS_CORNER_KEYS}))?(?:-(.+))?$`
+);
+// The documented chrome scale. `""` is the bare `rounded` (4px badges).
+const CHROME_RADIUS_VALUES = new Set(["", "none", "full", "md", "lg"]);
+// Namespaces Tailwind itself owns. A declared utility inside one of these
+// cannot claim the namespace as its own prefix — `rounded-md` is not shape
+// vocabulary just because `rounded-card` is.
+const STOCK_UTILITY_NAMESPACES = new Set(["rounded"]);
+// Values the border-radius text rule already reports with a better message, so
+// this rule stays quiet on them rather than double-reporting.
+const TEXT_RULE_RADIUS_VALUES = new Set(["xs", "sm", "xl", "2xl", "3xl"]);
 
 // Elevation shadows are hard, non-blurred offsets (globals.css, "Shadow
 // values"). The `shadow` rules therefore fail three things.
@@ -295,9 +312,15 @@ const RULES = [
       `raw color ${JSON.stringify(match[0])}; define a token in src/app/globals.css`,
   },
   {
+    // The corner group carries every Tailwind corner key, longest first. It
+    // used to accept only `-[trbl]` with an optional `-[se]`, which silently
+    // let `rounded-tl-sm` through: `tl` never matched, so the whole class read
+    // as an unknown value and fell out of the pattern entirely.
     name: "border-radius",
-    regex:
-      /(?<![\w-])rounded(?:-[trbl](?:-[se])?)?-(?:xs|sm|xl|2xl|3xl|\[[^\]\r\n]+\])/g,
+    regex: new RegExp(
+      `(?<![\\w-])rounded(?:-(?:${RADIUS_CORNER_KEYS}))?-(?:xs|sm|xl|2xl|3xl|\\[[^\\]\\r\\n]+\\])`,
+      "g"
+    ),
     describe: (match) =>
       `off-scale radius ${JSON.stringify(match[0])}; use rounded/rounded-md/rounded-lg or an approved shape primitive`,
   },
@@ -328,9 +351,10 @@ const IS_MAIN =
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 const files = IS_MAIN ? collectTsxFiles(SOURCE_ROOT) : [];
-const declaredShapeUtilities = IS_MAIN
-  ? collectDeclaredShapeUtilities(readFileSync(GLOBALS_CSS_PATH, "utf8"))
-  : new Set();
+const declaredShapeUtilities = collectDeclaredShapeUtilities(
+  readFileSync(GLOBALS_CSS_PATH, "utf8")
+);
+const SHAPE_VOCABULARY = shapeVocabulary(declaredShapeUtilities);
 const violations = [];
 let buttonOverrideCount = 0;
 let exemptSpacingFileCount = 0;
@@ -482,6 +506,46 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
 }
 
 /**
+ * The shape vocabulary, derived entirely from what globals.css declares.
+ *
+ * Nothing in here is a spelling this file guessed at. `declared` is the parsed
+ * `@utility` set; everything else is computed from it, so adding a utility to
+ * globals.css extends the rules and removing one contracts them.
+ *
+ * - `namespacePrefixes` — the project-owned namespace each utility lives in
+ *   (`chamfer-`). A declared name in a *stock Tailwind* namespace is excluded,
+ *   because that namespace has its own closed world of valid values and is
+ *   policed by the radius rule instead. Without that split, `rounded-` as a
+ *   prefix would swallow every legitimate `rounded-md` in the codebase.
+ * - `radiusValues` — the values a declared `rounded-*` utility contributes to
+ *   the radius closed world (`card`).
+ * - `stems` — every hyphen-boundary proper prefix of a declared name
+ *   (`chamfer-`, `chamfer-cut-`, `rounded-`). A class string that *ends* with
+ *   one is the prefix half of a name Tailwind will never see whole.
+ */
+export function shapeVocabulary(declared) {
+  const namespacePrefixes = new Set();
+  const radiusValues = new Set();
+  const stems = new Set();
+
+  for (const name of declared) {
+    const segments = name.split("-");
+    for (let end = 1; end < segments.length; end += 1) {
+      stems.add(`${segments.slice(0, end).join("-")}-`);
+    }
+
+    const namespace = segments[0];
+    if (STOCK_UTILITY_NAMESPACES.has(namespace)) {
+      if (namespace === "rounded") radiusValues.add(segments.slice(1).join("-"));
+      continue;
+    }
+    namespacePrefixes.add(`${namespace}-`);
+  }
+
+  return { declared, namespacePrefixes, radiusValues, stems };
+}
+
+/**
  * Every shape-vocabulary class reference in a .tsx source — `chamfer-*` and
  * `rounded-card` — as `{ index, utility, kind }`.
  *
@@ -493,32 +557,56 @@ export function findTextViolations(source, { includeSpacing = true } = {}) {
  * examined, so `const status = "chamfer-example"`, `querySelector(...)`,
  * `data-slot={...}`, and module specifiers can never produce a finding.
  *
- * - `kind: "class"` — a static literal class token. Always allowed; only a name
- *   missing from globals.css is a violation.
+ * - `kind: "class"` — a static literal class token that is a declared name or
+ *   sits in a project-owned namespace. Only a name missing from globals.css is
+ *   a violation.
  * - `kind: "dynamic"` — a non-literal expression in a class position whose
- *   string parts contain a `chamfer-` or `rounded-card` token (template
- *   substitution, `+` concatenation, `[...].join()`, …). Tailwind only ever
- *   sees whole class names, so this is always a violation.
+ *   string parts carry a declared name, or end with one of its stems
+ *   (template substitution, `+` concatenation, `[...].join()`, …). Tailwind
+ *   only ever sees whole class names, so this is always a violation. Matching
+ *   on the *declared name* rather than on a hand-written prefix is what lets
+ *   `` `${state}:rounded-card` `` be caught: the name is there, whatever
+ *   precedes it.
  */
-export function findShapeVocabularyUsages(source) {
+export function findShapeVocabularyUsages(
+  source,
+  vocabulary = SHAPE_VOCABULARY
+) {
   const usages = [];
 
   forEachClassPosition(source, {
     onLiteral: (node, index) => {
       for (const token of classTokenNames(node.text)) {
-        if (!SHAPE_CLASS_TOKEN_RE.test(token)) continue;
+        if (!isShapeVocabularyToken(token, vocabulary)) continue;
         usages.push({ index, utility: token, kind: "class" });
       }
     },
     onDynamic: (node, index) => {
       // Only a finding when it actually carries vocabulary text; plain identifiers
       // stay silent.
-      const fragment = firstShapeFragment(node);
+      const fragment = firstShapeFragment(node, vocabulary);
       if (fragment) usages.push({ index, utility: fragment, kind: "dynamic" });
     },
   });
 
   return usages;
+}
+
+/**
+ * Whether a static class token belongs to the shape vocabulary at all — the
+ * question that precedes "is it declared".
+ *
+ * A declared name always does. So does anything inside a project-owned
+ * namespace, which is how a typo (`chamfer-crad`) still reaches the
+ * declaration check. A `rounded-*` near miss deliberately does *not*: the
+ * radius rule owns that namespace's whole closed world and reports it once.
+ */
+function isShapeVocabularyToken(token, vocabulary) {
+  if (vocabulary.declared.has(token)) return true;
+  for (const prefix of vocabulary.namespacePrefixes) {
+    if (token.startsWith(prefix)) return true;
+  }
+  return false;
 }
 
 /**
@@ -531,8 +619,15 @@ export function findShapeVocabularyUsages(source) {
  *
  * `includeTypeFloor` is false for the badge-anatomy files listed in
  * TYPE_FLOOR_EXEMPT_PATHS, which own the sanctioned 12px box.
+ *
+ * The radius rule lives here for the same reason: `rounded-card` is a real
+ * class in a class position and a quoted assertion everywhere else, and only
+ * the AST walk can tell those apart.
  */
-export function findClassTokenViolations(source, { includeTypeFloor = true } = {}) {
+export function findClassTokenViolations(
+  source,
+  { includeTypeFloor = true, vocabulary = SHAPE_VOCABULARY } = {}
+) {
   const violations = [];
 
   const report = (token, index) => {
@@ -541,6 +636,18 @@ export function findClassTokenViolations(source, { includeTypeFloor = true } = {
         index,
         rule: "type-floor",
         message: `${JSON.stringify(token)} is below the ${JSON.stringify("text-sm")} chrome floor; 12px is reserved for badge internals (Badge, effect chip, color chip)`,
+      });
+      return;
+    }
+    const radius = unknownRadiusValue(token, vocabulary);
+    if (radius !== null) {
+      const known = [...CHROME_RADIUS_VALUES, ...vocabulary.radiusValues]
+        .map((value) => (value === "" ? "rounded" : `rounded-${value}`))
+        .sort();
+      violations.push({
+        index,
+        rule: "border-radius",
+        message: `unknown radius ${JSON.stringify(token)}; the complete set is ${known.join(", ")} (chrome scale in docs/design/BRANDING-GUIDELINES.md §6, shape utilities declared in src/app/globals.css)`,
       });
       return;
     }
@@ -946,14 +1053,58 @@ function classTokenNames(text) {
   return text.split(/\s+/).map(normalizeClassToken).filter(Boolean);
 }
 
-/** The first shape-vocabulary fragment in any string part of an expression tree. */
-function firstShapeFragment(node) {
+/**
+ * The radius value of a class token that is not in the closed world, or `null`
+ * when the token is a known radius or not a radius at all.
+ *
+ * Values the border-radius text rule already reports are excluded so a single
+ * off-scale class produces one finding, not two.
+ */
+function unknownRadiusValue(token, vocabulary) {
+  const match = RADIUS_CLASS_RE.exec(token);
+  if (!match) return null;
+
+  const value = match[1] ?? "";
+  if (CHROME_RADIUS_VALUES.has(value)) return null;
+  if (vocabulary.radiusValues.has(value)) return null;
+  if (TEXT_RULE_RADIUS_VALUES.has(value)) return null;
+  // Arbitrary and CSS-variable forms are the text rule's, by shape of value.
+  if (/^[[(]/.test(value)) return null;
+
+  return value;
+}
+
+/**
+ * The first shape-vocabulary fragment in any string part of an expression tree.
+ *
+ * Two ways a dynamic expression carries vocabulary, both derived from what
+ * globals.css declares rather than from a written-out pattern:
+ *
+ * 1. A declared name appears anywhere in the string. Substring, not
+ *    whitespace-anchored, so a variant prefix cannot hide it — that is the
+ *    `` `${state}:rounded-card` `` case.
+ * 2. A string *ends* with a stem, which is the prefix half of a name split by
+ *    an interpolation — `` `rounded-${kind}` ``, `"chamfer-cut-" + cut`.
+ *    Ending is the whole test, so a complete `rounded-md` followed by a space
+ *    never trips it.
+ */
+function firstShapeFragment(node, vocabulary) {
   let found = null;
 
   const check = (text) => {
     if (found) return;
-    const match = SHAPE_FRAGMENT_RE.exec(text);
-    if (match) found = match[1];
+    for (const name of vocabulary.declared) {
+      if (text.includes(name)) {
+        found = name;
+        return;
+      }
+    }
+    for (const stem of vocabulary.stems) {
+      if (text.endsWith(stem)) {
+        found = stem;
+        return;
+      }
+    }
   };
 
   const walk = (current) => {
