@@ -1,18 +1,7 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { handCardHover } from "@/lib/motion";
+import { afterEach, describe, expect, it } from "vitest";
 import type { CardWithRelations } from "./card-browser";
-
-const motionState = vi.hoisted(() => ({ reduced: false }));
-
-// `motion.button` renders a plain <button> here so react-test-renderer can
-// inspect the animation props the tile hands to Motion. The preset values
-// themselves are asserted against the shared export, not re-typed.
-vi.mock("motion/react", () => ({
-  motion: { button: "button" },
-  useReducedMotion: () => motionState.reduced,
-}));
 
 import { CardGrid, CardGridSkeleton } from "./card-grid";
 
@@ -43,7 +32,6 @@ let renderer: ReactTestRenderer | null = null;
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = null;
-  motionState.reduced = false;
 });
 
 function renderGrid() {
@@ -52,48 +40,29 @@ function renderGrid() {
   });
   return renderer!.root.findByType("button").props as {
     className: string;
-    whileHover?: typeof handCardHover;
-    transition?: { duration: number; ease: string };
+    whileHover?: unknown;
+    transition?: unknown;
   };
 }
 
-describe("CardGrid tile hover (OPT-693)", () => {
-  it("applies the board's hand-card pop-and-raise preset on hover", () => {
+describe("CardGrid tile hover (OPT-714)", () => {
+  it("uses the documented CSS scale and shadow transition", () => {
     const props = renderGrid();
 
-    // Same object identity as the board preset — no inline duplicate values.
-    expect(props.whileHover).toBe(handCardHover);
-    // Computed geometry the preset resolves to.
-    expect(props.whileHover?.scale).toBe(1.05);
-    expect(props.whileHover?.y).toBe(-8);
-    expect(props.whileHover?.rotate).toEqual([0, 1.2, -1.2, 0]);
-    expect(props.whileHover?.transition.scale).toEqual({
-      type: "spring",
-      stiffness: 420,
-      damping: 13,
-    });
-    expect(props.whileHover?.transition.y).toEqual({
-      type: "spring",
-      stiffness: 420,
-      damping: 13,
-    });
+    expect(props.className).toContain("shadow-sm");
+    expect(props.className).toContain("hover:shadow-md");
+    expect(props.className).toContain("motion-safe:hover:scale-[1.03]");
+    expect(props.className).toContain("transition-[scale,box-shadow]");
+    expect(props.className).toContain("duration-200");
+    expect(props.className).toContain("ease-out");
   });
 
-  it("tweens the hover transforms out instead of inheriting the spring", () => {
+  it("does not use Motion or add raise, rotation, or an inner image zoom", () => {
     const props = renderGrid();
 
-    expect(props.transition).toEqual({ duration: 0.15, ease: "easeOut" });
-  });
+    expect(props.whileHover).toBeUndefined();
+    expect(props.transition).toBeUndefined();
 
-  it("rests at shadow-sm and hovers to shadow-md", () => {
-    const { className } = renderGrid();
-
-    expect(className).toContain("shadow-sm");
-    expect(className).toContain("hover:shadow-md");
-    expect(className).toContain("transition-shadow");
-  });
-
-  it("does not stack a CSS translate or an inner image zoom on the preset", () => {
     act(() => {
       renderer = create(<CardGrid cards={[CARD]} onCardClick={() => {}} />);
     });
@@ -104,13 +73,13 @@ describe("CardGrid tile hover (OPT-693)", () => {
     expect(html).not.toContain("transition-all");
   });
 
-  it("drops the hover animation under prefers-reduced-motion but keeps the shadow lift", () => {
-    motionState.reduced = true;
-    const props = renderGrid();
+  it("gates the hover transform behind motion-safe and keeps the shadow step", () => {
+    const { className } = renderGrid();
 
-    expect(props.whileHover).toBeUndefined();
-    expect(props.className).toContain("shadow-sm");
-    expect(props.className).toContain("hover:shadow-md");
+    expect(className).toContain("motion-safe:hover:scale-[1.03]");
+    expect(className).not.toContain("motion-reduce:hover:scale");
+    expect(className).toContain("shadow-sm");
+    expect(className).toContain("hover:shadow-md");
   });
 
   it("renders an empty state instead of tiles when there are no cards", () => {
