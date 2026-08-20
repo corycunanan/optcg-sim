@@ -257,6 +257,7 @@ function InviteCard({
       </div>
       <div className="mt-3 flex gap-2">
         <Button
+          elevation="flat"
           onClick={onJoin}
           disabled={busy}
           className="flex-1"
@@ -264,6 +265,7 @@ function InviteCard({
           {busy ? "Joining..." : "Join"}
         </Button>
         <Button
+          elevation="flat"
           onClick={onDecline}
           disabled={busy}
           className="flex-1"

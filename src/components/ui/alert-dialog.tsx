@@ -150,7 +150,11 @@ function AlertDialogAction({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action> &
   Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   return (
-    <Button variant={variant} size={size} asChild>
+    // `elevation="flat"`: the alert dialog panel already casts `shadow-lg`, and
+    // a footer button casting on top of it would claim to be nearer the viewer
+    // than the panel carrying it (ELEVATION-LANGUAGE §The solid-button
+    // register). Setting it here covers every alert dialog in the app.
+    <Button variant={variant} size={size} elevation="flat" asChild>
       <AlertDialogPrimitive.Action
         data-slot="alert-dialog-action"
         className={cn(className)}
@@ -168,7 +172,7 @@ function AlertDialogCancel({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> &
   Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   return (
-    <Button variant={variant} size={size} asChild>
+    <Button variant={variant} size={size} elevation="flat" asChild>
       <AlertDialogPrimitive.Cancel
         data-slot="alert-dialog-cancel"
         className={cn(className)}

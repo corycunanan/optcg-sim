@@ -159,6 +159,13 @@
   --shadow-elevation-color-lg: oklch(5% 0.004 260 / 0.65);
   --shadow-elevation-sm: var(--shadow-elevation-offset-sm)
     var(--shadow-elevation-offset-sm) 0 0 var(--shadow-elevation-color-sm);
+  /* The distance a surface rises when its hover steps it up one tier. One
+     value for the whole app: a lift that varies by site reads as a different
+     material each time, and the eye compares altitudes across a page faster
+     than it compares shadows. It matches `--shadow-elevation-offset-sm` at 2px
+     — the surface climbs by exactly the height of the resting cast it leaves
+     behind — and is negative because the rise is up the y axis. */
+  --lift-elevation-hover: -2px;
   --shadow-elevation-md: var(--shadow-elevation-offset-md)
     var(--shadow-elevation-offset-md) 0 0 var(--shadow-elevation-color-md);
   --shadow-elevation-lg: var(--shadow-elevation-offset-lg)
@@ -265,6 +272,8 @@
   --shadow-color-sm: var(--shadow-elevation-color-sm);
   --shadow-color-md: var(--shadow-elevation-color-md);
   --shadow-color-lg: var(--shadow-elevation-color-lg);
+  /* The standardized hover lift, consumed through the `lift` utility. */
+  --lift-hover: var(--lift-elevation-hover);
 
   /* Chart roles */
   --chart-1: var(--gold-500);
@@ -923,6 +932,20 @@ body {
    are a class swap on the root that the layer follows — including the
    transition, because the layer's own `translate` and `background-color`
    computed values change with them. */
+/* The hover lift, as one named step instead of a raw distance repeated per
+   site. Tailwind's `-translate-y-*` scale has no 2px step, and the design-system
+   lint refuses off-scale spacing in app code for exactly the reason this token
+   exists: an altitude that every surface picks for itself is not a ladder.
+
+   It writes the standalone `translate` property, which is the property the
+   lifting surfaces name in their transitions (`transition-[translate,…]`) so
+   the rise and the shadow step arrive together. Pair it with `motion-safe:`:
+   under `prefers-reduced-motion` the surface still steps its color and its
+   cast, it just does not move. */
+@utility lift {
+  translate: 0 var(--lift-hover);
+}
+
 @utility chamfer-shadow-none {
   --chamfer-shadow-offset: 0px;
   --chamfer-shadow-color: transparent;

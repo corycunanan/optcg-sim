@@ -50,7 +50,11 @@ export function DeckBuilderCardModal({
           <div className="flex items-center gap-3">
             {isLeader && onRemoveLeader ? (
               <>
-                <Button variant="destructive" onClick={onRemoveLeader}>
+                <Button
+                  variant="destructive"
+                  elevation="flat"
+                  onClick={onRemoveLeader}
+                >
                   Remove Leader
                 </Button>
                 <span className="text-content-tertiary text-sm">{copyLabel}</span>
@@ -84,7 +88,7 @@ export function DeckBuilderCardModal({
                 <span className="text-content-tertiary text-sm">{copyLabel}</span>
               </>
             ) : (
-              <Button onClick={handleAdd} disabled={!card}>
+              <Button elevation="flat" onClick={handleAdd} disabled={!card}>
                 {isLeader || card?.type === "Leader"
                   ? "Set as Leader"
                   : "+ Add to Deck"}

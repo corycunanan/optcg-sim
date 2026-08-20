@@ -4,7 +4,9 @@
 > (OPT-695) to split structural list rows from art-bearing rows and to specify how a clipped
 > (chamfered) surface casts; amended 2026-08-19 (OPT-702) once the card-tile treatment
 > converged across the app's list and grid surfaces, adding §The card register and
-> §Non-interactive card previews. This doc owns the
+> §Non-interactive card previews; amended 2026-08-20 (OPT-713) to put the solid button
+> variants on a register of their own and to standardize the hover lift at one distance,
+> adding §The solid-button register and §The standardized lift. This doc owns the
 > surface-stacking model: which surfaces may cast a shadow, which take the flat edge
 > treatment, and how the z-ladder, the elevation color steps, and the hard-shadow scale
 > line up. It consolidates guidance previously scattered through
@@ -33,7 +35,7 @@ surfaces that are read constantly and must never pull focus.
 | Treatment                                              | What it says                               | Who gets it                                                                                                                                                                                |
 | ------------------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Elevation color step** (no shadow)                   | "I am part of the page's terrain"          | Structural surfaces that tile or divide the layout: page ground, panels, nav, insets, seat columns, structural list rows                                                                   |
-| **Hard shadow** (`shadow-sm/md/lg`)                    | "I am temporarily sitting on top of you"   | Overlapping chrome: dropdowns, selects, popovers, hover cards, dialogs, sheets, sticky action bars, toasts, chat widget — plus cards at rest/hover, including **art-bearing rows** (below) |
+| **Hard shadow** (`shadow-sm/md/lg`)                    | "I am temporarily sitting on top of you"   | Overlapping chrome: dropdowns, selects, popovers, hover cards, dialogs, sheets, sticky action bars, toasts, chat widget — plus cards at rest/hover, including **art-bearing rows** (below), and the **solid button variants** (below) |
 | **Edge frame** (`shadow-none` + `edge-*` border-image) | "I am an information layer, not an object" | Tier-5 information surfaces: tooltips, `card-info-panel` ([MATERIAL-LANGUAGE.md](./MATERIAL-LANGUAGE.md) §Tier 5)                                                                          |
 
 One treatment per surface. A surface never stacks a shadow on an edge frame, and a hover
@@ -111,12 +113,88 @@ and DON tabs (`src/components/deck-builder/deck-builder-backs.tsx`,
 `deck-builder-don.tsx`): both are read-only sleeve/DON!! previews, both rest at `shadow-sm`,
 neither moves on hover.
 
+### The solid-button register
+
+A button is an object the user pushes. That puts it on the hard-shadow treatment for the
+same reason a card tile is there — it reads as a thing resting on the page, not as terrain
+the page is made of — and it takes the card register's step verbatim: `shadow-sm` at rest,
+`shadow-md` on hover, with the standardized lift riding the hover (§The standardized lift).
+
+Which button casts is two questions, not one: **is the silhouette solid**, and **is the
+control wide enough for a cast to read as depth**. `src/components/ui/button.tsx` answers
+both at once — the register is a single `compoundVariants` entry keyed on variant _and_
+size, not a class pasted onto four variants.
+
+| Variant       | Sizes `default` / `sm` / `lg`      | Sizes `icon` / `icon-sm` |
+| ------------- | ---------------------------------- | ------------------------ |
+| `default`     | `shadow-sm` → `shadow-md` + lift   | flat                     |
+| `outline`     | `shadow-sm` → `shadow-md` + lift   | flat                     |
+| `destructive` | `shadow-sm` → `shadow-md` + lift   | flat                     |
+| `gold`        | `shadow-sm` → `shadow-md` + lift   | flat                     |
+| `ghost`       | flat                               | flat                     |
+| `link`        | flat                               | flat                     |
+
+**All four raised variants rest at `shadow-sm`, including `outline`.** A cast is generated
+from the border box and clipped inside it, so a transparent fill behind a solid gold border
+still casts a clean 2px offset — the silhouette is the border, and the border is solid.
+Resting flat and casting `shadow-md` only on hover was the alternative, and it fails the
+rule in §Anti-stacking twice: it makes the hover a two-tier jump from nothing to `md`, and
+it means a page of buttons has no altitude until a pointer crosses it. `shadow-sm` → lift +
+`shadow-md` is one tier moving as one change, exactly as the `/decks` row moves
+`bg-surface-1` + `shadow-sm` → `bg-surface-2` + `shadow-md`.
+
+**`ghost` and `link` stay flat because they have no silhouette.** A cast under a
+transparent surface traces a border box the eye cannot otherwise see, so the control reads
+as a rectangle floating over the page rather than an object sitting on it — the shadow
+announces an edge the design deliberately withheld.
+
+**The icon sizes stay flat at every variant, by size.** `icon` and `icon-sm` are 40px and
+32px squares; a hard 4px offset against a 32px edge is an eighth of the control, which
+lands as a slab rather than as depth. A gold icon button is excluded for its size even
+though its variant is on the register — hence the compound key.
+
+#### Nesting: `elevation="flat"`
+
+A button that already sits on a casting surface must not cast again. A `shadow-md` child
+inside a `shadow-lg` dialog panel inverts the ladder — the smaller object claims to be
+nearer the viewer than the panel carrying it — and a hard offset inside an
+`overflow-hidden` parent is clipped to a stub along the edge it crosses.
+
+The opt-out is a variant on the button, `elevation="flat"`, and it is deliberately not a
+context. A context would make the exclusion invisible at the call site and would have to
+guess which ancestors count as casting; the app nests solid buttons inside casting surfaces
+at a countable number of places, and naming each one keeps the ladder auditable by reading
+the JSX. `elevation` defaults to `raised`, mirrors onto `data-elevation` for tests and VQA,
+and simply withholds the compound entry rather than overriding it — there is no
+`shadow-none` fighting a `shadow-sm` further up the class string.
+
+Reach for it when the parent already casts, not when a cast merely looks busy. `ghost` and
+`link` footer buttons and every icon button need no opt-out, because the register never
+reached them: the `/decks` row kebab (rendered at `src/app/decks/deck-list.tsx:208`, inside
+the `shadow="sm" shadowHover="md"` `ChamferFrame` at `deck-list.tsx:96-97`) is `ghost` at
+`size="icon"` (`src/components/deck-builder/deck-delete-button.tsx:70-71`) and is excluded
+twice over.
+
+`elevation="flat"` also answers the smaller case of a button that already carries an
+elevation statement of its own. The ornamental hero CTA
+([BRANDING-GUIDELINES.md](./BRANDING-GUIDELINES.md) §Ornamental CTA, shipped at
+`src/app/page.tsx:42-50`) wears a gold hairline at `outline-offset: 3px`; a `shadow-sm` cast
+would sit inside that 3px gap and `shadow-md` would cross the ring, which is altitude plus a
+decorative frame — two registers on one hover, and what §Anti-stacking forbids.
+
+Where the casting surface is itself a component, the opt-out belongs in that component
+rather than at every call site. `AlertDialogAction` and `AlertDialogCancel` render a
+`Button` (`src/components/ui/alert-dialog.tsx:157`, `:175`), so passing `elevation="flat"`
+there flattens every alert dialog footer in the app from one place. `InputGroupButton`
+(`src/components/ui/input-group.tsx:102`) does the same for a control that sits flush inside
+an input's surface.
+
 ## The ladder: z-index ↔ elevation color ↔ shadow
 
 | z tier          | Typical surfaces                                                             | Elevation color                                                            | Shadow token                                                                                                                                                                                                                                                             |
 | --------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `z-0`           | Page ground, panels, insets                                                  | `--elevation-page` 22% / `--elevation-panel` 27% / `--elevation-inset` 37% | none — color separates structure                                                                                                                                                                                                                                         |
-| `z-0` (content) | Card art tiles and art-bearing rows at rest / hover                          | `--surface-panel` stage                                                    | `shadow-sm` rest → `shadow-md` hover, shipped across the register (§The card register, below). A tile that pairs the step with a lift moves both together as one tier                                                                                                     |
+| `z-0` (content) | Card art tiles and art-bearing rows at rest / hover; solid button variants   | `--surface-panel` stage                                                    | `shadow-sm` rest → `shadow-md` hover, shipped across the register (§The card register, below). A tile that pairs the step with a lift moves both together as one tier                                                                                                     |
 | `z-10`          | Sticky headers, raised in-flow panels (lobby action bars, chat widget)       | panel/raised step                                                          | `shadow-lg` when they overlap scrolling content; none when they only divide it                                                                                                                                                                                           |
 | `z-20`          | Dropdowns, selects, popovers, hover cards                                    | `--surface-raised` 32% (popover role)                                      | `shadow-md` (4px 4px)                                                                                                                                                                                                                                                    |
 | `z-30`          | Fixed navbar                                                                 | `--elevation-nav` 18%                                                      | none — the darkest step reads as the page's frame, nothing sits under it                                                                                                                                                                                                 |
@@ -154,6 +232,44 @@ entering the scene.
   `inset-shadow-*`) are blurred and unbacked — lint fails them, including arbitrary
   `shadow-[…]` values whose blur position carries anything but a literal zero — unless
   both offsets are literal zero, which is the glow shape and passes (next section).
+
+## The standardized lift
+
+A surface that steps up a tier on hover may also rise. The rise is **2px, everywhere**, and
+it is spent through one token rather than typed per site:
+
+| Layer     | Name                     | Value                            |
+| --------- | ------------------------ | -------------------------------- |
+| Primitive | `--lift-elevation-hover` | `-2px`                           |
+| Semantic  | `--lift-hover`           | `var(--lift-elevation-hover)`    |
+| Utility   | `lift`                   | `translate: 0 var(--lift-hover)` |
+
+Write it as `motion-safe:hover:lift`, alongside the surface's `shadow-*` step.
+
+Three reasons it is a token and not a distance:
+
+- **One altitude for every riser.** The eye compares heights across a page faster than it
+  compares shadows, so a rise that varies by site reads as a different material each time.
+  Nothing forces a tier step to rise — the `/decks` row steps color and cast without moving
+  — but a step that does rise now rises the same amount everywhere. Before OPT-713 the
+  `/sets` tile had picked 1px on its own.
+- **2px is the resting cast.** The surface climbs by exactly the offset of the `shadow-sm`
+  it leaves behind (`--shadow-elevation-offset-sm`), so the rise and the cast are one
+  gesture rather than two magnitudes that have to be reconciled by eye.
+- **Tailwind has no 2px step.** Its `-translate-y-*` scale jumps 1px → 4px, and
+  `scripts/lint-design-system.mjs` refuses off-scale spacing in app code for exactly the
+  reason this token exists. The lint's own guidance is to add a design-system token instead
+  of extending its allowlist.
+
+The utility writes the standalone `translate` property — the property a lifting surface
+names in `transition-[translate,box-shadow]`, so the rise and the shadow step arrive
+together (§The card register). Pair it with `motion-safe:`: under
+`prefers-reduced-motion: reduce` the surface still steps its color and its cast, it just
+does not move, per [BRANDING-GUIDELINES.md](./BRANDING-GUIDELINES.md) §Reduced Motion.
+
+The larger lifts already shipped on the fanned card stacks (`-translate-y-2`) and the lobby
+seat art (`-translate-y-1`) are not this register: they are a card being drawn out of a
+stack, where the travel is the point. They stay as they are until a ticket revisits them.
 
 ## Casting from a clipped surface
 
@@ -203,11 +319,12 @@ not use elevation to fake a signal.
 ## When you add a surface
 
 1. **Does it overlap content transiently?** No → give it an elevation color step and stop.
-   The one exception is the card register: a card tile, or an art-bearing row (§Structural
-   rows vs. art-bearing rows), reads as an object resting on the page even though it never
-   moves over anything, and takes `shadow-sm` rest → `shadow-md` hover. If it is a card the
-   user cannot act on, it rests at `shadow-sm` and stops there (§Non-interactive card
-   previews).
+   Two exceptions read as objects resting on the page even though they never move over
+   anything, and both take `shadow-sm` rest → `shadow-md` hover: the card register — a card
+   tile or an art-bearing row (§Structural rows vs. art-bearing rows) — and the solid button
+   variants (§The solid-button register). If it is a card the user cannot act on, it rests
+   at `shadow-sm` and stops there (§Non-interactive card previews). If it is a button on a
+   surface that already casts, it takes `elevation="flat"`.
 2. **Is it a read-constantly information layer?** Yes → Tier-5 treatment: `shadow-none` +
    the `edge-*` frame on an opaque dark fill. App-side Tier-5 (tooltip, card-info-panel)
    carries the 2px chrome radius per the OPT-670 amendment; board-side Tier-5 stays

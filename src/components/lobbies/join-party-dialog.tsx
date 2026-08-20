@@ -146,12 +146,17 @@ export function JoinPartyDialog({
             <DialogFooter>
               <Button
                 type="button"
+                elevation="flat"
                 disabled={busy}
                 onClick={() => setOpen(false)}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={busy || code.length !== 6}>
+              <Button
+                type="submit"
+                elevation="flat"
+                disabled={busy || code.length !== 6}
+              >
                 {busy ? "Joining…" : "Join party"}
               </Button>
             </DialogFooter>

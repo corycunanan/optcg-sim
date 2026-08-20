@@ -129,6 +129,7 @@ export function SpectatorsModal({
                       type="button"
                       variant="destructive"
                       size="sm"
+                      elevation="flat"
                       aria-label={`Remove ${name}`}
                       disabled={removing}
                       onFocus={() => {
