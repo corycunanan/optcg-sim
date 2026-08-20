@@ -374,6 +374,112 @@ describe("Navbar", () => {
     expect(listClasses.some((c) => /^gap-(?!0$)/.test(c))).toBe(false);
   });
 
+  it("gives the actions cluster the links' full-height square slab (OPT-712)", () => {
+    renderNavbar();
+
+    const home = screen.getByRole("link", { name: "Home" });
+    const controls = [
+      home,
+      screen.getByRole("button", {
+        name: "Notifications, No unread notifications",
+      }),
+      screen.getByRole("button", { name: "Friends" }),
+      screen.getByRole("button", { name: "Account menu for luffy" }),
+    ];
+
+    for (const control of controls) {
+      const classes = control.className.split(/\s+/);
+
+      // The bar has one interactive shape: a full-height square section with
+      // the links' own padding, hovering and focusing to the same two steps.
+      for (const shared of [
+        "h-full",
+        "rounded-none",
+        "px-3",
+        "sm:px-4",
+        "transition-all",
+        "hover:bg-surface-2",
+        "hover:text-content-inverse",
+        "focus:bg-surface-2",
+        "focus:text-content-inverse",
+      ]) {
+        expect(classes).toContain(shared);
+      }
+      // No compact-pill geometry left anywhere in the bar.
+      expect(classes.some((c) => /^rounded-(?!none)/.test(c))).toBe(false);
+      expect(classes).not.toContain("h-9");
+      expect(classes).not.toContain("h-10");
+      expect(classes).not.toContain("size-10");
+      // ELEVATION-LANGUAGE.md §The ladder: the navbar never casts.
+      expect(classes.some((c) => c.startsWith("shadow-"))).toBe(false);
+      // Tailwind v4: `outline-none` sets `--tw-outline-style: none` and would
+      // defeat the inset indicator these sections share with the links.
+      expect(classes).not.toContain("outline-none");
+      expect(classes).toContain("focus-visible:outline-2");
+      expect(classes).toContain("focus-visible:-outline-offset-2");
+    }
+  });
+
+  it("stacks the actions cluster as adjoining full-height sections", () => {
+    renderNavbar();
+
+    const actions = document.querySelector('[data-slot="navbar-actions"]');
+    const classes = actions?.className.split(/\s+/) ?? [];
+
+    // Same height chain and same seamlessness as the link row: a gap would let
+    // the nav background show through between two adjacent sections.
+    expect(classes).toContain("h-full");
+    expect(classes).not.toContain("h-10");
+    expect(classes.some((c) => /^gap-(?!0$)/.test(c))).toBe(false);
+  });
+
+  it("holds the open paint on the friends toggle while the drawer is open", async () => {
+    renderNavbar();
+
+    const toggle = screen.getByRole("button", { name: "Friends" });
+
+    expect(toggle.className.split(/\s+/)).not.toContain("bg-surface-2");
+
+    await userEvent.click(toggle);
+    const openClasses = toggle.className.split(/\s+/);
+    expect(openClasses).toContain("bg-surface-2");
+    expect(openClasses).toContain("text-content-inverse");
+
+    await userEvent.click(toggle);
+    expect(toggle.className.split(/\s+/)).not.toContain("bg-surface-2");
+  });
+
+  it("holds the open paint on the account trigger while its menu is open", () => {
+    renderNavbar();
+
+    const classes = screen
+      .getByRole("button", { name: "Account menu for luffy" })
+      .className.split(/\s+/);
+
+    // The account trigger owned a `data-open` background before OPT-712 and it
+    // never matched anything: Tailwind v4 compiles `data-open:` to the
+    // attribute-presence selector `[data-open]`, and Radix's trigger only ever
+    // carries `data-state="open"`. The explicit form is the live one.
+    for (const openToken of [
+      "data-[state=open]:bg-surface-2",
+      "data-[state=open]:text-content-inverse",
+      "data-[state=open]:hover:bg-surface-2",
+      "data-[state=open]:focus:bg-surface-2",
+    ]) {
+      expect(classes).toContain(openToken);
+    }
+    // This suite mocks the navigation-menu primitive away, so the class string
+    // here is exactly what the component contributes — and none of it may lean
+    // on the dead short form.
+    expect(
+      classes.some(
+        (c) => c.startsWith("data-open:") || c.startsWith("data-popup-open:")
+      )
+    ).toBe(false);
+    // The attribute half of this contract needs the real Radix trigger, so it
+    // lives in navbar-account-menu.test.tsx rather than here.
+  });
+
   it("keeps a focus indicator that survives inside a full-height section", () => {
     renderNavbar();
 

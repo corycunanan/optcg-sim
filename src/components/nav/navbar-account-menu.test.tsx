@@ -110,6 +110,49 @@ describe("NavbarAccountMenu", () => {
     expect(content?.className).toContain("left-auto");
   });
 
+  it("paints the open slab through a selector Radix actually matches (OPT-712)", async () => {
+    const user = userEvent.setup();
+    render(<NavbarAccountMenu user={{ username: "luffy" }} />);
+
+    const trigger = screen.getByRole("button", {
+      name: "Account menu for luffy",
+    });
+
+    expect(trigger.getAttribute("data-state")).toBe("closed");
+
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    // The attribute half of the contract. `@radix-ui/react-navigation-menu`
+    // writes `data-state="open"` and nothing else — no `data-open`, no
+    // `data-popup-open` — so asserting the class string alone would pass with a
+    // selector that never matches.
+    expect(trigger.getAttribute("data-state")).toBe("open");
+    expect(trigger.matches('[data-state="open"]')).toBe(true);
+    expect(trigger.hasAttribute("data-open")).toBe(false);
+    expect(trigger.hasAttribute("data-popup-open")).toBe(false);
+
+    // The class half. Tailwind v4 compiles `data-open:` to `[data-open]`, an
+    // attribute-presence selector, so the short form is dead on this element;
+    // only the explicit `data-[state=open]:` form paints.
+    const classes = trigger.className.split(/\s+/);
+    for (const live of [
+      "data-[state=open]:bg-surface-2",
+      "data-[state=open]:text-content-inverse",
+      "data-[state=open]:hover:bg-surface-2",
+      "data-[state=open]:focus:bg-surface-2",
+    ]) {
+      expect(classes).toContain(live);
+    }
+    // Nothing this component contributes may rely on the dead short form.
+    const ownVariants = classes.filter(
+      (c) => c.startsWith("data-open:") || c.startsWith("data-popup-open:")
+    );
+    for (const dead of ownVariants) {
+      expect(dead).toContain("bg-muted");
+    }
+  });
+
   it("renders through the shared rectangular surface with body-role rows", async () => {
     const user = userEvent.setup();
     render(<NavbarAccountMenu user={{ username: "luffy" }} />);

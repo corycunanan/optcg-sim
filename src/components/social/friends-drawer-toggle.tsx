@@ -1,8 +1,13 @@
 "use client";
 
 import { Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  navSlabIconBoxStyles,
+  navSlabOpenStyles,
+  navSlabStyles,
+} from "@/components/nav/navbar-slab";
 import { useSidebar } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 /**
  * DOM id the drawer panel carries so this toggle can own `aria-controls`.
@@ -29,20 +34,32 @@ export const FRIENDS_DRAWER_TOGGLE_ID = "friends-drawer-toggle";
 export function FriendsDrawerToggle() {
   const { openMobile, setOpenMobile } = useSidebar();
 
+  // Same slab as the nav links and the notification bell (OPT-712), so the bar
+  // hovers as one surface rather than a link row plus a tray of pills. `Button
+  // variant="ghost"` is gone with it: the slab overrode that recipe's radius,
+  // height, width, padding, transition, and hover colors outright.
   return (
-    <Button
+    <button
       id={FRIENDS_DRAWER_TOGGLE_ID}
       type="button"
-      variant="ghost"
-      size="icon"
       aria-label="Friends"
       aria-haspopup="dialog"
       aria-expanded={openMobile}
       aria-controls={FRIENDS_DRAWER_ID}
       onClick={() => setOpenMobile(!openMobile)}
-      className="text-content-secondary md:hidden"
+      className={cn(
+        navSlabStyles,
+        "text-content-secondary md:hidden",
+        // Held while the drawer is on screen, matching the bell's open paint
+        // and the active link's section.
+        openMobile && navSlabOpenStyles
+      )}
     >
-      <Users aria-hidden="true" />
-    </Button>
+      <span className={navSlabIconBoxStyles}>
+        {/* Sized here rather than inherited: without `Button` nothing upstream
+            normalizes a bare lucide glyph to 16px. */}
+        <Users className="size-4" aria-hidden="true" />
+      </span>
+    </button>
   );
 }
