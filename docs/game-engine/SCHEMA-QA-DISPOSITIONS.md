@@ -34,3 +34,11 @@ cohort remains deferred.
 | ST12-017 | Incorrect — corrected        | The schema hard-coded the unplayed revealed card to the deck bottom. It now uses `TOP_OR_BOTTOM`, and the arrange prompt exposes and executes both official destinations.                                                            |
 | ST22-011 | Incorrect — corrected        | The power action could boost any Leader. It now filters the target to a type including Whitebeard Pirates; direct Leader targeting now enforces authored filters.                                                                    |
 | ST22-017 | Implemented / false positive | A filtered two-card Whitebeard Pirates `REVEAL_FROM_HAND` cost precedes the draw and cost-5 Character bottom-deck action; the Trigger return is also encoded.                                                                        |
+
+## OPT-728 triage — 2026-08-20
+
+| Card     | Verdict                      | Evidence                                                                                                                                                 |
+| -------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP17-005 | Implemented / false positive | The hand-zone cost modifier applies only while the opponent controls a Character with 10000 power or more; its separate On Play block is also encoded. |
+| OP17-013 | Implemented / false positive | The hand-zone cost modifier applies only while the opponent controls a Character with 10000 power or more; its separate On Play block is also encoded. |
+| OP17-042 | Implemented / false positive | `REVEAL_FROM_HAND` is the filtered three-card Rocks Pirates activation cost before the opponent Character power reduction.                              |

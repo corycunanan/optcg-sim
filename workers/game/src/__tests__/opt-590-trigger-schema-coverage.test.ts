@@ -133,7 +133,7 @@ describe("OPT-590 canonical Trigger schema coverage", () => {
       "OP16-080",
     ];
 
-    expect(triggerCardIds).toHaveLength(490);
+    expect(triggerCardIds).toHaveLength(496);
     expect(manifest["OP01-009"].hasTriggerText).toBe(true);
     expect(
       referencedTriggerCardIds.filter(
