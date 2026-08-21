@@ -12,6 +12,7 @@ import type {
   PendingEvent,
   EffectStackFrame,
   QueuedTrigger,
+  PromptResumeContext,
   ResumeContext,
 } from "../../../types.js";
 import {
@@ -76,7 +77,15 @@ export function reenterBatchResume(
     events.push(...actionResult.events);
 
     if (actionResult.pendingPrompt) {
-      const context = actionResult.pendingPrompt.resumeContext as ResumeContext;
+      const context = actionResult.pendingPrompt.resumeContext;
+      if (!isResumeContext(context)) {
+        return {
+          state: nextState,
+          events,
+          resolved: false,
+          pendingPrompt: actionResult.pendingPrompt,
+        };
+      }
       const generated = generateFrameId(nextState);
       const promptFrame: EffectStackFrame = {
         id: generated.id,
@@ -205,6 +214,20 @@ export function reenterBatchResume(
     }
     // Loop: check for another AWAITING_BATCH_RESUME frame underneath.
   }
+}
+
+function isResumeContext(
+  context: PromptResumeContext
+): context is ResumeContext {
+  return (
+    typeof context === "object" &&
+    context !== null &&
+    "effectSourceInstanceId" in context &&
+    "controller" in context &&
+    "remainingActions" in context &&
+    "resultRefs" in context &&
+    "validTargets" in context
+  );
 }
 
 function dispatchBatchResume(

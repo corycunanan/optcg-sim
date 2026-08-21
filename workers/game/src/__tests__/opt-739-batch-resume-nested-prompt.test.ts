@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { CONTINUATION_EFFECT_BLOCK } from "../engine/effect-stack.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
+import { pushBatchResumeFrame } from "../engine/effect-resolver/resume/batch.js";
 import { resolveEffect } from "../engine/effect-resolver/resolver.js";
-import type { EffectBlock } from "../engine/effect-types.js";
+import type {
+  EffectBlock,
+  RuntimeActiveEffect,
+} from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { OP04_003_USOPP } from "../engine/schemas/op04.js";
 import {
@@ -372,6 +377,163 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
     expect(playedTarget).toBeDefined();
     expect(playedTarget?.state).toBe("RESTED");
     expect(completed.state.effectStack).toHaveLength(0);
+  });
+
+  it("preserves a replacement-batch prompt raised during KO batch re-entry", () => {
+    const cardDb = createTestCardDb();
+    const saverCard: CardData = {
+      ...CARDS.VANILLA,
+      id: "REPLACEMENT-SAVER",
+      name: "Replacement Saver",
+    };
+    cardDb.set(saverCard.id, saverCard);
+    const base = createBattleReadyState(cardDb);
+    const saver = cardInstance(
+      saverCard.id,
+      "replacement-saver",
+      0,
+      "CHARACTER"
+    );
+    const victim = cardInstance(
+      CARDS.BLOCKER.id,
+      "replacement-victim",
+      0,
+      "CHARACTER"
+    );
+    const replacement: RuntimeActiveEffect = {
+      id: "opt-739-save-replacement",
+      sourceCardInstanceId: saver.instanceId,
+      sourceEffectBlockId: "opt-739-save-replacement-block",
+      category: "replacement",
+      modifiers: [
+        {
+          type: "REPLACEMENT_EFFECT",
+          params: {
+            trigger: "WOULD_BE_KO",
+            cause_filter: { by: "OPPONENT_EFFECT" },
+            target_filter: {
+              card_type: "CHARACTER",
+              exclude_self: true,
+            },
+            replacement_actions: [
+              { type: "TRASH_CARD", target: { type: "SELF" } },
+            ],
+            optional: true,
+            once_per_turn: false,
+          },
+        },
+      ],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: 0,
+    };
+    const koAction = {
+      type: "KO" as const,
+      target: {
+        type: "CHARACTER" as const,
+        controller: "OPPONENT" as const,
+        count: { exact: 1 },
+      },
+    };
+    const state = withPlayers(base, {
+      characters: padChars([saver, victim]),
+    });
+    const stateWithBatch = pushBatchResumeFrame(
+      { ...state, activeEffects: [replacement] },
+      "opponent-effect-source",
+      1,
+      CONTINUATION_EFFECT_BLOCK,
+      {
+        kind: "KO",
+        pausedAction: koAction,
+        remainingTargetIds: [victim.instanceId],
+        koedSoFar: [],
+      },
+      [],
+      [],
+      new Map()
+    );
+
+    const prompted = resumeFromStack(stateWithBatch, { type: "PASS" }, cardDb);
+    expect(prompted.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    const completed = resumePromptLifecycle(
+      {
+        ...prompted.state,
+        pendingPrompt: prompted.pendingPrompt ?? null,
+      },
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      cardDb,
+      {
+        drainPregame: (current: GameState) => current,
+        advanceStartOfTurn: (current: GameState) => current,
+      }
+    );
+
+    expect(
+      completed.state.players[0].trash.some(
+        (card) => card.cardId === saverCard.id
+      )
+    ).toBe(true);
+    expect(
+      completed.state.players[0].characters.some(
+        (card) => card?.instanceId === victim.instanceId
+      )
+    ).toBe(true);
+  });
+
+  it("dispatches an AWAITING_BATCH_RESUME frame directly from the stack", () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const target = cardInstance(
+      CARDS.VANILLA.id,
+      "direct-batch-target",
+      0,
+      "TRASH"
+    );
+    const action = {
+      type: "PLAY_CARD" as const,
+      target: {
+        type: "CHARACTER_CARD" as const,
+        source_zone: "TRASH" as const,
+        count: { exact: 1 },
+      },
+      params: { source_zone: "TRASH" as const, cost_override: "FREE" as const },
+    };
+    const stateWithBatch = pushBatchResumeFrame(
+      withPlayers(base, { characters: padChars([]), trash: [target] }),
+      "direct-batch-source",
+      0,
+      CONTINUATION_EFFECT_BLOCK,
+      {
+        kind: "PLAY_CARD",
+        pausedAction: action,
+        resumeFrame: {
+          remainingTargetIds: [target.instanceId],
+          remaining: { ACTIVE: 0, RESTED: 0 },
+          playedSoFar: [],
+        },
+      },
+      [],
+      [],
+      new Map()
+    );
+    expect(stateWithBatch.effectStack.at(-1)?.phase).toBe(
+      "AWAITING_BATCH_RESUME"
+    );
+
+    const result = resumeFromStack(stateWithBatch, { type: "PASS" }, cardDb);
+
+    expect(
+      result.state.players[0].characters.some(
+        (card) => card?.cardId === target.cardId
+      )
+    ).toBe(true);
+    expect(result.events.some((event) => event.type === "CARD_PLAYED")).toBe(
+      true
+    );
+    expect(result.state.effectStack).toHaveLength(0);
   });
 
   it("resumes a multi-KO after the first target's real ON_KO prompt", () => {
