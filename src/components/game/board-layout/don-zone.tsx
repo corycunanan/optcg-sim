@@ -87,7 +87,9 @@ function DraggableDonCard({
         zIndex: index,
         cursor: disabled ? "default" : "grab",
       }}
-      className="touch-none rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible"
+      // Shrink-wraps the DON token `<Card>`, so the drag focus ring traces that
+      // card's outline rather than a chrome corner.
+      className="touch-none rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible"
     >
       <Card
         variant="don"

@@ -115,9 +115,18 @@ The layers move as one. The radius is shared across the stack in `card.tsx` — 
 wrapper, the three transform layers, the power flash — plus `card-front.tsx`, `card-back.tsx`,
 `card-highlight-ring.tsx`, and the reserved card box in `life-zone.tsx`. `box-shadow` and `overflow`
 both follow `border-radius`, so a layer left behind traces a visibly different corner over the one
-beneath it. The owned-box rule holds throughout: every `CARD_SIZES` token is a 600/838 box, and the
-`inset-0` layers inherit it. Boxes that merely *hold* a card stay chrome — the field-card wrappers
-reserve a 112×112 square so a rested card can rotate inside them, and a square is not a card.
+beneath it. The consumer wrappers that shrink-wrap a fixed-size `<Card>` move too — the modal
+selection buttons, the hand drag wrapper, the DON token and attached-DON handles, and the stage and
+field targeting wrappers all own focus or selection rings that hug a card face. Boxes that merely
+*hold* a card stay chrome: the field-card wrappers reserve a 112×112 square so a rested card can
+rotate inside them, and a square is not a card; so do the zone slots that draw their own border.
+
+**Card-shaped, to a tolerance.** The `CARD_SIZES` tokens are not literally 600/838. Four are 5:7
+(field 80×112, modal 120×168, preview 200×280, don 50×70) and `hand` is 42:59 (84×118), against the
+printed 300:419. The consequence is that the two radius axes disagree by **0.005–0.020px** — the
+corner is a circle to well within a rendered pixel, not exactly. That is the real invariant and what
+the test pins; the tokens track board geometry and should not be bent to the printed ratio for a
+fiftieth of a pixel.
 
 **Lint.** The design-system lint derives its radius rules from this vocabulary rather than from a
 list of bad spellings. Every `rounded-*` class in a class position must resolve to either the

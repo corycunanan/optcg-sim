@@ -320,7 +320,10 @@ export const DroppableStageZone = React.memo(function DroppableStageZone({
               }
               transition={rejectionSequence ? rejectionAnimation.transition : undefined}
               className={cn(
-                "relative z-[1] rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
+                // Flex item shrink-wrapping a fixed-size `<Card>`, so the
+                // targeting ring hugs the card. The zone slot above keeps its
+                // chrome corner and its own border.
+                "relative z-[1] rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
                 (menuTriggerEnabled ||
                   (targetSelectionControl &&
                     targetSelection &&

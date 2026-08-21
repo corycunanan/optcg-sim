@@ -146,7 +146,9 @@ function SortableModalCard({
         opacity: isDragging ? 0.3 : undefined,
       }}
       className={cn(
-        "relative shrink-0 touch-none select-none rounded border-0 bg-transparent p-0 text-left cursor-grab focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gb-signal-eligible",
+        // Zero padding and border around a fixed-size `<Card>`, so the drag and
+        // selection rings trace the card's own outline.
+        "relative shrink-0 touch-none select-none rounded-card border-0 bg-transparent p-0 text-left cursor-grab focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gb-signal-eligible",
         selected && "ring-2 ring-gb-accent-amber ring-offset-1 ring-offset-transparent",
         dimmed && "opacity-40",
       )}

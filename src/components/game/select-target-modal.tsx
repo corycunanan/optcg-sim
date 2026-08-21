@@ -75,7 +75,10 @@ function TargetCard({
       }}
       title={selection.disabledReason ?? undefined}
       className={cn(
-        "focus-visible:ring-gb-signal-eligible relative shrink-0 rounded border-0 bg-transparent p-0 text-left transition-[box-shadow] duration-150 select-none focus-visible:ring-2 focus-visible:outline-none",
+        // Zero padding and border around a fixed-size `<Card>`, so this button's
+        // box is the card's box and its focus/selection rings trace that card's
+        // outline (SHAPE-LANGUAGE.md §The card radius).
+        "focus-visible:ring-gb-signal-eligible relative shrink-0 rounded-card border-0 bg-transparent p-0 text-left transition-[box-shadow] duration-150 select-none focus-visible:ring-2 focus-visible:outline-none",
         blocked && "cursor-not-allowed opacity-30",
         !blocked &&
           selection.selected &&

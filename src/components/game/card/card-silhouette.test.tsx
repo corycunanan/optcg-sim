@@ -135,16 +135,27 @@ describe("board card silhouette (OPT-720)", () => {
     }
   });
 
-  // `rounded-card` is `4%` of the box's width, which is only the printed
-  // card's ~2.5mm corner when the box is the printed card's 600/838. Every
-  // size token the primitive can hand `PerspectiveContainer` must hold that
-  // shape, or the percentage resolves against a box that is not a card.
-  it("reserves a card-shaped box at every size token", () => {
+  // `rounded-card` writes `4% / calc(4% * 600/838)`, so the horizontal radius
+  // resolves against the box's width and the vertical against its height. The
+  // two are the same length — a true quarter-circle — only on a 600/838 box.
+  //
+  // No `CARD_SIZES` token is literally that: four are 5:7 and `hand` is 42:59.
+  // So the invariant worth pinning is not the ratio but its consequence — how
+  // far apart the two radius axes land. Today that is 0.005–0.020px, which is
+  // a circle to well within a rendered pixel. A new token that drifted far
+  // enough to paint a visible ellipse fails here.
+  const MAX_RADIUS_AXIS_DELTA_PX = 0.05;
+
+  it("keeps both radius axes within a sub-pixel of each other at every size token", () => {
     for (const [token, { width, height }] of Object.entries(CARD_SIZES)) {
+      const horizontal = 0.04 * width;
+      const vertical = 0.04 * (600 / 838) * height;
+
       expect(
-        Math.abs(width / height - 600 / 838),
-        `${token} (${width}x${height}) is not card-shaped`,
-      ).toBeLessThan(0.01);
+        Math.abs(horizontal - vertical),
+        `${token} (${width}x${height}) paints an elliptical corner: ` +
+          `${horizontal.toFixed(4)}px vs ${vertical.toFixed(4)}px`,
+      ).toBeLessThan(MAX_RADIUS_AXIS_DELTA_PX);
     }
   });
 });

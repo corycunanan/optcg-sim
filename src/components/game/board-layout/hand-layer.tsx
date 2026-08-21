@@ -178,7 +178,9 @@ function SortableHandCard({
           visibility: hidden ? "hidden" : undefined,
           touchAction: "none",
         }}
-        className="focus-visible:ring-gb-signal-eligible rounded-md focus-visible:ring-4 focus-visible:outline-none"
+        // Shrink-wraps a fixed-size hand `<Card>`, so the drag focus ring hugs
+        // the card and takes the card's corner.
+        className="focus-visible:ring-gb-signal-eligible rounded-card focus-visible:ring-4 focus-visible:outline-none"
       >
         <motion.div
           key={rejectionSequence ?? "idle"}
