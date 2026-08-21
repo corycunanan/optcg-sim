@@ -1,6 +1,7 @@
 export type KeywordName =
   | "BLOCKER"
   | "RUSH"
+  | "RUSH_CHARACTER"
   | "DOUBLE_ATTACK"
   | "UNBLOCKABLE"
   | "BANISH"
@@ -9,6 +10,7 @@ export type KeywordName =
 type PrintedKeywords = {
   blocker?: boolean;
   rush?: boolean;
+  rushCharacter?: boolean;
   doubleAttack?: boolean;
   unblockable?: boolean;
   banish?: boolean;
@@ -26,6 +28,7 @@ type ActiveKeywordEffect = {
 const PRINTED_KEYWORD_FIELDS: Record<KeywordName, keyof PrintedKeywords> = {
   BLOCKER: "blocker",
   RUSH: "rush",
+  RUSH_CHARACTER: "rushCharacter",
   DOUBLE_ATTACK: "doubleAttack",
   UNBLOCKABLE: "unblockable",
   BANISH: "banish",
@@ -38,7 +41,9 @@ const PRINTED_KEYWORD_FIELDS: Record<KeywordName, keyof PrintedKeywords> = {
  * Broadcast effects already exclude false conditions. SELF modifier targets are
  * resolved into `appliesTo` by the worker, so membership is sufficient here.
  * Dynamic aura targets are absent from `appliesTo` and remain unsupported until
- * the worker broadcasts their resolved targets.
+ * the worker broadcasts their resolved targets. `CAN_ATTACK_ACTIVE` and
+ * `_DON_PHASE_GIVE_TO_LEADER` are internal engine grants and deliberately
+ * excluded from the client-facing keyword set.
  */
 export function hasRuntimeKeyword(
   instanceId: string,
@@ -60,5 +65,5 @@ export function hasRuntimeKeyword(
     }
   }
 
-  return (printed && !removed) || granted;
+  return (printed || granted) && !removed;
 }

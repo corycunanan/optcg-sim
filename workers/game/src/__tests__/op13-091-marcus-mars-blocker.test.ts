@@ -10,6 +10,7 @@ import type {
   GameState,
   PlayerState,
 } from "../types.js";
+import type { RuntimeActiveEffect } from "../engine/effect-types.js";
 import { derivePrintedKeywords } from "../engine/printed-keywords.js";
 import { OP13_091_ST_MARCUS_MARS } from "../engine/schemas/op13.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
@@ -147,5 +148,49 @@ describe("OPT-738: OP13-091 St. Marcus Mars runtime Blocker", () => {
         "BLOCKER"
       )
     ).toBe(true);
+  });
+
+  it("lets an applicable removal suppress Mars's granted Blocker", () => {
+    const { state, cardDb, mars } = blockerState(7);
+    const removal: RuntimeActiveEffect = {
+      id: "opt738-remove-blocker",
+      sourceCardInstanceId: mars.instanceId,
+      sourceEffectBlockId: "opt738-remove-blocker",
+      category: "permanent",
+      modifiers: [
+        {
+          type: "REMOVE_KEYWORD",
+          target: { type: "SELF" },
+          params: { keyword: "BLOCKER" },
+        },
+      ],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: mars.controller,
+      appliesTo: [mars.instanceId],
+      timestamp: 2,
+    };
+    const removed = {
+      ...state,
+      activeEffects: [...state.activeEffects, removal],
+    };
+    const visible = visibleStateForPlayer(removed, cardDb, 1);
+
+    expect(
+      validate(
+        removed,
+        { type: "DECLARE_BLOCKER", blockerInstanceId: mars.instanceId },
+        cardDb,
+        1
+      )
+    ).toBe("This card does not have [Blocker]");
+    expect(
+      hasRuntimeKeyword(
+        mars.instanceId,
+        cardDb.get(mars.cardId)?.keywords,
+        visible.activeEffects,
+        "BLOCKER"
+      )
+    ).toBe(false);
   });
 });
