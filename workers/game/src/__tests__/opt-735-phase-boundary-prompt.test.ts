@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Action } from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { EB02_015_JEWELRY_BONNEY } from "../engine/schemas/eb02.js";
 import { OP13_024_GORDON } from "../engine/schemas/op13.js";
 import {
   SessionRepository,
@@ -10,15 +11,16 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import type { GameState, PlayerState } from "../types.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
-function scheduledDonAction(): Action {
-  const block = OP13_024_GORDON.effects.find(
-    (effect) => effect.id === "OP13-024_on_play"
-  );
+function scheduledDonAction(
+  schema: typeof OP13_024_GORDON,
+  effectId: string
+): Action {
+  const block = schema.effects.find((effect) => effect.id === effectId);
   const scheduled = block?.actions?.find(
     (action) => action.type === "SCHEDULE_ACTION"
   );
   if (scheduled?.type !== "SCHEDULE_ACTION" || !scheduled.params?.action) {
-    throw new Error("Expected OP13-024's scheduled DON!! action");
+    throw new Error(`Expected ${schema.card_id}'s scheduled DON!! action`);
   }
   return scheduled.params.action;
 }
@@ -49,7 +51,10 @@ class MemoryStorage implements SessionStorage {
   async deleteAlarm(): Promise<void> {}
 }
 
-function scheduledEndPhaseState(scheduledCount = 1): GameState {
+function scheduledEndPhaseState(
+  scheduledCount = 1,
+  action = scheduledDonAction(OP13_024_GORDON, "OP13-024_on_play")
+): GameState {
   const cardDb = createTestCardDb();
   const base = createBattleReadyState(cardDb);
   const players = [...base.players] as [PlayerState, PlayerState];
@@ -66,7 +71,7 @@ function scheduledEndPhaseState(scheduledCount = 1): GameState {
     scheduledActions: Array.from({ length: scheduledCount }, (_, index) => ({
       id: `opt-735-scheduled-${index}`,
       timing: "END_OF_THIS_TURN",
-      action: scheduledDonAction(),
+      action,
       boundToInstanceId: null,
       sourceEffectId: base.players[0].leader.instanceId,
       controller: 0,
@@ -81,6 +86,38 @@ describe("OPT-735 phase-boundary prompts", () => {
     const offered = runPipeline(state, { type: "ADVANCE_PHASE" }, cardDb, 0);
     return { cardDb, state, offered };
   }
+
+  it("replaces EB02-015's auto-max baseline with a 0..1 pipeline prompt", () => {
+    const cardDb = createTestCardDb();
+    const state = scheduledEndPhaseState(
+      1,
+      scheduledDonAction(
+        EB02_015_JEWELRY_BONNEY,
+        "on_play_prohibit_refresh_schedule_don"
+      )
+    );
+    const offered = runPipeline(
+      state,
+      { type: "ADVANCE_PHASE" },
+      cardDb,
+      0
+    );
+
+    expect(offered.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (offered.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+      throw new Error("Expected EB02-015's scheduled amount prompt");
+    }
+    expect(
+      offered.pendingPrompt.options.choices.map((choice) => choice.id)
+    ).toEqual(["choose-value:0", "choose-value:1"]);
+    expect(offered.state.players[0].donCostArea).toEqual(
+      state.players[0].donCostArea
+    );
+    expect(offered.state.turn).toMatchObject({
+      activePlayerIndex: 0,
+      phase: "END",
+    });
+  });
 
   it("offers 0..2 for a scheduled up-to DON!! action before turn handoff", () => {
     const { state, offered } = offerScheduledChoice();
