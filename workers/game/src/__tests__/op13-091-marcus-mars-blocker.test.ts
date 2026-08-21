@@ -10,7 +10,11 @@ import type {
   GameState,
   PlayerState,
 } from "../types.js";
-import type { RuntimeActiveEffect } from "../engine/effect-types.js";
+import type {
+  EffectBlock,
+  RuntimeActiveEffect,
+} from "../engine/effect-types.js";
+import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { derivePrintedKeywords } from "../engine/printed-keywords.js";
 import { OP13_091_ST_MARCUS_MARS } from "../engine/schemas/op13.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
@@ -97,6 +101,33 @@ function blockerState(trashCount: number): {
   return { state, cardDb, mars };
 }
 
+function negateOnlyOpponentCharacter(
+  state: GameState,
+  cardDb: Map<string, CardData>
+): GameState {
+  const negation: EffectBlock = {
+    id: "opt738-engine-negation",
+    category: "auto",
+    actions: [
+      {
+        type: "NEGATE_EFFECTS",
+        target: {
+          type: "CHARACTER",
+          controller: "OPPONENT",
+          count: { exact: 1 },
+        },
+      },
+    ],
+  };
+  return resolveEffect(
+    state,
+    negation,
+    state.players[0].leader.instanceId,
+    0,
+    cardDb
+  ).state;
+}
+
 describe("OPT-738: OP13-091 St. Marcus Mars runtime Blocker", () => {
   it("rejects Blocker at six trash and accepts it at seven", () => {
     const belowThreshold = blockerState(6);
@@ -179,6 +210,96 @@ describe("OPT-738: OP13-091 St. Marcus Mars runtime Blocker", () => {
     expect(
       validate(
         removed,
+        { type: "DECLARE_BLOCKER", blockerInstanceId: mars.instanceId },
+        cardDb,
+        1
+      )
+    ).toBe("This card does not have [Blocker]");
+    expect(
+      hasRuntimeKeyword(
+        mars.instanceId,
+        cardDb.get(mars.cardId)?.keywords,
+        visible.activeEffects,
+        "BLOCKER"
+      )
+    ).toBe(false);
+  });
+
+  it("matches server rejection for an engine-negated printed Blocker", () => {
+    const cardDb = createTestCardDb();
+    const base = createBattleReadyState(cardDb);
+    const blocker = base.players[1].characters.find(
+      (candidate) => candidate?.cardId === CARDS.BLOCKER.id
+    );
+    if (!blocker) throw new Error("Expected the printed Blocker fixture");
+
+    const players = [...base.players] as [PlayerState, PlayerState];
+    players[1] = { ...players[1], characters: padChars([blocker]) };
+    const state: GameState = {
+      ...base,
+      players,
+      turn: {
+        ...base.turn,
+        activePlayerIndex: 0,
+        battleSubPhase: "BLOCK_STEP",
+        battle: {
+          battleId: "opt738-negation-battle",
+          attackerInstanceId: players[0].leader.instanceId,
+          targetInstanceId: players[1].leader.instanceId,
+          attackerPower: 5000,
+          defenderPower: 5000,
+          counterPowerAdded: 0,
+          blockerActivated: false,
+        },
+      },
+    };
+    const negated = negateOnlyOpponentCharacter(state, cardDb);
+    const visible = visibleStateForPlayer(negated, cardDb, 1);
+
+    expect(
+      visible.activeEffects.some(
+        (effect) =>
+          effect.appliesTo.includes(blocker.instanceId) &&
+          effect.modifiers.some(
+            (modifier) => modifier.type === "NEGATE_EFFECTS_FLAG"
+          )
+      )
+    ).toBe(true);
+    expect(
+      validate(
+        negated,
+        { type: "DECLARE_BLOCKER", blockerInstanceId: blocker.instanceId },
+        cardDb,
+        1
+      )
+    ).toBe("This card does not have [Blocker]");
+    expect(
+      hasRuntimeKeyword(
+        blocker.instanceId,
+        CARDS.BLOCKER.keywords,
+        visible.activeEffects,
+        "BLOCKER"
+      )
+    ).toBe(false);
+  });
+
+  it("matches server rejection for engine-negated Mars", () => {
+    const { state, cardDb, mars } = blockerState(7);
+    const negated = negateOnlyOpponentCharacter(state, cardDb);
+    const visible = visibleStateForPlayer(negated, cardDb, 1);
+
+    expect(
+      visible.activeEffects.some(
+        (effect) =>
+          effect.appliesTo.includes(mars.instanceId) &&
+          effect.modifiers.some(
+            (modifier) => modifier.type === "NEGATE_EFFECTS_FLAG"
+          )
+      )
+    ).toBe(true);
+    expect(
+      validate(
+        negated,
         { type: "DECLARE_BLOCKER", blockerInstanceId: mars.instanceId },
         cardDb,
         1

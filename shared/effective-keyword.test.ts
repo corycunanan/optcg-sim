@@ -77,6 +77,41 @@ describe("hasRuntimeKeyword", () => {
     ).toBe(false);
   });
 
+  it("returns false when a printed keyword is negated", () => {
+    expect(
+      hasRuntimeKeyword(
+        "card-1",
+        { blocker: true },
+        [
+          {
+            appliesTo: ["card-1"],
+            modifiers: [{ type: "NEGATE_EFFECTS_FLAG" }],
+          },
+        ],
+        "BLOCKER"
+      )
+    ).toBe(false);
+  });
+
+  it("keeps a granted keyword active when printed effects are negated", () => {
+    expect(
+      hasRuntimeKeyword(
+        "card-1",
+        { blocker: true },
+        [
+          {
+            appliesTo: ["card-1"],
+            modifiers: [
+              { type: "NEGATE_EFFECTS_FLAG" },
+              { type: "GRANT_KEYWORD", params: { keyword: "BLOCKER" } },
+            ],
+          },
+        ],
+        "BLOCKER"
+      )
+    ).toBe(true);
+  });
+
   it("ignores a grant for a different instance", () => {
     expect(
       hasRuntimeKeyword(
