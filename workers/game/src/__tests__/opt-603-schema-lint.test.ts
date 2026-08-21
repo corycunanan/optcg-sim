@@ -21,7 +21,7 @@ const execOptions: ExecFileSyncOptionsWithStringEncoding = {
 describe("OPT-603 — canonical attached-DON schema lint", () => {
   it("passes the complete 219-card canonical [DON!! xN] sweep", () => {
     expect(execFileSync("node", [linter], execOptions)).toContain(
-      "Schema validation clean — 2359 card(s)."
+      "Schema validation clean — 2381 card(s)."
     );
   });
 
