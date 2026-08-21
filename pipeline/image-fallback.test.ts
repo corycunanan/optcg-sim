@@ -59,4 +59,13 @@ describe("shouldReplaceStubImage", () => {
       )
     ).toBe(true);
   });
+
+  it("replaces an uppercase parallel marker", () => {
+    expect(
+      shouldReplaceStubImage("https://example.com/cards/ST31-004_P1.png", {
+        imageUrl: "https://example.com/cards/ST31-004.png",
+        imageIsVariantFallback: false,
+      })
+    ).toBe(true);
+  });
 });

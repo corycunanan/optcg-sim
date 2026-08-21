@@ -10,5 +10,5 @@ export function shouldReplaceStubImage(
 
   // Migrated stubs use cards/<cardId>.webp, which loses the _p marker and is
   // therefore not detectable from its URL. Replacing those stubs is out of scope.
-  return /_p\d+$/.test(stem);
+  return /_p\d+$/i.test(stem);
 }
