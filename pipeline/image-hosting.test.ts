@@ -33,6 +33,44 @@ describe("image hosting checks", () => {
     ]);
   });
 
+  it("rejects a lookalike CDN host", () => {
+    const row = {
+      id: "OP17-002",
+      imageUrl: "https://cdn.example.com.evil/cards/OP17-002.webp",
+    };
+
+    expect(findOffCdnImages([row], "https://cdn.example.com")).toEqual([row]);
+  });
+
+  it("requires a non-empty object path under the normalized CDN prefix", () => {
+    const cdnUrl = normalizeCdnUrl("https://cdn.example.com/images/");
+    expect(cdnUrl).toBe("https://cdn.example.com/images");
+
+    const siblingPath = {
+      id: "OP17-003",
+      imageUrl: "https://cdn.example.com/images-other/OP17-003.webp",
+    };
+    const bareRoot = {
+      id: "OP17-004",
+      imageUrl: "https://cdn.example.com/images",
+    };
+    const emptyObjectPath = {
+      id: "OP17-005",
+      imageUrl: "https://cdn.example.com/images/",
+    };
+    const hostedObject = {
+      id: "OP17-006",
+      imageUrl: "https://cdn.example.com/images/OP17-006.webp",
+    };
+
+    expect(
+      findOffCdnImages(
+        [siblingPath, bareRoot, emptyObjectPath, hostedObject],
+        cdnUrl!
+      )
+    ).toEqual([siblingPath, bareRoot, emptyObjectPath]);
+  });
+
   it("summarizes off-CDN cards and variants, including official-host URLs", () => {
     const cards = [
       {

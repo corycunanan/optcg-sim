@@ -3,12 +3,7 @@ import { resolve } from "node:path";
 
 export default defineConfig({
   test: {
-    include: [
-      "src/**/*.test.ts",
-      "src/**/*.test.tsx",
-      "shared/**/*.test.ts",
-      "pipeline/**/*.test.ts",
-    ],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "shared/**/*.test.ts"],
     environment: "node",
     globalSetup: ["src/test/database/global-setup.ts"],
     setupFiles: ["src/test/setup.ts"],

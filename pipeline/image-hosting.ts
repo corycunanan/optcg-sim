@@ -9,7 +9,12 @@ export interface ImageRow {
 }
 
 export function findOffCdnImages(rows: ImageRow[], cdnUrl: string): ImageRow[] {
-  return rows.filter((row) => !row.imageUrl.startsWith(cdnUrl));
+  const objectPrefix = `${cdnUrl}/`;
+  return rows.filter(
+    (row) =>
+      !row.imageUrl.startsWith(objectPrefix) ||
+      row.imageUrl.length === objectPrefix.length
+  );
 }
 
 export interface OffCdnSummary {
