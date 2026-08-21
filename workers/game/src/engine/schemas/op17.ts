@@ -2501,7 +2501,7 @@ export const OP17_076_I_THINK_IVE_SOBERED_UP: EffectSchema = {
       id: "counter_trash_power",
       category: "activate",
       trigger: { keyword: "COUNTER_EVENT" },
-      // Canonical source typo: "Charactes" is interpreted as "Characters".
+      // Official print typo: "Charactes" is interpreted as "Characters".
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [
         {
@@ -3617,6 +3617,22 @@ export const OP17_109_CHARLOTTE_PUDDING: EffectSchema = {
       actions: [{ type: "DRAW", params: { amount: 3 } }],
       flags: { optional: true },
     },
+    {
+      id: "trigger_search_big_mom_pirates",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "SEARCH_DECK",
+          params: {
+            look_at: 5,
+            pick: { up_to: 1 },
+            filter: { traits: ["Big Mom Pirates"] },
+            rest_destination: "BOTTOM",
+          },
+        },
+      ],
+    },
   ],
 };
 
@@ -3685,6 +3701,12 @@ export const OP17_111_CHARLOTTE_MONT_DOR: EffectSchema = {
         },
       ],
       flags: { optional: true },
+    },
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
     },
   ],
 };
