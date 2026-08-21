@@ -1268,15 +1268,41 @@ export function InvitePanel({
 
   if (pendingInvite && pendingInviteName && timing?.kind === "invited") {
     return (
+      /* Two compositions of the same four parts, and the seats column decides
+         which one runs.
+
+         From `lg` the panel is a fixed-width column beside the host seat and
+         gets that row's full height, so it stays the header-over-body panel it
+         has always been (OPT-664/OPT-686), with the `min-height:50rem` step
+         still opening it up on tall screens.
+
+         Below `lg` the seats are a *stacked height budget* — the host seat, the
+         panel, and the fixed chrome above and below all come out of one
+         viewport — and the panel's header band alone cost more than the whole
+         budget left after the seat. So the same parts re-flow into one strip
+         built to the compact seat's own geometry (`lobby-seat-card`): avatar on
+         the left, a truncating identity line beside it, the controls pinned to
+         the right. `contents` is what makes that a *re-flow* rather than a
+         second layout — the header and body boxes drop out and their children
+         become items of the section's row, so the DOM stays in one reading and
+         tab order and each part keeps its own styling.
+
+         What yields is fixed by the state's purpose: the waiting state is a
+         countdown and a way out, so those two never leave the frame. The
+         reassurance line goes first (it is already tall-viewport-only), then
+         the header's label and heading — "invite pending" is what the pulsing
+         avatar and a running countdown already say, and the section's
+         `aria-label` still says it outright for assistive tech. Who was invited
+         survives twice over: the avatar, and the name in the identity line. */
       <section
         aria-label="Guest seat — invite pending"
-        className="border-border bg-surface-1 flex min-h-0 shrink-0 grow flex-col overflow-hidden rounded-lg border lg:w-72 lg:grow-0"
+        className="border-border bg-surface-1 flex min-h-0 shrink-0 overflow-hidden rounded-lg border max-lg:items-center max-lg:gap-3 max-lg:px-3 max-lg:py-2 lg:w-72 lg:flex-col"
       >
-        <header className="border-border flex min-h-16 shrink-0 items-center gap-3 border-b px-5 py-3 lg:min-h-20 lg:py-4">
+        <header className="max-lg:contents lg:border-border lg:flex lg:min-h-20 lg:shrink-0 lg:items-center lg:gap-3 lg:border-b lg:px-5 lg:py-4">
           <div className="ring-gold-500/30 shrink-0 animate-pulse rounded-full ring-2">
             <UserAvatar user={pendingInvite.user} size="md" variant="dark" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 max-lg:hidden">
             <p className="text-content-tertiary text-sm font-semibold tracking-widest uppercase">
               Guest
             </p>
@@ -1285,21 +1311,27 @@ export function InvitePanel({
             </h2>
           </div>
         </header>
-        {/* The waiting state is a countdown and a way out. On short and narrow
-            viewports everything else — the display heading, the reassurance
-            line, the column arrangement — yields so those two never leave the
-            frame. */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 px-6 py-4 text-center lg:gap-4 lg:[@media(min-height:50rem)]:gap-5 lg:[@media(min-height:50rem)]:py-10">
-          <div className="w-full min-w-0">
+        <div className="max-lg:contents lg:flex lg:min-h-0 lg:min-w-0 lg:flex-1 lg:flex-col lg:items-center lg:justify-center lg:gap-4 lg:px-6 lg:py-4 lg:text-center lg:[@media(min-height:50rem)]:gap-5 lg:[@media(min-height:50rem)]:py-10">
+          <div className="min-w-0 max-lg:flex-1 lg:w-full">
+            {/* The strip names *who*, not *what happened*: at 768px the
+                sentence has 92px to render 209px of display caps, and
+                "Invite se…" says nothing at all. The pulsing ring, a running
+                countdown, and a cancel action standing beside the name already
+                say an invite is out, so the prefix is what the narrow fold
+                spends and the name is what it keeps. */}
             <h3 className="font-display text-content-primary truncate text-base lg:[@media(min-height:50rem)]:text-2xl">
-              Invite sent to {pendingInviteName}
+              <span className="max-lg:hidden">Invite sent to </span>
+              {pendingInviteName}
             </h3>
             <p className="text-content-secondary mt-2 hidden text-sm lg:[@media(min-height:50rem)]:block">
               Their seat is reserved until the invitation expires.
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-3 lg:flex-col lg:[@media(min-height:50rem)]:gap-5">
-            <p className="border-border bg-surface-3 text-content-primary rounded border px-4 py-2 text-sm font-semibold tabular-nums">
+          {/* `shrink-0` below `lg` is the whole point of the strip: the
+              countdown and the cancel action keep their intrinsic widths and
+              the identity line is the member that gives way. */}
+          <div className="flex items-center justify-center gap-3 max-lg:shrink-0 lg:flex-col lg:[@media(min-height:50rem)]:gap-5">
+            <p className="border-border bg-surface-3 text-content-primary rounded border px-4 py-2 text-sm font-semibold tabular-nums whitespace-nowrap max-lg:px-3">
               Expires in {formatInviteCountdown(timing.remainingMs)}
             </p>
             {showInviteFriend && (
