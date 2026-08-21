@@ -19,7 +19,7 @@ Pipeline (TypeScript)
     ↓
 PostgreSQL (Neon)         Cloudflare R2 CDN
   cards                     cards/{id}.webp
-  art_variants              variants/{variantId}.webp
+  art_variants              variants/{ArtVariant.id}.webp
   card_sets
 ```
 
@@ -36,6 +36,7 @@ Run scripts with `tsx` (e.g. `pnpm pipeline:import`). The main entry point orche
 | `build-set-membership.ts` | Build Card ↔ Set many-to-many membership from pack metadata |
 | `write.ts` | Upsert transformed cards, sets, variants, and errata into PostgreSQL via Prisma |
 | `migrate-images.ts` | Download card images from vegapull CDN and upload to Cloudflare R2 |
+| `check-images.ts` | Fail unless every card and art variant image is hosted on the configured CDN |
 | `verify.ts` | Post-import sanity checks — counts, missing images, orphaned records |
 
 ## Running the Pipeline
@@ -46,7 +47,16 @@ pnpm pipeline:import [--data-dir <path>] [--dry-run]
 
 # Image migration to R2 (run after import)
 pnpm pipeline:migrate-images [--dry-run] [--concurrency <n>] [--limit <n>]
+
+# Hard gate after image migration
+pnpm pipeline:check-images
 ```
+
+An import is not complete until `pnpm pipeline:migrate-images` has run and
+`pnpm pipeline:check-images` passes. The official host sends
+`cross-origin-resource-policy: same-site`, so browsers render its card URLs as blank
+`<img>` elements when the simulator loads them cross-site. Import verification warns
+about off-CDN rows without failing because newly written rows have not been migrated yet.
 
 - Default data dir: `data/vegapull-full/json`
 - `--dry-run`: Print summary without writing to DB / uploading images
@@ -145,10 +155,11 @@ Batch upserts in groups of 100 (transactional):
 - Count comparisons (DB vs expected, allows 1 variance for known OP07-091_p1 duplicate)
 - Spot-checks known cards: ST01-001 (Luffy Leader), OP01-001 (Zoro Leader), OP01-025 (Zoro Character)
 - Data quality: missing effectText, empty imageUrl, type distribution, block distribution
+- Image hosting: warns with off-CDN counts and sample IDs; this warning never fails import
 
 ## Image Migration (`migrate-images.ts`)
 
-Runs independently after import:
+Runs after every import:
 
 1. Fetches all Card + ArtVariant image URLs from DB
 2. Skips URLs already pointing to CDN (`NEXT_PUBLIC_CDN_URL`)
@@ -156,7 +167,14 @@ Runs independently after import:
 4. Uploads to R2 as webp with immutable cache headers
 5. Updates DB `imageUrl` with CDN URL
 
-R2 key format: `cards/{id}.webp` for cards, `variants/{variantId}.webp` for art variants.
+R2 key format: `cards/{id}.webp` for cards and `variants/{ArtVariant.id}.webp`
+for art variants. The migration passes the variant row's UUID to
+`sourceUrlToR2Key(v.id, "variant")`; it does not use the human-readable `variantId`.
+
+After migration, run `pnpm pipeline:check-images`. The command uses
+`DIRECT_DATABASE_URL` when available, otherwise a safe `DATABASE_URL`, and exits non-zero
+when `NEXT_PUBLIC_CDN_URL` is unset or any card or variant image remains off-CDN. A zero
+exit confirms every stored image URL starts with the normalized CDN URL.
 
 ## Database Schema (Key Tables)
 
