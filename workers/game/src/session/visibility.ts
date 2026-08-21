@@ -302,13 +302,22 @@ function withVisibleFieldPower(
 ): GameState {
   const decorate = (card: CardInstance): CardInstance => {
     const data = cardDb.get(card.cardId);
-    return data
-      ? {
-          ...card,
-          basePower: data.power ?? 0,
-          effectivePower: getEffectivePower(card, data, authoritative, cardDb),
-        }
-      : card;
+    if (!data) return card;
+
+    const basePower = data.power ?? 0;
+    const effectivePower = getEffectivePower(card, data, authoritative, cardDb);
+    const effectOnlyPower = getEffectivePower(
+      { ...card, attachedDon: [] },
+      data,
+      authoritative,
+      cardDb,
+    );
+    return {
+      ...card,
+      basePower,
+      effectivePower,
+      powerDelta: effectOnlyPower - basePower,
+    };
   };
 
   return {

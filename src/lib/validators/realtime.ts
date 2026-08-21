@@ -171,10 +171,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const VisibleFieldCardSchema = z.looseObject({
   basePower: z.number().optional(),
   effectivePower: z.number().optional(),
+  powerDelta: z.number().optional(),
 });
 const VisiblePlayerSchema = z.looseObject({
-  leader: VisibleFieldCardSchema,
-  characters: z.array(VisibleFieldCardSchema.nullable()),
+  leader: VisibleFieldCardSchema.nullable().optional(),
+  characters: z.array(VisibleFieldCardSchema.nullable()).optional(),
 });
 const VisibleGameStateSchema = z.looseObject({
   status: z.string(),
