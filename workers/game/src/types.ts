@@ -116,6 +116,16 @@ export interface ReturnToDeckArrangement {
   remainingOwners: Array<0 | 1>;
 }
 
+export interface PhaseBoundaryContinuation {
+  kind: "END_PHASE";
+  endingPlayerIndex: 0 | 1;
+  remainingScheduledActions: Array<{
+    action: import("./engine/effect-types.js").Action;
+    controller: 0 | 1;
+    sourceEffectId: string;
+  }>;
+}
+
 export interface ResumeContext {
   effectSourceInstanceId: string;
   controller: 0 | 1;
@@ -225,6 +235,8 @@ export interface EffectStackFrame {
   simultaneousGroup?: import("./engine/effect-resolver/simultaneous.js").SimultaneousGroupPlan;
   /** Outer replacement batch to continue after a nested substitute prompt. */
   replacementBatchContinuation?: import("./engine/replacements.js").ReplacementBatchResumeContext;
+  /** End-phase work parked below a scheduled effect's prompt frame. */
+  phaseBoundaryContinuation?: PhaseBoundaryContinuation;
 
   // Cost tracking
   costs: import("./engine/effect-types.js").Cost[];

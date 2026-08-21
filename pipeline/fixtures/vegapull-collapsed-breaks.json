@@ -1,0 +1,38 @@
+[
+  {
+    "id": "OP99-001",
+    "pack_id": "569199",
+    "name": "Fixture Card One",
+    "rarity": "Rare",
+    "category": "Character",
+    "img_url": "../images/cardlist/card/OP99-001.png",
+    "img_full_url": "https://en.onepiece-cardgame.com/images/cardlist/card/OP99-001.png",
+    "cost": 1,
+    "attributes": ["Strike"],
+    "power": 1000,
+    "counter": 1000,
+    "colors": ["Red"],
+    "block_number": 5,
+    "types": ["Fixture Pirates"],
+    "effect": "[On Play] Draw 1 card. Then, discard 1 card.",
+    "trigger": "[Trigger] Draw 1 card. Then, discard 1 card."
+  },
+  {
+    "id": "OP99-002",
+    "pack_id": "569199",
+    "name": "Fixture Card Two",
+    "rarity": "Common",
+    "category": "Character",
+    "img_url": "../images/cardlist/card/OP99-002.png",
+    "img_full_url": "https://en.onepiece-cardgame.com/images/cardlist/card/OP99-002.png",
+    "cost": 2,
+    "attributes": ["Slash"],
+    "power": 2000,
+    "counter": 1000,
+    "colors": ["Blue"],
+    "block_number": 5,
+    "types": ["Fixture Pirates"],
+    "effect": "[Blocker]",
+    "trigger": null
+  }
+]

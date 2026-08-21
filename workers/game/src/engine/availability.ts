@@ -10,7 +10,10 @@ import {
   type TargetFilter,
 } from "./effect-types.js";
 import { computeAllValidTargets } from "./effect-resolver/target-resolver.js";
-import { isCardNegated } from "./modifiers.js";
+import {
+  isCardNegated,
+  isPermanentBlockGateMet,
+} from "./modifiers.js";
 import {
   areEffectCostsPayable,
   getActivateEffectTimingError,
@@ -204,10 +207,7 @@ function availabilityForBlock(
     if (isCardNegated(card, state, cardDb)) {
       return { effectId: block.id, status: "blocked", reason: "CONDITION" };
     }
-    const conditionMet =
-      block.conditions === undefined ||
-      evaluateCondition(state, block.conditions, conditionContext);
-    return conditionMet
+    return isPermanentBlockGateMet(state, block, conditionContext)
       ? { effectId: block.id, status: "active" }
       : { effectId: block.id, status: "blocked", reason: "CONDITION" };
   }

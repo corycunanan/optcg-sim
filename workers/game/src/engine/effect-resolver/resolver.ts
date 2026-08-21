@@ -330,8 +330,7 @@ export function resolveEffect(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  triggeringCardInstanceId?: string | null,
-  executionContext: "INTERACTIVE" | "PROMPTLESS_PHASE" = "INTERACTIVE"
+  triggeringCardInstanceId?: string | null
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -495,8 +494,7 @@ export function resolveEffect(
       cardDb,
       initialRefs,
       blockDescription,
-      undefined,
-      executionContext
+      undefined
     );
     state = chainResult.state;
     events.push(...chainResult.events);
@@ -762,8 +760,7 @@ export function executeActionChain(
   cardDb: Map<string, CardData>,
   initialResultRefs?: Map<string, EffectResult>,
   effectDescription?: string,
-  priorActionSucceeded?: boolean,
-  executionContext: "INTERACTIVE" | "PROMPTLESS_PHASE" = "INTERACTIVE"
+  priorActionSucceeded?: boolean
 ): ChainResult {
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
@@ -827,10 +824,7 @@ export function executeActionChain(
       }
     }
 
-    if (
-      executionContext === "INTERACTIVE" &&
-      isUpToResourceAction(action)
-    ) {
+    if (isUpToResourceAction(action)) {
       const expanded = expandUpToResourceAction(
         state,
         action,
@@ -847,7 +841,6 @@ export function executeActionChain(
         resultRefs,
         effectDescription,
         lastActionSucceeded,
-        executionContext,
       );
       return {
         state: continuation.state,

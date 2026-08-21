@@ -450,6 +450,23 @@ function hasValidSimultaneousGroup(value: unknown): boolean {
   );
 }
 
+function hasValidPhaseBoundaryContinuation(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
+  return (
+    value.kind === "END_PHASE" &&
+    (value.endingPlayerIndex === 0 || value.endingPlayerIndex === 1) &&
+    Array.isArray(value.remainingScheduledActions) &&
+    value.remainingScheduledActions.every(
+      (entry) =>
+        isRecord(entry) &&
+        isKnownAction(entry.action) &&
+        (entry.controller === 0 || entry.controller === 1) &&
+        typeof entry.sourceEffectId === "string"
+    )
+  );
+}
+
 function hasValidStackFrame(value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (
@@ -471,7 +488,8 @@ function hasValidStackFrame(value: unknown): boolean {
     return false;
   if (
     !hasValidBatchResumeMarker(value.batchResumeMarker) ||
-    !hasValidSimultaneousGroup(value.simultaneousGroup)
+    !hasValidSimultaneousGroup(value.simultaneousGroup) ||
+    !hasValidPhaseBoundaryContinuation(value.phaseBoundaryContinuation)
   )
     return false;
   for (const key of ["pendingTriggers", "simultaneousTriggers"] as const) {

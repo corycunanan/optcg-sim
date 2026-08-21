@@ -12,6 +12,7 @@ import type {
 import { EB01_016_BINGOH } from "../engine/schemas/eb01.js";
 import { EB02_047_BLUENO } from "../engine/schemas/eb02.js";
 import { EB03_014_KUINA } from "../engine/schemas/eb03.js";
+import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import { ST27_004_SANJUAN_WOLF } from "../engine/schemas/st27.js";
 import type { CardData, Env, GameState } from "../types.js";
 import {
@@ -112,7 +113,7 @@ describe("computeEffectAvailability", () => {
     ]);
   });
 
-  it("marks a real LeaderPropertyCondition permanent active or condition-blocked", () => {
+  it("keeps a permanent with conditions and no duration condition-gated", () => {
     const cardDb = createTestCardDb();
     setSchema(cardDb, CARDS.VANILLA.id, ST27_004_SANJUAN_WOLF);
     const state = createBattleReadyState(cardDb);
@@ -170,6 +171,92 @@ describe("computeEffectAvailability", () => {
     expect(computeEffectAvailability(negated, cardDb)[sourceId]).toEqual([
       {
         effectId: "conditional_blocker_cost",
+        status: "blocked",
+        reason: "CONDITION",
+      },
+    ]);
+  });
+
+  it("activates OP13-099 with 22 trash only during its controller's turn", () => {
+    const cardDb = createTestCardDb();
+    setSchema(cardDb, CARDS.STAGE.id, OP13_099_THE_EMPTY_THRONE);
+    const state = createBattleReadyState(cardDb);
+    const sourceSeed = state.players[0].characters[0]!;
+    const source = {
+      ...sourceSeed,
+      instanceId: "op13-099-stage",
+      cardId: CARDS.STAGE.id,
+      zone: "STAGE" as const,
+    };
+    const trash = Array.from({ length: 22 }, (_, index) => ({
+      ...sourceSeed,
+      instanceId: `op13-099-trash-${index}`,
+      zone: "TRASH" as const,
+    }));
+    const ownTurn = {
+      ...state,
+      players: [
+        { ...state.players[0], stage: source, trash },
+        state.players[1],
+      ],
+    } as GameState;
+
+    expect(
+      computeEffectAvailability(ownTurn, cardDb)[source.instanceId]?.find(
+        ({ effectId }) => effectId === "OP13-099_your_turn_power"
+      )
+    ).toEqual({ effectId: "OP13-099_your_turn_power", status: "active" });
+
+    const opponentTurn = {
+      ...ownTurn,
+      turn: { ...ownTurn.turn, activePlayerIndex: 1 as const },
+    };
+    expect(
+      computeEffectAvailability(opponentTurn, cardDb)[source.instanceId]?.find(
+        ({ effectId }) => effectId === "OP13-099_your_turn_power"
+      )
+    ).toEqual({
+      effectId: "OP13-099_your_turn_power",
+      status: "blocked",
+      reason: "CONDITION",
+    });
+  });
+
+  it("gates a permanent with duration and no conditions", () => {
+    const cardDb = createTestCardDb();
+    setSchema(cardDb, CARDS.VANILLA.id, {
+      effects: [
+        {
+          id: "your_turn_only",
+          category: "permanent",
+          modifiers: [
+            {
+              type: "MODIFY_POWER",
+              target: { type: "SELF" },
+              params: { amount: 1000 },
+            },
+          ],
+          duration: {
+            type: "WHILE_CONDITION",
+            condition: { type: "IS_MY_TURN", controller: "SELF" },
+          },
+        },
+      ],
+    });
+    const state = createBattleReadyState(cardDb);
+    const sourceId = state.players[0].characters[0]!.instanceId;
+
+    expect(computeEffectAvailability(state, cardDb)[sourceId]).toEqual([
+      { effectId: "your_turn_only", status: "active" },
+    ]);
+
+    const opponentTurn = {
+      ...state,
+      turn: { ...state.turn, activePlayerIndex: 1 as const },
+    };
+    expect(computeEffectAvailability(opponentTurn, cardDb)[sourceId]).toEqual([
+      {
+        effectId: "your_turn_only",
         status: "blocked",
         reason: "CONDITION",
       },
