@@ -87,6 +87,35 @@ describe("LifeZone battle feedback", () => {
     expect(onInspect).toHaveBeenCalledTimes(2);
   });
 
+  // The zone box is `CARD_SIZES.field` and the top life card fills it exactly,
+  // so every ring drawn on it traces that card's outline. `ring-*` is a
+  // `box-shadow` generated from the border box, which means the ring's corner
+  // is whatever radius the box carries (SHAPE-LANGUAGE.md §The card radius).
+  it("draws the zone rings on the card silhouette, not the chrome radius", () => {
+    const onInspect = vi.fn();
+    for (const props of [
+      { onInspect },
+      { onInspect, triggerPulse: true },
+      { onInspect, damagePulseNonce: 1 },
+      { onInspect, scryPulseNonce: 1 },
+    ]) {
+      const root = renderLifeZone(props);
+      const ringed = root
+        .findAllByType("div")
+        .map((node) => String(node.props.className))
+        .filter((name) => name.includes("ring-4"));
+
+      expect(ringed.length).toBeGreaterThan(0);
+      for (const name of ringed) {
+        expect(name).toContain("rounded-card");
+        expect(name).not.toMatch(/(?:^|\s)rounded(?:\s|$)/);
+      }
+
+      act(() => renderer?.unmount());
+      renderer = null;
+    }
+  });
+
   it("renders an amber Trigger pulse on the zone container", () => {
     const root = renderLifeZone({ triggerPulse: true });
     const ring = root
