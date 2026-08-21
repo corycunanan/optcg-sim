@@ -16,6 +16,7 @@ import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader, hasEffectiveKeyword } from "./keywords.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
 import type { Cost } from "./effect-types.js";
+import { evaluateCondition } from "./conditions.js";
 
 export function validate(
   state: GameState,
@@ -373,11 +374,24 @@ function validateActivateEffect(
   const cardData = cardDb.get(found.card.cardId);
   const schema = cardData?.effectSchema;
   const block = schema?.effects.find((b) => b.id === effectId);
-  if (!block || block.category !== "activate" || !block.costs?.length) return null;
+  if (!block || block.category !== "activate") return null;
 
   const controller = found.playerIndex;
-  if (!areEffectCostsPayable(state, block.costs, controller, cardDb, cardInstanceId)) {
+  if (
+    block.costs?.length &&
+    !areEffectCostsPayable(state, block.costs, controller, cardDb, cardInstanceId)
+  ) {
     return "Cost cannot be paid";
+  }
+  if (
+    block.conditions &&
+    !evaluateCondition(state, block.conditions, {
+      sourceCardInstanceId: cardInstanceId,
+      controller,
+      cardDb,
+    })
+  ) {
+    return "Effect conditions are not met";
   }
   return null;
 }

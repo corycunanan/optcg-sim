@@ -1571,6 +1571,93 @@ describe("ACTIVATE_EFFECT via pipeline", () => {
     expect(result.state.players[0].deck.length).toBe(state.players[0].deck.length - 1);
   });
 
+  it("rejects unmet activate conditions without recording or consuming the effect", () => {
+    const effectId = "activate_conditional_draw";
+    const activateCard: CardData = {
+      ...CARDS.VANILLA,
+      id: "TEST-CONDITIONAL-ACTIVATE",
+      name: "Conditional Activator",
+      effectText:
+        "[Activate: Main] [Once Per Turn] If this Character was played this turn, draw 1 card.",
+      effectSchema: {
+        card_id: "TEST-CONDITIONAL-ACTIVATE",
+        card_name: "Conditional Activator",
+        card_type: "Character",
+        effects: [
+          {
+            id: effectId,
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            conditions: { type: "WAS_PLAYED_THIS_TURN" },
+            costs: [{ type: "REST_SELF" }],
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+            flags: { once_per_turn: true },
+          },
+        ],
+      },
+    };
+    const { state: baseState, cardDb } = setupGame();
+    cardDb.set(activateCard.id, activateCard);
+    const source: CardInstance = {
+      instanceId: "conditional-activate-char",
+      cardId: activateCard.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const players = [...baseState.players] as [
+      typeof baseState.players[0],
+      typeof baseState.players[1],
+    ];
+    players[0] = {
+      ...players[0],
+      characters: padChars([
+        ...(players[0].characters.filter(Boolean) as CardInstance[]),
+        source,
+      ]),
+    };
+    const state: GameState = {
+      ...baseState,
+      players,
+      turn: {
+        ...baseState.turn,
+        number: 2,
+        activePlayerIndex: 0,
+        phase: "MAIN",
+        battleSubPhase: null,
+        battle: null,
+      },
+    };
+
+    const result = runPipeline(
+      state,
+      {
+        type: "ACTIVATE_EFFECT",
+        cardInstanceId: source.instanceId,
+        effectId,
+      },
+      cardDb,
+      0,
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Effect conditions are not met");
+    expect(result.state.turn.actionsPerformedThisTurn).toEqual(
+      state.turn.actionsPerformedThisTurn,
+    );
+    expect(result.state.turn.oncePerTurnUsed).toEqual(
+      state.turn.oncePerTurnUsed,
+    );
+    expect(
+      result.state.players[0].characters.find(
+        (card) => card?.instanceId === source.instanceId,
+      )?.state,
+    ).toBe("ACTIVE");
+  });
+
   it("blocks once-per-turn ACTIVATE_EFFECT from activating twice", () => {
     const oncePerTurnCard: CardData = {
       id: "TEST-OPT",

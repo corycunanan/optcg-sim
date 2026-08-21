@@ -107,7 +107,8 @@ function lucyState(
 
 function activateLucy(
   state: GameState,
-  cardDb: Map<string, CardData>
+  cardDb: Map<string, CardData>,
+  expectedValid = true
 ): GameState {
   const result = runPipeline(
     state,
@@ -119,7 +120,10 @@ function activateLucy(
     cardDb,
     0
   );
-  expect(result.valid).toBe(true);
+  expect(result.valid).toBe(expectedValid);
+  if (!expectedValid) {
+    expect(result.error).toBe("Effect conditions are not met");
+  }
   return result.state;
 }
 
@@ -173,7 +177,7 @@ describe("OPT-443: OP15-002 Lucy through PLAY_CARD → ACTIVATE_EFFECT", () => {
     ).toBe(true);
 
     const deckBefore = played.state.players[0].deck.length;
-    const after = activateLucy(played.state, cardDb);
+    const after = activateLucy(played.state, cardDb, false);
     expect(after.players[0].deck).toHaveLength(deckBefore);
   });
 
@@ -208,7 +212,7 @@ describe("OPT-443: OP15-002 Lucy through PLAY_CARD → ACTIVATE_EFFECT", () => {
     ).toBe(false);
 
     const deckBefore = played.state.players[0].deck.length;
-    const after = activateLucy(played.state, cardDb);
+    const after = activateLucy(played.state, cardDb, false);
     expect(after.players[0].deck).toHaveLength(deckBefore);
   });
 
@@ -344,7 +348,7 @@ describe("OPT-443: controller and latent action-category scope", () => {
     ).toBe(true);
 
     const deckBefore = result.state.players[0].deck.length;
-    const after = activateLucy(result.state, cardDb);
+    const after = activateLucy(result.state, cardDb, false);
     expect(after.players[0].deck).toHaveLength(deckBefore);
   });
 
