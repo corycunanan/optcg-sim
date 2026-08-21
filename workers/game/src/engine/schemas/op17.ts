@@ -1419,10 +1419,7 @@ export const OP17_043_GANZUI: EffectSchema = {
       category: "replacement",
       replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" },
       replacement_actions: [
-        {
-          type: "TRASH_CARD",
-          target: { type: "CARD_IN_HAND", controller: "SELF", count: { exact: 2 } },
-        },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 } },
       ],
       flags: { optional: true },
     },
@@ -1511,10 +1508,7 @@ export const OP17_045_KYO: EffectSchema = {
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
-        {
-          type: "TRASH_CARD",
-          target: { type: "CARD_IN_HAND", controller: "SELF", count: { exact: 2 } },
-        },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 } },
       ],
       flags: { optional: true },
     },
@@ -1566,6 +1560,12 @@ export const OP17_047_SHIKI: EffectSchema = {
       id: "end_turn_opponent_bottom_deck",
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
+      conditions: {
+        type: "HAND_COUNT",
+        controller: "SELF",
+        operator: "<=",
+        value: 2,
+      },
       actions: [
         {
           type: "OPPONENT_ACTION",
@@ -2305,6 +2305,7 @@ export const OP17_103_CHARLOTTE_KATAKURI: EffectSchema = {
       },
       actions: [
         {
+          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
           params: { amount: 1, position: "TOP", face: "DOWN" },
         },
@@ -2345,6 +2346,7 @@ export const OP17_104_CHARLOTTE_CRACKER: EffectSchema = {
       },
       actions: [
         {
+          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
           params: { amount: 1, position: "TOP", face: "DOWN" },
         },
@@ -2402,6 +2404,7 @@ export const OP17_106_CHARLOTTE_SMOOTHIE: EffectSchema = {
       costs: [{ type: "REST_DON", amount: 2 }],
       actions: [
         {
+          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
           params: { amount: 1, position: "TOP", face: "DOWN" },
         },

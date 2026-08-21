@@ -17,11 +17,23 @@ import type {
 import type { EffectSchema } from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
+import {
+  checkReplacementForRemoval,
+  resumeReplacement,
+  type ReplacementResumeContext,
+} from "../engine/replacements.js";
 import { getEffectivePower } from "../engine/modifiers.js";
-import { registerPermanentEffectsForCard } from "../engine/triggers.js";
+import {
+  registerPermanentEffectsForCard,
+  registerReplacementsForCard,
+  registerTriggersForCard,
+} from "../engine/triggers.js";
 import {
   OP17_042_KAIDO,
+  OP17_043_GANZUI,
   OP17_044_CAPTAIN_JOHN,
+  OP17_045_KYO,
   OP17_047_SHIKI,
   OP17_049_CHARLOTTE_LINLIN,
   OP17_101_CARIBOU,
@@ -207,32 +219,44 @@ function restedDonCount(state: GameState, playerIndex: 0 | 1): number {
 }
 
 describe("OPT-728 opponent-relative controller regressions", () => {
-  it("OP17-047 moves a card from the opponent's hand to their deck bottom", () => {
-    const { state, cardDb, source } = installCharacter(OP17_047_SHIKI);
+  it("OP17-047 fires at end of turn when its owner has 2 cards in hand", () => {
+    const { state: base, cardDb, source } = installCharacter(OP17_047_SHIKI);
+    let state = withPlayer(base, 0, { hand: base.players[0].hand.slice(0, 2) });
+    state = registerTriggersForCard(state, source, cardDb.get(source.cardId)!);
     const ownerHandBefore = state.players[0].hand.length;
     const opponentHandBefore = state.players[1].hand.length;
     const opponentDeckBefore = state.players[1].deck.length;
-    let result = resolveBlock(
-      state,
-      cardDb,
-      source,
-      OP17_047_SHIKI,
-      "end_turn_opponent_bottom_deck"
-    );
+    const result = runPipeline(state, { type: "ADVANCE_PHASE" }, cardDb, 0);
+    expect(result.valid).toBe(true);
     expect(result.pendingPrompt?.respondingPlayer).toBe(1);
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
       throw new Error("Expected opponent hand selection");
     }
-    result = selectTargets(
+    const completed = selectTargets(
       result,
       [result.pendingPrompt.options.validTargets[0]],
       cardDb
     );
 
+    expect(completed.pendingPrompt).toBeUndefined();
+    expect(completed.state.players[0].hand).toHaveLength(ownerHandBefore);
+    expect(completed.state.players[1].hand).toHaveLength(opponentHandBefore - 1);
+    expect(completed.state.players[1].deck).toHaveLength(opponentDeckBefore + 1);
+  });
+
+  it("OP17-047 does not fire at end of turn when its owner has 3 cards in hand", () => {
+    const { state: base, cardDb, source } = installCharacter(OP17_047_SHIKI);
+    let state = withPlayer(base, 0, { hand: base.players[0].hand.slice(0, 3) });
+    state = registerTriggersForCard(state, source, cardDb.get(source.cardId)!);
+    const opponentHandBefore = state.players[1].hand.length;
+    const opponentDeckBefore = state.players[1].deck.length;
+
+    const result = runPipeline(state, { type: "ADVANCE_PHASE" }, cardDb, 0);
+
+    expect(result.valid).toBe(true);
     expect(result.pendingPrompt).toBeUndefined();
-    expect(result.state.players[0].hand).toHaveLength(ownerHandBefore);
-    expect(result.state.players[1].hand).toHaveLength(opponentHandBefore - 1);
-    expect(result.state.players[1].deck).toHaveLength(opponentDeckBefore + 1);
+    expect(result.state.players[1].hand).toHaveLength(opponentHandBefore);
+    expect(result.state.players[1].deck).toHaveLength(opponentDeckBefore);
   });
 
   it("OP17-049 makes the opponent trash two cards from their own hand", () => {
@@ -304,6 +328,59 @@ describe("OPT-728 opponent-relative controller regressions", () => {
 });
 
 describe("OPT-728 paid and post-cost effects", () => {
+  it.each([
+    ["OP17-043", OP17_043_GANZUI],
+    ["OP17-045", OP17_045_KYO],
+  ])("%s offers its removal replacement only with at least 2 hand cards", (_cardId, schema) => {
+    const buildState = (handSize: number) => {
+      const { state: base, cardDb, source } = installCharacter(schema);
+      let state = withPlayer(base, 0, {
+        hand: base.players[0].hand.slice(0, handSize),
+      });
+      state = registerReplacementsForCard(
+        state,
+        source,
+        cardDb.get(source.cardId)!
+      );
+      return { state, cardDb, source };
+    };
+
+    const insufficient = buildState(1);
+    const unavailable = checkReplacementForRemoval(
+      insufficient.state,
+      insufficient.source.instanceId,
+      1,
+      insufficient.cardDb,
+      resolverExecutionServices
+    );
+    expect(unavailable.replaced).toBe(false);
+    expect(unavailable.pendingPrompt).toBeUndefined();
+    expect(unavailable.state.players[0].hand).toHaveLength(1);
+
+    const sufficient = buildState(2);
+    const offered = checkReplacementForRemoval(
+      sufficient.state,
+      sufficient.source.instanceId,
+      1,
+      sufficient.cardDb,
+      resolverExecutionServices
+    );
+    expect(offered.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    const completed = resumeReplacement(
+      offered.state,
+      offered.pendingPrompt!.resumeContext as ReplacementResumeContext,
+      true,
+      sufficient.cardDb,
+      resolverExecutionServices
+    );
+    expect(completed.replaced).toBe(true);
+    expect(completed.pendingPrompt).toBeUndefined();
+    expect(completed.state.players[0].hand).toHaveLength(0);
+    expect(completed.state.players[0].trash).toHaveLength(
+      sufficient.state.players[0].trash.length + 2
+    );
+  });
+
   it("OP17-044 blocks attacks away from rested Captain John", () => {
     const { state: base, cardDb, source } = installCharacter(
       OP17_044_CAPTAIN_JOHN
@@ -336,7 +413,7 @@ describe("OPT-728 paid and post-cost effects", () => {
     expect(forbidden.valid).toBe(false);
     expect(forbidden.state.players[1].leader.state).toBe("ACTIVE");
 
-    const allowed = runPipeline(
+    let allowed = runPipeline(
       state,
       {
         type: "DECLARE_ATTACK",
@@ -351,6 +428,21 @@ describe("OPT-728 paid and post-cost effects", () => {
     expect(allowed.state.turn.battle?.targetInstanceId).toBe(
       restedSource.instanceId
     );
+    allowed = runPipeline(allowed.state, { type: "PASS" }, cardDb, 1);
+    expect(allowed.valid).toBe(true);
+    allowed = runPipeline(allowed.state, { type: "PASS" }, cardDb, 1);
+    expect(allowed.valid).toBe(true);
+    expect(allowed.state.turn.battle).toBeNull();
+    expect(
+      allowed.state.players[0].characters.some(
+        (card) => card?.instanceId === restedSource.instanceId
+      )
+    ).toBe(false);
+    expect(
+      allowed.state.players[0].trash.some(
+        (card) => card.cardId === restedSource.cardId
+      )
+    ).toBe(true);
   });
 
   it("OP17-042 reveals three Rocks cards before completing the debuff", () => {
