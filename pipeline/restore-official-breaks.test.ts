@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { RawVegapullCard } from "./load";
 import {
   formattingLossWarning,
+  parseArguments,
   parseOfficialCardlist,
   restoreOfficialFormatting,
 } from "./restore-official-breaks";
@@ -24,6 +25,12 @@ describe("official cardlist formatting restoration", () => {
       ),
       readFile(join(FIXTURES, "official-cardlist-br.html"), "utf8"),
     ]);
+  });
+
+  it("accepts one leading pnpm argument separator", () => {
+    expect(
+      parseArguments(["--", "--pack-id", PACK_ID, "--data-dir", "/tmp/cards"])
+    ).toEqual({ packId: PACK_ID, dataDir: "/tmp/cards" });
   });
 
   it("restores official effect and trigger separators", () => {

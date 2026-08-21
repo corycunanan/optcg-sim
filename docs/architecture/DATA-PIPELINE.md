@@ -370,7 +370,7 @@ vega pull -o <dir> packs
 # Then pull each pack individually and immediately restore official separators
 for pack_id in $(cat <dir>/json/packs.json | python3 -c "..."); do
   vega pull -o <dir> cards "$pack_id"
-  pnpm pipeline:restore-official-breaks -- \
+  pnpm pipeline:restore-official-breaks \
     --pack-id "$pack_id" \
     --data-dir <dir>/json
   sleep 0.5  # rate limit
@@ -378,7 +378,7 @@ done
 
 # With images (much slower):
 vega pull -o <dir> cards <pack_id> --with-images
-pnpm pipeline:restore-official-breaks -- \
+pnpm pipeline:restore-official-breaks \
   --pack-id <pack_id> \
   --data-dir <dir>/json
 ```

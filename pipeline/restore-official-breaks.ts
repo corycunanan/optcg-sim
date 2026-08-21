@@ -2,7 +2,7 @@
  * Restore official Effect and Trigger `<br>` separators after a vega pull.
  *
  * Required immediately after every per-pack pull:
- *   pnpm pipeline:restore-official-breaks -- --pack-id 569117
+ *   pnpm pipeline:restore-official-breaks --pack-id 569117
  *
  * The script validates every field after replacing `<br>` with spaces and
  * collapsing whitespace. It writes nothing if any card's wording differs.
@@ -193,11 +193,12 @@ export function restoreOfficialFormatting(
   };
 }
 
-function parseArguments(args: string[]): RestoreOptions {
+export function parseArguments(args: string[]): RestoreOptions {
+  const normalizedArgs = args[0] === "--" ? args.slice(1) : args;
   const values = new Map<string, string>();
-  for (let index = 0; index < args.length; index += 2) {
-    const key = args[index];
-    const value = args[index + 1];
+  for (let index = 0; index < normalizedArgs.length; index += 2) {
+    const key = normalizedArgs[index];
+    const value = normalizedArgs[index + 1];
     if (!key?.startsWith("--") || !value || value.startsWith("--")) {
       throw new Error(`invalid argument near ${key ?? "end of command"}`);
     }
