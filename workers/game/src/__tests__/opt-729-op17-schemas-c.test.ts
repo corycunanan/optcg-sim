@@ -40,7 +40,12 @@ import {
 } from "../engine/schemas/op17.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
-type PromptResult = { state: GameState; pendingPrompt?: PendingPromptState };
+type PromptResult = {
+  state: GameState;
+  pendingPrompt?: PendingPromptState;
+  resolved?: boolean;
+  rejected?: boolean;
+};
 
 function withPlayer(
   state: GameState,
@@ -406,6 +411,86 @@ describe("OPT-729 multi-step costs and post-cost gates", () => {
     expect(result.state.players[0].donCostArea).toHaveLength(don + 1);
     expect(result.state.players[0].donCostArea.at(-1)?.state).toBe("ACTIVE");
   });
+
+  it("OP17-061 pays DON!! but records a performed no-op when its post-cost leader gate fails", () => {
+    const { state, cardDb, source } = installCharacter(OP17_061_LEAD_PERFORMERS);
+    const before = state.players[0];
+    const result = resolveBlock(state, cardDb, source, OP17_061_LEAD_PERFORMERS, "on_play_add_life");
+    expect(result.resolved).toBe(true);
+    expect(result.state.players[0].donCostArea).toHaveLength(before.donCostArea.length - 1);
+    expect(result.state.players[0].life).toEqual(before.life);
+    expect(result.state.players[0].deck).toEqual(before.deck);
+  });
+
+  it("OP17-063 pays DON!! but records a performed no-op when its post-cost played-this-turn gate fails", () => {
+    const fixture = installCharacter(OP17_063_KAIDO);
+    const source = { ...fixture.source, turnPlayed: fixture.state.turn.number - 1 };
+    const state = withPlayer(fixture.state, 0, { characters: padChars([source]) });
+    const before = state.players[1];
+    const result = resolveBlock(state, fixture.cardDb, source, OP17_063_KAIDO, "activate_negate_ko");
+    expect(result.resolved).toBe(true);
+    expect(result.state.players[0].donCostArea).toHaveLength(state.players[0].donCostArea.length - 1);
+    expect(result.state.players[1].characters).toEqual(before.characters);
+    expect(result.state.players[1].trash).toEqual(before.trash);
+  });
+
+  for (const [schema, effectId] of [
+    [OP17_066_KUROZUMI_OROCHI, "on_play_draw_trash"],
+    [OP17_067_KUROZUMI_KANJURO, "on_play_rest_character"],
+  ] as const) {
+    it(`${schema.card_id} pays DON!! but records a performed no-op when its post-cost cost-10 gate fails`, () => {
+      const { state, cardDb, source } = installCharacter(schema);
+      const ownerBefore = state.players[0];
+      const opponentBefore = state.players[1];
+      const result = resolveBlock(state, cardDb, source, schema, effectId);
+      expect(result.resolved).toBe(true);
+      expect(result.state.players[0].donCostArea).toHaveLength(ownerBefore.donCostArea.length - 1);
+      expect(result.state.players[0].hand).toEqual(ownerBefore.hand);
+      expect(result.state.players[0].deck).toEqual(ownerBefore.deck);
+      expect(result.state.players[0].trash).toEqual(ownerBefore.trash);
+      expect(result.state.players[1].characters).toEqual(opponentBefore.characters);
+    });
+  }
+
+  it("OP17-068 trashes two cards but records a performed no-op when its post-cost leader gate fails", () => {
+    const { state, cardDb, source } = installCharacter(OP17_068_SASAKI);
+    const hand = state.players[0].hand.length;
+    const trash = state.players[0].trash.length;
+    const don = state.players[0].donCostArea.length;
+    let result = resolveBlock(state, cardDb, source, OP17_068_SASAKI, "when_attacking_add_don");
+    result = acceptOptional(result, cardDb);
+    if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") throw new Error("hand prompt");
+    result = selectTargets(result, result.pendingPrompt.options.validTargets.slice(0, 2), cardDb);
+    expect(result.resolved).toBe(true);
+    expect(result.state.players[0].hand).toHaveLength(hand - 2);
+    expect(result.state.players[0].trash).toHaveLength(trash + 2);
+    expect(result.state.players[0].donCostArea).toHaveLength(don);
+  });
+
+  it("OP17-069 pays DON!! but records a performed no-op when its post-cost leader gate fails", () => {
+    const { state, cardDb, source } = installCharacter(OP17_069_JACK);
+    const target = state.players[1].characters[0]!;
+    const targetData = cardDb.get(target.cardId)!;
+    const result = resolveBlock(state, cardDb, source, OP17_069_JACK, "on_play_debuff");
+    expect(result.resolved).toBe(true);
+    expect(result.state.players[0].donCostArea).toHaveLength(state.players[0].donCostArea.length - 1);
+    expect(getEffectivePower(target, targetData, result.state, cardDb)).toBe(targetData.power);
+  });
+
+  it("OP17-073 trashes a card but records a performed no-op when its post-cost leader gate fails", () => {
+    const { state, cardDb, source } = installCharacter(OP17_073_BASIL_HAWKINS);
+    const hand = state.players[0].hand.length;
+    const trash = state.players[0].trash.length;
+    const don = state.players[0].donCostArea.length;
+    let result = resolveBlock(state, cardDb, source, OP17_073_BASIL_HAWKINS, "on_play_add_don");
+    result = acceptOptional(result, cardDb);
+    if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") throw new Error("hand prompt");
+    result = selectTargets(result, [result.pendingPrompt.options.validTargets[0]], cardDb);
+    expect(result.resolved).toBe(true);
+    expect(result.state.players[0].hand).toHaveLength(hand - 1);
+    expect(result.state.players[0].trash).toHaveLength(trash + 1);
+    expect(result.state.players[0].donCostArea).toHaveLength(don);
+  });
 });
 
 describe("OPT-729 counter grant and aggregate targeting", () => {
@@ -475,6 +560,32 @@ describe("OPT-729 counter grant and aggregate targeting", () => {
     expect(result.state.players[1].characters.some((card) => card?.instanceId === targets[2].instanceId)).toBe(false);
     expect(result.state.players[1].trash).toHaveLength(trash + 2);
     expect(fieldCount(result.state, 0)).toBe(fieldCount(state, 0));
+  });
+
+  it("OP17-119 rejects a selection whose total cost exceeds four without mutating the board", () => {
+    const { state: base, cardDb, source } = installCharacter(OP17_119_LOKI);
+    const costs = [2, 3];
+    const targets = costs.map((cost) => {
+      const id = `TEST-OVER-LIMIT-${cost}`;
+      cardDb.set(id, { ...CARDS.VANILLA, id, name: id, cost });
+      return {
+        ...base.players[1].characters[0]!,
+        instanceId: `opponent-over-limit-${cost}`,
+        cardId: id,
+        controller: 1 as const,
+        owner: 1 as const,
+        zone: "CHARACTER" as const,
+      };
+    });
+    const state = withPlayer(base, 1, { characters: padChars(targets) });
+    const beforeCharacters = state.players[1].characters;
+    const beforeTrash = state.players[1].trash;
+    let result = resolveBlock(state, cardDb, source, OP17_119_LOKI, "on_play_ko_aggregate");
+    result = selectTargets(result, targets.map((target) => target.instanceId), cardDb);
+    expect(result.rejected).toBe(true);
+    expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(result.state.players[1].characters).toEqual(beforeCharacters);
+    expect(result.state.players[1].trash).toEqual(beforeTrash);
   });
 });
 

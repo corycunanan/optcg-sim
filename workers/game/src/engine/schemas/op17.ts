@@ -1974,7 +1974,12 @@ export const OP17_062_KAIDO: EffectSchema = {
           type: "ADD_DON_FROM_DECK",
           params: { amount: 1, target_state: "ACTIVE" },
         },
-        { type: "SET_DON_ACTIVE", params: { amount: 1 }, chain: "THEN" },
+        {
+          // OPT-731: SET_DON_ACTIVE cannot yet model printed “up to 1”.
+          type: "SET_DON_ACTIVE",
+          params: { amount: 1 },
+          chain: "THEN",
+        },
       ],
       flags: { once_per_turn: true },
     },
@@ -3149,51 +3154,6 @@ export const OP17_094_RODO: EffectSchema = {
   ],
 };
 
-// ─── OP17-095 Roronoa Zoro (Character) ─────────────────────────────────────
-
-export const OP17_095_RORONOA_ZORO: EffectSchema = {
-  card_id: "OP17-095",
-  card_name: "Roronoa Zoro",
-  card_type: "Character",
-  effects: [
-    {
-      id: "cost_12_power",
-      category: "permanent",
-      modifiers: [
-        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
-      ],
-      duration: {
-        type: "WHILE_CONDITION",
-        condition: {
-          type: "BOARD_WIDE_EXISTENCE",
-          filter: { card_type: "CHARACTER", cost_min: 12 },
-        },
-      },
-    },
-    {
-      id: "removal_replacement_recycle",
-      category: "replacement",
-      replaces: {
-        event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { controller: "SELF", card_type: "CHARACTER" },
-        cause_filter: { by: "OPPONENT_EFFECT" },
-      },
-      replacement_actions: [
-        {
-          type: "PLACE_HAND_TO_DECK",
-          target: {
-            type: "CARD_IN_TRASH",
-            controller: "SELF",
-            count: { exact: 3 },
-          },
-          params: { amount: 3, position: "BOTTOM" },
-        },
-      ],
-      flags: { optional: true },
-    },
-  ],
-};
-
 // ─── OP17-096 I'm Luffy!! The Man Who Will Be King of the Pirates!! ─────────
 
 export const OP17_096_IM_LUFFY: EffectSchema = {
@@ -4112,7 +4072,6 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-092": OP17_092_BROGY,
   "OP17-093": OP17_093_MONKEY_D_LUFFY,
   "OP17-094": OP17_094_RODO,
-  "OP17-095": OP17_095_RORONOA_ZORO,
   "OP17-096": OP17_096_IM_LUFFY,
   "OP17-097": OP17_097_FEED_ON_THIS_RAGE,
   "OP17-098": OP17_098_GUM_GUM_KONG_GUN,
