@@ -15,8 +15,10 @@ import type {
   RuntimeActiveEffect,
   Target,
 } from "../engine/effect-types.js";
-import { getEffectivePower } from "../engine/modifiers.js";
+import { getEffectiveCost, getEffectivePower } from "../engine/modifiers.js";
+import { OP01_067_CROCODILE } from "../engine/schemas/op01.js";
 import { OP03_004_CURIEL } from "../engine/schemas/op03.js";
+import { OP05_097_MARY_GEOISE } from "../engine/schemas/op05.js";
 import {
   OP13_004_SABO,
   OP13_099_THE_EMPTY_THRONE,
@@ -299,5 +301,105 @@ describe("OPT-740 — permanent modifier leader targets", () => {
     expect(
       power(withUnknown.players[0].characters[0]!, withUnknown, cardDb)
     ).toBe(4000);
+  });
+
+  it("preserves OP05-097 Mary Geoise's CHARACTER_CARD cost reduction", () => {
+    const maryGeoiseData = data(
+      "OP05-097",
+      "Stage",
+      null,
+      OP05_097_MARY_GEOISE
+    );
+    const celestialDragonData = {
+      ...data("OPT740-CELESTIAL-DRAGON", "Character", 2000, null, 2),
+      types: ["Celestial Dragons"],
+    };
+    const cardDb = createTestCardDb();
+    cardDb.set(maryGeoiseData.id, maryGeoiseData);
+    cardDb.set(celestialDragonData.id, celestialDragonData);
+    let state = createBattleReadyState(cardDb);
+    const maryGeoise = instance(
+      maryGeoiseData.id,
+      0,
+      "opt740-mary-geoise",
+      "STAGE"
+    );
+    const celestialDragon = instance(
+      celestialDragonData.id,
+      0,
+      "opt740-celestial-dragon",
+      "HAND"
+    );
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      stage: maryGeoise,
+      hand: [celestialDragon],
+    };
+    state = { ...state, players };
+    state = registerPermanentEffectsForCard(state, maryGeoise, maryGeoiseData);
+
+    expect(
+      getEffectiveCost(
+        celestialDragonData,
+        state,
+        celestialDragon.instanceId,
+        cardDb
+      )
+    ).toBe(1);
+  });
+
+  it("preserves OP01-067 Crocodile's current CARD_IN_HAND cost reduction", () => {
+    const crocodileData = data(
+      "OP01-067",
+      "Character",
+      5000,
+      OP01_067_CROCODILE,
+      7
+    );
+    const blueEventData = {
+      ...data("OPT740-BLUE-EVENT", "Event", null, null, 4),
+      color: ["Blue" as const],
+    };
+    const cardDb = createTestCardDb();
+    cardDb.set(crocodileData.id, crocodileData);
+    cardDb.set(blueEventData.id, blueEventData);
+    let state = createBattleReadyState(cardDb);
+    const crocodile = {
+      ...instance(
+        crocodileData.id,
+        0,
+        "opt740-crocodile",
+        "CHARACTER"
+      ),
+      attachedDon: [
+        {
+          instanceId: "opt740-crocodile-don",
+          state: "ACTIVE" as const,
+          attachedTo: "opt740-crocodile",
+        },
+      ],
+    };
+    const blueEvent = instance(
+      blueEventData.id,
+      0,
+      "opt740-blue-event",
+      "HAND"
+    );
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      characters: padChars([crocodile]),
+      hand: [blueEvent],
+    };
+    state = { ...state, players };
+    state = registerPermanentEffectsForCard(state, crocodile, crocodileData);
+
+    // Known pre-existing bug: the active effect and raw-schema hand scan each
+    // apply -1. This pins today's observable behavior; a separate issue owns
+    // the rules-correct single application.
+    expect(
+      getEffectiveCost(blueEventData, state, blueEvent.instanceId, cardDb)
+    ).toBe(2);
   });
 });

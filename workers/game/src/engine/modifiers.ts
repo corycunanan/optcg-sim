@@ -114,22 +114,6 @@ function isCharacterOnField(
   );
 }
 
-const warnedPermanentModifierTargetTypes = new Set<string>();
-
-function warnUnhandledPermanentModifierTarget(
-  targetType: string | undefined
-): void {
-  if (typeof process === "undefined" || process.env.NODE_ENV === "production") {
-    return;
-  }
-  const label = targetType ?? "<missing>";
-  if (warnedPermanentModifierTargetTypes.has(label)) return;
-  warnedPermanentModifierTargetTypes.add(label);
-  console.warn(
-    `[modifiers] Unhandled permanent modifier target type "${label}"; modifier ignored.`
-  );
-}
-
 function numericModifierParam(
   modifier: Modifier,
   key: "amount" | "value"
@@ -237,7 +221,8 @@ function modifierAppliesToCard(
     case "SELF":
       return false;
     default:
-      warnUnhandledPermanentModifierTarget(targetType);
+      // Unknown permanent targets fail closed so a new target cannot become a
+      // wildcard across both fields before this resolver explicitly supports it.
       return false;
   }
 
