@@ -6,7 +6,7 @@
 
 > **Official reconciliation (2026-08-21, OPT-721):** The official site and vegapull confirm pack `569117`, titled `BOOSTER PACK -THE WORLD’S STRONGEST WARRIORS- [OP-17]`. The official payload contains 169 records: 119 OP-17 base cards, 39 OP-17 alternate arts, and 11 cross-set alternate arts. Five Block X base cards now have null block numbers. OP17-109 and OP17-111 have genuine Trigger fields on the official site, so OP-17 now contains 16 Trigger cards and the global OPT-590 inventory rises from 500 to 502. The 112 effect-bearing and 6 neither-effect-nor-Trigger counts remain unchanged.
 
-> **OPT-733 handoff:** OPT-721 leaves authored schemas and gate ratchets untouched and lands with a sliced manifest: the committed manifest intentionally keeps `hasTriggerText: false` for OP17-109 and OP17-111 so every merge stays green, even though the official site carries their Trigger fields. An interim `SEARCH_TRASH_THE_REST` disposition for OP17-109 sits in `docs/game-engine/SCHEMA-QA-DISPOSITIONS.md`. OPT-733 must flip the two manifest facts to true, encode both TRIGGER blocks, move the OPT-590 ratchet from 500 to 502, and resolve the interim disposition — in one PR, per the sliced-manifest landing pattern.
+> **OPT-733 closure (2026-08-21):** OPT-733 flips `hasTriggerText` to true for OP17-109 and OP17-111, authors both official TRIGGER blocks, and moves the OPT-590 ratchet from 500 to 502. The OP17-109 `SEARCH_TRASH_THE_REST` finding is resolved as an implemented false positive because `SEARCH_DECK` preserves the official bottom-the-rest clause.
 
 ## Official reconciliation delta inventory
 

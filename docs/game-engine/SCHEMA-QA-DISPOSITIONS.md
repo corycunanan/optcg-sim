@@ -53,4 +53,4 @@ cohort remains deferred.
 
 | Card     | Verdict             | Evidence                                                                                                                                                                                              |
 | -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP17-109 | Deferred to OPT-733 | The official pull added a five-card look Trigger that bottoms the rest; the authored schema predates it. OPT-733 encodes the TRIGGER block, flips the manifest fact, and resolves this disposition. |
+| OP17-109 | Implemented / false positive | `SEARCH_DECK` looks at five cards, adds up to one exact {Big Mom Pirates} type card to hand, and bottoms the rest. The detector's coarse signal only recognizes the trash-the-rest variant. |
