@@ -10,9 +10,11 @@ import {
   OP13_091_ST_MARCUS_MARS,
 } from "../engine/schemas/op13.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import type {
   CardData,
   CardInstance,
+  EffectStackFrame,
   GameState,
   PlayerState,
 } from "../types.js";
@@ -278,6 +280,100 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
     expectAllEldersPlayed(result.state);
   });
 
+  it("keeps a distributed play prompt above an outer interrupted continuation", () => {
+    const scenario = selectFiveElders(true);
+    expect(scenario.result.pendingPrompt?.options.promptType).toBe(
+      "OPTIONAL_EFFECT"
+    );
+    expect(
+      scenario.result.state.effectStack.map((frame) => frame.phase)
+    ).toEqual(["AWAITING_BATCH_RESUME", "AWAITING_OPTIONAL_RESPONSE"]);
+
+    const [batchFrame, optionalFrame] = scenario.result.state.effectStack;
+    if (batchFrame.batchResumeMarker?.kind !== "PLAY_CARD") {
+      throw new Error("Expected a PLAY_CARD batch resume marker");
+    }
+    const promptedTarget = scenario.selected[1];
+    const distributedAction = {
+      ...batchFrame.batchResumeMarker.pausedAction,
+      params: {
+        ...batchFrame.batchResumeMarker.pausedAction.params,
+        entry_state: "PLAYER_CHOICE" as const,
+        state_distribution: { ACTIVE: 1, RESTED: 1 },
+      },
+    };
+    const distributedBatchFrame: EffectStackFrame = {
+      ...batchFrame,
+      batchResumeMarker: {
+        kind: "PLAY_CARD",
+        pausedAction: distributedAction,
+        resumeFrame: {
+          remainingTargetIds: [promptedTarget.instanceId],
+          remaining: { ACTIVE: 1, RESTED: 1 },
+          playedSoFar: batchFrame.batchResumeMarker.resumeFrame.playedSoFar,
+        },
+      },
+    };
+    const outerFrame: EffectStackFrame = {
+      ...batchFrame,
+      id: "outer-interrupted-continuation",
+      phase: "INTERRUPTED_BY_TRIGGERS",
+      pausedAction: null,
+      remainingActions: [
+        {
+          type: "SET_REST",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { all: true },
+          },
+        },
+      ],
+      pendingTriggers: [],
+      batchResumeMarker: undefined,
+    };
+    const lifecycleServices = {
+      drainPregame: (state: GameState) => state,
+      advanceStartOfTurn: (state: GameState) => state,
+    };
+    const nestedState: GameState = {
+      ...scenario.result.state,
+      effectStack: [outerFrame, distributedBatchFrame, optionalFrame],
+      pendingPrompt: scenario.result.pendingPrompt ?? null,
+    };
+
+    const declined = resumePromptLifecycle(
+      nestedState,
+      { type: "PLAYER_CHOICE", choiceId: "skip" },
+      scenario.cardDb,
+      lifecycleServices
+    );
+    expect(declined.state.pendingPrompt?.options.promptType).toBe(
+      "PLAYER_CHOICE"
+    );
+    if (declined.state.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+      throw new Error("Expected a play state-choice prompt");
+    }
+    const activeChoice = declined.state.pendingPrompt.options.choices.find(
+      (choice) => choice.id.endsWith(":ACTIVE")
+    );
+    if (!activeChoice) throw new Error("Expected an active play choice");
+
+    const completed = resumePromptLifecycle(
+      declined.state,
+      { type: "PLAYER_CHOICE", choiceId: activeChoice.id },
+      scenario.cardDb,
+      lifecycleServices
+    );
+    const playedTarget = completed.state.players[0].characters.find(
+      (card) => card?.cardId === promptedTarget.cardId
+    );
+
+    expect(playedTarget).toBeDefined();
+    expect(playedTarget?.state).toBe("RESTED");
+    expect(completed.state.effectStack).toHaveLength(0);
+  });
+
   it("resumes a multi-KO after the first target's real ON_KO prompt", () => {
     const cardDb = createTestCardDb();
     cardDb.set(USOPP.id, USOPP);
@@ -334,6 +430,11 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
     );
 
     expect(result.state.players[1].characters.filter(Boolean)).toHaveLength(0);
+    expect(
+      result.state.players[1].trash.some(
+        (card) => card.cardId === secondVictim.cardId
+      )
+    ).toBe(true);
     expect(result.state.effectStack).toHaveLength(0);
   });
 });

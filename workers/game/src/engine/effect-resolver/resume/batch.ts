@@ -12,11 +12,18 @@ import type {
   PendingEvent,
   EffectStackFrame,
   QueuedTrigger,
+  ResumeContext,
 } from "../../../types.js";
-import { popFrame, peekFrame, pushFrame } from "../../effect-stack.js";
+import {
+  CONTINUATION_EFFECT_BLOCK,
+  popFrame,
+  peekFrame,
+  pushFrame,
+} from "../../effect-stack.js";
 import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { executePlayCard, executeSetRest } from "../actions/play.js";
 import { executeKO } from "../actions/removal.js";
+import { promptTypeToPhase } from "../cost-handler.js";
 import type {
   EffectResolverResult,
   ActionResult,
@@ -69,11 +76,40 @@ export function reenterBatchResume(
     events.push(...actionResult.events);
 
     if (actionResult.pendingPrompt) {
+      const context = actionResult.pendingPrompt.resumeContext as ResumeContext;
+      const generated = generateFrameId(nextState);
+      const promptFrame: EffectStackFrame = {
+        id: generated.id,
+        sourceCardInstanceId: context.effectSourceInstanceId,
+        controller: context.controller,
+        remainingActionsController: top.controller,
+        effectBlock: CONTINUATION_EFFECT_BLOCK,
+        phase: promptTypeToPhase(actionResult.pendingPrompt.options.promptType),
+        pausedAction: context.pausedAction,
+        remainingActions: top.remainingActions,
+        resultRefs: context.resultRefs,
+        validTargets: context.validTargets,
+        returnToDeckArrangement: context.returnToDeckArrangement,
+        costs: [],
+        currentCostIndex: 0,
+        costsPaid: true,
+        oncePerTurnMarked: true,
+        costResultRefs: [],
+        pendingTriggers: [],
+        simultaneousTriggers: [],
+        accumulatedEvents: events,
+        ruleTrashForPlay: context.ruleTrashForPlay,
+        stateDistributionForPlay: context.stateDistributionForPlay,
+      };
+      nextState = pushFrame(generated.state, promptFrame);
       return {
         state: nextState,
         events,
         resolved: false,
-        pendingPrompt: actionResult.pendingPrompt,
+        pendingPrompt: {
+          ...actionResult.pendingPrompt,
+          resumeContext: promptFrame.id,
+        },
       };
     }
 
