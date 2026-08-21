@@ -253,6 +253,11 @@ export function parseCardPage(
     }
     effect = "-";
   }
+  if (effect !== "-" && !/[.!?]["'）)\]]?$/.test(effect)) {
+    console.warn(
+      `  ⚠ ${id}: effect may be truncated; suspect tail "${effect.slice(-40)}"`
+    );
+  }
 
   const rarityLabel = requiredMatch(
     html,

@@ -134,6 +134,40 @@ describe("Limitless scraper", () => {
     );
   });
 
+  it("warns only when a non-vanilla effect lacks terminal punctuation", async () => {
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    const truncatedHtml = await readFile(
+      join(FIXTURES, "limitless-truncated-effect.html"),
+      "utf8"
+    );
+    const effectText =
+      "[On Play] Up to 1 of your opponent's Characters with a";
+    const cases = [
+      { effect: effectText, warns: true },
+      { effect: `${effectText}.`, warns: false },
+      { effect: `${effectText}.)`, warns: false },
+      { effect: "-", warns: false },
+    ];
+
+    for (const testCase of cases) {
+      warning.mockClear();
+      const html = truncatedHtml.replace(effectText, testCase.effect);
+
+      expect(parseCardPage(html, "OP17-105", PACK_ID).effect).toBe(
+        testCase.effect
+      );
+      if (testCase.warns) {
+        expect(warning).toHaveBeenCalledWith(
+          '  ⚠ OP17-105: effect may be truncated; suspect tail "o 1 of your opponent\'s Characters with a"'
+        );
+      } else {
+        expect(warning).not.toHaveBeenCalled();
+      }
+    }
+  });
+
   it("reports every failed card after attempting the complete list", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const references = [
