@@ -1,7 +1,15 @@
 "use client";
 
 import { memo, useCallback } from "react";
-import type { CardDb, GameAction, PlayerState, TurnState } from "@shared/game-types";
+import type {
+  CardDb,
+  CardInstance,
+  GameAction,
+  PlayerState,
+  TurnState,
+} from "@shared/game-types";
+import { hasRuntimeKeyword } from "@shared/effective-keyword";
+import { useActiveEffects } from "@/contexts/active-effects-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import { EmptySlot } from "./empty-slot";
@@ -57,6 +65,8 @@ interface PlayerFieldProps {
   pendingTransferDonIdsByCard?: Map<string, Set<string>>;
   donCountAdjustments?: Map<string, number>;
   attackerInstanceId?: string | null;
+  attackerCard?: CardInstance | null;
+  blockerAlreadyDeclared?: boolean;
   defenderInstanceId?: string | null;
   counterPulseIds?: Set<string>;
   winnerPulseIds?: Set<string>;
@@ -94,6 +104,8 @@ function PlayerFieldComponent({
   pendingTransferDonIdsByCard,
   donCountAdjustments,
   attackerInstanceId,
+  attackerCard,
+  blockerAlreadyDeclared = false,
   defenderInstanceId,
   counterPulseIds,
   winnerPulseIds,
@@ -108,6 +120,16 @@ function PlayerFieldComponent({
   onTargetToggle,
 }: PlayerFieldProps) {
   const interactionMode = useInteractionMode();
+  const activeEffects = useActiveEffects();
+  const attackerData = attackerCard ? cardDb[attackerCard.cardId] : undefined;
+  const attackerUnblockable = attackerCard
+    ? hasRuntimeKeyword(
+        attackerCard.instanceId,
+        attackerData?.keywords,
+        activeEffects,
+        "UNBLOCKABLE",
+      )
+    : false;
   const zoneKey = (zone: string) =>
     boardZoneKey(playerIndex, bottomPlayerIndex, zone);
   const handlePreviewLife = useCallback(
@@ -177,8 +199,15 @@ function PlayerFieldComponent({
         const isBlockerEligible =
           interactionMode !== "spectator" &&
           inBlockStep &&
+          !blockerAlreadyDeclared &&
+          !attackerUnblockable &&
           char.state === "ACTIVE" &&
-          !!charData?.keywords?.blocker;
+          hasRuntimeKeyword(
+            char.instanceId,
+            charData?.keywords,
+            activeEffects,
+            "BLOCKER",
+          );
         return (
           <PlayerFieldCard
             key={`plr-c${i}`}
