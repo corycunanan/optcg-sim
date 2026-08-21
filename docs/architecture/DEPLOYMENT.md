@@ -138,29 +138,42 @@ Card data updates (new set drops, errata patches, pipeline re-runs) land on dev 
 ```bash
 DEV_DIRECT=<dev DIRECT_DATABASE_URL>
 PROD_DIRECT=<prod DIRECT_DATABASE_URL>
+PROD_ENDPOINT_HINT=ep-your-production-endpoint
+
+# A Vercel-stored DIRECT_DATABASE_URL may end with the literal characters "\\n".
+# Strip that suffix because it breaks parsing of the channel_binding query parameter.
+PROD_DIRECT="${PROD_DIRECT%\\n}"
 
 # 1. Make sure schema is in sync on both branches (prod deploys apply migrations automatically;
 #    dev should already be caught up from local `pnpm db:migrate`).
 
-# 2. Dump only card-data tables from dev.
+# 2. Dump prod's card-data tables before changing them. Keep this file as the
+#    rollback source; restore it to a temporary database before using its rows.
 pg_dump \
-  --dbname="$DEV_DIRECT" \
+  --dbname="$PROD_DIRECT" \
   --data-only \
   --no-owner \
   --no-acl \
-  -t '"Card"' \
-  -t '"ArtVariant"' \
-  -t '"CardSet"' \
-  -t '"Errata"' \
-  > /tmp/optcg-card-data.sql
+  --format=custom \
+  --table=public.cards \
+  --table=public.art_variants \
+  --table=public.card_sets \
+  --table=public.errata \
+  --file=/tmp/optcg-prod-card-data.dump
 
-# 3. Take a prod snapshot (Neon console → Branches → branch from main) as a rollback point.
-
-# 4. Restore into prod. Card rows are upserted on primary key; safe to re-apply.
-#    CardSet is a clean-slate table in the pipeline — if the dump wasn't taken at a stable
-#    point, prefer re-running the pipeline against dev, freezing dev, then dumping.
-psql "$PROD_DIRECT" < /tmp/optcg-card-data.sql
+# 3. Promote with two direct database connections. The required endpoint hint
+#    makes the script fail closed unless PROD_URL names the expected prod host.
+DEV_URL="$DEV_DIRECT" \
+PROD_URL="$PROD_DIRECT" \
+PROD_ENDPOINT_HINT="$PROD_ENDPOINT_HINT" \
+npx tsx scripts/promote-card-data.ts
 ```
+
+The script upserts `Card` by `id`, `CardSet` by `(cardId, packId)`, and `ArtVariant` by `variantId`. It runs in batches, reports before/after counts, never deletes rows, and never copies dev UUIDs into existing prod rows.
+
+`Errata` has no natural unique key, so the script skips every errata row with a runtime warning. Promote errata separately only after adding and deploying a schema-backed natural key.
+
+Do not restore a `pg_dump --data-only` file directly into non-empty prod tables. Its `COPY` statements stop at duplicate primary keys. Do not use `TRUNCATE ... CASCADE` as a workaround because it can cascade into `deck_cards` and destroy user deck contents.
 
 ## Cloudflare Workers: deploying on merge
 
