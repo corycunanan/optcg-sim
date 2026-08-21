@@ -1166,6 +1166,18 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(cancel).toBeDefined();
     expect(cancel!.props.className ?? "").not.toContain("hidden");
 
+    // The strip is the only band that forbids wrapping. `lg` is a fixed 18rem
+    // column inside an `overflow-hidden` section, so it keeps `main`'s
+    // `flex-wrap` and a countdown whose text can still break under text zoom —
+    // both rules stay scoped rather than becoming unconditional.
+    const controls = countdown!.parent!;
+    expect(controls.props.className).toContain("lg:flex-wrap");
+    expect(controls.props.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+    expect(countdown!.props.className).toContain("max-lg:whitespace-nowrap");
+    expect(countdown!.props.className).not.toMatch(
+      /(^|\s)whitespace-nowrap(\s|$)/
+    );
+
     // Identity is the strip's flexible member, so it truncates rather than
     // pushing the countdown or the cancel action out of the frame.
     const identity = panel

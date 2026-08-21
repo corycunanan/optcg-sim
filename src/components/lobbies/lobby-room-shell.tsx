@@ -1329,9 +1329,13 @@ export function InvitePanel({
           </div>
           {/* `shrink-0` below `lg` is the whole point of the strip: the
               countdown and the cancel action keep their intrinsic widths and
-              the identity line is the member that gives way. */}
-          <div className="flex items-center justify-center gap-3 max-lg:shrink-0 lg:flex-col lg:[@media(min-height:50rem)]:gap-5">
-            <p className="border-border bg-surface-3 text-content-primary rounded border px-4 py-2 text-sm font-semibold tabular-nums whitespace-nowrap max-lg:px-3">
+              the identity line is the member that gives way. Both wrapping
+              rules are scoped to the strip for the same reason — the `lg`
+              panel is a fixed 18rem column that has to stay able to reflow
+              under text zoom, so it keeps `flex-wrap` and a countdown whose
+              text can still break across lines. */}
+          <div className="flex items-center justify-center gap-3 max-lg:shrink-0 lg:flex-col lg:flex-wrap lg:[@media(min-height:50rem)]:gap-5">
+            <p className="border-border bg-surface-3 text-content-primary rounded border px-4 py-2 text-sm font-semibold tabular-nums max-lg:px-3 max-lg:whitespace-nowrap">
               Expires in {formatInviteCountdown(timing.remainingMs)}
             </p>
             {showInviteFriend && (
