@@ -395,6 +395,7 @@ if (IS_MAIN) {
 
     for (const violation of findClassTokenViolations(source, {
       includeTypeFloor: !typeFloorExempt,
+      includeNonstandardRadixStateVariants: !path.endsWith(".test.tsx"),
     })) {
       addViolation(
         path,
@@ -626,9 +627,28 @@ function isShapeVocabularyToken(token, vocabulary) {
  */
 export function findClassTokenViolations(
   source,
-  { includeTypeFloor = true, vocabulary = SHAPE_VOCABULARY } = {}
+  {
+    includeTypeFloor = true,
+    includeNonstandardRadixStateVariants = true,
+    vocabulary = SHAPE_VOCABULARY,
+  } = {}
 ) {
   const violations = [];
+
+  const reportNonstandardRadixStateVariant = (token, index) => {
+    const nonstandardRadixStateVariant = [
+      "data-open:",
+      "data-closed:",
+      "data-popup-open:",
+    ].find((variant) => token.includes(variant));
+    if (!includeNonstandardRadixStateVariants || !nonstandardRadixStateVariant)
+      return;
+    violations.push({
+      index,
+      rule: "radix-data-state",
+      message: `nonstandard Radix state variant ${JSON.stringify(nonstandardRadixStateVariant)} in ${JSON.stringify(token)}; data-popup-open: is a dead selector and data-open:/data-closed: depend on a vendored shadcn custom variant; use data-[state=open]:/data-[state=closed]:`,
+    });
+  };
 
   const report = (token, index) => {
     if (includeTypeFloor && TYPE_FLOOR_CLASS_TOKENS.has(token)) {
@@ -661,11 +681,17 @@ export function findClassTokenViolations(
 
   forEachClassPosition(source, {
     onLiteral: (node, index) => {
-      for (const token of classTokenNames(node.text)) report(token, index);
+      for (const rawToken of node.text.split(/\s+/).filter(Boolean)) {
+        reportNonstandardRadixStateVariant(rawToken, index);
+        report(normalizeClassToken(rawToken), index);
+      }
     },
     // A class list assembled around interpolations still contributes its static
     // halves verbatim, so `` className={`shadow ${extra}`} `` is a real `shadow`.
-    onStaticToken: report,
+    onStaticToken: (token, index) => {
+      reportNonstandardRadixStateVariant(token, index);
+      report(normalizeClassToken(token), index);
+    },
     onDynamic: () => {},
   });
 
@@ -861,8 +887,7 @@ function templateStaticTokens(node, sourceFile) {
 
     const index = fragment.node.getStart(sourceFile);
     for (const chunk of chunks) {
-      const token = normalizeClassToken(chunk);
-      if (token) tokens.push({ token, index });
+      if (chunk) tokens.push({ token: chunk, index });
     }
   }
 
