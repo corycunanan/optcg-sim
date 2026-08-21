@@ -14,6 +14,8 @@
 
 > **OPT-723 closure (2026-08-21):** OPT-723 adds Stage K.O. field transitions with KO events, replacement interception, and Character-only trigger filtering. It authors the full OP17-018 and OP17-116 Main and Counter effects without Trigger blocks, advancing the OPT-603 sweep to 2,471 cards alongside the merged OP17-095; OP17-041 remains deferred to OPT-725.
 
+> **OPT-725 closure (2026-08-21):** OPT-725 authors OP17-041 after extending owner-ordered bottom-deck arrangement prompts to multi-card field batches. The OPT-603 sweep advances to 2,472 cards; with OP17-018, OP17-095, and OP17-116 already landed by OPT-723/732, no OP17 cards remain deferred to engine tickets except the OPT-731 migration set.
+
 ## Official reconciliation delta inventory
 
 | Field                     |                                Records | Official delta                                                                                                                                                  | Disposition                                                                                                  |

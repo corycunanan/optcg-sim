@@ -261,6 +261,17 @@ const PregameState = z.strictObject({
   startOfGameEffectsResolved: z.tuple([z.boolean(), z.boolean()]),
 });
 
+const ReturnToDeckArrangement = z.strictObject({
+  targetIds: StringArray,
+  orderedOwnerGroups: z.array(
+    z.strictObject({
+      owner: PlayerIndex,
+      targetIds: StringArray,
+    })
+  ),
+  remainingOwners: z.array(PlayerIndex),
+});
+
 const StackFrameCore = z.strictObject({
   id: z.string(),
   sourceCardInstanceId: z.string(),
@@ -281,6 +292,7 @@ const StackFrameCore = z.strictObject({
   remainingActions: z.array(z.unknown()),
   resultRefs: z.array(z.tuple([z.string(), z.unknown()])),
   validTargets: StringArray,
+  returnToDeckArrangement: ReturnToDeckArrangement.optional(),
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
   replacementBatchContinuation: z.unknown().optional(),

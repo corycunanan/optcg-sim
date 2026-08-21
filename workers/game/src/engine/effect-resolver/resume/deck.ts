@@ -88,6 +88,7 @@ export function handleArrangeReturnToDeck(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   validTargets: string[] | undefined,
+  arrangement: import("../../../types.js").ReturnToDeckArrangement | undefined,
   services: EffectResolverServices,
 ): ActionResult | null {
   if (action.type !== "ARRANGE_TOP_CARDS" || !pausedAction || pausedAction.type !== "RETURN_TO_DECK") {
@@ -102,6 +103,22 @@ export function handleArrangeReturnToDeck(
     if (!seen.has(id)) ordered.push(id);
   }
 
+  const pendingOwner = arrangement?.remainingOwners[0];
+  const nextArrangement = arrangement && pendingOwner !== undefined
+    ? {
+        ...arrangement,
+        orderedOwnerGroups: [
+          ...arrangement.orderedOwnerGroups,
+          { owner: pendingOwner, targetIds: ordered },
+        ],
+        remainingOwners: arrangement.remainingOwners.slice(1),
+      }
+    : {
+        targetIds: ordered,
+        orderedOwnerGroups: [],
+        remainingOwners: [],
+      };
+
   return executeReturnToDeck(
     state,
     pausedAction,
@@ -109,9 +126,9 @@ export function handleArrangeReturnToDeck(
     controller,
     cardDb,
     resultRefs,
-    ordered,
+    nextArrangement.targetIds,
     services,
-    true,
+    nextArrangement,
   );
 }
 

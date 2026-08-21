@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
 import type {
+  EffectStackFrame,
   Env,
   GameState,
   LobbyMode,
@@ -62,6 +63,37 @@ function checkpoint(state: GameState, turnNumber: number): GameState {
   };
 }
 
+function arrangementFrame(): EffectStackFrame {
+  return {
+    id: "return-to-deck-arrangement",
+    sourceCardInstanceId: "return-to-deck-source",
+    controller: 0,
+    effectBlock: {
+      id: "return-to-deck-effect",
+      category: "activate",
+      actions: [],
+    },
+    phase: "AWAITING_ARRANGE_CARDS",
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: ["owner-zero-card", "owner-one-card"],
+    returnToDeckArrangement: {
+      targetIds: ["owner-zero-card", "owner-one-card"],
+      orderedOwnerGroups: [{ owner: 0, targetIds: ["owner-zero-card"] }],
+      remainingOwners: [1],
+    },
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+  };
+}
+
 type TestGameSession = {
   gameState: GameState | null;
   cardDb: Map<string, unknown> | null;
@@ -84,6 +116,47 @@ function gameSession(storage: SessionStorage): TestGameSession {
 }
 
 describe("OPT-379 split session persistence", () => {
+  it("round-trips return-to-deck arrangement progress on the top stack frame", async () => {
+    const storage = new MemoryStorage();
+    const { state, cardDb } = setupGame();
+    const frame = arrangementFrame();
+
+    await repository(storage).save({
+      state: { ...state, effectStack: [frame] },
+      cardDb,
+      mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
+      testPriorityRolls: null,
+      undoHistory: [],
+    });
+
+    const restored = await repository(storage).load();
+    expect(restored?.state.effectStack.at(-1)?.returnToDeckArrangement).toEqual(
+      frame.returnToDeckArrangement
+    );
+  });
+
+  it("restores a stack frame without return-to-deck arrangement progress", async () => {
+    const storage = new MemoryStorage();
+    const { state, cardDb } = setupGame();
+    const { returnToDeckArrangement: _omitted, ...legacyFrame } =
+      arrangementFrame();
+
+    await repository(storage).save({
+      state: { ...state, effectStack: [legacyFrame] },
+      cardDb,
+      mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
+      testPriorityRolls: null,
+      undoHistory: [],
+    });
+
+    const restored = await repository(storage).load();
+    expect(
+      restored?.state.effectStack.at(-1)?.returnToDeckArrangement
+    ).toBeUndefined();
+  });
+
   it("persists the Solitaire random first-side decision across hibernation", async () => {
     const storage = new MemoryStorage();
     const { state, cardDb } = setupGame();
@@ -100,18 +173,18 @@ describe("OPT-379 split session persistence", () => {
     const restored = await repository(storage).load();
     expect(restored?.pregameMode).toBe("SOLITAIRE_RANDOM");
     expect(restored?.state.pregame?.firstPlayerIndex).toBe(
-      saved.state.pregame?.firstPlayerIndex,
+      saved.state.pregame?.firstPlayerIndex
     );
     expect(restored?.state.turn.activePlayerIndex).toBe(
-      saved.state.turn.activePlayerIndex,
+      saved.state.turn.activePlayerIndex
     );
     expect(restored?.state.executionContext.rngState).toBe(
-      saved.state.executionContext.rngState,
+      saved.state.executionContext.rngState
     );
     expect(
       restored?.state.eventLog.some(
-        (event) => event.type === "PREGAME_PRIORITY_ROLLED",
-      ),
+        (event) => event.type === "PREGAME_PRIORITY_ROLLED"
+      )
     ).toBe(false);
   });
 
