@@ -116,16 +116,50 @@ describe("OPT-730 OPPONENT_CHOICE branch feasibility", () => {
     ).toBe(false);
   });
 
-  it("offers both Maser Saber branches when the opponent can trash exactly three cards", () => {
-    const { result } = driveToMaserSaberTrigger(3);
+  it("lets the opponent trash exactly three hand cards without executing the K.O. branch", () => {
+    const { result: trigger, cardDb, opponentTarget } = driveToMaserSaberTrigger(4);
+    const cardsToTrash = trigger.state.players[0].hand.slice(0, 3);
 
-    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
-    if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+    expect(trigger.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (trigger.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
       throw new Error("Expected a branch-choice prompt");
     }
-    expect(result.pendingPrompt.options.choices.map((choice) => choice.id)).toEqual([
+    expect(trigger.pendingPrompt.options.choices.map((choice) => choice.id)).toEqual([
       "0",
       "1",
     ]);
+    let result = resumeFromStack(
+      trigger.state,
+      { type: "PLAYER_CHOICE", choiceId: "0" },
+      cardDb,
+    );
+
+    expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+    if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
+      throw new Error("Expected the opponent's hand-selection prompt");
+    }
+    result = resumeFromStack(
+      result.state,
+      {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: cardsToTrash.map((card) => card.instanceId),
+      },
+      cardDb,
+    );
+
+    expect(result.state.players[0].hand.map((card) => cardDb.get(card.cardId)?.name)).toEqual([
+      "CHAR-BLOCKER",
+    ]);
+    expect(
+      result.state.players[0].trash
+        .map((card) => cardDb.get(card.cardId)?.name)
+        .sort(),
+    ).toEqual(["CHAR-DATK", "CHAR-RUSH", "CHAR-VANILLA"]);
+    expect(
+      result.state.players[0].characters.some(
+        (card: CardInstance | null) => card?.instanceId === opponentTarget.instanceId,
+      ),
+    ).toBe(true);
   });
 });
