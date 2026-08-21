@@ -278,6 +278,14 @@ function BoardLayoutInner({
   );
   const attackerInstanceId = bs.battle?.attackerInstanceId ?? null;
   const defenderInstanceId = bs.battle?.targetInstanceId ?? null;
+  const attackerCard = attackerInstanceId
+    ? [
+        bottomPlayer?.leader,
+        topPlayer?.leader,
+        ...(bottomPlayer?.characters ?? []),
+        ...(topPlayer?.characters ?? []),
+      ].find((card) => card?.instanceId === attackerInstanceId) ?? null
+    : null;
   const playerLifeTriggerPulse = triggerPulsePlayerIndexes.has(bottomPlayerIndex);
   const opponentLifeTriggerPulse = triggerPulsePlayerIndexes.has(topPlayerIndex);
   const playerLifeDamagePulseNonce = lifeDamagePulseNonces.get(bottomPlayerIndex);
@@ -551,6 +559,8 @@ function BoardLayoutInner({
             pendingTransferDonIdsByCard={redistribution.pendingDonIdsByCard}
             donCountAdjustments={mergedDonCountAdjustments}
             attackerInstanceId={attackerInstanceId}
+            attackerCard={attackerCard}
+            blockerAlreadyDeclared={bs.battle?.blockerActivated ?? false}
             defenderInstanceId={defenderInstanceId}
             counterPulseIds={counterPulseIds}
             winnerPulseIds={fieldPulseProps.winnerPulseIds}

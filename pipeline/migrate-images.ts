@@ -18,6 +18,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { normalizeCdnUrl } from "./image-hosting";
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY!;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!;
-const CDN_URL = (process.env.NEXT_PUBLIC_CDN_URL || "").replace(/\/$/, "");
+const CDN_URL = normalizeCdnUrl(process.env.NEXT_PUBLIC_CDN_URL) || "";
 
 const DEFAULT_CONCURRENCY = 5;
 const RETRY_ATTEMPTS = 3;
@@ -74,7 +75,12 @@ interface MigrationResult {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function validateEnv() {
-  const required = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME", "NEXT_PUBLIC_CDN_URL"];
+  if (!CDN_URL) {
+    console.error("\nNEXT_PUBLIC_CDN_URL must be set to a non-empty CDN URL.\n");
+    process.exit(1);
+  }
+
+  const required = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     console.error(`\nMissing required env vars: ${missing.join(", ")}`);

@@ -7,6 +7,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { BaseCard, ArtVariantEntry } from "./classify";
 import type { CardSetEntry } from "./build-set-membership";
+import { normalizeCdnUrl, summarizeOffCdn } from "./image-hosting";
 
 export async function verify(
   prisma: PrismaClient,
@@ -132,6 +133,36 @@ export async function verify(
 
   if (missingImage > 0) {
     issues.push(`${missingImage} cards have empty imageUrl`);
+  }
+
+  const cdnUrl = normalizeCdnUrl(process.env.NEXT_PUBLIC_CDN_URL);
+  if (!cdnUrl) {
+    console.log(`    ⚠ NEXT_PUBLIC_CDN_URL unset — cannot check image hosting`);
+  } else {
+    const [cardImages, variantImages] = await Promise.all([
+      prisma.card.findMany({ select: { id: true, imageUrl: true } }),
+      prisma.artVariant.findMany({
+        select: { variantId: true, imageUrl: true },
+      }),
+    ]);
+    const imageHosting = summarizeOffCdn(
+      cardImages,
+      variantImages.map(({ variantId, imageUrl }) => ({
+        id: variantId,
+        imageUrl,
+      })),
+      cdnUrl
+    );
+
+    if (imageHosting.total > 0) {
+      console.log(
+        `    ⚠ ${imageHosting.total} images not yet on CDN (${imageHosting.cards.length} cards, ${imageHosting.variants.length} variants) — run: pnpm pipeline:migrate-images`
+      );
+      const ids = [...imageHosting.cards, ...imageHosting.variants]
+        .slice(0, 20)
+        .map(({ id }) => id);
+      console.log(`      First ${ids.length} ids: ${ids.join(", ")}`);
+    }
   }
 
   console.log(`    Vanilla cards (empty effect): ${missingEffect}`);
