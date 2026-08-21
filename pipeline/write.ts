@@ -34,64 +34,68 @@ export async function writeToDatabase(
   for (let i = 0; i < baseCards.length; i += BATCH_SIZE) {
     const batch = baseCards.slice(i, i + BATCH_SIZE);
 
-    await prisma.$transaction(async (tx) => {
-      const existingCards = await tx.card.findMany({
-        where: { id: { in: batch.map((card) => card.id) } },
-        select: { id: true, imageUrl: true },
-      });
-      const existingImageUrls = new Map(
-        existingCards.map((card) => [card.id, card.imageUrl])
-      );
+    // Allow one BATCH_SIZE upsert batch to complete over a remote connection.
+    await prisma.$transaction(
+      async (tx) => {
+        const existingCards = await tx.card.findMany({
+          where: { id: { in: batch.map((card) => card.id) } },
+          select: { id: true, imageUrl: true },
+        });
+        const existingImageUrls = new Map(
+          existingCards.map((card) => [card.id, card.imageUrl])
+        );
 
-      await Promise.all(
-        batch.map((card) => {
-          const existingImageUrl = existingImageUrls.get(card.id);
-          const replaceStubImage =
-            existingImageUrl !== undefined &&
-            shouldReplaceStubImage(existingImageUrl, card);
+        await Promise.all(
+          batch.map((card) => {
+            const existingImageUrl = existingImageUrls.get(card.id);
+            const replaceStubImage =
+              existingImageUrl !== undefined &&
+              shouldReplaceStubImage(existingImageUrl, card);
 
-          return tx.card.upsert({
-            where: { id: card.id },
-            create: {
-              id: card.id,
-              originSet: card.originSet,
-              name: card.name,
-              type: card.type,
-              color: card.color,
-              cost: card.cost,
-              life: card.life,
-              power: card.power,
-              counter: card.counter,
-              attribute: card.attribute,
-              traits: card.traits,
-              rarity: card.rarity,
-              effectText: card.effectText,
-              triggerText: card.triggerText,
-              imageUrl: card.imageUrl,
-              blockNumber: card.blockNumber,
-              isReprint: card.isReprint,
-            },
-            update: {
-              name: card.name,
-              type: card.type,
-              color: card.color,
-              cost: card.cost,
-              life: card.life,
-              power: card.power,
-              counter: card.counter,
-              attribute: card.attribute,
-              traits: card.traits,
-              rarity: card.rarity,
-              effectText: card.effectText,
-              triggerText: card.triggerText,
-              ...(replaceStubImage ? { imageUrl: card.imageUrl } : {}),
-              // Otherwise preserve CDN URLs set by migrate-images.
-              blockNumber: card.blockNumber,
-            },
-          });
-        })
-      );
-    });
+            return tx.card.upsert({
+              where: { id: card.id },
+              create: {
+                id: card.id,
+                originSet: card.originSet,
+                name: card.name,
+                type: card.type,
+                color: card.color,
+                cost: card.cost,
+                life: card.life,
+                power: card.power,
+                counter: card.counter,
+                attribute: card.attribute,
+                traits: card.traits,
+                rarity: card.rarity,
+                effectText: card.effectText,
+                triggerText: card.triggerText,
+                imageUrl: card.imageUrl,
+                blockNumber: card.blockNumber,
+                isReprint: card.isReprint,
+              },
+              update: {
+                name: card.name,
+                type: card.type,
+                color: card.color,
+                cost: card.cost,
+                life: card.life,
+                power: card.power,
+                counter: card.counter,
+                attribute: card.attribute,
+                traits: card.traits,
+                rarity: card.rarity,
+                effectText: card.effectText,
+                triggerText: card.triggerText,
+                ...(replaceStubImage ? { imageUrl: card.imageUrl } : {}),
+                // Otherwise preserve CDN URLs set by migrate-images.
+                blockNumber: card.blockNumber,
+              },
+            });
+          })
+        );
+      },
+      { maxWait: 10_000, timeout: 120_000 }
+    );
 
     cardsUpserted += batch.length;
     if ((i + BATCH_SIZE) % 500 === 0 || i + BATCH_SIZE >= baseCards.length) {
