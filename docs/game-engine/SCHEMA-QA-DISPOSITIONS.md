@@ -53,4 +53,4 @@ cohort remains deferred.
 
 | Card     | Verdict             | Evidence                                                                                                                                                                                              |
 | -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP17-109 | Implemented / false positive | `SEARCH_DECK` looks at five cards, adds up to one exact {Big Mom Pirates} type card to hand, and bottoms the rest. The detector's coarse signal only recognizes the trash-the-rest variant. |
+| OP17-109 | Incorrect — corrected | The detector correctly flagged the missing official Trigger encoding (its pattern matches bottom-the-rest searches and clears on `SEARCH_DECK`). OPT-733 added the `SEARCH_DECK` Trigger block: look at five, add up to one exact {Big Mom Pirates} type card to hand, bottom the rest. |
