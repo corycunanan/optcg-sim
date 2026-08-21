@@ -1376,6 +1376,56 @@ export const OP17_039_ROCKS_D_XEBEC: EffectSchema = {
   ],
 };
 
+// ─── OP17-040 Edward.Newgate (Character) ────────────────────────────────────
+
+export const OP17_040_EDWARD_NEWGATE: EffectSchema = {
+  card_id: "OP17-040",
+  card_name: "Edward.Newgate",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_draw",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    },
+    {
+      id: "rocks_leader_attack_or_attacked_power",
+      category: "auto",
+      trigger: {
+        any_of: [
+          {
+            keyword: "WHEN_ATTACKING",
+            source_filter: {
+              controller: "SELF",
+              card_type: "LEADER",
+              traits_contains: ["Rocks Pirates"],
+            },
+          },
+          {
+            keyword: "WHEN_ATTACKED",
+            source_filter: {
+              controller: "SELF",
+              card_type: "LEADER",
+              traits_contains: ["Rocks Pirates"],
+            },
+          },
+        ],
+      },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER" },
+          params: { amount: 3000 },
+          duration: { type: "THIS_BATTLE" },
+        },
+      ],
+      flags: { once_per_turn: true, optional: true },
+    },
+  ],
+};
+
 // ─── OP17-042 Kaido (Character) ─────────────────────────────────────────────
 
 export const OP17_042_KAIDO: EffectSchema = {
@@ -3916,9 +3966,6 @@ export const OP17_117_MASER_SABER: EffectSchema = {
       trigger: { keyword: "TRIGGER" },
       actions: [
         {
-          // GAP: OPPONENT_CHOICE has no branch-feasibility contract, so the
-          // exact-3 branch cannot be hidden when the opponent has fewer than
-          // 3 cards without changing engine vocabulary.
           type: "OPPONENT_CHOICE",
           params: {
             mandatory: true,
@@ -3931,6 +3978,7 @@ export const OP17_117_MASER_SABER: EffectSchema = {
                     mandatory: true,
                     action: {
                       type: "TRASH_CARD",
+                      requires: { type: "FULL_TARGET_COUNT" },
                       target: {
                         type: "CARD_IN_HAND",
                         controller: "SELF",
@@ -4097,6 +4145,7 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-037": OP17_037_AFRAID_OF_THE_NEW_ERA,
   "OP17-038": OP17_038_UGLY_FUTURE,
   "OP17-039": OP17_039_ROCKS_D_XEBEC,
+  "OP17-040": OP17_040_EDWARD_NEWGATE,
   "OP17-042": OP17_042_KAIDO,
   "OP17-043": OP17_043_GANZUI,
   "OP17-044": OP17_044_CAPTAIN_JOHN,

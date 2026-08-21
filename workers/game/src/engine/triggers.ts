@@ -499,8 +499,26 @@ function matchesKeywordTrigger(
   // filter only the negated branch and still fire on other branches.
   if (isTriggerTypeNegated(state, sourceCard, trigger.keyword, cardDb)) return false;
 
-  // For self-referencing triggers, check that the event involves this card
-  if (isSelfReferencingTrigger(trigger.keyword)) {
+  // Source-filtered attack triggers observe another card while keeping the
+  // effect registered on its schema host. The observed card is the attacker
+  // at ATTACK_DECLARED and the final target at ATTACK_TARGET_FINAL.
+  if (trigger.source_filter) {
+    const observedCardId = getSourceFilteredAttackCardId(trigger.keyword, event);
+    if (!observedCardId) return false;
+    const observedCard = findCardInstance(state, observedCardId);
+    if (!observedCard) return false;
+    if (!matchesFilter(
+      observedCard,
+      trigger.source_filter,
+      cardDb,
+      state,
+      undefined,
+      undefined,
+      sourceCard.controller,
+    )) return false;
+  } else if (isSelfReferencingTrigger(trigger.keyword)) {
+    // Existing keyword triggers remain self-referencing when no source filter
+    // is declared.
     const cardInEvent = getCardFromEvent(event);
     if (cardInEvent && cardInEvent !== sourceCard.instanceId) return false;
   }
@@ -512,7 +530,7 @@ function matchesKeywordTrigger(
   // WHEN_ATTACKED does not fire).
   if (trigger.keyword === "WHEN_ATTACKED") {
     if (event.type !== "ATTACK_TARGET_FINAL") return false;
-    if (event.payload.targetInstanceId !== sourceCard.instanceId) return false;
+    if (!trigger.source_filter && event.payload.targetInstanceId !== sourceCard.instanceId) return false;
   }
 
   // On Play does not fire when the Character entered the field rested.
@@ -639,6 +657,19 @@ function isSelfReferencingTrigger(keyword: KeywordTriggerType): boolean {
     "ON_KO",
     "ON_BLOCK",
   ].includes(keyword);
+}
+
+function getSourceFilteredAttackCardId(
+  keyword: KeywordTriggerType,
+  event: GameEvent,
+): string | null {
+  if (keyword === "WHEN_ATTACKING" && event.type === "ATTACK_DECLARED") {
+    return event.payload.attackerInstanceId;
+  }
+  if (keyword === "WHEN_ATTACKED" && event.type === "ATTACK_TARGET_FINAL") {
+    return event.payload.targetInstanceId;
+  }
+  return null;
 }
 
 /** Check if a trigger contains ON_KO (direct keyword or inside compound any_of). */

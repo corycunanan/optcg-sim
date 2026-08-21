@@ -261,6 +261,16 @@ export function handlePlayerChoiceBranch(
   ) {
     return null;
   }
+  if (
+    resumeCtx.validTargets &&
+    resumeCtx.validTargets.length > 0 &&
+    !resumeCtx.validTargets.includes(action.choiceId)
+  ) {
+    return {
+      kind: "terminal",
+      result: { state, events: [], resolved: false, rejected: true },
+    };
+  }
 
   let nextState = state;
   const options = getActionParams(pausedAction, pausedAction.type).options;

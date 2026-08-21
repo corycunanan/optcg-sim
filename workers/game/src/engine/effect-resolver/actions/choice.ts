@@ -19,6 +19,7 @@ import { describeActionBranch, resolveAmount } from "../action-utils.js";
 import { getActionParams } from "../../effect-types.js";
 import { findCardInstance } from "../../state.js";
 import type { EffectResolverServices } from "../services.js";
+import { isActionBranchFeasible } from "../feasibility.js";
 
 export function executePlayerChoice(
   state: GameState,
@@ -39,25 +40,48 @@ export function executePlayerChoice(
   if (!options || options.length === 0)
     return { state, events, succeeded: false };
 
+  const feasibleOptions = options
+    .map((branch, originalIndex) => ({ branch, originalIndex }))
+    .filter(({ branch }) =>
+      isActionBranchFeasible(
+        state,
+        branch,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+      ),
+    );
+  if (feasibleOptions.length === 0)
+    return { state, events, succeeded: false };
+
   // Determine who chooses: PLAYER_CHOICE = controller, OPPONENT_CHOICE = opponent
   const chooser: 0 | 1 =
     action.type === "OPPONENT_CHOICE" ? (controller === 0 ? 1 : 0) : controller;
 
   // If only one option, auto-select it (no prompt needed)
-  if (options.length === 1) {
-    const result = services.executeActionChain(state, options[0], sourceCardInstanceId, controller, cardDb);
+  if (feasibleOptions.length === 1) {
+    const result = services.executeActionChain(
+      state,
+      feasibleOptions[0].branch,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+    );
     return {
       state: result.state,
       events: [...events, ...result.events],
-      succeeded: true,
+      succeeded: !result.pendingPrompt,
+      pendingPrompt: result.pendingPrompt,
     };
   }
 
   // Build choice labels from action types or explicit labels
   const explicitLabels = params.labels;
-  const choices = options.map((branch, i) => ({
-    id: String(i),
-    label: explicitLabels?.[i] ?? describeActionBranch(branch),
+  const choices = feasibleOptions.map(({ branch, originalIndex }) => ({
+    id: String(originalIndex),
+    label: explicitLabels?.[originalIndex] ?? describeActionBranch(branch),
   }));
 
   const choiceSourceCard = findCardInstance(state, sourceCardInstanceId);
@@ -70,7 +94,7 @@ export function executePlayerChoice(
     pausedAction: action,
     remainingActions: [],
     resultRefs: [...resultRefs.entries()],
-    validTargets: [],
+    validTargets: choices.map((choice) => choice.id),
   };
 
   const pendingPrompt: PendingPromptState = {
