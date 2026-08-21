@@ -320,7 +320,7 @@ export function executePlayCard(
     if (frame.failed) break;
     if (frame.playedId) playedIds.push(frame.playedId);
 
-    // OPT-172: rule 6-2 — drain ON_PLAY triggers between frames. If this
+    // OPT-172: §8-6 / §8-6-1-1 — drain ON_PLAY triggers between frames. If this
     // frame queued any triggers and more frames remain, pause the batch and
     // surface a resume marker so the resolver can drain triggers first and
     // then re-invoke us with the remaining-batch state.
@@ -481,7 +481,7 @@ export function executeSetRest(
     frameEvents.push(evt);
     restedIds.push(id);
 
-    // OPT-172: rule 6-2 — drain ON_REST triggers between SET_REST frames.
+    // OPT-172: §8-6 / §8-6-1-1 — drain ON_REST triggers between SET_REST frames.
     if (i + 1 < unprotectedIds.length && frameEvents.length > 0) {
       const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
       nextState = scan.state;

@@ -635,6 +635,9 @@ export function resumeFromStack(
         services
       );
 
+    case "AWAITING_BATCH_RESUME":
+      return services.reenterBatchResume(state, cardDb);
+
     default:
       return { state, events: [], resolved: false };
   }

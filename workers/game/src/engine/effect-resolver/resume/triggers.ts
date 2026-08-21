@@ -31,7 +31,7 @@ export function processRemainingTriggers(
   let nextState = state;
 
   if (pendingTriggers.length === 0) {
-    return { state: nextState, events, resolved: true };
+    return services.reenterBatchResume(nextState, cardDb, events);
   }
 
   // Group by controller — turn player resolves first (§8-6),
