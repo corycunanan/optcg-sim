@@ -1,6 +1,11 @@
 import type { ComponentProps, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import {
+  act,
+  create,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from "react-test-renderer";
 import type { LobbyRoomState } from "@/lib/lobbies/state";
 import type { RealtimeServerEvent } from "@/types/realtime";
 
@@ -242,6 +247,13 @@ let renderer: ReactTestRenderer | null = null;
 
 function renderedText() {
   return JSON.stringify(renderer?.toJSON());
+}
+
+/** Flattens an element's text, including text held by nested elements. */
+function textOf(node: ReactTestInstance): string {
+  return node.children
+    .map((child) => (typeof child === "string" ? child : textOf(child)))
+    .join("");
 }
 
 function lobbyState(overrides: Partial<LobbyRoomState> = {}): LobbyRoomState {
@@ -1067,10 +1079,120 @@ describe("LobbyRoomShell redesign scenarios", () => {
     expect(
       renderer!.root
         .findAllByType("h3")
-        .some((heading) =>
-          heading.children.join("").startsWith("Invite sent to ")
-        )
+        .some((heading) => textOf(heading) === "Invite sent to nami")
     ).toBe(true);
+  });
+
+  // OPT-711. Class strings cannot prove geometry — the browser measurement in
+  // the PR does that. What they can pin is the *mechanism*: below `lg` the
+  // header and body boxes drop out (`contents`) so their children re-flow into
+  // one strip beside the avatar, and only the parts the fold is allowed to
+  // spend carry a hiding variant.
+  it("re-flows the pending-invite panel into one strip below lg", async () => {
+    mocks.apiGet.mockImplementation(async (url: string) =>
+      url === "/api/decks"
+        ? { data: [] }
+        : {
+            data: lobbyState({
+              status: "WAITING",
+              guest: null,
+              pendingInvite: {
+                id: "invite-1",
+                expiresAt: "2099-07-24T20:01:00.000Z",
+                user: {
+                  id: "friend-1",
+                  username: "nami",
+                  name: "Nami",
+                  image: null,
+                },
+              },
+            }),
+          }
+    );
+
+    await act(async () => {
+      renderer = create(
+        <LobbyRoomShell lobbyId="lobby-1" currentUserId="host-user" />
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const panel = renderer!.root.findByProps({
+      "aria-label": "Guest seat — invite pending",
+    });
+
+    // A row on the seats column's height budget, a panel column from `lg`.
+    const panelClasses: string = panel.props.className;
+    expect(panelClasses).toContain("max-lg:items-center");
+    expect(panelClasses).toContain("max-lg:px-3");
+    expect(panelClasses).toContain("max-lg:py-2");
+    expect(panelClasses).toContain("lg:flex-col");
+    expect(panelClasses).toContain("lg:w-72");
+    // Nothing stretches the strip to fill a tall stacked column any more.
+    expect(panelClasses).not.toMatch(/(^|\s)grow(\s|$)/);
+
+    // Both boxes dissolve below `lg`; the DOM order is untouched.
+    const header = panel.findByType("header");
+    expect(header.props.className).toContain("max-lg:contents");
+    const body = panel
+      .findAllByType("div")
+      .find((node) => node.findAllByType("h3").length > 0);
+    expect(body?.props.className).toContain("max-lg:contents");
+
+    // What yields: the reassurance line (already tall-viewport-only), then the
+    // header's label and heading.
+    const headingBlock = header
+      .findAllByType("div")
+      .find((node) => node.findAllByType("h2").length > 0);
+    expect(headingBlock?.props.className).toContain("max-lg:hidden");
+    const reassurance = panel
+      .findAllByType("p")
+      .find((node) => node.children.join("").startsWith("Their seat is"));
+    expect(reassurance?.props.className).toContain("hidden");
+    expect(reassurance?.props.className).toContain(
+      "lg:[@media(min-height:50rem)]:block"
+    );
+
+    // What never yields: the countdown and the way out.
+    const countdown = panel
+      .findAllByType("p")
+      .find((node) => node.children.join("").startsWith("Expires in"));
+    expect(countdown).toBeDefined();
+    expect(countdown!.props.className).not.toContain("hidden");
+    const cancel = panel
+      .findAllByType("button")
+      .find((node) => node.children.includes("Cancel invite"));
+    expect(cancel).toBeDefined();
+    expect(cancel!.props.className ?? "").not.toContain("hidden");
+
+    // The strip is the only band that forbids wrapping. `lg` is a fixed 18rem
+    // column inside an `overflow-hidden` section, so it keeps `main`'s
+    // `flex-wrap` and a countdown whose text can still break under text zoom —
+    // both rules stay scoped rather than becoming unconditional.
+    const controls = countdown!.parent!;
+    expect(controls.props.className).toContain("lg:flex-wrap");
+    expect(controls.props.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+    expect(countdown!.props.className).toContain("max-lg:whitespace-nowrap");
+    expect(countdown!.props.className).not.toMatch(
+      /(^|\s)whitespace-nowrap(\s|$)/
+    );
+
+    // Identity is the strip's flexible member, so it truncates rather than
+    // pushing the countdown or the cancel action out of the frame.
+    const identity = panel
+      .findAllByType("div")
+      .find((node) => node.findAllByType("h3").length > 0 && node !== body);
+    expect(identity?.props.className).toContain("max-lg:flex-1");
+    expect(identity?.props.className).toContain("min-w-0");
+    const identityHeading = panel.findByType("h3");
+    expect(identityHeading.props.className).toContain("truncate");
+    // The strip names who, not what happened: the sentence's prefix is the
+    // part the narrow fold spends, so the name always renders in full.
+    expect(textOf(identityHeading)).toBe("Invite sent to nami");
+    const prefix = identityHeading.findByType("span");
+    expect(textOf(prefix)).toBe("Invite sent to ");
+    expect(prefix.props.className).toContain("max-lg:hidden");
   });
 
   it("renders occupied host and guest seats with self-scoped controls", async () => {
