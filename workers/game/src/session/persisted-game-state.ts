@@ -350,6 +350,7 @@ const EventPayloadSchemas = {
     causingController: PlayerIndex.optional(),
     causeCardInstanceId: z.string().optional(),
     preKO_donCount: FiniteNumber,
+    cardType: z.literal("STAGE").optional(),
   }),
   CARD_DRAWN: z.strictObject({
     cardId: z.string(),

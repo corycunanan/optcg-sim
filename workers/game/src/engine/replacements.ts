@@ -248,6 +248,17 @@ function replacementMatchesTarget(
 ): boolean {
   if (params.trigger !== event) return false;
 
+  const targetCard = findCardInstance(state, targetInstanceId);
+  if (event === "WOULD_BE_KO" && targetCard?.zone === "STAGE") {
+    const declaredCardTypes = params.target_filter?.card_type;
+    const includesStage = Array.isArray(declaredCardTypes)
+      ? declaredCardTypes.includes("STAGE")
+      : declaredCardTypes === "STAGE";
+    // WOULD_BE_KO filters default to Character-only: every replacement print
+    // authored before Stage K.O. support scopes its protected card as a Character.
+    if (!includesStage) return false;
+  }
+
   // Removal/leave replacements describe a card leaving the field. Secret-
   // and open-area moves such as Hand/Trash/Life -> Deck must not spend or
   // offer a field replacement merely because the replacement is wildcarded.
@@ -260,7 +271,6 @@ function replacementMatchesTarget(
   if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) return false;
 
   if (params.target_filter) {
-    const targetCard = findCardInstance(state, targetInstanceId);
     if (!targetCard) return false;
     if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) return false;
     if (!matchesFilter(targetCard, params.target_filter, cardDb, state, undefined, undefined, effect.controller)) return false;

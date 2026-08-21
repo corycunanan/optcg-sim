@@ -487,6 +487,15 @@ function matchesKeywordTrigger(
   sourceCard: CardInstance,
   cardDb: Map<string, CardData>,
 ): boolean {
+  // Rule 10-2-17 defines [On K.O.] on Character cards only. OP17-018/116 can
+  // K.O. a Stage via Rule 1-3-1, but that Stage K.O. does not open an ON_KO
+  // trigger window.
+  if (
+    trigger.keyword === "ON_KO" &&
+    event.type === "CARD_KO" &&
+    event.payload.cardType === "STAGE"
+  ) return false;
+
   // Map keyword trigger types to event types
   const eventType = keywordToEventType(trigger.keyword);
   if (!eventType) return false;
@@ -696,6 +705,12 @@ const REMOVED_FROM_FIELD_EVENTS: GameEventType[] = [
 ];
 
 function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent): boolean {
+  if (
+    event.type === "CARD_KO" &&
+    event.payload.cardType === "STAGE" &&
+    ["CHARACTER_REMOVED_FROM_FIELD", "OPPONENT_CHARACTER_KO", "ANY_CHARACTER_KO"].includes(custom)
+  ) return false;
+
   if (custom === "CHARACTER_REMOVED_FROM_FIELD") {
     if (!REMOVED_FROM_FIELD_EVENTS.includes(event.type)) return false;
     if (event.type === "CARD_TRASHED") {
