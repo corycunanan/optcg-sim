@@ -10,6 +10,8 @@
 
 > **OPT-726 closure (2026-08-21):** OPT-726 authors OP17-118 after adding conditional HAND-zone self `COUNTER_GRANT` evaluation at counter time. The OPT-603 sweep advances to 2,467 cards, leaving OP17-018, OP17-040, OP17-041, OP17-095, and OP17-116 deferred to their sibling engine tickets.
 
+> **OPT-732 closure (2026-08-21):** OPT-732 authors OP17-095 after reusing the OPT-730 `FULL_TARGET_COUNT` feasibility contract for replacement substitutes. The OPT-603 sweep advances to 2,469 cards; OP17-095 now places exactly 3 Trash cards at the deck bottom in their owner's order and is not offered with fewer than 3 eligible cards.
+
 ## Official reconciliation delta inventory
 
 | Field                     |                                Records | Official delta                                                                                                                                                  | Disposition                                                                                                  |
