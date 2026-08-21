@@ -111,7 +111,7 @@ function precolonPhrase(line: string): string {
  * phrase it declines. Each entry is a reviewed judgment about a real card, not a
  * regression baseline — adding one asserts "this phrase is not a price".
  *
- * The first eight are option headers: prose that introduces a list of modes, not
+ * The first nine are option headers: prose that introduces a list of modes, not
  * something the player pays. They are the reason the grammar insists on a
  * payment marker instead of taking any pre-colon phrase.
  *
@@ -131,6 +131,7 @@ function precolonPhrase(line: string): string {
 const UNPRICED_COLON_PHRASES = [
   "Choose one",
   "Your opponent chooses one",
+  "Draw 1 card, then choose one",
   "Apply each of the following effects based on the number of cards in your trash",
   "If the number of DON!! cards on your field is equal to or less than the number on your opponent's field, choose one",
   "If your Leader is [Lucy], choose one",
