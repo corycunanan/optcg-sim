@@ -236,7 +236,22 @@ export const OP17_037_AFRAID_OF_THE_NEW_ERA: EffectSchema = {
       id: "counter_rest_card_power",
       category: "activate",
       trigger: { keyword: "COUNTER_EVENT" },
-      costs: [{ type: "REST_CARDS", amount: 1 }],
+      costs: [
+        {
+          type: "CHOICE",
+          labels: ["Rest 1 field card", "Rest 1 DON!! card"],
+          options: [
+            [
+              {
+                type: "REST_CARDS",
+                amount: 1,
+                filter: { card_type: ["LEADER", "CHARACTER", "STAGE"] },
+              },
+            ],
+            [{ type: "REST_DON", amount: 1 }],
+          ],
+        },
+      ],
       actions: [
         {
           type: "MODIFY_POWER",
@@ -265,7 +280,52 @@ export const OP17_038_UGLY_FUTURE: EffectSchema = {
       id: "main_rest_character",
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
-      costs: [{ type: "REST_CARDS", amount: 4 }],
+      costs: [
+        {
+          type: "CHOICE",
+          labels: [
+            "Rest 4 field cards",
+            "Rest 3 field cards and 1 DON!! card",
+            "Rest 2 field cards and 2 DON!! cards",
+            "Rest 1 field card and 3 DON!! cards",
+            "Rest 4 DON!! cards",
+          ],
+          options: [
+            [
+              {
+                type: "REST_CARDS",
+                amount: 4,
+                filter: { card_type: ["LEADER", "CHARACTER", "STAGE"] },
+              },
+            ],
+            [
+              {
+                type: "REST_CARDS",
+                amount: 3,
+                filter: { card_type: ["LEADER", "CHARACTER", "STAGE"] },
+              },
+              { type: "REST_DON", amount: 1 },
+            ],
+            [
+              {
+                type: "REST_CARDS",
+                amount: 2,
+                filter: { card_type: ["LEADER", "CHARACTER", "STAGE"] },
+              },
+              { type: "REST_DON", amount: 2 },
+            ],
+            [
+              {
+                type: "REST_CARDS",
+                amount: 1,
+                filter: { card_type: ["LEADER", "CHARACTER", "STAGE"] },
+              },
+              { type: "REST_DON", amount: 3 },
+            ],
+            [{ type: "REST_DON", amount: 4 }],
+          ],
+        },
+      ],
       actions: [
         {
           type: "SET_REST",
@@ -503,6 +563,7 @@ export const OP17_076_I_THINK_IVE_SOBERED_UP: EffectSchema = {
       id: "counter_trash_power",
       category: "activate",
       trigger: { keyword: "COUNTER_EVENT" },
+      // Canonical source typo: "Charactes" is interpreted as "Characters".
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [
         {
@@ -811,7 +872,7 @@ export const OP17_099_CHARLOTTE_LINLIN: EffectSchema = {
                       type: "TRASH_CARD",
                       target: {
                         type: "CARD_IN_HAND",
-                        controller: "OPPONENT",
+                        controller: "SELF",
                         count: { exact: 1 },
                       },
                     },
@@ -905,6 +966,9 @@ export const OP17_117_MASER_SABER: EffectSchema = {
       trigger: { keyword: "TRIGGER" },
       actions: [
         {
+          // GAP: OPPONENT_CHOICE has no branch-feasibility contract, so the
+          // exact-3 branch cannot be hidden when the opponent has fewer than
+          // 3 cards without changing engine vocabulary.
           type: "OPPONENT_CHOICE",
           params: {
             mandatory: true,
@@ -919,7 +983,7 @@ export const OP17_117_MASER_SABER: EffectSchema = {
                       type: "TRASH_CARD",
                       target: {
                         type: "CARD_IN_HAND",
-                        controller: "OPPONENT",
+                        controller: "SELF",
                         count: { exact: 3 },
                       },
                     },
