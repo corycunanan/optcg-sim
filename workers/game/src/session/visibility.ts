@@ -8,6 +8,7 @@ import type {
   TurnState,
 } from "../types.js";
 import { isEffectConditionMet } from "../engine/modifiers.js";
+import { getEffectiveCounterValue } from "../engine/counter-value.js";
 import {
   filterStateForPlayer,
   obfuscatePlayersDecksAndFaceDownLife,
@@ -299,7 +300,18 @@ export function visibleStateForPlayer(
   cardDb: Map<string, CardData>,
   playerIndex: 0 | 1
 ): GameState {
-  return filterStateForPlayer(stripInactiveEffects(state, cardDb), playerIndex);
+  const visible = filterStateForPlayer(stripInactiveEffects(state, cardDb), playerIndex);
+  const players = [...visible.players] as [typeof visible.players[0], typeof visible.players[1]];
+  players[playerIndex] = {
+    ...players[playerIndex],
+    hand: players[playerIndex].hand.map((card) => {
+      const data = cardDb.get(card.cardId);
+      return data
+        ? { ...card, effectiveCounter: getEffectiveCounterValue(card, data, state, cardDb) }
+        : card;
+    }),
+  };
+  return { ...visible, players };
 }
 
 /**

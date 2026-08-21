@@ -206,7 +206,15 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
           {data.type !== "Leader" && (
             <TooltipStat
               label="Counter"
-              value={data.counter != null ? `+${data.counter}` : "—"}
+              value={
+                card?.effectiveCounter != null
+                  ? card.effectiveCounter > 0
+                    ? `+${card.effectiveCounter}`
+                    : "—"
+                  : data.counter != null
+                    ? `+${data.counter}`
+                    : "—"
+              }
             />
           )}
         </div>

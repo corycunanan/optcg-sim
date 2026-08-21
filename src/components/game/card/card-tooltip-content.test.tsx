@@ -442,6 +442,20 @@ describe("CardTooltipContent status glyph row", () => {
 });
 
 describe("CardTooltipContent modified stats", () => {
+  it("shows a server-computed effective Counter for a hand Character", () => {
+    const markup = renderTooltip({
+      cardData: { ...data, counter: null },
+      cardInstance: {
+        ...card,
+        zone: "HAND",
+        effectiveCounter: 2000,
+      } as CardInstance,
+    });
+
+    expect(markup).toContain("Counter");
+    expect(markup).toContain("+2000");
+  });
+
   it("keeps the value white and points the chevron pair up for a power buff", () => {
     const markup = renderTooltip({
       effectAvailability: {},

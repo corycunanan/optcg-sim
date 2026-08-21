@@ -4007,6 +4007,59 @@ export const OP17_117_MASER_SABER: EffectSchema = {
   ],
 };
 
+// ─── OP17-118 Rocks.D.Xebec (Character) ──────────────────────────────────────
+
+export const OP17_118_ROCKS_D_XEBEC: EffectSchema = {
+  card_id: "OP17-118",
+  card_name: "Rocks.D.Xebec",
+  card_type: "Character",
+  effects: [
+    {
+      id: "hand_counter_grant",
+      category: "rule_modification",
+      source_text:
+        "If you only have Characters without a Counter, this card in your hand has a +2000 Counter.",
+      zone: "HAND",
+      conditions: {
+        not: {
+          type: "CARD_ON_FIELD",
+          controller: "SELF",
+          filter: { card_type: "CHARACTER", has_counter: true },
+        },
+      },
+      rule: {
+        rule_type: "COUNTER_GRANT",
+        value: 2000,
+        filter: { card_type: "CHARACTER" },
+      },
+    },
+    {
+      id: "on_play_draw_and_play",
+      category: "auto",
+      source_text:
+        "[On Play] Draw 1 card and play up to 2 {Rocks Pirates} type cards with different card names and a total cost of 9 or less from your hand.",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            source_zone: "HAND",
+            count: { up_to: 2 },
+            filter: { traits: ["Rocks Pirates"] },
+            uniqueness_constraint: { field: "name" },
+            aggregate_constraint: { property: "cost", operator: "<=", value: 9 },
+          },
+          params: { source_zone: "HAND", cost_override: "FREE" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP17-119 Loki (Character) ─────────────────────────────────────────────
 
 export const OP17_119_LOKI: EffectSchema = {
@@ -4163,5 +4216,6 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-114": OP17_114_SWEET_3_GENERALS,
   "OP17-115": OP17_115_CODE_OF_HONOR,
   "OP17-117": OP17_117_MASER_SABER,
+  "OP17-118": OP17_118_ROCKS_D_XEBEC,
   "OP17-119": OP17_119_LOKI,
 };
