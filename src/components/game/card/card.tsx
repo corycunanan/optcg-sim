@@ -187,12 +187,17 @@ export const Card = React.memo(function Card({
 
   // Every layer from here down carries `rounded-card` — the card silhouette
   // (docs/design/SHAPE-LANGUAGE.md §The card radius), adopted board-side by
-  // OPT-720. The radius is `4%` of the box's width, and `resolveSize` hands
-  // this container a 600/838 box at every size token, so the percentage is
-  // exact. ScaledBoard's uniform transform scales the painted corner with the
-  // card rather than against it: a ratio holds at every scale, where the fixed
-  // 4px this replaced was already being scaled to ~2.4px at the floor viewport
-  // without staying proportional at any other one.
+  // OPT-720. The radius is `4%` of the box's width against `4% * 600/838` of
+  // its height, which is a true quarter-circle only on the printed card's
+  // 600/838. No `resolveSize` token is literally that — four are 5:7 and
+  // `hand` is 42:59 — so the corner is card-shaped to a tolerance rather than
+  // exact: the two radius axes land 0.005–0.020px apart, well inside a
+  // rendered pixel. `card-silhouette.test.tsx` pins that delta.
+  //
+  // The board's uniform scale carries the ratio with the card rather than
+  // against it, so it holds at every rendered size. The fixed 4px this
+  // replaced was already being scaled to ~2.4px at the floor viewport without
+  // staying proportional at any other one.
   //
   // The layers must move together. The wrapper takes a focus ring, the faces
   // clip art, the power flash tints, and `CardHighlightRing` draws over the

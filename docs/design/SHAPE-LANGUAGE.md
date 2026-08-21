@@ -116,10 +116,11 @@ wrapper, the three transform layers, the power flash — plus `card-front.tsx`, 
 `card-highlight-ring.tsx`, and the reserved card box in `life-zone.tsx`. `box-shadow` and `overflow`
 both follow `border-radius`, so a layer left behind traces a visibly different corner over the one
 beneath it. The consumer wrappers that shrink-wrap a fixed-size `<Card>` move too — the modal
-selection buttons, the hand drag wrapper, the DON token and attached-DON handles, and the stage and
-field targeting wrappers all own focus or selection rings that hug a card face. Boxes that merely
-*hold* a card stay chrome: the field-card wrappers reserve a 112×112 square so a rested card can
-rotate inside them, and a square is not a card; so do the zone slots that draw their own border.
+selection buttons, the hand drag wrapper, the DON token and attached-DON handles, and both stage
+targeting wrappers all own focus or selection rings that hug a card face. Boxes that merely *hold* a
+card stay chrome, and the **field** targeting wrappers are deliberately on that side of the line:
+they reserve a 112×112 square so a rested card can rotate inside them, so their ring bounds a square
+rather than a card. The zone slots that draw their own border stay chrome for the same reason.
 
 **Card-shaped, to a tolerance.** The `CARD_SIZES` tokens are not literally 600/838. Four are 5:7
 (field 80×112, modal 120×168, preview 200×280, don 50×70) and `hand` is 42:59 (84×118), against the
