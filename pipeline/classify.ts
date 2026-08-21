@@ -27,6 +27,7 @@ export interface BaseCard {
   effectText: string;
   triggerText: string | null;
   imageUrl: string;
+  imageIsVariantFallback: boolean;
   blockNumber: number;
   isReprint: boolean;
 }
@@ -111,6 +112,7 @@ export function classifyEntries(transformedCards: TransformedCard[]): {
         effectText: first.effectText,
         triggerText: first.triggerText,
         imageUrl: first.imageUrl,
+        imageIsVariantFallback: true,
         blockNumber: first.blockNumber,
         isReprint: false,
       });
@@ -133,6 +135,7 @@ export function classifyEntries(transformedCards: TransformedCard[]): {
         effectText: baseEntry.effectText,
         triggerText: baseEntry.triggerText,
         imageUrl: baseEntry.imageUrl,
+        imageIsVariantFallback: false,
         blockNumber: baseEntry.blockNumber,
         isReprint: false,
       });
