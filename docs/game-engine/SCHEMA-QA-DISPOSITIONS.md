@@ -42,3 +42,9 @@ cohort remains deferred.
 | OP17-005 | Implemented / false positive | The hand-zone cost modifier applies only while the opponent controls a Character with 10000 power or more; its separate On Play block is also encoded. |
 | OP17-013 | Implemented / false positive | The hand-zone cost modifier applies only while the opponent controls a Character with 10000 power or more; its separate On Play block is also encoded. |
 | OP17-042 | Implemented / false positive | `REVEAL_FROM_HAND` is the filtered three-card Rocks Pirates activation cost before the opponent Character power reduction.                              |
+
+## OPT-729 triage — 2026-08-20
+
+| Card     | Verdict                      | Evidence                                                                                                                        |
+| -------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| OP17-111 | Implemented / false positive | `REVEAL_FROM_HAND` is the filtered two-card Trigger activation cost before the up-to-two cost-1-or-less Character K.O. action. |
