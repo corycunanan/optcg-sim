@@ -356,21 +356,34 @@ vegapull v1.2.0 successfully scraped the live official site. **Mode A is confirm
 
 ### CLI Usage Notes
 
-The `vega pull all` command requires TTY (interactive mode) and fails in scripts. Use pack-by-pack loop instead:
+The recovered vega binary has two machine-specific constraints:
+
+1. The extracted binary from `~/Downloads/vegapull.zip` can freeze at `_dyld_start` on its first launch under Gatekeeper. Byte-copy the binary to a new file, then apply an ad-hoc signature with `codesign -f -s - <copied-vega-path>`.
+2. The `vega pull all` command requires a TTY and fails in scripts. Use per-pack pulls instead.
+
+Pull the pack list, then pull and restore each pack individually:
 
 ```bash
 # Pull pack list first
 vega pull -o <dir> packs
 
-# Then pull each pack individually
+# Then pull each pack individually and immediately restore official separators
 for pack_id in $(cat <dir>/json/packs.json | python3 -c "..."); do
   vega pull -o <dir> cards "$pack_id"
+  pnpm pipeline:restore-official-breaks -- \
+    --pack-id "$pack_id" \
+    --data-dir <dir>/json
   sleep 0.5  # rate limit
 done
 
 # With images (much slower):
 vega pull -o <dir> cards <pack_id> --with-images
+pnpm pipeline:restore-official-breaks -- \
+  --pack-id <pack_id> \
+  --data-dir <dir>/json
 ```
+
+Separator restoration is required after every `vega pull` and before every import. The script fetches the matching official English cardlist page, reads each variant-aware Effect and Trigger field, and restores its literal `<br>` separators in `cards_<pack_id>.json`. It first replaces `<br>` with spaces and collapses whitespace in both versions. Any per-card wording difference or missing official card aborts the entire write. A warning also flags the known formatting-loss signature: the pulled pack contains zero Effect `<br>` separators while its official page contains at least one.
 
 ### Known Issues
 
