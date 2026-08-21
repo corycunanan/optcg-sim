@@ -581,9 +581,20 @@ function validateTriggerShape(trigger: unknown, prefix: string): string[] {
     );
   }
   if ("keyword" in trigger) {
-    return typeof Reflect.get(trigger, "keyword") === "string"
-      ? []
-      : [`${prefix}.keyword: Must be a string`];
+    const keyword = Reflect.get(trigger, "keyword");
+    if (typeof keyword !== "string") {
+      return [`${prefix}.keyword: Must be a string`];
+    }
+    if (
+      "source_filter" in trigger &&
+      keyword !== "WHEN_ATTACKING" &&
+      keyword !== "WHEN_ATTACKED"
+    ) {
+      return [
+        `${prefix}.source_filter: source_filter is only supported for WHEN_ATTACKING and WHEN_ATTACKED keyword triggers`,
+      ];
+    }
+    return [];
   }
   if ("event" in trigger) {
     return typeof Reflect.get(trigger, "event") === "string"
