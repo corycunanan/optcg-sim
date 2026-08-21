@@ -8,6 +8,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { BaseCard } from "./classify";
 import type { ArtVariantEntry } from "./classify";
 import type { CardSetEntry } from "./build-set-membership";
+import { shouldReplaceStubImage } from "./image-fallback";
 
 export interface WriteResult {
   cardsUpserted: number;
@@ -32,10 +33,22 @@ export async function writeToDatabase(
   console.log(`  Upserting ${baseCards.length} cards...`);
   for (let i = 0; i < baseCards.length; i += BATCH_SIZE) {
     const batch = baseCards.slice(i, i + BATCH_SIZE);
+    const existingCards = await prisma.card.findMany({
+      where: { id: { in: batch.map((card) => card.id) } },
+      select: { id: true, imageUrl: true },
+    });
+    const existingImageUrls = new Map(
+      existingCards.map((card) => [card.id, card.imageUrl])
+    );
 
     await prisma.$transaction(
-      batch.map((card) =>
-        prisma.card.upsert({
+      batch.map((card) => {
+        const existingImageUrl = existingImageUrls.get(card.id);
+        const replaceStubImage =
+          existingImageUrl !== undefined &&
+          shouldReplaceStubImage(existingImageUrl, card);
+
+        return prisma.card.upsert({
           where: { id: card.id },
           create: {
             id: card.id,
@@ -69,11 +82,12 @@ export async function writeToDatabase(
             rarity: card.rarity,
             effectText: card.effectText,
             triggerText: card.triggerText,
-            // imageUrl intentionally excluded — preserve CDN URLs set by migrate-images
+            ...(replaceStubImage ? { imageUrl: card.imageUrl } : {}),
+            // Otherwise preserve CDN URLs set by migrate-images.
             blockNumber: card.blockNumber,
           },
-        })
-      )
+        });
+      })
     );
 
     cardsUpserted += batch.length;
