@@ -273,7 +273,10 @@ describe("OPT-614 — transactional multi-cost payment", () => {
 
     // When authored costs evolve, inspect every diff to this expectation and
     // update the PR/audit classification instead of accepting count drift.
-    expect(mixedBlocks).toHaveLength(55);
+    // OPT-727 adds OP17-057 Fullalead, OP17-077 Kundali Dragon Swarm, and
+    // OP17-078 Drunken Dragon Bagua. Their selection costs use the
+    // transactional path and add no stranding shape.
+    expect(mixedBlocks).toHaveLength(58);
     expect([...strandableCardIds].sort()).toEqual([
       "EB01-011",
       "EB02-047",
