@@ -48,3 +48,9 @@ cohort remains deferred.
 | Card     | Verdict                      | Evidence                                                                                                                        |
 | -------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | OP17-111 | Implemented / false positive | `REVEAL_FROM_HAND` is the filtered two-card Trigger activation cost before the up-to-two cost-1-or-less Character K.O. action. |
+
+## OPT-721 official reconciliation — 2026-08-21
+
+| Card     | Verdict             | Evidence                                                                                                                                                                                              |
+| -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP17-109 | Deferred to OPT-733 | The official pull added a five-card look Trigger that bottoms the rest; the authored schema predates it. OPT-733 encodes the TRIGGER block, flips the manifest fact, and resolves this disposition. |
