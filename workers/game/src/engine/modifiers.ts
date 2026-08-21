@@ -96,6 +96,40 @@ function matchesFilter(
   );
 }
 
+function isLeaderInstance(card: CardInstance, state: GameState): boolean {
+  return state.players[card.controller].leader.instanceId === card.instanceId;
+}
+
+function isCharacterOnField(
+  card: CardInstance,
+  state: GameState,
+  cardDb: Map<string, CardData>
+): boolean {
+  const data = cardDb.get(card.cardId);
+  return (
+    data?.type?.toUpperCase() === "CHARACTER" &&
+    state.players[card.controller].characters.some(
+      (character) => character?.instanceId === card.instanceId
+    )
+  );
+}
+
+const warnedPermanentModifierTargetTypes = new Set<string>();
+
+function warnUnhandledPermanentModifierTarget(
+  targetType: string | undefined
+): void {
+  if (typeof process === "undefined" || process.env.NODE_ENV === "production") {
+    return;
+  }
+  const label = targetType ?? "<missing>";
+  if (warnedPermanentModifierTargetTypes.has(label)) return;
+  warnedPermanentModifierTargetTypes.add(label);
+  console.warn(
+    `[modifiers] Unhandled permanent modifier target type "${label}"; modifier ignored.`
+  );
+}
+
 function numericModifierParam(
   modifier: Modifier,
   key: "amount" | "value"
@@ -160,6 +194,13 @@ function modifierAppliesToCard(
   // Dynamic match — check non-SELF modifier targets against the card
   if (!cardDb) return false;
   const targetType = modifier.target.type?.toUpperCase();
+
+  if (targetType === "YOUR_LEADER" || targetType === "OPPONENT_LEADER") {
+    const wantSelf = targetType === "YOUR_LEADER";
+    if ((card.controller === effect.controller) !== wantSelf) return false;
+    if (!isLeaderInstance(card, state)) return false;
+  }
+
   const controller =
     modifier.target.controller ??
     (targetType === "ALL_YOUR_CHARACTERS"
@@ -172,14 +213,32 @@ function modifierAppliesToCard(
   if (controller === "OPPONENT" && card.controller === effect.controller)
     return false;
 
-  // Card type check
-  if (
-    targetType === "CHARACTER" ||
-    targetType === "ALL_YOUR_CHARACTERS" ||
-    targetType === "ALL_OPPONENT_CHARACTERS"
-  ) {
-    const data = cardDb.get(card.cardId);
-    if (!data || data.type?.toUpperCase() !== "CHARACTER") return false;
+  switch (targetType) {
+    case "CHARACTER":
+    case "ALL_YOUR_CHARACTERS":
+    case "ALL_OPPONENT_CHARACTERS": {
+      const data = cardDb.get(card.cardId);
+      if (!data || data.type?.toUpperCase() !== "CHARACTER") return false;
+      break;
+    }
+    case "LEADER_OR_CHARACTER":
+      if (
+        !isLeaderInstance(card, state) &&
+        !isCharacterOnField(card, state, cardDb)
+      ) {
+        return false;
+      }
+      break;
+    case "YOUR_LEADER":
+    case "OPPONENT_LEADER":
+    case "CARD_IN_HAND":
+    case "CHARACTER_CARD":
+      break;
+    case "SELF":
+      return false;
+    default:
+      warnUnhandledPermanentModifierTarget(targetType);
+      return false;
   }
 
   return (
