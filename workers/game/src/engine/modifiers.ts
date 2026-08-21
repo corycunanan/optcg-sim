@@ -246,28 +246,39 @@ function isEffectSourceNegated(
 }
 
 /**
- * Evaluate the complete permanent-modifier gate in narrowing order.
- *
- * Raw-schema cost paths and registered active effects both delegate here so
- * block conditions, block duration, and modifier duration cannot diverge.
+ * Evaluate the permanent block's conditions and block-level duration.
  */
+export function isPermanentBlockGateMet(
+  state: GameState,
+  block: Pick<EffectBlock, "conditions" | "duration">,
+  conditionContext: ConditionContext
+): boolean {
+  if (
+    block.conditions &&
+    !evaluateCondition(state, block.conditions, conditionContext)
+  ) {
+    return false;
+  }
+
+  const blockDuration = block.duration;
+  if (
+    blockDuration?.type === "WHILE_CONDITION" &&
+    blockDuration.condition &&
+    !evaluateCondition(state, blockDuration.condition, conditionContext)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 function isModifierGateMet(
   block: Pick<EffectBlock, "conditions" | "duration">,
   modifier: Modifier | undefined,
   state: GameState,
   ctx: ConditionContext
 ): boolean {
-  if (block.conditions && !evaluateCondition(state, block.conditions, ctx))
-    return false;
-
-  const blockDuration = block.duration;
-  if (
-    blockDuration?.type === "WHILE_CONDITION" &&
-    blockDuration.condition &&
-    !evaluateCondition(state, blockDuration.condition, ctx)
-  ) {
-    return false;
-  }
+  if (!isPermanentBlockGateMet(state, block, ctx)) return false;
 
   const modifierDuration = modifier?.duration;
   if (
