@@ -123,6 +123,11 @@ export type Trigger = KeywordTrigger | CustomTrigger | CompoundTrigger;
 
 export interface KeywordTrigger {
   keyword: KeywordTriggerType;
+  /**
+   * Observe an attack event's subject instead of requiring the schema host.
+   * WHEN_ATTACKING filters the attacker; WHEN_ATTACKED filters the final target.
+   */
+  source_filter?: TargetFilter;
   turn_restriction?: TurnRestriction;
   once_per_turn?: boolean;
   don_requirement?: number;
