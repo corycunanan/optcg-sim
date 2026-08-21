@@ -2751,5 +2751,7 @@
   "ST30-014": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
   "ST30-015": {"category":"Event","hasRealEffectText":true,"hasTriggerText":true},
   "ST30-016": {"category":"Event","hasRealEffectText":true,"hasTriggerText":false},
-  "ST30-017": {"category":"Event","hasRealEffectText":true,"hasTriggerText":true}
+  "ST30-017": {"category":"Event","hasRealEffectText":true,"hasTriggerText":true},
+  "ST31-004": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
+  "ST32-002": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false}
 }
