@@ -25,6 +25,7 @@ import {
   processScheduledActions,
 } from "./duration-tracker.js";
 import { resolveEffect } from "./effect-resolver/index.js";
+import { emitPendingEvent } from "./events.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
   generateFrameId,
@@ -194,14 +195,19 @@ function continueEndPhase(
       cardDb
     );
     state = result.state;
+    events.push(...result.events);
     if (result.pendingPrompt) {
+      state = publishPhaseBoundaryEvents(
+        state,
+        events,
+        continuation.endingPlayerIndex
+      );
       state = parkEndPhaseBelowPrompt(
         state,
         {
           ...continuation,
           remainingScheduledActions: scheduledActions.slice(index + 1),
-        },
-        events
+        }
       );
       return {
         state,
@@ -216,8 +222,7 @@ function continueEndPhase(
 
 function parkEndPhaseBelowPrompt(
   state: GameState,
-  continuation: PhaseBoundaryContinuation,
-  accumulatedEvents: PendingEvent[]
+  continuation: PhaseBoundaryContinuation
 ): GameState {
   const promptFrame = peekFrame(state);
   if (!promptFrame) return state;
@@ -241,9 +246,21 @@ function parkEndPhaseBelowPrompt(
     costResultRefs: [],
     pendingTriggers: [],
     simultaneousTriggers: [],
-    accumulatedEvents: [...accumulatedEvents],
+    accumulatedEvents: [],
   };
   return pushFrame(pushFrame(frameId.state, phaseFrame), promptFrame);
+}
+
+function publishPhaseBoundaryEvents(
+  initialState: GameState,
+  events: PendingEvent[],
+  defaultPlayerIndex: 0 | 1
+): GameState {
+  let state = initialState;
+  for (const event of events) {
+    state = emitPendingEvent(state, event, defaultPlayerIndex);
+  }
+  return state;
 }
 
 function completeTurnHandoff(

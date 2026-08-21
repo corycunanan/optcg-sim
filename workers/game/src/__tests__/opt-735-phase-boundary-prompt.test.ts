@@ -79,6 +79,10 @@ function scheduledEndPhaseState(
   };
 }
 
+function eventTypes(state: GameState): string[] {
+  return state.eventLog.map((event) => event.type);
+}
+
 describe("OPT-735 phase-boundary prompts", () => {
   function offerScheduledChoice(scheduledCount = 1) {
     const cardDb = createTestCardDb();
@@ -117,6 +121,33 @@ describe("OPT-735 phase-boundary prompts", () => {
       activePlayerIndex: 0,
       phase: "END",
     });
+    expect(eventTypes(offered.state)).toEqual(["PHASE_CHANGED"]);
+    expect(offered.state.eventLog.at(-1)?.payload).toEqual({
+      from: "MAIN",
+      to: "END",
+    });
+  });
+
+  it("orders a mandatory scheduled action between the phase change and handoff", () => {
+    const cardDb = createTestCardDb();
+    const state = scheduledEndPhaseState(1, {
+      type: "SET_DON_ACTIVE",
+      params: { amount: 1, up_to: false },
+    });
+    const result = runPipeline(
+      state,
+      { type: "ADVANCE_PHASE" },
+      cardDb,
+      0
+    );
+
+    expect(eventTypes(result.state)).toEqual([
+      "PHASE_CHANGED",
+      "DON_SET_ACTIVE",
+      "TURN_ENDED",
+      "TURN_STARTED",
+      "PHASE_CHANGED",
+    ]);
   });
 
   it("offers 0..2 for a scheduled up-to DON!! action before turn handoff", () => {
@@ -164,6 +195,13 @@ describe("OPT-735 phase-boundary prompts", () => {
         activePlayerIndex: 1,
         phase: "REFRESH",
       });
+      expect(eventTypes(resumed.state)).toEqual([
+        "PHASE_CHANGED",
+        ...(amount === 1 ? ["DON_SET_ACTIVE"] : []),
+        "TURN_ENDED",
+        "TURN_STARTED",
+        "PHASE_CHANGED",
+      ]);
     });
   }
 
@@ -209,10 +247,14 @@ describe("OPT-735 phase-boundary prompts", () => {
       "PLAYER_CHOICE"
     );
     expect(firstChoice.state.turn.activePlayerIndex).toBe(0);
+    expect(eventTypes(firstChoice.state)).toEqual([
+      "PHASE_CHANGED",
+      "DON_SET_ACTIVE",
+    ]);
 
     const secondChoice = resumePromptLifecycle(
       firstChoice.state,
-      { type: "PLAYER_CHOICE", choiceId: "choose-value:0" },
+      { type: "PLAYER_CHOICE", choiceId: "choose-value:1" },
       restored!.cardDb,
       {
         drainPregame: (state) => state,
@@ -224,5 +266,13 @@ describe("OPT-735 phase-boundary prompts", () => {
       activePlayerIndex: 1,
       phase: "REFRESH",
     });
+    expect(eventTypes(secondChoice.state)).toEqual([
+      "PHASE_CHANGED",
+      "DON_SET_ACTIVE",
+      "DON_SET_ACTIVE",
+      "TURN_ENDED",
+      "TURN_STARTED",
+      "PHASE_CHANGED",
+    ]);
   });
 });
