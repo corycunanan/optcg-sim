@@ -20,6 +20,9 @@ const CATEGORIES = new Set(["Leader", "Character", "Event", "Stage"]);
 const COLORS = new Set(["Red", "Blue", "Green", "Purple", "Black", "Yellow"]);
 const ATTRIBUTES = new Set(["Strike", "Slash", "Ranged", "Special", "Wisdom"]);
 
+const COMPLETE_EFFECT_ENDING =
+  /(?:[.!?。！？…]["'”’」』）)\]]*|\[[^\[\]\r\n]+\])$/;
+
 const RARITY_MAP: Record<string, string> = {
   "Super Rare": "SuperRare",
   "Secret Rare": "SecretRare",
@@ -40,6 +43,10 @@ interface ScrapeOptions {
 }
 
 type CardFailures = Map<string, string[]>;
+
+export function hasCompleteEffectEnding(effect: string): boolean {
+  return effect === "-" || COMPLETE_EFFECT_ENDING.test(effect);
+}
 
 function requiredMatch(
   input: string,
@@ -252,6 +259,11 @@ export function parseCardPage(
       );
     }
     effect = "-";
+  }
+  if (!hasCompleteEffectEnding(effect)) {
+    console.warn(
+      `  ⚠ ${id}: effect may be truncated; suspect tail "${effect.slice(-40)}"`
+    );
   }
 
   const rarityLabel = requiredMatch(

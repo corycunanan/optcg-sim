@@ -1,4 +1,4 @@
-import { readFile } from "fs/promises";
+import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RawVegapullCard } from "./load";
 import {
   inheritVariantRarities,
+  hasCompleteEffectEnding,
   parseCardPage,
   parseSetList,
   scrapeCardReferences,
@@ -132,6 +133,91 @@ describe("Limitless scraper", () => {
     expect(warning).toHaveBeenCalledWith(
       '  ⚠ OP17-005: regulation mark "Block X" is not numeric; block_number set to null'
     );
+  });
+
+  it("warns only when a non-vanilla effect lacks terminal punctuation", async () => {
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    const truncatedHtml = await readFile(
+      join(FIXTURES, "limitless-truncated-effect.html"),
+      "utf8"
+    );
+    const effectText =
+      "[On Play] Up to 1 of your opponent's Characters with a";
+    const cases = [
+      { effect: effectText, warns: true },
+      {
+        effect: "[On Play] Draw 1 card. Then, up to 1 of your",
+        warns: true,
+      },
+      { effect: `${effectText}.`, warns: false },
+      { effect: `${effectText}.)`, warns: false },
+      { effect: "[Blocker]", warns: false },
+      { effect: `${effectText}。」`, warns: false },
+      { effect: `${effectText}…`, warns: false },
+      { effect: "-", warns: false },
+    ];
+
+    for (const testCase of cases) {
+      warning.mockClear();
+      const html = truncatedHtml.replace(effectText, testCase.effect);
+
+      expect(parseCardPage(html, "OP17-105", PACK_ID).effect).toBe(
+        testCase.effect
+      );
+      if (testCase.warns) {
+        expect(warning).toHaveBeenCalledWith(
+          `  ⚠ OP17-105: effect may be truncated; suspect tail "${testCase.effect.slice(-40)}"`
+        );
+      } else {
+        expect(warning).not.toHaveBeenCalled();
+      }
+    }
+  });
+
+  it("accepts every documented card's final effect text", async () => {
+    const cardsDirectory = join(process.cwd(), "docs", "cards");
+    const files = (await readdir(cardsDirectory)).filter((file) =>
+      file.endsWith(".md")
+    );
+    const suspectedTruncations: string[] = [];
+    let documentedCards = 0;
+
+    for (const file of files) {
+      const lines = (await readFile(join(cardsDirectory, file), "utf8"))
+        .replace(/<br\s*\/?>/gi, "\n")
+        .split(/\r?\n/);
+      let cardId: string | null = null;
+      let finalEffectLine: string | null = null;
+
+      const checkCard = () => {
+        if (cardId === null || finalEffectLine === null) return;
+        documentedCards += 1;
+        if (!hasCompleteEffectEnding(finalEffectLine)) {
+          suspectedTruncations.push(`${cardId}: ${finalEffectLine}`);
+        }
+      };
+
+      for (const line of lines) {
+        const metadata = line.match(/^\*\*([^*]+)\*\*/);
+        if (metadata) {
+          checkCard();
+          cardId = metadata[1];
+          finalEffectLine = null;
+        } else if (line === "---") {
+          checkCard();
+          cardId = null;
+          finalEffectLine = null;
+        } else if (cardId !== null && line.trim()) {
+          finalEffectLine = line.trim();
+        }
+      }
+      checkCard();
+    }
+
+    expect(documentedCards).toBeGreaterThan(2_400);
+    expect(suspectedTruncations).toEqual([]);
   });
 
   it("reports every failed card after attempting the complete list", async () => {
