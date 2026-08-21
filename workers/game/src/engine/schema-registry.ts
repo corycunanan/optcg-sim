@@ -119,6 +119,11 @@ const UNHANDLED_ACTION_TYPES: ReadonlySet<string> = new Set(
 );
 const VALID_TARGET_TYPES: ReadonlySet<string> = new Set(ALL_TARGET_TYPES);
 const VALID_COST_TYPES: ReadonlySet<string> = new Set(ALL_COST_TYPES);
+const REF_DEPENDENT_TARGET_TYPES: ReadonlySet<TargetType> = new Set([
+  "SELECTED_CARDS",
+  "TRIGGERING_CARD",
+  "TRIGGERING_CARD_IN_TRASH",
+]);
 const IMPLICIT_COST_RESULT_REFS = new Set([
   "__cost_don_rested",
   "__cost_cards_trashed",
@@ -128,7 +133,7 @@ const IMPLICIT_COST_RESULT_REFS = new Set([
 ]);
 const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
   "type", "params", "target", "duration", "chain", "target_ref",
-  "result_ref", "conditions",
+  "result_ref", "conditions", "requires",
 ]);
 const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set(
   TARGET_FILTER_KEYS,
@@ -699,6 +704,31 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
   }
   if (action.chain && !["THEN", "IF_DO", "AND"].includes(action.chain)) {
     errors.push(`${prefix}: Unknown chain connector '${action.chain}'`);
+  }
+  if (action.requires !== undefined) {
+    if (
+      !action.requires ||
+      typeof action.requires !== "object" ||
+      Array.isArray(action.requires) ||
+      action.requires.type !== "FULL_TARGET_COUNT"
+    ) {
+      errors.push(`${prefix}.requires: Expected { type: 'FULL_TARGET_COUNT' }`);
+    } else {
+      if (
+        !action.target?.count ||
+        !("exact" in action.target.count)
+      ) {
+        errors.push(`${prefix}.requires: FULL_TARGET_COUNT requires an exact target count`);
+      }
+      if (
+        action.target?.type &&
+        REF_DEPENDENT_TARGET_TYPES.has(action.target.type)
+      ) {
+        errors.push(
+          `${prefix}.requires: FULL_TARGET_COUNT does not support ref-dependent target type '${action.target.type}' because branch feasibility is evaluated before prior action results are available`,
+        );
+      }
+    }
   }
 
   if (action.type === "CHOOSE_VALUE") {

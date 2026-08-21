@@ -598,6 +598,11 @@ export interface ActionBase {
   target_ref?: string;
   result_ref?: string;
   conditions?: Condition;
+  requires?: ActionFeasibilityRequirement;
+}
+
+export interface ActionFeasibilityRequirement {
+  type: "FULL_TARGET_COUNT";
 }
 
 /** Exhaustive action union keyed by type with its exact parameter contract. */

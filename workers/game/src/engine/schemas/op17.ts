@@ -3966,9 +3966,6 @@ export const OP17_117_MASER_SABER: EffectSchema = {
       trigger: { keyword: "TRIGGER" },
       actions: [
         {
-          // GAP: OPPONENT_CHOICE has no branch-feasibility contract, so the
-          // exact-3 branch cannot be hidden when the opponent has fewer than
-          // 3 cards without changing engine vocabulary.
           type: "OPPONENT_CHOICE",
           params: {
             mandatory: true,
@@ -3981,6 +3978,7 @@ export const OP17_117_MASER_SABER: EffectSchema = {
                     mandatory: true,
                     action: {
                       type: "TRASH_CARD",
+                      requires: { type: "FULL_TARGET_COUNT" },
                       target: {
                         type: "CARD_IN_HAND",
                         controller: "SELF",
