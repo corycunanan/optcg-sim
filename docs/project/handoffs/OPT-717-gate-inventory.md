@@ -10,7 +10,11 @@
 
 > **OPT-726 closure (2026-08-21):** OPT-726 authors OP17-118 after adding conditional HAND-zone self `COUNTER_GRANT` evaluation at counter time. The OPT-603 sweep advances to 2,467 cards, leaving OP17-018, OP17-040, OP17-041, OP17-095, and OP17-116 deferred to their sibling engine tickets.
 
-> **OPT-725 closure (2026-08-21):** OPT-725 authors OP17-041 after extending owner-ordered bottom-deck arrangement prompts to multi-card field batches. The OPT-603 sweep advances from 2,468 to 2,469 cards, leaving OP17-018, OP17-095, and OP17-116 deferred to sibling engine tickets.
+> **OPT-732 closure (2026-08-21):** OPT-732 authors OP17-095 after reusing the OPT-730 `FULL_TARGET_COUNT` feasibility contract for replacement substitutes. OP17-095 now places exactly 3 Trash cards at the deck bottom in their owner's order and is not offered with fewer than 3 eligible cards.
+
+> **OPT-723 closure (2026-08-21):** OPT-723 adds Stage K.O. field transitions with KO events, replacement interception, and Character-only trigger filtering. It authors the full OP17-018 and OP17-116 Main and Counter effects without Trigger blocks, advancing the OPT-603 sweep to 2,471 cards alongside the merged OP17-095; OP17-041 remains deferred to OPT-725.
+
+> **OPT-725 closure (2026-08-21):** OPT-725 authors OP17-041 after extending owner-ordered bottom-deck arrangement prompts to multi-card field batches. The OPT-603 sweep advances to 2,472 cards; with OP17-018, OP17-095, and OP17-116 already landed by OPT-723/732, no OP17 cards remain deferred to engine tickets except the OPT-731 migration set.
 
 ## Official reconciliation delta inventory
 

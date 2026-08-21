@@ -36,6 +36,7 @@ import { matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
 import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
+import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -247,6 +248,17 @@ function replacementMatchesTarget(
 ): boolean {
   if (params.trigger !== event) return false;
 
+  const targetCard = findCardInstance(state, targetInstanceId);
+  if (event === "WOULD_BE_KO" && targetCard?.zone === "STAGE") {
+    const declaredCardTypes = params.target_filter?.card_type;
+    const includesStage = Array.isArray(declaredCardTypes)
+      ? declaredCardTypes.includes("STAGE")
+      : declaredCardTypes === "STAGE";
+    // WOULD_BE_KO filters default to Character-only: every replacement print
+    // authored before Stage K.O. support scopes its protected card as a Character.
+    if (!includesStage) return false;
+  }
+
   // Removal/leave replacements describe a card leaving the field. Secret-
   // and open-area moves such as Hand/Trash/Life -> Deck must not spend or
   // offer a field replacement merely because the replacement is wildcarded.
@@ -259,7 +271,6 @@ function replacementMatchesTarget(
   if (effect.appliesTo.length > 0 && !effect.appliesTo.includes(targetInstanceId)) return false;
 
   if (params.target_filter) {
-    const targetCard = findCardInstance(state, targetInstanceId);
     if (!targetCard) return false;
     if (params.target_filter.exclude_self && targetCard.instanceId === effect.sourceCardInstanceId) return false;
     if (!matchesFilter(targetCard, params.target_filter, cardDb, state, undefined, undefined, effect.controller)) return false;
@@ -504,6 +515,15 @@ function canExecuteReplacementSubstitute(
   cardDb: Map<string, CardData>,
 ): boolean {
   for (const action of actions) {
+    if (!isActionFeasible(
+      state,
+      action,
+      effect.sourceCardInstanceId,
+      effect.controller,
+      cardDb,
+      new Map(),
+    )) return false;
+
     if (action.type === "SET_REST") {
       if (!canSetRestSucceed(state, action, effect, cardDb)) return false;
     } else if (action.type === "TURN_LIFE_FACE_UP") {

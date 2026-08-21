@@ -61,10 +61,13 @@ export function emitEvent<T extends GameEventType>(
     timestamp: timed.timestamp,
   } as GameEvent;
   let turn = timed.state.turn;
-  // Record K.O.s for ACTION_PERFORMED_THIS_TURN conditions (OP16-100
-  // "if your opponent's Character has been K.O.'d during this turn").
-  // playerIndex on CARD_KO is the K.O.'d character's owner.
-  if (type === "CARD_KO") {
+  // Record Character K.O.s for ACTION_PERFORMED_THIS_TURN conditions (OP16-100
+  // "if your opponent's Character has been K.O.'d during this turn"). Stage
+  // K.O.s keep CARD_KO event semantics without satisfying Character checks.
+  // playerIndex on CARD_KO is the K.O.'d card's owner.
+  const isStageKO = type === "CARD_KO" &&
+    (payload as GameEventPayloadMap["CARD_KO"]).cardType === "STAGE";
+  if (type === "CARD_KO" && !isStageKO) {
     turn = {
       ...turn,
       actionsPerformedThisTurn: [

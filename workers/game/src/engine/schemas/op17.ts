@@ -594,6 +594,56 @@ export const OP17_017_GA_HA_HA_HA: EffectSchema = {
   ],
 };
 
+// ─── OP17-018 The Power to Destroy the World (Event) ────────────────────────
+
+export const OP17_018_THE_POWER_TO_DESTROY_THE_WORLD: EffectSchema = {
+  card_id: "OP17-018",
+  card_name: "The Power to Destroy the World",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_ko_stage",
+      category: "activate",
+      trigger: { keyword: "MAIN_EVENT" },
+      costs: [{ type: "REST_DON", amount: 2 }],
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "STAGE",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+    {
+      id: "counter_high_power_characters",
+      category: "activate",
+      trigger: { keyword: "COUNTER_EVENT" },
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", base_power_min: 8000 },
+        count: { operator: ">=", value: 2 },
+      },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+          },
+          params: { amount: 4000 },
+          duration: { type: "THIS_BATTLE" },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP17-019 I Don't Have Time to Chat with Snot-Nosed Brats (Event) ───────
 
 export const OP17_019_I_DONT_HAVE_TIME_TO_CHAT: EffectSchema = {
@@ -3234,6 +3284,49 @@ export const OP17_094_RODO: EffectSchema = {
   ],
 };
 
+// ─── OP17-095 Roronoa Zoro (Character) ─────────────────────────────────────
+
+export const OP17_095_RORONOA_ZORO: EffectSchema = {
+  card_id: "OP17-095",
+  card_name: "Roronoa Zoro",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_character_power",
+      category: "permanent",
+      conditions: {
+        type: "BOARD_WIDE_EXISTENCE",
+        filter: { card_type: "CHARACTER", cost_min: 12 },
+      },
+      modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+    },
+    {
+      id: "removed_replacement_trash_to_deck",
+      category: "replacement",
+      replaces: {
+        event: "WOULD_BE_REMOVED_FROM_FIELD",
+        target_filter: { controller: "SELF", card_type: "CHARACTER" },
+        cause_filter: { by: "OPPONENT_EFFECT" },
+      },
+      replacement_actions: [
+        {
+          type: "RETURN_TO_DECK",
+          target: {
+            type: "CARD_IN_TRASH",
+            controller: "SELF",
+            count: { exact: 3 },
+          },
+          params: { position: "BOTTOM" },
+          requires: { type: "FULL_TARGET_COUNT" },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
 // ─── OP17-096 I'm Luffy!! The Man Who Will Be King of the Pirates!! ─────────
 
 export const OP17_096_IM_LUFFY: EffectSchema = {
@@ -3965,6 +4058,56 @@ export const OP17_115_CODE_OF_HONOR: EffectSchema = {
   ],
 };
 
+// ─── OP17-116 Fulgora (Event) ──────────────────────────────────────────────
+
+export const OP17_116_FULGORA: EffectSchema = {
+  card_id: "OP17-116",
+  card_name: "Fulgora",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_ko_stage",
+      category: "activate",
+      trigger: { keyword: "MAIN_EVENT" },
+      costs: [{ type: "REST_DON", amount: 2 }],
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "STAGE",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+    {
+      id: "counter_trigger_characters",
+      category: "activate",
+      trigger: { keyword: "COUNTER_EVENT" },
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", has_trigger: true },
+        count: { operator: ">=", value: 2 },
+      },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+          },
+          params: { amount: 4000 },
+          duration: { type: "THIS_BATTLE" },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP17-117 Maser Saber (Event) ───────────────────────────────────────────
 
 export const OP17_117_MASER_SABER: EffectSchema = {
@@ -4155,6 +4298,7 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-015": OP17_015_MARCO,
   "OP17-016": OP17_016_RAKUYO,
   "OP17-017": OP17_017_GA_HA_HA_HA,
+  "OP17-018": OP17_018_THE_POWER_TO_DESTROY_THE_WORLD,
   "OP17-019": OP17_019_I_DONT_HAVE_TIME_TO_CHAT,
   "OP17-020": OP17_020_SHANKS,
   "OP17-021": OP17_021_CRONE_OLI,
@@ -4227,6 +4371,7 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-092": OP17_092_BROGY,
   "OP17-093": OP17_093_MONKEY_D_LUFFY,
   "OP17-094": OP17_094_RODO,
+  "OP17-095": OP17_095_RORONOA_ZORO,
   "OP17-096": OP17_096_IM_LUFFY,
   "OP17-097": OP17_097_FEED_ON_THIS_RAGE,
   "OP17-098": OP17_098_GUM_GUM_KONG_GUN,
@@ -4246,6 +4391,7 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-113": OP17_113_STREUSEN,
   "OP17-114": OP17_114_SWEET_3_GENERALS,
   "OP17-115": OP17_115_CODE_OF_HONOR,
+  "OP17-116": OP17_116_FULGORA,
   "OP17-117": OP17_117_MASER_SABER,
   "OP17-118": OP17_118_ROCKS_D_XEBEC,
   "OP17-119": OP17_119_LOKI,
