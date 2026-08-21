@@ -36,6 +36,7 @@ import { matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
 import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
+import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -514,6 +515,15 @@ function canExecuteReplacementSubstitute(
   cardDb: Map<string, CardData>,
 ): boolean {
   for (const action of actions) {
+    if (!isActionFeasible(
+      state,
+      action,
+      effect.sourceCardInstanceId,
+      effect.controller,
+      cardDb,
+      new Map(),
+    )) return false;
+
     if (action.type === "SET_REST") {
       if (!canSetRestSucceed(state, action, effect, cardDb)) return false;
     } else if (action.type === "TURN_LIFE_FACE_UP") {
