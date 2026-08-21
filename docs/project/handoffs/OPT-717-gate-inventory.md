@@ -8,6 +8,8 @@
 
 > **OPT-733 closure (2026-08-21):** OPT-733 flips `hasTriggerText` to true for OP17-109 and OP17-111, authors both official TRIGGER blocks, and moves the OPT-590 ratchet from 500 to 502. The OP17-109 `SEARCH_TRASH_THE_REST` finding is resolved as an implemented false positive because `SEARCH_DECK` preserves the official bottom-the-rest clause.
 
+> **OPT-726 closure (2026-08-21):** OPT-726 authors OP17-118 after adding conditional HAND-zone self `COUNTER_GRANT` evaluation at counter time. The OPT-603 sweep advances to 2,467 cards, leaving OP17-018, OP17-040, OP17-041, OP17-095, and OP17-116 deferred to their sibling engine tickets.
+
 ## Official reconciliation delta inventory
 
 | Field                     |                                Records | Official delta                                                                                                                                                  | Disposition                                                                                                  |

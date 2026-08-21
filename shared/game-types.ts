@@ -30,6 +30,8 @@ export interface CardInstance {
   turnPlayed: number | null; // for Rush check: can attack if turnPlayed === turn.number
   controller: 0 | 1;
   owner: 0 | 1;
+  /** Recipient-visible, server-computed Counter value for cards in their hand. */
+  effectiveCounter?: number;
 }
 
 export interface LifeCard {

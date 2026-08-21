@@ -1045,6 +1045,7 @@ function toSharedTargetFilterCard(
     hasTrigger: data.keywords.trigger,
     hasEffect: Boolean(data.effectText?.trim()),
     hasBaseEffect: hasBaseEffect(data),
+    // Canonical card data represents counterless cards as null; numeric 0 is not emitted.
     hasCounter: data.counter !== null && data.counter !== undefined,
     treatsAsAllNames: cardTreatsAsAll(data, "names"),
     treatsAsAllTraits: cardTreatsAsAll(data, "types"),
