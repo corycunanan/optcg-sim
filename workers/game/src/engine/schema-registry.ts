@@ -128,7 +128,7 @@ const IMPLICIT_COST_RESULT_REFS = new Set([
 ]);
 const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
   "type", "params", "target", "duration", "chain", "target_ref",
-  "result_ref", "conditions",
+  "result_ref", "conditions", "requires",
 ]);
 const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set(
   TARGET_FILTER_KEYS,
@@ -688,6 +688,21 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
   }
   if (action.chain && !["THEN", "IF_DO", "AND"].includes(action.chain)) {
     errors.push(`${prefix}: Unknown chain connector '${action.chain}'`);
+  }
+  if (action.requires !== undefined) {
+    if (
+      !action.requires ||
+      typeof action.requires !== "object" ||
+      Array.isArray(action.requires) ||
+      action.requires.type !== "FULL_TARGET_COUNT"
+    ) {
+      errors.push(`${prefix}.requires: Expected { type: 'FULL_TARGET_COUNT' }`);
+    } else if (
+      !action.target?.count ||
+      !("exact" in action.target.count)
+    ) {
+      errors.push(`${prefix}.requires: FULL_TARGET_COUNT requires an exact target count`);
+    }
   }
 
   if (action.type === "CHOOSE_VALUE") {

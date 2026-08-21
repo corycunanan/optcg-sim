@@ -24,6 +24,7 @@ import {
   popFrame,
   pushFrame,
   generateFrameId,
+  updateTopFrame,
 } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
 import type {
@@ -770,6 +771,7 @@ export function executeActionChain(
     }
 
     // Execute the action
+    const stackDepthBeforeAction = state.effectStack.length;
     const result = executeEffectAction(
       state,
       action,
@@ -788,6 +790,26 @@ export function executeActionChain(
     if (result.pendingPrompt) {
       // Pause — push a stack frame with the remaining actions and surface the prompt
       const nestedPromptFrame = result.state.effectStack.at(-1);
+      if (
+        (action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") &&
+        nestedPromptFrame &&
+        result.state.effectStack.length > stackDepthBeforeAction
+      ) {
+        const remainingActions = actions.slice(i + 1);
+        const nestedState = remainingActions.length > 0
+          ? updateTopFrame(result.state, {
+              remainingActions: [
+                ...nestedPromptFrame.remainingActions,
+                ...remainingActions,
+              ],
+            })
+          : result.state;
+        return {
+          state: nestedState,
+          events,
+          pendingPrompt: result.pendingPrompt,
+        };
+      }
       if (nestedPromptFrame?.replacementBatchContinuation) {
         // A non-optional replacement substitute opened its own prompt and
         // already pushed that prompt's frame. Insert this action chain's
