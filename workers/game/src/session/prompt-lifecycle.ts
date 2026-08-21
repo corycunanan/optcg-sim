@@ -18,6 +18,7 @@ import {
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
 import { continuePipelineFromExecution } from "../engine/pipeline.js";
+import { resumePhaseBoundary } from "../engine/phases.js";
 import { resumePregameFromPrompt } from "../engine/pregame.js";
 import {
   continueReplacementBatchAfterSubstitute,
@@ -417,6 +418,25 @@ function resumeInterruptedEffectContinuations(
     state.effectStack.at(-1)?.phase === "INTERRUPTED_BY_TRIGGERS"
   ) {
     const frame = state.effectStack.at(-1)!;
+    if (frame.phaseBoundaryContinuation) {
+      const resumed = resumePhaseBoundary(state, cardDb);
+      state = resumed.state;
+      if (resumed.pendingPrompt) {
+        state = { ...state, pendingPrompt: resumed.pendingPrompt };
+        break;
+      }
+      if (resumed.events.length > 0) {
+        const pipeline = continuePipelineFromExecution(
+          state,
+          resumed,
+          cardDb,
+          frame.phaseBoundaryContinuation.endingPlayerIndex
+        );
+        state = pipeline.state;
+        gameOver = pipeline.gameOver;
+      }
+      continue;
+    }
     const resumed = resumeFromStack(state, action, cardDb);
     state = resumed.state;
     if (resumed.pendingPrompt) {

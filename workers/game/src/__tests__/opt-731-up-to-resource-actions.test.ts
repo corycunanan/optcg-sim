@@ -218,7 +218,7 @@ describe("OPT-731 choose-fewer resource action contract", () => {
     );
   });
 
-  it("resolves EB02-015's scheduled up-to action at the maximum without stranding a prompt", () => {
+  it("surfaces EB02-015's scheduled up-to prompt without handing off the turn", () => {
     const cardDb = createTestCardDb();
     const base = createBattleReadyState(cardDb);
     const scheduled = actionFrom(
@@ -255,12 +255,13 @@ describe("OPT-731 choose-fewer resource action contract", () => {
 
     const result = executeAdvancePhase(state, cardDb);
 
-    expect(result.state.effectStack).toEqual([]);
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(result.state.effectStack).toHaveLength(2);
     expect(result.state.scheduledActions).toEqual([]);
-    expect(result.state.players[0].donCostArea[0]?.state).toBe("ACTIVE");
+    expect(result.state.players[0].donCostArea[0]?.state).toBe("RESTED");
     expect(result.state.turn).toMatchObject({
-      activePlayerIndex: 1,
-      phase: "REFRESH",
+      activePlayerIndex: 0,
+      phase: "END",
     });
   });
 

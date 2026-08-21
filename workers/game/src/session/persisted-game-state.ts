@@ -272,6 +272,18 @@ const ReturnToDeckArrangement = z.strictObject({
   remainingOwners: z.array(PlayerIndex),
 });
 
+const PhaseBoundaryContinuation = z.strictObject({
+  kind: z.literal("END_PHASE"),
+  endingPlayerIndex: PlayerIndex,
+  remainingScheduledActions: z.array(
+    z.strictObject({
+      action: z.unknown(),
+      controller: PlayerIndex,
+      sourceEffectId: z.string(),
+    })
+  ),
+});
+
 const StackFrameCore = z.strictObject({
   id: z.string(),
   sourceCardInstanceId: z.string(),
@@ -296,6 +308,7 @@ const StackFrameCore = z.strictObject({
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
   replacementBatchContinuation: z.unknown().optional(),
+  phaseBoundaryContinuation: PhaseBoundaryContinuation.optional(),
   costs: z.array(z.unknown()),
   currentCostIndex: NonNegativeInteger,
   costsPaid: z.boolean(),
