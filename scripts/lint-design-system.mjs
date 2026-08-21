@@ -395,7 +395,7 @@ if (IS_MAIN) {
 
     for (const violation of findClassTokenViolations(source, {
       includeTypeFloor: !typeFloorExempt,
-      includeDeadRadixStateVariants: !path.endsWith(".test.tsx"),
+      includeNonstandardRadixStateVariants: !path.endsWith(".test.tsx"),
     })) {
       addViolation(
         path,
@@ -629,23 +629,24 @@ export function findClassTokenViolations(
   source,
   {
     includeTypeFloor = true,
-    includeDeadRadixStateVariants = true,
+    includeNonstandardRadixStateVariants = true,
     vocabulary = SHAPE_VOCABULARY,
   } = {}
 ) {
   const violations = [];
 
-  const reportDeadRadixStateVariant = (token, index) => {
-    const deadRadixStateVariant = [
+  const reportNonstandardRadixStateVariant = (token, index) => {
+    const nonstandardRadixStateVariant = [
       "data-open:",
       "data-closed:",
       "data-popup-open:",
     ].find((variant) => token.includes(variant));
-    if (!includeDeadRadixStateVariants || !deadRadixStateVariant) return;
+    if (!includeNonstandardRadixStateVariants || !nonstandardRadixStateVariant)
+      return;
     violations.push({
       index,
       rule: "radix-data-state",
-      message: `dead Radix variant ${JSON.stringify(deadRadixStateVariant)} in ${JSON.stringify(token)}; use data-[state=open]: or data-[state=closed]:`,
+      message: `nonstandard Radix state variant ${JSON.stringify(nonstandardRadixStateVariant)} in ${JSON.stringify(token)}; data-popup-open: is a dead selector and data-open:/data-closed: depend on a vendored shadcn custom variant; use data-[state=open]:/data-[state=closed]:`,
     });
   };
 
@@ -681,14 +682,14 @@ export function findClassTokenViolations(
   forEachClassPosition(source, {
     onLiteral: (node, index) => {
       for (const rawToken of node.text.split(/\s+/).filter(Boolean)) {
-        reportDeadRadixStateVariant(rawToken, index);
+        reportNonstandardRadixStateVariant(rawToken, index);
         report(normalizeClassToken(rawToken), index);
       }
     },
     // A class list assembled around interpolations still contributes its static
     // halves verbatim, so `` className={`shadow ${extra}`} `` is a real `shadow`.
     onStaticToken: (token, index) => {
-      reportDeadRadixStateVariant(token, index);
+      reportNonstandardRadixStateVariant(token, index);
       report(normalizeClassToken(token), index);
     },
     onDynamic: () => {},

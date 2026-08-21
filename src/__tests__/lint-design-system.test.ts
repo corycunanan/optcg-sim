@@ -251,13 +251,15 @@ describe("Radix data-state variants", () => {
     "data-popup-open:bg-muted",
     "data-[side=bottom]:data-open:slide-in-from-bottom-10",
     "group-data-[viewport=false]/navigation-menu:data-closed:animate-out",
-  ])("flags the dead short form in %s", (token) => {
+  ])("flags the nonstandard short form in %s", (token) => {
     expect(
       findClassTokenViolations(`<div className="${token}" />`)
     ).toEqual([
       expect.objectContaining({
         rule: "radix-data-state",
-        message: expect.stringContaining("data-[state=open]:"),
+        message: expect.stringContaining(
+          "data-popup-open: is a dead selector and data-open:/data-closed: depend on a vendored shadcn custom variant"
+        ),
       }),
     ]);
   });
@@ -270,10 +272,10 @@ describe("Radix data-state variants", () => {
     ).toEqual([]);
   });
 
-  it("can exclude test fixtures that assert the dead strings", () => {
+  it("can exclude test fixtures that assert the guarded strings", () => {
     expect(
       findClassTokenViolations('<div className="data-open:animate-in" />', {
-        includeDeadRadixStateVariants: false,
+        includeNonstandardRadixStateVariants: false,
       })
     ).toEqual([]);
   });
