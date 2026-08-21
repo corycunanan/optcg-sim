@@ -700,7 +700,7 @@ export const OP07_021_UROUGE: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -2133,7 +2133,7 @@ export const OP07_060_ITOMIMIZU: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2309,7 +2309,7 @@ export const OP07_065_GINA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2344,7 +2344,7 @@ export const OP07_066_TONY_TONY_CHOPPER: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2373,7 +2373,7 @@ export const OP07_068_HAMBURG: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2489,7 +2489,7 @@ export const OP07_071_FOXY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2595,7 +2595,7 @@ export const OP07_074_MONDA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2685,7 +2685,7 @@ export const OP07_076_SLOW_SLOW_BEAM_SWORD: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2788,7 +2788,7 @@ export const OP07_078_MEGATON_NINE_TAILS_RUSH: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -3948,7 +3948,7 @@ export const OP07_112_LUCY: EffectSchema = {
         },
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
           chain: "THEN",
           conditions: {
             type: "LIFE_COUNT",
@@ -4224,7 +4224,7 @@ export const OP07_119_PORTGAS_D_ACE: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
         {
           type: "GRANT_KEYWORD",

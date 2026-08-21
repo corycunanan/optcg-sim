@@ -221,18 +221,8 @@ describe("OPT-590 canonical Trigger schema coverage", () => {
       },
       actions: [
         {
-          type: "PLAYER_CHOICE",
-          params: {
-            options: [
-              [
-                {
-                  type: "ADD_TO_LIFE_FROM_DECK",
-                  params: { amount: 1, position: "TOP" },
-                },
-              ],
-              [],
-            ],
-          },
+          type: "ADD_TO_LIFE_FROM_DECK",
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],

@@ -775,7 +775,7 @@ export const OP13_023_UTA: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -835,7 +835,7 @@ export const OP13_024_GORDON: EffectSchema = {
             timing: "END_OF_THIS_TURN",
             action: {
               type: "SET_DON_ACTIVE",
-              params: { amount: 2 },
+              params: { amount: 2, up_to: true },
             },
           },
         },
@@ -881,7 +881,7 @@ export const OP13_025_KOBY: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -932,7 +932,7 @@ export const OP13_027_SANJI: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
     },
@@ -957,7 +957,7 @@ export const OP13_027_SANJI: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -1011,7 +1011,7 @@ export const OP13_030_TONY_TONY_CHOPPER: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
     },
@@ -1158,7 +1158,7 @@ export const OP13_034_BROOK: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -1183,7 +1183,7 @@ export const OP13_035_BEPO: EffectSchema = {
           params: {
             options: [
               [{ type: "SET_ACTIVE", target: { type: "SELF" } }],
-              [{ type: "SET_DON_ACTIVE", params: { amount: 1 } }],
+              [{ type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } }],
             ],
             labels: ["Set this Character as active", "Set 1 DON!! as active"],
           },
@@ -1224,7 +1224,7 @@ export const OP13_037_RORONOA_ZORO: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
     },
@@ -1272,7 +1272,7 @@ export const OP13_038_GUM_GUM_ELEPHANT_GUN: EffectSchema = {
             timing: "END_OF_THIS_TURN",
             action: {
               type: "SET_DON_ACTIVE",
-              params: { amount: 2 },
+              params: { amount: 2, up_to: true },
             },
           },
           chain: "THEN",
@@ -2094,7 +2094,7 @@ export const OP13_061_INUARASHI: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
         {
           type: "KO",
@@ -2134,7 +2134,7 @@ export const OP13_062_CROCUS: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2184,7 +2184,7 @@ export const OP13_063_KOUZUKI_ODEN: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2317,7 +2317,7 @@ export const OP13_066_SILVERS_RAYLEIGH: EffectSchema = {
             timing: "END_OF_THIS_TURN",
             action: {
               type: "ADD_DON_FROM_DECK",
-              params: { amount: 1, target_state: "ACTIVE" },
+              params: { amount: 1, target_state: "ACTIVE", up_to: true },
             },
           },
           chain: "THEN",
@@ -2363,7 +2363,7 @@ export const OP13_067_SCOPPER_GABAN: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
       ],
@@ -2411,7 +2411,7 @@ export const OP13_068_DOUGLAS_BULLET: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2511,7 +2511,7 @@ export const OP13_072_BUGGY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2581,7 +2581,7 @@ export const OP13_075_GUESS_WELL_HAVE_ANOTHER_SCRAP: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2739,7 +2739,7 @@ export const OP13_078_ORO_JACKSON: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -3751,7 +3751,7 @@ export const OP13_104_KOUZUKI_HIYORI: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -4287,7 +4287,7 @@ export const OP13_118_MONKEY_D_LUFFY: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 4 },
+          params: { amount: 4, up_to: true },
         },
         {
           type: "APPLY_PROHIBITION",

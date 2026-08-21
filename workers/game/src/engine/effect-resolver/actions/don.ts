@@ -90,7 +90,7 @@ export function executeAddDonFromDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = params.amount ?? 1;
+  const amount = resolveAmount(params.amount ?? 1, _resultRefs, state, controller, _cardDb);
   const targetState = params.target_state ?? "ACTIVE";
 
   const p = state.players[controller];
@@ -393,7 +393,7 @@ export function executeSetDonActive(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = params.amount ?? 1;
+  const amount = resolveAmount(params.amount ?? 1, _resultRefs, state, controller, _cardDb);
   const p = state.players[controller];
   const restedDon = p.donCostArea.filter((d) => d.state === "RESTED");
   const count = Math.min(amount, restedDon.length);

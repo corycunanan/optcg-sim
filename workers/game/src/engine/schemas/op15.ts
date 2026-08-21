@@ -2306,11 +2306,11 @@ export const OP15_058_ENEL: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 4, target_state: "RESTED" },
+          params: { amount: 4, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
         {
@@ -2589,7 +2589,7 @@ export const OP15_065_GORO: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
           conditions: {
             type: "REVEALED_CARD_PROPERTY",
@@ -4375,7 +4375,7 @@ export const OP15_109_NICO_ROBIN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         {
           type: "PLAY_CARD",
@@ -4414,7 +4414,7 @@ export const OP15_110_BRAHAM: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -4504,7 +4504,7 @@ export const OP15_113_RORONOA_ZORO: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -4650,7 +4650,7 @@ export const OP15_116_GUM_GUM_GOLDEN_RIFLE: EffectSchema = {
         },
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
           chain: "THEN",
         },
         {

@@ -1106,7 +1106,7 @@ export const OP08_032_MILKY: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -1354,7 +1354,7 @@ export const OP08_039_ZOU: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -2092,7 +2092,7 @@ export const OP08_058_CHARLOTTE_PUDDING: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2275,7 +2275,7 @@ export const OP08_063_CHARLOTTE_KATAKURI: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2335,7 +2335,7 @@ export const OP08_066_CHARLOTTE_BRULEE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2363,7 +2363,7 @@ export const OP08_067_CHARLOTTE_PUDDING: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2386,7 +2386,7 @@ export const OP08_068_CHARLOTTE_PEROSPERO: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2427,7 +2427,7 @@ export const OP08_069_CHARLOTTE_LINLIN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
         {
           type: "ADD_TO_LIFE_FROM_FIELD",
@@ -2601,7 +2601,7 @@ export const OP08_074_BLACK_MARIA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 5, target_state: "RESTED" },
+          params: { amount: 5, target_state: "RESTED", up_to: true },
         },
         {
           type: "SCHEDULE_ACTION",
@@ -2662,7 +2662,7 @@ export const OP08_075_CANDY_MAIDEN: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2687,11 +2687,11 @@ export const OP08_076_ITS_TO_DIE_FOR: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
           conditions: {
             type: "CARD_ON_FIELD",
             controller: "OPPONENT",
@@ -2708,7 +2708,7 @@ export const OP08_076_ITS_TO_DIE_FOR: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -3845,7 +3845,7 @@ export const OP08_109_MONT_BLANC_NOLAND: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
     },
@@ -4290,7 +4290,7 @@ export const OP08_119_KAIDO_AND_LINLIN: EffectSchema = {
         },
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
           chain: "THEN",
         },
         {

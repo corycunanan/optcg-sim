@@ -120,7 +120,7 @@ export const ST09_005_KOUZUKI_ODEN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -284,7 +284,7 @@ export const ST09_014_NARIKABURA_ARROW: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
       flags: { optional: true },

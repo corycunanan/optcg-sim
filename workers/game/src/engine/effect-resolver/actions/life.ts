@@ -21,6 +21,7 @@ import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
+import { resolveAmount } from "../action-utils.js";
 
 export function executeAddToLifeFromDeck(
   state: GameState,
@@ -32,7 +33,7 @@ export function executeAddToLifeFromDeck(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = params.amount ?? 1;
+  const amount = resolveAmount(params.amount ?? 1, _resultRefs, state, controller, _cardDb);
   const face = params.face ?? "DOWN";
   const position = params.position ?? "TOP";
 

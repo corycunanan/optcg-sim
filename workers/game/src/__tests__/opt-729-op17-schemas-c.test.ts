@@ -114,6 +114,20 @@ function acceptOptional(result: PromptResult, cardDb: Map<string, CardData>): Pr
   );
 }
 
+function chooseMaximum(result: PromptResult, cardDb: Map<string, CardData>): PromptResult {
+  expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+  if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+    throw new Error("Expected an amount prompt");
+  }
+  const choiceId = result.pendingPrompt.options.choices.at(-1)?.id;
+  if (!choiceId) throw new Error("Expected an amount choice");
+  return resumeFromStack(
+    result.state,
+    { type: "PLAYER_CHOICE", choiceId },
+    cardDb,
+  );
+}
+
 function declineOptional(result: PromptResult, cardDb: Map<string, CardData>): PromptResult {
   expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
   return resumeFromStack(
@@ -318,7 +332,8 @@ describe("OPT-729 multi-step costs and post-cost gates", () => {
     const life = state.players[0].life.length;
     const deck = state.players[0].deck.length;
     const don = state.players[0].donCostArea.length;
-    const result = resolveBlock(state, cardDb, source, OP17_061_LEAD_PERFORMERS, "on_play_add_life");
+    let result = resolveBlock(state, cardDb, source, OP17_061_LEAD_PERFORMERS, "on_play_add_life");
+    result = chooseMaximum(result, cardDb);
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.state.players[0].donCostArea).toHaveLength(don - 1);
     expect(result.state.players[0].life).toHaveLength(life + 1);
@@ -375,6 +390,7 @@ describe("OPT-729 multi-step costs and post-cost gates", () => {
     result = acceptOptional(result, cardDb);
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") throw new Error("hand prompt");
     result = selectTargets(result, result.pendingPrompt.options.validTargets.slice(0, 2), cardDb);
+    result = chooseMaximum(result, cardDb);
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.state.players[0].hand).toHaveLength(hand - 2);
     expect(result.state.players[0].trash).toHaveLength(trash + 2);
@@ -405,6 +421,7 @@ describe("OPT-729 multi-step costs and post-cost gates", () => {
     result = acceptOptional(result, cardDb);
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") throw new Error("hand prompt");
     result = selectTargets(result, [result.pendingPrompt.options.validTargets[0]], cardDb);
+    result = chooseMaximum(result, cardDb);
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.state.players[0].hand).toHaveLength(hand - 1);
     expect(result.state.players[0].trash).toHaveLength(trash + 1);

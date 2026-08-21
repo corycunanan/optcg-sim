@@ -16,6 +16,8 @@
 
 > **OPT-725 closure (2026-08-21):** OPT-725 authors OP17-041 after extending owner-ordered bottom-deck arrangement prompts to multi-card field batches. The OPT-603 sweep advances to 2,472 cards; with OP17-018, OP17-095, and OP17-116 already landed by OPT-723/732, no OP17 cards remain deferred to engine tickets except the OPT-731 migration set.
 
+> **OPT-731 closure (2026-08-21):** OPT-731 routes 270 optional resource-action occurrences through the existing numeric choice prompt and preserves 10 mandatory occurrences unchanged. The migration covers every true “up to” `ADD_DON_FROM_DECK`, `ADD_TO_LIFE_FROM_DECK`, and `SET_DON_ACTIVE` print, including all seven OP-17 cards, while the OPT-603 sweep remains 2,472 cards.
+
 ## Official reconciliation delta inventory
 
 | Field                     |                                Records | Official delta                                                                                                                                                  | Disposition                                                                                                  |

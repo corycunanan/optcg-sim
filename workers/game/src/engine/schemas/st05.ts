@@ -52,7 +52,7 @@ export const ST05_002_AIN: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } },
       ],
     },
   ],
@@ -322,7 +322,7 @@ export const ST05_016_LIONS_THREAT_IMPERIAL_EARTH_BIND: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } },
       ],
     },
   ],
@@ -373,7 +373,7 @@ export const ST05_017_UNION_ARMADA: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } },
       ],
     },
   ],

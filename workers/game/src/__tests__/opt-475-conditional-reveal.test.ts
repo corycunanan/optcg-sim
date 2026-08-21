@@ -476,11 +476,16 @@ describe("OPT-475 conditional reveal closure", () => {
     const donDeckBefore = seeded.state.players[0].donDeck.length;
     const costAreaBefore = seeded.state.players[0].donCostArea.length;
 
-    const result = resolveEffect(
+    let result = resolveEffect(
       seeded.state,
       revealBlock(schemas["OP15-065"]),
       seeded.source.instanceId,
       0,
+      cardDb,
+    );
+    result = resumeFromStack(
+      result.state,
+      { type: "PLAYER_CHOICE", choiceId: "choose-value:1" },
       cardDb,
     );
     expect(result.state.players[0].donDeck).toHaveLength(donDeckBefore - 1);

@@ -187,7 +187,7 @@ export const ST04_008_JACK: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } },
       ],
       flags: { optional: true },
     },
@@ -262,7 +262,7 @@ export const ST04_014_LEAD_PERFORMER_DISASTER: EffectSchema = {
         { type: "DRAW", params: { amount: 1 } },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
           chain: "THEN",
         },
       ],
@@ -303,7 +303,7 @@ export const ST04_015_BRACHIO_BOMBER: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
           chain: "THEN",
         },
       ],
@@ -313,7 +313,7 @@ export const ST04_015_BRACHIO_BOMBER: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } },
       ],
     },
   ],
@@ -370,7 +370,7 @@ export const ST04_017_ONIGASHIMA_ISLAND: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },

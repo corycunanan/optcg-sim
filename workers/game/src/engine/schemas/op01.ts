@@ -883,7 +883,7 @@ export const OP01_031_ODEN: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
       flags: { once_per_turn: true, optional: true },
@@ -969,7 +969,7 @@ export const OP01_034_INUARASHI: EffectSchema = {
       id: "when_attacking_set_don",
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING", don_requirement: 2 },
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 1 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } }],
     },
   ],
 };
@@ -1258,7 +1258,7 @@ export const OP01_046_DENJIRO: EffectSchema = {
         controller: "SELF",
         property: { name: "Kouzuki Oden" },
       },
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2, up_to: true } }],
     },
   ],
 };
@@ -1732,7 +1732,7 @@ export const OP01_061_KAIDO_LEADER: EffectSchema = {
         turn_restriction: "YOUR_TURN",
         once_per_turn: true,
       },
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } }],
       flags: { once_per_turn: true },
     },
   ],
@@ -2523,7 +2523,7 @@ export const OP01_093_ULTI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "DON_REST", amount: 1 }],
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }],
       flags: { optional: true },
     },
   ],
@@ -2739,7 +2739,7 @@ export const OP01_101_SASAKI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING", don_requirement: 1 },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }],
       flags: { optional: true },
     },
   ],
@@ -2811,7 +2811,7 @@ export const OP01_106_BASIL_HAWKINS: EffectSchema = {
       id: "on_play_add_don",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }],
     },
     {
       id: "trigger_play_self",
@@ -2958,7 +2958,7 @@ export const OP01_113_HOLEDEM: EffectSchema = {
       id: "on_ko_add_don",
       category: "auto",
       trigger: { keyword: "ON_KO" },
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }],
     },
   ],
 };
@@ -3013,7 +3013,7 @@ export const OP01_115_ELEPHANTS_MARCHOO: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
           chain: "THEN",
         },
       ],
@@ -3113,7 +3113,7 @@ export const OP01_118_ULTI_MORTAR: EffectSchema = {
       id: "trigger_add_don",
       category: "auto",
       trigger: { keyword: "TRIGGER" },
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } }],
     },
   ],
 };
@@ -3140,7 +3140,7 @@ export const OP01_119_THUNDER_BAGUA: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
           conditions: {
             type: "LIFE_COUNT",
@@ -3155,7 +3155,7 @@ export const OP01_119_THUNDER_BAGUA: EffectSchema = {
       id: "trigger_add_don",
       category: "auto",
       trigger: { keyword: "TRIGGER" },
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } }],
     },
   ],
 };

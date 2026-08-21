@@ -77,7 +77,7 @@ export const ST24_002_KID_AND_KILLER: EffectSchema = {
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
       costs: [{ type: "TRASH_SELF" }],
       actions: [
-        { type: "SET_DON_ACTIVE", params: { amount: 1 } },
+        { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } },
       ],
       flags: { optional: true },
     },
@@ -97,7 +97,7 @@ export const ST24_003_BASIL_HAWKINS: EffectSchema = {
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
       actions: [
-        { type: "SET_DON_ACTIVE", params: { amount: 1 } },
+        { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } },
       ],
     },
   ],
@@ -185,7 +185,7 @@ export const ST24_005_X_DRAKE: EffectSchema = {
             timing: "END_OF_THIS_TURN",
             action: {
               type: "SET_DON_ACTIVE",
-              params: { amount: 1 },
+              params: { amount: 1, up_to: true },
             },
           },
           chain: "THEN",

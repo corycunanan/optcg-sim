@@ -439,7 +439,7 @@ export const EB01_012_CAVENDISH: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
     },
@@ -726,7 +726,7 @@ export const EB01_021_HANNYABAL: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -1173,7 +1173,7 @@ export const EB01_034_MS_WEDNESDAY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -1255,7 +1255,7 @@ export const EB01_036_MINOCHIHUAHUA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -1375,7 +1375,7 @@ export const EB01_039_CONQUERER_OF_THREE_WORLDS_RAGNARAKU: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -1399,7 +1399,7 @@ export const EB01_061_MR2_BON_KUREI: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -1768,7 +1768,7 @@ export const EB01_050_I_WANT_TO_LIVE: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -2003,7 +2003,7 @@ export const EB01_057_SHIRAHOSHI: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },

@@ -729,7 +729,7 @@ export const OP09_022_LIM: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
         {
           type: "PLAY_CARD",
@@ -771,7 +771,7 @@ export const OP09_023_ADIO: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 3 },
+          params: { amount: 3, up_to: true },
         },
       ],
     },
@@ -2085,11 +2085,11 @@ export const OP09_061_MONKEY_D_LUFFY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
       ],
@@ -2121,7 +2121,7 @@ export const OP09_062_NICO_ROBIN: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2457,7 +2457,7 @@ export const OP09_075_EUSTASS_CAPTAIN_KID: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2482,7 +2482,7 @@ export const OP09_076_RORONOA_ZORO: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2523,7 +2523,7 @@ export const OP09_077_GUM_GUM_LIGHTNING: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2615,7 +2615,7 @@ export const OP09_079_GUM_GUM_JUMP_ROPE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2651,7 +2651,7 @@ export const OP09_080_THOUSAND_SUNNY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -4003,19 +4003,8 @@ export const OP09_105_SANJI: EffectSchema = {
       },
       actions: [
         {
-          type: "PLAYER_CHOICE",
-          params: {
-            options: [
-              [
-                {
-                  type: "ADD_TO_LIFE_FROM_DECK",
-                  params: { amount: 1, position: "TOP", face: "DOWN" },
-                },
-              ],
-              [],
-            ],
-            labels: ["Add the top card of your deck to Life", "Add no cards"],
-          },
+          type: "ADD_TO_LIFE_FROM_DECK",
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
         { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],

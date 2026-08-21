@@ -2229,7 +2229,7 @@ export const OP03_064_TILESTONE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2270,7 +2270,7 @@ export const OP03_066_PAULIE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
         {
           type: "KO",
@@ -2314,7 +2314,7 @@ export const OP03_067_PEEPLEY_LULU: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2348,7 +2348,7 @@ export const OP03_068_MINOZEBRA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2487,7 +2487,7 @@ export const OP03_072_GUM_GUM_JET_GATLING: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2596,7 +2596,7 @@ export const OP03_075_GALLEY_LA_COMPANY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2665,7 +2665,7 @@ export const OP03_077_CHARLOTTE_LINLIN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -3463,7 +3463,7 @@ export const OP03_102_SANJI: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -3620,7 +3620,7 @@ export const OP03_109_CHARLOTTE_CHIFFON: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -3761,7 +3761,7 @@ export const OP03_114_CHARLOTTE_LINLIN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         {
           type: "TRASH_FROM_LIFE",
@@ -3915,7 +3915,7 @@ export const OP03_118_IKOKU_SOVEREIGNTY: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },

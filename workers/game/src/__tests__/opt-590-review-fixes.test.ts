@@ -87,7 +87,7 @@ describe("OPT-590 adversarial review regressions", () => {
 
     const declined = resumeFromStack(
       { ...offered.state, pendingPrompt: null },
-      { type: "PLAYER_CHOICE", choiceId: "1" },
+      { type: "PLAYER_CHOICE", choiceId: "choose-value:0" },
       cardDb
     );
 

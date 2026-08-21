@@ -217,16 +217,21 @@ export function executeOpponentAction(
   if (!wrappedAction) return { state, events, succeeded: false };
 
   const oppController = controller === 0 ? 1 : 0;
-  const result = services.executeEffectAction(
+  const result = services.executeActionChain(
     state,
-    wrappedAction,
+    [wrappedAction],
     sourceCardInstanceId,
     oppController,
     cardDb,
     resultRefs,
   );
 
-  return result;
+  return {
+    state: result.state,
+    events: result.events,
+    succeeded: !result.pendingPrompt,
+    pendingPrompt: result.pendingPrompt,
+  };
 }
 
 export function executeReuseEffect(
