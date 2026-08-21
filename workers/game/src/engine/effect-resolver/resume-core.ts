@@ -159,6 +159,7 @@ export function resumeEffectChain(
     cardDb,
     resultRefs,
     validTargets,
+    resumeCtx.returnToDeckArrangement,
     services
   );
   if (returnToDeck) {
@@ -410,6 +411,7 @@ export function resumeFromStack(
         remainingActions: topFrame.remainingActions,
         resultRefs: topFrame.resultRefs,
         validTargets: topFrame.validTargets,
+        returnToDeckArrangement: topFrame.returnToDeckArrangement,
         ruleTrashForPlay: topFrame.ruleTrashForPlay,
         stateDistributionForPlay: topFrame.stateDistributionForPlay,
       };
@@ -481,6 +483,7 @@ export function resumeFromStack(
             remainingActions: topFrame.remainingActions,
             resultRefs: promptCtx.resultRefs,
             validTargets: promptCtx.validTargets,
+            returnToDeckArrangement: promptCtx.returnToDeckArrangement,
             accumulatedEvents: [
               ...topFrame.accumulatedEvents,
               ...result.events,

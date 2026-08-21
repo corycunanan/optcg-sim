@@ -9,6 +9,7 @@ import type {
   GameState,
   PendingEvent,
   PendingPromptState,
+  ReturnToDeckArrangement,
   ResumeContext,
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
@@ -190,7 +191,7 @@ export function executeReturnToDeck(
   resultRefs: Map<string, EffectResult>,
   preselectedTargets: string[] | undefined,
   services: EffectResolverServices,
-  arrangementResolved = false,
+  arrangement?: ReturnToDeckArrangement,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -214,7 +215,7 @@ export function executeReturnToDeck(
   ) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
-  const targetIds = autoSelectTargets(action.target, allValidIds);
+  let targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   // Rule 3-1-7: when multiple cards enter a new area simultaneously, their
@@ -224,16 +225,39 @@ export function executeReturnToDeck(
     const card = findCardInstance(state, id);
     return card ? [card] : [];
   });
-  const owner = sourceCards[0]?.owner;
   const sourceZone = sourceCards[0]?.zone;
-  const needsArrange = !arrangementResolved &&
-    targetIds.length > 1 &&
-    owner !== undefined &&
-    (sourceZone === "HAND" || sourceZone === "TRASH" || sourceZone === "LIFE" ||
-      sourceZone === "CHARACTER" || sourceZone === "STAGE") &&
+  // Comprehensive Rules 3-1-7 keys ordering to the new area, so mixing the
+  // Character and Stage source areas in one FIELD_CARD batch does not remove
+  // the owner's ordering choice when those cards enter their deck together.
+  const sourceGroup = sourceZone === "CHARACTER" || sourceZone === "STAGE"
+    ? "FIELD"
+    : sourceZone;
+  const arrangementEligible = targetIds.length > 1 &&
+    (sourceGroup === "HAND" || sourceGroup === "TRASH" || sourceGroup === "LIFE" ||
+      sourceGroup === "FIELD") &&
     sourceCards.length === targetIds.length &&
-    sourceCards.every((card) => card.owner === owner && card.zone === sourceZone);
-  if (needsArrange) {
+    sourceCards.every((card) => {
+      const cardSourceGroup = card.zone === "CHARACTER" || card.zone === "STAGE"
+        ? "FIELD"
+        : card.zone;
+      return cardSourceGroup === sourceGroup;
+    });
+  const owners = sourceCards.reduce<Array<0 | 1>>((result, card) => {
+    if (!result.includes(card.owner)) result.push(card.owner);
+    return result;
+  }, []);
+  const arrangementProgress = arrangement ?? {
+    targetIds,
+    orderedOwnerGroups: [],
+    remainingOwners: owners.filter((candidateOwner) =>
+      sourceCards.filter((card) => card.owner === candidateOwner).length > 1
+    ),
+  };
+  const pendingOwner = arrangementEligible
+    ? arrangementProgress.remainingOwners[0]
+    : undefined;
+  if (pendingOwner !== undefined) {
+    const ownerCards = sourceCards.filter((card) => card.owner === pendingOwner);
     const sourceCard = findCardInstance(state, sourceCardInstanceId);
     const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
     const resumeContext: ResumeContext = {
@@ -242,21 +266,34 @@ export function executeReturnToDeck(
       pausedAction: action,
       remainingActions: [],
       resultRefs: [...resultRefs.entries()],
-      validTargets: targetIds,
+      validTargets: ownerCards.map((card) => card.instanceId),
+      returnToDeckArrangement: arrangementProgress,
     };
     const pendingPrompt: PendingPromptState = {
       options: {
         promptType: "ARRANGE_TOP_CARDS",
-        cards: sourceCards,
+        cards: ownerCards,
         effectDescription: sourceData?.effectText ?? `Place the cards at the ${position === "TOP" ? "top" : "bottom"} of the deck in any order`,
         canSendToBottom: position === "BOTTOM",
         validTargets: [],
         maxKeep: 0,
       },
-      respondingPlayer: owner,
+      respondingPlayer: pendingOwner,
       resumeContext,
     };
     return { state, events, succeeded: false, pendingPrompt };
+  }
+
+  if (arrangement) {
+    const orderedByOwner = new Map(
+      arrangement.orderedOwnerGroups.map((group) => [group.owner, group.targetIds])
+    );
+    targetIds = owners.flatMap((candidateOwner) =>
+      orderedByOwner.get(candidateOwner) ??
+      sourceCards
+        .filter((card) => card.owner === candidateOwner)
+        .map((card) => card.instanceId)
+    );
   }
 
   const sameDeckIds = targetIds.filter((id) => findCardInstance(state, id)?.zone === "DECK");

@@ -911,6 +911,7 @@ export function executeActionChain(
         remainingActions: actions.slice(i + 1),
         resultRefs: [...resultRefs.entries()],
         validTargets: ctx.validTargets,
+        returnToDeckArrangement: ctx.returnToDeckArrangement,
         costs: [],
         currentCostIndex: 0,
         costsPaid: true, // costs already paid before action chain

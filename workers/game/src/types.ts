@@ -107,6 +107,15 @@ export interface ExecuteResult {
   pendingPrompt?: PendingPromptState;
 }
 
+export interface ReturnToDeckArrangement {
+  targetIds: string[];
+  orderedOwnerGroups: Array<{
+    owner: 0 | 1;
+    targetIds: string[];
+  }>;
+  remainingOwners: Array<0 | 1>;
+}
+
 export interface ResumeContext {
   effectSourceInstanceId: string;
   controller: 0 | 1;
@@ -116,6 +125,8 @@ export interface ResumeContext {
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, import("./engine/effect-types.js").EffectResult][];
   validTargets: string[];
+  /** Per-owner Rule 3-1-7 ordering choices collected before a deck-return batch commits. */
+  returnToDeckArrangement?: ReturnToDeckArrangement;
   // Rule 3-7-6-1: when an effect-driven play hits a full board, the prompt asks
   // the controller to pick one of their own Characters to trash before the play
   // resolves. On resume, the chosen victim is rule-trashed (no On K.O. triggers
@@ -206,6 +217,8 @@ export interface EffectStackFrame {
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, import("./engine/effect-types.js").EffectResult][];
   validTargets: string[];
+  /** Persisted per-owner Rule 3-1-7 ordering progress for RETURN_TO_DECK. */
+  returnToDeckArrangement?: ReturnToDeckArrangement;
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;
   /** AND transaction waiting for all snapshot-locked target choices. */
