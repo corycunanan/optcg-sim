@@ -202,7 +202,11 @@ export interface DeckListEntry {
 export interface ActiveEffect {
   id: string;
   sourceCardInstanceId: string;
-  // Full type defined in M4
+  appliesTo?: string[];
+  modifiers?: Array<{
+    type: string;
+    params?: Record<string, unknown> & { keyword?: string };
+  }>;
 }
 
 export interface ActiveProhibition {
