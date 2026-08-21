@@ -5,7 +5,14 @@
  * and turn handoff. Extracted from execute.ts for clarity.
  */
 
-import type { CardData, GameState, PendingEvent, ExecuteResult } from "../types.js";
+import type {
+  CardData,
+  EffectStackFrame,
+  ExecuteResult,
+  GameState,
+  PendingEvent,
+  PhaseBoundaryContinuation,
+} from "../types.js";
 import {
   getActivePlayerIndex,
   returnAttachedDonToCostArea,
@@ -18,6 +25,14 @@ import {
   processScheduledActions,
 } from "./duration-tracker.js";
 import { resolveEffect } from "./effect-resolver/index.js";
+import { emitPendingEvent } from "./events.js";
+import {
+  CONTINUATION_EFFECT_BLOCK,
+  generateFrameId,
+  peekFrame,
+  popFrame,
+  pushFrame,
+} from "./effect-stack.js";
 import { applyRefreshProhibitions } from "./prohibitions.js";
 import { transitionCard } from "./zone-transition.js";
 
@@ -103,10 +118,7 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
       nextState = { ...nextState, turn: { ...nextState.turn, phase: "END" } };
       events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "MAIN", to: "END" } });
       // Run end-phase sequence automatically
-      const endResult = runEndPhase(nextState, pi, cardDb);
-      nextState = endResult.state;
-      events.push(...endResult.events);
-      break;
+      return runEndPhase(nextState, pi, cardDb, events);
     }
 
     case "END": {
@@ -118,9 +130,12 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
   return { state: nextState, events };
 }
 
-function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>): ExecuteResult {
-  const events: PendingEvent[] = [];
-
+function runEndPhase(
+  state: GameState,
+  pi: 0 | 1,
+  cardDb: Map<string, CardData>,
+  events: PendingEvent[] = []
+): ExecuteResult {
   // Steps 1 & 2: [End of Your Turn] / [End of Your Opponent's Turn] effects (M4)
 
   // Steps 3-6: Expire THIS_TURN / UNTIL_END_OF_*_TURN effects and
@@ -129,29 +144,130 @@ function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>)
 
   // Process end-of-turn scheduled actions
   const scheduled = processScheduledActions(state, "END_OF_THIS_TURN");
-  state = scheduled.state;
-  for (const entry of scheduled.actionsToRun) {
+  return continueEndPhase(
+    scheduled.state,
+    {
+      kind: "END_PHASE",
+      endingPlayerIndex: pi,
+      remainingScheduledActions: scheduled.actionsToRun,
+    },
+    cardDb,
+    events
+  );
+}
+
+/** Resume end-phase work parked below a scheduled effect's prompt frame. */
+export function resumePhaseBoundary(
+  state: GameState,
+  cardDb: Map<string, CardData>
+): ExecuteResult {
+  const frame = peekFrame(state);
+  if (!frame?.phaseBoundaryContinuation) return { state, events: [] };
+  return continueEndPhase(
+    popFrame(state),
+    frame.phaseBoundaryContinuation,
+    cardDb,
+    [...frame.accumulatedEvents]
+  );
+}
+
+function continueEndPhase(
+  initialState: GameState,
+  continuation: PhaseBoundaryContinuation,
+  cardDb: Map<string, CardData>,
+  events: PendingEvent[]
+): ExecuteResult {
+  let state = initialState;
+  const scheduledActions = continuation.remainingScheduledActions;
+
+  for (let index = 0; index < scheduledActions.length; index += 1) {
+    const entry = scheduledActions[index];
     const fakeBlock = {
       id: "scheduled_" + entry.sourceEffectId,
       category: "auto" as const,
       actions: [entry.action],
     };
-    // Phase-boundary execution is prompt-free and cannot pause/resume. Preserve
-    // the pre-OPT-731 auto-maximum behavior for the eight scheduled up-to
-    // clauses: EB02-015, OP04-026, OP04-033, OP13-024, OP13-038, OP13-066,
-    // OP14-031, and ST24-005.
     const result = resolveEffect(
       state,
       fakeBlock,
       entry.sourceEffectId,
       entry.controller,
-      cardDb,
-      undefined,
-      "PROMPTLESS_PHASE"
+      cardDb
     );
     state = result.state;
+    events.push(...result.events);
+    if (result.pendingPrompt) {
+      state = publishPhaseBoundaryEvents(
+        state,
+        events,
+        continuation.endingPlayerIndex
+      );
+      state = parkEndPhaseBelowPrompt(
+        state,
+        {
+          ...continuation,
+          remainingScheduledActions: scheduledActions.slice(index + 1),
+        }
+      );
+      return {
+        state,
+        events: [],
+        pendingPrompt: result.pendingPrompt,
+      };
+    }
   }
 
+  return completeTurnHandoff(state, continuation.endingPlayerIndex, events);
+}
+
+function parkEndPhaseBelowPrompt(
+  state: GameState,
+  continuation: PhaseBoundaryContinuation
+): GameState {
+  const promptFrame = peekFrame(state);
+  if (!promptFrame) return state;
+
+  const frameId = generateFrameId(popFrame(state));
+  const phaseFrame: EffectStackFrame = {
+    id: frameId.id,
+    sourceCardInstanceId: promptFrame.sourceCardInstanceId,
+    controller: continuation.endingPlayerIndex,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "INTERRUPTED_BY_TRIGGERS",
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: [],
+    phaseBoundaryContinuation: continuation,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+  };
+  return pushFrame(pushFrame(frameId.state, phaseFrame), promptFrame);
+}
+
+function publishPhaseBoundaryEvents(
+  initialState: GameState,
+  events: PendingEvent[],
+  defaultPlayerIndex: 0 | 1
+): GameState {
+  let state = initialState;
+  for (const event of events) {
+    state = emitPendingEvent(state, event, defaultPlayerIndex);
+  }
+  return state;
+}
+
+function completeTurnHandoff(
+  state: GameState,
+  pi: 0 | 1,
+  events: PendingEvent[]
+): ExecuteResult {
   // Turn passes to opponent. Round-counter (state.turn.number) increments only
   // when control returns to the first player (OPT-366 — previously this was
   // hardcoded to player 0, which broke when player 1 went first).
