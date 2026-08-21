@@ -109,6 +109,27 @@ The full retro: `docs/project/pr-255-workflow-retro.md`.
 - **Empty diffs hard-stop the review.** Without that, lenses improvise ranges or read a
   reversed diff.
 
+## Guardrails, readiness, and evidence (added 2026-08-21)
+
+- **Git guardrails hook** — `.claude/hooks/block-dangerous-git.sh` (registered in
+  `.claude/settings.json` as a `PreToolUse` hook on Bash) blocks `git restore`, `checkout --`,
+  `reset --hard`, `clean -f`, `branch -D`, force pushes, `stash drop/clear`, and forced worktree
+  removal. Plain `git push` stays allowed. Bypass after inspecting the target: prefix the command
+  with `GIT_GUARDRAILS_OK=1`.
+- **Evidence ladder** — `.claude/reference/evidence-ladder.md`. Every review finding, refutation,
+  and PR-body validation claim names its rung (1 said so … 4 ran it, 5 reproduced in the app);
+  rung ≤ 3 is `unproven`. The `pr-review` workflow carries `rung` in its finding and verdict schemas.
+- **Spec-fidelity lens** — `pr-review` resolves the Linear ticket from the PR title/branch
+  (or `{ticket: "OPT-123"}` in args), a haiku agent writes it to `/private/tmp/pr-review-<pr>-ticket.md`,
+  and a Terra low-effort lens reports MISSING (asked, not delivered) and UNASKED (delivered, not asked).
+- **Linear workflow labels** — `Ready for agent` (every acceptance criterion determinate; `/orchestrate`
+  gates dispatch on it), `Spec-execute` / `Design-lead` (routing consumed by `/orchestrate-frontend`).
+  Applied by `/triage-feedback` and `/investigate`.
+- **Skills** — `/grill` (decision-tree interview before ticketing ambiguous scope), `/reflect`
+  (route session learnings to hooks/lints/skill edits before memory), `writing-for-agents`
+  (standard for editing skills, workflow prompts, CLAUDE.md). Orchestrate gotchas live in
+  `.claude/skills/orchestrate/GOTCHAS.md`.
+
 ---
 
-_Last updated: 2026-07-10 (PR #255 retro applied; supersedes the GSD-era guide — see git history for the old content)._
+_Last updated: 2026-08-21 (guardrails, evidence ladder, spec-fidelity lens, readiness labels)._

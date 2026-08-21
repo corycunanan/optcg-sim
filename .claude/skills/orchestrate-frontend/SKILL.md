@@ -33,7 +33,7 @@ For each ticket, the orchestrator answers one question: **would two reasonable i
 - Bugfixes with defined expected behavior; design-system normalization sweeps
 - Dispatch flag: add `-c model_reasoning_effort="low"` to the `codex exec` invocation. Sol, not Terra — only Sol reliably completes commit/push/PR (memory: `.git` sandbox denial stops Terra).
 
-Route on **design ambiguity, not size**. A one-line spacing change on the game board hero is design-lead; a 40-file mechanical token rename is spec-execute. When in doubt, design-lead. Present the routing table at kickoff for ratification.
+Route on **design ambiguity, not size**. A one-line spacing change on the game board hero is design-lead; a 40-file mechanical token rename is spec-execute. When in doubt, design-lead. Tickets already labelled `Spec-execute` or `Design-lead` (by `/triage-feedback`) keep that routing unless you state a reason to change it; apply the label to the rest once ratified so escalations and later runs inherit it. Present the routing table at kickoff for ratification. The base skill's readiness gate (`Ready for agent`) applies before routing.
 
 **Escalation:** a spec-execute PR that fails VQA gets ONE findings loop with screenshot-annotated feedback. A second VQA failure escalates the ticket to design-lead — an Opus subagent takes over the branch with a Fable-authored diagnosis of why the Sol attempts failed (the technique-brief pattern). Never loop Sol on aesthetic judgment; low-reasoning Sol executes specs, it does not converge on taste.
 
