@@ -218,8 +218,8 @@ export function executeReturnToDeck(
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   // Rule 3-1-7: when multiple cards enter a new area simultaneously, their
-  // owner chooses the order. Hidden/open-area sources newly supported by
-  // OPT-487 must pause before their identities are reset and committed.
+  // owner chooses the order. Pause before source identities are reset and
+  // committed, including batches leaving the field.
   const sourceCards = targetIds.flatMap((id) => {
     const card = findCardInstance(state, id);
     return card ? [card] : [];
@@ -229,7 +229,8 @@ export function executeReturnToDeck(
   const needsArrange = !arrangementResolved &&
     targetIds.length > 1 &&
     owner !== undefined &&
-    (sourceZone === "HAND" || sourceZone === "TRASH" || sourceZone === "LIFE") &&
+    (sourceZone === "HAND" || sourceZone === "TRASH" || sourceZone === "LIFE" ||
+      sourceZone === "CHARACTER" || sourceZone === "STAGE") &&
     sourceCards.length === targetIds.length &&
     sourceCards.every((card) => card.owner === owner && card.zone === sourceZone);
   if (needsArrange) {

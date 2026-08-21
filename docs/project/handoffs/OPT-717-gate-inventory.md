@@ -10,6 +10,8 @@
 
 > **OPT-726 closure (2026-08-21):** OPT-726 authors OP17-118 after adding conditional HAND-zone self `COUNTER_GRANT` evaluation at counter time. The OPT-603 sweep advances to 2,467 cards, leaving OP17-018, OP17-040, OP17-041, OP17-095, and OP17-116 deferred to their sibling engine tickets.
 
+> **OPT-725 closure (2026-08-21):** OPT-725 authors OP17-041 after extending owner-ordered bottom-deck arrangement prompts to multi-card field batches. The OPT-603 sweep advances from 2,468 to 2,469 cards, leaving OP17-018, OP17-095, and OP17-116 deferred to sibling engine tickets.
+
 ## Official reconciliation delta inventory
 
 | Field                     |                                Records | Official delta                                                                                                                                                  | Disposition                                                                                                  |

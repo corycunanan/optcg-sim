@@ -1426,6 +1426,36 @@ export const OP17_040_EDWARD_NEWGATE: EffectSchema = {
   ],
 };
 
+// ─── OP17-041 Wang Zhi (Character) ───────────────────────────────────────────
+
+export const OP17_041_WANG_ZHI: EffectSchema = {
+  card_id: "OP17-041",
+  card_name: "Wang Zhi",
+  card_type: "Character",
+  effects: [
+    { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      id: "on_play_bottom_deck_base_cost_one",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        {
+          type: "RETURN_TO_DECK",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { all: true },
+            filter: { base_cost_exact: 1 },
+          },
+          params: { position: "BOTTOM" },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
 // ─── OP17-042 Kaido (Character) ─────────────────────────────────────────────
 
 export const OP17_042_KAIDO: EffectSchema = {
@@ -4146,6 +4176,7 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-038": OP17_038_UGLY_FUTURE,
   "OP17-039": OP17_039_ROCKS_D_XEBEC,
   "OP17-040": OP17_040_EDWARD_NEWGATE,
+  "OP17-041": OP17_041_WANG_ZHI,
   "OP17-042": OP17_042_KAIDO,
   "OP17-043": OP17_043_GANZUI,
   "OP17-044": OP17_044_CAPTAIN_JOHN,
