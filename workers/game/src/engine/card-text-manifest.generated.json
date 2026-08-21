@@ -2266,9 +2266,9 @@
   "OP17-106": {"category":"Character","hasRealEffectText":true,"hasTriggerText":true},
   "OP17-107": {"category":"Character","hasRealEffectText":false,"hasTriggerText":true},
   "OP17-108": {"category":"Character","hasRealEffectText":true,"hasTriggerText":true},
-  "OP17-109": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
+  "OP17-109": {"category":"Character","hasRealEffectText":true,"hasTriggerText":true},
   "OP17-110": {"category":"Character","hasRealEffectText":true,"hasTriggerText":true},
-  "OP17-111": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
+  "OP17-111": {"category":"Character","hasRealEffectText":true,"hasTriggerText":true},
   "OP17-112": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
   "OP17-113": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
   "OP17-114": {"category":"Character","hasRealEffectText":true,"hasTriggerText":true},
@@ -2751,5 +2751,7 @@
   "ST30-014": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
   "ST30-015": {"category":"Event","hasRealEffectText":true,"hasTriggerText":true},
   "ST30-016": {"category":"Event","hasRealEffectText":true,"hasTriggerText":false},
-  "ST30-017": {"category":"Event","hasRealEffectText":true,"hasTriggerText":true}
+  "ST30-017": {"category":"Event","hasRealEffectText":true,"hasTriggerText":true},
+  "ST31-004": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false},
+  "ST32-002": {"category":"Character","hasRealEffectText":true,"hasTriggerText":false}
 }
