@@ -37,6 +37,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "pipeline:import": "tsx pipeline/import.ts",
+    "pipeline:scrape-limitless": "tsx pipeline/scrape-limitless.ts",
     "pipeline:migrate-images": "tsx pipeline/migrate-images.ts",
     "pipeline:sync-schemas": "tsx pipeline/sync-effect-schemas.ts",
     "worker:deploy": "cd workers/images && pnpm install && pnpm run deploy",
