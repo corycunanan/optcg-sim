@@ -136,19 +136,23 @@ Destructive, only affects dev. Three flavors:
 Card data updates (new set drops, errata patches, pipeline re-runs) land on dev first, get inspected, then get promoted to prod. Don't run `pnpm pipeline:import` against prod.
 
 ```bash
-DEV_DIRECT=<dev DIRECT_DATABASE_URL>
-PROD_DIRECT=<prod DIRECT_DATABASE_URL>
-PROD_ENDPOINT_HINT=ep-your-production-endpoint
+DEV_DIRECT='<dev DIRECT_DATABASE_URL>'
+PROD_DIRECT='<prod DIRECT_DATABASE_URL>'
+PROD_ENDPOINT_HINT='ep-your-production-endpoint'
 
-# A Vercel-stored DIRECT_DATABASE_URL may end with the literal characters "\\n".
-# Strip that suffix because it breaks parsing of the channel_binding query parameter.
+# Depending on how Vercel stored or returned each secret, the URL may end with
+# a real newline or the escaped characters "\\n". Either form breaks parsing
+# of the channel_binding query parameter, so strip both from both URLs.
+DEV_DIRECT="${DEV_DIRECT%$'\n'}"
+DEV_DIRECT="${DEV_DIRECT%\\n}"
+PROD_DIRECT="${PROD_DIRECT%$'\n'}"
 PROD_DIRECT="${PROD_DIRECT%\\n}"
 
 # 1. Make sure schema is in sync on both branches (prod deploys apply migrations automatically;
 #    dev should already be caught up from local `pnpm db:migrate`).
 
-# 2. Dump prod's card-data tables before changing them. Keep this file as the
-#    rollback source; restore it to a temporary database before using its rows.
+# 2. Dump prod's card-data tables before changing them. Keep this custom-format
+#    archive as the rollback source; pg_restore, not psql, reads this format.
 pg_dump \
   --dbname="$PROD_DIRECT" \
   --data-only \
@@ -174,6 +178,35 @@ The script upserts `Card` by `id`, `CardSet` by `(cardId, packId)`, and `ArtVari
 `Errata` has no natural unique key, so the script skips every errata row with a runtime warning. Promote errata separately only after adding and deploying a schema-backed natural key.
 
 Do not restore a `pg_dump --data-only` file directly into non-empty prod tables. Its `COPY` statements stop at duplicate primary keys. Do not use `TRUNCATE ... CASCADE` as a workaround because it can cascade into `deck_cards` and destroy user deck contents.
+
+#### Rolling back a promotion
+
+Restore the custom-format archive into an empty temporary database or empty Neon branch with the same schema. Do not restore it directly into prod.
+
+```bash
+ROLLBACK_DIRECT='<empty temporary DIRECT_DATABASE_URL>'
+
+# Apply the production schema to the empty rollback database, then restore data.
+DATABASE_URL="$ROLLBACK_DIRECT" \
+DIRECT_DATABASE_URL="$ROLLBACK_DIRECT" \
+npx prisma migrate deploy
+
+pg_restore \
+  --dbname="$ROLLBACK_DIRECT" \
+  --data-only \
+  --no-owner \
+  --no-acl \
+  --exit-on-error \
+  /tmp/optcg-prod-card-data.dump
+
+# Reapply the pre-promotion values from the rollback database to prod.
+DEV_URL="$ROLLBACK_DIRECT" \
+PROD_URL="$PROD_DIRECT" \
+PROD_ENDPOINT_HINT="$PROD_ENDPOINT_HINT" \
+npx tsx scripts/promote-card-data.ts
+```
+
+This rollback reapplies every pre-promotion `Card`, `CardSet`, and `ArtVariant` value, while `Errata` remains unchanged because promotion skips it. The script deliberately leaves keys created by the promotion in prod; an exact rollback requires a DBA to delete only keys absent from the rollback database after checking `decks` and `deck_cards` references.
 
 ## Cloudflare Workers: deploying on merge
 

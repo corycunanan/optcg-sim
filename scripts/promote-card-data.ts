@@ -23,7 +23,14 @@ if (!devUrl || !prodUrl) throw new Error("DEV_URL and PROD_URL required");
 if (devUrl === prodUrl) throw new Error("dev and prod URLs are identical");
 if (!prodEndpointHint) throw new Error("PROD_ENDPOINT_HINT required");
 
+const devHostname = new URL(devUrl).hostname;
 const prodHostname = new URL(prodUrl).hostname;
+if (devHostname.includes("-pooler")) {
+  throw new Error("DEV_URL must use a direct, non-pooler database endpoint");
+}
+if (prodHostname.includes("-pooler")) {
+  throw new Error("PROD_URL must use a direct, non-pooler database endpoint");
+}
 if (!prodHostname.includes(prodEndpointHint)) {
   throw new Error(
     `PROD_URL hostname does not match PROD_ENDPOINT_HINT (${prodEndpointHint})`
