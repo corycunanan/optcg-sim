@@ -192,7 +192,10 @@ function OpponentFieldComponent({
               stageSelection?.disabledReason ? stageDescriptionId : undefined
             }
             className={cn(
-              "rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
+              // Flex item shrink-wrapping a fixed-size `<Card>`, so the stage
+              // targeting ring hugs the card and takes its corner. The zone
+              // slot around it stays chrome.
+              "rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
               stageSelection?.disabledReason && "opacity-35",
               stageSelection && !stageSelection.disabledReason && "cursor-pointer",
             )}

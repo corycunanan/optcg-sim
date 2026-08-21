@@ -93,4 +93,44 @@ describe("SelectTargetModal card-state semantics", () => {
     });
     expect(selectedTarget?.props["aria-pressed"]).toBe(true);
   });
+
+  // The button carries no padding or border around a fixed-size `<Card>`, so
+  // its box is the card's box and both the focus ring and the selected ring
+  // trace that card's outline (OPT-720, SHAPE-LANGUAGE.md §The card radius).
+  it("draws the selection and focus rings on the card silhouette", () => {
+    act(() => {
+      renderer = create(
+        <SelectTargetModal
+          cards={[target]}
+          validTargets={[target.instanceId]}
+          effectDescription="Choose a Character"
+          countMin={1}
+          countMax={1}
+          ctaLabel="Choose"
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    const button = renderer?.root.findByProps({
+      "aria-label": "Nami. rested. eligible for selection",
+    });
+
+    expect(button?.props.className).toContain("rounded-card");
+    expect(button?.props.className).not.toMatch(
+      /(?:^|\s)rounded(?:-md)?(?:\s|$)/
+    );
+    expect(button?.props.className).toContain("p-0");
+
+    act(() => button?.props.onClick());
+
+    const selected = renderer?.root.findByProps({
+      "aria-label": "Nami. rested. selected",
+    });
+    expect(selected?.props.className).toContain("rounded-card");
+    expect(selected?.props.className).toContain("ring-2");
+  });
 });

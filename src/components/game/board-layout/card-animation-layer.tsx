@@ -9,6 +9,7 @@ import { useZonePosition } from "@/contexts/zone-position-context";
 import { cardFizzle, cardFizzleReduced, cardTransitions } from "@/lib/motion";
 import { getPortalContainer } from "../scaled-board";
 import { Card } from "../card";
+import { CARD_SIZES } from "../card/sizes";
 import {
   BOARD_CARD_W,
   BOARD_CARD_H,
@@ -67,17 +68,29 @@ function FlyingCard({
   // Flight footprint depends on kind. DON tokens are smaller than cards and
   // stay DON-sized for the entire flight; card flights size to their
   // source/destination zone.
+  //
+  // A spotlight source takes its *logical* size token, not `fromRect`. The
+  // registered spotlight element exits through `rotateY: 90` + `scale: 0.94`
+  // (spotlight-overlay.tsx), and `getRect` reads a live
+  // `getBoundingClientRect()`, so a dismissal sampled mid-exit measures a
+  // collapsed, non-card-shaped box. The inner card is then forced to
+  // 100%×100% of that box, which would paint the percentage radius as an
+  // ellipse for the length of the flight. The token is the truth here: the
+  // spotlight renders the card at exactly this size at rest.
+  const spotlightSource = transition.spotlightSourceSize
+    ? CARD_SIZES[transition.spotlightSourceSize]
+    : null;
   const fromW = isDonAttach
     ? DON_TOKEN_W
-    : isFromSpotlight
-      ? fromRect.width
+    : spotlightSource
+      ? spotlightSource.width
       : isFromHand
         ? HAND_CARD_W
         : BOARD_CARD_W;
   const fromH = isDonAttach
     ? DON_TOKEN_H
-    : isFromSpotlight
-      ? fromRect.height
+    : spotlightSource
+      ? spotlightSource.height
       : isFromHand
         ? HAND_CARD_H
         : BOARD_CARD_H;

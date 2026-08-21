@@ -147,7 +147,7 @@ export const Card = React.memo(function Card({
         tabIndex={clickable ? 0 : undefined}
         aria-label={clickable ? ariaLabel ?? emptyLabel ?? overlays?.label : undefined}
         className={cn(
-          "flex items-center justify-center rounded border border-dashed",
+          "flex items-center justify-center rounded-card border border-dashed",
           "border-gb-border-strong/30 bg-gb-board/50",
           clickable &&
             "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
@@ -185,6 +185,27 @@ export const Card = React.memo(function Card({
         ? "positive"
         : "negative";
 
+  // Every layer from here down carries `rounded-card` — the card silhouette
+  // (docs/design/SHAPE-LANGUAGE.md §The card radius), adopted board-side by
+  // OPT-720. The radius is `4%` of the box's width against `4% * 600/838` of
+  // its height, which is a true quarter-circle only on the printed card's
+  // 600/838. No `resolveSize` token is literally that — four are 5:7 and
+  // `hand` is 42:59 — so the corner is card-shaped to a tolerance rather than
+  // exact: the two radius axes land 0.005–0.020px apart, well inside a
+  // rendered pixel. `card-silhouette.test.tsx` pins that delta.
+  //
+  // The board's uniform scale carries the ratio with the card rather than
+  // against it, so it holds at every rendered size. The fixed 4px this
+  // replaced was already being scaled to ~2.4px at the floor viewport without
+  // staying proportional at any other one.
+  //
+  // The layers must move together. The wrapper takes a focus ring, the faces
+  // clip art, the power flash tints, and `CardHighlightRing` draws over the
+  // same box — `box-shadow` and `overflow` both follow `border-radius`, so a
+  // single layer left at chrome radius traces a visibly different corner over
+  // the one beneath it. The three transform layers (state rotation, breathing,
+  // interaction) paint nothing today and carry the radius so that anything
+  // added to them inherits the silhouette instead of re-deciding it.
   const cardElement = (
     <PerspectiveContainer
       width={width}
@@ -197,7 +218,7 @@ export const Card = React.memo(function Card({
       aria-label={clickable ? ariaLabel ?? cardData?.name ?? overlays?.label : undefined}
       className={cn(
         clickable &&
-          "cursor-pointer rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
+          "cursor-pointer rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
         className,
       )}
     >
@@ -206,7 +227,7 @@ export const Card = React.memo(function Card({
           *compose* with state rotation instead of overwriting it — so a
           rested card wiggles around 90°, not 0°. */}
       <motion.div
-        className="absolute inset-0 rounded"
+        className="absolute inset-0 rounded-card"
         animate={motionConfig.animate}
         transition={motionConfig.transition}
       >
@@ -216,7 +237,7 @@ export const Card = React.memo(function Card({
             motion, non-idle states) the layer animates once to baseline and
             stays put. */}
         <motion.div
-          className="absolute inset-0 rounded"
+          className="absolute inset-0 rounded-card"
           animate={breathing?.animate ?? BREATHING_BASELINE}
           transition={breathing?.transition ?? BREATHING_BASELINE_TRANSITION}
         >
@@ -229,7 +250,7 @@ export const Card = React.memo(function Card({
           <motion.div
             ref={interactionRef}
             className={cn(
-              "absolute inset-0 rounded will-change-transform",
+              "absolute inset-0 rounded-card will-change-transform",
               interaction?.clickable && "cursor-pointer",
             )}
             transition={{ duration: 0.15, ease: "easeOut" as const }}
@@ -255,7 +276,7 @@ export const Card = React.memo(function Card({
                 key={`power-flash:${powerMod.nonce ?? powerMod.value}`}
                 aria-hidden
                 className={cn(
-                  "pointer-events-none absolute inset-0 z-10 rounded",
+                  "pointer-events-none absolute inset-0 z-10 rounded-card",
                   powerModTone === "absolute"
                     ? "bg-gb-accent-blue/30"
                     : powerModTone === "positive"

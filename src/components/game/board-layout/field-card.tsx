@@ -494,7 +494,10 @@ export const PlayerFieldCard = React.memo(function PlayerFieldCard({
                 donListeners?.onPointerDown?.(e);
               }}
               className={cn(
-                "absolute bottom-0 right-0 z-20 origin-bottom-right scale-75 touch-none cursor-grab rounded animate-pulse focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
+                // Absolutely positioned and shrink-wrapping a DON `<Card>`, so
+                // its drag ring traces that card. `scale-75` is a transform and
+                // scales the ratio corner with the card, which is the point.
+                "absolute bottom-0 right-0 z-20 origin-bottom-right scale-75 touch-none cursor-grab rounded-card animate-pulse focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
                 isDonDragging ? "opacity-30" : "opacity-100",
               )}
               aria-label="Drag attached DON"

@@ -22,7 +22,7 @@ export function CardBack({
   return (
     <div
       className={cn(
-        "absolute inset-0 overflow-hidden rounded border border-gb-border-strong",
+        "absolute inset-0 overflow-hidden rounded-card border border-gb-border-strong",
         "[backface-visibility:hidden] [transform:rotateY(180deg)]",
         "bg-gb-board-dark",
         className,

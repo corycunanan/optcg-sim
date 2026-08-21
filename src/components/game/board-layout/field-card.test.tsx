@@ -5,6 +5,7 @@ import type { CardInstance } from "@shared/game-types";
 import { cardWinnerPulse } from "@/lib/motion";
 import type { CardOverlays } from "../card";
 import type { TargetCardSelectionState } from "@/lib/game/target-selection";
+import { SQUARE } from "./constants";
 import { DroppableStageZone } from "./drop-zones";
 import { OpponentFieldCard, PlayerFieldCard } from "./field-card";
 import {
@@ -256,6 +257,61 @@ function renderBlockerSelection(
   if (!renderer) throw new Error("Blocker-selection renderer did not mount");
   return renderer.root.findByProps({ "data-blocker-selection": "" });
 }
+
+// OPT-720 splits these two deliberately, so pin both halves — a later sweep
+// that "fixes the inconsistency" either way should fail here.
+//
+// The stage wrapper shrink-wraps a fixed-size `<Card>`, so its targeting ring
+// hugs the card face and takes the card corner. The field-card wrapper
+// reserves a 112×112 square (SQUARE × SQUARE) so a rested card can rotate
+// inside it — the ring there bounds a square, not a card, and stays chrome.
+describe("field vs stage ring silhouette", () => {
+  const CHROME_RADIUS = /(?:^|\s)rounded(?:-md)?(?:\s|$)/;
+
+  it("draws the stage targeting ring on the card silhouette", () => {
+    const wrapper = renderTargetSelection("stage", "full", vi.fn());
+
+    expect(wrapper.props.className).toContain("rounded-card");
+    expect(wrapper.props.className).not.toMatch(CHROME_RADIUS);
+  });
+
+  it("keeps the square field-card wrapper on the chrome radius", () => {
+    const wrapper = renderTargetSelection("field", "full", vi.fn());
+
+    expect(wrapper.props.className).toContain("rounded-md");
+    expect(wrapper.props.className).not.toContain("rounded-card");
+    expect(wrapper.props.style).toMatchObject({ width: SQUARE, height: SQUARE });
+  });
+
+  // The attached-DON drag handle shrink-wraps a DON `<Card>`, so its ring
+  // traces that card even though it sits inside the square wrapper above.
+  it("draws the attached-DON drag ring on the card silhouette", () => {
+    act(() => {
+      renderer = create(
+        <PlayerFieldCard
+          card={{
+            ...card,
+            attachedDon: [
+              { instanceId: "don-1", state: "ACTIVE", attachedTo: card.instanceId },
+            ],
+          }}
+          cardDb={{}}
+          activeDragType={null}
+          canAttack={false}
+          redistributeSource
+          style={{ position: "absolute", left: 0, top: 0 }}
+        />,
+      );
+    });
+
+    const handle = renderer!.root.findByProps({
+      "aria-label": "Drag attached DON",
+    });
+
+    expect(handle.props.className).toContain("rounded-card");
+    expect(handle.props.className).not.toMatch(CHROME_RADIUS);
+  });
+});
 
 describe("target-selection response-only keyboard contract", () => {
   it.each(["Enter", " "])(

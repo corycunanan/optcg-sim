@@ -8,7 +8,7 @@ function FieldRow() {
       {fieldSlots.map((_, index) => (
         <Skeleton
           key={index}
-          className="aspect-card bg-gb-surface-raised w-12 rounded sm:w-16"
+          className="aspect-card bg-gb-surface-raised w-12 rounded-card sm:w-16"
         />
       ))}
     </div>
@@ -41,7 +41,7 @@ export default function GameLoading() {
           {Array.from({ length: 5 }).map((_, index) => (
             <Skeleton
               key={index}
-              className="aspect-card bg-gb-surface-raised w-10 rounded sm:w-12"
+              className="aspect-card bg-gb-surface-raised w-10 rounded-card sm:w-12"
             />
           ))}
         </div>
@@ -56,7 +56,7 @@ export default function GameLoading() {
           {Array.from({ length: 7 }).map((_, index) => (
             <Skeleton
               key={index}
-              className="aspect-card bg-gb-surface-raised w-10 rounded sm:w-12"
+              className="aspect-card bg-gb-surface-raised w-10 rounded-card sm:w-12"
             />
           ))}
         </div>

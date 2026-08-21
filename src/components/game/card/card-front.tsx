@@ -29,7 +29,7 @@ export function CardFront({
   return (
     <div
       className={cn(
-        "absolute inset-0 overflow-hidden rounded border border-gb-border-strong",
+        "absolute inset-0 overflow-hidden rounded-card border border-gb-border-strong",
         "[backface-visibility:hidden]",
         !imageUrl && "flex flex-col bg-gb-surface-raised",
         className,

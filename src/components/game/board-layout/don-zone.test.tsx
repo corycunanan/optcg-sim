@@ -148,6 +148,22 @@ describe("DonZone entry stagger", () => {
   });
 });
 
+// The draggable wrapper shrink-wraps a fixed-size DON `<Card>`, so its focus
+// ring hugs that card face and takes the card's corner (OPT-720,
+// SHAPE-LANGUAGE.md §The card radius).
+describe("DonZone card silhouette", () => {
+  it("draws the drag focus ring on the card silhouette", () => {
+    const root = renderZone(player(don("active-1", "ACTIVE")), true);
+    const wrapper = findDonWrapper(root, "active-1");
+
+    expect(wrapper.props.className).toContain("rounded-card");
+    expect(wrapper.props.className).not.toMatch(
+      /(?:^|\s)rounded(?:-md)?(?:\s|$)/
+    );
+    expect(wrapper.props.className).toContain("focus-visible:ring-4");
+  });
+});
+
 describe("DonZone accessibility", () => {
   it("labels the zone counts and the state of draggable DON", () => {
     const root = renderZone(

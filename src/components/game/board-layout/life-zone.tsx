@@ -106,8 +106,13 @@ export const LifeZone = React.memo(function LifeZone({
           ? lifeDamageImpact.transition
           : { duration: 0 }
       }
+      // The zone box is `CARD_SIZES.field` and the top life card sits at
+      // top-0/left-0 filling it exactly, so every ring drawn here — focus,
+      // damage, and the two pulses below — traces that card's own outline.
+      // It takes the card silhouette for the same reason `CardHighlightRing`
+      // does (SHAPE-LANGUAGE.md §The card radius).
       className={cn(
-        "relative rounded focus-visible:outline-none",
+        "relative rounded-card focus-visible:outline-none",
         onInspect &&
           "cursor-pointer focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
         zoneFeedback === "damage" &&
@@ -117,7 +122,7 @@ export const LifeZone = React.memo(function LifeZone({
       {zoneFeedback === "trigger" && (
         <motion.div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 rounded ring-4 ring-gb-accent-amber shadow-[0_0_18px_var(--gb-accent-amber)]"
+          className="pointer-events-none absolute inset-0 z-20 rounded-card ring-4 ring-gb-accent-amber shadow-[0_0_18px_var(--gb-accent-amber)]"
           initial={{ opacity: 0, scale: 1 }}
           animate={{
             opacity: lifeTriggerPulse.opacity,
@@ -131,7 +136,7 @@ export const LifeZone = React.memo(function LifeZone({
         <motion.div
           key={`scry:${scryPulseNonce}`}
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 rounded ring-4 ring-gb-accent-blue shadow-[0_0_16px_var(--gb-accent-blue)]"
+          className="pointer-events-none absolute inset-0 z-20 rounded-card ring-4 ring-gb-accent-blue shadow-[0_0_16px_var(--gb-accent-blue)]"
           initial={{ opacity: 0, scale: 1 }}
           animate={{
             opacity: lifeScriedFlash.opacity,

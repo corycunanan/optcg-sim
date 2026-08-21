@@ -161,6 +161,28 @@ describe("HandLayer spectator interaction", () => {
     expect(useSortable).toHaveBeenCalledTimes(2);
   });
 
+  // The sortable wrapper shrink-wraps a fixed-size hand `<Card>`, so its drag
+  // focus ring hugs the card face and must trace the card's corner rather than
+  // a chrome one (OPT-720, SHAPE-LANGUAGE.md §The card radius).
+  it("draws the drag focus ring on the card silhouette", () => {
+    act(() => {
+      renderer = create(
+        <InteractionModeProvider value="full">
+          <HandLayer cards={[bottomCard]} cardDb={{} as CardDb} enableDrag />
+        </InteractionModeProvider>
+      );
+    });
+
+    const wrapper = renderer!.root
+      .findAllByType("div")
+      .find((node) =>
+        String(node.props.className ?? "").includes("focus-visible:ring-4")
+      );
+
+    expect(wrapper?.props.className).toContain("rounded-card");
+    expect(wrapper?.props.className).not.toMatch(/(?:^|\s)rounded(?:-md)?(?:\s|$)/);
+  });
+
   it("keeps a defensive hidden card static in full mode", () => {
     const hiddenCard = makeHiddenCard("bottom-hand-hidden", 0);
 

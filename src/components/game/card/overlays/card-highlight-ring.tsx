@@ -17,6 +17,11 @@ import type { HighlightRingColor } from "../types";
  * request it via `overlays.highlightRing`, decoupling selection/validation
  * feedback from the underlying motion state.
  *
+ * Every variant carries `rounded-card`: the ring is `inset-0` over the card
+ * box, and `ring-*` is a `box-shadow` generated from the border box, so its
+ * corner is only ever as right as the radius it traces. It moves with the rest
+ * of the card stack in `card.tsx` (SHAPE-LANGUAGE.md §The card radius).
+ *
  * Ring → visual treatment map:
  *   selected → green static (blocker chosen, target-picker selection)
  *   eligible → blue static (eligible but not yet chosen)
@@ -58,7 +63,7 @@ export function CardHighlightRing({
       <motion.div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-0 z-10 rounded",
+          "pointer-events-none absolute inset-0 z-10 rounded-card",
           "ring-4 ring-gb-signal-selected",
           "shadow-[0_0_18px_var(--gb-signal-selected)]",
           className,
@@ -80,7 +85,7 @@ export function CardHighlightRing({
       <motion.div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-0 z-10 rounded",
+          "pointer-events-none absolute inset-0 z-10 rounded-card",
           "ring-4 ring-gb-signal-battle",
           "shadow-[0_0_18px_var(--gb-signal-battle)]",
           className,
@@ -103,7 +108,7 @@ export function CardHighlightRing({
       <motion.div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-0 z-10 rounded",
+          "pointer-events-none absolute inset-0 z-10 rounded-card",
           "ring-4 ring-gb-signal-disabled/70",
           "shadow-[0_0_12px_var(--gb-signal-disabled)]",
           className,
@@ -123,7 +128,7 @@ export function CardHighlightRing({
       <motion.div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-0 z-10 rounded",
+          "pointer-events-none absolute inset-0 z-10 rounded-card",
           "ring-4 ring-gb-signal-battle",
           "shadow-[0_0_14px_var(--gb-signal-battle)]",
           className,
@@ -147,7 +152,7 @@ export function CardHighlightRing({
       <motion.div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-0 z-10 rounded",
+          "pointer-events-none absolute inset-0 z-10 rounded-card",
           "ring-4 ring-gb-signal-battle",
           "shadow-[0_0_18px_var(--gb-signal-battle)]",
           className,
@@ -177,7 +182,7 @@ export function CardHighlightRing({
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute inset-0 z-10 rounded",
+        "pointer-events-none absolute inset-0 z-10 rounded-card",
         staticRingClass,
         className,
       )}

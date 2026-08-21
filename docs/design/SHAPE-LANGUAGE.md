@@ -94,10 +94,40 @@ radius would visibly change corner size as content streamed in. **The element ca
 otherwise the percentage resolves against whatever height the content happens to have at that
 moment, including zero before an image loads.
 
-**Not the game board.** `card-front.tsx` / `card-back.tsx` render the same object but sit inside
-`ScaledBoard`'s ~0.59 transform, cast no shadow, and share their radius with several sibling layers
-(glow, focus ring, flip faces). They stay at `rounded` until a board-side ticket moves the whole
-stack together — the ScaledBoard note below is the reason to decide it there rather than here.
+**The game board too** *(2026-08-21, OPT-720)*. The board was deferred out of OPT-715 on the
+ScaledBoard note below: at the 1280×640 floor the board scales to ~0.59, so 4% of an 80px field card
+paints ~1.9px, which is inside the sub-pixel band that note warns about. Adopted anyway, because the
+objection cuts both ways. The `rounded` it replaced was 4px *authored*, not 4px *painted* — the same
+board scale takes it to ~2.4px at that same viewport. Nothing on the board was ever rendering at its
+authored radius, so the choice was never "4px versus 1.9px"; it was "a length that happens to land
+somewhere, versus a ratio."
+
+The scale is what settles it. `BoardLayout` applies one CSS `zoom` factor to the board layer, and
+`zoom` scales lengths and resolves percentages against the same scaled box — so a percentage radius
+holds exactly 4% of the card's painted width at every size the board is ever rendered at, which is
+the physical-card argument above working rather than failing. The 4px it replaced held 5% of an
+80px card, and held it only as an authored number the viewer never sees. Adopting costs `0.8px ×
+boardScale` — under a pixel at any viewport, about half of one at the floor — and makes every larger
+viewport proportionally correct. No scale compensation, no board-specific constant: the board card
+is the same object as the `/cards` tile, so it takes the same corner.
+
+The layers move as one. The radius is shared across the stack in `card.tsx` — the focus-ring
+wrapper, the three transform layers, the power flash — plus `card-front.tsx`, `card-back.tsx`,
+`card-highlight-ring.tsx`, and the reserved card box in `life-zone.tsx`. `box-shadow` and `overflow`
+both follow `border-radius`, so a layer left behind traces a visibly different corner over the one
+beneath it. The consumer wrappers that shrink-wrap a fixed-size `<Card>` move too — the modal
+selection buttons, the hand drag wrapper, the DON token and attached-DON handles, and both stage
+targeting wrappers all own focus or selection rings that hug a card face. Boxes that merely *hold* a
+card stay chrome, and the **field** targeting wrappers are deliberately on that side of the line:
+they reserve a 112×112 square so a rested card can rotate inside them, so their ring bounds a square
+rather than a card. The zone slots that draw their own border stay chrome for the same reason.
+
+**Card-shaped, to a tolerance.** The `CARD_SIZES` tokens are not literally 600/838. Four are 5:7
+(field 80×112, modal 120×168, preview 200×280, don 50×70) and `hand` is 42:59 (84×118), against the
+printed 300:419. The consequence is that the two radius axes disagree by **0.005–0.020px** — the
+corner is a circle to well within a rendered pixel, not exactly. That is the real invariant and what
+the test pins; the tokens track board geometry and should not be bent to the printed ratio for a
+fiftieth of a pixel.
 
 **Lint.** The design-system lint derives its radius rules from this vocabulary rather than from a
 list of bad spellings. Every `rounded-*` class in a class position must resolve to either the
@@ -194,7 +224,12 @@ region**. If two pennants compete, neither is featured.
   rectangular and clip a *child* so the hit target stays ≥ the visual shape.
 - **ScaledBoard:** inside the scaled subtree (~0.59 at the 1280×640 floor), 1px hairlines and 4px
   chamfers land sub-pixel and smear. Author board-side shapes at scale-compensated sizes, or render
-  ornament in unscaled chrome. Same rule as the material language's hairline caveat.
+  ornament in unscaled chrome. Same rule as the material language's hairline caveat. **A
+  proportional radius is the exception** (OPT-720): the board scale is a single uniform factor —
+  CSS `zoom` on the board layer, so descendants lay out at final pixel size — and `rounded-card`
+  scales with the card it sits on, needing no compensation. The caveat is about *lengths* authored
+  in px, which the scale shrinks away from the number they were picked for. A ratio has no such
+  number to lose.
 - **Figma:** corner smoothing 0; author chamfers as vector polygons with the cut size annotated in
   px; pennant/swallowtail apexes as explicit vector points, never radius tricks.
 
@@ -219,5 +254,10 @@ region**. If two pennants compete, neither is featured.
 6. **Card silhouette shipped (2026-08-20, OPT-715):** the 2026-08-12 amendment flattened chrome to
    2px and swept card tiles along with it, because the rounded-rectangle row of the shape-semantics
    table pointed at a primitive nobody had built. `rounded-card` is that primitive; every raw-card
-   art site now takes it and the chrome scale is untouched. The game board is deferred (§The card
-   radius).
+   art site now takes it and the chrome scale is untouched.
+7. **Board card faces adopted (2026-08-21, OPT-720):** the board was the one deferral left by the
+   step above, held back on the sub-pixel worry in the ScaledBoard note. Resolved in favour of the
+   ratio — the transform scales the old fixed radius too, so the board was never painting the 4px it
+   authored (§The card radius). The card stack in `card.tsx`, both faces, the highlight ring, the
+   life-zone box, and the board's loading skeleton all move together. Wrappers that reserve a square
+   for a rotating card stay chrome; the vocabulary is unchanged.
