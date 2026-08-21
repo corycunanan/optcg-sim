@@ -125,7 +125,7 @@ export const ST07_005_CHARLOTTE_DAIFUKU: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
       flags: { optional: true },

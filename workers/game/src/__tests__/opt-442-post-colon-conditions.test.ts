@@ -121,7 +121,14 @@ describe("OPT-442: OP05-060 Monkey.D.Luffy", () => {
     const initialDonDeck = state.players[0].donDeck.length;
 
     const offered = resolveEffect(state, block, sourceId, 0, cardDb);
-    const result = resumeFromStack(offered.state, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
+    let result = resumeFromStack(offered.state, { type: "PLAYER_CHOICE", choiceId: "accept" }, cardDb);
+    if (gatePasses) {
+      result = resumeFromStack(
+        result.state,
+        { type: "PLAYER_CHOICE", choiceId: "choose-value:1" },
+        cardDb,
+      );
+    }
 
     expect(result.resolved).toBe(true);
     // Cost always paid (life → hand); the gate decides only the DON add.

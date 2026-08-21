@@ -18,6 +18,7 @@ import type { EffectSchema } from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
+import type { EffectResolverResult } from "../engine/effect-resolver/types.js";
 import {
   checkReplacementForRemoval,
   resumeReplacement,
@@ -63,6 +64,23 @@ function withPlayer(
   const players = [...state.players] as [PlayerState, PlayerState];
   players[playerIndex] = { ...players[playerIndex], ...patch };
   return { ...state, players };
+}
+
+function chooseMaximum(
+  result: PromptResult,
+  cardDb: Map<string, CardData>
+): EffectResolverResult {
+  expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+  if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+    throw new Error("Expected an amount prompt");
+  }
+  const choiceId = result.pendingPrompt.options.choices.at(-1)?.id;
+  if (!choiceId) throw new Error("Expected an amount choice");
+  return resumeFromStack(
+    result.state,
+    { type: "PLAYER_CHOICE", choiceId },
+    cardDb
+  );
 }
 
 function cardData(
@@ -308,6 +326,7 @@ describe("OPT-728 opponent-relative controller regressions", () => {
       "on_play_life_opponent_trash"
     );
     result = acceptOptional(result, cardDb);
+    result = chooseMaximum(result, cardDb);
     expect(result.pendingPrompt?.respondingPlayer).toBe(1);
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
       throw new Error("Expected opponent hand selection");
@@ -532,6 +551,7 @@ describe("OPT-728 paid and post-cost effects", () => {
       "on_play_rest_don_add_life"
     );
     result = acceptOptional(result, cardDb);
+    result = chooseMaximum(result, cardDb);
 
     expect(result.pendingPrompt).toBeUndefined();
     expect(restedDonCount(result.state, 0)).toBe(restedBefore + 2);

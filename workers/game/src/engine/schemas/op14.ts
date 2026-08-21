@@ -700,7 +700,7 @@ export const OP14_020_DRACULE_MIHAWK: EffectSchema = {
             controller: "SELF",
             count: { up_to: 3 },
           },
-          params: { amount: 3 },
+          params: { amount: 3, up_to: true },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -779,7 +779,7 @@ export const OP14_022_USOPP: EffectSchema = {
             controller: "SELF",
             count: { up_to: 2 },
           },
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
     },
@@ -830,7 +830,7 @@ export const OP14_024_KINEMON: EffectSchema = {
             controller: "SELF",
             count: { up_to: 3 },
           },
-          params: { amount: 3 },
+          params: { amount: 3, up_to: true },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -1095,7 +1095,7 @@ export const OP14_031_NAMI: EffectSchema = {
                 controller: "SELF",
                 count: { up_to: 5 },
               },
-              params: { amount: 5 },
+              params: { amount: 5, up_to: true },
             },
           },
           chain: "THEN",
@@ -1468,7 +1468,7 @@ export const OP14_039_COFFIN_BOAT: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -2434,7 +2434,7 @@ export const OP14_063_SUGAR: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2483,7 +2483,7 @@ export const OP14_064_GIOLLA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
         {
           type: "KO",
@@ -2540,7 +2540,7 @@ export const OP14_067_DELLINGER: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
         {
           type: "SEARCH_DECK",
@@ -2585,7 +2585,7 @@ export const OP14_068_TREBOL: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2708,7 +2708,7 @@ export const OP14_071_PICA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2732,7 +2732,7 @@ export const OP14_072_BABY_5: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2744,7 +2744,7 @@ export const OP14_072_BABY_5: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -2774,7 +2774,7 @@ export const OP14_074_MONET: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2799,7 +2799,7 @@ export const OP14_074_MONET: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 2, target_state: "RESTED" },
+          params: { amount: 2, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
       ],
@@ -2823,7 +2823,7 @@ export const OP14_075_LAO_G: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
         {
           type: "MODIFY_POWER",
@@ -2866,7 +2866,7 @@ export const OP14_076_EVER_WHITE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2913,7 +2913,7 @@ export const OP14_077_PENTA_CHROMATIC_STRING: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
           conditions: {
             type: "BOARD_WIDE_EXISTENCE",
@@ -3084,7 +3084,7 @@ export const OP14_080_GECKO_MORIA: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -4384,7 +4384,7 @@ export const OP14_112_BOA_HANCOCK: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         {
           type: "LIFE_TO_HAND",
@@ -4537,7 +4537,7 @@ export const OP14_115_RINDO: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         {
           type: "SELF_TAKE_DAMAGE",

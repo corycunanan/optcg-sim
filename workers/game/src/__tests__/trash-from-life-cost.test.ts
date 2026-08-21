@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { CardData, CardInstance, GameAction, GameState, PlayerState } from "../types.js";
+import type { CardData, CardInstance, GameAction, GameState, PendingPromptState, PlayerState } from "../types.js";
 import type { Cost, EffectBlock, EffectSchema } from "../engine/effect-types.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { isCostPayable, costNeedsPlayerSelection } from "../engine/effect-resolver/cost-handler.js";
@@ -57,6 +57,22 @@ function boardWithLeader(leaderTrait: boolean): { state: GameState; cardDb: Map<
   return { state, cardDb };
 }
 
+function chooseMaximum(
+  result: { state: GameState; pendingPrompt?: PendingPromptState },
+  cardDb: Map<string, CardData>,
+) {
+  expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+  const choiceId = result.pendingPrompt?.options.promptType === "PLAYER_CHOICE"
+    ? result.pendingPrompt.options.choices.at(-1)?.id
+    : undefined;
+  if (!choiceId) throw new Error("Expected an amount choice");
+  return resumeFromStack(
+    result.state,
+    { type: "PLAYER_CHOICE", choiceId },
+    cardDb,
+  );
+}
+
 describe("TRASH_FROM_LIFE cost — deterministic top-of-life payment (EB03-055)", () => {
   const onPlayBlock = EB03_055_NICO_ROBIN.effects[0] as unknown as EffectBlock;
 
@@ -68,7 +84,8 @@ describe("TRASH_FROM_LIFE cost — deterministic top-of-life payment (EB03-055)"
     const start = resolveEffect(state, onPlayBlock, "char-0-v1", 0, cardDb);
     expect(start.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
 
-    const step = resumeFromStack(start.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb);
+    const amountOffered = resumeFromStack(start.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb);
+    const step = chooseMaximum(amountOffered, cardDb);
 
     // The soft-lock regression: no SELECT_TARGET (or any other) prompt may
     // follow acceptance — the payment is fully deterministic.
@@ -81,7 +98,7 @@ describe("TRASH_FROM_LIFE cost — deterministic top-of-life payment (EB03-055)"
     expect(p0.life.some((l) => l.instanceId === topLifeId)).toBe(false);
     // …and the Straw Hat Crew gate passed: −1 (cost) +2 (added from deck).
     expect(p0.life.length).toBe(lifeBefore.length + 1);
-    const trashed = step.events.find((event) => event.type === "CARD_TRASHED");
+    const trashed = [...amountOffered.events, ...step.events].find((event) => event.type === "CARD_TRASHED");
     expect(trashed?.payload).toMatchObject({
       count: 1,
       reason: "cost",
@@ -131,7 +148,8 @@ describe("TRASH_FROM_LIFE cost — TOP_OR_BOTTOM offers a position choice (OP03-
     // A position choice, not a card selection — life stays hidden.
     expect(accepted.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
-    const step = resumeFromStack(accepted.state, { type: "PLAYER_CHOICE", choiceId: "1" } as GameAction, cardDb);
+    const amountOffered = resumeFromStack(accepted.state, { type: "PLAYER_CHOICE", choiceId: "1" } as GameAction, cardDb);
+    const step = chooseMaximum(amountOffered, cardDb);
     expect(step.pendingPrompt).toBeFalsy();
     expect(step.state.effectStack).toHaveLength(0);
 
@@ -141,7 +159,7 @@ describe("TRASH_FROM_LIFE cost — TOP_OR_BOTTOM offers a position choice (OP03-
     expect(p0.life.some((l) => l.instanceId === bottomLifeId)).toBe(false);
     // …then "add up to 1 from the top of your deck": −1 +1.
     expect(p0.life.length).toBe(lifeBefore.length);
-    const trashed = step.events.find((event) => event.type === "CARD_TRASHED");
+    const trashed = [...amountOffered.events, ...step.events].find((event) => event.type === "CARD_TRASHED");
     expect(trashed?.payload).toMatchObject({
       count: 1,
       reason: "cost",
@@ -212,10 +230,11 @@ describe("TRASH_FROM_LIFE cost — life exits wake CARD_REMOVED_FROM_LIFE watche
     const handBefore = state.players[0].hand.length;
 
     const start = resolveEffect(state, EB03_055_NICO_ROBIN.effects[0] as unknown as EffectBlock, "char-0-v1", 0, cardDb);
-    const step = resumeFromStack(start.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb);
+    const amountOffered = resumeFromStack(start.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb);
+    const step = chooseMaximum(amountOffered, cardDb);
 
     expect(step.pendingPrompt).toBeFalsy();
-    expect(step.events.some((e) => e.type === "CARD_REMOVED_FROM_LIFE")).toBe(true);
+    expect([...amountOffered.events, ...step.events].some((e) => e.type === "CARD_REMOVED_FROM_LIFE")).toBe(true);
     // Watcher drew 1.
     expect(step.state.players[0].hand.length).toBe(handBefore + 1);
   });
@@ -227,10 +246,11 @@ describe("TRASH_FROM_LIFE cost — life exits wake CARD_REMOVED_FROM_LIFE watche
     const start = resolveEffect(state, OP03_109_CHARLOTTE_CHIFFON.effects[0] as unknown as EffectBlock, "char-0-v1", 0, cardDb);
     const accepted = resumeFromStack(start.state, { type: "PLAYER_CHOICE", choiceId: "activate" } as GameAction, cardDb);
     expect(accepted.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
-    const step = resumeFromStack(accepted.state, { type: "PLAYER_CHOICE", choiceId: "1" } as GameAction, cardDb);
+    const amountOffered = resumeFromStack(accepted.state, { type: "PLAYER_CHOICE", choiceId: "1" } as GameAction, cardDb);
+    const step = chooseMaximum(amountOffered, cardDb);
 
     expect(step.pendingPrompt).toBeFalsy();
-    expect(step.events.some((e) => e.type === "CARD_REMOVED_FROM_LIFE")).toBe(true);
+    expect([...amountOffered.events, ...step.events].some((e) => e.type === "CARD_REMOVED_FROM_LIFE")).toBe(true);
     expect(step.state.players[0].hand.length).toBe(handBefore + 1);
   });
 });

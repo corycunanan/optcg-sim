@@ -347,7 +347,7 @@ export const EB02_010_MONKEY_D_LUFFY: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
         {
           type: "MODIFY_POWER",
@@ -549,7 +549,7 @@ export const EB02_015_JEWELRY_BONNEY: EffectSchema = {
             timing: "END_OF_THIS_TURN",
             action: {
               type: "SET_DON_ACTIVE",
-              params: { amount: 1 },
+              params: { amount: 1, up_to: true },
             },
           },
           chain: "THEN",
@@ -1284,7 +1284,7 @@ export const EB02_035_SANJI_AND_PUDDING: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -1379,7 +1379,7 @@ export const EB02_037_FRANKY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -1972,7 +1972,7 @@ export const EB02_052_ENEL: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         {
           type: "MODIFY_POWER",

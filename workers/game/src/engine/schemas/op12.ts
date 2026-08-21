@@ -1097,7 +1097,7 @@ export const OP12_030_DRACULE_MIHAWK: EffectSchema = {
             controller: "SELF",
             count: { up_to: 4 },
           },
-          params: { amount: 4 },
+          params: { amount: 4, up_to: true },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -1491,7 +1491,7 @@ export const OP12_041_SANJI: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2250,7 +2250,7 @@ export const OP12_062_VINSMOKE_SORA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
         {
           type: "DRAW",
@@ -2566,7 +2566,7 @@ export const OP12_073_TRAFALGAR_LAW: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
         {
           type: "MODIFY_POWER",
@@ -2621,7 +2621,7 @@ export const OP12_074_PATTY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2658,7 +2658,7 @@ export const OP12_075_MS_ALL_SUNDAY: EffectSchema = {
           params: {
             action: {
               type: "ADD_DON_FROM_DECK",
-              params: { amount: 1, target_state: "ACTIVE" },
+              params: { amount: 1, target_state: "ACTIVE", up_to: true },
             },
           },
           chain: "THEN",
@@ -3854,7 +3854,7 @@ export const OP12_107_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, face: "DOWN", position: "TOP" },
+          params: { amount: 1, face: "DOWN", position: "TOP", up_to: true },
         },
       ],
     },
@@ -4168,7 +4168,7 @@ export const OP12_118_JEWELRY_BONNEY: EffectSchema = {
             controller: "SELF",
             count: { up_to: 1 },
           },
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
           chain: "THEN",
         },
       ],
@@ -4197,7 +4197,7 @@ export const OP12_119_BARTHOLOMEW_KUMA: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, face: "DOWN", position: "TOP" },
+          params: { amount: 1, face: "DOWN", position: "TOP", up_to: true },
         },
         {
           type: "MODIFY_COST",
@@ -4215,7 +4215,7 @@ export const OP12_119_BARTHOLOMEW_KUMA: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, face: "DOWN", position: "TOP" },
+          params: { amount: 1, face: "DOWN", position: "TOP", up_to: true },
         },
       ],
     },

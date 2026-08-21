@@ -184,7 +184,7 @@ export const PRB02_004_JEWELRY_BONNEY: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -480,7 +480,7 @@ export const PRB02_011_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },

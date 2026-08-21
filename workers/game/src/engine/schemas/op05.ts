@@ -1413,11 +1413,7 @@ export const OP05_038_CHARLESTONE: EffectSchema = {
         },
         {
           type: "SET_DON_ACTIVE",
-          target: {
-            type: "DON_IN_COST_AREA",
-            controller: "SELF",
-            count: { up_to: 3 },
-          },
+          params: { amount: 3, up_to: true },
           chain: "IF_DO",
         },
       ],
@@ -2289,7 +2285,7 @@ export const OP05_060_MONKEY_D_LUFFY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { once_per_turn: true, optional: true },
@@ -2501,7 +2497,7 @@ export const OP05_067_ZORO_JUUROU: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2727,7 +2723,7 @@ export const OP05_073_MISS_DOUBLEFINGER: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2779,7 +2775,7 @@ export const OP05_074_EUSTASS_CAPTAIN_KID: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { once_per_turn: true },
@@ -2912,7 +2908,7 @@ export const OP05_077_GAMMA_KNIFE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2962,7 +2958,7 @@ export const OP05_078_PUNK_ROTTEN: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -4378,7 +4374,7 @@ export const OP05_115_TWO_HUNDRED_MILLION_VOLTS_AMARU: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -4540,7 +4536,7 @@ export const OP05_119_MONKEY_D_LUFFY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { once_per_turn: true },

@@ -324,7 +324,7 @@ export const ST02_015_SCALPEL: EffectSchema = {
         },
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
           chain: "THEN",
         },
       ],
@@ -334,7 +334,7 @@ export const ST02_015_SCALPEL: EffectSchema = {
       category: "auto",
       trigger: { keyword: "TRIGGER" },
       actions: [
-        { type: "SET_DON_ACTIVE", params: { amount: 2 } },
+        { type: "SET_DON_ACTIVE", params: { amount: 2, up_to: true } },
       ],
     },
   ],
@@ -365,7 +365,7 @@ export const ST02_016_REPEL: EffectSchema = {
         },
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
           chain: "THEN",
         },
       ],

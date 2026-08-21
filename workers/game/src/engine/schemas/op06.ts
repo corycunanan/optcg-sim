@@ -46,7 +46,7 @@ export const OP06_001_UTA: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
       ],
@@ -996,7 +996,7 @@ export const OP06_028_ZEO: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
         {
           type: "MODIFY_POWER",
@@ -3896,7 +3896,7 @@ export const OP06_104_KIKUNOJO: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -4286,7 +4286,7 @@ export const OP06_115_YOURE_THE_ONE_WHO_SHOULD_DISAPPEAR: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         {
           type: "TRASH_FROM_HAND",

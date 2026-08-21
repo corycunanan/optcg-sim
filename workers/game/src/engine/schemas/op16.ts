@@ -542,7 +542,7 @@ export const OP16_022_MONKEY_D_LUFFY: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true },
       conditions: { type: "FIELD_PURITY", controller: "SELF", filter: { traits: ["Impel Down"] } },
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2, up_to: true } }],
     },
   ],
 };
@@ -1357,7 +1357,7 @@ export const OP16_063_KUZAN: EffectSchema = {
   card_name: "Kuzan",
   card_type: "Character",
   effects: [
-    { id: "on_play_add_don", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 2, target_state: "RESTED" } }] },
+    { id: "on_play_add_don", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 2, target_state: "RESTED", up_to: true } }] },
     {
       id: "activate_blocker_lock",
       category: "activate",
@@ -1420,7 +1420,7 @@ export const OP16_065_SAKAZUKI: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 2, target_state: "ACTIVE" },
+          params: { amount: 2, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -1438,7 +1438,7 @@ export const OP16_066_SENGOKU: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Navy" } },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 2, target_state: "RESTED" } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 2, target_state: "RESTED", up_to: true } },
         { type: "DRAW", params: { amount: 2 }, chain: "THEN" },
         { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
       ],
@@ -1468,7 +1468,7 @@ export const OP16_068_TRAFALGAR_LAW: EffectSchema = {
   card_name: "Trafalgar Law",
   card_type: "Character",
   effects: [
-    { id: "on_play_add_don", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } }] },
+    { id: "on_play_add_don", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } }] },
     {
       id: "when_attacking_power",
       category: "auto",
@@ -1488,7 +1488,7 @@ export const OP16_069_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       id: "on_play_or_attack_add_don",
       category: "auto",
       trigger: { any_of: [{ keyword: "ON_PLAY" }, { keyword: "WHEN_ATTACKING" }] },
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } }],
     },
   ],
 };
@@ -1509,7 +1509,7 @@ export const OP16_070_DONQUIXOTE_ROSINANTE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -1527,10 +1527,10 @@ export const OP16_071_BENEVOLENT_KING_OF_THE_WAVES: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }],
       flags: { optional: true },
     },
-    { id: "on_ko_add_don", category: "auto", trigger: { keyword: "ON_KO" }, actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } }] },
+    { id: "on_ko_add_don", category: "auto", trigger: { keyword: "ON_KO" }, actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true } }] },
   ],
 };
 
@@ -1553,8 +1553,8 @@ export const OP16_073_BORSALINO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" }, chain: "THEN" },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true }, chain: "THEN" },
       ],
     },
     {
@@ -1597,8 +1597,8 @@ export const OP16_075_MONKEY_D_GARP: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       conditions: { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Navy" } },
       actions: [
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } },
-        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" }, chain: "THEN" },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } },
+        { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED", up_to: true }, chain: "THEN" },
       ],
     },
   ],

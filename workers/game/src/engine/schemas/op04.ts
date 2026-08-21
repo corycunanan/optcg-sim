@@ -625,7 +625,7 @@ export const OP04_019_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       id: "eot_set_don_active",
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2, up_to: true } }],
     },
   ],
 };
@@ -874,7 +874,7 @@ export const OP04_026_SENOR_PINK: EffectSchema = {
             timing: "END_OF_THIS_TURN",
             action: {
               type: "SET_DON_ACTIVE",
-              params: { amount: 1 },
+              params: { amount: 1, up_to: true },
             },
           },
           chain: "THEN",
@@ -953,7 +953,7 @@ export const OP04_029_DELLINGER: EffectSchema = {
       id: "eot_set_don_active",
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 1 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } }],
     },
   ],
 };
@@ -1051,7 +1051,7 @@ export const OP04_032_BABY_5: EffectSchema = {
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
       costs: [{ type: "TRASH_SELF" }],
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 2, up_to: true } }],
       flags: { optional: true },
     },
   ],
@@ -1092,7 +1092,7 @@ export const OP04_033_MACHVISE: EffectSchema = {
             timing: "END_OF_THIS_TURN",
             action: {
               type: "SET_DON_ACTIVE",
-              params: { amount: 1 },
+              params: { amount: 1, up_to: true },
             },
           },
           chain: "THEN",
@@ -1322,7 +1322,7 @@ export const OP04_038_THE_WEAK: EffectSchema = {
       id: "trigger_set_don_active",
       category: "auto",
       trigger: { keyword: "TRIGGER" },
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 5 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 5, up_to: true } }],
     },
   ],
 };
@@ -1415,7 +1415,7 @@ export const OP04_040_QUEEN: EffectSchema = {
               [
                 {
                   type: "ADD_TO_LIFE_FROM_DECK",
-                  params: { amount: 1, position: "TOP", face: "DOWN" },
+                  params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
                   conditions: {
                     type: "CARD_ON_FIELD",
                     controller: "SELF",
@@ -2042,7 +2042,7 @@ export const OP04_058_CROCODILE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2106,7 +2106,7 @@ export const OP04_060_CROCODILE: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
     },
@@ -2154,7 +2154,7 @@ export const OP04_061_TOM: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2217,7 +2217,7 @@ export const OP04_064_MS_ALL_SUNDAY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
         {
           type: "DRAW",
@@ -2547,7 +2547,7 @@ export const OP04_073_MR_13_AND_MS_FRIDAY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2607,7 +2607,7 @@ export const OP04_074_COLORS_TRAP: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2642,7 +2642,7 @@ export const OP04_075_NEZ_PALM_CANNON: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
           conditions: {
             type: "LIFE_COUNT",
@@ -2660,7 +2660,7 @@ export const OP04_075_NEZ_PALM_CANNON: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2702,7 +2702,7 @@ export const OP04_076_WEAKNESS_IS_AN_UNFORGIVABLE_SIN: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -3977,7 +3977,7 @@ export const OP04_112_YAMATO: EffectSchema = {
         },
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
           chain: "THEN",
           conditions: {
             type: "LIFE_COUNT",

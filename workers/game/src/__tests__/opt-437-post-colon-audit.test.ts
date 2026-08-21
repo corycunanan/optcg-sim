@@ -314,7 +314,12 @@ describe("OPT-437 family: the gate covers the whole chain incl. THEN (EB02-010 L
     const block = EB02_010_MONKEY_D_LUFFY.effects.find(
       (b) => b.id === "activate_set_don_active_power",
     )!;
-    const result = resolveEffect(state, block, state.players[0].leader.instanceId, 0, cardDb);
+    let result = resolveEffect(state, block, state.players[0].leader.instanceId, 0, cardDb);
+    result = resumeFromStack(
+      result.state,
+      { type: "PLAYER_CHOICE", choiceId: "choose-value:2" },
+      cardDb,
+    );
 
     expect(result.resolved).toBe(true);
     // Rested DON reactivated (2 rested → 0; DON_MINUS took 2 active first).

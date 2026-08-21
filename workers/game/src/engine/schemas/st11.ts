@@ -155,7 +155,7 @@ export const ST11_004_NEW_GENESIS: EffectSchema = {
         },
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
           chain: "THEN",
         },
       ],

@@ -57,7 +57,7 @@ export const OP10_001_SMOKER: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
     },
@@ -124,7 +124,7 @@ export const OP10_003_SUGAR: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -149,7 +149,7 @@ export const OP10_003_SUGAR: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -1095,7 +1095,7 @@ export const OP10_030_SMOKER: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -1257,7 +1257,7 @@ export const OP10_036_PERONA: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
       ],
     },
@@ -2363,7 +2363,7 @@ export const OP10_067_SENOR_PINK: EffectSchema = {
         },
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
           chain: "THEN",
         },
       ],
@@ -2478,7 +2478,7 @@ export const OP10_071_DONQUIXOTE_DOFLAMINGO: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2518,7 +2518,7 @@ export const OP10_072_DONQUIXOTE_ROSINANTE: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 2 },
+          params: { amount: 2, up_to: true },
         },
       ],
     },
@@ -2616,7 +2616,7 @@ export const OP10_076_BABY_5: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2647,7 +2647,7 @@ export const OP10_077_BELLAMY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2718,7 +2718,7 @@ export const OP10_079_GOD_THREAD: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
           chain: "THEN",
         },
       ],
@@ -2730,7 +2730,7 @@ export const OP10_079_GOD_THREAD: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2783,7 +2783,7 @@ export const OP10_080_LITTLE_BLACK_BEARS: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },

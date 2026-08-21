@@ -756,7 +756,7 @@ export const OP11_021_JINBE: EffectSchema = {
         },
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
           chain: "THEN",
         },
       ],
@@ -2315,7 +2315,7 @@ export const OP11_067_CHARLOTTE_KATAKURI: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
       ],
@@ -2348,7 +2348,7 @@ export const OP11_069_CHARLOTTE_BRULEE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -2599,7 +2599,7 @@ export const OP11_080_GEAR_TWO: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -3958,7 +3958,7 @@ export const OP11_066_CHARLOTTE_OVEN: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
       ],
@@ -4002,7 +4002,7 @@ export const OP11_071_CHARLOTTE_PEROSPERO: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
           chain: "THEN",
           conditions: {
             type: "REVEALED_CARD_PROPERTY",
@@ -4204,7 +4204,7 @@ export const OP11_081_COGNAC_MAMA_MASH: EffectSchema = {
       id: "trigger_add_don",
       category: "auto",
       trigger: { keyword: "TRIGGER" },
-      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE" } }],
+      actions: [{ type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "ACTIVE", up_to: true } }],
     },
   ],
 };

@@ -37,6 +37,7 @@ import type {
 import {
   markOncePerTurnUsed,
   extractEffectDescription,
+  resolveAmount,
 } from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import {
@@ -329,7 +330,8 @@ export function resolveEffect(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  triggeringCardInstanceId?: string | null
+  triggeringCardInstanceId?: string | null,
+  executionContext: "INTERACTIVE" | "PROMPTLESS_PHASE" = "INTERACTIVE"
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -492,7 +494,9 @@ export function resolveEffect(
       controller,
       cardDb,
       initialRefs,
-      blockDescription
+      blockDescription,
+      undefined,
+      executionContext
     );
     state = chainResult.state;
     events.push(...chainResult.events);
@@ -518,6 +522,67 @@ export interface ChainResult {
   state: GameState;
   events: PendingEvent[];
   pendingPrompt?: PendingPromptState;
+}
+
+type UpToResourceAction =
+  | ActionOf<"ADD_DON_FROM_DECK">
+  | ActionOf<"ADD_TO_LIFE_FROM_DECK">
+  | ActionOf<"SET_DON_ACTIVE">;
+
+function isUpToResourceAction(action: Action): action is UpToResourceAction {
+  return (
+    (action.type === "ADD_DON_FROM_DECK" ||
+      action.type === "ADD_TO_LIFE_FROM_DECK" ||
+      action.type === "SET_DON_ACTIVE") &&
+    action.params?.up_to === true
+  );
+}
+
+function availableUpToAmount(
+  state: GameState,
+  action: UpToResourceAction,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): number {
+  const requested = Math.max(
+    0,
+    resolveAmount(action.params?.amount ?? 1, resultRefs, state, controller, cardDb),
+  );
+  const player = state.players[controller];
+  const available = action.type === "ADD_DON_FROM_DECK"
+    ? player.donDeck.length
+    : action.type === "ADD_TO_LIFE_FROM_DECK"
+      ? player.deck.length
+      : player.donCostArea.filter((don) => don.state === "RESTED").length;
+  return Math.min(requested, available);
+}
+
+function expandUpToResourceAction(
+  state: GameState,
+  action: UpToResourceAction,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): [ActionOf<"CHOOSE_VALUE">, Action] {
+  const resultRef = "__engine_up_to_amount";
+  const max = availableUpToAmount(state, action, controller, cardDb, resultRefs);
+  const chooseAction: ActionOf<"CHOOSE_VALUE"> = {
+    type: "CHOOSE_VALUE",
+    params: { domain: "NUMBER", constraints: { min: 0, max } },
+    result_ref: resultRef,
+    chain: action.chain,
+  };
+  const resumedAction = {
+    ...action,
+    chain: "IF_DO",
+    params: {
+      ...action.params,
+      amount: { type: "CHOSEN_VALUE", ref: resultRef },
+      up_to: false,
+    },
+  } as Action;
+  return [chooseAction, resumedAction];
 }
 
 function promptForSimultaneousSelection(
@@ -697,7 +762,8 @@ export function executeActionChain(
   cardDb: Map<string, CardData>,
   initialResultRefs?: Map<string, EffectResult>,
   effectDescription?: string,
-  priorActionSucceeded?: boolean
+  priorActionSucceeded?: boolean,
+  executionContext: "INTERACTIVE" | "PROMPTLESS_PHASE" = "INTERACTIVE"
 ): ChainResult {
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
@@ -761,6 +827,37 @@ export function executeActionChain(
       }
     }
 
+    if (
+      executionContext === "INTERACTIVE" &&
+      isUpToResourceAction(action)
+    ) {
+      const expanded = expandUpToResourceAction(
+        state,
+        action,
+        controller,
+        cardDb,
+        resultRefs,
+      );
+      const continuation = executeActionChain(
+        state,
+        [...expanded, ...actions.slice(i + 1)],
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+        effectDescription,
+        lastActionSucceeded,
+        executionContext,
+      );
+      return {
+        state: continuation.state,
+        events: [...events, ...continuation.events],
+        ...(continuation.pendingPrompt
+          ? { pendingPrompt: continuation.pendingPrompt }
+          : {}),
+      };
+    }
+
     // Resolve target_ref to preselected targets
     let preselected: string[] | undefined;
     if (action.target_ref && resultRefs.has(action.target_ref)) {
@@ -791,7 +888,9 @@ export function executeActionChain(
       // Pause — push a stack frame with the remaining actions and surface the prompt
       const nestedPromptFrame = result.state.effectStack.at(-1);
       if (
-        (action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") &&
+        (action.type === "PLAYER_CHOICE" ||
+          action.type === "OPPONENT_CHOICE" ||
+          action.type === "OPPONENT_ACTION") &&
         nestedPromptFrame &&
         result.state.effectStack.length > stackDepthBeforeAction
       ) {
@@ -802,6 +901,9 @@ export function executeActionChain(
                 ...nestedPromptFrame.remainingActions,
                 ...remainingActions,
               ],
+              ...(action.type === "OPPONENT_ACTION"
+                ? { remainingActionsController: controller }
+                : {}),
             })
           : result.state;
         return {

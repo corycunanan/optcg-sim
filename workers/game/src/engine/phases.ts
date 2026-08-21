@@ -136,7 +136,19 @@ function runEndPhase(state: GameState, pi: 0 | 1, cardDb: Map<string, CardData>)
       category: "auto" as const,
       actions: [entry.action],
     };
-    const result = resolveEffect(state, fakeBlock, entry.sourceEffectId, entry.controller, cardDb);
+    // Phase-boundary execution is prompt-free and cannot pause/resume. Preserve
+    // the pre-OPT-731 auto-maximum behavior for the eight scheduled up-to
+    // clauses: EB02-015, OP04-026, OP04-033, OP13-024, OP13-038, OP13-066,
+    // OP14-031, and ST24-005.
+    const result = resolveEffect(
+      state,
+      fakeBlock,
+      entry.sourceEffectId,
+      entry.controller,
+      cardDb,
+      undefined,
+      "PROMPTLESS_PHASE"
+    );
     state = result.state;
   }
 

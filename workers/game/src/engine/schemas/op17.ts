@@ -782,7 +782,7 @@ export const OP17_022_SHANKS: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [
-        { type: "SET_DON_ACTIVE", params: { amount: 2 } },
+        { type: "SET_DON_ACTIVE", params: { amount: 2, up_to: true } },
         {
           type: "SET_REST",
           target: { type: "ALL_OPPONENT_CHARACTERS" },
@@ -988,7 +988,7 @@ export const OP17_029_HONGO: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [
-        { type: "SET_DON_ACTIVE", params: { amount: 1 } },
+        { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } },
         {
           type: "SET_REST",
           target: {
@@ -1036,7 +1036,7 @@ export const OP17_030_MONKEY_D_LUFFY: EffectSchema = {
         operator: "<=",
         value: 5,
       },
-      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 1 } }],
+      actions: [{ type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } }],
       flags: { once_per_turn: true },
     },
   ],
@@ -1172,7 +1172,7 @@ export const OP17_034_ROCKSTAR: EffectSchema = {
         property: { power: { operator: ">=", value: 6000 } },
       },
       actions: [
-        { type: "SET_DON_ACTIVE", params: { amount: 1 } },
+        { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } },
         {
           type: "SET_BASE_POWER",
           target: { type: "YOUR_LEADER", filter: { traits: ["Red-Haired Pirates"] } },
@@ -2015,9 +2015,8 @@ export const OP17_060_ULTI_PAGE_ONE: EffectSchema = {
       },
       actions: [
         {
-          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
         {
           type: "KO",
@@ -2053,9 +2052,8 @@ export const OP17_061_LEAD_PERFORMERS: EffectSchema = {
       },
       actions: [
         {
-          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
     },
@@ -2100,14 +2098,12 @@ export const OP17_062_KAIDO: EffectSchema = {
       },
       actions: [
         {
-          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
         {
-          // OPT-731: SET_DON_ACTIVE cannot yet model printed “up to 1”.
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
           chain: "THEN",
         },
       ],
@@ -2286,9 +2282,8 @@ export const OP17_068_SASAKI: EffectSchema = {
       },
       actions: [
         {
-          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 2”.
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 2, target_state: "RESTED" },
+          params: { amount: 2, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2404,9 +2399,8 @@ export const OP17_073_BASIL_HAWKINS: EffectSchema = {
       },
       actions: [
         {
-          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2428,9 +2422,8 @@ export const OP17_074_YAMATO: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         {
-          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -2680,7 +2673,7 @@ export const OP17_077_KUNDALI_DRAGON_SWARM: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 3, target_state: "RESTED" },
+          params: { amount: 3, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2725,7 +2718,7 @@ export const OP17_078_DRUNKEN_DRAGON_BAGUA: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 3, target_state: "RESTED" },
+          params: { amount: 3, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -3478,7 +3471,7 @@ export const OP17_099_CHARLOTTE_LINLIN: EffectSchema = {
                 { type: "TRASH_FROM_HAND", params: { amount: 1 } },
                 {
                   type: "ADD_TO_LIFE_FROM_DECK",
-                  params: { amount: 1, position: "TOP", face: "DOWN" },
+                  params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
                   chain: "THEN",
                 },
               ],
@@ -3602,9 +3595,8 @@ export const OP17_103_CHARLOTTE_KATAKURI: EffectSchema = {
       },
       actions: [
         {
-          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
         {
           type: "MODIFY_POWER",
@@ -3643,9 +3635,8 @@ export const OP17_104_CHARLOTTE_CRACKER: EffectSchema = {
       },
       actions: [
         {
-          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -3701,9 +3692,8 @@ export const OP17_106_CHARLOTTE_SMOOTHIE: EffectSchema = {
       costs: [{ type: "REST_DON", amount: 2 }],
       actions: [
         {
-          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
         },
         {
           type: "OPPONENT_ACTION",
@@ -3925,9 +3915,8 @@ export const OP17_112_CHARLOTTE_LINLIN: EffectSchema = {
             options: [
               [
                 {
-                  // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
                   type: "ADD_TO_LIFE_FROM_DECK",
-                  params: { amount: 1, position: "TOP", face: "DOWN" },
+                  params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
                 },
               ],
               [
@@ -3987,9 +3976,8 @@ export const OP17_114_SWEET_3_GENERALS: EffectSchema = {
       actions: [
         { type: "DRAW", params: { amount: 1 } },
         {
-          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP", face: "DOWN" },
+          params: { amount: 1, position: "TOP", face: "DOWN", up_to: true },
           chain: "THEN",
         },
         {

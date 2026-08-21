@@ -664,7 +664,7 @@ export const EB03_017_JEWELRY_BONNEY: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
         {
           type: "APPLY_PROHIBITION",
@@ -829,7 +829,7 @@ export const EB03_061_UTA: EffectSchema = {
       actions: [
         {
           type: "SET_DON_ACTIVE",
-          params: { amount: 1 },
+          params: { amount: 1, up_to: true },
         },
         {
           type: "SET_REST",
@@ -1317,7 +1317,7 @@ export const EB03_033_CHARLOTTE_BRULEE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -1349,7 +1349,7 @@ export const EB03_034_CHARLOTTE_LINLIN: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
           chain: "THEN",
         },
       ],
@@ -1362,7 +1362,7 @@ export const EB03_034_CHARLOTTE_LINLIN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -1395,7 +1395,7 @@ export const EB03_035_CHARLOTTE_PUDDING: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -1497,7 +1497,7 @@ export const EB03_038_THANKS_FOR_THE_TREAT: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 2, target_state: "RESTED" },
+          params: { amount: 2, target_state: "RESTED", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2170,7 +2170,7 @@ export const EB03_054_NICO_ROBIN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2213,7 +2213,7 @@ export const EB03_055_NICO_ROBIN: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 2, position: "TOP" },
+          params: { amount: 2, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },
@@ -2476,7 +2476,7 @@ export const EB03_062_TRAFALGAR_LAW: EffectSchema = {
       actions: [
         {
           type: "ADD_TO_LIFE_FROM_DECK",
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
         {
           type: "PLAY_CARD",

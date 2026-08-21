@@ -80,7 +80,7 @@ export const ST10_002_MONKEY_D_LUFFY: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
       flags: { once_per_turn: true },
@@ -291,7 +291,7 @@ export const ST10_008_SHACHI_AND_PENGUIN: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 2, target_state: "RESTED" },
+          params: { amount: 2, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -314,7 +314,7 @@ export const ST10_009_JEAN_BART: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },
@@ -426,7 +426,7 @@ export const ST10_012_BEPO: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
         },
       ],
     },
@@ -614,7 +614,7 @@ export const ST10_017_PUNK_VISE: EffectSchema = {
         },
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "RESTED" },
+          params: { amount: 1, target_state: "RESTED", up_to: true },
           chain: "THEN",
         },
       ],
@@ -626,7 +626,7 @@ export const ST10_017_PUNK_VISE: EffectSchema = {
       actions: [
         {
           type: "ADD_DON_FROM_DECK",
-          params: { amount: 1, target_state: "ACTIVE" },
+          params: { amount: 1, target_state: "ACTIVE", up_to: true },
         },
       ],
     },

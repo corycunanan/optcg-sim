@@ -850,8 +850,8 @@ export interface ActionParamsMap {
 
   GIVE_DON: { amount?: number; don_state?: CardState };
   RETURN_DON_TO_DECK: { amount?: number | DynamicValue };
-  ADD_DON_FROM_DECK: { amount?: number; target_state?: CardState };
-  SET_DON_ACTIVE: { amount?: number };
+  ADD_DON_FROM_DECK: { amount?: number | DynamicValue; target_state?: CardState; up_to?: boolean };
+  SET_DON_ACTIVE: { amount?: number | DynamicValue; up_to?: boolean };
   REST_DON: { amount?: number };
   REDISTRIBUTE_DON: { amount?: number };
   FORCE_OPPONENT_DON_RETURN: { amount?: number };
@@ -907,9 +907,10 @@ export interface ActionParamsMap {
   LIFE_SCRY: { look_at?: number };
   REORDER_ALL_LIFE: Record<string, never>;
   ADD_TO_LIFE_FROM_DECK: {
-    amount?: number;
+    amount?: number | DynamicValue;
     face?: "UP" | "DOWN";
     position?: "TOP" | "BOTTOM";
+    up_to?: boolean;
   };
   ADD_TO_LIFE_FROM_HAND: {
     amount?: number;

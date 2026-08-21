@@ -573,6 +573,7 @@ describe("OPT-727 OP17 Event and Stage resolution", () => {
         result.pendingPrompt.options.validTargets.slice(0, 2),
         cardDb
       );
+      result = choose(result, "choose-value:3", cardDb);
 
       expect(result.pendingPrompt).toBeUndefined();
       expect(result.state.players[0].hand).toHaveLength(handBefore - 2);
