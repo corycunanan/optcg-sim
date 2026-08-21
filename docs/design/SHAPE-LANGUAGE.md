@@ -98,16 +98,18 @@ moment, including zero before an image loads.
 ScaledBoard note below: at the 1280×640 floor the board scales to ~0.59, so 4% of an 80px field card
 paints ~1.9px, which is inside the sub-pixel band that note warns about. Adopted anyway, because the
 objection cuts both ways. The `rounded` it replaced was 4px *authored*, not 4px *painted* — the same
-transform scales it to ~2.4px at that same viewport. Nothing on the board was ever rendering at its
+board scale takes it to ~2.4px at that same viewport. Nothing on the board was ever rendering at its
 authored radius, so the choice was never "4px versus 1.9px"; it was "a length that happens to land
 somewhere, versus a ratio."
 
-The transform is what settles it. `ScaledBoard` scales uniformly, so a percentage radius keeps
-exactly 4% of the card's width at every scale the board is ever rendered at — the physical-card
-argument above working rather than failing. A fixed length keeps only its authored number, which is
-the one number nobody sees. Adopting costs about a quarter of a pixel at the floor viewport and
-makes every larger viewport proportionally correct. No scale compensation, no board-specific
-constant: the board card is the same object as the `/cards` tile, so it takes the same corner.
+The scale is what settles it. `BoardLayout` applies one CSS `zoom` factor to the board layer, and
+`zoom` scales lengths and resolves percentages against the same scaled box — so a percentage radius
+holds exactly 4% of the card's painted width at every size the board is ever rendered at, which is
+the physical-card argument above working rather than failing. The 4px it replaced held 5% of an
+80px card, and held it only as an authored number the viewer never sees. Adopting costs `0.8px ×
+boardScale` — under a pixel at any viewport, about half of one at the floor — and makes every larger
+viewport proportionally correct. No scale compensation, no board-specific constant: the board card
+is the same object as the `/cards` tile, so it takes the same corner.
 
 The layers move as one. The radius is shared across the stack in `card.tsx` — the focus-ring
 wrapper, the three transform layers, the power flash — plus `card-front.tsx`, `card-back.tsx`,
@@ -213,9 +215,10 @@ region**. If two pennants compete, neither is featured.
 - **ScaledBoard:** inside the scaled subtree (~0.59 at the 1280×640 floor), 1px hairlines and 4px
   chamfers land sub-pixel and smear. Author board-side shapes at scale-compensated sizes, or render
   ornament in unscaled chrome. Same rule as the material language's hairline caveat. **A
-  proportional radius is the exception** (OPT-720): the transform is uniform, so `rounded-card`
-  scales with the card it is on and needs no compensation. The caveat is about *lengths* authored in
-  px, which the transform shrinks away from the number they were picked for. A ratio has no such
+  proportional radius is the exception** (OPT-720): the board scale is a single uniform factor —
+  CSS `zoom` on the board layer, so descendants lay out at final pixel size — and `rounded-card`
+  scales with the card it sits on, needing no compensation. The caveat is about *lengths* authored
+  in px, which the scale shrinks away from the number they were picked for. A ratio has no such
   number to lose.
 - **Figma:** corner smoothing 0; author chamfers as vector polygons with the cut size annotated in
   px; pennant/swallowtail apexes as explicit vector points, never radius tricks.
