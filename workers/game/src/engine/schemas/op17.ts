@@ -3,6 +3,7 @@
  *
  * OPT-727 slice: 6 Leaders, 15 Events, and 1 Stage.
  * OPT-728 slice: 44 Characters (red, green, blue, and first yellow group).
+ * OPT-729 slice: final 42 Characters and manifest closure.
  */
 
 import type { EffectSchema } from "../effect-types.js";
@@ -1716,6 +1717,621 @@ export const OP17_050_STREUSEN: EffectSchema = {
   ],
 };
 
+// ─── OP17-052 Don Marlon (Character) ───────────────────────────────────────
+
+export const OP17_052_DON_MARLON: EffectSchema = {
+  card_id: "OP17-052",
+  card_name: "Don Marlon",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_recover_event",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "RETURN_TO_HAND",
+          target: {
+            type: "EVENT_CARD",
+            controller: "SELF",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { color: "BLUE", cost_exact: 0 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-053 Barbell (Character) ──────────────────────────────────────────
+
+export const OP17_053_BARBELL: EffectSchema = {
+  card_id: "OP17-053",
+  card_name: "Barbell",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_ko_opponent_bottom_deck",
+      category: "auto",
+      trigger: { keyword: "ON_KO" },
+      actions: [
+        {
+          type: "OPPONENT_ACTION",
+          params: {
+            mandatory: true,
+            action: {
+              type: "RETURN_TO_DECK",
+              target: {
+                type: "CARD_IN_HAND",
+                controller: "SELF",
+                count: { exact: 2 },
+              },
+              params: { position: "BOTTOM" },
+            },
+          },
+        },
+      ],
+    },
+    {
+      id: "activate_power",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "SELF" },
+          params: { amount: 3000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+      flags: { once_per_turn: true, optional: true },
+    },
+  ],
+};
+
+// ─── OP17-054 Miss Buckingham Stussy (Character) ───────────────────────────
+
+export const OP17_054_MISS_BUCKINGHAM_STUSSY: EffectSchema = {
+  card_id: "OP17-054",
+  card_name: "Miss Buckingham Stussy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_cannot_attack",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "APPLY_PROHIBITION",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { base_cost_max: 6 },
+          },
+          params: { prohibition_type: "CANNOT_ATTACK" },
+          duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
+        },
+      ],
+    },
+    {
+      id: "activate_cannot_attack",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [
+        { type: "REST_DON", amount: 3 },
+        { type: "REST_SELF" },
+      ],
+      actions: [
+        {
+          type: "APPLY_PROHIBITION",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+          params: { prohibition_type: "CANNOT_ATTACK" },
+          duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-059 Aramaki (Character) ──────────────────────────────────────────
+
+export const OP17_059_ARAMAKI: EffectSchema = {
+  card_id: "OP17-059",
+  card_name: "Aramaki",
+  card_type: "Character",
+  effects: [
+    { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      id: "on_play_draw_ko",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 2 },
+            filter: { cost_max: 2 },
+          },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-060 Ulti & Page One (Character) ──────────────────────────────────
+
+export const OP17_060_ULTI_PAGE_ONE: EffectSchema = {
+  card_id: "OP17-060",
+  card_name: "Ulti & Page One",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_don_ko",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Animal Kingdom Pirates" },
+      },
+      actions: [
+        {
+          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 1, target_state: "ACTIVE" },
+        },
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { power_max: 3000 },
+          },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-061 Lead Performers (Character) ──────────────────────────────────
+
+export const OP17_061_LEAD_PERFORMERS: EffectSchema = {
+  card_id: "OP17-061",
+  card_name: "Lead Performers",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_add_life",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Animal Kingdom Pirates" },
+      },
+      actions: [
+        {
+          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
+          type: "ADD_TO_LIFE_FROM_DECK",
+          params: { amount: 1, position: "TOP", face: "DOWN" },
+        },
+      ],
+    },
+    {
+      id: "activate_play_performer",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TRASH_SELF" }],
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: "HAND",
+            count: { up_to: 1 },
+            filter: { name_any_of: ["King", "Queen", "Jack"] },
+          },
+          params: { source_zone: "HAND", cost_override: "FREE" },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-062 Kaido (Character) ────────────────────────────────────────────
+
+export const OP17_062_KAIDO: EffectSchema = {
+  card_id: "OP17-062",
+  card_name: "Kaido",
+  card_type: "Character",
+  effects: [
+    { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      id: "don_returned_refresh",
+      category: "auto",
+      trigger: {
+        event: "DON_RETURNED_TO_DON_DECK",
+        filter: { controller: "SELF" },
+        turn_restriction: "YOUR_TURN",
+      },
+      actions: [
+        {
+          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 1, target_state: "ACTIVE" },
+        },
+        {
+          // OPT-731: SET_DON_ACTIVE cannot yet model printed “up to 1”.
+          type: "SET_DON_ACTIVE",
+          params: { amount: 1 },
+          chain: "THEN",
+        },
+      ],
+      flags: { once_per_turn: true },
+    },
+  ],
+};
+
+// ─── OP17-063 Kaido (Character) ────────────────────────────────────────────
+
+export const OP17_063_KAIDO: EffectSchema = {
+  card_id: "OP17-063",
+  card_name: "Kaido",
+  card_type: "Character",
+  effects: [
+    {
+      id: "counter_grant_rule",
+      category: "rule_modification",
+      rule: {
+        rule_type: "COUNTER_GRANT",
+        value: 1000,
+        filter: { card_type: "CHARACTER", has_counter: false },
+      },
+    },
+    {
+      id: "activate_negate_ko",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      post_cost_conditions: { type: "WAS_PLAYED_THIS_TURN" },
+      actions: [
+        {
+          type: "NEGATE_EFFECTS",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 6 },
+          },
+          duration: { type: "THIS_TURN" },
+          result_ref: "negated_character",
+        },
+        { type: "KO", target_ref: "negated_character", chain: "THEN" },
+      ],
+      flags: { once_per_turn: true },
+    },
+  ],
+};
+
+// ─── OP17-064 King (Character) ─────────────────────────────────────────────
+
+export const OP17_064_KING: EffectSchema = {
+  card_id: "OP17-064",
+  card_name: "King",
+  card_type: "Character",
+  effects: [
+    { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      id: "on_opponent_attack_power",
+      category: "auto",
+      trigger: { keyword: "ON_OPPONENT_ATTACK" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { up_to: 1 } },
+          params: { amount: 2000 },
+          duration: { type: "THIS_BATTLE" },
+        },
+      ],
+      flags: { once_per_turn: true, optional: true },
+    },
+  ],
+};
+
+// ─── OP17-065 Queen (Character) ────────────────────────────────────────────
+
+export const OP17_065_QUEEN: EffectSchema = {
+  card_id: "OP17-065",
+  card_name: "Queen",
+  card_type: "Character",
+  effects: [
+    { id: "banish", category: "permanent", flags: { keywords: ["BANISH"] } },
+    {
+      id: "on_play_draw_cannot_attack",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "APPLY_PROHIBITION",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 2 },
+            filter: { cost_max: 5 },
+          },
+          params: { prohibition_type: "CANNOT_ATTACK" },
+          duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-066 Kurozumi Orochi (Character) ──────────────────────────────────
+
+export const OP17_066_KUROZUMI_OROCHI: EffectSchema = {
+  card_id: "OP17-066",
+  card_name: "Kurozumi Orochi",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_draw_trash",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      post_cost_conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", cost_min: 10 },
+      },
+      actions: [
+        { type: "DRAW", params: { amount: 2 } },
+        { type: "TRASH_FROM_HAND", params: { amount: 1 }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-067 Kurozumi Kanjuro (Character) ─────────────────────────────────
+
+export const OP17_067_KUROZUMI_KANJURO: EffectSchema = {
+  card_id: "OP17-067",
+  card_name: "Kurozumi Kanjuro",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_rest_character",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      post_cost_conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", cost_min: 10 },
+      },
+      actions: [
+        {
+          type: "SET_REST",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-068 Sasaki (Character) ───────────────────────────────────────────
+
+export const OP17_068_SASAKI: EffectSchema = {
+  card_id: "OP17-068",
+  card_name: "Sasaki",
+  card_type: "Character",
+  effects: [
+    {
+      id: "when_attacking_add_don",
+      category: "auto",
+      trigger: { keyword: "WHEN_ATTACKING" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 2 }],
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Animal Kingdom Pirates" },
+      },
+      actions: [
+        {
+          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 2”.
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 2, target_state: "RESTED" },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-069 Jack (Character) ─────────────────────────────────────────────
+
+export const OP17_069_JACK: EffectSchema = {
+  card_id: "OP17-069",
+  card_name: "Jack",
+  card_type: "Character",
+  effects: [
+    { id: "rush_character", category: "permanent", flags: { keywords: ["RUSH_CHARACTER"] } },
+    {
+      id: "on_play_debuff",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Animal Kingdom Pirates" },
+      },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+          params: { amount: -2000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-071 Who's.Who (Character) ────────────────────────────────────────
+
+export const OP17_071_WHOS_WHO: EffectSchema = {
+  card_id: "OP17-071",
+  card_name: "Who's.Who",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_ko",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 1 }],
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 2 },
+            filter: { cost_max: 2 },
+          },
+        },
+      ],
+    },
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+// ─── OP17-072 Black Maria (Character) ──────────────────────────────────────
+
+export const OP17_072_BLACK_MARIA: EffectSchema = {
+  card_id: "OP17-072",
+  card_name: "Black Maria",
+  card_type: "Character",
+  effects: [
+    { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      id: "on_opponent_attack_power",
+      category: "auto",
+      trigger: { keyword: "ON_OPPONENT_ATTACK" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { up_to: 1 } },
+          params: { amount: 1000 },
+          duration: { type: "THIS_BATTLE" },
+        },
+      ],
+      flags: { once_per_turn: true, optional: true },
+    },
+  ],
+};
+
+// ─── OP17-073 Basil Hawkins (Character) ────────────────────────────────────
+
+export const OP17_073_BASIL_HAWKINS: EffectSchema = {
+  card_id: "OP17-073",
+  card_name: "Basil Hawkins",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_add_don",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      post_cost_conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Animal Kingdom Pirates" },
+      },
+      actions: [
+        {
+          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 1, target_state: "ACTIVE" },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-074 Yamato (Character) ───────────────────────────────────────────
+
+export const OP17_074_YAMATO: EffectSchema = {
+  card_id: "OP17-074",
+  card_name: "Yamato",
+  card_type: "Character",
+  effects: [
+    { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      id: "on_play_add_don",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          // OPT-731: ADD_DON_FROM_DECK cannot yet model printed “up to 1”.
+          type: "ADD_DON_FROM_DECK",
+          params: { amount: 1, target_state: "RESTED" },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-075 X.Drake (Character) ──────────────────────────────────────────
+
+export const OP17_075_X_DRAKE: EffectSchema = {
+  card_id: "OP17-075",
+  card_name: "X.Drake",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_opponent_trash",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "DON_MINUS", amount: 2 }],
+      actions: [
+        {
+          type: "OPPONENT_ACTION",
+          params: {
+            mandatory: true,
+            action: { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP17-055 There's No Authority in the World That Lasts Forever (Event) ─
 
 export const OP17_055_NO_AUTHORITY_LASTS_FOREVER: EffectSchema = {
@@ -2026,6 +2642,514 @@ export const OP17_079_MONKEY_D_LUFFY: EffectSchema = {
           params: { keyword: "BLOCKER" },
         },
       ],
+    },
+  ],
+};
+
+// ─── OP17-080 Usopp (Character) ─────────────────────────────────────────────
+
+export const OP17_080_USOPP: EffectSchema = {
+  card_id: "OP17-080",
+  card_name: "Usopp",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_power",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "BOARD_WIDE_EXISTENCE",
+          filter: { card_type: "CHARACTER", cost_min: 12 },
+        },
+      },
+    },
+    {
+      id: "on_play_search_elbaph",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "SEARCH_TRASH_THE_REST",
+          params: {
+            look_at: 3,
+            pick: { up_to: 1 },
+            filter: { traits: ["Elbaph"] },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-081 Gerd (Character) ─────────────────────────────────────────────
+
+export const OP17_081_GERD: EffectSchema = {
+  card_id: "OP17-081",
+  card_name: "Gerd",
+  card_type: "Character",
+  effects: [
+    {
+      id: "elbaph_leader_cost",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_COST", target: { type: "SELF" }, params: { amount: 12 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "LEADER_PROPERTY",
+          controller: "SELF",
+          property: { trait: "Elbaph" },
+        },
+      },
+    },
+    {
+      id: "on_play_recover_character",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+      actions: [
+        {
+          type: "RETURN_TO_HAND",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { cost_max: 8, exclude_name: "Gerd" },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-082 Sanji (Character) ────────────────────────────────────────────
+
+export const OP17_082_SANJI: EffectSchema = {
+  card_id: "OP17-082",
+  card_name: "Sanji",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_power",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "BOARD_WIDE_EXISTENCE",
+          filter: { card_type: "CHARACTER", cost_min: 12 },
+        },
+      },
+    },
+    {
+      id: "on_play_draw_trash",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        { type: "DRAW", params: { amount: 2 } },
+        { type: "TRASH_FROM_HAND", params: { amount: 2 }, chain: "THEN" },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-083 Jinbe (Character) ────────────────────────────────────────────
+
+export const OP17_083_JINBE: EffectSchema = {
+  card_id: "OP17-083",
+  card_name: "Jinbe",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_blocker_power",
+      category: "permanent",
+      modifiers: [
+        { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "BLOCKER" } },
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "BOARD_WIDE_EXISTENCE",
+          filter: { card_type: "CHARACTER", cost_min: 12 },
+        },
+      },
+    },
+  ],
+};
+
+// ─── OP17-084 Tony Tony.Chopper (Character) ────────────────────────────────
+
+export const OP17_084_TONY_TONY_CHOPPER: EffectSchema = {
+  card_id: "OP17-084",
+  card_name: "Tony Tony.Chopper",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_grant_unblockable",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      conditions: {
+        type: "BOARD_WIDE_EXISTENCE",
+        filter: { card_type: "CHARACTER", cost_min: 12 },
+      },
+      actions: [
+        {
+          type: "GRANT_KEYWORD",
+          target: { type: "CHARACTER", controller: "SELF", count: { up_to: 1 } },
+          params: { keyword: "UNBLOCKABLE" },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-085 Dorry (Character) ────────────────────────────────────────────
+
+export const OP17_085_DORRY: EffectSchema = {
+  card_id: "OP17-085",
+  card_name: "Dorry",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_increase",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_COST", target: { type: "SELF" }, params: { amount: 12 } },
+      ],
+    },
+    {
+      id: "on_play_play_brogy",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Elbaph" },
+      },
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: ["HAND", "TRASH"],
+            count: { up_to: 1 },
+            filter: { name: "Brogy", cost_max: 5 },
+          },
+          params: { cost_override: "FREE" },
+        },
+        {
+          type: "APPLY_PROHIBITION",
+          target: { type: "PLAYER", controller: "SELF" },
+          params: { prohibition_type: "CANNOT_PLAY_CHARACTER" },
+          duration: { type: "THIS_TURN" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-086 Nami (Character) ─────────────────────────────────────────────
+
+export const OP17_086_NAMI: EffectSchema = {
+  card_id: "OP17-086",
+  card_name: "Nami",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_draw",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1, filter: { traits: ["Elbaph"] } }],
+      actions: [{ type: "DRAW", params: { amount: 2 } }],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-087 Nico Robin (Character) ───────────────────────────────────────
+
+export const OP17_087_NICO_ROBIN: EffectSchema = {
+  card_id: "OP17-087",
+  card_name: "Nico Robin",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_power",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "BOARD_WIDE_EXISTENCE",
+          filter: { card_type: "CHARACTER", cost_min: 12 },
+        },
+      },
+    },
+    {
+      id: "on_play_debuff",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      conditions: {
+        type: "BOARD_WIDE_EXISTENCE",
+        filter: { card_type: "CHARACTER", cost_min: 12 },
+      },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+          params: { amount: -3000 },
+          duration: { type: "THIS_TURN" },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-089 Jaguar.D.Saul (Character) ────────────────────────────────────
+
+export const OP17_089_JAGUAR_D_SAUL: EffectSchema = {
+  card_id: "OP17-089",
+  card_name: "Jaguar.D.Saul",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_increase",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_COST", target: { type: "SELF" }, params: { amount: 12 } },
+      ],
+    },
+    {
+      id: "on_play_search_elbaph",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "SEARCH_TRASH_THE_REST",
+          params: {
+            look_at: 3,
+            pick: { up_to: 1 },
+            filter: { traits: ["Elbaph"] },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-090 Franky (Character) ───────────────────────────────────────────
+
+export const OP17_090_FRANKY: EffectSchema = {
+  card_id: "OP17-090",
+  card_name: "Franky",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_power",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "BOARD_WIDE_EXISTENCE",
+          filter: { card_type: "CHARACTER", cost_min: 12 },
+        },
+      },
+    },
+    {
+      id: "on_play_ko",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      conditions: {
+        type: "BOARD_WIDE_EXISTENCE",
+        filter: { card_type: "CHARACTER", cost_min: 12 },
+      },
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 2 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-091 Brook (Character) ────────────────────────────────────────────
+
+export const OP17_091_BROOK: EffectSchema = {
+  card_id: "OP17-091",
+  card_name: "Brook",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_power",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "BOARD_WIDE_EXISTENCE",
+          filter: { card_type: "CHARACTER", cost_min: 12 },
+        },
+      },
+    },
+    {
+      id: "on_play_opponent_trash",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      conditions: {
+        type: "BOARD_WIDE_EXISTENCE",
+        filter: { card_type: "CHARACTER", cost_min: 12 },
+      },
+      actions: [
+        {
+          type: "OPPONENT_ACTION",
+          params: {
+            mandatory: true,
+            action: { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-092 Brogy (Character) ────────────────────────────────────────────
+
+export const OP17_092_BROGY: EffectSchema = {
+  card_id: "OP17-092",
+  card_name: "Brogy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_increase",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_COST", target: { type: "SELF" }, params: { amount: 12 } },
+      ],
+    },
+    {
+      id: "on_play_play_dorry",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      conditions: {
+        type: "LEADER_PROPERTY",
+        controller: "SELF",
+        property: { trait: "Elbaph" },
+      },
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: ["HAND", "TRASH"],
+            count: { up_to: 1 },
+            filter: { name: "Dorry", cost_max: 5 },
+          },
+          params: { cost_override: "FREE" },
+        },
+        {
+          type: "APPLY_PROHIBITION",
+          target: { type: "PLAYER", controller: "SELF" },
+          params: { prohibition_type: "CANNOT_PLAY_CHARACTER" },
+          duration: { type: "THIS_TURN" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-093 Monkey.D.Luffy (Character) ───────────────────────────────────
+
+export const OP17_093_MONKEY_D_LUFFY: EffectSchema = {
+  card_id: "OP17-093",
+  card_name: "Monkey.D.Luffy",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_12_rush",
+      category: "permanent",
+      modifiers: [
+        { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "RUSH" } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "BOARD_WIDE_EXISTENCE",
+          filter: { card_type: "CHARACTER", cost_min: 12 },
+        },
+      },
+    },
+    {
+      id: "on_play_draw_play",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: "TRASH",
+            count: { up_to: 1 },
+            filter: { cost_max: 2 },
+          },
+          params: { source_zone: "TRASH", cost_override: "FREE" },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-094 Rodo (Character) ─────────────────────────────────────────────
+
+export const OP17_094_RODO: EffectSchema = {
+  card_id: "OP17-094",
+  card_name: "Rodo",
+  card_type: "Character",
+  effects: [
+    {
+      id: "elbaph_leader_cost",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_COST", target: { type: "SELF" }, params: { amount: 12 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: {
+          type: "LEADER_PROPERTY",
+          controller: "SELF",
+          property: { trait: "Elbaph" },
+        },
+      },
     },
   ],
 };
@@ -2451,6 +3575,247 @@ export const OP17_107_CHARLOTTE_DAIFUKU: EffectSchema = {
   ],
 };
 
+// ─── OP17-108 Charlotte Brulee (Character) ─────────────────────────────────
+
+export const OP17_108_CHARLOTTE_BRULEE: EffectSchema = {
+  card_id: "OP17-108",
+  card_name: "Charlotte Brulee",
+  card_type: "Character",
+  effects: [
+    { id: "blocker", category: "permanent", flags: { keywords: ["BLOCKER"] } },
+    {
+      id: "trigger_rest_character",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        {
+          type: "SET_REST",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 6 },
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-109 Charlotte Pudding (Character) ────────────────────────────────
+
+export const OP17_109_CHARLOTTE_PUDDING: EffectSchema = {
+  card_id: "OP17-109",
+  card_name: "Charlotte Pudding",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_draw",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 1, filter: { has_trigger: true } }],
+      actions: [{ type: "DRAW", params: { amount: 3 } }],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-110 Charlotte Perospero (Character) ──────────────────────────────
+
+export const OP17_110_CHARLOTTE_PEROSPERO: EffectSchema = {
+  card_id: "OP17-110",
+  card_name: "Charlotte Perospero",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_play_and_rush",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY", turn_restriction: "YOUR_TURN" },
+      actions: [
+        {
+          type: "PLAY_CARD",
+          target: {
+            type: "CHARACTER_CARD",
+            controller: "SELF",
+            source_zone: "HAND",
+            count: { up_to: 1 },
+            filter: { traits: ["Big Mom Pirates"], cost_max: 6 },
+          },
+          params: { source_zone: "HAND", cost_override: "FREE" },
+        },
+        {
+          type: "GRANT_KEYWORD",
+          target: { type: "SELF" },
+          params: { keyword: "RUSH" },
+          duration: { type: "THIS_TURN" },
+          chain: "THEN",
+        },
+      ],
+    },
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
+// ─── OP17-111 Charlotte Mont-d'or (Character) ──────────────────────────────
+
+export const OP17_111_CHARLOTTE_MONT_DOR: EffectSchema = {
+  card_id: "OP17-111",
+  card_name: "Charlotte Mont-d'or",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_reveal_ko",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      costs: [{ type: "REVEAL_FROM_HAND", amount: 2, filter: { has_trigger: true } }],
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 2 },
+            filter: { cost_max: 1 },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+  ],
+};
+
+// ─── OP17-112 Charlotte Linlin (Character) ─────────────────────────────────
+
+export const OP17_112_CHARLOTTE_LINLIN: EffectSchema = {
+  card_id: "OP17-112",
+  card_name: "Charlotte Linlin",
+  card_type: "Character",
+  effects: [
+    {
+      id: "your_turn_trigger_base_power",
+      category: "permanent",
+      modifiers: [
+        {
+          type: "SET_BASE_POWER",
+          target: {
+            type: "CHARACTER",
+            controller: "SELF",
+            count: { all: true },
+            filter: { has_trigger: true, base_power_exact: 4000 },
+          },
+          params: { value: 8000 },
+        },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "SELF" },
+      },
+    },
+    {
+      id: "on_play_draw_choose_life",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          type: "PLAYER_CHOICE",
+          params: {
+            mandatory: true,
+            labels: ["Add your top deck card to Life", "Take opponent's top Life"],
+            options: [
+              [
+                {
+                  // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
+                  type: "ADD_TO_LIFE_FROM_DECK",
+                  params: { amount: 1, position: "TOP", face: "DOWN" },
+                },
+              ],
+              [
+                {
+                  type: "LIFE_TO_HAND",
+                  target: { type: "OPPONENT_LIFE", count: { up_to: 1 } },
+                  params: { amount: 1, position: "TOP" },
+                },
+              ],
+            ],
+          },
+          chain: "THEN",
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-113 Streusen (Character) ─────────────────────────────────────────
+
+export const OP17_113_STREUSEN: EffectSchema = {
+  card_id: "OP17-113",
+  card_name: "Streusen",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_search_big_mom",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "SEARCH_DECK",
+          params: {
+            look_at: 3,
+            pick: { up_to: 1 },
+            filter: { traits: ["Big Mom Pirates"] },
+            rest_destination: "BOTTOM",
+          },
+        },
+      ],
+    },
+  ],
+};
+
+// ─── OP17-114 Sweet 3 Generals (Character) ─────────────────────────────────
+
+export const OP17_114_SWEET_3_GENERALS: EffectSchema = {
+  card_id: "OP17-114",
+  card_name: "Sweet 3 Generals",
+  card_type: "Character",
+  effects: [
+    {
+      id: "on_play_draw_life_debuff",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY", turn_restriction: "YOUR_TURN" },
+      costs: [{ type: "REST_DON", amount: 2 }],
+      actions: [
+        { type: "DRAW", params: { amount: 1 } },
+        {
+          // OPT-731: ADD_TO_LIFE_FROM_DECK cannot yet model printed “up to 1”.
+          type: "ADD_TO_LIFE_FROM_DECK",
+          params: { amount: 1, position: "TOP", face: "DOWN" },
+          chain: "THEN",
+        },
+        {
+          type: "MODIFY_POWER",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 2 } },
+          params: { amount: -3000 },
+          duration: { type: "THIS_TURN" },
+          chain: "THEN",
+        },
+      ],
+      flags: { optional: true },
+    },
+    {
+      id: "trigger_play_self",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [{ type: "PLAY_SELF" }],
+    },
+  ],
+};
+
 // ─── OP17-115 Don't You Know... There's Still a Code of Honor?!! (Event) ───
 
 export const OP17_115_CODE_OF_HONOR: EffectSchema = {
@@ -2572,6 +3937,54 @@ export const OP17_117_MASER_SABER: EffectSchema = {
   ],
 };
 
+// ─── OP17-119 Loki (Character) ─────────────────────────────────────────────
+
+export const OP17_119_LOKI: EffectSchema = {
+  card_id: "OP17-119",
+  card_name: "Loki",
+  card_type: "Character",
+  effects: [
+    {
+      id: "cost_increase",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_COST", target: { type: "SELF" }, params: { amount: 12 } },
+      ],
+    },
+    {
+      id: "opponent_turn_power",
+      category: "permanent",
+      modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 3000 } },
+      ],
+      duration: {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "OPPONENT" },
+      },
+    },
+    {
+      id: "on_play_ko_aggregate",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { any_number: true },
+            aggregate_constraint: {
+              property: "cost",
+              operator: "<=",
+              value: 4,
+            },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-001": OP17_001_EDWARD_NEWGATE,
   "OP17-002": OP17_002_ATMOS,
@@ -2618,14 +4031,47 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-048": OP17_048_SHIKI,
   "OP17-049": OP17_049_CHARLOTTE_LINLIN,
   "OP17-050": OP17_050_STREUSEN,
+  "OP17-052": OP17_052_DON_MARLON,
+  "OP17-053": OP17_053_BARBELL,
+  "OP17-054": OP17_054_MISS_BUCKINGHAM_STUSSY,
   "OP17-055": OP17_055_NO_AUTHORITY_LASTS_FOREVER,
   "OP17-056": OP17_056_ROCKS_PIRATES,
   "OP17-057": OP17_057_FULLALEAD,
   "OP17-058": OP17_058_KAIDO,
+  "OP17-059": OP17_059_ARAMAKI,
+  "OP17-060": OP17_060_ULTI_PAGE_ONE,
+  "OP17-061": OP17_061_LEAD_PERFORMERS,
+  "OP17-062": OP17_062_KAIDO,
+  "OP17-063": OP17_063_KAIDO,
+  "OP17-064": OP17_064_KING,
+  "OP17-065": OP17_065_QUEEN,
+  "OP17-066": OP17_066_KUROZUMI_OROCHI,
+  "OP17-067": OP17_067_KUROZUMI_KANJURO,
+  "OP17-068": OP17_068_SASAKI,
+  "OP17-069": OP17_069_JACK,
+  "OP17-071": OP17_071_WHOS_WHO,
+  "OP17-072": OP17_072_BLACK_MARIA,
+  "OP17-073": OP17_073_BASIL_HAWKINS,
+  "OP17-074": OP17_074_YAMATO,
+  "OP17-075": OP17_075_X_DRAKE,
   "OP17-076": OP17_076_I_THINK_IVE_SOBERED_UP,
   "OP17-077": OP17_077_KUNDALI_DRAGON_SWARM,
   "OP17-078": OP17_078_DRUNKEN_DRAGON_BAGUA,
   "OP17-079": OP17_079_MONKEY_D_LUFFY,
+  "OP17-080": OP17_080_USOPP,
+  "OP17-081": OP17_081_GERD,
+  "OP17-082": OP17_082_SANJI,
+  "OP17-083": OP17_083_JINBE,
+  "OP17-084": OP17_084_TONY_TONY_CHOPPER,
+  "OP17-085": OP17_085_DORRY,
+  "OP17-086": OP17_086_NAMI,
+  "OP17-087": OP17_087_NICO_ROBIN,
+  "OP17-089": OP17_089_JAGUAR_D_SAUL,
+  "OP17-090": OP17_090_FRANKY,
+  "OP17-091": OP17_091_BROOK,
+  "OP17-092": OP17_092_BROGY,
+  "OP17-093": OP17_093_MONKEY_D_LUFFY,
+  "OP17-094": OP17_094_RODO,
   "OP17-096": OP17_096_IM_LUFFY,
   "OP17-097": OP17_097_FEED_ON_THIS_RAGE,
   "OP17-098": OP17_098_GUM_GUM_KONG_GUN,
@@ -2637,6 +4083,14 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-105": OP17_105_CHARLOTTE_CHIFFON,
   "OP17-106": OP17_106_CHARLOTTE_SMOOTHIE,
   "OP17-107": OP17_107_CHARLOTTE_DAIFUKU,
+  "OP17-108": OP17_108_CHARLOTTE_BRULEE,
+  "OP17-109": OP17_109_CHARLOTTE_PUDDING,
+  "OP17-110": OP17_110_CHARLOTTE_PEROSPERO,
+  "OP17-111": OP17_111_CHARLOTTE_MONT_DOR,
+  "OP17-112": OP17_112_CHARLOTTE_LINLIN,
+  "OP17-113": OP17_113_STREUSEN,
+  "OP17-114": OP17_114_SWEET_3_GENERALS,
   "OP17-115": OP17_115_CODE_OF_HONOR,
   "OP17-117": OP17_117_MASER_SABER,
+  "OP17-119": OP17_119_LOKI,
 };
