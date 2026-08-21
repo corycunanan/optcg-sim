@@ -1,13 +1,14 @@
 import type {
   BattleContext,
   CardData,
+  CardInstance,
   GameEvent,
   GameState,
   LifeCard,
   PendingPromptState,
   TurnState,
 } from "../types.js";
-import { isEffectConditionMet } from "../engine/modifiers.js";
+import { getEffectivePower, isEffectConditionMet } from "../engine/modifiers.js";
 import { getEffectiveCounterValue } from "../engine/counter-value.js";
 import {
   filterStateForPlayer,
@@ -294,6 +295,32 @@ export function stripInactiveEffects(
     : { ...state, activeEffects: active };
 }
 
+function withVisibleFieldPower(
+  visible: GameState,
+  authoritative: GameState,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const decorate = (card: CardInstance): CardInstance => {
+    const data = cardDb.get(card.cardId);
+    return data
+      ? {
+          ...card,
+          basePower: data.power ?? 0,
+          effectivePower: getEffectivePower(card, data, authoritative, cardDb),
+        }
+      : card;
+  };
+
+  return {
+    ...visible,
+    players: visible.players.map((player) => ({
+      ...player,
+      leader: decorate(player.leader),
+      characters: player.characters.map((card) => card ? decorate(card) : null),
+    })) as GameState["players"],
+  };
+}
+
 /** Build the only state representation allowed to cross the socket boundary. */
 export function visibleStateForPlayer(
   state: GameState,
@@ -311,7 +338,7 @@ export function visibleStateForPlayer(
         : card;
     }),
   };
-  return { ...visible, players };
+  return withVisibleFieldPower({ ...visible, players }, state, cardDb);
 }
 
 /**
@@ -339,10 +366,14 @@ export function visibleStateForSpectator(
   const playerZeroView = filterStateForPlayer(stripped, 0);
   const playerOneView = filterStateForPlayer(stripped, 1);
 
-  return mergePlayerViewsForSpectator(
-    stripped,
-    playerZeroView,
-    playerOneView,
+  return withVisibleFieldPower(
+    mergePlayerViewsForSpectator(
+      stripped,
+      playerZeroView,
+      playerOneView,
+    ),
+    state,
+    cardDb,
   );
 }
 

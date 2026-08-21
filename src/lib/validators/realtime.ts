@@ -168,11 +168,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // The shared game protocol does not yet export runtime schemas. These guards
 // validate the fields consumed by this client; exhaustive shared schemas are
 // tracked as a follow-up so the worker and app cannot drift independently.
+const VisibleFieldCardSchema = z.looseObject({
+  basePower: z.number().optional(),
+  effectivePower: z.number().optional(),
+});
+const VisiblePlayerSchema = z.looseObject({
+  leader: VisibleFieldCardSchema,
+  characters: z.array(VisibleFieldCardSchema.nullable()),
+});
+const VisibleGameStateSchema = z.looseObject({
+  status: z.string(),
+  players: z.array(VisiblePlayerSchema),
+});
 const GameStateSchema = z.custom<GameState>(
-  (value) =>
-    isRecord(value) &&
-    typeof value.status === "string" &&
-    Array.isArray(value.players)
+  (value) => VisibleGameStateSchema.safeParse(value).success
 );
 const GameActionSchema = z.custom<GameAction>(
   (value) => isRecord(value) && typeof value.type === "string"

@@ -32,6 +32,10 @@ export interface CardInstance {
   owner: 0 | 1;
   /** Recipient-visible, server-computed Counter value for cards in their hand. */
   effectiveCounter?: number;
+  /** Printed power, published only for visible Leader and Character cards. */
+  basePower?: number;
+  /** Canonical server-computed power, published only for visible field cards. */
+  effectivePower?: number;
 }
 
 export interface LifeCard {

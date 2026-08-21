@@ -101,3 +101,55 @@ describe("GameServerMessageSchema spectator lifecycle", () => {
     }
   );
 });
+
+describe("GameServerMessageSchema visible field power", () => {
+  const state = {
+    status: "IN_PROGRESS",
+    players: [
+      {
+        leader: { basePower: 5000, effectivePower: 6000 },
+        characters: [{ basePower: 4000, effectivePower: 6000 }, null],
+      },
+      {
+        leader: { basePower: 5000, effectivePower: 5000 },
+        characters: [],
+      },
+    ],
+  };
+
+  it("accepts numeric field power and old snapshots without it", () => {
+    expect(
+      GameServerMessageSchema.safeParse({ type: "game:state", state }).success
+    ).toBe(true);
+    expect(
+      GameServerMessageSchema.safeParse({
+        type: "game:state",
+        state: {
+          ...state,
+          players: state.players.map((player) => ({
+            leader: {},
+            characters: player.characters.map((card) => card && {}),
+          })),
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it("rejects non-numeric field power", () => {
+    expect(
+      GameServerMessageSchema.safeParse({
+        type: "game:state",
+        state: {
+          ...state,
+          players: [
+            {
+              ...state.players[0],
+              leader: { basePower: 5000, effectivePower: "6000" },
+            },
+            state.players[1],
+          ],
+        },
+      }).success
+    ).toBe(false);
+  });
+});
