@@ -2,6 +2,8 @@
 
 > **Provisional source:** OP-17 effect text came from limitlesstcg.com, not the official OPTCG site. Revalidate this inventory after vegapull can pull the official set, expected around 2026-08-28. Limitless's page truncates OP17-105 at the second inline `[Trigger]` icon. The full text was restored on 2026-08-20 from [OPDeckGuide](https://opdeckguide.com/cards-list/OP17/) and [The Orc's Lair](https://theorcslair.com/products/product_511b162em7bw58k44ca8346vsq), independently verified, and adopted into the canonical dataset before merge. OP17-116's inline-reference misclassification was found and corrected on 2026-08-20; it belongs to the same corruption class as the four earlier inline-`[Trigger]` reference cards.
 
+> **Closure (2026-08-21):** The holding pattern closed via OPT-718 in PRs #581, #582, and #583. `op17.ts` now authors 106 of the 112 effect-bearing cards plus the trigger-only OP17-107, the regenerated manifest with 119 OP-17 entries is committed, the OPT-590 ratchet stands at 500, the OPT-603 sweep stands at 2,466, and `pnpm schema:check` is fully green. Six cards remain deferred to engine tickets: OP17-018 and OP17-116 (OPT-723), OP17-040 (OPT-724), OP17-041 (OPT-725), OP17-118 (OPT-726), and OP17-095 (OPT-732). Statements below describe the pre-closure state recorded during OPT-717.
+
 ## Outcome
 
 `pnpm --filter optcg-game schema:generate` produced 119 OP-17 base-card manifest entries. The generator collapsed the 157 source records by canonical card ID and preserved category, real-effect, and Trigger facts across variants.
