@@ -594,6 +594,56 @@ export const OP17_017_GA_HA_HA_HA: EffectSchema = {
   ],
 };
 
+// ─── OP17-018 The Power to Destroy the World (Event) ────────────────────────
+
+export const OP17_018_THE_POWER_TO_DESTROY_THE_WORLD: EffectSchema = {
+  card_id: "OP17-018",
+  card_name: "The Power to Destroy the World",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_ko_stage",
+      category: "activate",
+      trigger: { keyword: "MAIN_EVENT" },
+      costs: [{ type: "REST_DON", amount: 2 }],
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "STAGE",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+    {
+      id: "counter_high_power_characters",
+      category: "activate",
+      trigger: { keyword: "COUNTER_EVENT" },
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", base_power_min: 8000 },
+        count: { operator: ">=", value: 2 },
+      },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+          },
+          params: { amount: 4000 },
+          duration: { type: "THIS_BATTLE" },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP17-019 I Don't Have Time to Chat with Snot-Nosed Brats (Event) ───────
 
 export const OP17_019_I_DONT_HAVE_TIME_TO_CHAT: EffectSchema = {
@@ -3935,6 +3985,56 @@ export const OP17_115_CODE_OF_HONOR: EffectSchema = {
   ],
 };
 
+// ─── OP17-116 Fulgora (Event) ──────────────────────────────────────────────
+
+export const OP17_116_FULGORA: EffectSchema = {
+  card_id: "OP17-116",
+  card_name: "Fulgora",
+  card_type: "Event",
+  effects: [
+    {
+      id: "main_ko_stage",
+      category: "activate",
+      trigger: { keyword: "MAIN_EVENT" },
+      costs: [{ type: "REST_DON", amount: 2 }],
+      actions: [
+        {
+          type: "KO",
+          target: {
+            type: "STAGE",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+          },
+        },
+      ],
+      flags: { optional: true },
+    },
+    {
+      id: "counter_trigger_characters",
+      category: "activate",
+      trigger: { keyword: "COUNTER_EVENT" },
+      conditions: {
+        type: "CARD_ON_FIELD",
+        controller: "SELF",
+        filter: { card_type: "CHARACTER", has_trigger: true },
+        count: { operator: ">=", value: 2 },
+      },
+      actions: [
+        {
+          type: "MODIFY_POWER",
+          target: {
+            type: "LEADER_OR_CHARACTER",
+            controller: "SELF",
+            count: { up_to: 1 },
+          },
+          params: { amount: 4000 },
+          duration: { type: "THIS_BATTLE" },
+        },
+      ],
+    },
+  ],
+};
+
 // ─── OP17-117 Maser Saber (Event) ───────────────────────────────────────────
 
 export const OP17_117_MASER_SABER: EffectSchema = {
@@ -4125,6 +4225,7 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-015": OP17_015_MARCO,
   "OP17-016": OP17_016_RAKUYO,
   "OP17-017": OP17_017_GA_HA_HA_HA,
+  "OP17-018": OP17_018_THE_POWER_TO_DESTROY_THE_WORLD,
   "OP17-019": OP17_019_I_DONT_HAVE_TIME_TO_CHAT,
   "OP17-020": OP17_020_SHANKS,
   "OP17-021": OP17_021_CRONE_OLI,
@@ -4215,6 +4316,7 @@ export const OP17_SCHEMAS: Record<string, EffectSchema> = {
   "OP17-113": OP17_113_STREUSEN,
   "OP17-114": OP17_114_SWEET_3_GENERALS,
   "OP17-115": OP17_115_CODE_OF_HONOR,
+  "OP17-116": OP17_116_FULGORA,
   "OP17-117": OP17_117_MASER_SABER,
   "OP17-118": OP17_118_ROCKS_D_XEBEC,
   "OP17-119": OP17_119_LOKI,

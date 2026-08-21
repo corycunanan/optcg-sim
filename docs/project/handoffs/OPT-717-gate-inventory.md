@@ -10,6 +10,8 @@
 
 > **OPT-726 closure (2026-08-21):** OPT-726 authors OP17-118 after adding conditional HAND-zone self `COUNTER_GRANT` evaluation at counter time. The OPT-603 sweep advances to 2,467 cards, leaving OP17-018, OP17-040, OP17-041, OP17-095, and OP17-116 deferred to their sibling engine tickets.
 
+> **OPT-723 closure (2026-08-21):** OPT-723 adds Stage K.O. field transitions with KO events, replacement interception, and Character-only trigger filtering. It authors the full OP17-018 and OP17-116 Main and Counter effects without Trigger blocks, advances the OPT-603 sweep to 2,470 cards, and leaves OP17-041 and OP17-095 deferred to sibling engine tickets.
+
 ## Official reconciliation delta inventory
 
 | Field                     |                                Records | Official delta                                                                                                                                                  | Disposition                                                                                                  |

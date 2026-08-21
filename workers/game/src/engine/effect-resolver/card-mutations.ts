@@ -20,7 +20,7 @@ export function koCharacter(
     position: "TOP",
     preserveSourceTriggers: true,
   });
-  if (!moved || moved.fact.source !== "CHARACTER") return null;
+  if (!moved || !["CHARACTER", "STAGE"].includes(moved.fact.source)) return null;
   const owner = moved.fact.owner;
   return {
     state: moved.state,
@@ -35,6 +35,7 @@ export function koCharacter(
         cause: causingController !== owner ? "OPPONENT_EFFECT" : "EFFECT",
         causingController,
         preKO_donCount: moved.fact.detachedDonInstanceIds.length,
+        ...(moved.fact.source === "STAGE" ? { cardType: "STAGE" as const } : {}),
       },
     }],
   };
