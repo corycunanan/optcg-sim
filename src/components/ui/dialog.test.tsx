@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -8,6 +9,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  DialogTrigger,
 } from "./dialog";
 
 afterEach(cleanup);
@@ -32,6 +34,38 @@ function renderDialog(
 }
 
 describe("DialogContent", () => {
+  it("animates the real Radix overlay and content through data-state", async () => {
+    const user = userEvent.setup();
+    render(
+      <Dialog>
+        <DialogTrigger>Open dialog</DialogTrigger>
+        <DialogContent>
+          <DialogTitle>Dialog title</DialogTitle>
+          <DialogDescription>Dialog description</DialogDescription>
+        </DialogContent>
+      </Dialog>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open dialog" }));
+
+    const overlay = document.querySelector<HTMLElement>(
+      '[data-slot="dialog-overlay"]'
+    );
+    const content = screen.getByRole("dialog");
+
+    for (const element of [overlay, content]) {
+      expect(element?.getAttribute("data-state")).toBe("open");
+      expect(element?.matches('[data-state="open"]')).toBe(true);
+      expect(element?.hasAttribute("data-open")).toBe(false);
+      expect(element?.hasAttribute("data-closed")).toBe(false);
+
+      const classes = element?.className.split(/\s+/) ?? [];
+      expect(classes).toContain("data-[state=open]:animate-in");
+      expect(classes).not.toContain("data-open:animate-in");
+      expect(classes).not.toContain("data-closed:animate-out");
+    }
+  });
+
   it("uses the shared modal chrome and default width", () => {
     const classes = renderDialog()?.className.split(/\s+/);
 

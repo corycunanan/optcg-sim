@@ -395,6 +395,7 @@ if (IS_MAIN) {
 
     for (const violation of findClassTokenViolations(source, {
       includeTypeFloor: !typeFloorExempt,
+      includeDeadRadixStateVariants: !path.endsWith(".test.tsx"),
     })) {
       addViolation(
         path,
@@ -626,9 +627,27 @@ function isShapeVocabularyToken(token, vocabulary) {
  */
 export function findClassTokenViolations(
   source,
-  { includeTypeFloor = true, vocabulary = SHAPE_VOCABULARY } = {}
+  {
+    includeTypeFloor = true,
+    includeDeadRadixStateVariants = true,
+    vocabulary = SHAPE_VOCABULARY,
+  } = {}
 ) {
   const violations = [];
+
+  const reportDeadRadixStateVariant = (token, index) => {
+    const deadRadixStateVariant = [
+      "data-open:",
+      "data-closed:",
+      "data-popup-open:",
+    ].find((variant) => token.includes(variant));
+    if (!includeDeadRadixStateVariants || !deadRadixStateVariant) return;
+    violations.push({
+      index,
+      rule: "radix-data-state",
+      message: `dead Radix variant ${JSON.stringify(deadRadixStateVariant)} in ${JSON.stringify(token)}; use data-[state=open]: or data-[state=closed]:`,
+    });
+  };
 
   const report = (token, index) => {
     if (includeTypeFloor && TYPE_FLOOR_CLASS_TOKENS.has(token)) {
@@ -661,11 +680,17 @@ export function findClassTokenViolations(
 
   forEachClassPosition(source, {
     onLiteral: (node, index) => {
-      for (const token of classTokenNames(node.text)) report(token, index);
+      for (const rawToken of node.text.split(/\s+/).filter(Boolean)) {
+        reportDeadRadixStateVariant(rawToken, index);
+        report(normalizeClassToken(rawToken), index);
+      }
     },
     // A class list assembled around interpolations still contributes its static
     // halves verbatim, so `` className={`shadow ${extra}`} `` is a real `shadow`.
-    onStaticToken: report,
+    onStaticToken: (token, index) => {
+      reportDeadRadixStateVariant(token, index);
+      report(normalizeClassToken(token), index);
+    },
     onDynamic: () => {},
   });
 
@@ -861,8 +886,7 @@ function templateStaticTokens(node, sourceFile) {
 
     const index = fragment.node.getStart(sourceFile);
     for (const chunk of chunks) {
-      const token = normalizeClassToken(chunk);
-      if (token) tokens.push({ token, index });
+      if (chunk) tokens.push({ token: chunk, index });
     }
   }
 
