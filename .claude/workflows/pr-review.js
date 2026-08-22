@@ -218,7 +218,7 @@ const ticketId = (A.ticket || scope.ticketId || '').toUpperCase().match(/OPT-\d+
 let ticket = null
 if (ticketId) {
   ticket = await agent(
-    `Fetch Linear issue ${ticketId}: load the tool with ToolSearch "select:mcp__claude_ai_Linear__get_issue", call it, and write a markdown file to ${TICKET_FILE} containing the issue identifier, title, description (verbatim, including acceptance criteria and "not in scope" sections), labels, and any comments that amend the spec. Return found=true with the path on success. If the tool is unavailable or the issue does not exist, return found=false and write nothing.`,
+    `Fetch Linear issue ${ticketId}: load both tools with ToolSearch "select:mcp__claude_ai_Linear__get_issue,mcp__claude_ai_Linear__list_comments", call get_issue and then list_comments for the same issue (comments are NOT included in get_issue), and write a markdown file to ${TICKET_FILE} containing the issue identifier, title, description (verbatim, including acceptance criteria and "not in scope" sections), labels, and a "Comments" section with every comment verbatim in chronological order — decisions that amend the spec often live only there. Return found=true with the path on success. If get_issue is unavailable or the issue does not exist, return found=false and write nothing; if only list_comments fails, still write the file and note "comments unavailable" in it.`,
     { model: 'haiku', effort: 'low', label: `fetch-ticket:${ticketId}`, phase: 'Scope',
       schema: { type: 'object', properties: { found: { type: 'boolean' }, path: { type: 'string' } }, required: ['found', 'path'], additionalProperties: false } }
   )
@@ -254,14 +254,21 @@ const lensErrors = reviews.filter(Boolean).filter(r => r.notes).map(r => `${r.le
 if (lensErrors.length) log(`Lens caveats: ${lensErrors.join(' | ')}`)
 
 const all = reviews.filter(Boolean).flatMap(r => r.findings.map(f => ({ ...f, lens: r.lens })))
-const seen = new Set()
-const deduped = all.filter(f => {
-  // file:line only — two lenses describing the same bug word titles differently
+// file:line only — two lenses describing the same bug word titles differently.
+// Keep the STRONGEST finding per location (severity, then evidence rung), not
+// the first-listed: lens order would otherwise let a minor spec note mask a
+// critical correctness finding on the same line.
+const rank = { critical: 0, major: 1, minor: 2 }
+const byLoc = new Map()
+for (const f of all) {
   const key = `${f.file}:${f.line || 0}`
-  if (seen.has(key)) return false
-  seen.add(key)
-  return true
-})
+  const cur = byLoc.get(key)
+  const stronger = !cur
+    || (rank[f.severity] ?? 3) < (rank[cur.severity] ?? 3)
+    || ((rank[f.severity] ?? 3) === (rank[cur.severity] ?? 3) && (f.rung ?? 1) > (cur.rung ?? 1))
+  if (stronger) byLoc.set(key, f)
+}
+const deduped = [...byLoc.values()]
 log(`${all.length} raw findings → ${deduped.length} after dedup`)
 if (!deduped.length) {
   return { confirmed: [], areas, lensesRun: selected.map(l => l.key), lensErrors, summary: scope.summary }
@@ -342,7 +349,6 @@ if (A.claudeVerify === false) {
 }
 log(`${confirmed.length} confirmed, ${claudeRefuted.length} refuted by Claude gate`)
 
-const rank = { critical: 0, major: 1, minor: 2 }
 confirmed.sort((a, b) => (rank[a.severity] ?? 3) - (rank[b.severity] ?? 3))
 
 return {

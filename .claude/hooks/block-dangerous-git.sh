@@ -18,16 +18,21 @@ COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 
 if printf '%s' "$COMMAND" | grep -qE '^[[:space:]]*GIT_GUARDRAILS_OK=1[[:space:]]'; then exit 0; fi
 
-# `git` plus any global options (-C <dir>, -c key=val, --git-dir=..., etc.)
-# before the subcommand, then the subcommand plus any options before the
-# argument that makes it destructive.
-G='(^|[^[:alnum:]_./-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|-[a-zA-Z]|--[a-z-]+(=[^[:space:]]*)?))*[[:space:]]+'
+# `git` (bare or by path) plus any global options (-C <dir>, -c key=val,
+# --git-dir=<x>, --git-dir <x>, --no-pager, ...) before the subcommand, then the
+# subcommand plus any options before the argument that makes it destructive.
+# The scan is textual over the whole command string: a quoted mention of a
+# guarded command (grep/echo) also trips it — a false positive costs one bypass
+# prefix, a false negative costs work.
+G='(^|[^[:alnum:]_.-])([^[:space:]]*/)?git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|-[a-zA-Z]|--[a-z-]+(=[^[:space:]]*|[[:space:]]+[^[:space:]-][^[:space:]]*)?))*[[:space:]]+'
 O='([[:space:]]+-[^[:space:]]+)*[[:space:]]+'
+A='([[:space:]]+[^[:space:]]+)*[[:space:]]+'   # any arguments
 
 # Patterns are extended regexes matched against the whole command string.
 DANGEROUS_PATTERNS=(
-  "${G}restore([[:space:]]|\$)"                                  # git restore <anything>, incl. --staged
-  "${G}checkout${O}(--([[:space:]]|\$)|\.([[:space:]]|\$))"     # git checkout [-opts] -- <path> / git checkout .
+  "${G}restore([[:space:]]|$)"                                  # git restore <anything>, incl. --staged
+  "${G}checkout${A}(--|\\.)([[:space:]]|$)"                       # git checkout [ref] -- <path> / git checkout .
+  "${G}checkout${O}(-f|--force|-[a-zA-Z]*f[a-zA-Z]*)([[:space:]]|$)"  # git checkout -f <ref>
   "${G}reset${O}(--hard|--merge)"                                 # git reset [-q] --hard|--merge
   "${G}clean${O}(-[a-zA-Z]*[fx]|--force)"                         # git clean -f / -fd / -x / --force
   "${G}branch${O}(-D|--delete${O}--force|--force${O}--delete|-[a-zA-Z]*D)"
