@@ -36,7 +36,7 @@ DANGEROUS_PATTERNS=(
   "${G}reset${O}(--hard|--merge)"                                 # git reset [-q] --hard|--merge
   "${G}clean${O}(-[a-zA-Z]*[fx]|--force)"                         # git clean -f / -fd / -x / --force
   "${G}branch${O}(-D|--delete${O}--force|--force${O}--delete|-[a-zA-Z]*D)"
-  "${G}push${O}(-f|--force|--force-with-lease)([[:space:]]|=|\$)"  # force flags
+  "${G}push${A}(-f|--force|--force-with-lease)([[:space:]]|=|\$)"  # force flags, before or after refs
   "${G}push([[:space:]]+[^[:space:]]+)*[[:space:]]+\+[^[:space:]]+"  # forced refspec: push origin +main
   "${G}stash${O}(drop|clear)"
   "${G}worktree${O}remove${O}(--force|-f)"
