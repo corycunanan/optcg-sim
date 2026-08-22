@@ -214,10 +214,6 @@ const areas = scope.areas
 if (!scope.files.length) {
   return { confirmed: [], skipped: `empty diff for ${DIFF_CMD} — nothing to review`, summary: scope.summary }
 }
-if (areas.length === 1 && areas[0] === 'docs') {
-  return { confirmed: [], skipped: 'docs-only diff, no review lenses apply', summary: scope.summary }
-}
-
 const ticketId = (A.ticket || scope.ticketId || '').toUpperCase().match(/OPT-\d+/)?.[0] || ''
 let ticket = null
 if (ticketId) {
@@ -231,7 +227,15 @@ if (ticketId) {
   log('No Linear ticket ID in PR/branch — spec-fidelity lens skipped')
 }
 
-const selected = LENSES.filter(l => l.when === 'always' || (l.when === 'ticket' ? !!ticket?.found : l.when.some(a => areas.includes(a))))
+const docsOnly = areas.length === 1 && areas[0] === 'docs'
+if (docsOnly && !ticket?.found) {
+  return { confirmed: [], skipped: 'docs-only diff with no ticket, no review lenses apply', summary: scope.summary }
+}
+// Docs-only diffs with a ticket still get the spec-fidelity lens (did the docs
+// change cover what the ticket asked?) but no code lenses.
+const selected = LENSES.filter(l => docsOnly
+  ? l.when === 'ticket'
+  : (l.when === 'always' || (l.when === 'ticket' ? !!ticket?.found : l.when.some(a => areas.includes(a)))))
 log(`Areas: ${areas.join(', ')} → lenses: ${selected.map(l => `${l.key}(${l.model.replace('gpt-5.6-', '')})`).join(', ')}`)
 
 // ---- Phase 2: Review (barrier — dedup needs all findings before verify) -----
@@ -283,15 +287,19 @@ const stage1 = await parallel(candidates.map(f => () =>
     effort: 'high',
     sandbox: 'read-only',
     schema: VERDICT_SCHEMA,
-    fallback: '{"refuted": false, "reasoning": "codex refute unavailable: <error text>"}',
+    fallback: '{"refuted": false, "reasoning": "codex refute unavailable: <error text>", "rung": 1}',
     task: `You are an adversarial verifier of a code-review finding in this repository (One Piece TCG simulator; game engine in workers/game, official rules in docs/rules/, card text in docs/cards/${f.lens === 'spec-fidelity' ? `; the originating ticket is at ${TICKET_FILE}` : ''}). Try to REFUTE it: read the actual code and, for rules claims, the official text. Default to refuted=true if the evidence does not hold up, the scenario is unreachable, or the behavior is intended. ${LADDER} A refutation at rung 1-3 is not decisive: if you cannot get to rung 4 cheaply, say so and lean on the finding's own rung — a rung 4-5 finding survives a rung 1-3 refutation. Keep reasoning to one short paragraph.\n\nFinding (lens: ${f.lens}, severity: ${f.severity}, rung: ${f.rung})\nFile: ${f.file}${f.line ? `:${f.line}` : ''}\nTitle: ${f.title}\nDetail: ${f.detail}`,
   }), { model: 'haiku', effort: 'low', schema: VERDICT_SCHEMA, label: `refute:${f.title.slice(0, 30)}`, phase: 'Verify' })
-    .then(v => v && { ...f, codexVerdict: v })
+    .then(v => ({ ...f, codexVerdict: v || { refuted: false, reasoning: 'codex refute agent failed — unverified', rung: 1 } }))
 ))
 
+// A refutation only counts when it out-evidences the finding: rung 4-5 kills
+// anything; rung 1-3 kills only a finding that is itself rung 1-3.
+const decisive = (finding, verdict) => verdict.refuted && ((verdict.rung ?? 1) >= 4 || (finding.rung ?? 1) <= 3)
+
 const s1 = stage1.filter(Boolean)
-const s1Refuted = s1.filter(f => f.codexVerdict.refuted)
-const survivors = s1.filter(f => !f.codexVerdict.refuted)
+const s1Refuted = s1.filter(f => decisive(f, f.codexVerdict))
+const survivors = s1.filter(f => !decisive(f, f.codexVerdict))
 log(`Codex refute gate: ${s1Refuted.length} killed, ${survivors.length} survive`)
 
 const codexOnly = survivors.filter(f => f.severity === 'minor')
@@ -313,20 +321,24 @@ if (A.claudeVerify === false) {
       { model: 'sonnet', effort: 'high', schema: GROUP_VERDICT_SCHEMA, label: `verify:${file.split('/').pop()}`, phase: 'Verify' }
     ).then(r => r && { fs, verdicts: r.verdicts })
   ))
+  // Results cross the workflow runtime as clones, so track coverage by key,
+  // not object identity (identity tracking double-counted findings in run
+  // wf_040a675d-284).
+  const fkey = f => `${f.file}:${f.line || 0}:${f.title}`
   const covered = new Set()
   for (const g of groupResults.filter(Boolean)) {
     for (const v of g.verdicts) {
       const f = g.fs[v.index]
-      if (!f) continue
-      covered.add(f)
-      if (v.refuted) claudeRefuted.push({ ...f, verdict: v })
+      if (!f || covered.has(fkey(f))) continue
+      covered.add(fkey(f))
+      if (decisive(f, v)) claudeRefuted.push({ ...f, verdict: v })
       else confirmed.push({ ...f, verdict: v })
     }
   }
   // A failed/partial group agent must not silently drop findings — pass them
   // through flagged as codex-verified only.
-  confirmed.push(...toConfirm.filter(f => !covered.has(f))
-    .map(f => ({ ...f, verdict: { refuted: false, reasoning: 'claude verify unavailable — codex-verified only' } })))
+  confirmed.push(...toConfirm.filter(f => !covered.has(fkey(f)))
+    .map(f => ({ ...f, verdict: { refuted: false, reasoning: 'claude verify unavailable — codex-verified only', rung: 1 } })))
 }
 log(`${confirmed.length} confirmed, ${claudeRefuted.length} refuted by Claude gate`)
 

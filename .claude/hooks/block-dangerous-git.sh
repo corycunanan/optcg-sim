@@ -7,25 +7,34 @@
 # commands are never needed by the ticket/orchestrate pipeline, which merges via
 # `gh pr merge` and syncs with `git branch -f main origin/main`.
 #
-# Bypass: prefix the command with `GIT_GUARDRAILS_OK=1 ` after looking at what
-# the target holds (`git status`, `git stash list`) and saying so in the reply.
+# Bypass: prefix the whole command with `GIT_GUARDRAILS_OK=1 ` after looking at
+# what the target holds (`git status`, `git stash list`) and saying so in the
+# reply. Only a leading prefix counts; the token elsewhere in the command is
+# ignored.
 
 INPUT=$(cat)
 COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 [ -z "$COMMAND" ] && exit 0
 
-case "$COMMAND" in *GIT_GUARDRAILS_OK=1*) exit 0 ;; esac
+if printf '%s' "$COMMAND" | grep -qE '^[[:space:]]*GIT_GUARDRAILS_OK=1[[:space:]]'; then exit 0; fi
+
+# `git` plus any global options (-C <dir>, -c key=val, --git-dir=..., etc.)
+# before the subcommand, then the subcommand plus any options before the
+# argument that makes it destructive.
+G='(^|[^[:alnum:]_./-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|-[a-zA-Z]|--[a-z-]+(=[^[:space:]]*)?))*[[:space:]]+'
+O='([[:space:]]+-[^[:space:]]+)*[[:space:]]+'
 
 # Patterns are extended regexes matched against the whole command string.
 DANGEROUS_PATTERNS=(
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?restore[[:space:]]'        # git restore <anything>, incl. --staged
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?checkout[[:space:]]+(--|\.)'  # git checkout -- <path> / git checkout .
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?reset[[:space:]]+(--hard|--merge)'
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?clean[[:space:]]+-[a-zA-Z]*[fx]'
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?branch[[:space:]]+(-D|--delete[[:space:]]+--force)'
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?push[[:space:]]+(.*[[:space:]])?(-f|--force|--force-with-lease)([[:space:]]|$)'
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?stash[[:space:]]+(drop|clear)'
-  'git[[:space:]]+(-C[[:space:]]+[^[:space:]]+[[:space:]]+)?worktree[[:space:]]+remove[[:space:]].*--force'
+  "${G}restore([[:space:]]|\$)"                                  # git restore <anything>, incl. --staged
+  "${G}checkout${O}(--([[:space:]]|\$)|\.([[:space:]]|\$))"     # git checkout [-opts] -- <path> / git checkout .
+  "${G}reset${O}(--hard|--merge)"                                 # git reset [-q] --hard|--merge
+  "${G}clean${O}(-[a-zA-Z]*[fx]|--force)"                         # git clean -f / -fd / -x / --force
+  "${G}branch${O}(-D|--delete${O}--force|--force${O}--delete|-[a-zA-Z]*D)"
+  "${G}push${O}(-f|--force|--force-with-lease)([[:space:]]|=|\$)"  # force flags
+  "${G}push([[:space:]]+[^[:space:]]+)*[[:space:]]+\+[^[:space:]]+"  # forced refspec: push origin +main
+  "${G}stash${O}(drop|clear)"
+  "${G}worktree${O}remove${O}(--force|-f)"
 )
 
 for pattern in "${DANGEROUS_PATTERNS[@]}"; do
