@@ -11,8 +11,84 @@ import {
   filterStateForPlayer,
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
-import { visibleStateForSpectator } from "../session/visibility.js";
-import { setupGame, advanceToPhase } from "./factories.js";
+import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
+import type { RuntimeActiveEffect } from "../engine/effect-types.js";
+import { registerPermanentEffectsForCard } from "../engine/triggers.js";
+import {
+  visibleStateForPlayer,
+  visibleStateForSpectator,
+} from "../session/visibility.js";
+import type { CardData, CardInstance, PlayerState } from "../types.js";
+import {
+  CARDS,
+  setupGame,
+  advanceToPhase,
+  createBattleReadyState,
+  createTestCardDb,
+} from "./factories.js";
+
+function fieldPowerState() {
+  const cardDb = createTestCardDb();
+  const throneData: CardData = {
+    ...CARDS.STAGE,
+    id: "OP13-099",
+    name: "The Empty Throne",
+    effectSchema: OP13_099_THE_EMPTY_THRONE,
+  };
+  cardDb.set(throneData.id, throneData);
+
+  let state = createBattleReadyState(cardDb);
+  const throne: CardInstance = {
+    instanceId: "opt744-empty-throne",
+    cardId: throneData.id,
+    zone: "STAGE",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: 1,
+    controller: 0,
+    owner: 0,
+  };
+  const character = state.players[0].characters[0]!;
+  const attachedDon = (card: CardInstance, prefix: string) =>
+    [0, 1].map((index) => ({
+      instanceId: `opt744-${prefix}-don-${index}`,
+      state: "RESTED" as const,
+      attachedTo: card.instanceId,
+    }));
+  const attachedCharacter: CardInstance = {
+    ...character,
+    attachedDon: attachedDon(character, "character"),
+  };
+  const trash = Array.from({ length: 22 }, (_, index): CardInstance => ({
+    instanceId: `opt744-trash-${index}`,
+    cardId: CARDS.VANILLA.id,
+    zone: "TRASH",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: 1,
+    controller: 0,
+    owner: 0,
+  }));
+  const players = [...state.players] as [PlayerState, PlayerState];
+  players[0] = {
+    ...players[0],
+    leader: {
+      ...players[0].leader,
+      attachedDon: attachedDon(players[0].leader, "leader"),
+    },
+    stage: throne,
+    trash,
+    characters: [attachedCharacter, ...players[0].characters.slice(1)],
+  };
+  state = {
+    ...state,
+    players,
+    turn: { ...state.turn, activePlayerIndex: 0 },
+  };
+  state = registerPermanentEffectsForCard(state, throne, throneData);
+
+  return { state, cardDb };
+}
 
 describe("filterStateForPlayer", () => {
   function getMainPhaseState() {
@@ -264,6 +340,121 @@ describe("filterStateForPlayer", () => {
   });
 });
 
+describe("visible field power", () => {
+  it("publishes canonical power to both players and spectators without decorating hidden zones", () => {
+    const { state, cardDb } = fieldPowerState();
+    const ownLeaderBase = cardDb.get(state.players[0].leader.cardId)!.power!;
+    const opponentLeaderBase = cardDb.get(state.players[1].leader.cardId)!.power!;
+    const characterBase = cardDb.get(state.players[0].characters[0]!.cardId)!.power!;
+
+    for (const visible of [
+      visibleStateForPlayer(state, cardDb, 0),
+      visibleStateForPlayer(state, cardDb, 1),
+      visibleStateForSpectator(state, cardDb),
+    ]) {
+      const ownLeader = visible.players[0].leader;
+      const opponentLeader = visible.players[1].leader;
+      const character = visible.players[0].characters[0]!;
+
+      expect(ownLeader.basePower).toBe(ownLeaderBase);
+      expect(ownLeader.effectivePower).toBe(ownLeaderBase + 3000);
+      expect(ownLeader.powerDelta).toBe(1000);
+      expect(opponentLeader.basePower).toBe(opponentLeaderBase);
+      expect(opponentLeader.effectivePower).toBe(opponentLeaderBase);
+      expect(opponentLeader.powerDelta).toBe(0);
+      expect(character.basePower).toBe(characterBase);
+      expect(character.effectivePower).toBe(characterBase + 2000);
+      expect(character.powerDelta).toBe(0);
+
+      for (const hiddenZoneCard of [
+        ...visible.players[0].hand,
+        ...visible.players[0].deck,
+        ...visible.players[0].trash,
+        ...visible.players[0].removedFromGame,
+      ]) {
+        expect(hiddenZoneCard.basePower).toBeUndefined();
+        expect(hiddenZoneCard.effectivePower).toBeUndefined();
+        expect(hiddenZoneCard.powerDelta).toBeUndefined();
+      }
+      expect(visible.players[0].stage?.basePower).toBeUndefined();
+      expect(visible.players[0].stage?.effectivePower).toBeUndefined();
+      expect(visible.players[0].stage?.powerDelta).toBeUndefined();
+      for (const lifeCard of visible.players[0].life) {
+        expect("basePower" in lifeCard).toBe(false);
+        expect("effectivePower" in lifeCard).toBe(false);
+      }
+    }
+
+    const opponentTurn = {
+      ...state,
+      turn: { ...state.turn, activePlayerIndex: 1 as const },
+    };
+    const opponentTurnView = visibleStateForPlayer(opponentTurn, cardDb, 0);
+    const opponentTurnLeader = opponentTurnView.players[0].leader;
+    const opponentTurnCharacter = opponentTurnView.players[0].characters[0]!;
+
+    expect(opponentTurnLeader.effectivePower).toBe(ownLeaderBase);
+    expect(opponentTurnLeader.powerDelta).toBe(0);
+    expect(opponentTurnCharacter.effectivePower).toBe(characterBase);
+    expect(opponentTurnCharacter.powerDelta).toBe(0);
+  });
+
+  it("evaluates hidden-zone modifier conditions against authoritative state", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const hiddenHandCharacter: CardInstance = {
+      instanceId: "opt744-hidden-hand-character",
+      cardId: CARDS.VANILLA.id,
+      zone: "HAND",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: null,
+      controller: 0,
+      owner: 0,
+    };
+    const hiddenHandEffect: RuntimeActiveEffect = {
+      id: "opt744-hidden-hand-power",
+      sourceCardInstanceId: state.players[0].leader.instanceId,
+      sourceEffectBlockId: "opt744-hidden-hand-power",
+      category: "permanent",
+      modifiers: [{
+        type: "MODIFY_POWER",
+        target: { type: "YOUR_LEADER" },
+        params: { amount: 1000 },
+      }],
+      conditions: {
+        type: "CARD_TYPE_IN_ZONE",
+        controller: "SELF",
+        card_type: "CHARACTER",
+        zone: "HAND",
+        operator: ">=",
+        value: 1,
+      },
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: 1,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = { ...players[0], hand: [hiddenHandCharacter] };
+    const authoritative = {
+      ...state,
+      players,
+      activeEffects: [...state.activeEffects, hiddenHandEffect],
+    };
+    const basePower = cardDb.get(authoritative.players[0].leader.cardId)!.power!;
+    const opponentView = visibleStateForPlayer(authoritative, cardDb, 1);
+    const spectatorView = visibleStateForSpectator(authoritative, cardDb);
+
+    expect(opponentView.players[0].hand[0].cardId).toBe("hidden");
+    expect(opponentView.players[0].leader.effectivePower).toBe(basePower + 1000);
+    expect(opponentView.players[0].leader.powerDelta).toBe(1000);
+    expect(spectatorView.players[0].leader.effectivePower).toBe(basePower + 1000);
+    expect(spectatorView.players[0].leader.powerDelta).toBe(1000);
+  });
+});
+
 describe("visibleStateForSpectator", () => {
   function getMainPhaseState() {
     const { state, cardDb } = setupGame();
@@ -341,9 +532,9 @@ describe("visibleStateForSpectator", () => {
 
     for (const playerIndex of [0, 1] as const) {
       expect(spectator.players[playerIndex].leader)
-        .toEqual(state.players[playerIndex].leader);
+        .toMatchObject(state.players[playerIndex].leader);
       expect(spectator.players[playerIndex].characters)
-        .toEqual(state.players[playerIndex].characters);
+        .toMatchObject(state.players[playerIndex].characters);
       expect(spectator.players[playerIndex].stage)
         .toEqual(state.players[playerIndex].stage);
       expect(spectator.players[playerIndex].trash)
