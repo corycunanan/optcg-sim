@@ -14,7 +14,10 @@ import {
   isModifierConditionMet,
   modifierAppliesToCard,
 } from "../engine/modifiers.js";
-import { isProhibitionConditionMet } from "../engine/prohibitions.js";
+import {
+  isProhibitionConditionMet,
+  isProhibitionOverridden,
+} from "../engine/prohibitions.js";
 import { getEffectiveCounterValue } from "../engine/counter-value.js";
 import {
   filterStateForPlayer,
@@ -307,8 +310,10 @@ export function stripInactiveProhibitions(
   cardDb: Map<string, CardData>
 ): GameState {
   const prohibitions = state.prohibitions;
-  const active = prohibitions.filter((prohibition) =>
-    isProhibitionConditionMet(prohibition, state, cardDb)
+  const active = prohibitions.filter(
+    (prohibition) =>
+      isProhibitionConditionMet(prohibition, state, cardDb) &&
+      !isProhibitionOverridden(prohibition, state, cardDb),
   );
   return active.length === prohibitions.length
     ? state

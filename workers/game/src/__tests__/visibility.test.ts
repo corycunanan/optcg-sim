@@ -15,7 +15,11 @@ import { hasRuntimeKeyword } from "../../../../shared/effective-keyword.js";
 import { hasGrantedKeyword } from "../engine/modifiers.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import { OP11_046_VINSMOKE_YONJI } from "../engine/schemas/op11.js";
-import type { EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
+import type {
+  EffectSchema,
+  RuntimeActiveEffect,
+  RuntimeProhibition,
+} from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 import {
@@ -886,5 +890,38 @@ describe("conditional prohibition visibility", () => {
       .toHaveLength(2);
     expect(visibleStateForSpectator(active.state, active.cardDb).prohibitions)
       .toHaveLength(2);
+  });
+
+  it("omits a prohibition with a true conditional override", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const prohibition = (id: string, operator: ">=" | "<") => ({
+      id,
+      sourceCardInstanceId: state.players[0].leader.instanceId,
+      prohibitionType: "CANNOT_ACTIVATE_BLOCKER",
+      controller: 0,
+      appliesTo: [state.players[0].characters[0]!.instanceId],
+      scope: {},
+      usesRemaining: null,
+      conditionalOverride: {
+        type: "HAND_COUNT",
+        controller: "SELF",
+        operator,
+        value: 0,
+      },
+    }) as RuntimeProhibition;
+    const stateWithOverrides = {
+      ...state,
+      prohibitions: [
+        prohibition("true-override", ">="),
+        prohibition("false-override", "<"),
+      ],
+    };
+
+    expect(
+      visibleStateForPlayer(stateWithOverrides, cardDb, 0).prohibitions.map(
+        ({ id }) => id,
+      ),
+    ).toEqual(["false-override"]);
   });
 });

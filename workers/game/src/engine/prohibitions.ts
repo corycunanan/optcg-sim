@@ -51,6 +51,24 @@ function evaluateConditionalOverride(
   );
 }
 
+export function isProhibitionOverridden(
+  prohibition: RuntimeProhibition,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (!prohibition.conditionalOverride) return false;
+  const ctx: ConditionContext = {
+    sourceCardInstanceId: prohibition.sourceCardInstanceId,
+    controller: prohibition.controller,
+    cardDb,
+  };
+  return evaluateConditionalOverride(
+    state,
+    prohibition.conditionalOverride,
+    ctx,
+  );
+}
+
 // ─── Match-time resolution (OPT-451) ─────────────────────────────────────────
 //
 // Permanent prohibitions with population targets (e.g. P-084's "all Characters
@@ -204,18 +222,7 @@ export function checkProhibitions(
     if (!isProhibitionConditionMet(prohibition, state, cardDb)) continue;
 
     // Check conditional override
-    if (prohibition.conditionalOverride) {
-      const ctx: ConditionContext = {
-        sourceCardInstanceId: prohibition.sourceCardInstanceId,
-        controller: prohibition.controller,
-        cardDb,
-      };
-      if (
-        evaluateConditionalOverride(state, prohibition.conditionalOverride, ctx)
-      ) {
-        continue; // Override active — skip this prohibition
-      }
-    }
+    if (isProhibitionOverridden(prohibition, state, cardDb)) continue;
 
     const veto = matchesProhibition(prohibition, action, state, cardDb, actingPlayerIndex);
     if (veto) return veto;

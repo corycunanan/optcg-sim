@@ -127,6 +127,15 @@ function costEffect(instanceId: string, amount: number): ActiveEffect {
   };
 }
 
+function setCostEffect(instanceId: string, value: number): ActiveEffect {
+  return {
+    id: `set-cost-${instanceId}`,
+    sourceCardInstanceId: "source-1",
+    appliesTo: [instanceId],
+    modifiers: [{ type: "SET_COST", params: { value } }],
+  };
+}
+
 function renderBlockerEligibility({
   character,
   activeEffects = [],
@@ -303,6 +312,21 @@ describe("PlayerField blocker prohibition eligibility", () => {
         ],
       }),
     ).toBe(true);
+  });
+
+  it("hides a printed-cost-3 blocker whose effective cost is set to 0", () => {
+    expect(
+      renderBlockerEligibility({
+        character: printedBlocker,
+        activeEffects: [setCostEffect(printedBlocker.instanceId, 0)],
+        prohibitions: [
+          blockerProhibition("CANNOT_ACTIVATE_BLOCKER", {
+            controller: 1,
+            scope: { controller: "OPPONENT", filter: { cost_max: 0 } },
+          }),
+        ],
+      }),
+    ).toBe(false);
   });
 });
 
