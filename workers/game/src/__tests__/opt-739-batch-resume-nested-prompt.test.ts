@@ -235,6 +235,12 @@ function runKoProgressReplacement(
     0,
     "CHARACTER"
   );
+  const firstKoed = cardInstance(
+    CARDS.VANILLA.id,
+    "already-koed-transition-id",
+    0,
+    "TRASH"
+  );
   const drawCards = [
     cardInstance(CARDS.VANILLA.id, "progress-draw-1", 1, "DECK"),
     cardInstance(CARDS.BLOCKER.id, "progress-draw-2", 1, "DECK"),
@@ -279,7 +285,7 @@ function runKoProgressReplacement(
     {
       ...withPlayers(
         base,
-        { characters: padChars([saver, victim]) },
+        { characters: padChars([saver, victim]), trash: [firstKoed] },
         { deck: drawCards, hand: [] }
       ),
       activeEffects: [replacement],
@@ -291,7 +297,7 @@ function runKoProgressReplacement(
       kind: "KO",
       pausedAction: koAction,
       remainingTargetIds: [victim.instanceId],
-      koedSoFar: ["already-koed-transition-id"],
+      koedSoFar: [firstKoed.instanceId],
     },
     [],
     suffix,
@@ -735,9 +741,13 @@ describe("OPT-750: preserves batch progress across replacement prompts", () => {
         type: "DRAW",
         params: { amount: { type: "ACTION_RESULT", ref: "batch-ko" } },
       },
+      { type: "RETURN_TO_HAND", target_ref: "batch-ko", chain: "THEN" },
     ]);
 
     expect(state.players[1].hand).toHaveLength(1);
+    expect(state.players[0].hand.map((card) => card.cardId)).toContain(
+      CARDS.VANILLA.id
+    );
   });
 
   it("merges earlier and finalized KOs after declining the replacement", () => {
