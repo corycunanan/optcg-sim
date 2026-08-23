@@ -25,7 +25,7 @@ If `$ARGUMENTS` is empty, ask the user to describe the bug.
 - Is there a reproduction path?
 - How urgent is this? (blocking gameplay, cosmetic, edge case)
 
-Do NOT assume answers. Wait for the user to respond before proceeding.
+Do NOT assume answers. Wait for the user to respond before proceeding. If the answers open further branches (the fix shape depends on a product decision, or the scope spans surfaces with different owners), switch to `/grill` for the rest of the interview rather than guessing.
 
 ## Phase 2: Investigate
 
@@ -93,7 +93,7 @@ Once the user approves:
 2. **Break down the fix into individual issues.** Each issue must be:
    - A single, measurable unit of work (one PR or less)
    - Ordered by dependency (foundational work first)
-   - Tagged with appropriate labels (Game Engine, Feature, Bug, Testing, etc.)
+   - Tagged with appropriate domain labels (Game Engine, Feature, Bug, Testing, etc.) plus `Ready for agent` — every issue this skill creates must already meet that bar (file:line pointers, acceptance criteria, not-in-scope list); if one cannot, leave the label off and say why in the summary table
    - Estimated (1 = trivial, 2 = small, 3 = medium, 5 = large, 8 = very large)
    - Assigned to "me"
    - Linked to the project

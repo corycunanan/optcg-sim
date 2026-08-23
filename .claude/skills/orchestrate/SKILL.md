@@ -5,7 +5,7 @@ description: Run a Linear scope (project, issue list, or single issue) through t
 
 # Orchestrate — Codex implementation pipeline
 
-You are the orchestrator/PM. Codex implements every issue and authors every PR. You never write implementation code. Canonical policy: `docs/project/ORCHESTRATION-CHARTER.md`. Operational gotchas and validated recipes (sandbox, model routing, computer-use/VQA): recall from project memory (`project-codex-orchestration`) if present on this machine.
+You are the orchestrator/PM. Codex implements every issue and authors every PR. You never write implementation code. Canonical policy: `docs/project/ORCHESTRATION-CHARTER.md`. Validated gotchas (sandbox, clones, validation, merge, environments): `GOTCHAS.md` beside this file — read the section for the step you are on. Evidence standard for every claim in prompts, reviews, and PR bodies: `.claude/reference/evidence-ladder.md`.
 
 ## Dispatch runtime (per machine)
 
@@ -27,7 +27,9 @@ Parse `$ARGUMENTS` into one of:
 - **Issue set**: multiple issue IDs → fetch each with `get_issue`; infer ordering from `blockedBy` relations and ticket "Sequence" sections; otherwise treat as parallel-eligible.
 - **Single issue**: one issue ID → a one-ticket run (still full pipeline: preflight, review gates, merge, close-out).
 
-Confirm the resolved scope (issue list + proposed ordering/waves) with the user before dispatching.
+**Readiness gate.** An issue is dispatchable when it carries the `Ready for agent` label (applied by `/triage-feedback`, `/investigate`, or the user after a decision pass). For every scope issue without it, read the description and classify: determinate (every acceptance criterion checkable, no 🟡/❓ items, premises cite `file:line`) or not. List the non-determinate ones with the open question each carries. Dispatching one encodes a guess that only surfaces at review time.
+
+Confirm the resolved scope (issue list + proposed ordering/waves + readiness verdicts) with the user before dispatching. Issues the user waves through get the label applied then.
 
 ## 1. Kickoff (one exchange, before any dispatch)
 
@@ -45,8 +47,9 @@ For each issue, in wave order (one issue per dependency track in parallel; wide-
 3. Dispatch via the machine's runtime (see **Dispatch runtime**) from the clone. Prompt embeds: full ticket text, fresh-inventory instruction, behavior-preservation + scope-freeze rules, scope fences naming sibling tickets' surfaces, validation expectations (baseline + post-change in PR body), deliverable spec (commit suffix `(OPT-NNN)`, push, `gh pr create` ready-for-review NOT draft, no merge, no Linear writes). Two standing prompt clauses:
    - **Red-first (bugfix tickets):** author the regression test before the fix and run it — the PR body shows the test failing on the pre-fix code (red), then passing after (green). A bugfix PR whose test never went red has not demonstrated it covers the bug.
    - **Tagged instrumentation:** any temporary debug output added while implementing carries a unique `[DEBUG-<tag>]` prefix; before committing, grep the tag and remove every hit. Untagged debug logs survive into PRs; tagged ones die.
-   - **PR prose style:** the PR body follows the user's writing rule (`~/.claude/rules/writing-style.md`): lead with the outcome, ~20-word sentences, active voice with a named actor, one name per thing used verbatim throughout, exact `file:line` for every claim. Embed this clause in the dispatch prompt.
-4. On completion: sync clone to PR head (`git branch main origin/main` for review base), run the runtime's adversarial review with a targeted hunt brief naming failure classes, plus your own orchestrator review of the diff.
+   - **PR prose style:** lead with the outcome, ~20-word sentences, active voice with a named actor, one name per thing used verbatim throughout, exact `file:line` for every claim. Embed this clause in the dispatch prompt.
+   - **Evidence rung per claim:** the PR body's validation section names the evidence-ladder rung (1 said so … 4 ran it, 5 reproduced in the app) next to every "covered", "preserved", or "safe" claim, and labels rung ≤ 3 claims `unproven`. An accurate report of partial coverage beats an inaccurate claim of full coverage. Paste the rung table from `.claude/reference/evidence-ladder.md` into the prompt.
+4. On completion: sync clone to PR head (`git branch -f main origin/main` for review base), run the runtime's adversarial review with a targeted hunt brief naming failure classes, plus your own orchestrator review of the diff. The hunt brief requires each finding to report CONFIRMED (rung 4–5: ran it) or REASONED-ONLY (rung ≤ 3), and to re-run every mutation or coverage matrix the PR body reports rather than trusting it. Your own review includes a spec pass: every ticket acceptance criterion mapped to a hunk, every hunk mapped to a criterion; unmapped hunks are scope creep to question.
 5. Findings → resume the implementation thread (runtime's resume mechanism) with the findings verbatim; re-verify the fix (delta review). Cap: 1 full + 1 delta; unresolved survivors stop the merge and surface to the user.
 6. Merge gate: CI green + adversarial approve + your review clean → `gh pr merge <N> --squash --match-head-commit <reviewed-sha>`. Conflicts: merge `origin/main` into the branch (never rebase/force-push an open PR).
 7. Linear → Done; verify the PR attachment; dispatch newly-unblocked issues.
