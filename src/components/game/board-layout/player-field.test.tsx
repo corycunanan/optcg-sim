@@ -50,6 +50,7 @@ const attacker = makeCard("attacker-1", "ATTACKER", 1);
 const cardDb = {
   "PRINTED-BLOCKER": {
     type: "Character",
+    cost: 3,
     keywords: { blocker: true },
   },
   VANILLA: {
@@ -114,6 +115,15 @@ function keywordEffect(
     sourceCardInstanceId: "source-1",
     appliesTo: [instanceId],
     modifiers: [{ type: "GRANT_KEYWORD", params: { keyword } }],
+  };
+}
+
+function costEffect(instanceId: string, amount: number): ActiveEffect {
+  return {
+    id: `modify-cost-${instanceId}`,
+    sourceCardInstanceId: "source-1",
+    appliesTo: [instanceId],
+    modifiers: [{ type: "MODIFY_COST", params: { amount } }],
   };
 }
 
@@ -279,6 +289,21 @@ describe("PlayerField blocker prohibition eligibility", () => {
       ).toBe(false);
     },
   );
+
+  it("keeps a printed-cost-3 blocker whose effective cost is 5", () => {
+    expect(
+      renderBlockerEligibility({
+        character: printedBlocker,
+        activeEffects: [costEffect(printedBlocker.instanceId, 2)],
+        prohibitions: [
+          blockerProhibition("CANNOT_ACTIVATE_BLOCKER", {
+            controller: 1,
+            scope: { controller: "OPPONENT", filter: { cost_max: 3 } },
+          }),
+        ],
+      }),
+    ).toBe(true);
+  });
 });
 
 function blockerProhibition(

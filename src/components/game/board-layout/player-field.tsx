@@ -16,7 +16,10 @@ import {
   type SharedTargetFilter,
   type SharedTargetFilterCard,
 } from "@shared/target-filter";
-import { useActiveEffects } from "@/contexts/active-effects-context";
+import {
+  computeEffectiveCost,
+  useActiveEffects,
+} from "@/contexts/active-effects-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import { EmptySlot } from "./empty-slot";
@@ -395,13 +398,19 @@ function matchesBlockerFilter(
   card: CardInstance,
   cardData: CardDb[string] | undefined,
   filter: SharedTargetFilter,
-  activeEffects: Parameters<typeof hasRuntimeKeyword>[2],
+  activeEffects: ReturnType<typeof useActiveEffects>,
 ): boolean {
   const printedPower = card.basePower ?? cardData?.power ?? 0;
+  const baseCost = cardData?.cost ?? 0;
+  const effectiveCost = computeEffectiveCost(
+    activeEffects,
+    card.instanceId,
+    baseCost,
+  );
   const sharedCard: SharedTargetFilterCard = {
     controller: card.controller,
-    cost: cardData?.cost ?? 0,
-    baseCost: cardData?.cost ?? 0,
+    cost: effectiveCost,
+    baseCost,
     power: card.effectivePower ?? printedPower,
     basePower: printedPower,
     colors: cardData?.color ?? [],
@@ -422,7 +431,7 @@ function matchesBlockerFilter(
   };
 
   return matchesTargetFilter(sharedCard, filter, {
-    getEffectiveCost: () => cardData?.cost ?? 0,
+    getEffectiveCost: () => effectiveCost,
     getEffectivePower: () => card.effectivePower ?? printedPower,
     hasKeyword: (_candidate, keyword) =>
       isKeywordName(keyword) &&

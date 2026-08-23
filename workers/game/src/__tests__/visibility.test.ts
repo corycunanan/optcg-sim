@@ -12,6 +12,7 @@ import {
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
+import { OP11_046_VINSMOKE_YONJI } from "../engine/schemas/op11.js";
 import type { RuntimeActiveEffect } from "../engine/effect-types.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 import {
@@ -579,5 +580,53 @@ describe("visibleStateForSpectator", () => {
     expect(() => visibleStateForSpectator(divergentState, cardDb)).toThrow(
       "Spectator visibility invariant violated: players[0].leader differs between player views",
     );
+  });
+});
+
+describe("conditional prohibition visibility", () => {
+  function yonjiState(includeNonGermaCharacter: boolean) {
+    const cardDb = createTestCardDb();
+    const yonjiData: CardData = {
+      ...CARDS.BLOCKER,
+      id: "OP11-046",
+      name: "Vinsmoke Yonji",
+      types: ["GERMA"],
+      effectSchema: OP11_046_VINSMOKE_YONJI,
+    };
+    cardDb.set(yonjiData.id, yonjiData);
+
+    let state = createBattleReadyState(cardDb);
+    const yonji: CardInstance = {
+      ...state.players[0].characters[1]!,
+      instanceId: "opt752-yonji",
+      cardId: yonjiData.id,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      characters: includeNonGermaCharacter
+        ? [yonji, players[0].characters[0], null, null, null]
+        : [yonji, null, null, null, null],
+    };
+    state = registerPermanentEffectsForCard({ ...state, players }, yonji, yonjiData);
+
+    return { state, cardDb };
+  }
+
+  it("broadcasts Yonji's protection only while FIELD_PURITY is true", () => {
+    const inactive = yonjiState(true);
+    const active = yonjiState(false);
+
+    expect(inactive.state.prohibitions).toHaveLength(2);
+    expect(visibleStateForPlayer(inactive.state, inactive.cardDb, 0).prohibitions)
+      .toEqual([]);
+    expect(visibleStateForSpectator(inactive.state, inactive.cardDb).prohibitions)
+      .toEqual([]);
+
+    expect(active.state.prohibitions).toHaveLength(2);
+    expect(visibleStateForPlayer(active.state, active.cardDb, 0).prohibitions)
+      .toHaveLength(2);
+    expect(visibleStateForSpectator(active.state, active.cardDb).prohibitions)
+      .toHaveLength(2);
   });
 });
