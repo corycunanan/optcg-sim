@@ -79,6 +79,13 @@ export function reenterBatchResume(
     if (actionResult.pendingPrompt) {
       const context = actionResult.pendingPrompt.resumeContext;
       if (!isResumeContext(context)) {
+        const progressTargetIds = batchProgressTargetIds(marker);
+        if (marker.pausedAction.result_ref) {
+          resultRefs.set(marker.pausedAction.result_ref, {
+            targetInstanceIds: progressTargetIds,
+            count: progressTargetIds.length,
+          });
+        }
         const generated = generateFrameId(nextState);
         const continuationFrame: EffectStackFrame = {
           id: generated.id,
@@ -90,7 +97,7 @@ export function reenterBatchResume(
           remainingActions: top.remainingActions,
           resultRefs: [...resultRefs.entries()],
           validTargets: [],
-          priorActionSucceeded: false,
+          priorActionSucceeded: progressTargetIds.length > 0,
           costs: [],
           currentCostIndex: 0,
           costsPaid: true,
@@ -235,6 +242,17 @@ export function reenterBatchResume(
       }
     }
     // Loop: check for another AWAITING_BATCH_RESUME frame underneath.
+  }
+}
+
+function batchProgressTargetIds(marker: BatchResumeMarker): string[] {
+  switch (marker.kind) {
+    case "KO":
+      return marker.koedSoFar;
+    case "PLAY_CARD":
+      return marker.resumeFrame.playedSoFar;
+    case "SET_REST":
+      return marker.restedSoFar;
   }
 }
 

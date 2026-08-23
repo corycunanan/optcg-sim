@@ -4,6 +4,7 @@ import { resumeFromStack } from "../engine/effect-resolver/index.js";
 import { pushBatchResumeFrame } from "../engine/effect-resolver/resume/batch.js";
 import { resolveEffect } from "../engine/effect-resolver/resolver.js";
 import type {
+  Action,
   EffectBlock,
   RuntimeActiveEffect,
 } from "../engine/effect-types.js";
@@ -208,6 +209,106 @@ function expectAllEldersPlayed(state: GameState) {
       .sort()
   ).toEqual([MARS.id, ...OTHER_ELDERS.map((card) => card.id)].sort());
   expect(state.effectStack).toHaveLength(0);
+}
+
+function runKoProgressReplacement(
+  suffix: Action[],
+  choiceId: "accept" | "skip" = "accept"
+): GameState {
+  const cardDb = createTestCardDb();
+  const saverCard: CardData = {
+    ...CARDS.VANILLA,
+    id: "PROGRESS-SAVER",
+    name: "Progress Saver",
+  };
+  cardDb.set(saverCard.id, saverCard);
+  const base = createBattleReadyState(cardDb);
+  const saver = cardInstance(
+    saverCard.id,
+    "progress-saver",
+    0,
+    "CHARACTER"
+  );
+  const victim = cardInstance(
+    CARDS.BLOCKER.id,
+    "progress-victim",
+    0,
+    "CHARACTER"
+  );
+  const drawCards = [
+    cardInstance(CARDS.VANILLA.id, "progress-draw-1", 1, "DECK"),
+    cardInstance(CARDS.BLOCKER.id, "progress-draw-2", 1, "DECK"),
+    cardInstance(CARDS.VANILLA.id, "progress-draw-3", 1, "DECK"),
+  ];
+  const replacement: RuntimeActiveEffect = {
+    id: "progress-replacement",
+    sourceCardInstanceId: saver.instanceId,
+    sourceEffectBlockId: "progress-replacement-block",
+    category: "replacement",
+    modifiers: [
+      {
+        type: "REPLACEMENT_EFFECT",
+        params: {
+          trigger: "WOULD_BE_KO",
+          cause_filter: { by: "OPPONENT_EFFECT" },
+          target_filter: null,
+          replacement_actions: [
+            { type: "TRASH_CARD", target: { type: "SELF" } },
+          ],
+          optional: true,
+          once_per_turn: false,
+        },
+      },
+    ],
+    duration: { type: "PERMANENT" },
+    expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+    controller: 0,
+    appliesTo: [victim.instanceId],
+    timestamp: 0,
+  };
+  const koAction = {
+    type: "KO" as const,
+    target: {
+      type: "CHARACTER" as const,
+      controller: "OPPONENT" as const,
+      count: { exact: 2 },
+    },
+    result_ref: "batch-ko",
+  };
+  const stateWithBatch = pushBatchResumeFrame(
+    {
+      ...withPlayers(
+        base,
+        { characters: padChars([saver, victim]) },
+        { deck: drawCards, hand: [] }
+      ),
+      activeEffects: [replacement],
+    },
+    "opponent-source",
+    1,
+    CONTINUATION_EFFECT_BLOCK,
+    {
+      kind: "KO",
+      pausedAction: koAction,
+      remainingTargetIds: [victim.instanceId],
+      koedSoFar: ["already-koed-transition-id"],
+    },
+    [],
+    suffix,
+    new Map()
+  );
+  const prompted = resumeFromStack(stateWithBatch, { type: "PASS" }, cardDb);
+  expect(prompted.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+
+  return resumePromptLifecycle(
+    { ...prompted.state, pendingPrompt: prompted.pendingPrompt ?? null },
+    { type: "PLAYER_CHOICE", choiceId },
+    cardDb,
+    {
+      drainPregame: (state: GameState) => state,
+      advanceStartOfTurn: (state: GameState) => state,
+    }
+  ).state;
 }
 
 describe("OPT-739: nested prompts re-enter batch resume", () => {
@@ -616,5 +717,41 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
       )
     ).toBe(true);
     expect(result.state.effectStack).toHaveLength(0);
+  });
+});
+
+describe("OPT-750: preserves batch progress across replacement prompts", () => {
+  it("keeps overall success when an earlier KO succeeded and the final target is saved", () => {
+    const state = runKoProgressReplacement([
+      { type: "DRAW", chain: "IF_DO", params: { amount: 1 } },
+    ]);
+
+    expect(state.players[1].hand).toHaveLength(1);
+  });
+
+  it("keeps the earlier KO in the paused action result reference", () => {
+    const state = runKoProgressReplacement([
+      {
+        type: "DRAW",
+        params: { amount: { type: "ACTION_RESULT", ref: "batch-ko" } },
+      },
+    ]);
+
+    expect(state.players[1].hand).toHaveLength(1);
+  });
+
+  it("merges earlier and finalized KOs after declining the replacement", () => {
+    const state = runKoProgressReplacement(
+      [
+        { type: "DRAW", chain: "IF_DO", params: { amount: 1 } },
+        {
+          type: "DRAW",
+          params: { amount: { type: "ACTION_RESULT", ref: "batch-ko" } },
+        },
+      ],
+      "skip"
+    );
+
+    expect(state.players[1].hand).toHaveLength(3);
   });
 });
