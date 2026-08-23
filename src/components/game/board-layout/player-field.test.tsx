@@ -306,6 +306,24 @@ describe("PlayerField blocker prohibition eligibility", () => {
   });
 });
 
+describe("PlayerField aura-granted Blocker eligibility", () => {
+  it("offers a character listed by a broadcast Blocker aura", () => {
+    const auraGrant: ActiveEffect = {
+      id: "saldeath-blocker-aura",
+      sourceCardInstanceId: "saldeath-source",
+      appliesTo: [vanillaBlocker.instanceId],
+      modifiers: [{ type: "GRANT_KEYWORD", params: { keyword: "BLOCKER" } }],
+    };
+
+    expect(
+      renderBlockerEligibility({
+        character: vanillaBlocker,
+        activeEffects: [auraGrant],
+      }),
+    ).toBe(true);
+  });
+});
+
 function blockerProhibition(
   prohibitionType:
     | "CANNOT_ACTIVATE_BLOCKER"

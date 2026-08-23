@@ -8,7 +8,11 @@ import type {
   PendingPromptState,
   TurnState,
 } from "../types.js";
-import { getEffectivePower, isEffectConditionMet } from "../engine/modifiers.js";
+import {
+  getEffectivePower,
+  isEffectConditionMet,
+  modifierAppliesToCard,
+} from "../engine/modifiers.js";
 import { isProhibitionConditionMet } from "../engine/prohibitions.js";
 import { getEffectiveCounterValue } from "../engine/counter-value.js";
 import {
@@ -310,6 +314,80 @@ export function stripInactiveProhibitions(
     : { ...state, prohibitions: active };
 }
 
+function withResolvedFieldEffectTargets(
+  visible: GameState,
+  authoritative: GameState,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const fieldCards = authoritative.players.flatMap((player) => [
+    player.leader,
+    ...player.characters.filter((card): card is CardInstance => card !== null),
+  ]);
+  let changed = false;
+  const activeEffects = visible.activeEffects.flatMap((effect) => {
+    const hasDynamicModifier = effect.modifiers.some(
+      (modifier) =>
+        modifier.target?.type !== undefined && modifier.target.type !== "SELF",
+    );
+    if (!hasDynamicModifier) return [effect];
+
+    changed = true;
+    const hasStaticSelfModifier = effect.modifiers.some(
+      (modifier) => !modifier.target || modifier.target.type === "SELF",
+    );
+    const groups = new Map<string, {
+      appliesTo: string[];
+      modifiers: typeof effect.modifiers;
+    }>();
+
+    for (const modifier of effect.modifiers) {
+      const isDynamic =
+        modifier.target?.type !== undefined && modifier.target.type !== "SELF";
+      const effectForModifier = isDynamic && hasStaticSelfModifier
+        ? {
+            ...effect,
+            appliesTo: effect.appliesTo.filter(
+              (instanceId) => instanceId !== effect.sourceCardInstanceId,
+            ),
+          }
+        : effect;
+      const appliesTo = fieldCards
+        .filter((card) => modifierAppliesToCard(
+          effectForModifier,
+          modifier,
+          card,
+          authoritative,
+          cardDb,
+        ))
+        .map((card) => card.instanceId);
+      const targetSetKey = JSON.stringify(appliesTo);
+      const group = groups.get(targetSetKey);
+      if (group) {
+        group.modifiers.push(modifier);
+      } else {
+        groups.set(targetSetKey, { appliesTo, modifiers: [modifier] });
+      }
+    }
+
+    const resolvedGroups = [...groups.values()];
+    if (resolvedGroups.length === 1) {
+      return [{
+        ...effect,
+        appliesTo: resolvedGroups[0].appliesTo,
+        modifiers: resolvedGroups[0].modifiers,
+      }];
+    }
+    return resolvedGroups.map((group, groupIndex) => ({
+      ...effect,
+      id: `${effect.id}#${groupIndex}`,
+      appliesTo: group.appliesTo,
+      modifiers: group.modifiers,
+    }));
+  });
+
+  return changed ? { ...visible, activeEffects } : visible;
+}
+
 function withVisibleFieldPower(
   visible: GameState,
   authoritative: GameState,
@@ -365,7 +443,11 @@ export function visibleStateForPlayer(
         : card;
     }),
   };
-  return withVisibleFieldPower({ ...visible, players }, state, cardDb);
+  return withVisibleFieldPower(
+    withResolvedFieldEffectTargets({ ...visible, players }, state, cardDb),
+    state,
+    cardDb,
+  );
 }
 
 /**
@@ -397,10 +479,14 @@ export function visibleStateForSpectator(
   const playerOneView = filterStateForPlayer(stripped, 1);
 
   return withVisibleFieldPower(
-    mergePlayerViewsForSpectator(
-      stripped,
-      playerZeroView,
-      playerOneView,
+    withResolvedFieldEffectTargets(
+      mergePlayerViewsForSpectator(
+        stripped,
+        playerZeroView,
+        playerOneView,
+      ),
+      state,
+      cardDb,
     ),
     state,
     cardDb,

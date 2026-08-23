@@ -38,11 +38,10 @@ const PRINTED_KEYWORD_FIELDS: Record<KeywordName, keyof PrintedKeywords> = {
 /**
  * Return whether a broadcast card has a printed or runtime-granted keyword.
  *
- * Broadcast effects already exclude false conditions. Runtime-selected
- * negation targets and SELF modifier targets are resolved into `appliesTo` by
- * the worker, so membership is sufficient here. Dynamic aura targets are absent
- * from `appliesTo` and remain unsupported until the worker broadcasts their
- * resolved targets. `CAN_ATTACK_ACTIVE` and `_DON_PHASE_GIVE_TO_LEADER` are
+ * Broadcast effects already exclude false conditions. The worker resolves SELF,
+ * runtime-selected, and dynamic aura targets on public Leaders and Characters
+ * into `appliesTo`, while hidden-zone cards remain excluded, so membership is
+ * sufficient here. `CAN_ATTACK_ACTIVE` and `_DON_PHASE_GIVE_TO_LEADER` are
  * internal engine grants and deliberately excluded from the client-facing set.
  */
 export function hasRuntimeKeyword(
