@@ -11,7 +11,12 @@ import type {
   PendingEvent,
   PlayerState,
 } from "../types.js";
-import { OP13_079_IMU, OP13_082_FIVE_ELDERS } from "../engine/schemas/op13.js";
+import {
+  OP13_079_IMU,
+  OP13_082_FIVE_ELDERS,
+  OP13_083_ST_JAYGARCIA_SATURN,
+  OP13_091_ST_MARCUS_MARS,
+} from "../engine/schemas/op13.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumeFromStack } from "../engine/effect-resolver/index.js";
 import {
@@ -121,6 +126,93 @@ function buildScenario(useImu = true) {
 }
 
 describe("OPT-698: OP13-082 Five Elders", () => {
+  it("orders real Elder ON_PLAY effects after both cards reach the board", () => {
+    const scenario = buildScenario();
+    const saturn = {
+      ...ELDER_CARDS.find((card) => card.id === "OP13-083")!,
+      name: "St. Jaygarcia Saturn",
+      effectSchema: OP13_083_ST_JAYGARCIA_SATURN,
+    };
+    const mars = {
+      ...ELDER_CARDS.find((card) => card.id === "OP13-091")!,
+      name: "St. Marcus Mars",
+      effectSchema: OP13_091_ST_MARCUS_MARS,
+    };
+    scenario.cardDb.set(saturn.id, saturn);
+    scenario.cardDb.set(mars.id, mars);
+
+    const activation = runPipeline(
+      scenario.state,
+      {
+        type: "ACTIVATE_EFFECT",
+        cardInstanceId: scenario.fiveElders.instanceId,
+        effectId: EFFECT_ID,
+      },
+      scenario.cardDb,
+      0
+    );
+    let result = resumeFromStack(
+      activation.state,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      scenario.cardDb
+    );
+    if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
+      throw new Error("Expected the hand-cost target prompt");
+    }
+    result = resumeFromStack(
+      result.state,
+      {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: [result.pendingPrompt.options.validTargets[0]],
+      },
+      scenario.cardDb
+    );
+    if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
+      throw new Error("Expected the Five Elders target prompt");
+    }
+    const selectedIds = result.pendingPrompt.options.validTargets.filter(
+      (id) => {
+        const card = result.state.players[0].trash.find(
+          (candidate) => candidate.instanceId === id
+        );
+        return card?.cardId === saturn.id || card?.cardId === mars.id;
+      }
+    );
+    result = resumeFromStack(
+      result.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: selectedIds },
+      scenario.cardDb
+    );
+
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(result.state.effectStack.at(-1)?.phase).toBe(
+      "AWAITING_TRIGGER_ORDER_SELECTION"
+    );
+    expect(
+      result.state.players[0].characters
+        .filter((card): card is CardInstance => card !== null)
+        .map((card) => card.cardId)
+        .sort()
+    ).toEqual([saturn.id, mars.id].sort());
+    if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+      throw new Error("Expected the trigger-ordering prompt");
+    }
+    const marsChoice = result.pendingPrompt.options.choices.find((choice) =>
+      choice.label.includes(mars.name)
+    );
+    if (!marsChoice) throw new Error("Expected the Mars trigger choice");
+
+    result = resumeFromStack(
+      result.state,
+      { type: "PLAYER_CHOICE", choiceId: marsChoice.id },
+      scenario.cardDb
+    );
+    expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect(result.state.effectStack.at(-1)?.effectBlock.id).toBe(
+      "OP13-091_on_play"
+    );
+  });
+
   it("trashes all allied Characters without K.O. events, then plays five distinct Elders", () => {
     const scenario = buildScenario();
     const handSizeBefore = scenario.state.players[0].hand.length;

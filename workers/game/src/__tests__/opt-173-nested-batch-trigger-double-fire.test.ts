@@ -156,8 +156,10 @@ describe("OPT-173: nested batch-trigger drain double-fire", () => {
     );
     expect(result.pendingPrompt).toBeUndefined();
 
-    // Each victim left the field exactly once before the ordering prompt.
+    // Each victim left the field exactly once before the ordering prompt, and
+    // both CARD_KO events remain published exactly once after the response.
     expect(first.state.players[1].characters.filter(Boolean)).toHaveLength(0);
+    expect(result.state.eventLog.filter((event) => event.type === "CARD_KO")).toHaveLength(2);
 
     // Player 1 drew exactly one card per ON_KO. Without the fix, the outer
     // pipeline scan re-queues both ON_KO triggers, drawing 2 extra cards.

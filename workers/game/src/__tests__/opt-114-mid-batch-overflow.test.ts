@@ -92,6 +92,7 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
     const trash = [trashChar(onPlayCard.id, "one"), trashChar(onPlayCard.id, "two")];
     let state = seedBoardAndTrash(cardDb, 4, trash);
     const watcher = state.players[0].characters[0]!;
+    const victimId = watcher.instanceId;
     state = {
       ...state,
       players: [
@@ -119,7 +120,7 @@ describe("OPT-114 commit 3: mid-batch interleaving", () => {
     const resumed = resumeEffectChain(
       first.state,
       first.pendingPrompt!.resumeContext as ResumeContext,
-      { type: "SELECT_TARGET", selectedInstanceIds: ["board-b1"] },
+      { type: "SELECT_TARGET", selectedInstanceIds: [victimId] },
       cardDb,
     );
 

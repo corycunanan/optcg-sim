@@ -160,6 +160,7 @@ export function handleSelectTargetRuleTrashForPlay(
     };
   }
   const victimId = selected[0];
+  const stateBeforeRuleTrash = nextState;
   const trashResult = trashCharacter(nextState, victimId, controller);
   if (!trashResult) {
     return {
@@ -177,10 +178,39 @@ export function handleSelectTargetRuleTrashForPlay(
   const batch = ruleTrashForPlay.batch;
   let queuedTriggers = [...(batch?.queuedTriggers ?? [])];
   if (batch && events.length > 0) {
-    const scan = scanEventsForTriggers(nextState, events, controller, cardDb, effectSourceInstanceId);
-    nextState = scan.state;
-    replacePendingEventReferences(events, events, scan.events);
-    queuedTriggers = [...queuedTriggers, ...scan.triggers];
+    // Match the rule-trashed victim's own trash trigger against its last-known
+    // field state. After transition, normal zone validation correctly rejects
+    // that registry entry because its source is no longer on the field.
+    const matchEvents = events.map((event) => {
+      if (
+        event.type !== "CARD_TRASHED" ||
+        event.payload?.cardInstanceId !== victimId
+      ) {
+        return event;
+      }
+      const { newCardInstanceId: _newCardInstanceId, ...payload } = event.payload;
+      return { ...event, payload } as PendingEvent;
+    });
+    const scan = scanEventsForTriggers(
+      stateBeforeRuleTrash,
+      matchEvents,
+      controller,
+      cardDb,
+      effectSourceInstanceId,
+    );
+    const scannedEvents = events.map((event, index) => ({
+      ...event,
+      propagation: scan.events[index].propagation,
+    })) as PendingEvent[];
+    const scannedTriggers = scan.triggers.map((trigger) => {
+      const eventIndex = scan.events.indexOf(trigger.triggeringEvent);
+      return eventIndex >= 0
+        ? { ...trigger, triggeringEvent: scannedEvents[eventIndex] }
+        : trigger;
+    });
+    nextState = { ...nextState, executionContext: scan.state.executionContext };
+    replacePendingEventReferences(events, [...events], scannedEvents);
+    queuedTriggers = [...queuedTriggers, ...scannedTriggers];
   }
   const actionResult = batch
     ? executePlayCard(

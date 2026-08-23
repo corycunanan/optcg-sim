@@ -342,7 +342,7 @@ export function executePlayCard(
 
   }
 
-  if (queuedTriggers.length > 1) {
+  if (queuedTriggers.length > 0) {
     replacePendingEventReferences(events, [...events], scannedEvents);
     const marker: BatchResumeMarker = {
       kind: "PLAY_CARD",
@@ -357,14 +357,6 @@ export function executePlayCard(
       pendingBatchTriggers: { triggers: queuedTriggers, marker },
     };
   }
-  if (queuedTriggers.length === 1) {
-    nextState = {
-      ...nextState,
-      triggerRegistry: state.triggerRegistry,
-      activeEffects: state.activeEffects,
-    };
-  }
-
   return {
     state: nextState,
     events,
@@ -497,7 +489,7 @@ export function executeSetRest(
 
   const scan = scanEventsForTriggers(nextState, events, controller, cardDb, sourceCardInstanceId);
   nextState = scan.state;
-  if (scan.triggers.length > 1) {
+  if (scan.triggers.length > 0) {
     replacePendingEventReferences(events, [...events], scan.events);
     const marker: BatchResumeMarker = {
       kind: "SET_REST",
