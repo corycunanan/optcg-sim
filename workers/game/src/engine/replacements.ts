@@ -899,7 +899,11 @@ function finalizeTarget(
   kind: BatchActionKind,
   causingController: 0 | 1,
   returnToDeckPosition: "TOP" | "BOTTOM" | undefined,
-): { state: GameState; events: PendingEvent[] } | null {
+): {
+  state: GameState;
+  events: PendingEvent[];
+  transition?: { newInstanceId: string };
+} | null {
   switch (kind) {
     case "KO":
       return koCharacter(state, targetId, causingController);
@@ -1080,7 +1084,7 @@ function finishReplacementBatch(
     if (finalized) {
       resumeState = finalized.state;
       resumeEvents.push(...finalized.events);
-      finalizedIds.push(id);
+      finalizedIds.push(finalized.transition?.newInstanceId ?? id);
     }
   }
 

@@ -225,7 +225,8 @@ describe("multiple replacement effects on the same KO batch", () => {
     expect(p0.characters.some((c) => c?.instanceId === ids.gb)).toBe(true);
 
     // Final bookkeeping: finalized list = only ally B.
-    expect(final.finalizedIds).toEqual([ids.ab]);
+    const allyBInTrash = p0.trash.find((c) => c.cardId === "ALLY-B");
+    expect(final.finalizedIds).toEqual([allyBInTrash?.instanceId]);
     expect(final.protectedIds).toEqual([ids.aa]);
   });
 });
