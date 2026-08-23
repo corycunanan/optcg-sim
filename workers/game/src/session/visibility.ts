@@ -9,7 +9,7 @@ import type {
   TurnState,
 } from "../types.js";
 import {
-  getEffectiveCost,
+  getEffectiveFieldCost,
   getEffectivePower,
   isEffectConditionMet,
   isModifierConditionMet,
@@ -404,12 +404,11 @@ function withVisibleFieldPower(
     );
     return {
       ...card,
-      effectiveCost: getEffectiveCost(
+      effectiveCost: getEffectiveFieldCost(
         data,
         authoritative,
         card.instanceId,
         cardDb,
-        false,
       ),
       basePower,
       effectivePower,

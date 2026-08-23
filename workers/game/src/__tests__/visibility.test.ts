@@ -12,7 +12,11 @@ import {
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
 import { hasRuntimeKeyword } from "../../../../shared/effective-keyword.js";
-import { getEffectiveCost, hasGrantedKeyword } from "../engine/modifiers.js";
+import {
+  getEffectiveCost,
+  getEffectiveFieldCost,
+  hasGrantedKeyword,
+} from "../engine/modifiers.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import { OP11_046_VINSMOKE_YONJI } from "../engine/schemas/op11.js";
 import type {
@@ -548,12 +552,12 @@ describe("visible field cost", () => {
     };
   }
 
-  function costState(effects: RuntimeActiveEffect[]) {
+  function costState(effects: RuntimeActiveEffect[], printedCost = 3) {
     const cardDb = createTestCardDb();
     const targetData: CardData = {
       ...CARDS.BLOCKER,
       id: "OPT756-COST-TARGET",
-      cost: 3,
+      cost: printedCost,
     };
     cardDb.set(targetData.id, targetData);
     const state = createBattleReadyState(cardDb);
@@ -619,6 +623,41 @@ describe("visible field cost", () => {
 
     expect(serverCost).toBe(expected);
     expect(visibleTarget.effectiveCost).toBe(serverCost);
+  });
+
+  it("excludes a pending play discount from player and spectator field cost", () => {
+    const fixture = costState([], 5);
+    const state = {
+      ...fixture.state,
+      oneTimeModifiers: [{
+        id: "pending-play-discount",
+        appliesTo: { action: "PLAY_CARD", filter: {} },
+        modification: { type: "MODIFY_COST", params: { amount: -1 } },
+        expires: { type: "THIS_TURN" },
+        consumed: false,
+        controller: 0,
+      }],
+    } as typeof fixture.state;
+    const fieldCost = getEffectiveFieldCost(
+      fixture.cardDb.get(fixture.target.cardId)!,
+      state,
+      fixture.target.instanceId,
+      fixture.cardDb,
+    );
+
+    expect(fieldCost).toBe(5);
+    expect(getEffectiveCost(
+      fixture.cardDb.get(fixture.target.cardId)!,
+      state,
+      fixture.target.instanceId,
+      fixture.cardDb,
+    )).toBe(4);
+    for (const visible of [
+      visibleStateForPlayer(state, fixture.cardDb, 0),
+      visibleStateForSpectator(state, fixture.cardDb),
+    ]) {
+      expect(visible.players[0].characters[0]!.effectiveCost).toBe(fieldCost);
+    }
   });
 });
 
