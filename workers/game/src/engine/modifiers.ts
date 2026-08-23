@@ -159,7 +159,7 @@ function permanentModifierParam(
  * For non-SELF targets (e.g., CHARACTER with filter), dynamically resolves
  * against the card's properties using the modifier's target filter.
  */
-function modifierAppliesToCard(
+export function modifierAppliesToCard(
   effect: RuntimeActiveEffect,
   modifier: Modifier,
   card: CardInstance,

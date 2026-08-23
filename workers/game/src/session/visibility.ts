@@ -8,7 +8,11 @@ import type {
   PendingPromptState,
   TurnState,
 } from "../types.js";
-import { getEffectivePower, isEffectConditionMet } from "../engine/modifiers.js";
+import {
+  getEffectivePower,
+  isEffectConditionMet,
+  modifierAppliesToCard,
+} from "../engine/modifiers.js";
 import { getEffectiveCounterValue } from "../engine/counter-value.js";
 import {
   filterStateForPlayer,
@@ -295,6 +299,35 @@ export function stripInactiveEffects(
     : { ...state, activeEffects: active };
 }
 
+function withResolvedFieldEffectTargets(
+  visible: GameState,
+  authoritative: GameState,
+  cardDb: Map<string, CardData>,
+): GameState {
+  const fieldCards = authoritative.players.flatMap((player) => [
+    player.leader,
+    ...player.characters.filter((card): card is CardInstance => card !== null),
+  ]);
+  let changed = false;
+  const activeEffects = visible.activeEffects.map((effect) => {
+    const dynamicModifiers = effect.modifiers.filter(
+      (modifier) => modifier.target?.type && modifier.target.type !== "SELF",
+    );
+    if (dynamicModifiers.length === 0) return effect;
+
+    changed = true;
+    return {
+      ...effect,
+      appliesTo: fieldCards
+        .filter((card) => dynamicModifiers.some((modifier) =>
+          modifierAppliesToCard(effect, modifier, card, authoritative, cardDb)))
+        .map((card) => card.instanceId),
+    };
+  });
+
+  return changed ? { ...visible, activeEffects } : visible;
+}
+
 function withVisibleFieldPower(
   visible: GameState,
   authoritative: GameState,
@@ -347,7 +380,11 @@ export function visibleStateForPlayer(
         : card;
     }),
   };
-  return withVisibleFieldPower({ ...visible, players }, state, cardDb);
+  return withVisibleFieldPower(
+    withResolvedFieldEffectTargets({ ...visible, players }, state, cardDb),
+    state,
+    cardDb,
+  );
 }
 
 /**
@@ -376,10 +413,14 @@ export function visibleStateForSpectator(
   const playerOneView = filterStateForPlayer(stripped, 1);
 
   return withVisibleFieldPower(
-    mergePlayerViewsForSpectator(
-      stripped,
-      playerZeroView,
-      playerOneView,
+    withResolvedFieldEffectTargets(
+      mergePlayerViewsForSpectator(
+        stripped,
+        playerZeroView,
+        playerOneView,
+      ),
+      state,
+      cardDb,
     ),
     state,
     cardDb,

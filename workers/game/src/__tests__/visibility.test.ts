@@ -13,6 +13,7 @@ import {
 } from "../engine/state.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import type { RuntimeActiveEffect } from "../engine/effect-types.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 import {
   visibleStateForPlayer,
@@ -88,6 +89,68 @@ function fieldPowerState() {
   state = registerPermanentEffectsForCard(state, throne, throneData);
 
   return { state, cardDb };
+}
+
+function saldeathAuraState({
+  fieldTargetName = "Blugori",
+  includeHiddenBlugori = false,
+}: {
+  fieldTargetName?: string;
+  includeHiddenBlugori?: boolean;
+} = {}) {
+  const cardDb = createTestCardDb();
+  const saldeathSchema = getEffectSchema("OP02-074");
+  if (!saldeathSchema) throw new Error("Missing generated OP02-074 schema");
+
+  const saldeathData: CardData = {
+    ...CARDS.VANILLA,
+    id: "OP02-074",
+    name: "Saldeath",
+    effectSchema: saldeathSchema,
+  };
+  const fieldTargetData: CardData = {
+    ...CARDS.VANILLA,
+    id: "TEST-FIELD-AURA-TARGET",
+    name: fieldTargetName,
+  };
+  const hiddenTargetData: CardData = {
+    ...CARDS.VANILLA,
+    id: "TEST-HIDDEN-BLUGORI",
+    name: "Blugori",
+  };
+  for (const data of [saldeathData, fieldTargetData, hiddenTargetData]) {
+    cardDb.set(data.id, data);
+  }
+
+  let state = createBattleReadyState(cardDb);
+  const saldeath: CardInstance = {
+    ...state.players[0].characters[0]!,
+    instanceId: "saldeath-source",
+    cardId: saldeathData.id,
+  };
+  const fieldTarget: CardInstance = {
+    ...state.players[0].characters[1]!,
+    instanceId: "field-aura-target",
+    cardId: fieldTargetData.id,
+  };
+  const hiddenTarget: CardInstance = {
+    ...state.players[0].hand[0],
+    instanceId: "hidden-blugori-target",
+    cardId: hiddenTargetData.id,
+  };
+  const players = [...state.players] as [PlayerState, PlayerState];
+  players[0] = {
+    ...players[0],
+    characters: [saldeath, fieldTarget, null, null, null],
+    hand: includeHiddenBlugori ? [hiddenTarget] : players[0].hand,
+  };
+  state = registerPermanentEffectsForCard(
+    { ...state, players },
+    saldeath,
+    saldeathData,
+  );
+
+  return { state, cardDb, fieldTarget, hiddenTarget };
 }
 
 describe("filterStateForPlayer", () => {
@@ -452,6 +515,43 @@ describe("visible field power", () => {
     expect(opponentView.players[0].leader.powerDelta).toBe(1000);
     expect(spectatorView.players[0].leader.effectivePower).toBe(basePower + 1000);
     expect(spectatorView.players[0].leader.powerDelta).toBe(1000);
+  });
+});
+
+describe("visible dynamic aura targets", () => {
+  it("publishes Saldeath's granted Blugori in appliesTo", () => {
+    const { state, cardDb, fieldTarget } = saldeathAuraState();
+
+    for (const visible of [
+      visibleStateForPlayer(state, cardDb, 0),
+      visibleStateForSpectator(state, cardDb),
+    ]) {
+      expect(visible.activeEffects[0]?.appliesTo).toContain(fieldTarget.instanceId);
+    }
+    expect(state.activeEffects[0]?.appliesTo).toEqual([]);
+  });
+
+  it("removes a renamed field character from Saldeath's appliesTo", () => {
+    const { state, cardDb, fieldTarget } = saldeathAuraState({
+      fieldTargetName: "Not Blugori",
+    });
+
+    const visible = visibleStateForPlayer(state, cardDb, 0);
+
+    expect(visible.activeEffects[0]?.appliesTo).not.toContain(fieldTarget.instanceId);
+  });
+
+  it("keeps a matching hidden-hand card out of Saldeath's appliesTo", () => {
+    const { state, cardDb, hiddenTarget } = saldeathAuraState({
+      includeHiddenBlugori: true,
+    });
+
+    for (const visible of [
+      visibleStateForPlayer(state, cardDb, 0),
+      visibleStateForSpectator(state, cardDb),
+    ]) {
+      expect(visible.activeEffects[0]?.appliesTo).not.toContain(hiddenTarget.instanceId);
+    }
   });
 });
 
