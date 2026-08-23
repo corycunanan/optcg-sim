@@ -161,12 +161,19 @@ export function modifierAppliesToCard(
   cardDb?: Map<string, CardDataType>,
   costOverride?: number
 ): boolean {
-  // Resolver-created effects may pre-resolve any target into appliesTo.
-  if (effect.appliesTo?.includes(card.instanceId)) return true;
-
   // SELF (or implicit SELF) targets are resolved statically at registration.
   if (!modifier.target || modifier.target.type === "SELF") {
-    return false;
+    return effect.appliesTo?.includes(card.instanceId) ?? false;
+  }
+
+  // Resolver-created effects may pre-resolve arbitrary targets into appliesTo.
+  // A permanent block can also place its source there for a sibling SELF
+  // modifier, but that membership must not leak into this dynamic modifier.
+  if (
+    card.instanceId !== effect.sourceCardInstanceId &&
+    effect.appliesTo?.includes(card.instanceId)
+  ) {
+    return true;
   }
 
   // Dynamic match — check non-SELF modifier targets against the card

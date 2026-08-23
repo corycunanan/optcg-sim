@@ -12,6 +12,7 @@ import {
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
 import { hasRuntimeKeyword } from "../../../../shared/effective-keyword.js";
+import { hasGrantedKeyword } from "../engine/modifiers.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import { OP11_046_VINSMOKE_YONJI } from "../engine/schemas/op11.js";
 import type { EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
@@ -618,6 +619,15 @@ describe("visible dynamic aura targets", () => {
       sourceData,
     );
 
+    expect(hasGrantedKeyword(source, "BLOCKER", state, cardDb)).toBe(true);
+    expect(hasGrantedKeyword(source, "DOUBLE_ATTACK", state, cardDb)).toBe(false);
+    expect(hasGrantedKeyword(
+      dynamicTarget,
+      "DOUBLE_ATTACK",
+      state,
+      cardDb,
+    )).toBe(true);
+
     const visible = visibleStateForPlayer(state, cardDb, 0);
 
     expect(hasRuntimeKeyword(
@@ -648,6 +658,59 @@ describe("visible dynamic aura targets", () => {
       `${state.activeEffects[0].id}#0`,
       `${state.activeEffects[0].id}#1`,
     ]);
+  });
+
+  it("omits a dynamic modifier whose own duration gate is false", () => {
+    const cardDb = createTestCardDb();
+    const targetData: CardData = {
+      ...CARDS.VANILLA,
+      id: "TEST-DURATION-TARGET",
+      name: "Duration Target",
+      cost: 3,
+    };
+    cardDb.set(targetData.id, targetData);
+
+    const state = createBattleReadyState(cardDb);
+    const target: CardInstance = {
+      ...state.players[1].characters[0]!,
+      instanceId: "duration-target",
+      cardId: targetData.id,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[1] = {
+      ...players[1],
+      characters: [target, ...players[1].characters.slice(1)],
+    };
+    const effect: RuntimeActiveEffect = {
+      id: "duration-gated-aura",
+      sourceCardInstanceId: players[0].leader.instanceId,
+      sourceEffectBlockId: "duration_gated_aura",
+      category: "permanent",
+      modifiers: [{
+        type: "MODIFY_COST",
+        target: { type: "CHARACTER", controller: "OPPONENT" },
+        params: { amount: -3 },
+        duration: {
+          type: "WHILE_CONDITION",
+          condition: { type: "IS_MY_TURN", controller: "SELF" },
+        },
+      }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: 1,
+    };
+    const opponentTurnState = {
+      ...state,
+      players,
+      turn: { ...state.turn, activePlayerIndex: 1 as const },
+      activeEffects: [effect],
+    };
+
+    const visible = visibleStateForPlayer(opponentTurnState, cardDb, 1);
+
+    expect(visible.activeEffects).toEqual([]);
   });
 });
 

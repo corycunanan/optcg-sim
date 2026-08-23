@@ -11,6 +11,7 @@ import type {
 import {
   getEffectivePower,
   isEffectConditionMet,
+  isModifierConditionMet,
   modifierAppliesToCard,
 } from "../engine/modifiers.js";
 import { isProhibitionConditionMet } from "../engine/prohibitions.js";
@@ -332,28 +333,18 @@ function withResolvedFieldEffectTargets(
     if (!hasDynamicModifier) return [effect];
 
     changed = true;
-    const hasStaticSelfModifier = effect.modifiers.some(
-      (modifier) => !modifier.target || modifier.target.type === "SELF",
-    );
     const groups = new Map<string, {
       appliesTo: string[];
       modifiers: typeof effect.modifiers;
     }>();
 
     for (const modifier of effect.modifiers) {
-      const isDynamic =
-        modifier.target?.type !== undefined && modifier.target.type !== "SELF";
-      const effectForModifier = isDynamic && hasStaticSelfModifier
-        ? {
-            ...effect,
-            appliesTo: effect.appliesTo.filter(
-              (instanceId) => instanceId !== effect.sourceCardInstanceId,
-            ),
-          }
-        : effect;
+      if (!isModifierConditionMet(effect, modifier, authoritative, cardDb)) {
+        continue;
+      }
       const appliesTo = fieldCards
         .filter((card) => modifierAppliesToCard(
-          effectForModifier,
+          effect,
           modifier,
           card,
           authoritative,
