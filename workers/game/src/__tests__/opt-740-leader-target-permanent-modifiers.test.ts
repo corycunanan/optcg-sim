@@ -395,11 +395,10 @@ describe("OPT-740 — permanent modifier leader targets", () => {
     state = { ...state, players };
     state = registerPermanentEffectsForCard(state, crocodile, crocodileData);
 
-    // Known pre-existing bug: the active effect and raw-schema hand scan each
-    // apply -1. This pins today's observable behavior; a separate issue owns
-    // the rules-correct single application.
+    // The registered active effect is the single source of truth for the
+    // printed -1 CARD_IN_HAND modifier.
     expect(
       getEffectiveCost(blueEventData, state, blueEvent.instanceId, cardDb)
-    ).toBe(2);
+    ).toBe(3);
   });
 });

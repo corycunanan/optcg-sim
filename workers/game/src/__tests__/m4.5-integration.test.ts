@@ -52,6 +52,7 @@ import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
 import { payCosts } from "../engine/effect-resolver/cost-handler.js";
 import { findCardInstance } from "../engine/state.js";
 import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
+import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
 
@@ -271,13 +272,28 @@ describe("1. Hand-Zone Cost Modifiers", () => {
     const handEvent = makeInstance(blueEvent.id, "HAND", 0, { instanceId: "hand-event" });
     const handRedChar = makeInstance(redChar.id, "HAND", 0, { instanceId: "hand-red" });
     state.players[0].hand = [handEvent, handRedChar];
+    const registeredState = registerPermanentEffectsForCard(
+      state,
+      crocInstance,
+      crocodileCard
+    );
 
     // Blue Event should be reduced by 1
-    const eventCost = getEffectiveCost(blueEvent, state, "hand-event", cardDb);
+    const eventCost = getEffectiveCost(
+      blueEvent,
+      registeredState,
+      "hand-event",
+      cardDb
+    );
     expect(eventCost).toBe(3); // 4 - 1
 
     // Red Character should NOT be reduced
-    const charCost = getEffectiveCost(redChar, state, "hand-red", cardDb);
+    const charCost = getEffectiveCost(
+      redChar,
+      registeredState,
+      "hand-red",
+      cardDb
+    );
     expect(charCost).toBe(3); // Unchanged
   });
 

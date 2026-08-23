@@ -31,12 +31,6 @@ import {
   type EffectiveKeyword,
 } from "./effective-keyword.js";
 import { findCardInstance } from "./state.js";
-import { isPresent } from "./type-guards.js";
-import {
-  matchesTargetFilter,
-  type SharedTargetFilter,
-  type SharedTargetFilterCard,
-} from "../../../../shared/target-filter.js";
 import { resolvePermanentDynamicValue } from "./dynamic-values.js";
 
 type ConditionContext = Omit<QueryConditionContext, "queries">;
@@ -624,12 +618,6 @@ export function getEffectiveCost(
           cardInstanceId,
           cardDb
         );
-        cost += getFieldToHandCostModifier(
-          cardData,
-          state,
-          cardInstanceId,
-          cardDb
-        );
       }
     }
   }
@@ -678,12 +666,6 @@ export function getEffectiveCostForRead(
   let cost = getEffectiveCost(cardData, state, card.instanceId, cardDb, false);
   if (card.zone === "HAND" && cardDb) {
     cost += getHandZoneSelfCostModifier(
-      cardData,
-      state,
-      card.instanceId,
-      cardDb
-    );
-    cost += getFieldToHandCostModifier(
       cardData,
       state,
       card.instanceId,
@@ -816,145 +798,6 @@ function getHandZoneSelfCostModifier(
   }
 
   return adjustment;
-}
-
-/**
- * Evaluate field-to-hand cost modifiers from other cards on the field.
- * Returns the total cost adjustment for a card in hand.
- *
- * Example: OP01-067 Crocodile — while on field with DON!!×1, gives blue Events
- * in your hand −1 cost. These are permanent blocks on field cards whose modifiers
- * target CARD_IN_HAND.
- */
-function getFieldToHandCostModifier(
-  cardData: CardData,
-  state: GameState,
-  cardInstanceId: string,
-  cardDb: Map<string, CardData>
-): number {
-  const card = findCardInstance(state, cardInstanceId);
-  if (!card || card.zone !== "HAND") return 0;
-
-  let adjustment = 0;
-
-  for (const player of state.players) {
-    // Check leader, characters, and stage for field-to-hand modifiers
-    const fieldCards: CardInstance[] = [
-      player.leader,
-      ...player.characters.filter(isPresent),
-      ...(player.stage ? [player.stage] : []),
-    ];
-
-    for (const fieldCard of fieldCards) {
-      // OPT-261: a negated field Character's schema-sourced contributions are
-      // suppressed, including hand-zone cost modifiers it grants.
-      if (isCardNegated(fieldCard, state, cardDb)) continue;
-
-      const fieldCardData = cardDb.get(fieldCard.cardId);
-      if (!fieldCardData) continue;
-
-      const schema = fieldCardData.effectSchema;
-      if (!schema?.effects) continue;
-
-      for (const block of schema.effects) {
-        if (block.category !== "permanent") continue;
-        // Default zone is FIELD — skip HAND-zone blocks (those are self-reduction)
-        if (block.zone === "HAND") continue;
-        if (!block.modifiers) continue;
-
-        // Only consider blocks that have MODIFY_COST targeting CARD_IN_HAND
-        const handCostMods = block.modifiers.filter(
-          (m) => m.type === "MODIFY_COST" && m.target?.type === "CARD_IN_HAND"
-        );
-        if (handCostMods.length === 0) continue;
-
-        const ctx: ConditionContext = {
-          sourceCardInstanceId: fieldCard.instanceId,
-          controller: fieldCard.controller,
-          cardDb,
-        };
-
-        // Check if the hand card matches the modifier's target filter
-        for (const mod of handCostMods) {
-          if (!isModifierGateMet(block, mod, state, ctx)) continue;
-          if (!mod.target?.controller) continue;
-
-          // Controller check: the modifier's controller is relative to the field card
-          const targetControllerIdx: 0 | 1 | null =
-            mod.target.controller === "SELF"
-              ? fieldCard.controller
-              : mod.target.controller === "OPPONENT"
-                ? fieldCard.controller === 0
-                  ? 1
-                  : 0
-                : null;
-          if (
-            targetControllerIdx !== null &&
-            targetControllerIdx !== card.controller
-          )
-            continue;
-
-          // Filter check
-          if (
-            mod.target.filter &&
-            !matchesHandCardFilter(mod.target.filter, cardData)
-          )
-            continue;
-
-          const amount = permanentModifierParam(
-            mod,
-            "amount",
-            state,
-            fieldCard.controller,
-            cardDb,
-            block.id,
-          );
-          if (amount !== undefined) adjustment += amount;
-        }
-      }
-    }
-  }
-
-  return adjustment;
-}
-
-/**
- * Check if a card in hand matches a target filter from a field-to-hand modifier.
- */
-function matchesHandCardFilter(
-  filter: TargetFilter,
-  cardData: CardData
-): boolean {
-  const sharedCard: SharedTargetFilterCard = {
-    cost: cardData.cost ?? 0,
-    baseCost: cardData.cost ?? 0,
-    power: cardData.power ?? 0,
-    basePower: cardData.power ?? 0,
-    colors: cardData.color,
-    traits: cardData.types ?? [],
-    name: cardData.name,
-    attributes: cardData.attribute ?? [],
-    cardType: cardData.type,
-    attachedDonCount: 0,
-    hasTrigger: cardData.keywords.trigger,
-    hasEffect: Boolean(cardData.effectText.trim()),
-    hasBaseEffect: Boolean(cardData.effectText.trim()),
-    hasCounter: cardData.counter !== null && cardData.counter !== undefined,
-    treatsAsAllNames: false,
-    treatsAsAllTraits: false,
-    treatsAsAllAttributes: false,
-  };
-  const legacyHandFilter: SharedTargetFilter = {
-    color: filter.color,
-    color_includes: filter.color_includes,
-    card_type: filter.card_type,
-    traits: filter.traits,
-    cost_max: filter.cost_max,
-  };
-
-  return matchesTargetFilter(sharedCard, legacyHandFilter, {
-    getEffectiveCost: ({ cost }) => cost,
-  });
 }
 
 /**

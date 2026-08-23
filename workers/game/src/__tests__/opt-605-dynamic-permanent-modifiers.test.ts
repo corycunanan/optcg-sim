@@ -827,6 +827,11 @@ describe("OPT-605 — every permanent numeric application path", () => {
       players,
       activeEffects: [],
     };
+    fixture.state = registerPermanentEffectsForCard(
+      fixture.state,
+      aura,
+      auraData
+    );
 
     const read = (trashCount: number) => {
       const state = withTrashCount(fixture, trashCount).state;

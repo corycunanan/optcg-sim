@@ -37,7 +37,11 @@ import {
 } from "../engine/modifiers.js";
 import { canAttackThisTurn } from "../engine/keywords.js";
 import { hasBaseEffect, matchesFilter } from "../engine/conditions.js";
-import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
+import {
+  matchTriggersForEvent,
+  registerPermanentEffectsForCard,
+  registerTriggersForCard,
+} from "../engine/triggers.js";
 import { expireEndOfTurnEffects } from "../engine/duration-tracker.js";
 import { CARDS, padChars } from "./helpers.js";
 
@@ -538,14 +542,24 @@ describe("OPT-261: a negated field Character stops granting hand-zone cost reduc
     const handInst = makeInstance(handCard.id, "HAND", 0, { instanceId: "hand-evt" });
     state.players[0].characters = padChars([fieldInst]);
     state.players[0].hand = [handInst];
+    const withAura = registerPermanentEffectsForCard(
+      state,
+      fieldInst,
+      fieldCard
+    );
 
     // Baseline: reduction applies → 3 − 1 = 2.
-    expect(getEffectiveCost(handCard, state, handInst.instanceId, cardDb)).toBe(2);
+    expect(
+      getEffectiveCost(handCard, withAura, handInst.instanceId, cardDb)
+    ).toBe(2);
 
     // Negate the field source → reduction vanishes → cost back to 3.
     const negated = {
-      ...state,
-      activeEffects: [negationEffect(fieldInst.instanceId, { turn: state.turn.number })] as any,
+      ...withAura,
+      activeEffects: [
+        ...withAura.activeEffects,
+        negationEffect(fieldInst.instanceId, { turn: state.turn.number }),
+      ] as any,
     };
     expect(isCardNegated(fieldInst, negated, cardDb)).toBe(true);
     expect(getEffectiveCost(handCard, negated, handInst.instanceId, cardDb)).toBe(3);
