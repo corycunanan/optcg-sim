@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type {
   ActiveEffect,
+  ActiveProhibition,
   CardDb,
   EffectAvailability,
   GameAction,
@@ -94,6 +95,7 @@ export interface BoardLayoutProps {
   connectionStatus: string;
   eventLog: GameEvent[];
   activeEffects: ActiveEffect[];
+  prohibitions?: ActiveProhibition[];
   effectAvailability?: Record<string, EffectAvailability[]>;
   activePrompt: PromptOptions | null;
   activePromptId: string | null;
@@ -152,6 +154,7 @@ function BoardLayoutInner({
   battlePhase,
   connectionStatus,
   eventLog,
+  prohibitions = [],
   activePrompt,
   activePromptId,
   actionRejection = null,
@@ -524,6 +527,7 @@ function BoardLayoutInner({
             bottomPlayerIndex={bottomPlayerIndex}
             owner={composition.bottomOwner}
             cardDb={cardDb}
+            prohibitions={prohibitions}
             activeDragType={drag.activeDragType}
             activeDrag={drag.activeDrag}
             refreshWave={refreshWave}

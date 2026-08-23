@@ -390,6 +390,7 @@ function GameSessionView({
     connectionStatus: game.connectionStatus,
     eventLog: game.gameState.eventLog,
     activeEffects: game.gameState.activeEffects,
+    prohibitions: game.gameState.prohibitions,
     effectAvailability: game.gameState.effectAvailability,
     activePrompt,
     activePromptId,

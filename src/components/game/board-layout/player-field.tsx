@@ -2,6 +2,7 @@
 
 import { memo, useCallback } from "react";
 import type {
+  ActiveProhibition,
   CardDb,
   CardInstance,
   GameAction,
@@ -9,6 +10,12 @@ import type {
   TurnState,
 } from "@shared/game-types";
 import { hasRuntimeKeyword } from "@shared/effective-keyword";
+import { isBlockerProhibited } from "@shared/blocker-prohibition";
+import {
+  matchesTargetFilter,
+  type SharedTargetFilter,
+  type SharedTargetFilterCard,
+} from "@shared/target-filter";
 import { useActiveEffects } from "@/contexts/active-effects-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
@@ -49,6 +56,7 @@ interface PlayerFieldProps {
   bottomPlayerIndex: 0 | 1;
   owner: "me" | "opp";
   cardDb: CardDb;
+  prohibitions?: ActiveProhibition[];
   activeDragType: string | null;
   activeDrag: DragPayload | null;
   refreshWave: boolean;
@@ -88,6 +96,7 @@ function PlayerFieldComponent({
   bottomPlayerIndex,
   owner,
   cardDb,
+  prohibitions = [],
   activeDragType,
   activeDrag,
   refreshWave,
@@ -196,11 +205,30 @@ function PlayerFieldComponent({
           );
         }
         const charData = cardDb[char.cardId];
+        const blockerProhibited = isBlockerProhibited(
+          prohibitions,
+          {
+            instanceId: char.instanceId,
+            controller: char.controller,
+            cardType: charData?.type ?? "Character",
+          },
+          playerIndex,
+          {
+            matchesFilter: (filter) =>
+              matchesBlockerFilter(
+                char,
+                charData,
+                filter,
+                activeEffects,
+              ),
+          },
+        );
         const isBlockerEligible =
           interactionMode !== "spectator" &&
           inBlockStep &&
           !blockerAlreadyDeclared &&
           !attackerUnblockable &&
+          !blockerProhibited &&
           char.state === "ACTIVE" &&
           hasRuntimeKeyword(
             char.instanceId,
@@ -362,3 +390,61 @@ function PlayerFieldComponent({
 
 export const PlayerField = memo(PlayerFieldComponent);
 PlayerField.displayName = "PlayerField";
+
+function matchesBlockerFilter(
+  card: CardInstance,
+  cardData: CardDb[string] | undefined,
+  filter: SharedTargetFilter,
+  activeEffects: Parameters<typeof hasRuntimeKeyword>[2],
+): boolean {
+  const printedPower = card.basePower ?? cardData?.power ?? 0;
+  const sharedCard: SharedTargetFilterCard = {
+    controller: card.controller,
+    cost: cardData?.cost ?? 0,
+    baseCost: cardData?.cost ?? 0,
+    power: card.effectivePower ?? printedPower,
+    basePower: printedPower,
+    colors: cardData?.color ?? [],
+    traits: cardData?.types ?? [],
+    name: cardData?.name ?? card.cardId,
+    attributes: cardData?.attribute ?? [],
+    cardType: cardData?.type ?? "Character",
+    state: card.state,
+    attachedDonCount: card.attachedDon.length,
+    instanceId: card.instanceId,
+    hasTrigger: cardData?.keywords.trigger === true,
+    hasEffect: Boolean(cardData?.effectText?.trim()),
+    hasBaseEffect: Boolean(cardData?.effectText?.trim()),
+    hasCounter: cardData?.counter != null,
+    treatsAsAllNames: false,
+    treatsAsAllTraits: false,
+    treatsAsAllAttributes: false,
+  };
+
+  return matchesTargetFilter(sharedCard, filter, {
+    getEffectiveCost: () => cardData?.cost ?? 0,
+    getEffectivePower: () => card.effectivePower ?? printedPower,
+    hasKeyword: (_candidate, keyword) =>
+      isKeywordName(keyword) &&
+      hasRuntimeKeyword(
+        card.instanceId,
+        cardData?.keywords,
+        activeEffects,
+        keyword,
+      ),
+  });
+}
+
+function isKeywordName(
+  keyword: string,
+): keyword is Parameters<typeof hasRuntimeKeyword>[3] {
+  return [
+    "BLOCKER",
+    "RUSH",
+    "RUSH_CHARACTER",
+    "DOUBLE_ATTACK",
+    "UNBLOCKABLE",
+    "BANISH",
+    "TRIGGER",
+  ].includes(keyword);
+}

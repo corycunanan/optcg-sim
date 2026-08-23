@@ -5,6 +5,8 @@
  * Engine-internal types (PendingEvent, ExecuteResult) live there too.
  */
 
+import type { BlockerProhibition } from "./blocker-prohibition";
+
 // ─── Zones ────────────────────────────────────────────────────────────────────
 
 export type Zone =
@@ -215,10 +217,9 @@ export interface ActiveEffect {
   }>;
 }
 
-export interface ActiveProhibition {
+export interface ActiveProhibition extends BlockerProhibition {
   id: string;
   sourceCardInstanceId: string;
-  // Full type defined in M4
 }
 
 export interface ScheduledActionEntry {
