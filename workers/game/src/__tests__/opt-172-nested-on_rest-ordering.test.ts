@@ -83,7 +83,7 @@ function boardWith(cardDb: Map<string, CardData>, p0Chars: CardInstance[]): Game
 }
 
 describe("OPT-172: rule 6-2 ON_REST drain between SET_REST frames", () => {
-  it("executeSetRest returns pendingBatchTriggers when frame 1's CARD_STATE_CHANGED queues a CHARACTER_BECOMES_RESTED auto", () => {
+  it("executeSetRest defers ON_REST triggers until every SET_REST frame completes", () => {
     const cardDb = createTestCardDb();
     const restCard = makeOnRestDrawCard();
     cardDb.set(restCard.id, restCard);
@@ -108,28 +108,29 @@ describe("OPT-172: rule 6-2 ON_REST drain between SET_REST frames", () => {
       [c1.instanceId, c2.instanceId], resolverExecutionServices
     );
 
-    // Frame 1 rested; batch paused for trigger drain before frame 2.
+    // Both frames complete before the accumulated trigger batch is returned.
     expect(result.pendingBatchTriggers).toBeDefined();
-    expect(result.pendingBatchTriggers!.triggers).toHaveLength(1);
+    expect(result.pendingBatchTriggers!.triggers).toHaveLength(2);
+    expect(result.pendingBatchTriggers!.triggers.every((trigger) => trigger.groupSourceInstanceId === "any-source")).toBe(true);
     expect(result.pendingBatchTriggers!.marker.kind).toBe("SET_REST");
     if (result.pendingBatchTriggers!.marker.kind !== "SET_REST") throw new Error("kind");
-    expect(result.pendingBatchTriggers!.marker.remainingTargetIds).toEqual([c2.instanceId]);
-    expect(result.pendingBatchTriggers!.marker.restedSoFar).toEqual([c1.instanceId]);
+    expect(result.pendingBatchTriggers!.marker.remainingTargetIds).toEqual([]);
+    expect(result.pendingBatchTriggers!.marker.restedSoFar).toEqual([c1.instanceId, c2.instanceId]);
 
-    // Only frame 1's CARD_STATE_CHANGED has been emitted so far.
+    // Both state changes have been emitted before trigger resolution.
     const stateChangeEvents = result.events.filter((e) => e.type === "CARD_STATE_CHANGED");
-    expect(stateChangeEvents).toHaveLength(1);
+    expect(stateChangeEvents).toHaveLength(2);
     expect((stateChangeEvents[0].payload as { targetInstanceId: string }).targetInstanceId).toBe(c1.instanceId);
 
-    // Frame 1's character is now RESTED; frame 2 is still ACTIVE.
+    // Both characters are now RESTED.
     const chars = result.state.players[0].characters.filter(Boolean) as CardInstance[];
     const c1After = chars.find((c) => c.instanceId === c1.instanceId);
     const c2After = chars.find((c) => c.instanceId === c2.instanceId);
     expect(c1After?.state).toBe("RESTED");
-    expect(c2After?.state).toBe("ACTIVE");
+    expect(c2After?.state).toBe("RESTED");
   });
 
-  it("integrated: drains ON_REST between frames so events fire CARD_STATE_CHANGED → CARD_DRAWN → CARD_STATE_CHANGED", () => {
+  it("integrated: prompts after both SET_REST frames produce simultaneous triggers", () => {
     const cardDb = createTestCardDb();
     const restCard = makeOnRestDrawCard();
     cardDb.set(restCard.id, restCard);
@@ -150,22 +151,13 @@ describe("OPT-172: rule 6-2 ON_REST drain between SET_REST frames", () => {
     };
 
     const result = resolveEffect(state, block, "any-source", 0, cardDb);
-    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(result.pendingPrompt?.options.promptType === "PLAYER_CHOICE" && result.pendingPrompt.options.effectDescription).toBe("Choose which effect to activate first");
 
     // Both characters rested; frame 1's CHARACTER_BECOMES_RESTED drew a card.
     const stateChangeEvents = result.events.filter((e) => e.type === "CARD_STATE_CHANGED");
     expect(stateChangeEvents).toHaveLength(2);
-    const drawEvents = result.events.filter((e) => e.type === "CARD_DRAWN");
-    expect(drawEvents.length).toBeGreaterThanOrEqual(1);
-
-    // Strict ordering: frame 1's CARD_STATE_CHANGED, then DRAW (rule 6-2 drain),
-    // then frame 2's CARD_STATE_CHANGED — never the reverse.
-    const types = result.events.map((e) => e.type);
-    const firstStateIdx = types.indexOf("CARD_STATE_CHANGED");
-    const lastStateIdx = types.lastIndexOf("CARD_STATE_CHANGED");
-    const drawIdx = types.indexOf("CARD_DRAWN");
-    expect(firstStateIdx).toBeLessThan(drawIdx);
-    expect(drawIdx).toBeLessThan(lastStateIdx);
+    expect(result.events.filter((e) => e.type === "CARD_DRAWN")).toHaveLength(0);
 
     // Both characters end RESTED.
     const chars = result.state.players[0].characters.filter(Boolean) as CardInstance[];

@@ -118,14 +118,14 @@ function emptyBoardWith(
 }
 
 describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
-  it("executePlayCard returns pendingBatchTriggers when frame 1's ON_PLAY queues a trigger", () => {
+  it("executePlayCard defers ON_PLAY triggers until every PLAY_CARD frame completes", () => {
     const cardDb = createTestCardDb();
     const drawCard = makeOnPlayDrawCard();
     cardDb.set(drawCard.id, drawCard);
 
     const trash = [
       trashChar(drawCard.id, "first"),
-      trashChar(CARDS.VANILLA.id, "second"),
+      trashChar(drawCard.id, "second"),
     ];
     const state = emptyBoardWith(cardDb, trash);
 
@@ -145,33 +145,31 @@ describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
       trash.map((c) => c.instanceId),
     );
 
-    // Frame 1 played; batch paused for trigger drain before frame 2.
+    // Both frames play before the accumulated trigger batch is returned.
     expect(result.pendingBatchTriggers).toBeDefined();
-    expect(result.pendingBatchTriggers!.triggers).toHaveLength(1);
+    expect(result.pendingBatchTriggers!.triggers).toHaveLength(2);
+    expect(result.pendingBatchTriggers!.triggers.every((trigger) => trigger.groupSourceInstanceId === "any-source")).toBe(true);
     expect(result.pendingBatchTriggers!.marker.kind).toBe("PLAY_CARD");
     if (result.pendingBatchTriggers!.marker.kind !== "PLAY_CARD") throw new Error("kind");
-    expect(result.pendingBatchTriggers!.marker.resumeFrame.remainingTargetIds).toEqual([
-      "trash-second",
-    ]);
-    expect(result.pendingBatchTriggers!.marker.resumeFrame.playedSoFar).toHaveLength(1);
+    expect(result.pendingBatchTriggers!.marker.resumeFrame.remainingTargetIds).toEqual([]);
+    expect(result.pendingBatchTriggers!.marker.resumeFrame.playedSoFar).toHaveLength(2);
 
-    // Only frame 1's CARD_PLAYED has been emitted so far.
+    // Both CARD_PLAYED events have been emitted before trigger resolution.
     const played = result.events.filter((e) => e.type === "CARD_PLAYED");
-    expect(played).toHaveLength(1);
+    expect(played).toHaveLength(2);
     expect((played[0].payload as { cardId: string }).cardId).toBe(drawCard.id);
-    // Frame 1's source-zone card was consumed; frame 2 still in trash.
-    expect(result.state.players[0].trash.map((c) => c.instanceId)).toEqual(["trash-second"]);
-    expect(result.state.players[0].characters.filter(Boolean)).toHaveLength(1);
+    expect(result.state.players[0].trash).toHaveLength(0);
+    expect(result.state.players[0].characters.filter(Boolean)).toHaveLength(2);
   });
 
-  it("integrated: drains trigger between frames so events fire CARD_PLAYED → CARD_DRAWN → CARD_PLAYED", () => {
+  it("integrated: resolves the trigger after both CARD_PLAYED events", () => {
     const cardDb = createTestCardDb();
     const drawCard = makeOnPlayDrawCard();
     cardDb.set(drawCard.id, drawCard);
 
     const trash = [
       trashChar(drawCard.id, "first"),
-      trashChar(CARDS.VANILLA.id, "second"),
+      trashChar(drawCard.id, "second"),
     ];
     const state = emptyBoardWith(cardDb, trash);
 
@@ -188,22 +186,19 @@ describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
     };
 
     const result = resolveEffect(state, block, "any-source", 0, cardDb);
-    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
     // Both frames played; one card drawn from frame 1's ON_PLAY.
     const cardPlayed = result.events.filter((e) => e.type === "CARD_PLAYED");
     expect(cardPlayed).toHaveLength(2);
     const cardDrawn = result.events.filter((e) => e.type === "CARD_DRAWN");
-    expect(cardDrawn.length).toBeGreaterThanOrEqual(1);
+    expect(cardDrawn).toHaveLength(0);
 
-    // Strict ordering: frame 1's CARD_PLAYED, then DRAW (rule 6-2 drain), then
-    // frame 2's CARD_PLAYED — never the reverse.
+    // Both plays complete before the deferred trigger resolves.
     const types = result.events.map((e) => e.type);
     const firstPlayedIdx = types.indexOf("CARD_PLAYED");
     const lastPlayedIdx = types.lastIndexOf("CARD_PLAYED");
-    const drawIdx = types.indexOf("CARD_DRAWN");
-    expect(firstPlayedIdx).toBeLessThan(drawIdx);
-    expect(drawIdx).toBeLessThan(lastPlayedIdx);
+    expect(firstPlayedIdx).toBeLessThan(lastPlayedIdx);
   });
 
   it("frame 1's ON_PLAY emits CARD_TRASHED strictly between frame 1 and frame 2 plays", () => {
@@ -217,7 +212,7 @@ describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
     // strictly between the two CARD_PLAYED events.
     const trashSources: CardInstance[] = [
       { instanceId: "ts1", cardId: trashHandCard.id, zone: "TRASH", state: "ACTIVE", attachedDon: [], turnPlayed: 0, controller: 0, owner: 0 },
-      { instanceId: "ts2", cardId: CARDS.VANILLA.id, zone: "TRASH", state: "ACTIVE", attachedDon: [], turnPlayed: 0, controller: 0, owner: 0 },
+      { instanceId: "ts2", cardId: trashHandCard.id, zone: "TRASH", state: "ACTIVE", attachedDon: [], turnPlayed: 0, controller: 0, owner: 0 },
     ];
     const handBystander: CardInstance = {
       instanceId: "bystander", cardId: CARDS.VANILLA.id, zone: "HAND",
@@ -245,25 +240,24 @@ describe("OPT-172: rule 6-2 ON_PLAY drain between PLAY_CARD frames", () => {
     };
 
     const result = resolveEffect(state, block, "any-source", 0, cardDb);
-    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
     // Both frames played, plus the bystander was trashed by frame 1's ON_PLAY.
     const cardPlayed = result.events.filter((e) => e.type === "CARD_PLAYED");
     expect(cardPlayed).toHaveLength(2);
     expect((cardPlayed[0].payload as { cardId: string }).cardId).toBe(trashHandCard.id);
-    expect((cardPlayed[1].payload as { cardId: string }).cardId).toBe(CARDS.VANILLA.id);
+    expect((cardPlayed[1].payload as { cardId: string }).cardId).toBe(trashHandCard.id);
 
-    // Rule 6-2 ordering: CARD_TRASHED (from frame 1's ON_PLAY) sits strictly
-    // between frame 1's CARD_PLAYED and frame 2's CARD_PLAYED.
+    // The deferred ON_PLAY resolves after both play frames.
     const types = result.events.map((e) => e.type);
     const firstPlayedIdx = types.indexOf("CARD_PLAYED");
     const lastPlayedIdx = types.lastIndexOf("CARD_PLAYED");
     const trashedIdx = types.indexOf("CARD_TRASHED");
-    expect(trashedIdx).toBeGreaterThan(firstPlayedIdx);
-    expect(trashedIdx).toBeLessThan(lastPlayedIdx);
+    expect(lastPlayedIdx).toBeGreaterThan(firstPlayedIdx);
+    expect(trashedIdx).toBe(-1);
 
     // Bystander trashed; both batched cards on the board.
-    expect(result.state.players[0].hand).toHaveLength(0);
+    expect(result.state.players[0].hand).toHaveLength(1);
     expect(result.state.players[0].characters.filter(Boolean)).toHaveLength(2);
   });
 });

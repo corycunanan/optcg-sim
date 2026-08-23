@@ -152,6 +152,7 @@ export interface ResumeContext {
       remaining: { ACTIVE: number; RESTED: number };
       playedSoFar: string[];
       forcedFirstState?: "ACTIVE" | "RESTED";
+      queuedTriggers?: QueuedTrigger[];
     };
   };
   // OPT-114: when a PLAY_CARD with entry_state="PLAYER_CHOICE" pauses to ask the
@@ -163,6 +164,7 @@ export interface ResumeContext {
     remainingTargetIds: string[];
     remaining: { ACTIVE: number; RESTED: number };
     playedSoFar: string[];
+    queuedTriggers?: QueuedTrigger[];
   };
   // OPT-172: pause-and-return marker for rule 6-2 trigger interleaving.
   batchResumeMarker?: BatchResumeMarker;
@@ -271,6 +273,7 @@ export interface EffectStackFrame {
       remaining: { ACTIVE: number; RESTED: number };
       playedSoFar: string[];
       forcedFirstState?: "ACTIVE" | "RESTED";
+      queuedTriggers?: QueuedTrigger[];
     };
   };
   // OPT-114: mirror of ResumeContext.stateDistributionForPlay so the per-frame
@@ -280,6 +283,7 @@ export interface EffectStackFrame {
     remainingTargetIds: string[];
     remaining: { ACTIVE: number; RESTED: number };
     playedSoFar: string[];
+    queuedTriggers?: QueuedTrigger[];
   };
   // OPT-172: mirror of ActionResult.pendingBatchTriggers so the pending
   // batch-resume survives stack persistence through disconnects.
@@ -293,6 +297,7 @@ export interface EffectStackFrame {
 
 export interface QueuedTrigger {
   sourceCardInstanceId: string;
+  groupSourceInstanceId?: string;
   controller: 0 | 1;
   effectBlock: import("./engine/effect-types.js").EffectBlock;
   triggeringEvent: PendingGameEvent;

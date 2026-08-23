@@ -392,98 +392,15 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
     expectAllEldersPlayed(result.state);
   });
 
-  it("keeps a distributed play prompt above an outer interrupted continuation", () => {
+  it("finishes the play batch before the optional ON_PLAY prompt", () => {
     const scenario = selectFiveElders(true);
     expect(scenario.result.pendingPrompt?.options.promptType).toBe(
       "OPTIONAL_EFFECT"
     );
-    expect(
-      scenario.result.state.effectStack.map((frame) => frame.phase)
-    ).toEqual(["AWAITING_BATCH_RESUME", "AWAITING_OPTIONAL_RESPONSE"]);
-
-    const [batchFrame, optionalFrame] = scenario.result.state.effectStack;
-    if (batchFrame.batchResumeMarker?.kind !== "PLAY_CARD") {
-      throw new Error("Expected a PLAY_CARD batch resume marker");
-    }
-    const promptedTarget = scenario.selected[1];
-    const distributedAction = {
-      ...batchFrame.batchResumeMarker.pausedAction,
-      params: {
-        ...batchFrame.batchResumeMarker.pausedAction.params,
-        entry_state: "PLAYER_CHOICE" as const,
-        state_distribution: { ACTIVE: 1, RESTED: 1 },
-      },
-    };
-    const distributedBatchFrame: EffectStackFrame = {
-      ...batchFrame,
-      batchResumeMarker: {
-        kind: "PLAY_CARD",
-        pausedAction: distributedAction,
-        resumeFrame: {
-          remainingTargetIds: [promptedTarget.instanceId],
-          remaining: { ACTIVE: 1, RESTED: 1 },
-          playedSoFar: batchFrame.batchResumeMarker.resumeFrame.playedSoFar,
-        },
-      },
-    };
-    const outerFrame: EffectStackFrame = {
-      ...batchFrame,
-      id: "outer-interrupted-continuation",
-      phase: "INTERRUPTED_BY_TRIGGERS",
-      pausedAction: null,
-      remainingActions: [
-        {
-          type: "SET_REST",
-          target: {
-            type: "CHARACTER",
-            controller: "SELF",
-            count: { all: true },
-          },
-        },
-      ],
-      pendingTriggers: [],
-      batchResumeMarker: undefined,
-    };
-    const lifecycleServices = {
-      drainPregame: (state: GameState) => state,
-      advanceStartOfTurn: (state: GameState) => state,
-    };
-    const nestedState: GameState = {
-      ...scenario.result.state,
-      effectStack: [outerFrame, distributedBatchFrame, optionalFrame],
-      pendingPrompt: scenario.result.pendingPrompt ?? null,
-    };
-
-    const declined = resumePromptLifecycle(
-      nestedState,
-      { type: "PLAYER_CHOICE", choiceId: "skip" },
-      scenario.cardDb,
-      lifecycleServices
-    );
-    expect(declined.state.pendingPrompt?.options.promptType).toBe(
-      "PLAYER_CHOICE"
-    );
-    if (declined.state.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
-      throw new Error("Expected a play state-choice prompt");
-    }
-    const activeChoice = declined.state.pendingPrompt.options.choices.find(
-      (choice) => choice.id.endsWith(":ACTIVE")
-    );
-    if (!activeChoice) throw new Error("Expected an active play choice");
-
-    const completed = resumePromptLifecycle(
-      declined.state,
-      { type: "PLAYER_CHOICE", choiceId: activeChoice.id },
-      scenario.cardDb,
-      lifecycleServices
-    );
-    const playedTarget = completed.state.players[0].characters.find(
-      (card) => card?.cardId === promptedTarget.cardId
-    );
-
-    expect(playedTarget).toBeDefined();
-    expect(playedTarget?.state).toBe("RESTED");
-    expect(completed.state.effectStack).toHaveLength(0);
+    expect(scenario.result.state.effectStack.map((frame) => frame.phase)).toEqual([
+      "AWAITING_OPTIONAL_RESPONSE",
+    ]);
+    expectAllEldersPlayed({ ...scenario.result.state, effectStack: [] });
   });
 
   it("resumes trailing actions after accepting a replacement during KO batch re-entry", () => {
@@ -699,22 +616,8 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
         },
       ],
     };
-    let result = resolveEffect(state, block, "effect-source", 0, cardDb);
-    expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    result = resumeFromStack(
-      result.state,
-      {
-        type: "SELECT_TARGET",
-        selectedInstanceIds: [usopp.instanceId, secondVictim.instanceId],
-      },
-      cardDb
-    );
-    expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    result = resumeFromStack(
-      result.state,
-      { type: "SELECT_TARGET", selectedInstanceIds: [ownTarget.instanceId] },
-      cardDb
-    );
+    const result = resolveEffect(state, block, "effect-source", 0, cardDb);
+    expect(result.pendingPrompt).toBeUndefined();
 
     expect(result.state.players[1].characters.filter(Boolean)).toHaveLength(0);
     expect(

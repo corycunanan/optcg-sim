@@ -175,6 +175,13 @@ export function handleSelectTargetRuleTrashForPlay(
   // after the current card is placed. Otherwise fall back to the legacy
   // single-target re-entry (OPT-171).
   const batch = ruleTrashForPlay.batch;
+  let queuedTriggers = [...(batch?.queuedTriggers ?? [])];
+  if (batch && events.length > 0) {
+    const scan = scanEventsForTriggers(nextState, events, controller, cardDb, effectSourceInstanceId);
+    nextState = scan.state;
+    replacePendingEventReferences(events, events, scan.events);
+    queuedTriggers = [...queuedTriggers, ...scan.triggers];
+  }
   const actionResult = batch
     ? executePlayCard(
         nextState,
@@ -189,6 +196,7 @@ export function handleSelectTargetRuleTrashForPlay(
           remaining: batch.remaining,
           playedSoFar: batch.playedSoFar,
           forcedFirstState: batch.forcedFirstState,
+          queuedTriggers,
         }
       )
     : services.executeEffectAction(
@@ -222,6 +230,23 @@ export function handleSelectTargetRuleTrashForPlay(
   }
   if (actionResult.result && pausedAction.result_ref) {
     resultRefs.set(pausedAction.result_ref, actionResult.result);
+  }
+  if (actionResult.pendingBatchTriggers) {
+    const { triggers, marker } = actionResult.pendingBatchTriggers;
+    nextState = pushBatchResumeFrame(
+      nextState,
+      effectSourceInstanceId,
+      controller,
+      CONTINUATION_EFFECT_BLOCK,
+      marker,
+      triggers,
+      remainingActions,
+      resultRefs,
+    );
+    return {
+      kind: "terminal",
+      result: services.processRemainingTriggers(nextState, triggers, cardDb, events),
+    };
   }
 
   // Scan for triggers produced by the re-entered play (e.g., ON_PLAY)

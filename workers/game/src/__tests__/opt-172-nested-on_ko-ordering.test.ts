@@ -84,14 +84,14 @@ function boardWith(cardDb: Map<string, CardData>, p0Chars: CardInstance[]): Game
 }
 
 describe("OPT-172: rule 6-2 ON_KO drain between KO frames", () => {
-  it("executeKO returns pendingBatchTriggers when frame 1's CARD_KO queues an ON_KO trigger", () => {
+  it("executeKO defers ON_KO triggers until every KO frame completes", () => {
     const cardDb = createTestCardDb();
     const drawCard = makeOnKoDrawCard();
     cardDb.set(drawCard.id, drawCard);
 
     // Two SELF characters: the first has ON_KO Draw, the second is vanilla.
     const c1 = fieldChar(drawCard.id, 0, "ko-1");
-    const c2 = fieldChar(CARDS.VANILLA.id, 0, "ko-2");
+    const c2 = fieldChar(drawCard.id, 0, "ko-2");
     const state = boardWith(cardDb, [c1, c2]);
 
     const action: Action = {
@@ -109,33 +109,33 @@ describe("OPT-172: rule 6-2 ON_KO drain between KO frames", () => {
       [c1.instanceId, c2.instanceId], resolverExecutionServices
     );
 
-    // Frame 1 KO'd; batch paused for trigger drain before frame 2.
+    // Both frames complete before the accumulated trigger batch is returned.
     expect(result.pendingBatchTriggers).toBeDefined();
-    expect(result.pendingBatchTriggers!.triggers).toHaveLength(1);
+    expect(result.pendingBatchTriggers!.triggers).toHaveLength(2);
+    expect(result.pendingBatchTriggers!.triggers.every((trigger) => trigger.groupSourceInstanceId === "any-source")).toBe(true);
     expect(result.pendingBatchTriggers!.marker.kind).toBe("KO");
     if (result.pendingBatchTriggers!.marker.kind !== "KO") throw new Error("kind");
-    expect(result.pendingBatchTriggers!.marker.remainingTargetIds).toEqual([c2.instanceId]);
-    expect(result.pendingBatchTriggers!.marker.koedSoFar).toHaveLength(1);
+    expect(result.pendingBatchTriggers!.marker.remainingTargetIds).toEqual([]);
+    expect(result.pendingBatchTriggers!.marker.koedSoFar).toHaveLength(2);
     expect(result.pendingBatchTriggers!.marker.koedSoFar).not.toContain(c1.instanceId);
 
-    // Only frame 1's CARD_KO has been emitted so far.
+    // Both CARD_KO events have been emitted before trigger resolution.
     const koEvents = result.events.filter((e) => e.type === "CARD_KO");
-    expect(koEvents).toHaveLength(1);
+    expect(koEvents).toHaveLength(2);
     expect((koEvents[0].payload as { cardInstanceId: string }).cardInstanceId).toBe(c1.instanceId);
 
-    // Frame 1's character is in trash; frame 2 is still on the field.
+    // Both characters have left the field.
     const survivors = result.state.players[0].characters.filter(Boolean);
-    expect(survivors).toHaveLength(1);
-    expect(survivors[0]!.instanceId).toBe(c2.instanceId);
+    expect(survivors).toHaveLength(0);
   });
 
-  it("integrated: drains ON_KO between frames so events fire CARD_KO → CARD_DRAWN → CARD_KO", () => {
+  it("integrated: resolves ON_KO after both KO frames", () => {
     const cardDb = createTestCardDb();
     const drawCard = makeOnKoDrawCard();
     cardDb.set(drawCard.id, drawCard);
 
     const c1 = fieldChar(drawCard.id, 0, "ko-1");
-    const c2 = fieldChar(CARDS.VANILLA.id, 0, "ko-2");
+    const c2 = fieldChar(drawCard.id, 0, "ko-2");
     const state = boardWith(cardDb, [c1, c2]);
 
     const block: EffectBlock = {
@@ -150,22 +150,19 @@ describe("OPT-172: rule 6-2 ON_KO drain between KO frames", () => {
     };
 
     const result = resolveEffect(state, block, "any-source", 0, cardDb);
-    expect(result.pendingPrompt).toBeUndefined();
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
 
     // Both characters KO'd; frame 1's ON_KO drew a card.
     const koEvents = result.events.filter((e) => e.type === "CARD_KO");
     expect(koEvents).toHaveLength(2);
     const drawEvents = result.events.filter((e) => e.type === "CARD_DRAWN");
-    expect(drawEvents.length).toBeGreaterThanOrEqual(1);
+    expect(drawEvents).toHaveLength(0);
 
-    // Strict ordering: frame 1's CARD_KO, then DRAW (rule 6-2 drain), then
-    // frame 2's CARD_KO — never the reverse.
+    // Both KOs complete before the deferred trigger resolves.
     const types = result.events.map((e) => e.type);
     const firstKoIdx = types.indexOf("CARD_KO");
     const lastKoIdx = types.lastIndexOf("CARD_KO");
-    const drawIdx = types.indexOf("CARD_DRAWN");
-    expect(firstKoIdx).toBeLessThan(drawIdx);
-    expect(drawIdx).toBeLessThan(lastKoIdx);
+    expect(firstKoIdx).toBeLessThan(lastKoIdx);
 
     // Field cleared.
     expect(result.state.players[0].characters.filter(Boolean)).toHaveLength(0);

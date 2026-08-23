@@ -86,41 +86,33 @@ export function executeKO(
   const unprotectedIds = batch.unprotectedIds;
   const koedIds: string[] = [];
 
-  // OPT-172: rule 6-2 — drain ON_KO triggers between frames. Each frame KOs
-  // one target, then scans its events for auto triggers. If any fire and more
-  // targets remain, pause the batch so the resolver can resolve the triggers
-  // before the next CARD_KO is emitted.
   for (let i = 0; i < unprotectedIds.length; i++) {
     const id = unprotectedIds[i];
-    const frameEvents: PendingEvent[] = [];
     const result = koCharacter(nextState, id, controller);
     if (result) {
       nextState = result.state;
       events.push(...result.events);
-      frameEvents.push(...result.events);
       koedIds.push(result.transition.newInstanceId);
     }
+  }
 
-    if (frameEvents.length > 0 && i + 1 < unprotectedIds.length) {
-      const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
-      nextState = scan.state;
-      replacePendingEventReferences(events, frameEvents, scan.events);
-      if (scan.triggers.length > 0) {
-        const marker: BatchResumeMarker = {
-          kind: "KO",
-          pausedAction: action,
-          remainingTargetIds: unprotectedIds.slice(i + 1),
-          koedSoFar: koedIds,
-        };
-        return {
-          state: nextState,
-          events,
-          succeeded: koedIds.length > 0,
-          result: { targetInstanceIds: koedIds, count: koedIds.length },
-          pendingBatchTriggers: { triggers: scan.triggers, marker },
-        };
-      }
-    }
+  const scan = scanEventsForTriggers(nextState, events, controller, cardDb, sourceCardInstanceId);
+  nextState = scan.state;
+  if (scan.triggers.length > 1) {
+    replacePendingEventReferences(events, [...events], scan.events);
+    const marker: BatchResumeMarker = {
+      kind: "KO",
+      pausedAction: action,
+      remainingTargetIds: [],
+      koedSoFar: koedIds,
+    };
+    return {
+      state: nextState,
+      events,
+      succeeded: koedIds.length > 0,
+      result: { targetInstanceIds: koedIds, count: koedIds.length },
+      pendingBatchTriggers: { triggers: scan.triggers, marker },
+    };
   }
 
   return {

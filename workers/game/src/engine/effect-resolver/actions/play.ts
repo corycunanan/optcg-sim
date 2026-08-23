@@ -15,6 +15,7 @@ import type {
   GameState,
   PendingEvent,
   PendingPromptState,
+  QueuedTrigger,
   ResumeContext,
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
@@ -67,6 +68,7 @@ function playOneCharacter(
     remaining: { ACTIVE: number; RESTED: number };
     playedSoFar: string[];
     forcedFirstState?: "ACTIVE" | "RESTED";
+    queuedTriggers?: QueuedTrigger[];
   },
 ): FrameResult {
   const events: PendingEvent[] = [];
@@ -179,6 +181,7 @@ export type PlayCardResumeFrame = {
   // Optional override for the first frame (the PLAYER_CHOICE response).
   // If omitted, the distribution counters pick the state.
   forcedFirstState?: "ACTIVE" | "RESTED";
+  queuedTriggers?: QueuedTrigger[];
 };
 
 export function executePlayCard(
@@ -233,6 +236,8 @@ export function executePlayCard(
 
   let nextState = state;
   const playedIds: string[] = [...(resumeFrame?.playedSoFar ?? [])];
+  const queuedTriggers: QueuedTrigger[] = [...(resumeFrame?.queuedTriggers ?? [])];
+  const scannedEvents: PendingEvent[] = [];
 
   for (let i = 0; i < targetIds.length; i++) {
     const id = targetIds[i];
@@ -253,6 +258,9 @@ export function executePlayCard(
           const activeLeft = remaining.ACTIVE > 0;
           const restedLeft = remaining.RESTED > 0;
           if (activeLeft && restedLeft) {
+            if (queuedTriggers.length > 0) {
+              replacePendingEventReferences(events, [...events], scannedEvents);
+            }
             // Pause for PLAYER_CHOICE on this frame.
             const pendingPrompt: PendingPromptState = {
               options: {
@@ -276,6 +284,7 @@ export function executePlayCard(
                   remainingTargetIds: targetIds.slice(i),
                   remaining,
                   playedSoFar: playedIds,
+                  queuedTriggers,
                 },
               },
             };
@@ -297,6 +306,7 @@ export function executePlayCard(
         // Pin the entry_state we'd already resolved for this frame so the
         // state-choice prompt doesn't re-fire for the same card after overflow.
         ...(isDistributed ? { forcedFirstState: frameEntryState } : {}),
+        queuedTriggers,
       };
       frame = playOneCharacter(nextState, action, card, sourceCardInstanceId, controller, frameEntryState, resultRefs, batchContinuation);
 
@@ -315,38 +325,44 @@ export function executePlayCard(
     nextState = frame.state;
     events.push(...frame.events);
     if (frame.pendingPrompt) {
+      if (queuedTriggers.length > 0) {
+        replacePendingEventReferences(events, [...events], scannedEvents);
+      }
       return { state: nextState, events, succeeded: false, pendingPrompt: frame.pendingPrompt };
     }
     if (frame.failed) break;
     if (frame.playedId) playedIds.push(frame.playedId);
 
-    // OPT-172: §8-6 / §8-6-1-1 — drain ON_PLAY triggers between frames. If this
-    // frame queued any triggers and more frames remain, pause the batch and
-    // surface a resume marker so the resolver can drain triggers first and
-    // then re-invoke us with the remaining-batch state.
-    if (frame.playedId && i + 1 < targetIds.length && frame.events.length > 0) {
-      const scan = scanEventsForTriggers(nextState, frame.events, controller, cardDb);
+    if (frame.events.length > 0) {
+      const scan = scanEventsForTriggers(nextState, frame.events, controller, cardDb, sourceCardInstanceId);
       nextState = scan.state;
-      replacePendingEventReferences(events, frame.events, scan.events);
-      if (scan.triggers.length > 0) {
-        const marker: BatchResumeMarker = {
-          kind: "PLAY_CARD",
-          pausedAction: action,
-          resumeFrame: {
-            remainingTargetIds: targetIds.slice(i + 1),
-            remaining,
-            playedSoFar: playedIds,
-          },
-        };
-        return {
-          state: nextState,
-          events,
-          succeeded: playedIds.length > 0,
-          result: { targetInstanceIds: playedIds, count: playedIds.length },
-          pendingBatchTriggers: { triggers: scan.triggers, marker },
-        };
-      }
+      scannedEvents.push(...scan.events);
+      queuedTriggers.push(...scan.triggers);
     }
+
+  }
+
+  if (queuedTriggers.length > 1) {
+    replacePendingEventReferences(events, [...events], scannedEvents);
+    const marker: BatchResumeMarker = {
+      kind: "PLAY_CARD",
+      pausedAction: action,
+      resumeFrame: { remainingTargetIds: [], remaining, playedSoFar: playedIds },
+    };
+    return {
+      state: nextState,
+      events,
+      succeeded: playedIds.length > 0,
+      result: { targetInstanceIds: playedIds, count: playedIds.length },
+      pendingBatchTriggers: { triggers: queuedTriggers, marker },
+    };
+  }
+  if (queuedTriggers.length === 1) {
+    nextState = {
+      ...nextState,
+      triggerRegistry: state.triggerRegistry,
+      activeEffects: state.activeEffects,
+    };
   }
 
   return {
@@ -473,35 +489,29 @@ export function executeSetRest(
     const preRest = findCardInstance(nextState, id);
     if (preRest && preRest.state !== "ACTIVE") continue;
 
-    const frameEvents: PendingEvent[] = [];
-
     nextState = setCardState(nextState, id, "RESTED");
     const evt: PendingEvent = { type: "CARD_STATE_CHANGED", playerIndex: controller, payload: { targetInstanceId: id, newState: "RESTED" } };
     events.push(evt);
-    frameEvents.push(evt);
     restedIds.push(id);
+  }
 
-    // OPT-172: §8-6 / §8-6-1-1 — drain ON_REST triggers between SET_REST frames.
-    if (i + 1 < unprotectedIds.length && frameEvents.length > 0) {
-      const scan = scanEventsForTriggers(nextState, frameEvents, controller, cardDb);
-      nextState = scan.state;
-      replacePendingEventReferences(events, frameEvents, scan.events);
-      if (scan.triggers.length > 0) {
-        const marker: BatchResumeMarker = {
-          kind: "SET_REST",
-          pausedAction: action,
-          remainingTargetIds: unprotectedIds.slice(i + 1),
-          restedSoFar: restedIds,
-        };
-        return {
-          state: nextState,
-          events,
-          succeeded: restedIds.length > 0,
-          result: { targetInstanceIds: restedIds, count: restedIds.length },
-          pendingBatchTriggers: { triggers: scan.triggers, marker },
-        };
-      }
-    }
+  const scan = scanEventsForTriggers(nextState, events, controller, cardDb, sourceCardInstanceId);
+  nextState = scan.state;
+  if (scan.triggers.length > 1) {
+    replacePendingEventReferences(events, [...events], scan.events);
+    const marker: BatchResumeMarker = {
+      kind: "SET_REST",
+      pausedAction: action,
+      remainingTargetIds: [],
+      restedSoFar: restedIds,
+    };
+    return {
+      state: nextState,
+      events,
+      succeeded: restedIds.length > 0,
+      result: { targetInstanceIds: restedIds, count: restedIds.length },
+      pendingBatchTriggers: { triggers: scan.triggers, marker },
+    };
   }
 
   return {
