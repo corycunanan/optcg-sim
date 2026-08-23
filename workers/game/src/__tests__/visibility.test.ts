@@ -12,10 +12,20 @@ import {
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
 import { hasRuntimeKeyword } from "../../../../shared/effective-keyword.js";
-import { hasGrantedKeyword } from "../engine/modifiers.js";
+import {
+  getEffectiveCost,
+  getEffectiveFieldCost,
+  hasGrantedKeyword,
+} from "../engine/modifiers.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import { OP11_046_VINSMOKE_YONJI } from "../engine/schemas/op11.js";
-import type { EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
+import type {
+  Duration,
+  DynamicValue,
+  EffectSchema,
+  RuntimeActiveEffect,
+  RuntimeProhibition,
+} from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 import {
@@ -521,6 +531,136 @@ describe("visible field power", () => {
   });
 });
 
+describe("visible field cost", () => {
+  function setter(
+    id: string,
+    controller: 0 | 1,
+    value: number | DynamicValue,
+    duration?: Duration,
+  ): RuntimeActiveEffect {
+    return {
+      id,
+      sourceCardInstanceId: `source-${controller}`,
+      sourceEffectBlockId: id,
+      category: "permanent",
+      modifiers: [{ type: "SET_COST", params: { value }, duration }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller,
+      appliesTo: [],
+      timestamp: 1,
+    };
+  }
+
+  function costState(effects: RuntimeActiveEffect[], printedCost = 3) {
+    const cardDb = createTestCardDb();
+    const targetData: CardData = {
+      ...CARDS.BLOCKER,
+      id: "OPT756-COST-TARGET",
+      cost: printedCost,
+    };
+    cardDb.set(targetData.id, targetData);
+    const state = createBattleReadyState(cardDb);
+    const target = {
+      ...state.players[0].characters[0]!,
+      instanceId: "opt756-cost-target",
+      cardId: targetData.id,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      characters: [target, ...players[0].characters.slice(1)],
+    };
+    return {
+      cardDb,
+      target,
+      state: {
+        ...state,
+        players,
+        turn: { ...state.turn, activePlayerIndex: 0 as const },
+        activeEffects: effects.map((effect) => ({
+          ...effect,
+          appliesTo: [target.instanceId],
+        })),
+      },
+    };
+  }
+
+  it.each([
+    {
+      name: "opposing setters with turn-player priority",
+      effects: [setter("opponent-set-1", 1, 1), setter("turn-player-set-7", 0, 7)],
+      expected: 1,
+    },
+    {
+      name: "a dynamic PER_COUNT setter",
+      effects: [setter("dynamic-set", 0, {
+        type: "PER_COUNT",
+        source: "HAND_COUNT",
+        multiplier: 2,
+      })],
+      expected: 10,
+    },
+    {
+      name: "a false-gated setter",
+      effects: [setter("false-gated-set", 0, 0, {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "OPPONENT" },
+      })],
+      expected: 3,
+    },
+  ])("publishes canonical cost for $name", ({ effects, expected }) => {
+    const { state, cardDb, target } = costState(effects);
+    const serverCost = getEffectiveCost(
+      cardDb.get(target.cardId)!,
+      state,
+      target.instanceId,
+      cardDb,
+      false,
+    );
+    const visibleTarget = visibleStateForPlayer(state, cardDb, 0)
+      .players[0].characters[0] as CardInstance & { effectiveCost?: number };
+
+    expect(serverCost).toBe(expected);
+    expect(visibleTarget.effectiveCost).toBe(serverCost);
+  });
+
+  it("excludes a pending play discount from player and spectator field cost", () => {
+    const fixture = costState([], 5);
+    const state = {
+      ...fixture.state,
+      oneTimeModifiers: [{
+        id: "pending-play-discount",
+        appliesTo: { action: "PLAY_CARD", filter: {} },
+        modification: { type: "MODIFY_COST", params: { amount: -1 } },
+        expires: { type: "THIS_TURN" },
+        consumed: false,
+        controller: 0,
+      }],
+    } as typeof fixture.state;
+    const fieldCost = getEffectiveFieldCost(
+      fixture.cardDb.get(fixture.target.cardId)!,
+      state,
+      fixture.target.instanceId,
+      fixture.cardDb,
+    );
+
+    expect(fieldCost).toBe(5);
+    expect(getEffectiveCost(
+      fixture.cardDb.get(fixture.target.cardId)!,
+      state,
+      fixture.target.instanceId,
+      fixture.cardDb,
+    )).toBe(4);
+    for (const visible of [
+      visibleStateForPlayer(state, fixture.cardDb, 0),
+      visibleStateForSpectator(state, fixture.cardDb),
+    ]) {
+      expect(visible.players[0].characters[0]!.effectiveCost).toBe(fieldCost);
+    }
+  });
+});
+
 describe("visible dynamic aura targets", () => {
   it("publishes Saldeath's granted Blugori in appliesTo", () => {
     const { state, cardDb, fieldTarget } = saldeathAuraState();
@@ -886,5 +1026,38 @@ describe("conditional prohibition visibility", () => {
       .toHaveLength(2);
     expect(visibleStateForSpectator(active.state, active.cardDb).prohibitions)
       .toHaveLength(2);
+  });
+
+  it("omits a prohibition with a true conditional override", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const prohibition = (id: string, operator: ">=" | "<") => ({
+      id,
+      sourceCardInstanceId: state.players[0].leader.instanceId,
+      prohibitionType: "CANNOT_ACTIVATE_BLOCKER",
+      controller: 0,
+      appliesTo: [state.players[0].characters[0]!.instanceId],
+      scope: {},
+      usesRemaining: null,
+      conditionalOverride: {
+        type: "HAND_COUNT",
+        controller: "SELF",
+        operator,
+        value: 0,
+      },
+    }) as RuntimeProhibition;
+    const stateWithOverrides = {
+      ...state,
+      prohibitions: [
+        prohibition("true-override", ">="),
+        prohibition("false-override", "<"),
+      ],
+    };
+
+    expect(
+      visibleStateForPlayer(stateWithOverrides, cardDb, 0).prohibitions.map(
+        ({ id }) => id,
+      ),
+    ).toEqual(["false-override"]);
   });
 });

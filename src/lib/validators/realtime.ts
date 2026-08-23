@@ -170,6 +170,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // tracked as a follow-up so the worker and app cannot drift independently.
 const VisibleFieldCardSchema = z.looseObject({
   basePower: z.number().optional(),
+  effectiveCost: z.number().optional(),
   effectivePower: z.number().optional(),
   powerDelta: z.number().optional(),
 });

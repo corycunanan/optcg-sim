@@ -16,10 +16,7 @@ import {
   type SharedTargetFilter,
   type SharedTargetFilterCard,
 } from "@shared/target-filter";
-import {
-  computeEffectiveCost,
-  useActiveEffects,
-} from "@/contexts/active-effects-context";
+import { useActiveEffects } from "@/contexts/active-effects-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
 import { EmptySlot } from "./empty-slot";
@@ -402,11 +399,7 @@ function matchesBlockerFilter(
 ): boolean {
   const printedPower = card.basePower ?? cardData?.power ?? 0;
   const baseCost = cardData?.cost ?? 0;
-  const effectiveCost = computeEffectiveCost(
-    activeEffects,
-    card.instanceId,
-    baseCost,
-  );
+  const effectiveCost = card.effectiveCost ?? baseCost;
   const sharedCard: SharedTargetFilterCard = {
     controller: card.controller,
     cost: effectiveCost,
