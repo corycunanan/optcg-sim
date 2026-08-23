@@ -14,6 +14,7 @@ import type {
   RuntimeProhibition,
   ProhibitionType,
   Target,
+  TargetFilter,
 } from "./effect-types.js";
 import type {
   CardData,
@@ -28,6 +29,7 @@ import {
 } from "./conditions.js";
 import { findCardInState, findCardInstance } from "./state.js";
 import { isCardNegated } from "./modifiers.js";
+import { isBlockerProhibited } from "../../../../shared/blocker-prohibition.js";
 
 function isConditionOverride(
   override: ConditionalOverride
@@ -324,27 +326,21 @@ function matchesProhibition(
     }
 
     case "CANNOT_BE_RESTED": {
-      // OPT-250: attacking and declaring [Blocker] both rest the source card,
-      // so a "cannot be rested" prohibition transitively blocks both
-      // (qa_op13.md:73-87).
+      // OPT-250: attacking rests the source card, so a "cannot be rested"
+      // prohibition transitively blocks the attack (qa_op13.md:73-87).
       if (action.type === "DECLARE_ATTACK") {
         if (!prohibitionCoversInstance(prohibition, action.attackerInstanceId, state, cardDb)) return null;
         return "This card cannot be rested, so it cannot attack";
       }
-      if (action.type === "DECLARE_BLOCKER") {
-        if (!prohibitionCoversInstance(prohibition, action.blockerInstanceId, state, cardDb)) return null;
-        return "This card cannot be rested, so it cannot activate [Blocker]";
-      }
-      return null;
+      if (action.type !== "DECLARE_BLOCKER") return null;
+      break;
     }
 
     case "CANNOT_BLOCK":
-    case "CANNOT_ACTIVATE_BLOCKER": {
+    case "CANNOT_ACTIVATE_BLOCKER":
+    case "CANNOT_USE_BLOCKER":
       if (action.type !== "DECLARE_BLOCKER") return null;
-      if (!prohibitionCoversInstance(prohibition, action.blockerInstanceId, state, cardDb)) return null;
-      if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
-      return "This card cannot block (prohibited by an effect)";
-    }
+      break;
 
     case "CANNOT_BE_BLOCKED": {
       // This is checked during block step, not at action validation
@@ -403,12 +399,6 @@ function matchesProhibition(
       return "Cannot use counter (prohibited by an effect)";
     }
 
-    case "CANNOT_USE_BLOCKER": {
-      if (action.type !== "DECLARE_BLOCKER") return null;
-      if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
-      return "Cannot use Blocker (prohibited by an effect)";
-    }
-
     case "CANNOT_ACTIVATE_EFFECT": {
       if (action.type !== "ACTIVATE_EFFECT") return null;
       if (!matchesController(prohibition.controller, actingPlayerIndex, scope.controller)) return null;
@@ -450,6 +440,32 @@ function matchesProhibition(
     default:
       return null;
   }
+
+  const blocker = findCardInState(state, action.blockerInstanceId);
+  if (!blocker) return null;
+  const blockerData = cardDb.get(blocker.card.cardId);
+  if (!blockerData) return null;
+  const prohibited = isBlockerProhibited(
+    [prohibition],
+    {
+      instanceId: blocker.card.instanceId,
+      controller: blocker.card.controller,
+      cardType: blockerData.type,
+    },
+    actingPlayerIndex,
+    {
+      matchesFilter: (filter) =>
+        matchesFilter(blocker.card, filter as TargetFilter, cardDb, state),
+    },
+  );
+  if (!prohibited) return null;
+  if (type === "CANNOT_BE_RESTED") {
+    return "This card cannot be rested, so it cannot activate [Blocker]";
+  }
+  if (type === "CANNOT_USE_BLOCKER") {
+    return "Cannot use Blocker (prohibited by an effect)";
+  }
+  return "This card cannot block (prohibited by an effect)";
 }
 
 /**

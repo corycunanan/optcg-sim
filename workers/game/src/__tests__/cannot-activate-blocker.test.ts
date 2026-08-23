@@ -51,3 +51,63 @@ describe("CANNOT_ACTIVATE_BLOCKER vetoes DECLARE_BLOCKER per card", () => {
     expect(checkProhibitions(state, action, cardDb, 1)).toBeNull();
   });
 });
+
+describe("CANNOT_ACTIVATE_BLOCKER scope filters", () => {
+  it("vetoes only blockers matching an Usopp-style power filter", () => {
+    const highPowerCardId = "CHAR-HIGH-POWER";
+    const blockerData = cardDb.get("CHAR-BLOCKER")!;
+    cardDb.set(highPowerCardId, {
+      ...blockerData,
+      id: highPowerCardId,
+      power: 6000,
+    });
+
+    const base = createBattleReadyState(cardDb);
+    const highPowerBlocker = base.players[1].characters[1]!;
+    const lowPowerBlocker = base.players[1].characters[0]!;
+    const players = [...base.players] as GameState["players"];
+    players[1] = {
+      ...players[1],
+      characters: players[1].characters.map((card) =>
+        card?.instanceId === highPowerBlocker.instanceId
+          ? { ...card, cardId: highPowerCardId }
+          : card,
+      ),
+    };
+    const prohibition = {
+      id: "prohib-usopp-filter",
+      sourceCardInstanceId: "char-0-v1",
+      sourceEffectBlockId: "",
+      prohibitionType: "CANNOT_ACTIVATE_BLOCKER",
+      controller: 0,
+      appliesTo: [],
+      scope: { controller: "OPPONENT", filter: { power_min: 5000 } },
+      duration: { type: "THIS_BATTLE" },
+      usesRemaining: null,
+    } as unknown as GameState["prohibitions"][number];
+    const state = { ...base, players, prohibitions: [prohibition] };
+
+    expect(
+      checkProhibitions(
+        state,
+        {
+          type: "DECLARE_BLOCKER",
+          blockerInstanceId: highPowerBlocker.instanceId,
+        },
+        cardDb,
+        1,
+      ),
+    ).toMatch(/cannot block/i);
+    expect(
+      checkProhibitions(
+        state,
+        {
+          type: "DECLARE_BLOCKER",
+          blockerInstanceId: lowPowerBlocker.instanceId,
+        },
+        cardDb,
+        1,
+      ),
+    ).toBeNull();
+  });
+});

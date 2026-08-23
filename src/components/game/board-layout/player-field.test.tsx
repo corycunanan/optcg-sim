@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ActiveEffect,
+  ActiveProhibition,
   CardDb,
   CardInstance,
   PlayerState,
@@ -41,12 +42,15 @@ vi.mock("./life-zone", () => ({ LifeZone: () => null }));
 vi.mock("./trash-zone", () => ({ DroppableTrashZone: () => null }));
 
 const printedBlocker = makeCard("blocker-1", "PRINTED-BLOCKER");
+const highPowerBlocker = makeCard("high-power-blocker", "PRINTED-BLOCKER", 0, 6000);
+const lowPowerBlocker = makeCard("low-power-blocker", "PRINTED-BLOCKER", 0, 4000);
 const vanillaBlocker = makeCard("blocker-1", "VANILLA");
 const attacker = makeCard("attacker-1", "ATTACKER", 1);
 
 const cardDb = {
   "PRINTED-BLOCKER": {
     type: "Character",
+    cost: 3,
     keywords: { blocker: true },
   },
   VANILLA: {
@@ -65,6 +69,7 @@ function makeCard(
   instanceId: string,
   cardId: string,
   controller: 0 | 1 = 0,
+  effectivePower?: number,
 ): CardInstance {
   return {
     instanceId,
@@ -75,6 +80,8 @@ function makeCard(
     turnPlayed: null,
     controller,
     owner: controller,
+    basePower: effectivePower,
+    effectivePower,
   };
 }
 
@@ -111,14 +118,25 @@ function keywordEffect(
   };
 }
 
+function costEffect(instanceId: string, amount: number): ActiveEffect {
+  return {
+    id: `modify-cost-${instanceId}`,
+    sourceCardInstanceId: "source-1",
+    appliesTo: [instanceId],
+    modifiers: [{ type: "MODIFY_COST", params: { amount } }],
+  };
+}
+
 function renderBlockerEligibility({
   character,
   activeEffects = [],
+  prohibitions = [],
   attackerCard = null,
   blockerAlreadyDeclared = false,
 }: {
   character: CardInstance;
   activeEffects?: ActiveEffect[];
+  prohibitions?: ActiveProhibition[];
   attackerCard?: CardInstance | null;
   blockerAlreadyDeclared?: boolean;
 }): boolean {
@@ -132,6 +150,7 @@ function renderBlockerEligibility({
             bottomPlayerIndex={0}
             owner="me"
             cardDb={cardDb}
+            prohibitions={prohibitions}
             activeDragType={null}
             activeDrag={null}
             refreshWave={false}
@@ -213,6 +232,80 @@ describe("PlayerField blocker eligibility", () => {
   });
 });
 
+describe("PlayerField blocker prohibition eligibility", () => {
+  it("hides a blocker matching an Usopp-style power prohibition", () => {
+    expect(
+      renderBlockerEligibility({
+        character: highPowerBlocker,
+        prohibitions: [
+          blockerProhibition("CANNOT_ACTIVATE_BLOCKER", {
+            controller: 1,
+            scope: { controller: "OPPONENT", filter: { power_min: 5000 } },
+          }),
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps a blocker outside an Usopp-style power prohibition", () => {
+    expect(
+      renderBlockerEligibility({
+        character: lowPowerBlocker,
+        prohibitions: [
+          blockerProhibition("CANNOT_ACTIVATE_BLOCKER", {
+            controller: 1,
+            scope: { controller: "OPPONENT", filter: { power_min: 5000 } },
+          }),
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("hides a blocker covered by CANNOT_BE_RESTED", () => {
+    expect(
+      renderBlockerEligibility({
+        character: printedBlocker,
+        prohibitions: [
+          blockerProhibition("CANNOT_BE_RESTED", {
+            appliesTo: [printedBlocker.instanceId],
+          }),
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it.each(["CANNOT_BLOCK", "CANNOT_USE_BLOCKER"] as const)(
+    "hides a blocker covered by %s",
+    (prohibitionType) => {
+      expect(
+        renderBlockerEligibility({
+          character: printedBlocker,
+          prohibitions: [
+            blockerProhibition(prohibitionType, {
+              appliesTo: [printedBlocker.instanceId],
+            }),
+          ],
+        }),
+      ).toBe(false);
+    },
+  );
+
+  it("keeps a printed-cost-3 blocker whose effective cost is 5", () => {
+    expect(
+      renderBlockerEligibility({
+        character: printedBlocker,
+        activeEffects: [costEffect(printedBlocker.instanceId, 2)],
+        prohibitions: [
+          blockerProhibition("CANNOT_ACTIVATE_BLOCKER", {
+            controller: 1,
+            scope: { controller: "OPPONENT", filter: { cost_max: 3 } },
+          }),
+        ],
+      }),
+    ).toBe(true);
+  });
+});
+
 describe("PlayerField aura-granted Blocker eligibility", () => {
   it("offers a character listed by a broadcast Blocker aura", () => {
     const auraGrant: ActiveEffect = {
@@ -230,3 +323,23 @@ describe("PlayerField aura-granted Blocker eligibility", () => {
     ).toBe(true);
   });
 });
+
+function blockerProhibition(
+  prohibitionType:
+    | "CANNOT_ACTIVATE_BLOCKER"
+    | "CANNOT_BE_RESTED"
+    | "CANNOT_BLOCK"
+    | "CANNOT_USE_BLOCKER",
+  overrides: Record<string, unknown> = {},
+): ActiveProhibition {
+  return {
+    id: `prohibition-${prohibitionType.toLowerCase()}`,
+    sourceCardInstanceId: "source-1",
+    prohibitionType,
+    controller: 0,
+    appliesTo: [],
+    scope: {},
+    usesRemaining: null,
+    ...overrides,
+  } as unknown as ActiveProhibition;
+}

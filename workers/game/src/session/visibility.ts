@@ -13,6 +13,7 @@ import {
   isEffectConditionMet,
   modifierAppliesToCard,
 } from "../engine/modifiers.js";
+import { isProhibitionConditionMet } from "../engine/prohibitions.js";
 import { getEffectiveCounterValue } from "../engine/counter-value.js";
 import {
   filterStateForPlayer,
@@ -299,6 +300,20 @@ export function stripInactiveEffects(
     : { ...state, activeEffects: active };
 }
 
+/** Remove prohibitions whose runtime condition is not currently met. */
+export function stripInactiveProhibitions(
+  state: GameState,
+  cardDb: Map<string, CardData>
+): GameState {
+  const prohibitions = state.prohibitions;
+  const active = prohibitions.filter((prohibition) =>
+    isProhibitionConditionMet(prohibition, state, cardDb)
+  );
+  return active.length === prohibitions.length
+    ? state
+    : { ...state, prohibitions: active };
+}
+
 function withResolvedFieldEffectTargets(
   visible: GameState,
   authoritative: GameState,
@@ -414,7 +429,10 @@ export function visibleStateForPlayer(
   cardDb: Map<string, CardData>,
   playerIndex: 0 | 1
 ): GameState {
-  const visible = filterStateForPlayer(stripInactiveEffects(state, cardDb), playerIndex);
+  const visible = filterStateForPlayer(
+    stripInactiveEffects(stripInactiveProhibitions(state, cardDb), cardDb),
+    playerIndex,
+  );
   const players = [...visible.players] as [typeof visible.players[0], typeof visible.players[1]];
   players[playerIndex] = {
     ...players[playerIndex],
@@ -453,7 +471,10 @@ export function visibleStateForSpectator(
   state: GameState,
   cardDb: Map<string, CardData>,
 ): GameState {
-  const stripped = stripInactiveEffects(state, cardDb);
+  const stripped = stripInactiveEffects(
+    stripInactiveProhibitions(state, cardDb),
+    cardDb,
+  );
   const playerZeroView = filterStateForPlayer(stripped, 0);
   const playerOneView = filterStateForPlayer(stripped, 1);
 

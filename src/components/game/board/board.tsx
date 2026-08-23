@@ -2,6 +2,7 @@
 
 import type {
   ActiveEffect,
+  ActiveProhibition,
   CardDb,
   EffectAvailability,
   GameAction,
@@ -30,6 +31,7 @@ export interface BoardState {
   connectionStatus: string;
   eventLog: GameEvent[];
   activeEffects: ActiveEffect[];
+  prohibitions: ActiveProhibition[];
   effectAvailability?: Record<string, EffectAvailability[]>;
   activePrompt: PromptOptions | null;
   activePromptId: string | null;
