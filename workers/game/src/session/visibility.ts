@@ -309,20 +309,65 @@ function withResolvedFieldEffectTargets(
     ...player.characters.filter((card): card is CardInstance => card !== null),
   ]);
   let changed = false;
-  const activeEffects = visible.activeEffects.map((effect) => {
-    const dynamicModifiers = effect.modifiers.filter(
-      (modifier) => modifier.target?.type && modifier.target.type !== "SELF",
+  const activeEffects = visible.activeEffects.flatMap((effect) => {
+    const hasDynamicModifier = effect.modifiers.some(
+      (modifier) =>
+        modifier.target?.type !== undefined && modifier.target.type !== "SELF",
     );
-    if (dynamicModifiers.length === 0) return effect;
+    if (!hasDynamicModifier) return [effect];
 
     changed = true;
-    return {
+    const hasStaticSelfModifier = effect.modifiers.some(
+      (modifier) => !modifier.target || modifier.target.type === "SELF",
+    );
+    const groups = new Map<string, {
+      appliesTo: string[];
+      modifiers: typeof effect.modifiers;
+    }>();
+
+    for (const modifier of effect.modifiers) {
+      const isDynamic =
+        modifier.target?.type !== undefined && modifier.target.type !== "SELF";
+      const effectForModifier = isDynamic && hasStaticSelfModifier
+        ? {
+            ...effect,
+            appliesTo: effect.appliesTo.filter(
+              (instanceId) => instanceId !== effect.sourceCardInstanceId,
+            ),
+          }
+        : effect;
+      const appliesTo = fieldCards
+        .filter((card) => modifierAppliesToCard(
+          effectForModifier,
+          modifier,
+          card,
+          authoritative,
+          cardDb,
+        ))
+        .map((card) => card.instanceId);
+      const targetSetKey = JSON.stringify(appliesTo);
+      const group = groups.get(targetSetKey);
+      if (group) {
+        group.modifiers.push(modifier);
+      } else {
+        groups.set(targetSetKey, { appliesTo, modifiers: [modifier] });
+      }
+    }
+
+    const resolvedGroups = [...groups.values()];
+    if (resolvedGroups.length === 1) {
+      return [{
+        ...effect,
+        appliesTo: resolvedGroups[0].appliesTo,
+        modifiers: resolvedGroups[0].modifiers,
+      }];
+    }
+    return resolvedGroups.map((group, groupIndex) => ({
       ...effect,
-      appliesTo: fieldCards
-        .filter((card) => dynamicModifiers.some((modifier) =>
-          modifierAppliesToCard(effect, modifier, card, authoritative, cardDb)))
-        .map((card) => card.instanceId),
-    };
+      id: `${effect.id}#${groupIndex}`,
+      appliesTo: group.appliesTo,
+      modifiers: group.modifiers,
+    }));
   });
 
   return changed ? { ...visible, activeEffects } : visible;

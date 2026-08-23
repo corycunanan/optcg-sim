@@ -11,8 +11,9 @@ import {
   filterStateForPlayer,
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
+import { hasRuntimeKeyword } from "../../../../shared/effective-keyword.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
-import type { RuntimeActiveEffect } from "../engine/effect-types.js";
+import type { EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 import {
@@ -526,6 +527,8 @@ describe("visible dynamic aura targets", () => {
       visibleStateForPlayer(state, cardDb, 0),
       visibleStateForSpectator(state, cardDb),
     ]) {
+      expect(visible.activeEffects).toHaveLength(1);
+      expect(visible.activeEffects[0]?.id).toBe(state.activeEffects[0]?.id);
       expect(visible.activeEffects[0]?.appliesTo).toContain(fieldTarget.instanceId);
     }
     expect(state.activeEffects[0]?.appliesTo).toEqual([]);
@@ -552,6 +555,98 @@ describe("visible dynamic aura targets", () => {
     ]) {
       expect(visible.activeEffects[0]?.appliesTo).not.toContain(hiddenTarget.instanceId);
     }
+  });
+
+  it("preserves SELF while adding a separately targeted dynamic character", () => {
+    const cardDb = createTestCardDb();
+    const mixedKeywordSchema: EffectSchema = {
+      effects: [{
+        id: "mixed_keyword_aura",
+        category: "permanent",
+        modifiers: [
+          {
+            type: "GRANT_KEYWORD",
+            target: { type: "SELF" },
+            params: { keyword: "BLOCKER" },
+          },
+          {
+            type: "GRANT_KEYWORD",
+            target: {
+              type: "CHARACTER",
+              controller: "SELF",
+              filter: { name: "Dynamic Double Attacker" },
+            },
+            params: { keyword: "DOUBLE_ATTACK" },
+          },
+        ],
+      }],
+    };
+    const sourceData: CardData = {
+      ...CARDS.VANILLA,
+      id: "TEST-MIXED-KEYWORD-SOURCE",
+      name: "Mixed Keyword Source",
+      effectSchema: mixedKeywordSchema,
+    };
+    const dynamicTargetData: CardData = {
+      ...CARDS.VANILLA,
+      id: "TEST-DYNAMIC-DOUBLE-ATTACKER",
+      name: "Dynamic Double Attacker",
+    };
+    cardDb.set(sourceData.id, sourceData);
+    cardDb.set(dynamicTargetData.id, dynamicTargetData);
+
+    let state = createBattleReadyState(cardDb);
+    const source: CardInstance = {
+      ...state.players[0].characters[0]!,
+      instanceId: "mixed-keyword-source",
+      cardId: sourceData.id,
+    };
+    const dynamicTarget: CardInstance = {
+      ...state.players[0].characters[1]!,
+      instanceId: "dynamic-double-attacker",
+      cardId: dynamicTargetData.id,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      characters: [source, dynamicTarget, null, null, null],
+    };
+    state = registerPermanentEffectsForCard(
+      { ...state, players },
+      source,
+      sourceData,
+    );
+
+    const visible = visibleStateForPlayer(state, cardDb, 0);
+
+    expect(hasRuntimeKeyword(
+      source.instanceId,
+      sourceData.keywords,
+      visible.activeEffects,
+      "BLOCKER",
+    )).toBe(true);
+    expect(hasRuntimeKeyword(
+      source.instanceId,
+      sourceData.keywords,
+      visible.activeEffects,
+      "DOUBLE_ATTACK",
+    )).toBe(false);
+    expect(hasRuntimeKeyword(
+      dynamicTarget.instanceId,
+      dynamicTargetData.keywords,
+      visible.activeEffects,
+      "DOUBLE_ATTACK",
+    )).toBe(true);
+    expect(hasRuntimeKeyword(
+      dynamicTarget.instanceId,
+      dynamicTargetData.keywords,
+      visible.activeEffects,
+      "BLOCKER",
+    )).toBe(false);
+    expect(visible.activeEffects.map((effect) => effect.id)).toEqual([
+      `${state.activeEffects[0].id}#0`,
+      `${state.activeEffects[0].id}#1`,
+    ]);
   });
 });
 
