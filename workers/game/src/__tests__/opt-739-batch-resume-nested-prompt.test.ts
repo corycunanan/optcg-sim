@@ -758,10 +758,12 @@ describe("OPT-750: preserves batch progress across replacement prompts", () => {
           type: "DRAW",
           params: { amount: { type: "ACTION_RESULT", ref: "batch-ko" } },
         },
+        { type: "RETURN_TO_HAND", target_ref: "batch-ko", chain: "THEN" },
       ],
       "skip"
     );
 
     expect(state.players[1].hand).toHaveLength(3);
+    expect(state.players[0].hand).toHaveLength(7);
   });
 });

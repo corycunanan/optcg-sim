@@ -163,11 +163,11 @@ describe("Tashigi — WOULD_BE_REMOVED_FROM_FIELD replacement prompts", () => {
 
     const tashigi = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.tashigi);
     expect(tashigi?.state).toBe("ACTIVE");
-    expect(resumed.finalizedIds).toEqual([ids.green]);
+    const greenInHand = resumed.state.players[0].hand.find((c) => c.cardId === "GREEN-ALLY");
+    expect(resumed.finalizedIds).toEqual([greenInHand?.instanceId]);
     const green = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.green);
     expect(green).toBeUndefined(); // removed from field
-    const greenInHand = resumed.state.players[0].hand.some((c) => c.instanceId === ids.green);
-    expect(greenInHand).toBe(false);
+    expect(greenInHand?.instanceId).not.toBe(ids.green);
   });
 
   it("does not prompt when the non-green target is hit (filter rejects)", () => {
