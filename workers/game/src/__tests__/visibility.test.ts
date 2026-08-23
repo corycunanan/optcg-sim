@@ -12,9 +12,13 @@ import {
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
 import { hasRuntimeKeyword } from "../../../../shared/effective-keyword.js";
+import { hasGrantedKeyword } from "../engine/modifiers.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import { OP11_046_VINSMOKE_YONJI } from "../engine/schemas/op11.js";
-import type { EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
+import type {
+  EffectSchema,
+  RuntimeActiveEffect,
+} from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerPermanentEffectsForCard } from "../engine/triggers.js";
 import {
@@ -62,16 +66,19 @@ function fieldPowerState() {
     ...character,
     attachedDon: attachedDon(character, "character"),
   };
-  const trash = Array.from({ length: 22 }, (_, index): CardInstance => ({
-    instanceId: `opt744-trash-${index}`,
-    cardId: CARDS.VANILLA.id,
-    zone: "TRASH",
-    state: "ACTIVE",
-    attachedDon: [],
-    turnPlayed: 1,
-    controller: 0,
-    owner: 0,
-  }));
+  const trash = Array.from(
+    { length: 22 },
+    (_, index): CardInstance => ({
+      instanceId: `opt744-trash-${index}`,
+      cardId: CARDS.VANILLA.id,
+      zone: "TRASH",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    })
+  );
   const players = [...state.players] as [PlayerState, PlayerState];
   players[0] = {
     ...players[0],
@@ -149,7 +156,7 @@ function saldeathAuraState({
   state = registerPermanentEffectsForCard(
     { ...state, players },
     saldeath,
-    saldeathData,
+    saldeathData
   );
 
   return { state, cardDb, fieldTarget, hiddenTarget };
@@ -233,7 +240,9 @@ describe("filterStateForPlayer", () => {
     const filtered = filterStateForPlayer(state, 0);
 
     for (let i = 0; i < state.players[0].deck.length; i++) {
-      expect(filtered.players[0].deck[i].cardId).toBe(state.players[0].deck[i].cardId);
+      expect(filtered.players[0].deck[i].cardId).toBe(
+        state.players[0].deck[i].cardId
+      );
     }
   });
 
@@ -254,17 +263,22 @@ describe("filterStateForPlayer", () => {
     if (state.players[1].life.length > 0) {
       const modified = {
         ...state,
-        players: [...state.players] as [typeof state.players[0], typeof state.players[1]],
+        players: [...state.players] as [
+          (typeof state.players)[0],
+          (typeof state.players)[1],
+        ],
       };
       modified.players[1] = {
         ...modified.players[1],
         life: modified.players[1].life.map((lc, i) =>
-          i === 0 ? { ...lc, face: "UP" as const } : lc,
+          i === 0 ? { ...lc, face: "UP" as const } : lc
         ),
       };
 
       const filtered = filterStateForPlayer(modified, 0);
-      const faceUpCards = filtered.players[1].life.filter((lc) => lc.face === "UP");
+      const faceUpCards = filtered.players[1].life.filter(
+        (lc) => lc.face === "UP"
+      );
       expect(faceUpCards.length).toBeGreaterThan(0);
       for (const lc of faceUpCards) {
         expect(lc.cardId).not.toBe("hidden");
@@ -277,7 +291,9 @@ describe("filterStateForPlayer", () => {
     const filtered = filterStateForPlayer(state, 0);
 
     // Opponent's leader should be fully visible
-    expect(filtered.players[1].leader.cardId).toBe(state.players[1].leader.cardId);
+    expect(filtered.players[1].leader.cardId).toBe(
+      state.players[1].leader.cardId
+    );
 
     // Opponent's trash should be fully visible
     expect(filtered.players[1].trash).toEqual(state.players[1].trash);
@@ -329,7 +345,7 @@ describe("filterStateForPlayer", () => {
 
     const filtered = filterStateForPlayer(stateWithDrawEvent, 0);
     const opponentDrawEvents = filtered.eventLog.filter(
-      (e) => e.type === "CARD_DRAWN" && e.playerIndex === 1,
+      (e) => e.type === "CARD_DRAWN" && e.playerIndex === 1
     );
 
     for (const event of opponentDrawEvents) {
@@ -357,7 +373,7 @@ describe("filterStateForPlayer", () => {
 
     const filtered = filterStateForPlayer(stateWithDrawEvent, 0);
     const myDrawEvents = filtered.eventLog.filter(
-      (e) => e.type === "CARD_DRAWN" && e.playerIndex === 0,
+      (e) => e.type === "CARD_DRAWN" && e.playerIndex === 0
     );
 
     // Own events should keep cardId
@@ -409,8 +425,12 @@ describe("visible field power", () => {
   it("publishes canonical power to both players and spectators without decorating hidden zones", () => {
     const { state, cardDb } = fieldPowerState();
     const ownLeaderBase = cardDb.get(state.players[0].leader.cardId)!.power!;
-    const opponentLeaderBase = cardDb.get(state.players[1].leader.cardId)!.power!;
-    const characterBase = cardDb.get(state.players[0].characters[0]!.cardId)!.power!;
+    const opponentLeaderBase = cardDb.get(
+      state.players[1].leader.cardId
+    )!.power!;
+    const characterBase = cardDb.get(
+      state.players[0].characters[0]!.cardId
+    )!.power!;
 
     for (const visible of [
       visibleStateForPlayer(state, cardDb, 0),
@@ -482,11 +502,13 @@ describe("visible field power", () => {
       sourceCardInstanceId: state.players[0].leader.instanceId,
       sourceEffectBlockId: "opt744-hidden-hand-power",
       category: "permanent",
-      modifiers: [{
-        type: "MODIFY_POWER",
-        target: { type: "YOUR_LEADER" },
-        params: { amount: 1000 },
-      }],
+      modifiers: [
+        {
+          type: "MODIFY_POWER",
+          target: { type: "YOUR_LEADER" },
+          params: { amount: 1000 },
+        },
+      ],
       conditions: {
         type: "CARD_TYPE_IN_ZONE",
         controller: "SELF",
@@ -508,14 +530,20 @@ describe("visible field power", () => {
       players,
       activeEffects: [...state.activeEffects, hiddenHandEffect],
     };
-    const basePower = cardDb.get(authoritative.players[0].leader.cardId)!.power!;
+    const basePower = cardDb.get(
+      authoritative.players[0].leader.cardId
+    )!.power!;
     const opponentView = visibleStateForPlayer(authoritative, cardDb, 1);
     const spectatorView = visibleStateForSpectator(authoritative, cardDb);
 
     expect(opponentView.players[0].hand[0].cardId).toBe("hidden");
-    expect(opponentView.players[0].leader.effectivePower).toBe(basePower + 1000);
+    expect(opponentView.players[0].leader.effectivePower).toBe(
+      basePower + 1000
+    );
     expect(opponentView.players[0].leader.powerDelta).toBe(1000);
-    expect(spectatorView.players[0].leader.effectivePower).toBe(basePower + 1000);
+    expect(spectatorView.players[0].leader.effectivePower).toBe(
+      basePower + 1000
+    );
     expect(spectatorView.players[0].leader.powerDelta).toBe(1000);
   });
 });
@@ -530,7 +558,9 @@ describe("visible dynamic aura targets", () => {
     ]) {
       expect(visible.activeEffects).toHaveLength(1);
       expect(visible.activeEffects[0]?.id).toBe(state.activeEffects[0]?.id);
-      expect(visible.activeEffects[0]?.appliesTo).toContain(fieldTarget.instanceId);
+      expect(visible.activeEffects[0]?.appliesTo).toContain(
+        fieldTarget.instanceId
+      );
     }
     expect(state.activeEffects[0]?.appliesTo).toEqual([]);
   });
@@ -542,7 +572,9 @@ describe("visible dynamic aura targets", () => {
 
     const visible = visibleStateForPlayer(state, cardDb, 0);
 
-    expect(visible.activeEffects[0]?.appliesTo).not.toContain(fieldTarget.instanceId);
+    expect(visible.activeEffects[0]?.appliesTo).not.toContain(
+      fieldTarget.instanceId
+    );
   });
 
   it("keeps a matching hidden-hand card out of Saldeath's appliesTo", () => {
@@ -554,33 +586,37 @@ describe("visible dynamic aura targets", () => {
       visibleStateForPlayer(state, cardDb, 0),
       visibleStateForSpectator(state, cardDb),
     ]) {
-      expect(visible.activeEffects[0]?.appliesTo).not.toContain(hiddenTarget.instanceId);
+      expect(visible.activeEffects[0]?.appliesTo).not.toContain(
+        hiddenTarget.instanceId
+      );
     }
   });
 
   it("preserves SELF while adding a separately targeted dynamic character", () => {
     const cardDb = createTestCardDb();
     const mixedKeywordSchema: EffectSchema = {
-      effects: [{
-        id: "mixed_keyword_aura",
-        category: "permanent",
-        modifiers: [
-          {
-            type: "GRANT_KEYWORD",
-            target: { type: "SELF" },
-            params: { keyword: "BLOCKER" },
-          },
-          {
-            type: "GRANT_KEYWORD",
-            target: {
-              type: "CHARACTER",
-              controller: "SELF",
-              filter: { name: "Dynamic Double Attacker" },
+      effects: [
+        {
+          id: "mixed_keyword_aura",
+          category: "permanent",
+          modifiers: [
+            {
+              type: "GRANT_KEYWORD",
+              target: { type: "SELF" },
+              params: { keyword: "BLOCKER" },
             },
-            params: { keyword: "DOUBLE_ATTACK" },
-          },
-        ],
-      }],
+            {
+              type: "GRANT_KEYWORD",
+              target: {
+                type: "CHARACTER",
+                controller: "SELF",
+                filter: { name: "Dynamic Double Attacker" },
+              },
+              params: { keyword: "DOUBLE_ATTACK" },
+            },
+          ],
+        },
+      ],
     };
     const sourceData: CardData = {
       ...CARDS.VANILLA,
@@ -615,39 +651,110 @@ describe("visible dynamic aura targets", () => {
     state = registerPermanentEffectsForCard(
       { ...state, players },
       source,
-      sourceData,
+      sourceData
     );
+
+    expect(hasGrantedKeyword(source, "BLOCKER", state, cardDb)).toBe(true);
+    expect(hasGrantedKeyword(source, "DOUBLE_ATTACK", state, cardDb)).toBe(
+      false
+    );
+    expect(
+      hasGrantedKeyword(dynamicTarget, "DOUBLE_ATTACK", state, cardDb)
+    ).toBe(true);
 
     const visible = visibleStateForPlayer(state, cardDb, 0);
 
-    expect(hasRuntimeKeyword(
-      source.instanceId,
-      sourceData.keywords,
-      visible.activeEffects,
-      "BLOCKER",
-    )).toBe(true);
-    expect(hasRuntimeKeyword(
-      source.instanceId,
-      sourceData.keywords,
-      visible.activeEffects,
-      "DOUBLE_ATTACK",
-    )).toBe(false);
-    expect(hasRuntimeKeyword(
-      dynamicTarget.instanceId,
-      dynamicTargetData.keywords,
-      visible.activeEffects,
-      "DOUBLE_ATTACK",
-    )).toBe(true);
-    expect(hasRuntimeKeyword(
-      dynamicTarget.instanceId,
-      dynamicTargetData.keywords,
-      visible.activeEffects,
-      "BLOCKER",
-    )).toBe(false);
+    expect(
+      hasRuntimeKeyword(
+        source.instanceId,
+        sourceData.keywords,
+        visible.activeEffects,
+        "BLOCKER"
+      )
+    ).toBe(true);
+    expect(
+      hasRuntimeKeyword(
+        source.instanceId,
+        sourceData.keywords,
+        visible.activeEffects,
+        "DOUBLE_ATTACK"
+      )
+    ).toBe(false);
+    expect(
+      hasRuntimeKeyword(
+        dynamicTarget.instanceId,
+        dynamicTargetData.keywords,
+        visible.activeEffects,
+        "DOUBLE_ATTACK"
+      )
+    ).toBe(true);
+    expect(
+      hasRuntimeKeyword(
+        dynamicTarget.instanceId,
+        dynamicTargetData.keywords,
+        visible.activeEffects,
+        "BLOCKER"
+      )
+    ).toBe(false);
     expect(visible.activeEffects.map((effect) => effect.id)).toEqual([
       `${state.activeEffects[0].id}#0`,
       `${state.activeEffects[0].id}#1`,
     ]);
+  });
+
+  it("omits a dynamic modifier whose own duration gate is false", () => {
+    const cardDb = createTestCardDb();
+    const targetData: CardData = {
+      ...CARDS.VANILLA,
+      id: "TEST-DURATION-TARGET",
+      name: "Duration Target",
+      cost: 3,
+    };
+    cardDb.set(targetData.id, targetData);
+
+    const state = createBattleReadyState(cardDb);
+    const target: CardInstance = {
+      ...state.players[1].characters[0]!,
+      instanceId: "duration-target",
+      cardId: targetData.id,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[1] = {
+      ...players[1],
+      characters: [target, ...players[1].characters.slice(1)],
+    };
+    const effect: RuntimeActiveEffect = {
+      id: "duration-gated-aura",
+      sourceCardInstanceId: players[0].leader.instanceId,
+      sourceEffectBlockId: "duration_gated_aura",
+      category: "permanent",
+      modifiers: [
+        {
+          type: "MODIFY_COST",
+          target: { type: "CHARACTER", controller: "OPPONENT" },
+          params: { amount: -3 },
+          duration: {
+            type: "WHILE_CONDITION",
+            condition: { type: "IS_MY_TURN", controller: "SELF" },
+          },
+        },
+      ],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 0,
+      appliesTo: [],
+      timestamp: 1,
+    };
+    const opponentTurnState = {
+      ...state,
+      players,
+      turn: { ...state.turn, activePlayerIndex: 1 as const },
+      activeEffects: [effect],
+    };
+
+    const visible = visibleStateForPlayer(opponentTurnState, cardDb, 1);
+
+    expect(visible.activeEffects).toEqual([]);
   });
 });
 
@@ -662,15 +769,18 @@ describe("visibleStateForSpectator", () => {
     const expectedHands = state.players.map((player, playerIndex) =>
       player.hand.map((card, cardIndex) => ({
         ...card,
-        attachedDon: cardIndex === 0
-          ? [{
-              instanceId: `hand-don-${playerIndex}`,
-              state: "RESTED" as const,
-              attachedTo: card.instanceId,
-            }]
-          : card.attachedDon,
-      })),
-    ) as [typeof state.players[0]["hand"], typeof state.players[1]["hand"]];
+        attachedDon:
+          cardIndex === 0
+            ? [
+                {
+                  instanceId: `hand-don-${playerIndex}`,
+                  state: "RESTED" as const,
+                  attachedTo: card.instanceId,
+                },
+              ]
+            : card.attachedDon,
+      }))
+    ) as [(typeof state.players)[0]["hand"], (typeof state.players)[1]["hand"]];
     const withAttachedDon = {
       ...state,
       players: [
@@ -682,12 +792,16 @@ describe("visibleStateForSpectator", () => {
     const spectator = visibleStateForSpectator(withAttachedDon, cardDb);
 
     for (const playerIndex of [0, 1] as const) {
-      expect(spectator.players[playerIndex].hand).toEqual(expectedHands[playerIndex]);
+      expect(spectator.players[playerIndex].hand).toEqual(
+        expectedHands[playerIndex]
+      );
       for (const card of spectator.players[playerIndex].hand) {
         expect(card.cardId).not.toBe("hidden");
         expect(card.instanceId).not.toMatch(/^hidden-/);
       }
-      expect(spectator.players[playerIndex].hand[0]?.attachedDon).toHaveLength(1);
+      expect(spectator.players[playerIndex].hand[0]?.attachedDon).toHaveLength(
+        1
+      );
     }
   });
 
@@ -698,13 +812,15 @@ describe("visibleStateForSpectator", () => {
     for (const playerIndex of [0, 1] as const) {
       for (const card of spectator.players[playerIndex].deck) {
         expect(card.cardId).toBe("hidden");
-        expect(card.instanceId).toMatch(new RegExp(`^hidden-${playerIndex}-deck-`));
+        expect(card.instanceId).toMatch(
+          new RegExp(`^hidden-${playerIndex}-deck-`)
+        );
       }
       for (const lifeCard of spectator.players[playerIndex].life) {
         if (lifeCard.face === "DOWN") {
           expect(lifeCard.cardId).toBe("hidden");
           expect(lifeCard.instanceId).toMatch(
-            new RegExp(`^hidden-${playerIndex}-life-`),
+            new RegExp(`^hidden-${playerIndex}-life-`)
           );
         }
       }
@@ -717,7 +833,9 @@ describe("visibleStateForSpectator", () => {
     const playerOneView = filterStateForPlayer(state, 1);
     const spectator = visibleStateForSpectator(state, cardDb);
 
-    expect(playerZeroView.executionContext).toEqual(playerOneView.executionContext);
+    expect(playerZeroView.executionContext).toEqual(
+      playerOneView.executionContext
+    );
     expect(spectator.executionContext).toEqual(playerZeroView.executionContext);
     expect(spectator.effectStack).toEqual([]);
   });
@@ -727,14 +845,18 @@ describe("visibleStateForSpectator", () => {
     const spectator = visibleStateForSpectator(state, cardDb);
 
     for (const playerIndex of [0, 1] as const) {
-      expect(spectator.players[playerIndex].leader)
-        .toMatchObject(state.players[playerIndex].leader);
-      expect(spectator.players[playerIndex].characters)
-        .toMatchObject(state.players[playerIndex].characters);
-      expect(spectator.players[playerIndex].stage)
-        .toEqual(state.players[playerIndex].stage);
-      expect(spectator.players[playerIndex].trash)
-        .toEqual(state.players[playerIndex].trash);
+      expect(spectator.players[playerIndex].leader).toMatchObject(
+        state.players[playerIndex].leader
+      );
+      expect(spectator.players[playerIndex].characters).toMatchObject(
+        state.players[playerIndex].characters
+      );
+      expect(spectator.players[playerIndex].stage).toEqual(
+        state.players[playerIndex].stage
+      );
+      expect(spectator.players[playerIndex].trash).toEqual(
+        state.players[playerIndex].trash
+      );
     }
   });
 
@@ -744,7 +866,7 @@ describe("visibleStateForSpectator", () => {
     const divergentExecutionContext = { ...state.executionContext };
     Object.defineProperty(divergentExecutionContext, "version", {
       enumerable: true,
-      get: () => versionReads++ === 0 ? 1 : 2,
+      get: () => (versionReads++ === 0 ? 1 : 2),
     });
     const divergentState = {
       ...state,
@@ -752,7 +874,7 @@ describe("visibleStateForSpectator", () => {
     } as typeof state;
 
     expect(() => visibleStateForSpectator(divergentState, cardDb)).toThrow(
-      "Spectator visibility invariant violated: executionContext differs between player views",
+      "Spectator visibility invariant violated: executionContext differs between player views"
     );
   });
 
@@ -763,9 +885,10 @@ describe("visibleStateForSpectator", () => {
     let leaderReads = 0;
     Object.defineProperty(playerZero, "leader", {
       enumerable: true,
-      get: () => leaderReads++ === 0
-        ? leader
-        : { ...leader, cardId: "viewer-specific-leader" },
+      get: () =>
+        leaderReads++ === 0
+          ? leader
+          : { ...leader, cardId: "viewer-specific-leader" },
     });
     const divergentState = {
       ...state,
@@ -773,7 +896,7 @@ describe("visibleStateForSpectator", () => {
     } as typeof state;
 
     expect(() => visibleStateForSpectator(divergentState, cardDb)).toThrow(
-      "Spectator visibility invariant violated: players[0].leader differs between player views",
+      "Spectator visibility invariant violated: players[0].leader differs between player views"
     );
   });
 });
@@ -803,7 +926,11 @@ describe("conditional prohibition visibility", () => {
         ? [yonji, players[0].characters[0], null, null, null]
         : [yonji, null, null, null, null],
     };
-    state = registerPermanentEffectsForCard({ ...state, players }, yonji, yonjiData);
+    state = registerPermanentEffectsForCard(
+      { ...state, players },
+      yonji,
+      yonjiData
+    );
 
     return { state, cardDb };
   }
@@ -813,15 +940,19 @@ describe("conditional prohibition visibility", () => {
     const active = yonjiState(false);
 
     expect(inactive.state.prohibitions).toHaveLength(2);
-    expect(visibleStateForPlayer(inactive.state, inactive.cardDb, 0).prohibitions)
-      .toEqual([]);
-    expect(visibleStateForSpectator(inactive.state, inactive.cardDb).prohibitions)
-      .toEqual([]);
+    expect(
+      visibleStateForPlayer(inactive.state, inactive.cardDb, 0).prohibitions
+    ).toEqual([]);
+    expect(
+      visibleStateForSpectator(inactive.state, inactive.cardDb).prohibitions
+    ).toEqual([]);
 
     expect(active.state.prohibitions).toHaveLength(2);
-    expect(visibleStateForPlayer(active.state, active.cardDb, 0).prohibitions)
-      .toHaveLength(2);
-    expect(visibleStateForSpectator(active.state, active.cardDb).prohibitions)
-      .toHaveLength(2);
+    expect(
+      visibleStateForPlayer(active.state, active.cardDb, 0).prohibitions
+    ).toHaveLength(2);
+    expect(
+      visibleStateForSpectator(active.state, active.cardDb).prohibitions
+    ).toHaveLength(2);
   });
 });
