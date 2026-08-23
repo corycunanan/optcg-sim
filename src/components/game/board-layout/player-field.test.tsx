@@ -118,24 +118,6 @@ function keywordEffect(
   };
 }
 
-function costEffect(instanceId: string, amount: number): ActiveEffect {
-  return {
-    id: `modify-cost-${instanceId}`,
-    sourceCardInstanceId: "source-1",
-    appliesTo: [instanceId],
-    modifiers: [{ type: "MODIFY_COST", params: { amount } }],
-  };
-}
-
-function setCostEffect(instanceId: string, value: number): ActiveEffect {
-  return {
-    id: `set-cost-${instanceId}`,
-    sourceCardInstanceId: "source-1",
-    appliesTo: [instanceId],
-    modifiers: [{ type: "SET_COST", params: { value } }],
-  };
-}
-
 function renderBlockerEligibility({
   character,
   activeEffects = [],
@@ -300,10 +282,14 @@ describe("PlayerField blocker prohibition eligibility", () => {
   );
 
   it("keeps a printed-cost-3 blocker whose effective cost is 5", () => {
+    const broadcastBlocker = {
+      ...printedBlocker,
+      effectiveCost: 5,
+    } as CardInstance & { effectiveCost: number };
+
     expect(
       renderBlockerEligibility({
-        character: printedBlocker,
-        activeEffects: [costEffect(printedBlocker.instanceId, 2)],
+        character: broadcastBlocker,
         prohibitions: [
           blockerProhibition("CANNOT_ACTIVATE_BLOCKER", {
             controller: 1,
@@ -314,11 +300,15 @@ describe("PlayerField blocker prohibition eligibility", () => {
     ).toBe(true);
   });
 
-  it("hides a printed-cost-3 blocker whose effective cost is set to 0", () => {
+  it("hides a printed-cost-3 blocker with broadcast effective cost 0", () => {
+    const broadcastBlocker = {
+      ...printedBlocker,
+      effectiveCost: 0,
+    } as CardInstance & { effectiveCost: number };
+
     expect(
       renderBlockerEligibility({
-        character: printedBlocker,
-        activeEffects: [setCostEffect(printedBlocker.instanceId, 0)],
+        character: broadcastBlocker,
         prohibitions: [
           blockerProhibition("CANNOT_ACTIVATE_BLOCKER", {
             controller: 1,

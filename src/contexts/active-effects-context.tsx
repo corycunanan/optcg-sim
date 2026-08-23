@@ -141,14 +141,6 @@ export function computeEffectiveCost(
   for (const effect of effects) {
     if (!effect.appliesTo?.includes(instanceId)) continue;
     for (const mod of effect.modifiers ?? []) {
-      if (mod.type === "SET_COST" && typeof mod.params?.value === "number") {
-        cost = mod.params.value;
-      }
-    }
-  }
-  for (const effect of effects) {
-    if (!effect.appliesTo?.includes(instanceId)) continue;
-    for (const mod of effect.modifiers ?? []) {
       if (
         mod.type === "MODIFY_COST" &&
         typeof mod.params?.amount === "number"

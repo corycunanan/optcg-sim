@@ -12,10 +12,12 @@ import {
   obfuscatePlayersDecksAndFaceDownLife,
 } from "../engine/state.js";
 import { hasRuntimeKeyword } from "../../../../shared/effective-keyword.js";
-import { hasGrantedKeyword } from "../engine/modifiers.js";
+import { getEffectiveCost, hasGrantedKeyword } from "../engine/modifiers.js";
 import { OP13_099_THE_EMPTY_THRONE } from "../engine/schemas/op13.js";
 import { OP11_046_VINSMOKE_YONJI } from "../engine/schemas/op11.js";
 import type {
+  Duration,
+  DynamicValue,
   EffectSchema,
   RuntimeActiveEffect,
   RuntimeProhibition,
@@ -522,6 +524,101 @@ describe("visible field power", () => {
     expect(opponentView.players[0].leader.powerDelta).toBe(1000);
     expect(spectatorView.players[0].leader.effectivePower).toBe(basePower + 1000);
     expect(spectatorView.players[0].leader.powerDelta).toBe(1000);
+  });
+});
+
+describe("visible field cost", () => {
+  function setter(
+    id: string,
+    controller: 0 | 1,
+    value: number | DynamicValue,
+    duration?: Duration,
+  ): RuntimeActiveEffect {
+    return {
+      id,
+      sourceCardInstanceId: `source-${controller}`,
+      sourceEffectBlockId: id,
+      category: "permanent",
+      modifiers: [{ type: "SET_COST", params: { value }, duration }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller,
+      appliesTo: [],
+      timestamp: 1,
+    };
+  }
+
+  function costState(effects: RuntimeActiveEffect[]) {
+    const cardDb = createTestCardDb();
+    const targetData: CardData = {
+      ...CARDS.BLOCKER,
+      id: "OPT756-COST-TARGET",
+      cost: 3,
+    };
+    cardDb.set(targetData.id, targetData);
+    const state = createBattleReadyState(cardDb);
+    const target = {
+      ...state.players[0].characters[0]!,
+      instanceId: "opt756-cost-target",
+      cardId: targetData.id,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      characters: [target, ...players[0].characters.slice(1)],
+    };
+    return {
+      cardDb,
+      target,
+      state: {
+        ...state,
+        players,
+        turn: { ...state.turn, activePlayerIndex: 0 as const },
+        activeEffects: effects.map((effect) => ({
+          ...effect,
+          appliesTo: [target.instanceId],
+        })),
+      },
+    };
+  }
+
+  it.each([
+    {
+      name: "opposing setters with turn-player priority",
+      effects: [setter("opponent-set-1", 1, 1), setter("turn-player-set-7", 0, 7)],
+      expected: 1,
+    },
+    {
+      name: "a dynamic PER_COUNT setter",
+      effects: [setter("dynamic-set", 0, {
+        type: "PER_COUNT",
+        source: "HAND_COUNT",
+        multiplier: 2,
+      })],
+      expected: 10,
+    },
+    {
+      name: "a false-gated setter",
+      effects: [setter("false-gated-set", 0, 0, {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "OPPONENT" },
+      })],
+      expected: 3,
+    },
+  ])("publishes canonical cost for $name", ({ effects, expected }) => {
+    const { state, cardDb, target } = costState(effects);
+    const serverCost = getEffectiveCost(
+      cardDb.get(target.cardId)!,
+      state,
+      target.instanceId,
+      cardDb,
+      false,
+    );
+    const visibleTarget = visibleStateForPlayer(state, cardDb, 0)
+      .players[0].characters[0] as CardInstance & { effectiveCost?: number };
+
+    expect(serverCost).toBe(expected);
+    expect(visibleTarget.effectiveCost).toBe(serverCost);
   });
 });
 
