@@ -75,10 +75,7 @@ export function useActiveEffects(): RuntimeEffect[] {
   return useContext(ActiveEffectsContext);
 }
 
-/**
- * Check if power is modified by effects (not just DON).
- * Returns "up" | "down" | null.
- */
+/** Legacy snapshot fallback for power direction when canonical power is absent. */
 export function getPowerModDirection(
   effects: RuntimeEffect[],
   instanceId: string,
@@ -105,10 +102,7 @@ export function getPowerModDirection(
   return power > basePower ? "up" : power < basePower ? "down" : null;
 }
 
-/**
- * Compute effective power including DON bonus and effect modifications.
- * Mirrors the server-side getEffectivePower logic.
- */
+/** Legacy snapshot fallback for effective power when canonical power is absent. */
 export function computeEffectivePower(
   effects: RuntimeEffect[],
   instanceId: string,
