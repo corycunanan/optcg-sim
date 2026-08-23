@@ -79,6 +79,35 @@ export function reenterBatchResume(
     if (actionResult.pendingPrompt) {
       const context = actionResult.pendingPrompt.resumeContext;
       if (!isResumeContext(context)) {
+        const progressTargetIds = batchProgressTargetIds(marker);
+        if (marker.pausedAction.result_ref) {
+          resultRefs.set(marker.pausedAction.result_ref, {
+            targetInstanceIds: progressTargetIds,
+            count: progressTargetIds.length,
+          });
+        }
+        const generated = generateFrameId(nextState);
+        const continuationFrame: EffectStackFrame = {
+          id: generated.id,
+          sourceCardInstanceId: top.sourceCardInstanceId,
+          controller: top.controller,
+          effectBlock: CONTINUATION_EFFECT_BLOCK,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          pausedAction: marker.pausedAction,
+          remainingActions: top.remainingActions,
+          resultRefs: [...resultRefs.entries()],
+          validTargets: [],
+          priorActionSucceeded: progressTargetIds.length > 0,
+          costs: [],
+          currentCostIndex: 0,
+          costsPaid: true,
+          oncePerTurnMarked: true,
+          costResultRefs: [],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+        };
+        nextState = pushFrame(generated.state, continuationFrame);
         return {
           state: nextState,
           events,
@@ -213,6 +242,17 @@ export function reenterBatchResume(
       }
     }
     // Loop: check for another AWAITING_BATCH_RESUME frame underneath.
+  }
+}
+
+function batchProgressTargetIds(marker: BatchResumeMarker): string[] {
+  switch (marker.kind) {
+    case "KO":
+      return marker.koedSoFar;
+    case "PLAY_CARD":
+      return marker.resumeFrame.playedSoFar;
+    case "SET_REST":
+      return marker.restedSoFar;
   }
 }
 

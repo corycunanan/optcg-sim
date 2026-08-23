@@ -318,17 +318,24 @@ function recordReplacementContinuationResult(
   const resultRefs = [...frame.resultRefs];
   const resultRef = frame.pausedAction?.result_ref;
   if (resultRef) {
+    const existing = resultRefs.findIndex(([key]) => key === resultRef);
+    const previousResult = existing >= 0 ? resultRefs[existing][1] : undefined;
     const nextResult: [string, EffectResult] = [
       resultRef,
-      { targetInstanceIds: finalizedIds, count: finalizedIds.length },
+      {
+        targetInstanceIds: [
+          ...(previousResult?.targetInstanceIds ?? []),
+          ...finalizedIds,
+        ],
+        count: (previousResult?.count ?? 0) + finalizedIds.length,
+      },
     ];
-    const existing = resultRefs.findIndex(([key]) => key === resultRef);
     if (existing >= 0) resultRefs[existing] = nextResult;
     else resultRefs.push(nextResult);
   }
   const updated: EffectStackFrame = {
     ...frame,
-    priorActionSucceeded: succeeded,
+    priorActionSucceeded: frame.priorActionSucceeded === true || succeeded,
     resultRefs,
   };
   return {
