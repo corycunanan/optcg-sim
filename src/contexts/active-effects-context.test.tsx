@@ -4,6 +4,8 @@ import type { ActiveEffect } from "@shared/game-types";
 import {
   ActiveEffectsProvider,
   computeEffectiveCost,
+  computeEffectivePower,
+  getPowerModDirection,
   useActiveEffects,
 } from "./active-effects-context";
 
@@ -52,5 +54,19 @@ describe("ActiveEffectsProvider", () => {
     );
 
     expect(markup).toBe("<span>2:3</span>");
+  });
+
+  it("keeps client power helpers available for legacy snapshots", () => {
+    const effects = [
+      {
+        id: "legacy-power-buff",
+        sourceCardInstanceId: "source-1",
+        appliesTo: ["field-card"],
+        modifiers: [{ type: "MODIFY_POWER", params: { amount: 2000 } }],
+      },
+    ];
+
+    expect(computeEffectivePower(effects, "field-card", 1000, 1)).toBe(4000);
+    expect(getPowerModDirection(effects, "field-card", 1000)).toBe("up");
   });
 });

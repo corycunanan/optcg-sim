@@ -456,7 +456,46 @@ describe("CardTooltipContent modified stats", () => {
     expect(markup).toContain("+2000");
   });
 
-  it("keeps the value white and points the chevron pair up for a power buff", () => {
+  it("shows canonical effective power without a matching client effect", () => {
+    const markup = renderTooltip({
+      effectAvailability: {},
+      cardInstance: {
+        ...card,
+        effectivePower: 2000,
+        powerDelta: 1000,
+      },
+      activeEffects: [
+        {
+          id: "leader-aura",
+          sourceCardInstanceId: "source-1",
+          appliesTo: ["card-2"],
+          modifiers: [{ type: "MODIFY_POWER", params: { amount: 1000 } }],
+        },
+      ],
+    });
+
+    expect(markup).toContain(">2,000</span>");
+    expect(markup).toContain('data-chevron-pair="up"');
+  });
+
+  it("does not add attached DON to canonical effective power again", () => {
+    const markup = renderTooltip({
+      effectAvailability: {},
+      cardInstance: {
+        ...card,
+        attachedDon: [
+          { instanceId: "don-1", state: "ACTIVE", attachedTo: card.instanceId },
+        ],
+        effectivePower: 2000,
+        powerDelta: 0,
+      },
+    });
+
+    expect(markup).toContain(">2,000</span>");
+    expect(markup).not.toContain(">3,000</span>");
+  });
+
+  it("uses the client power calculation for a legacy snapshot", () => {
     const markup = renderTooltip({
       effectAvailability: {},
       activeEffects: [

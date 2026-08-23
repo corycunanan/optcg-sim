@@ -139,16 +139,29 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
   const basePower = data.power ?? 0;
   const instanceId = card?.instanceId ?? "";
 
-  const effectivePower = instanceId
-    ? computeEffectivePower(activeEffects, instanceId, basePower, donCount)
-    : basePower + donCount * 1000;
+  const canonicalEffectivePower = card?.effectivePower;
+  const canonicalPowerDelta = card?.powerDelta;
+  const hasCanonicalPower = canonicalEffectivePower !== undefined;
+  const effectivePower = hasCanonicalPower
+    ? canonicalEffectivePower
+    : instanceId
+      ? computeEffectivePower(activeEffects, instanceId, basePower, donCount)
+      : basePower + donCount * 1000;
 
   const baseCost = data.cost ?? 0;
   const effectiveCost = instanceId
     ? computeEffectiveCost(activeEffects, instanceId, baseCost)
     : baseCost;
 
-  const powerMod = instanceId ? getPowerModDirection(activeEffects, instanceId, basePower) : null;
+  const powerMod = hasCanonicalPower
+    ? canonicalPowerDelta === undefined || canonicalPowerDelta === 0
+      ? null
+      : canonicalPowerDelta > 0
+        ? "up"
+        : "down"
+    : instanceId
+      ? getPowerModDirection(activeEffects, instanceId, basePower)
+      : null;
   const costMod = instanceId ? getCostModDirection(activeEffects, instanceId) : null;
   const effectBlocks = parseEffectBlocks(data.effectSchema);
   const effectClauses = segmentEffectText(data.effectText, effectBlocks);
