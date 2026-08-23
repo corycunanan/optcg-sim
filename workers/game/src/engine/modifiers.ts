@@ -122,7 +122,7 @@ function permanentModifierParam(
   state: GameState,
   controller: 0 | 1,
   cardDb: Map<string, CardData> | undefined,
-  sourceLabel: string
+  sourceLabel: string,
 ): number | undefined {
   const value = modifier.params?.[key];
   if (typeof value === "number") return value;
@@ -143,7 +143,7 @@ function permanentModifierParam(
   if (resolution.reason === "MISSING_CARD_DB") return undefined;
 
   throw new Error(
-    `Unable to resolve permanent modifier ${sourceLabel}.${key}: ${resolution.detail}`
+    `Unable to resolve permanent modifier ${sourceLabel}.${key}: ${resolution.detail}`,
   );
 }
 
@@ -449,13 +449,14 @@ export function getEffectivePower(
   // Layer 1: base-setting effects
   const effects = state.activeEffects;
   const baseSetters = sortByTurnPlayerPriority(
-    effects.filter((e) =>
-      e.modifiers?.some(
-        (m) =>
-          m.type === "SET_POWER" &&
-          modifierAppliesToCard(e, m, card, state, cardDb) &&
-          isModifierConditionMet(e, m, state, cardDb)
-      )
+    effects.filter(
+      (e) =>
+        e.modifiers?.some(
+          (m) =>
+            m.type === "SET_POWER" &&
+            modifierAppliesToCard(e, m, card, state, cardDb) &&
+            isModifierConditionMet(e, m, state, cardDb)
+        )
     ),
     turnPlayerIndex
   );
@@ -476,7 +477,7 @@ export function getEffectivePower(
           state,
           lastSetter.controller,
           cardDb,
-          lastSetter.sourceEffectBlockId
+          lastSetter.sourceEffectBlockId,
         )
       : undefined;
     if (value !== undefined) power = value;
@@ -485,13 +486,14 @@ export function getEffectivePower(
   // Layer 2: additive/subtractive modifiers (commutative, but sort for
   // determinism and to make ordering visible in event traces).
   const additiveEffects = sortByTurnPlayerPriority(
-    effects.filter((e) =>
-      e.modifiers?.some(
-        (m) =>
-          m.type === "MODIFY_POWER" &&
-          modifierAppliesToCard(e, m, card, state, cardDb) &&
-          isModifierConditionMet(e, m, state, cardDb)
-      )
+    effects.filter(
+      (e) =>
+        e.modifiers?.some(
+          (m) =>
+            m.type === "MODIFY_POWER" &&
+            modifierAppliesToCard(e, m, card, state, cardDb) &&
+            isModifierConditionMet(e, m, state, cardDb)
+        )
     ),
     turnPlayerIndex
   );
@@ -506,7 +508,7 @@ export function getEffectivePower(
         state,
         effect.controller,
         cardDb,
-        effect.sourceEffectBlockId
+        effect.sourceEffectBlockId,
       );
       if (amount !== undefined) {
         power += amount;
@@ -580,7 +582,7 @@ export function getEffectiveCost(
           state,
           effect.controller,
           cardDb,
-          effect.sourceEffectBlockId
+          effect.sourceEffectBlockId,
         );
         if (value !== undefined) {
           cost = value;
@@ -713,8 +715,8 @@ function applyLayer2CostModifiers(
 
   // Candidates: effects carrying a MODIFY_COST modifier. Block and
   // modifier-level gates plus applicability are re-evaluated each pass.
-  const rawCandidates = effects.filter((e) =>
-    e.modifiers?.some((m) => m.type === "MODIFY_COST")
+  const rawCandidates = effects.filter(
+    (e) => e.modifiers?.some((m) => m.type === "MODIFY_COST")
   );
   const candidates = sortByTurnPlayerPriority(rawCandidates, turnPlayerIndex);
 
@@ -723,7 +725,9 @@ function applyLayer2CostModifiers(
     if (diagnostics) diagnostics.layer2Iterations = iter + 1;
     let addedThisPass = false;
     for (const effect of candidates) {
-      for (const [modifierIndex, mod] of (effect.modifiers ?? []).entries()) {
+      for (const [modifierIndex, mod] of (
+        effect.modifiers ?? []
+      ).entries()) {
         const inclusionKey = `${effect.id}:${modifierIndex}`;
         if (includedModifierKeys.has(inclusionKey)) continue;
 
@@ -740,7 +744,7 @@ function applyLayer2CostModifiers(
           state,
           effect.controller,
           cardDb,
-          effect.sourceEffectBlockId
+          effect.sourceEffectBlockId,
         );
         if (amount !== undefined) {
           cost += amount;
@@ -798,9 +802,10 @@ function getHandZoneSelfCostModifier(
         state,
         card.controller,
         cardDb,
-        block.id
+        block.id,
       );
-      if (amount !== undefined) adjustment += amount;
+      if (amount !== undefined)
+        adjustment += amount;
     }
   }
 
@@ -817,14 +822,15 @@ export function hasGrantedKeyword(
   cardDb?: Map<string, CardDataType>
 ): boolean {
   const effects = state.activeEffects;
-  return effects.some((e) =>
-    e.modifiers?.some(
-      (m) =>
-        m.type === "GRANT_KEYWORD" &&
-        m.params?.keyword === keyword &&
-        modifierAppliesToCard(e, m, card, state, cardDb) &&
-        isModifierConditionMet(e, m, state, cardDb)
-    )
+  return effects.some(
+    (e) =>
+      e.modifiers?.some(
+        (m) =>
+          m.type === "GRANT_KEYWORD" &&
+          m.params?.keyword === keyword &&
+          modifierAppliesToCard(e, m, card, state, cardDb) &&
+          isModifierConditionMet(e, m, state, cardDb)
+      )
   );
 }
 
@@ -842,15 +848,16 @@ export function hasGrantedAttribute(
 ): boolean {
   const want = attribute.toUpperCase();
   const effects = state.activeEffects;
-  return effects.some((e) =>
-    e.modifiers?.some(
-      (m) =>
-        m.type === "GRANT_ATTRIBUTE" &&
-        typeof m.params?.attribute === "string" &&
-        m.params.attribute.toUpperCase() === want &&
-        modifierAppliesToCard(e, m, card, state, cardDb) &&
-        isModifierConditionMet(e, m, state, cardDb)
-    )
+  return effects.some(
+    (e) =>
+      e.modifiers?.some(
+        (m) =>
+          m.type === "GRANT_ATTRIBUTE" &&
+          typeof m.params?.attribute === "string" &&
+          m.params.attribute.toUpperCase() === want &&
+          modifierAppliesToCard(e, m, card, state, cardDb) &&
+          isModifierConditionMet(e, m, state, cardDb)
+      )
   );
 }
 
@@ -864,14 +871,15 @@ export function hasRemovedKeyword(
   cardDb?: Map<string, CardDataType>
 ): boolean {
   const effects = state.activeEffects;
-  return effects.some((e) =>
-    e.modifiers?.some(
-      (m) =>
-        m.type === "REMOVE_KEYWORD" &&
-        m.params?.keyword === keyword &&
-        modifierAppliesToCard(e, m, card, state, cardDb) &&
-        isModifierConditionMet(e, m, state, cardDb)
-    )
+  return effects.some(
+    (e) =>
+      e.modifiers?.some(
+        (m) =>
+          m.type === "REMOVE_KEYWORD" &&
+          m.params?.keyword === keyword &&
+          modifierAppliesToCard(e, m, card, state, cardDb) &&
+          isModifierConditionMet(e, m, state, cardDb)
+      )
   );
 }
 

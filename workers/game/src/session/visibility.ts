@@ -30,42 +30,35 @@ import {
 function assertSameSpectatorField(
   field: string,
   playerZeroValue: unknown,
-  playerOneValue: unknown
+  playerOneValue: unknown,
 ): void {
   if (playerZeroValue === playerOneValue) return;
 
   if (JSON.stringify(playerZeroValue) !== JSON.stringify(playerOneValue)) {
     throw new Error(
-      `Spectator visibility invariant violated: ${field} differs between player views`
+      `Spectator visibility invariant violated: ${field} differs between player views`,
     );
   }
 }
 
 type RedactedGameEventType = {
-  [Type in keyof typeof GAME_EVENT_VISIBILITY]: (typeof GAME_EVENT_VISIBILITY)[Type] extends {
-    redactor: string;
-  }
-    ? Type
-    : never;
+  [Type in keyof typeof GAME_EVENT_VISIBILITY]:
+    (typeof GAME_EVENT_VISIBILITY)[Type] extends { redactor: string }
+      ? Type
+      : never;
 }[keyof typeof GAME_EVENT_VISIBILITY];
 
 /** Every private event remains in spectator history with identities hidden. */
 const SPECTATOR_REDACTED_EVENT_RULES = {
   CARD_DRAWN: "Preserve the draw event with identities hidden.",
-  CARD_RETURNED_TO_HAND:
-    "Preserve the hand-return event with identities hidden.",
-  CARD_ADDED_TO_HAND_FROM_LIFE:
-    "Preserve the Life-to-hand event with identities hidden.",
-  TRIGGER_ACTIVATED:
-    "Preserve an unaccepted Trigger offer with identity hidden.",
-  CARD_RETURNED_TO_DECK:
-    "Preserve the deck-return event with identities hidden.",
-  CARDS_REVEALED:
-    "Preserve controller-only peek history with identities hidden.",
+  CARD_RETURNED_TO_HAND: "Preserve the hand-return event with identities hidden.",
+  CARD_ADDED_TO_HAND_FROM_LIFE: "Preserve the Life-to-hand event with identities hidden.",
+  TRIGGER_ACTIVATED: "Preserve an unaccepted Trigger offer with identity hidden.",
+  CARD_RETURNED_TO_DECK: "Preserve the deck-return event with identities hidden.",
+  CARDS_REVEALED: "Preserve controller-only peek history with identities hidden.",
   LIFE_SCRIED: "Preserve Life-scry history with identities hidden.",
   LIFE_REORDERED: "Preserve Life-reorder history with identities hidden.",
-  CARD_REMOVED_FROM_LIFE:
-    "Preserve the Life-removal event with identities hidden.",
+  CARD_REMOVED_FROM_LIFE: "Preserve the Life-removal event with identities hidden.",
 } satisfies Record<RedactedGameEventType, string>;
 
 /**
@@ -84,7 +77,7 @@ export const SPECTATOR_PLAYER_VIEW_FIELDS = [
 ] as const satisfies readonly (keyof GameState)[];
 
 const HANDLED_PLAYER_VIEW_FIELDS = new Set<keyof GameState>(
-  SPECTATOR_PLAYER_VIEW_FIELDS
+  SPECTATOR_PLAYER_VIEW_FIELDS,
 );
 
 function isStructurallyEqual(a: unknown, b: unknown): boolean {
@@ -93,7 +86,7 @@ function isStructurallyEqual(a: unknown, b: unknown): boolean {
 
 function assertNoUnhandledPlayerViewDivergence(
   playerZeroView: GameState,
-  playerOneView: GameState
+  playerOneView: GameState,
 ): void {
   for (const field of Object.keys(playerZeroView) as (keyof GameState)[]) {
     if (
@@ -101,7 +94,7 @@ function assertNoUnhandledPlayerViewDivergence(
       !isStructurallyEqual(playerZeroView[field], playerOneView[field])
     ) {
       throw new Error(
-        `Spectator visibility invariant violated: unhandled player-view field ${String(field)} differs`
+        `Spectator visibility invariant violated: unhandled player-view field ${String(field)} differs`,
       );
     }
   }
@@ -115,7 +108,7 @@ function hiddenIdentityCount(value: unknown): number {
   if (value !== null && typeof value === "object") {
     return Object.values(value).reduce(
       (count, item) => count + hiddenIdentityCount(item),
-      0
+      0,
     );
   }
   return 0;
@@ -123,11 +116,11 @@ function hiddenIdentityCount(value: unknown): number {
 
 function mergeSpectatorEventLog(
   playerZeroEvents: readonly GameEvent[],
-  playerOneEvents: readonly GameEvent[]
+  playerOneEvents: readonly GameEvent[],
 ): GameEvent[] {
   if (playerZeroEvents.length !== playerOneEvents.length) {
     throw new Error(
-      "Spectator visibility invariant violated: eventLog lengths differ between player views"
+      "Spectator visibility invariant violated: eventLog lengths differ between player views",
     );
   }
 
@@ -139,7 +132,7 @@ function mergeSpectatorEventLog(
       playerZeroEvent.timestamp !== playerOneEvent.timestamp
     ) {
       throw new Error(
-        `Spectator visibility invariant violated: eventLog[${index}] order differs between player views`
+        `Spectator visibility invariant violated: eventLog[${index}] order differs between player views`,
       );
     }
 
@@ -149,7 +142,7 @@ function mergeSpectatorEventLog(
 
     if (!(playerZeroEvent.type in SPECTATOR_REDACTED_EVENT_RULES)) {
       throw new Error(
-        `Spectator visibility invariant violated: public eventLog[${index}] differs between player views`
+        `Spectator visibility invariant violated: public eventLog[${index}] differs between player views`,
       );
     }
 
@@ -157,13 +150,12 @@ function mergeSpectatorEventLog(
     const playerOneHiddenCount = hiddenIdentityCount(playerOneEvent);
     if (playerZeroHiddenCount === playerOneHiddenCount) {
       throw new Error(
-        `Spectator visibility invariant violated: eventLog[${index}] has ambiguous redaction`
+        `Spectator visibility invariant violated: eventLog[${index}] has ambiguous redaction`,
       );
     }
-    const unionedEvent =
-      playerZeroHiddenCount < playerOneHiddenCount
-        ? playerZeroEvent
-        : playerOneEvent;
+    const unionedEvent = playerZeroHiddenCount < playerOneHiddenCount
+      ? playerZeroEvent
+      : playerOneEvent;
     return filterEventForRecipient(unionedEvent, { kind: "OBSERVER" });
   });
 }
@@ -171,13 +163,13 @@ function mergeSpectatorEventLog(
 function mergeSpectatorPrompt(
   authoritativePrompt: PendingPromptState | null,
   playerZeroPrompt: PendingPromptState | null,
-  playerOnePrompt: PendingPromptState | null
+  playerOnePrompt: PendingPromptState | null,
 ): PendingPromptState | null {
   if (playerZeroPrompt && playerOnePrompt) {
     // A prompt has exactly one respondingPlayer, so both player filters cannot
     // legitimately retain it. Throw instead of guessing which call-to-act wins.
     throw new Error(
-      "Spectator visibility invariant violated: both player views contain pendingPrompt"
+      "Spectator visibility invariant violated: both player views contain pendingPrompt",
     );
   }
   return filterPromptForRecipient(authoritativePrompt, { kind: "OBSERVER" });
@@ -186,7 +178,7 @@ function mergeSpectatorPrompt(
 function unionViewerField<Value>(
   field: string,
   playerZeroValue: Value | null | undefined,
-  playerOneValue: Value | null | undefined
+  playerOneValue: Value | null | undefined,
 ): Value | null | undefined {
   if (playerZeroValue != null && playerOneValue != null) {
     assertSameSpectatorField(field, playerZeroValue, playerOneValue);
@@ -205,7 +197,7 @@ function redactLifeCardIdentity(card: LifeCard): LifeCard {
 
 function mergeSpectatorBattle(
   playerZeroBattle: BattleContext | null,
-  playerOneBattle: BattleContext | null
+  playerOneBattle: BattleContext | null,
 ): BattleContext | null {
   if (!playerZeroBattle || !playerOneBattle) {
     assertSameSpectatorField("turn.battle", playerZeroBattle, playerOneBattle);
@@ -223,13 +215,13 @@ function mergeSpectatorBattle(
   assertSameSpectatorField(
     "turn.battle (excluding pendingTriggerLifeCard)",
     playerZeroPublicBattle,
-    playerOnePublicBattle
+    playerOnePublicBattle,
   );
 
   const pendingTriggerLifeCard = unionViewerField(
     "turn.battle.pendingTriggerLifeCard",
     playerZeroPendingTrigger,
-    playerOnePendingTrigger
+    playerOnePendingTrigger,
   );
   return pendingTriggerLifeCard
     ? {
@@ -241,18 +233,20 @@ function mergeSpectatorBattle(
 
 function mergeSpectatorTurn(
   playerZeroTurn: TurnState,
-  playerOneTurn: TurnState
+  playerOneTurn: TurnState,
 ): TurnState {
   const {
     battle: playerZeroBattle,
     pendingTriggerFromEffect: playerZeroPendingTriggerFromEffect,
-    pendingBattleDamageContinuation: playerZeroPendingBattleDamageContinuation,
+    pendingBattleDamageContinuation:
+      playerZeroPendingBattleDamageContinuation,
     ...playerZeroInvariantTurn
   } = playerZeroTurn;
   const {
     battle: playerOneBattle,
     pendingTriggerFromEffect: playerOnePendingTriggerFromEffect,
-    pendingBattleDamageContinuation: playerOnePendingBattleDamageContinuation,
+    pendingBattleDamageContinuation:
+      playerOnePendingBattleDamageContinuation,
     ...playerOneInvariantTurn
   } = playerOneTurn;
 
@@ -261,18 +255,18 @@ function mergeSpectatorTurn(
   assertSameSpectatorField(
     "turn (excluding spectator-union fields)",
     playerZeroInvariantTurn,
-    playerOneInvariantTurn
+    playerOneInvariantTurn,
   );
 
   const pendingTriggerFromEffect = unionViewerField(
     "turn.pendingTriggerFromEffect",
     playerZeroPendingTriggerFromEffect,
-    playerOnePendingTriggerFromEffect
+    playerOnePendingTriggerFromEffect,
   );
   const pendingBattleDamageContinuation = unionViewerField(
     "turn.pendingBattleDamageContinuation",
     playerZeroPendingBattleDamageContinuation,
-    playerOnePendingBattleDamageContinuation
+    playerOnePendingBattleDamageContinuation,
   );
 
   return {
@@ -324,7 +318,7 @@ export function stripInactiveProhibitions(
 function withResolvedFieldEffectTargets(
   visible: GameState,
   authoritative: GameState,
-  cardDb: Map<string, CardData>
+  cardDb: Map<string, CardData>,
 ): GameState {
   const fieldCards = authoritative.players.flatMap((player) => [
     player.leader,
@@ -334,27 +328,28 @@ function withResolvedFieldEffectTargets(
   const activeEffects = visible.activeEffects.flatMap((effect) => {
     const hasDynamicModifier = effect.modifiers.some(
       (modifier) =>
-        modifier.target?.type !== undefined && modifier.target.type !== "SELF"
+        modifier.target?.type !== undefined && modifier.target.type !== "SELF",
     );
     if (!hasDynamicModifier) return [effect];
 
     changed = true;
-    const groups = new Map<
-      string,
-      {
-        appliesTo: string[];
-        modifiers: typeof effect.modifiers;
-      }
-    >();
+    const groups = new Map<string, {
+      appliesTo: string[];
+      modifiers: typeof effect.modifiers;
+    }>();
 
     for (const modifier of effect.modifiers) {
       if (!isModifierConditionMet(effect, modifier, authoritative, cardDb)) {
         continue;
       }
       const appliesTo = fieldCards
-        .filter((card) =>
-          modifierAppliesToCard(effect, modifier, card, authoritative, cardDb)
-        )
+        .filter((card) => modifierAppliesToCard(
+          effect,
+          modifier,
+          card,
+          authoritative,
+          cardDb,
+        ))
         .map((card) => card.instanceId);
       const targetSetKey = JSON.stringify(appliesTo);
       const group = groups.get(targetSetKey);
@@ -367,13 +362,11 @@ function withResolvedFieldEffectTargets(
 
     const resolvedGroups = [...groups.values()];
     if (resolvedGroups.length === 1) {
-      return [
-        {
-          ...effect,
-          appliesTo: resolvedGroups[0].appliesTo,
-          modifiers: resolvedGroups[0].modifiers,
-        },
-      ];
+      return [{
+        ...effect,
+        appliesTo: resolvedGroups[0].appliesTo,
+        modifiers: resolvedGroups[0].modifiers,
+      }];
     }
     return resolvedGroups.map((group, groupIndex) => ({
       ...effect,
@@ -389,7 +382,7 @@ function withResolvedFieldEffectTargets(
 function withVisibleFieldPower(
   visible: GameState,
   authoritative: GameState,
-  cardDb: Map<string, CardData>
+  cardDb: Map<string, CardData>,
 ): GameState {
   const decorate = (card: CardInstance): CardInstance => {
     const data = cardDb.get(card.cardId);
@@ -401,7 +394,7 @@ function withVisibleFieldPower(
       { ...card, attachedDon: [] },
       data,
       authoritative,
-      cardDb
+      cardDb,
     );
     return {
       ...card,
@@ -416,9 +409,7 @@ function withVisibleFieldPower(
     players: visible.players.map((player) => ({
       ...player,
       leader: decorate(player.leader),
-      characters: player.characters.map((card) =>
-        card ? decorate(card) : null
-      ),
+      characters: player.characters.map((card) => card ? decorate(card) : null),
     })) as GameState["players"],
   };
 }
@@ -431,33 +422,22 @@ export function visibleStateForPlayer(
 ): GameState {
   const visible = filterStateForPlayer(
     stripInactiveEffects(stripInactiveProhibitions(state, cardDb), cardDb),
-    playerIndex
+    playerIndex,
   );
-  const players = [...visible.players] as [
-    (typeof visible.players)[0],
-    (typeof visible.players)[1],
-  ];
+  const players = [...visible.players] as [typeof visible.players[0], typeof visible.players[1]];
   players[playerIndex] = {
     ...players[playerIndex],
     hand: players[playerIndex].hand.map((card) => {
       const data = cardDb.get(card.cardId);
       return data
-        ? {
-            ...card,
-            effectiveCounter: getEffectiveCounterValue(
-              card,
-              data,
-              state,
-              cardDb
-            ),
-          }
+        ? { ...card, effectiveCounter: getEffectiveCounterValue(card, data, state, cardDb) }
         : card;
     }),
   };
   return withVisibleFieldPower(
     withResolvedFieldEffectTargets({ ...visible, players }, state, cardDb),
     state,
-    cardDb
+    cardDb,
   );
 }
 
@@ -480,23 +460,27 @@ export function visibleStateForPlayer(
  */
 export function visibleStateForSpectator(
   state: GameState,
-  cardDb: Map<string, CardData>
+  cardDb: Map<string, CardData>,
 ): GameState {
   const stripped = stripInactiveEffects(
     stripInactiveProhibitions(state, cardDb),
-    cardDb
+    cardDb,
   );
   const playerZeroView = filterStateForPlayer(stripped, 0);
   const playerOneView = filterStateForPlayer(stripped, 1);
 
   return withVisibleFieldPower(
     withResolvedFieldEffectTargets(
-      mergePlayerViewsForSpectator(stripped, playerZeroView, playerOneView),
+      mergePlayerViewsForSpectator(
+        stripped,
+        playerZeroView,
+        playerOneView,
+      ),
       state,
-      cardDb
+      cardDb,
     ),
     state,
-    cardDb
+    cardDb,
   );
 }
 
@@ -508,11 +492,14 @@ export function visibleStateForSpectator(
 export function mergePlayerViewsForSpectator(
   stripped: GameState,
   playerZeroView: GameState,
-  playerOneView: GameState
+  playerOneView: GameState,
 ): GameState {
-  if (playerZeroView.id !== stripped.id || playerOneView.id !== stripped.id) {
+  if (
+    playerZeroView.id !== stripped.id ||
+    playerOneView.id !== stripped.id
+  ) {
     throw new Error(
-      "Spectator visibility invariant violated: player views do not match authoritative state id"
+      "Spectator visibility invariant violated: player views do not match authoritative state id",
     );
   }
   // filterStateForPlayer preserves the receiving player's authoritative object
@@ -523,7 +510,7 @@ export function mergePlayerViewsForSpectator(
     playerOneView.players[1] !== stripped.players[1]
   ) {
     throw new Error(
-      "Spectator visibility invariant violated: player views are not their indexed owner views"
+      "Spectator visibility invariant violated: player views are not their indexed owner views",
     );
   }
 
@@ -531,7 +518,7 @@ export function mergePlayerViewsForSpectator(
   assertSameSpectatorField(
     "executionContext",
     playerZeroView.executionContext,
-    playerOneView.executionContext
+    playerOneView.executionContext,
   );
 
   for (const playerIndex of [0, 1] as const) {
@@ -539,7 +526,7 @@ export function mergePlayerViewsForSpectator(
       assertSameSpectatorField(
         `players[${playerIndex}].${zone}`,
         playerZeroView.players[playerIndex][zone],
-        playerOneView.players[playerIndex][zone]
+        playerOneView.players[playerIndex][zone],
       );
     }
   }
@@ -548,25 +535,28 @@ export function mergePlayerViewsForSpectator(
     playerZeroView.players[0],
     playerOneView.players[1],
   ]);
-  const turn = mergeSpectatorTurn(playerZeroView.turn, playerOneView.turn);
+  const turn = mergeSpectatorTurn(
+    playerZeroView.turn,
+    playerOneView.turn,
+  );
   const eventLog = mergeSpectatorEventLog(
     playerZeroView.eventLog,
-    playerOneView.eventLog
+    playerOneView.eventLog,
   );
   const pendingPrompt = mergeSpectatorPrompt(
     stripped.pendingPrompt,
     playerZeroView.pendingPrompt,
-    playerOneView.pendingPrompt
+    playerOneView.pendingPrompt,
   );
   assertSameSpectatorField(
     "promptRespondingPlayer",
     playerZeroView.promptRespondingPlayer,
-    playerOneView.promptRespondingPlayer
+    playerOneView.promptRespondingPlayer,
   );
   assertSameSpectatorField(
     "effectStack",
     playerZeroView.effectStack,
-    playerOneView.effectStack
+    playerOneView.effectStack,
   );
 
   // Deliberately explicit: do not replace this literal with a view spread.
@@ -592,6 +582,8 @@ export function mergePlayerViewsForSpectator(
     winReason: stripped.winReason,
     engineOutcome: stripped.engineOutcome,
     engineActionCount: stripped.engineActionCount,
-  } satisfies GameState &
-    Record<keyof Omit<GameState, "effectAvailability">, unknown>;
+  } satisfies GameState & Record<
+    keyof Omit<GameState, "effectAvailability">,
+    unknown
+  >;
 }
