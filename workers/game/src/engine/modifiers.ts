@@ -209,8 +209,13 @@ function modifierAppliesToCard(
       break;
     case "YOUR_LEADER":
     case "OPPONENT_LEADER":
+      break;
     case "CARD_IN_HAND":
+      if (card.zone !== "HAND") return false;
+      break;
     case "CHARACTER_CARD":
+      if (modifier.target.source_zone === "HAND" && card.zone !== "HAND")
+        return false;
       break;
     case "SELF":
       return false;
