@@ -379,7 +379,7 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
     expect(completed.state.effectStack).toHaveLength(0);
   });
 
-  it("preserves a replacement-batch prompt raised during KO batch re-entry", () => {
+  it("resumes trailing actions after accepting a replacement during KO batch re-entry", () => {
     const cardDb = createTestCardDb();
     const saverCard: CardData = {
       ...CARDS.VANILLA,
@@ -399,6 +399,12 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
       "replacement-victim",
       0,
       "CHARACTER"
+    );
+    const drawCard = cardInstance(
+      CARDS.VANILLA.id,
+      "replacement-trailing-draw",
+      1,
+      "DECK"
     );
     const replacement: RuntimeActiveEffect = {
       id: "opt-739-save-replacement",
@@ -437,9 +443,11 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
         count: { exact: 1 },
       },
     };
-    const state = withPlayers(base, {
-      characters: padChars([saver, victim]),
-    });
+    const state = withPlayers(
+      base,
+      { characters: padChars([saver, victim]) },
+      { deck: [drawCard], hand: [] }
+    );
     const stateWithBatch = pushBatchResumeFrame(
       { ...state, activeEffects: [replacement] },
       "opponent-effect-source",
@@ -452,8 +460,15 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
         koedSoFar: [],
       },
       [],
-      [],
-      new Map()
+      [
+        {
+          type: "DRAW",
+          params: { amount: { type: "ACTION_RESULT", ref: "first-ko" } },
+        },
+      ],
+      new Map([
+        ["first-ko", { targetInstanceIds: ["first-ko-target"], count: 1 }],
+      ])
     );
 
     const prompted = resumeFromStack(stateWithBatch, { type: "PASS" }, cardDb);
@@ -481,6 +496,9 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
         (card) => card?.instanceId === victim.instanceId
       )
     ).toBe(true);
+    expect(completed.state.players[1].hand.map((card) => card.cardId)).toEqual([
+      drawCard.cardId,
+    ]);
   });
 
   it("dispatches an AWAITING_BATCH_RESUME frame directly from the stack", () => {

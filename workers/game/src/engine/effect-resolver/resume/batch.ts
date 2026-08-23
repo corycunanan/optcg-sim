@@ -79,6 +79,28 @@ export function reenterBatchResume(
     if (actionResult.pendingPrompt) {
       const context = actionResult.pendingPrompt.resumeContext;
       if (!isResumeContext(context)) {
+        const generated = generateFrameId(nextState);
+        const continuationFrame: EffectStackFrame = {
+          id: generated.id,
+          sourceCardInstanceId: top.sourceCardInstanceId,
+          controller: top.controller,
+          effectBlock: CONTINUATION_EFFECT_BLOCK,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          pausedAction: marker.pausedAction,
+          remainingActions: top.remainingActions,
+          resultRefs: [...resultRefs.entries()],
+          validTargets: [],
+          priorActionSucceeded: false,
+          costs: [],
+          currentCostIndex: 0,
+          costsPaid: true,
+          oncePerTurnMarked: true,
+          costResultRefs: [],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+        };
+        nextState = pushFrame(generated.state, continuationFrame);
         return {
           state: nextState,
           events,
