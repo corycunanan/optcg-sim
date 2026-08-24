@@ -50,6 +50,44 @@ function findButton(renderer: ReactTestRenderer, label: string) {
 }
 
 describe("PlayerChoiceModal confirmed selection mode", () => {
+  it("shows the source effect and keeps resolved rows disabled in place", async () => {
+    const onAction = vi.fn();
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="Choose which effect to activate first"
+          sourceEffectDescription="Five Elders"
+          choices={[
+            { id: "elder-1", label: "Elder 1", disabled: true },
+            { id: "elder-2", label: "Elder 2" },
+          ]}
+          confirmOrSkip
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={onAction}
+        />
+      );
+    });
+
+    expect(renderer.root.findAllByType("p")[0].children).toEqual([
+      "Five Elders",
+    ]);
+    expect(findButton(renderer, "Elder 1 — Resolved").props.disabled).toBe(
+      true
+    );
+    expect(
+      renderer.root
+        .findAllByType("button")
+        .map((button) => button.children.join(""))
+    ).toContain("Elder 2");
+    await act(async () => {
+      findButton(renderer, "Elder 1 — Resolved").props.onClick?.();
+    });
+    expect(onAction).not.toHaveBeenCalled();
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
+  });
+
   it("selects without submitting and requires Confirm", async () => {
     const onAction = vi.fn();
     let renderer!: ReactTestRenderer;
@@ -62,7 +100,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
-        />,
+        />
       );
     });
 
@@ -71,8 +109,9 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
       findButton(renderer, "Rest 2 → +4000").props.onClick();
     });
     expect(onAction).not.toHaveBeenCalled();
-    expect(findButton(renderer, "Rest 2 → +4000").props["aria-pressed"])
-      .toBe(true);
+    expect(findButton(renderer, "Rest 2 → +4000").props["aria-pressed"]).toBe(
+      true
+    );
     expect(findButton(renderer, "Confirm").props.disabled).toBe(false);
 
     await act(async () => {
@@ -96,7 +135,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
-        />,
+        />
       );
     });
 
@@ -121,7 +160,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
-        />,
+        />
       );
     });
 
@@ -132,9 +171,11 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
       type: "PLAYER_CHOICE",
       choiceId: "don-rest:1",
     });
-    expect(renderer.root.findAllByType("button").some(
-      (button) => button.children.join("") === "Confirm",
-    )).toBe(false);
+    expect(
+      renderer.root
+        .findAllByType("button")
+        .some((button) => button.children.join("") === "Confirm")
+    ).toBe(false);
   });
 
   it("does not auto-submit a lone confirmed choice", async () => {
@@ -149,7 +190,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
-        />,
+        />
       );
     });
 

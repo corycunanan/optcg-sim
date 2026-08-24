@@ -481,12 +481,19 @@ export interface EffectStackFrame {
   // Simultaneous triggers awaiting player ordering choice
   simultaneousTriggers?: QueuedTrigger[];
 
+  // Full ordering group retained while chosen effects and nested prompts resolve
+  triggerOrderingGroup?: {
+    triggers: QueuedTrigger[];
+    resolvedTriggerIds: string[];
+  };
+
   // Events accumulated during partial execution
   accumulatedEvents: PendingGameEvent[];
 }
 
 export interface QueuedTrigger {
   sourceCardInstanceId: string;
+  orderingId?: string;
   controller: 0 | 1;
   /** EffectBlock — typed as unknown in shared layer, cast in worker */
   effectBlock: unknown;
@@ -762,8 +769,9 @@ export interface RedistributeDonPrompt {
 
 export interface PlayerChoicePrompt {
   promptType: "PLAYER_CHOICE";
-  choices: { id: string; label: string }[];
+  choices: { id: string; label: string; disabled?: boolean }[];
   effectDescription: string;
+  sourceEffectDescription?: string;
   source?: "PREGAME" | "EFFECT";
   /** Select a row first, then submit it from a Confirm/Skip footer. */
   confirmOrSkip?: boolean;

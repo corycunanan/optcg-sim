@@ -25,7 +25,8 @@ export function processRemainingTriggers(
   pendingTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
   services: EffectResolverServices,
-  priorEvents: PendingEvent[] = []
+  priorEvents: PendingEvent[] = [],
+  triggerOrderingGroup?: import("../../../types.js").EffectStackFrame["triggerOrderingGroup"]
 ): EffectResolverResult {
   const events = [...priorEvents];
   let nextState = state;
@@ -37,13 +38,46 @@ export function processRemainingTriggers(
       nextState,
       event.type,
       event.playerIndex ?? nextState.turn.activePlayerIndex,
-      event.payload ?? {},
+      event.payload ?? {}
     );
     events[index] = withEventLogEmitted(event);
   }
 
   if (pendingTriggers.length === 0) {
     return services.reenterBatchResume(nextState, cardDb, events);
+  }
+
+  if (triggerOrderingGroup) {
+    const unresolvedIds = new Set(
+      triggerOrderingGroup.triggers
+        .map((trigger) => trigger.orderingId)
+        .filter(
+          (id): id is string =>
+            id !== undefined && !triggerOrderingGroup.resolvedTriggerIds.includes(id)
+        )
+    );
+    const groupTriggers = pendingTriggers.filter((trigger) =>
+      trigger.orderingId !== undefined && unresolvedIds.has(trigger.orderingId)
+    );
+    const afterTriggers = pendingTriggers.filter(
+      (trigger) =>
+        trigger.orderingId === undefined || !unresolvedIds.has(trigger.orderingId)
+    );
+    if (groupTriggers.length >= 2) {
+      const promptResult = buildTriggerSelectionPrompt(
+        nextState,
+        groupTriggers,
+        afterTriggers,
+        cardDb,
+        triggerOrderingGroup
+      );
+      return {
+        state: promptResult.state,
+        events,
+        resolved: false,
+        pendingPrompt: promptResult.pendingPrompt,
+      };
+    }
   }
 
   // Group by controller — turn player resolves first (§8-6),

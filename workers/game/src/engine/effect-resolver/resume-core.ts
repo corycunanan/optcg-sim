@@ -550,7 +550,8 @@ export function resumeFromStack(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
-        events
+        events,
+        topFrame.triggerOrderingGroup
       );
     }
 

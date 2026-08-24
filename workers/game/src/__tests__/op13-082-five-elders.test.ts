@@ -62,6 +62,19 @@ const ELDER_CARDS: CardData[] = FIVE_ELDER_IDS.map((id, index) => ({
   color: ["Black"],
   power: 5000,
   types: ["Five Elders", "Celestial Dragons"],
+  effectSchema: {
+    card_id: id,
+    card_name: `Five Elder ${index + 1}`,
+    card_type: "Character",
+    effects: [
+      {
+        id: `${id}_on_play`,
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        actions: [],
+      },
+    ],
+  },
 }));
 
 function character(cardId: string, instanceId: string): CardInstance {
@@ -133,12 +146,17 @@ describe("OPT-698: OP13-082 Five Elders", () => {
       name: "St. Jaygarcia Saturn",
       effectSchema: OP13_083_ST_JAYGARCIA_SATURN,
     };
+    const nusjuro = {
+      ...ELDER_CARDS.find((card) => card.id === "OP13-080")!,
+      name: "St. Ethanbaron V. Nusjuro",
+    };
     const mars = {
       ...ELDER_CARDS.find((card) => card.id === "OP13-091")!,
       name: "St. Marcus Mars",
       effectSchema: OP13_091_ST_MARCUS_MARS,
     };
     scenario.cardDb.set(saturn.id, saturn);
+    scenario.cardDb.set(nusjuro.id, nusjuro);
     scenario.cardDb.set(mars.id, mars);
 
     const activation = runPipeline(
@@ -175,7 +193,7 @@ describe("OPT-698: OP13-082 Five Elders", () => {
         const card = result.state.players[0].trash.find(
           (candidate) => candidate.instanceId === id
         );
-        return card?.cardId === saturn.id || card?.cardId === mars.id;
+        return card ? FIVE_ELDER_IDS.includes(card.cardId) : false;
       }
     );
     result = resumeFromStack(
@@ -193,10 +211,24 @@ describe("OPT-698: OP13-082 Five Elders", () => {
         .filter((card): card is CardInstance => card !== null)
         .map((card) => card.cardId)
         .sort()
-    ).toEqual([saturn.id, mars.id].sort());
+    ).toEqual([...FIVE_ELDER_IDS].sort());
     if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
       throw new Error("Expected the trigger-ordering prompt");
     }
+    expect(result.pendingPrompt.options.sourceEffectDescription).toBe(
+      FIVE_ELDERS.name
+    );
+    expect(result.pendingPrompt.options.confirmOrSkip).toBe(true);
+    expect(result.pendingPrompt.options.choices).toHaveLength(5);
+    expect(
+      result.pendingPrompt.options.choices.map((choice) => choice.id)
+    ).not.toEqual(["0", "1", "2", "3", "4"]);
+    expect(
+      result.pendingPrompt.options.choices.every((choice) => !choice.disabled)
+    ).toBe(true);
+    const initialChoiceIds = result.pendingPrompt.options.choices.map(
+      (choice) => choice.id
+    );
     const marsChoice = result.pendingPrompt.options.choices.find((choice) =>
       choice.label.includes(mars.name)
     );
@@ -211,6 +243,27 @@ describe("OPT-698: OP13-082 Five Elders", () => {
     expect(result.state.effectStack.at(-1)?.effectBlock.id).toBe(
       "OP13-091_on_play"
     );
+
+    result = resumeFromStack(
+      result.state,
+      { type: "PLAYER_CHOICE", choiceId: "skip" },
+      scenario.cardDb
+    );
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+      throw new Error("Expected the trigger-ordering prompt to re-open");
+    }
+    expect(result.pendingPrompt.options.sourceEffectDescription).toBe(
+      FIVE_ELDERS.name
+    );
+    expect(
+      result.pendingPrompt.options.choices.map((choice) => choice.id)
+    ).toEqual(initialChoiceIds);
+    expect(
+      result.pendingPrompt.options.choices.find(
+        (choice) => choice.id === marsChoice.id
+      )?.disabled
+    ).toBe(true);
   });
 
   it("trashes all allied Characters without K.O. events, then plays five distinct Elders", () => {

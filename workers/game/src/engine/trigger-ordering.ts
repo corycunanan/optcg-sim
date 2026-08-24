@@ -4,7 +4,12 @@
  * Extracted to avoid circular imports (pipeline → effect-resolver → resume → pipeline).
  */
 
-import type { CardData, GameState, PendingPromptState, PendingEvent } from "../types.js";
+import type {
+  CardData,
+  GameState,
+  PendingPromptState,
+  PendingEvent,
+} from "../types.js";
 import type { QueuedTrigger, EffectStackFrame } from "../types.js";
 import {
   matchTriggersForEvent,
@@ -30,7 +35,7 @@ export function scanEventsForTriggers(
   events: PendingEvent[],
   defaultController: 0 | 1,
   cardDb: Map<string, CardData>,
-  groupSourceInstanceId?: string,
+  groupSourceInstanceId?: string
 ): { triggers: QueuedTrigger[]; state: GameState; events: PendingEvent[] } {
   const triggers: QueuedTrigger[] = [];
   let nextState = state;
@@ -74,7 +79,10 @@ export function scanEventsForTriggers(
     const matched = matchTriggersForEvent(nextState, gameEvent, cardDb);
     if (matched.length === 0) continue;
 
-    const ordered = orderMatchedTriggers(matched, nextState.turn.activePlayerIndex);
+    const ordered = orderMatchedTriggers(
+      matched,
+      nextState.turn.activePlayerIndex
+    );
     for (const match of ordered) {
       triggers.push({
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
@@ -100,22 +108,43 @@ export function buildTriggerSelectionPrompt(
   triggers: QueuedTrigger[],
   afterTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
+  triggerOrderingGroup?: EffectStackFrame["triggerOrderingGroup"]
 ): { state: GameState; pendingPrompt?: PendingPromptState } {
-  const controller = triggers[0].controller;
+  const fullTriggers = withStableOrderingIds(
+    triggerOrderingGroup?.triggers ?? triggers
+  );
+  const orderingGroup = {
+    triggers: fullTriggers,
+    resolvedTriggerIds: triggerOrderingGroup?.resolvedTriggerIds ?? [],
+  };
+  const triggersById = new Map(
+    fullTriggers.map((trigger) => [trigger.orderingId, trigger])
+  );
+  const remainingTriggers = triggerOrderingGroup
+    ? triggers.map(
+        (trigger) => triggersById.get(trigger.orderingId) ?? trigger
+      )
+    : fullTriggers;
+  const controller = remainingTriggers[0].controller;
+  const resolvedIds = new Set(orderingGroup.resolvedTriggerIds);
 
   // Build choice labels from card name + effect description
-  const choices = triggers.map((t, i) => {
+  const choices = orderingGroup.triggers.map((t) => {
     const card = findCardInstance(state, t.sourceCardInstanceId);
     const cardData = card ? cardDb.get(card.cardId) : null;
     const cardName = cardData?.name ?? "Unknown Card";
     const effectDesc = cardData
       ? extractEffectDescription(cardData.effectText, t.effectBlock)
       : "Activate effect";
-    return { id: String(i), label: `${cardName}: ${effectDesc}` };
+    return {
+      id: t.orderingId!,
+      label: `${cardName}: ${effectDesc}`,
+      ...(resolvedIds.has(t.orderingId!) ? { disabled: true } : {}),
+    };
   });
 
   // Add "Done" option if all remaining triggers are optional
-  const allOptional = triggers.every(
+  const allOptional = remainingTriggers.every(
     (t) => t.effectBlock.flags?.optional === true
   );
   if (allOptional) {
@@ -125,9 +154,9 @@ export function buildTriggerSelectionPrompt(
   const frameId = generateFrameId(state);
   const frame: EffectStackFrame = {
     id: frameId.id,
-    sourceCardInstanceId: triggers[0].sourceCardInstanceId,
+    sourceCardInstanceId: remainingTriggers[0].sourceCardInstanceId,
     controller,
-    effectBlock: triggers[0].effectBlock,
+    effectBlock: remainingTriggers[0].effectBlock,
     phase: "AWAITING_TRIGGER_ORDER_SELECTION",
     pausedAction: null,
     remainingActions: [],
@@ -139,7 +168,8 @@ export function buildTriggerSelectionPrompt(
     oncePerTurnMarked: false,
     costResultRefs: [],
     pendingTriggers: afterTriggers,
-    simultaneousTriggers: triggers,
+    simultaneousTriggers: remainingTriggers,
+    triggerOrderingGroup: orderingGroup,
     accumulatedEvents: [],
   };
 
@@ -150,11 +180,67 @@ export function buildTriggerSelectionPrompt(
     options: {
       promptType: "PLAYER_CHOICE",
       effectDescription: "Choose which effect to activate first",
+      sourceEffectDescription: (() => {
+        const groupSourceInstanceId =
+          orderingGroup.triggers[0]?.groupSourceInstanceId;
+        if (!groupSourceInstanceId) return undefined;
+        const sourceCard = findCardInstance(state, groupSourceInstanceId);
+        if (sourceCard) return cardDb.get(sourceCard.cardId)?.name;
+        const sourceEvent = [...state.eventLog].reverse().find((event) => {
+          const payload = event.payload as
+            | { cardInstanceId?: string }
+            | undefined;
+          return payload?.cardInstanceId === groupSourceInstanceId;
+        });
+        const sourceCardId = (sourceEvent?.payload as { cardId?: string })
+          ?.cardId;
+        if (sourceCardId) return cardDb.get(sourceCardId)?.name;
+        const sourceFrame = [...state.effectStack]
+          .reverse()
+          .find(
+            (frame) => frame.sourceCardInstanceId === groupSourceInstanceId
+          );
+        if (!sourceFrame) return undefined;
+        const batchAction = sourceFrame.batchResumeMarker?.pausedAction;
+        for (const cardData of cardDb.values()) {
+          if (
+            cardData.effectSchema?.effects.some(
+              (effect) =>
+                effect.id === sourceFrame.effectBlock.id ||
+                (batchAction &&
+                  effect.actions?.some(
+                    (action) =>
+                      action.type === batchAction.type &&
+                      JSON.stringify(action.target) ===
+                        JSON.stringify(batchAction.target)
+                  ))
+            )
+          ) {
+            return cardData.name;
+          }
+        }
+        return undefined;
+      })(),
       choices,
+      confirmOrSkip: true,
     },
     respondingPlayer: controller,
     resumeContext: frame.id,
   };
 
   return { state: nextState, pendingPrompt };
+}
+
+export function withStableOrderingIds(triggers: QueuedTrigger[]): QueuedTrigger[] {
+  const occurrences = new Map<string, number>();
+  return triggers.map((trigger) => {
+    if (trigger.orderingId) return trigger;
+    const pair = `${trigger.sourceCardInstanceId}:${trigger.effectBlock.id}`;
+    const occurrence = occurrences.get(pair) ?? 0;
+    occurrences.set(pair, occurrence + 1);
+    return {
+      ...trigger,
+      orderingId: `${pair}:${occurrence}`,
+    };
+  });
 }

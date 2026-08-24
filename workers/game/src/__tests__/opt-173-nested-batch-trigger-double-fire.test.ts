@@ -148,10 +148,11 @@ describe("OPT-173: nested batch-trigger drain double-fire", () => {
     const first = runPipeline(state, { type: "PLAY_CARD", cardInstanceId: executor.instanceId }, cardDb, 0);
     expect(first.valid).toBe(true);
     expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (first.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") throw new Error("Expected ordering prompt");
 
     const result = resumeFromStack(
       first.state,
-      { type: "PLAYER_CHOICE", choiceId: "0" },
+      { type: "PLAYER_CHOICE", choiceId: first.pendingPrompt.options.choices[0].id },
       cardDb,
     );
     expect(result.pendingPrompt).toBeUndefined();

@@ -307,13 +307,14 @@ const completeResolverServices: EffectResolverServices = {
       controller,
       cardDb
     ),
-  processRemainingTriggers: (state, triggers, cardDb, events) =>
+  processRemainingTriggers: (state, triggers, cardDb, events, triggerOrderingGroup) =>
     processRemainingTriggers(
       state,
       triggers,
       cardDb,
       completeResolverServices,
-      events
+      events,
+      triggerOrderingGroup
     ),
   reenterBatchResume: (state, cardDb, events) =>
     reenterBatchResume(state, cardDb, completeResolverServices, events),
