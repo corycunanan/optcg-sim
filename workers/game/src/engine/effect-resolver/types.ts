@@ -4,6 +4,7 @@
 
 import type {
   BatchResumeMarker,
+  EffectStackFrame,
   GameState,
   PendingEvent,
   PendingPromptState,
@@ -83,7 +84,8 @@ export interface EffectResolverServices {
     state: GameState,
     pendingTriggers: QueuedTrigger[],
     cardDb: Map<string, CardData>,
-    priorEvents?: PendingEvent[]
+    priorEvents?: PendingEvent[],
+    triggerOrderingGroup?: EffectStackFrame["triggerOrderingGroup"]
   ): EffectResolverResult;
   reenterBatchResume(
     state: GameState,

@@ -508,6 +508,16 @@ function hasValidStackFrame(value: unknown): boolean {
     )
       return false;
   }
+  const triggerOrderingGroup = value.triggerOrderingGroup;
+  if (
+    triggerOrderingGroup !== undefined &&
+    (!isRecord(triggerOrderingGroup) ||
+      !Array.isArray(triggerOrderingGroup.triggers) ||
+      !Array.isArray(triggerOrderingGroup.resolvedSourceInstanceIds) ||
+      triggerOrderingGroup.resolvedSourceInstanceIds.some(
+        (id) => typeof id !== "string"
+      ))
+  ) return false;
   return (
     Array.isArray(value.accumulatedEvents) &&
     value.accumulatedEvents.every(isKnownPendingEvent)

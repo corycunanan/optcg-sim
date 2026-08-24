@@ -23,7 +23,12 @@ import type {
   EffectStackFrame,
   ResumeContext,
 } from "../../../types.js";
-import { CONTINUATION_EFFECT_BLOCK, popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
+import {
+  CONTINUATION_EFFECT_BLOCK,
+  popFrame,
+  peekFrame,
+  updateTopFrame,
+} from "../../effect-stack.js";
 import {
   emitEvent,
   getEventCardInstanceId,
@@ -78,7 +83,7 @@ export function handlePlayerChoiceStateDistribution(
   resultRefs: Map<string, EffectResult>,
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
-  services: EffectResolverServices,
+  services: EffectResolverServices
 ): ChoiceBranchResult {
   const {
     pausedAction,
@@ -163,11 +168,16 @@ export function handlePlayerChoiceStateDistribution(
       marker,
       triggers,
       resumeCtx.remainingActions,
-      resultRefs,
+      resultRefs
     );
     return {
       kind: "terminal",
-      result: services.processRemainingTriggers(nextWithFrame, triggers, cardDb, events),
+      result: services.processRemainingTriggers(
+        nextWithFrame,
+        triggers,
+        cardDb,
+        events
+      ),
     };
   }
   if (actionResult.result && pausedAction.result_ref) {
@@ -383,7 +393,9 @@ export function handleAwaitingOptionalResponse(
     return services.processRemainingTriggers(
       nextState,
       topFrame.pendingTriggers,
-      cardDb
+      cardDb,
+      [],
+      topFrame.triggerOrderingGroup
     );
   }
 
@@ -406,7 +418,9 @@ export function handleAwaitingOptionalResponse(
       return services.processRemainingTriggers(
         nextState,
         topFrame.pendingTriggers,
-        cardDb
+        cardDb,
+        [],
+        topFrame.triggerOrderingGroup
       );
     }
 
@@ -426,6 +440,7 @@ export function handleAwaitingOptionalResponse(
         nextState = updateTopFrame(nextState, {
           pendingTriggers: topFrame.pendingTriggers,
           resultRefs: topFrame.resultRefs,
+          triggerOrderingGroup: topFrame.triggerOrderingGroup,
         });
       }
       return {
@@ -451,9 +466,7 @@ export function handleAwaitingOptionalResponse(
   let pendingTriggers = topFrame.pendingTriggers;
   if (events.length > 0) {
     const scannable = events.filter(
-      (e) =>
-      e.type !== "CARD_TRASHED" ||
-        Boolean(getEventCardInstanceId(e))
+      (e) => e.type !== "CARD_TRASHED" || Boolean(getEventCardInstanceId(e))
     );
     if (scannable.length > 0) {
       const costScan = scanEventsForTriggers(
@@ -486,7 +499,8 @@ export function handleAwaitingOptionalResponse(
       nextState,
       pendingTriggers,
       cardDb,
-      events
+      events,
+      topFrame.triggerOrderingGroup
     );
   }
 
@@ -507,7 +521,10 @@ export function handleAwaitingOptionalResponse(
     if (chainResult.pendingPrompt) {
       const newTop = peekFrame(nextState);
       if (newTop) {
-        nextState = updateTopFrame(nextState, { pendingTriggers });
+        nextState = updateTopFrame(nextState, {
+          pendingTriggers,
+          triggerOrderingGroup: topFrame.triggerOrderingGroup,
+        });
       }
       return {
         state: nextState,
@@ -537,7 +554,8 @@ export function handleAwaitingOptionalResponse(
           nextState,
           allTriggers,
           cardDb,
-          events
+          events,
+          topFrame.triggerOrderingGroup
         );
       }
     }
@@ -547,7 +565,8 @@ export function handleAwaitingOptionalResponse(
     nextState,
     pendingTriggers,
     cardDb,
-    events
+    events,
+    topFrame.triggerOrderingGroup
   );
 }
 
@@ -584,14 +603,29 @@ export function handleAwaitingTriggerOrderSelection(
     return { state, events, resolved: false };
   }
 
-  const chosenIndex = parseInt(action.choiceId, 10);
-  const chosenTrigger = simultaneous[chosenIndex];
+  const chosenTrigger = simultaneous.find(
+    (trigger) => trigger.sourceCardInstanceId === action.choiceId
+  ) ?? simultaneous[Number.parseInt(action.choiceId, 10)];
   if (!chosenTrigger) {
     return { state, events, resolved: false };
   }
 
   // Remove chosen trigger from the remaining simultaneous set
-  const remaining = simultaneous.filter((_, i) => i !== chosenIndex);
+  const remaining = simultaneous.filter(
+    (trigger) =>
+      trigger.sourceCardInstanceId !== chosenTrigger.sourceCardInstanceId
+  );
+  const triggerOrderingGroup = topFrame.triggerOrderingGroup ?? {
+    triggers: simultaneous,
+    resolvedSourceInstanceIds: [],
+  };
+  const nextTriggerOrderingGroup = {
+    ...triggerOrderingGroup,
+    resolvedSourceInstanceIds: [
+      ...triggerOrderingGroup.resolvedSourceInstanceIds,
+      chosenTrigger.sourceCardInstanceId,
+    ],
+  };
 
   // Pop the selection frame
   nextState = popFrame(nextState);
@@ -620,6 +654,7 @@ export function handleAwaitingTriggerOrderSelection(
     if (newTop) {
       nextState = updateTopFrame(nextState, {
         pendingTriggers: [...remaining, ...savedPendingTriggers],
+        triggerOrderingGroup: nextTriggerOrderingGroup,
       });
     }
     return {
@@ -669,6 +704,7 @@ export function handleAwaitingTriggerOrderSelection(
         if (newTop) {
           nextState = updateTopFrame(nextState, {
             pendingTriggers: [...remaining, ...savedPendingTriggers],
+            triggerOrderingGroup: nextTriggerOrderingGroup,
           });
         }
         return {
@@ -690,7 +726,8 @@ export function handleAwaitingTriggerOrderSelection(
       nextState,
       remaining,
       savedPendingTriggers,
-      cardDb
+      cardDb,
+      nextTriggerOrderingGroup
     );
     return {
       state: promptResult.state,

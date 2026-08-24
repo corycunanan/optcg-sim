@@ -324,6 +324,12 @@ const StackFrameCore = z.strictObject({
   costReplacementChecked: z.boolean().optional(),
   pendingTriggers: z.array(z.unknown()),
   simultaneousTriggers: z.array(z.unknown()),
+  triggerOrderingGroup: z
+    .strictObject({
+      triggers: z.array(z.unknown()),
+      resolvedSourceInstanceIds: StringArray,
+    })
+    .optional(),
   accumulatedEvents: z.array(z.unknown()),
   ruleTrashForPlay: z.unknown().optional(),
   stateDistributionForPlay: z.unknown().optional(),

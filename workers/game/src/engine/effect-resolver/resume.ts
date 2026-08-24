@@ -40,14 +40,16 @@ export function processRemainingTriggers(
   state: GameState,
   pendingTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
-  priorEvents: PendingEvent[] = []
+  priorEvents: PendingEvent[] = [],
+  triggerOrderingGroup?: import("../../types.js").EffectStackFrame["triggerOrderingGroup"]
 ) {
   return processRemainingTriggersCore(
     state,
     pendingTriggers,
     cardDb,
     resolverExecutionServices,
-    priorEvents
+    priorEvents,
+    triggerOrderingGroup
   );
 }
 

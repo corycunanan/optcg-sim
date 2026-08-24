@@ -259,6 +259,12 @@ export interface EffectStackFrame {
   // Simultaneous triggers awaiting player ordering choice
   simultaneousTriggers: QueuedTrigger[];
 
+  // Full ordering group retained while chosen effects and nested prompts resolve
+  triggerOrderingGroup?: {
+    triggers: QueuedTrigger[];
+    resolvedSourceInstanceIds: string[];
+  };
+
   // Events accumulated during partial execution
   accumulatedEvents: PendingEvent[];
 

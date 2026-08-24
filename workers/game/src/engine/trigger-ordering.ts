@@ -4,7 +4,12 @@
  * Extracted to avoid circular imports (pipeline → effect-resolver → resume → pipeline).
  */
 
-import type { CardData, GameState, PendingPromptState, PendingEvent } from "../types.js";
+import type {
+  CardData,
+  GameState,
+  PendingPromptState,
+  PendingEvent,
+} from "../types.js";
 import type { QueuedTrigger, EffectStackFrame } from "../types.js";
 import {
   matchTriggersForEvent,
@@ -30,7 +35,7 @@ export function scanEventsForTriggers(
   events: PendingEvent[],
   defaultController: 0 | 1,
   cardDb: Map<string, CardData>,
-  groupSourceInstanceId?: string,
+  groupSourceInstanceId?: string
 ): { triggers: QueuedTrigger[]; state: GameState; events: PendingEvent[] } {
   const triggers: QueuedTrigger[] = [];
   let nextState = state;
@@ -74,7 +79,10 @@ export function scanEventsForTriggers(
     const matched = matchTriggersForEvent(nextState, gameEvent, cardDb);
     if (matched.length === 0) continue;
 
-    const ordered = orderMatchedTriggers(matched, nextState.turn.activePlayerIndex);
+    const ordered = orderMatchedTriggers(
+      matched,
+      nextState.turn.activePlayerIndex
+    );
     for (const match of ordered) {
       triggers.push({
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
@@ -100,18 +108,27 @@ export function buildTriggerSelectionPrompt(
   triggers: QueuedTrigger[],
   afterTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
+  triggerOrderingGroup: EffectStackFrame["triggerOrderingGroup"] = {
+    triggers,
+    resolvedSourceInstanceIds: [],
+  }
 ): { state: GameState; pendingPrompt?: PendingPromptState } {
   const controller = triggers[0].controller;
+  const resolvedIds = new Set(triggerOrderingGroup.resolvedSourceInstanceIds);
 
   // Build choice labels from card name + effect description
-  const choices = triggers.map((t, i) => {
+  const choices = triggerOrderingGroup.triggers.map((t) => {
     const card = findCardInstance(state, t.sourceCardInstanceId);
     const cardData = card ? cardDb.get(card.cardId) : null;
     const cardName = cardData?.name ?? "Unknown Card";
     const effectDesc = cardData
       ? extractEffectDescription(cardData.effectText, t.effectBlock)
       : "Activate effect";
-    return { id: String(i), label: `${cardName}: ${effectDesc}` };
+    return {
+      id: t.sourceCardInstanceId,
+      label: `${cardName}: ${effectDesc}`,
+      ...(resolvedIds.has(t.sourceCardInstanceId) ? { disabled: true } : {}),
+    };
   });
 
   // Add "Done" option if all remaining triggers are optional
@@ -140,6 +157,7 @@ export function buildTriggerSelectionPrompt(
     costResultRefs: [],
     pendingTriggers: afterTriggers,
     simultaneousTriggers: triggers,
+    triggerOrderingGroup,
     accumulatedEvents: [],
   };
 
@@ -150,7 +168,49 @@ export function buildTriggerSelectionPrompt(
     options: {
       promptType: "PLAYER_CHOICE",
       effectDescription: "Choose which effect to activate first",
+      sourceEffectDescription: (() => {
+        const groupSourceInstanceId =
+          triggerOrderingGroup.triggers[0]?.groupSourceInstanceId;
+        if (!groupSourceInstanceId) return undefined;
+        const sourceCard = findCardInstance(state, groupSourceInstanceId);
+        if (sourceCard) return cardDb.get(sourceCard.cardId)?.name;
+        const sourceEvent = [...state.eventLog].reverse().find((event) => {
+          const payload = event.payload as
+            | { cardInstanceId?: string }
+            | undefined;
+          return payload?.cardInstanceId === groupSourceInstanceId;
+        });
+        const sourceCardId = (sourceEvent?.payload as { cardId?: string })
+          ?.cardId;
+        if (sourceCardId) return cardDb.get(sourceCardId)?.name;
+        const sourceFrame = [...state.effectStack]
+          .reverse()
+          .find(
+            (frame) => frame.sourceCardInstanceId === groupSourceInstanceId
+          );
+        if (!sourceFrame) return undefined;
+        const batchAction = sourceFrame.batchResumeMarker?.pausedAction;
+        for (const cardData of cardDb.values()) {
+          if (
+            cardData.effectSchema?.effects.some(
+              (effect) =>
+                effect.id === sourceFrame.effectBlock.id ||
+                (batchAction &&
+                  effect.actions?.some(
+                    (action) =>
+                      action.type === batchAction.type &&
+                      JSON.stringify(action.target) ===
+                        JSON.stringify(batchAction.target)
+                  ))
+            )
+          ) {
+            return cardData.name;
+          }
+        }
+        return undefined;
+      })(),
       choices,
+      confirmOrSkip: true,
     },
     respondingPlayer: controller,
     resumeContext: frame.id,

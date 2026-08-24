@@ -13,7 +13,8 @@ import { GameButton } from "./game-button";
 
 interface PlayerChoiceModalProps {
   effectDescription: string;
-  choices: { id: string; label: string }[];
+  sourceEffectDescription?: string;
+  choices: { id: string; label: string; disabled?: boolean }[];
   donReturn?: {
     count: number;
     sources: Array<{
@@ -31,6 +32,7 @@ interface PlayerChoiceModalProps {
 
 export function PlayerChoiceModal({
   effectDescription,
+  sourceEffectDescription,
   choices,
   donReturn,
   confirmOrSkip = false,
@@ -89,11 +91,7 @@ export function PlayerChoiceModal({
   // payable). Auto-dispatch the lone choice and log so we notice in dev.
   const autoDispatchedRef = React.useRef(false);
   React.useEffect(() => {
-    if (
-      confirmOrSkip ||
-      choices.length !== 1 ||
-      autoDispatchedRef.current
-    )
+    if (confirmOrSkip || choices.length !== 1 || autoDispatchedRef.current)
       return;
     autoDispatchedRef.current = true;
     const [only] = choices;
@@ -121,9 +119,16 @@ export function PlayerChoiceModal({
         className="bg-gb-surface border-gb-border-strong text-gb-text flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[400px]"
       >
         <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
+          <div className="space-y-1">
           <DialogTitle className="text-gb-text-bright">
             {effectDescription}
           </DialogTitle>
+            {sourceEffectDescription && (
+              <p className="text-gb-text-dim text-sm">
+                {sourceEffectDescription}
+              </p>
+            )}
+          </div>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
           </GameButton>
@@ -201,11 +206,15 @@ export function PlayerChoiceModal({
                   variant={
                     selectedChoiceId === choice.id ? "amber" : "secondary"
                   }
-                  onClick={() => setSelectedChoiceId(choice.id)}
+                  onClick={() => {
+                    if (!choice.disabled) setSelectedChoiceId(choice.id);
+                  }}
+                  disabled={choice.disabled}
                   aria-pressed={selectedChoiceId === choice.id}
                   className="h-auto w-full justify-start px-4 py-3 text-sm"
                 >
                   {choice.label}
+                  {choice.disabled ? " — Resolved" : ""}
                 </GameButton>
               ))}
             </div>

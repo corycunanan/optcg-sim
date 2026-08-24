@@ -107,6 +107,7 @@ export function BoardModals({
           <PlayerChoiceModal
             key={activePromptId ?? "player-choice"}
             effectDescription={activePrompt.effectDescription}
+            sourceEffectDescription={activePrompt.sourceEffectDescription}
             choices={activePrompt.choices}
             donReturn={activePrompt.donReturn}
             confirmOrSkip={activePrompt.confirmOrSkip}
