@@ -661,6 +661,128 @@ describe("visible field cost", () => {
   });
 });
 
+describe("visible hand cost", () => {
+  function setter(
+    id: string,
+    controller: 0 | 1,
+    value: number | DynamicValue,
+    duration?: Duration,
+  ): RuntimeActiveEffect {
+    return {
+      id,
+      sourceCardInstanceId: `source-${controller}`,
+      sourceEffectBlockId: id,
+      category: "permanent",
+      modifiers: [{ type: "SET_COST", params: { value }, duration }],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller,
+      appliesTo: [],
+      timestamp: 1,
+    };
+  }
+
+  function handCostState(effects: RuntimeActiveEffect[]) {
+    const cardDb = createTestCardDb();
+    const targetData: CardData = {
+      ...CARDS.BLOCKER,
+      id: "OPT759-HAND-COST-TARGET",
+      cost: 3,
+    };
+    cardDb.set(targetData.id, targetData);
+    const state = createBattleReadyState(cardDb);
+    const target = {
+      ...state.players[0].hand[0]!,
+      instanceId: "opt759-hand-cost-target",
+      cardId: targetData.id,
+    };
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      hand: [target, ...players[0].hand.slice(1)],
+    };
+    return {
+      cardDb,
+      target,
+      state: {
+        ...state,
+        players,
+        turn: { ...state.turn, activePlayerIndex: 0 as const },
+        activeEffects: effects.map((effect) => ({
+          ...effect,
+          appliesTo: [target.instanceId],
+        })),
+      },
+    };
+  }
+
+  it.each([
+    {
+      name: "opposing setters with turn-player priority",
+      effects: [setter("opponent-set-1", 1, 1), setter("turn-player-set-7", 0, 7)],
+      expected: 1,
+    },
+    {
+      name: "a dynamic PER_COUNT setter",
+      effects: [setter("dynamic-set", 0, {
+        type: "PER_COUNT",
+        source: "HAND_COUNT",
+        multiplier: 2,
+      })],
+      expected: 10,
+    },
+    {
+      name: "a false-gated setter",
+      effects: [setter("false-gated-set", 0, 0, {
+        type: "WHILE_CONDITION",
+        condition: { type: "IS_MY_TURN", controller: "OPPONENT" },
+      })],
+      expected: 3,
+    },
+  ])("publishes PLAY_CARD cost for $name", ({ effects, expected }) => {
+    const { state, cardDb, target } = handCostState(effects);
+    const serverCost = getEffectiveCost(
+      cardDb.get(target.cardId)!,
+      state,
+      target.instanceId,
+      cardDb,
+      true,
+    );
+    const visibleTarget = visibleStateForPlayer(state, cardDb, 0)
+      .players[0].hand[0] as CardInstance & { effectiveCost?: number };
+
+    expect(serverCost).toBe(expected);
+    expect(visibleTarget.effectiveCost).toBe(serverCost);
+  });
+
+  it("includes a pending play discount in owner-visible hand cost", () => {
+    const fixture = handCostState([]);
+    const state = {
+      ...fixture.state,
+      oneTimeModifiers: [{
+        id: "pending-play-discount",
+        appliesTo: { action: "PLAY_CARD", filter: {} },
+        modification: { type: "MODIFY_COST", params: { amount: -1 } },
+        expires: { type: "THIS_TURN" },
+        consumed: false,
+        controller: 0,
+      }],
+    } as typeof fixture.state;
+    const serverCost = getEffectiveCost(
+      fixture.cardDb.get(fixture.target.cardId)!,
+      state,
+      fixture.target.instanceId,
+      fixture.cardDb,
+      true,
+    );
+    const visibleTarget = visibleStateForPlayer(state, fixture.cardDb, 0)
+      .players[0].hand[0] as CardInstance & { effectiveCost?: number };
+
+    expect(serverCost).toBe(2);
+    expect(visibleTarget.effectiveCost).toBe(serverCost);
+  });
+});
+
 describe("visible dynamic aura targets", () => {
   it("publishes Saldeath's granted Blugori in appliesTo", () => {
     const { state, cardDb, fieldTarget } = saldeathAuraState();
