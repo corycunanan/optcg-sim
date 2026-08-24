@@ -30,6 +30,18 @@ export function processRemainingTriggers(
   const events = [...priorEvents];
   let nextState = state;
 
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
+    if (event.propagation?.eventLogEmitted) continue;
+    nextState = emitEvent(
+      nextState,
+      event.type,
+      event.playerIndex ?? nextState.turn.activePlayerIndex,
+      event.payload ?? {},
+    );
+    events[index] = withEventLogEmitted(event);
+  }
+
   if (pendingTriggers.length === 0) {
     return services.reenterBatchResume(nextState, cardDb, events);
   }

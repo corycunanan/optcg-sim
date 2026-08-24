@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import { runPipeline } from "../engine/pipeline.js";
+import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
@@ -144,14 +145,21 @@ describe("OPT-173: nested batch-trigger drain double-fire", () => {
     const p1HandBefore = state.players[1].hand.length;
     const p1DeckBefore = state.players[1].deck.length;
 
-    const result = runPipeline(state, { type: "PLAY_CARD", cardInstanceId: executor.instanceId }, cardDb, 0);
-    expect(result.valid).toBe(true);
+    const first = runPipeline(state, { type: "PLAY_CARD", cardInstanceId: executor.instanceId }, cardDb, 0);
+    expect(first.valid).toBe(true);
+    expect(first.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+
+    const result = resumeFromStack(
+      first.state,
+      { type: "PLAYER_CHOICE", choiceId: "0" },
+      cardDb,
+    );
     expect(result.pendingPrompt).toBeUndefined();
 
-    // Each victim KO'd exactly once (no double-emit in eventLog either: the
-    // pipeline's outer scan would add CARD_KO twice without OPT-173).
-    const koEvents = result.state.eventLog.filter((e) => e.type === "CARD_KO");
-    expect(koEvents).toHaveLength(2);
+    // Each victim left the field exactly once before the ordering prompt, and
+    // both CARD_KO events remain published exactly once after the response.
+    expect(first.state.players[1].characters.filter(Boolean)).toHaveLength(0);
+    expect(result.state.eventLog.filter((event) => event.type === "CARD_KO")).toHaveLength(2);
 
     // Player 1 drew exactly one card per ON_KO. Without the fix, the outer
     // pipeline scan re-queues both ON_KO triggers, drawing 2 extra cards.

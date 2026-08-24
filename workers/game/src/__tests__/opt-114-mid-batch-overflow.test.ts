@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { executePlayCard } from "../engine/effect-resolver/actions/play.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
+import { registerTriggersForCard } from "../engine/triggers.js";
 import type { Action, EffectResult } from "../engine/effect-types.js";
 import type { CardData, CardInstance, GameState, ResumeContext } from "../types.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
@@ -62,6 +63,75 @@ function seedBoardAndTrash(
 }
 
 describe("OPT-114 commit 3: mid-batch interleaving", () => {
+  it("keeps pre-overflow ON_PLAY and rule-trash triggers in one simultaneous group", () => {
+    const cardDb = createTestCardDb();
+    const onPlayCard: CardData = {
+      ...CARDS.VANILLA,
+      id: "OVERFLOW-ON-PLAY",
+      name: "Overflow On Play",
+      effectSchema: {
+        card_id: "OVERFLOW-ON-PLAY",
+        card_name: "Overflow On Play",
+        card_type: "Character",
+        effects: [{ id: "overflow-on-play", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: [{ type: "DRAW", params: { amount: 1 } }] }],
+      },
+    };
+    const trashWatcher: CardData = {
+      ...CARDS.VANILLA,
+      id: "OVERFLOW-TRASH-WATCHER",
+      name: "Overflow Trash Watcher",
+      effectSchema: {
+        card_id: "OVERFLOW-TRASH-WATCHER",
+        card_name: "Overflow Trash Watcher",
+        card_type: "Character",
+        effects: [{ id: "overflow-trash-watch", category: "auto", trigger: { event: "ANY_CHARACTER_TRASHED" }, actions: [{ type: "DRAW", params: { amount: 1 } }] }],
+      },
+    };
+    cardDb.set(onPlayCard.id, onPlayCard);
+    cardDb.set(trashWatcher.id, trashWatcher);
+    const trash = [trashChar(onPlayCard.id, "one"), trashChar(onPlayCard.id, "two")];
+    let state = seedBoardAndTrash(cardDb, 4, trash);
+    const watcher = state.players[0].characters[0]!;
+    const victimId = watcher.instanceId;
+    state = {
+      ...state,
+      players: [
+        {
+          ...state.players[0],
+          characters: state.players[0].characters.map((card, index) =>
+            index === 0 ? { ...watcher, cardId: trashWatcher.id } : card
+          ),
+        },
+        state.players[1],
+      ] as [typeof state.players[0], typeof state.players[1]],
+    };
+    state = registerTriggersForCard(state, state.players[0].characters[0]!, trashWatcher);
+
+    const action: Action = {
+      type: "PLAY_CARD",
+      target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { exact: 2 } },
+      params: { source_zone: "TRASH", cost_override: "FREE" },
+    };
+    const first = executePlayCard(
+      state, action, "batch-source", 0, cardDb, new Map<string, EffectResult>(),
+      trash.map((card) => card.instanceId),
+    );
+    expect(first.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    const resumed = resumeEffectChain(
+      first.state,
+      first.pendingPrompt!.resumeContext as ResumeContext,
+      { type: "SELECT_TARGET", selectedInstanceIds: [victimId] },
+      cardDb,
+    );
+
+    expect(resumed.state.players[0].characters.filter(Boolean)).toHaveLength(5);
+    expect(resumed.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (resumed.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+      throw new Error("Expected simultaneous trigger ordering prompt");
+    }
+    expect(resumed.pendingPrompt.options.choices).toHaveLength(3);
+  });
+
   it("overflow mid-batch: remaining frames continue after victim is rule-trashed", () => {
     const cardDb = createTestCardDb();
     const trash = [

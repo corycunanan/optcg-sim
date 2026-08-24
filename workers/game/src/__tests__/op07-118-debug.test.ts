@@ -239,9 +239,15 @@ describe("OP07-118 Sabo dual-target KO", () => {
       { type: "SELECT_TARGET", selectedInstanceIds: [opp1a.instanceId, opp1b.instanceId] },
       cardDb,
     );
+    expect(step4.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    const step5 = resumeFromStack(
+      step4.state,
+      { type: "PLAYER_CHOICE", choiceId: "0" },
+      cardDb,
+    );
 
     // Both cost-1 chars must be KO'd.
-    const opp = step4.state.players[1];
+    const opp = step5.state.players[1];
     expect(opp.characters.filter(Boolean)).toHaveLength(0);
     expect(opp.trash.find(c => c.instanceId === opp1a.instanceId)).toBeUndefined();
     expect(opp.trash.find(c => c.instanceId === opp1b.instanceId)).toBeUndefined();

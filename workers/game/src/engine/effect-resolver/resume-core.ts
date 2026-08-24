@@ -187,7 +187,8 @@ export function resumeEffectChain(
     resumeCtx,
     resultRefs,
     cardDb,
-    events
+    events,
+    services
   );
   if (stateDist?.kind === "terminal") return stateDist.result;
   if (stateDist?.kind === "fallthrough") {

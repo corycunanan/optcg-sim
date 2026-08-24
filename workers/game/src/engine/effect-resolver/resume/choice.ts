@@ -23,8 +23,13 @@ import type {
   EffectStackFrame,
   ResumeContext,
 } from "../../../types.js";
-import { popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
-import { emitEvent, getEventCardInstanceId, replacePendingEventReferences } from "../../events.js";
+import { CONTINUATION_EFFECT_BLOCK, popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
+import {
+  emitEvent,
+  getEventCardInstanceId,
+  replacePendingEventReferences,
+  withEventLogEmitted,
+} from "../../events.js";
 import {
   scanEventsForTriggers,
   buildTriggerSelectionPrompt,
@@ -39,6 +44,7 @@ import {
   decodeFieldDonReturnChoice,
 } from "../actions/don.js";
 import type { EffectResolverResult, EffectResolverServices } from "../types.js";
+import { pushBatchResumeFrame } from "./batch.js";
 
 export interface ChoiceFallthrough {
   kind: "fallthrough";
@@ -71,7 +77,8 @@ export function handlePlayerChoiceStateDistribution(
   resumeCtx: ResumeContext,
   resultRefs: Map<string, EffectResult>,
   cardDb: Map<string, CardData>,
-  events: PendingEvent[]
+  events: PendingEvent[],
+  services: EffectResolverServices,
 ): ChoiceBranchResult {
   const {
     pausedAction,
@@ -129,6 +136,7 @@ export function handlePlayerChoiceStateDistribution(
       remaining: sd.remaining,
       playedSoFar: sd.playedSoFar,
       forcedFirstState: chosenState,
+      queuedTriggers: sd.queuedTriggers,
     }
   );
   const nextState = actionResult.state;
@@ -143,6 +151,23 @@ export function handlePlayerChoiceStateDistribution(
         resolved: false,
         pendingPrompt: actionResult.pendingPrompt,
       },
+    };
+  }
+  if (actionResult.pendingBatchTriggers) {
+    const { triggers, marker } = actionResult.pendingBatchTriggers;
+    const nextWithFrame = pushBatchResumeFrame(
+      nextState,
+      effectSourceInstanceId,
+      controller,
+      CONTINUATION_EFFECT_BLOCK,
+      marker,
+      triggers,
+      resumeCtx.remainingActions,
+      resultRefs,
+    );
+    return {
+      kind: "terminal",
+      result: services.processRemainingTriggers(nextWithFrame, triggers, cardDb, events),
     };
   }
   if (actionResult.result && pausedAction.result_ref) {
@@ -606,13 +631,17 @@ export function handleAwaitingTriggerOrderSelection(
   }
 
   // Emit events from the resolved trigger
-  for (const event of result.events) {
+  for (let index = 0; index < result.events.length; index++) {
+    const event = result.events[index];
     nextState = emitEvent(
       nextState,
       event.type,
       event.playerIndex ?? chosenTrigger.controller,
       event.payload ?? {}
     );
+    const emittedEvent = withEventLogEmitted(event);
+    result.events[index] = emittedEvent;
+    replacePendingEventReferences(events, [event], [emittedEvent]);
   }
 
   // Scan for nested triggers (LIFO — resolve before returning to simultaneous set)
@@ -699,13 +728,17 @@ export function handleAwaitingTriggerOrderSelection(
     }
 
     // Emit events from the last trigger
-    for (const event of lastResult.events) {
+    for (let index = 0; index < lastResult.events.length; index++) {
+      const event = lastResult.events[index];
       nextState = emitEvent(
         nextState,
         event.type,
         event.playerIndex ?? remaining[0].controller,
         event.payload ?? {}
       );
+      const emittedEvent = withEventLogEmitted(event);
+      lastResult.events[index] = emittedEvent;
+      replacePendingEventReferences(events, [event], [emittedEvent]);
     }
 
     // Scan for nested triggers from last resolved trigger

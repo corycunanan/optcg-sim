@@ -30,6 +30,7 @@ export function scanEventsForTriggers(
   events: PendingEvent[],
   defaultController: 0 | 1,
   cardDb: Map<string, CardData>,
+  groupSourceInstanceId?: string,
 ): { triggers: QueuedTrigger[]; state: GameState; events: PendingEvent[] } {
   const triggers: QueuedTrigger[] = [];
   let nextState = state;
@@ -77,6 +78,7 @@ export function scanEventsForTriggers(
     for (const match of ordered) {
       triggers.push({
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
+        ...(groupSourceInstanceId ? { groupSourceInstanceId } : {}),
         controller: match.trigger.controller,
         effectBlock: match.effectBlock,
         triggeringEvent: scannedEvents[index],

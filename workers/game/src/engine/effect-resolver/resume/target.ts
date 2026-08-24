@@ -160,6 +160,7 @@ export function handleSelectTargetRuleTrashForPlay(
     };
   }
   const victimId = selected[0];
+  const stateBeforeRuleTrash = nextState;
   const trashResult = trashCharacter(nextState, victimId, controller);
   if (!trashResult) {
     return {
@@ -175,6 +176,42 @@ export function handleSelectTargetRuleTrashForPlay(
   // after the current card is placed. Otherwise fall back to the legacy
   // single-target re-entry (OPT-171).
   const batch = ruleTrashForPlay.batch;
+  let queuedTriggers = [...(batch?.queuedTriggers ?? [])];
+  if (batch && events.length > 0) {
+    // Match the rule-trashed victim's own trash trigger against its last-known
+    // field state. After transition, normal zone validation correctly rejects
+    // that registry entry because its source is no longer on the field.
+    const matchEvents = events.map((event) => {
+      if (
+        event.type !== "CARD_TRASHED" ||
+        event.payload?.cardInstanceId !== victimId
+      ) {
+        return event;
+      }
+      const { newCardInstanceId: _newCardInstanceId, ...payload } = event.payload;
+      return { ...event, payload } as PendingEvent;
+    });
+    const scan = scanEventsForTriggers(
+      stateBeforeRuleTrash,
+      matchEvents,
+      controller,
+      cardDb,
+      effectSourceInstanceId,
+    );
+    const scannedEvents = events.map((event, index) => ({
+      ...event,
+      propagation: scan.events[index].propagation,
+    })) as PendingEvent[];
+    const scannedTriggers = scan.triggers.map((trigger) => {
+      const eventIndex = scan.events.indexOf(trigger.triggeringEvent);
+      return eventIndex >= 0
+        ? { ...trigger, triggeringEvent: scannedEvents[eventIndex] }
+        : trigger;
+    });
+    nextState = { ...nextState, executionContext: scan.state.executionContext };
+    replacePendingEventReferences(events, [...events], scannedEvents);
+    queuedTriggers = [...queuedTriggers, ...scannedTriggers];
+  }
   const actionResult = batch
     ? executePlayCard(
         nextState,
@@ -189,6 +226,7 @@ export function handleSelectTargetRuleTrashForPlay(
           remaining: batch.remaining,
           playedSoFar: batch.playedSoFar,
           forcedFirstState: batch.forcedFirstState,
+          queuedTriggers,
         }
       )
     : services.executeEffectAction(
@@ -222,6 +260,23 @@ export function handleSelectTargetRuleTrashForPlay(
   }
   if (actionResult.result && pausedAction.result_ref) {
     resultRefs.set(pausedAction.result_ref, actionResult.result);
+  }
+  if (actionResult.pendingBatchTriggers) {
+    const { triggers, marker } = actionResult.pendingBatchTriggers;
+    nextState = pushBatchResumeFrame(
+      nextState,
+      effectSourceInstanceId,
+      controller,
+      CONTINUATION_EFFECT_BLOCK,
+      marker,
+      triggers,
+      remainingActions,
+      resultRefs,
+    );
+    return {
+      kind: "terminal",
+      result: services.processRemainingTriggers(nextState, triggers, cardDb, events),
+    };
   }
 
   // Scan for triggers produced by the re-entered play (e.g., ON_PLAY)
