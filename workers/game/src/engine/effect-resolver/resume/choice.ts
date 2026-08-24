@@ -24,7 +24,12 @@ import type {
   ResumeContext,
 } from "../../../types.js";
 import { CONTINUATION_EFFECT_BLOCK, popFrame, peekFrame, updateTopFrame } from "../../effect-stack.js";
-import { emitEvent, getEventCardInstanceId, replacePendingEventReferences } from "../../events.js";
+import {
+  emitEvent,
+  getEventCardInstanceId,
+  replacePendingEventReferences,
+  withEventLogEmitted,
+} from "../../events.js";
 import {
   scanEventsForTriggers,
   buildTriggerSelectionPrompt,
@@ -626,13 +631,17 @@ export function handleAwaitingTriggerOrderSelection(
   }
 
   // Emit events from the resolved trigger
-  for (const event of result.events) {
+  for (let index = 0; index < result.events.length; index++) {
+    const event = result.events[index];
     nextState = emitEvent(
       nextState,
       event.type,
       event.playerIndex ?? chosenTrigger.controller,
       event.payload ?? {}
     );
+    const emittedEvent = withEventLogEmitted(event);
+    result.events[index] = emittedEvent;
+    replacePendingEventReferences(events, [event], [emittedEvent]);
   }
 
   // Scan for nested triggers (LIFO — resolve before returning to simultaneous set)
@@ -719,13 +728,17 @@ export function handleAwaitingTriggerOrderSelection(
     }
 
     // Emit events from the last trigger
-    for (const event of lastResult.events) {
+    for (let index = 0; index < lastResult.events.length; index++) {
+      const event = lastResult.events[index];
       nextState = emitEvent(
         nextState,
         event.type,
         event.playerIndex ?? remaining[0].controller,
         event.payload ?? {}
       );
+      const emittedEvent = withEventLogEmitted(event);
+      lastResult.events[index] = emittedEvent;
+      replacePendingEventReferences(events, [event], [emittedEvent]);
     }
 
     // Scan for nested triggers from last resolved trigger

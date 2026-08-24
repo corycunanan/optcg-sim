@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveEffect } from "../engine/effect-resolver/resolver.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
+import { runPipeline } from "../engine/pipeline.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import type { EffectBlock, EffectSchema } from "../engine/effect-types.js";
 import type { CardData, CardInstance, GameState } from "../types.js";
@@ -27,6 +28,21 @@ const TRASH_WATCH_SCHEMA: EffectSchema = {
     category: "auto",
     trigger: { event: "ANY_CHARACTER_TRASHED" },
     actions: [{ type: "DRAW", params: { amount: 1 } }],
+  }],
+};
+
+const TRASH_SOURCE_SCHEMA: EffectSchema = {
+  card_id: "OPT757-TRASH-SOURCE",
+  card_name: "OPT757 Trash Source",
+  card_type: "Character",
+  effects: [{
+    id: "opt757-trash-source",
+    category: "activate",
+    trigger: { keyword: "ACTIVATE_MAIN" },
+    actions: [{
+      type: "TRASH_CARD",
+      target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+    }],
   }],
 };
 
@@ -101,6 +117,23 @@ function chooseState(state: GameState, choiceSuffix: "ACTIVE" | "RESTED", cardDb
     : undefined;
   if (!choice) throw new Error(`Missing ${choiceSuffix} state choice`);
   return resumeFromStack(state, { type: "PLAYER_CHOICE", choiceId: choice.id }, cardDb);
+}
+
+function resolveOrderedTriggers(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+) {
+  const prompt = state.pendingPrompt;
+  if (prompt?.options.promptType !== "PLAYER_CHOICE") {
+    throw new Error("Missing trigger-ordering choice");
+  }
+  const choice = prompt.options.choices.find((entry) => entry.id !== "done");
+  if (!choice) throw new Error("Missing ordered trigger choice");
+  return resumeFromStack(
+    state,
+    { type: "PLAYER_CHOICE", choiceId: choice.id },
+    cardDb,
+  );
 }
 
 describe("OPT-757: trigger accumulation across PLAY_CARD pauses", () => {
@@ -218,5 +251,66 @@ describe("OPT-757: trigger accumulation across PLAY_CARD pauses", () => {
     expect(resumed.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
     const ids = resumed.state.effectStack.at(-1)?.simultaneousTriggers.map((trigger) => trigger.effectBlock.id);
     expect(ids).toEqual(["opt757-on-play", "opt757-trash-watch", "opt757-on-play"]);
+  });
+
+  it("publishes each ordered batch trigger's draw event exactly once", () => {
+    const cardDb = createTestCardDb();
+    const triggerCard = cardData("OPT757-ON-PLAY", ON_PLAY_DRAW_SCHEMA);
+    cardDb.set(triggerCard.id, triggerCard);
+    const trash = [trashCard(triggerCard.id, "a"), trashCard(triggerCard.id, "b")];
+    const state = stateWith(cardDb, trash);
+    const handBefore = state.players[0].hand.length;
+    const ordered = resolveEffect(state, playBlock(2), "batch-source", 0, cardDb);
+    const completed = resolveOrderedTriggers(
+      { ...ordered.state, pendingPrompt: ordered.pendingPrompt ?? null },
+      cardDb,
+    );
+
+    expect(completed.state.players[0].hand).toHaveLength(handBefore + 2);
+    expect(
+      completed.state.eventLog.filter((event) => event.type === "CARD_DRAWN")
+    ).toHaveLength(2);
+  });
+
+  it("publishes each ordered non-batch trigger's draw event exactly once", () => {
+    const cardDb = createTestCardDb();
+    const watcherCard = cardData("OPT757-TRASH-WATCH", TRASH_WATCH_SCHEMA);
+    const sourceCard = cardData("OPT757-TRASH-SOURCE", TRASH_SOURCE_SCHEMA);
+    cardDb.set(watcherCard.id, watcherCard);
+    cardDb.set(sourceCard.id, sourceCard);
+    const watcherA = boardCard(watcherCard.id, "watcher-a");
+    const watcherB = boardCard(watcherCard.id, "watcher-b");
+    const source = boardCard(sourceCard.id, "plain-source");
+    const victim = { ...boardCard(CARDS.VANILLA.id, "plain-victim"), controller: 1 as const, owner: 1 as const };
+    let state = stateWith(cardDb, [], [watcherA, watcherB, source]);
+    state = {
+      ...state,
+      players: [
+        state.players[0],
+        { ...state.players[1], characters: padChars([victim]) },
+      ],
+    };
+    state = registerTriggersForCard(state, watcherA, watcherCard);
+    state = registerTriggersForCard(state, watcherB, watcherCard);
+    const handBefore = state.players[0].hand.length;
+    const ordered = runPipeline(
+      state,
+      {
+        type: "ACTIVATE_EFFECT",
+        cardInstanceId: source.instanceId,
+        effectId: "opt757-trash-source",
+      },
+      cardDb,
+      0,
+    );
+    const completed = resolveOrderedTriggers(
+      { ...ordered.state, pendingPrompt: ordered.pendingPrompt ?? null },
+      cardDb,
+    );
+
+    expect(completed.state.players[0].hand).toHaveLength(handBefore + 2);
+    expect(
+      completed.state.eventLog.filter((event) => event.type === "CARD_DRAWN")
+    ).toHaveLength(2);
   });
 });
