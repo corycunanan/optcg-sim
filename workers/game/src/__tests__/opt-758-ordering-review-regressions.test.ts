@@ -3,6 +3,7 @@ import type { EffectBlock } from "../engine/effect-types.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { buildTriggerSelectionPrompt } from "../engine/trigger-ordering.js";
 import { SessionCoordinator } from "../session/coordinator.js";
+import { parseStoredSession } from "../session/persistence.js";
 import type { CardData, CardInstance, QueuedTrigger } from "../types.js";
 import {
   CARDS,
@@ -155,23 +156,7 @@ describe("OPT-758 ordering review regressions", () => {
   ] as const)("rejects a %s ordering id without mutating state", (_case, choiceId) => {
     const { state, cardDb, triggers } = duplicateSourceScenario();
     const prompted = buildTriggerSelectionPrompt(state, triggers, [], cardDb);
-    let responseState = prompted.state;
-    if (_case === "numeric") {
-      const legacyFrame = responseState.effectStack.at(-1)!;
-      const { triggerOrderingGroup: _group, ...withoutGroup } = legacyFrame;
-      responseState = {
-        ...responseState,
-        effectStack: [
-          ...responseState.effectStack.slice(0, -1),
-          {
-            ...withoutGroup,
-            simultaneousTriggers: legacyFrame.simultaneousTriggers.map(
-              ({ orderingId: _orderingId, ...trigger }) => trigger
-            ),
-          },
-        ],
-      };
-    }
+    const responseState = prompted.state;
     const before = structuredClone(responseState);
 
     const rejected = resumeFromStack(
@@ -214,5 +199,70 @@ describe("OPT-758 ordering review regressions", () => {
     expect(rejected.rejected).toBe(true);
     expect(rejected.state).toEqual(before);
     expect(rejected.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+  });
+
+  it("normalizes and round-trips a legacy ordering frame before resuming", () => {
+    const { state, cardDb, triggers } = duplicateSourceScenario();
+    const initialHand = state.players[0].hand.length;
+    const prompted = buildTriggerSelectionPrompt(
+      state,
+      triggers.slice(0, 2),
+      [],
+      cardDb
+    );
+    const currentFrame = prompted.state.effectStack.at(-1)!;
+    const { triggerOrderingGroup: _group, ...withoutGroup } = currentFrame;
+    const legacyState = {
+      ...prompted.state,
+      effectStack: [
+        ...prompted.state.effectStack.slice(0, -1),
+        {
+          ...withoutGroup,
+          simultaneousTriggers: currentFrame.simultaneousTriggers.map(
+            ({ orderingId: _orderingId, ...trigger }) => trigger
+          ),
+        },
+      ],
+    };
+
+    const rejected = resumeFromStack(
+      legacyState,
+      { type: "PLAYER_CHOICE", choiceId: "0" },
+      cardDb
+    );
+    expect(rejected.rejected).toBe(true);
+    expect(rejected.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (rejected.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") {
+      throw new Error("Expected regenerated ordering prompt");
+    }
+    const normalizedFrame = rejected.state.effectStack.at(-1)!;
+    expect(
+      normalizedFrame.simultaneousTriggers.every(
+        (trigger) => trigger.orderingId !== undefined
+      )
+    ).toBe(true);
+    expect(normalizedFrame.triggerOrderingGroup?.triggers).toHaveLength(2);
+
+    const restored = parseStoredSession({
+      state: { ...rejected.state, pendingPrompt: rejected.pendingPrompt },
+      cardDb: Object.fromEntries(cardDb),
+      mode: "PVP",
+      testPriorityRolls: null,
+      undoHistory: [],
+    });
+    expect(
+      restored.state.effectStack.at(-1)?.simultaneousTriggers.every(
+        (trigger) => trigger.orderingId !== undefined
+      )
+    ).toBe(true);
+
+    const selectedId = rejected.pendingPrompt.options.choices[1].id;
+    const completed = resumeFromStack(
+      restored.state,
+      { type: "PLAYER_CHOICE", choiceId: selectedId },
+      new Map(Object.entries(restored.cardDb))
+    );
+    expect(completed.pendingPrompt).toBeUndefined();
+    expect(completed.state.players[0].hand).toHaveLength(initialHand + 3);
   });
 });

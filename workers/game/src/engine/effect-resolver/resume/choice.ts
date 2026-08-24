@@ -38,6 +38,7 @@ import {
 import {
   scanEventsForTriggers,
   buildTriggerSelectionPrompt,
+  withStableOrderingIds,
 } from "../../trigger-ordering.js";
 import { markOncePerTurnUsed } from "../action-utils.js";
 import { payCostsWithSelection } from "../cost-handler.js";
@@ -607,15 +608,38 @@ export function handleAwaitingTriggerOrderSelection(
     (trigger) => trigger.orderingId === action.choiceId
   );
   if (!chosenTrigger) {
+    const normalizedSimultaneous = withStableOrderingIds(simultaneous);
+    const normalizedOrderingGroup = topFrame.triggerOrderingGroup
+      ? {
+          ...topFrame.triggerOrderingGroup,
+          triggers: withStableOrderingIds(
+            topFrame.triggerOrderingGroup.triggers
+          ),
+        }
+      : {
+          triggers: normalizedSimultaneous,
+          resolvedTriggerIds: [],
+        };
+    const needsNormalization =
+      simultaneous.some((trigger) => !trigger.orderingId) ||
+      topFrame.triggerOrderingGroup?.triggers.some(
+        (trigger) => !trigger.orderingId
+      );
+    const rejectionState = needsNormalization
+      ? updateTopFrame(state, {
+          simultaneousTriggers: normalizedSimultaneous,
+          triggerOrderingGroup: normalizedOrderingGroup,
+        })
+      : state;
     const regenerated = buildTriggerSelectionPrompt(
-      popFrame(state),
-      simultaneous,
+      popFrame(rejectionState),
+      normalizedSimultaneous,
       savedPendingTriggers,
       cardDb,
-      topFrame.triggerOrderingGroup
+      normalizedOrderingGroup
     ).pendingPrompt;
     return {
-      state,
+      state: rejectionState,
       events,
       resolved: false,
       rejected: true,

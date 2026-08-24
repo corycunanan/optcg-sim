@@ -231,7 +231,7 @@ export function buildTriggerSelectionPrompt(
   return { state: nextState, pendingPrompt };
 }
 
-function withStableOrderingIds(triggers: QueuedTrigger[]): QueuedTrigger[] {
+export function withStableOrderingIds(triggers: QueuedTrigger[]): QueuedTrigger[] {
   const occurrences = new Map<string, number>();
   return triggers.map((trigger) => {
     if (trigger.orderingId) return trigger;
