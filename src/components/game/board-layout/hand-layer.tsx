@@ -8,7 +8,6 @@ import {
 } from "@dnd-kit/sortable";
 import { motion, useReducedMotion } from "motion/react";
 import type { CardDb, CardInstance } from "@shared/game-types";
-import { useActiveEffects } from "@/contexts/active-effects-context";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { getCardAffordability } from "@/lib/game/client-legality";
 import { isCounterEligibleCard } from "@/lib/game/counter-eligibility";
@@ -244,7 +243,6 @@ export const HandLayer = React.memo(function HandLayer({
   const hasVisibleCards = cards.some((card) => card.cardId !== "hidden");
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion() ?? false;
-  const activeEffects = useActiveEffects();
   const inputSuppressed = useInteractionMode() !== "full";
 
   // OPT-364: hide cards on their first render in this HandLayer instance so
@@ -329,8 +327,7 @@ export const HandLayer = React.memo(function HandLayer({
         ? undefined
         : getCardAffordability(
             cardDb[card.cardId],
-            card.instanceId,
-            activeEffects,
+            card,
             availableDon
           );
     const unaffordable = affordability?.affordable === false;

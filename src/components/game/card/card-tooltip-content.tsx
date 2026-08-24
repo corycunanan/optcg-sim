@@ -5,9 +5,7 @@ import type { CardData, CardInstance } from "@shared/game-types";
 import {
   useActiveEffects,
   getPowerModDirection,
-  getCostModDirection,
   computeEffectivePower,
-  computeEffectiveCost,
 } from "@/contexts/active-effects-context";
 import { useEffectAvailability } from "@/contexts/effect-availability-context";
 import {
@@ -149,9 +147,7 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
       : basePower + donCount * 1000;
 
   const baseCost = data.cost ?? 0;
-  const effectiveCost = instanceId
-    ? computeEffectiveCost(activeEffects, instanceId, baseCost)
-    : baseCost;
+  const effectiveCost = card?.effectiveCost ?? baseCost;
 
   const powerMod = hasCanonicalPower
     ? canonicalPowerDelta === undefined || canonicalPowerDelta === 0
@@ -162,7 +158,11 @@ export const CardTooltipContent = React.memo(function CardTooltipContent({
     : instanceId
       ? getPowerModDirection(activeEffects, instanceId, basePower)
       : null;
-  const costMod = instanceId ? getCostModDirection(activeEffects, instanceId) : null;
+  const costMod = effectiveCost === baseCost
+    ? null
+    : effectiveCost > baseCost
+      ? "up"
+      : "down";
   const effectBlocks = parseEffectBlocks(data.effectSchema);
   const effectClauses = segmentEffectText(data.effectText, effectBlocks);
   const cardAvailability = instanceId

@@ -202,3 +202,30 @@ describe("GameServerMessageSchema visible field cost", () => {
     expect(GameServerMessageSchema.safeParse(message("3")).success).toBe(false);
   });
 });
+
+describe("GameServerMessageSchema visible hand cost", () => {
+  const message = (effectiveCost?: unknown) => ({
+    type: "game:state",
+    state: {
+      status: "IN_PROGRESS",
+      players: [
+        {
+          hand: [effectiveCost === undefined ? {} : { effectiveCost }],
+        },
+        { hand: [] },
+      ],
+    },
+  });
+
+  it("accepts numeric effective cost", () => {
+    expect(GameServerMessageSchema.safeParse(message(3)).success).toBe(true);
+  });
+
+  it("accepts an absent effective cost", () => {
+    expect(GameServerMessageSchema.safeParse(message()).success).toBe(true);
+  });
+
+  it("rejects non-numeric effective cost", () => {
+    expect(GameServerMessageSchema.safeParse(message("3")).success).toBe(false);
+  });
+});

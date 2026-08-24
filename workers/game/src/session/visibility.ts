@@ -9,6 +9,7 @@ import type {
   TurnState,
 } from "../types.js";
 import {
+  getEffectiveCost,
   getEffectiveFieldCost,
   getEffectivePower,
   isEffectConditionMet,
@@ -442,7 +443,17 @@ export function visibleStateForPlayer(
     hand: players[playerIndex].hand.map((card) => {
       const data = cardDb.get(card.cardId);
       return data
-        ? { ...card, effectiveCounter: getEffectiveCounterValue(card, data, state, cardDb) }
+        ? {
+            ...card,
+            effectiveCounter: getEffectiveCounterValue(card, data, state, cardDb),
+            effectiveCost: getEffectiveCost(
+              data,
+              state,
+              card.instanceId,
+              cardDb,
+              true,
+            ),
+          }
         : card;
     }),
   };

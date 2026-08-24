@@ -92,6 +92,29 @@ afterEach(() => {
 });
 
 describe("HandLayer spectator interaction", () => {
+  it("renders a false-gated SET_COST hand card playable from its broadcast cost", () => {
+    const handCard = { ...bottomCard, effectiveCost: 3 };
+    const cardDb = {
+      [handCard.cardId]: { name: "Conditional Setter", cost: 5, type: "Character" },
+    } as CardDb;
+
+    act(() => {
+      renderer = create(
+        <InteractionModeProvider value="full">
+          <HandLayer
+            cards={[handCard]}
+            cardDb={cardDb}
+            enableDrag
+            availableDon={3}
+          />
+        </InteractionModeProvider>
+      );
+    });
+
+    expect(renderer!.root.findByProps({ role: "button" }).props["aria-disabled"])
+      .toBe(false);
+  });
+
   it("renders both face-up spectator hands without pointer or keyboard affordances", () => {
     act(() => {
       renderer = create(

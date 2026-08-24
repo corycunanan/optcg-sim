@@ -174,9 +174,13 @@ const VisibleFieldCardSchema = z.looseObject({
   effectivePower: z.number().optional(),
   powerDelta: z.number().optional(),
 });
+const VisibleHandCardSchema = z.looseObject({
+  effectiveCost: z.number().optional(),
+});
 const VisiblePlayerSchema = z.looseObject({
   leader: VisibleFieldCardSchema.nullable().optional(),
   characters: z.array(VisibleFieldCardSchema.nullable()).optional(),
+  hand: z.array(VisibleHandCardSchema).optional(),
 });
 const VisibleGameStateSchema = z.looseObject({
   status: z.string(),

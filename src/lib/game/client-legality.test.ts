@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ActiveEffect, CardData } from "@shared/game-types";
+import type { CardData, CardInstance } from "@shared/game-types";
 import {
   canPlayCardInZone,
   getCardAffordability,
@@ -12,15 +12,27 @@ const character = {
 } as CardData;
 
 describe("getCardAffordability", () => {
-  it("uses effective cost and reports the exact DON shortfall", () => {
-    const effects = [
-      {
-        appliesTo: ["hand-1"],
-        modifiers: [{ type: "MODIFY_COST", params: { amount: -2 } }],
-      },
-    ] as unknown as ActiveEffect[];
+  it("keeps a false-gated SET_COST hand card affordable from its broadcast cost", () => {
+    const handCard = {
+      instanceId: "hand-1",
+      effectiveCost: 3,
+    } as CardInstance;
 
-    expect(getCardAffordability(character, "hand-1", effects, 2)).toEqual({
+    expect(getCardAffordability(character, handCard, 3)).toEqual({
+      effectiveCost: 3,
+      missingDon: 0,
+      affordable: true,
+      reason: undefined,
+    });
+  });
+
+  it("uses effective cost and reports the exact DON shortfall", () => {
+    const handCard = {
+      instanceId: "hand-1",
+      effectiveCost: 3,
+    } as CardInstance;
+
+    expect(getCardAffordability(character, handCard, 2)).toEqual({
       effectiveCost: 3,
       missingDon: 1,
       affordable: false,
@@ -29,7 +41,7 @@ describe("getCardAffordability", () => {
   });
 
   it("does not add a reason when the effective cost is affordable", () => {
-    expect(getCardAffordability(character, "hand-1", [], 5)).toEqual({
+    expect(getCardAffordability(character, { effectiveCost: 5 } as CardInstance, 5)).toEqual({
       effectiveCost: 5,
       missingDon: 0,
       affordable: true,

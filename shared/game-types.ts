@@ -34,7 +34,7 @@ export interface CardInstance {
   owner: 0 | 1;
   /** Recipient-visible, server-computed Counter value for cards in their hand. */
   effectiveCounter?: number;
-  /** Canonical on-field cost after active server-side modifiers. */
+  /** Canonical server-computed cost for recipient-visible hand and field cards. */
   effectiveCost?: number;
   /** Printed power before effects or owner-turn attached-DON bonuses. */
   basePower?: number;

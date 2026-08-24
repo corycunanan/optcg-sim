@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { ActiveEffect } from "@shared/game-types";
 import {
   ActiveEffectsProvider,
-  computeEffectiveCost,
   computeEffectivePower,
   getPowerModDirection,
   useActiveEffects,
@@ -11,8 +10,7 @@ import {
 
 function AffordabilityProbe() {
   const effects = useActiveEffects();
-  const cost = computeEffectiveCost(effects, "hand-card", 5);
-  return <span>{`${effects.length}:${cost}`}</span>;
+  return <span>{effects.length}</span>;
 }
 
 describe("ActiveEffectsProvider", () => {
@@ -53,7 +51,7 @@ describe("ActiveEffectsProvider", () => {
       </ActiveEffectsProvider>
     );
 
-    expect(markup).toBe("<span>2:3</span>");
+    expect(markup).toBe("<span>2</span>");
   });
 
   it("keeps client power helpers available for legacy snapshots", () => {

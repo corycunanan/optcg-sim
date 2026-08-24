@@ -517,25 +517,11 @@ describe("CardTooltipContent modified stats", () => {
   it("marks a cost increase as detrimental and a cost reduction as helpful", () => {
     const increased = renderTooltip({
       effectAvailability: {},
-      activeEffects: [
-        {
-          id: "cost-up",
-          sourceCardInstanceId: "source-1",
-          appliesTo: ["card-1"],
-          modifiers: [{ type: "MODIFY_COST", params: { amount: 2 } }],
-        },
-      ],
+      cardInstance: { ...card, effectiveCost: 7 },
     });
     const reduced = renderTooltip({
       effectAvailability: {},
-      activeEffects: [
-        {
-          id: "cost-down",
-          sourceCardInstanceId: "source-1",
-          appliesTo: ["card-1"],
-          modifiers: [{ type: "MODIFY_COST", params: { amount: -1 } }],
-        },
-      ],
+      cardInstance: { ...card, effectiveCost: 0 },
     });
 
     expect(increased).toContain('data-chevron-pair="up"');

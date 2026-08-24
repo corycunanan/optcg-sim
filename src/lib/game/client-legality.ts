@@ -1,5 +1,4 @@
-import type { ActiveEffect, CardData } from "@shared/game-types";
-import { computeEffectiveCost } from "@/contexts/active-effects-context";
+import type { CardData, CardInstance } from "@shared/game-types";
 
 export type PlayZone = "character" | "stage";
 export type AttackTargetKind = "leader" | "character";
@@ -18,15 +17,10 @@ export interface CardAffordability {
  */
 export function getCardAffordability(
   card: CardData | undefined,
-  instanceId: string,
-  activeEffects: ActiveEffect[],
+  instance: CardInstance,
   availableDon: number
 ): CardAffordability {
-  const effectiveCost = computeEffectiveCost(
-    activeEffects,
-    instanceId,
-    card?.cost ?? 0
-  );
+  const effectiveCost = instance.effectiveCost ?? card?.cost ?? 0;
   const missingDon = Math.max(0, effectiveCost - availableDon);
 
   return {
