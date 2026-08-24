@@ -50,16 +50,18 @@ export function processRemainingTriggers(
   if (triggerOrderingGroup) {
     const unresolvedIds = new Set(
       triggerOrderingGroup.triggers
-        .map((trigger) => trigger.sourceCardInstanceId)
+        .map((trigger) => trigger.orderingId)
         .filter(
-          (id) => !triggerOrderingGroup.resolvedSourceInstanceIds.includes(id)
+          (id): id is string =>
+            id !== undefined && !triggerOrderingGroup.resolvedTriggerIds.includes(id)
         )
     );
     const groupTriggers = pendingTriggers.filter((trigger) =>
-      unresolvedIds.has(trigger.sourceCardInstanceId)
+      trigger.orderingId !== undefined && unresolvedIds.has(trigger.orderingId)
     );
     const afterTriggers = pendingTriggers.filter(
-      (trigger) => !unresolvedIds.has(trigger.sourceCardInstanceId)
+      (trigger) =>
+        trigger.orderingId === undefined || !unresolvedIds.has(trigger.orderingId)
     );
     if (groupTriggers.length >= 2) {
       const promptResult = buildTriggerSelectionPrompt(

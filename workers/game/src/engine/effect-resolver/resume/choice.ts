@@ -604,26 +604,41 @@ export function handleAwaitingTriggerOrderSelection(
   }
 
   const chosenTrigger = simultaneous.find(
-    (trigger) => trigger.sourceCardInstanceId === action.choiceId
-  ) ?? simultaneous[Number.parseInt(action.choiceId, 10)];
+    (trigger) => trigger.orderingId === action.choiceId
+  );
   if (!chosenTrigger) {
-    return { state, events, resolved: false };
+    const regenerated = buildTriggerSelectionPrompt(
+      popFrame(state),
+      simultaneous,
+      savedPendingTriggers,
+      cardDb,
+      topFrame.triggerOrderingGroup
+    ).pendingPrompt;
+    return {
+      state,
+      events,
+      resolved: false,
+      rejected: true,
+      ...(regenerated
+        ? { pendingPrompt: { ...regenerated, resumeContext: topFrame.id } }
+        : {}),
+    };
   }
 
   // Remove chosen trigger from the remaining simultaneous set
   const remaining = simultaneous.filter(
     (trigger) =>
-      trigger.sourceCardInstanceId !== chosenTrigger.sourceCardInstanceId
+      trigger.orderingId !== chosenTrigger.orderingId
   );
   const triggerOrderingGroup = topFrame.triggerOrderingGroup ?? {
     triggers: simultaneous,
-    resolvedSourceInstanceIds: [],
+    resolvedTriggerIds: [],
   };
   const nextTriggerOrderingGroup = {
     ...triggerOrderingGroup,
-    resolvedSourceInstanceIds: [
-      ...triggerOrderingGroup.resolvedSourceInstanceIds,
-      chosenTrigger.sourceCardInstanceId,
+    resolvedTriggerIds: [
+      ...triggerOrderingGroup.resolvedTriggerIds,
+      chosenTrigger.orderingId!,
     ],
   };
 

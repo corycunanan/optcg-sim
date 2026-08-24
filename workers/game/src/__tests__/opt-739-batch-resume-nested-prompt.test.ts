@@ -741,9 +741,10 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
     };
     let result = resolveEffect(state, block, "effect-source", 0, cardDb);
     expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (result.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") throw new Error("Expected ordering prompt");
     result = resumeFromStack(
       result.state,
-      { type: "PLAYER_CHOICE", choiceId: "0" },
+      { type: "PLAYER_CHOICE", choiceId: result.pendingPrompt.options.choices[0].id },
       cardDb
     );
     expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");

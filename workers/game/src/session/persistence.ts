@@ -501,6 +501,8 @@ function hasValidStackFrame(value: unknown): boolean {
         (trigger) =>
           !isRecord(trigger) ||
           typeof trigger.sourceCardInstanceId !== "string" ||
+          (trigger.orderingId !== undefined &&
+            typeof trigger.orderingId !== "string") ||
           (trigger.controller !== 0 && trigger.controller !== 1) ||
           !hasValidEffectBlock(trigger.effectBlock) ||
           !isKnownPendingEvent(trigger.triggeringEvent)
@@ -513,8 +515,17 @@ function hasValidStackFrame(value: unknown): boolean {
     triggerOrderingGroup !== undefined &&
     (!isRecord(triggerOrderingGroup) ||
       !Array.isArray(triggerOrderingGroup.triggers) ||
-      !Array.isArray(triggerOrderingGroup.resolvedSourceInstanceIds) ||
-      triggerOrderingGroup.resolvedSourceInstanceIds.some(
+      triggerOrderingGroup.triggers.some(
+        (trigger) =>
+          !isRecord(trigger) ||
+          typeof trigger.orderingId !== "string" ||
+          typeof trigger.sourceCardInstanceId !== "string" ||
+          (trigger.controller !== 0 && trigger.controller !== 1) ||
+          !hasValidEffectBlock(trigger.effectBlock) ||
+          !isKnownPendingEvent(trigger.triggeringEvent)
+      ) ||
+      !Array.isArray(triggerOrderingGroup.resolvedTriggerIds) ||
+      triggerOrderingGroup.resolvedTriggerIds.some(
         (id) => typeof id !== "string"
       ))
   ) return false;
@@ -527,6 +538,22 @@ function hasValidStackFrame(value: unknown): boolean {
 function hasValidPrompt(value: unknown): boolean {
   if (value === null) return true;
   if (!isRecord(value)) return false;
+  const options = value.options;
+  if (
+    isRecord(options) &&
+    options.promptType === "PLAYER_CHOICE" &&
+    (typeof options.effectDescription !== "string" ||
+      (options.sourceEffectDescription !== undefined &&
+        typeof options.sourceEffectDescription !== "string") ||
+      !Array.isArray(options.choices) ||
+      options.choices.some(
+        (choice) =>
+          !isRecord(choice) ||
+          typeof choice.id !== "string" ||
+          typeof choice.label !== "string" ||
+          (choice.disabled !== undefined && typeof choice.disabled !== "boolean")
+      ))
+  ) return false;
   const resume = value.resumeContext;
   if (!isRecord(resume)) return typeof resume === "string" || resume === null;
   if (

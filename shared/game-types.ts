@@ -484,7 +484,7 @@ export interface EffectStackFrame {
   // Full ordering group retained while chosen effects and nested prompts resolve
   triggerOrderingGroup?: {
     triggers: QueuedTrigger[];
-    resolvedSourceInstanceIds: string[];
+    resolvedTriggerIds: string[];
   };
 
   // Events accumulated during partial execution
@@ -493,6 +493,7 @@ export interface EffectStackFrame {
 
 export interface QueuedTrigger {
   sourceCardInstanceId: string;
+  orderingId?: string;
   controller: 0 | 1;
   /** EffectBlock — typed as unknown in shared layer, cast in worker */
   effectBlock: unknown;

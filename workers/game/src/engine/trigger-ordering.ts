@@ -108,16 +108,28 @@ export function buildTriggerSelectionPrompt(
   triggers: QueuedTrigger[],
   afterTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
-  triggerOrderingGroup: EffectStackFrame["triggerOrderingGroup"] = {
-    triggers,
-    resolvedSourceInstanceIds: [],
-  }
+  triggerOrderingGroup?: EffectStackFrame["triggerOrderingGroup"]
 ): { state: GameState; pendingPrompt?: PendingPromptState } {
-  const controller = triggers[0].controller;
-  const resolvedIds = new Set(triggerOrderingGroup.resolvedSourceInstanceIds);
+  const fullTriggers = withStableOrderingIds(
+    triggerOrderingGroup?.triggers ?? triggers
+  );
+  const orderingGroup = {
+    triggers: fullTriggers,
+    resolvedTriggerIds: triggerOrderingGroup?.resolvedTriggerIds ?? [],
+  };
+  const triggersById = new Map(
+    fullTriggers.map((trigger) => [trigger.orderingId, trigger])
+  );
+  const remainingTriggers = triggerOrderingGroup
+    ? triggers.map(
+        (trigger) => triggersById.get(trigger.orderingId) ?? trigger
+      )
+    : fullTriggers;
+  const controller = remainingTriggers[0].controller;
+  const resolvedIds = new Set(orderingGroup.resolvedTriggerIds);
 
   // Build choice labels from card name + effect description
-  const choices = triggerOrderingGroup.triggers.map((t) => {
+  const choices = orderingGroup.triggers.map((t) => {
     const card = findCardInstance(state, t.sourceCardInstanceId);
     const cardData = card ? cardDb.get(card.cardId) : null;
     const cardName = cardData?.name ?? "Unknown Card";
@@ -125,14 +137,14 @@ export function buildTriggerSelectionPrompt(
       ? extractEffectDescription(cardData.effectText, t.effectBlock)
       : "Activate effect";
     return {
-      id: t.sourceCardInstanceId,
+      id: t.orderingId!,
       label: `${cardName}: ${effectDesc}`,
-      ...(resolvedIds.has(t.sourceCardInstanceId) ? { disabled: true } : {}),
+      ...(resolvedIds.has(t.orderingId!) ? { disabled: true } : {}),
     };
   });
 
   // Add "Done" option if all remaining triggers are optional
-  const allOptional = triggers.every(
+  const allOptional = remainingTriggers.every(
     (t) => t.effectBlock.flags?.optional === true
   );
   if (allOptional) {
@@ -142,9 +154,9 @@ export function buildTriggerSelectionPrompt(
   const frameId = generateFrameId(state);
   const frame: EffectStackFrame = {
     id: frameId.id,
-    sourceCardInstanceId: triggers[0].sourceCardInstanceId,
+    sourceCardInstanceId: remainingTriggers[0].sourceCardInstanceId,
     controller,
-    effectBlock: triggers[0].effectBlock,
+    effectBlock: remainingTriggers[0].effectBlock,
     phase: "AWAITING_TRIGGER_ORDER_SELECTION",
     pausedAction: null,
     remainingActions: [],
@@ -156,8 +168,8 @@ export function buildTriggerSelectionPrompt(
     oncePerTurnMarked: false,
     costResultRefs: [],
     pendingTriggers: afterTriggers,
-    simultaneousTriggers: triggers,
-    triggerOrderingGroup,
+    simultaneousTriggers: remainingTriggers,
+    triggerOrderingGroup: orderingGroup,
     accumulatedEvents: [],
   };
 
@@ -170,7 +182,7 @@ export function buildTriggerSelectionPrompt(
       effectDescription: "Choose which effect to activate first",
       sourceEffectDescription: (() => {
         const groupSourceInstanceId =
-          triggerOrderingGroup.triggers[0]?.groupSourceInstanceId;
+          orderingGroup.triggers[0]?.groupSourceInstanceId;
         if (!groupSourceInstanceId) return undefined;
         const sourceCard = findCardInstance(state, groupSourceInstanceId);
         if (sourceCard) return cardDb.get(sourceCard.cardId)?.name;
@@ -217,4 +229,18 @@ export function buildTriggerSelectionPrompt(
   };
 
   return { state: nextState, pendingPrompt };
+}
+
+function withStableOrderingIds(triggers: QueuedTrigger[]): QueuedTrigger[] {
+  const occurrences = new Map<string, number>();
+  return triggers.map((trigger) => {
+    if (trigger.orderingId) return trigger;
+    const pair = `${trigger.sourceCardInstanceId}:${trigger.effectBlock.id}`;
+    const occurrence = occurrences.get(pair) ?? 0;
+    occurrences.set(pair, occurrence + 1);
+    return {
+      ...trigger,
+      orderingId: `${pair}:${occurrence}`,
+    };
+  });
 }

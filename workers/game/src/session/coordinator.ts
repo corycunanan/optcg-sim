@@ -444,7 +444,7 @@ function validatePromptPayload(
       return null;
     }
     return prompt.options.choices.some(
-      (choice) => choice.id === action.choiceId
+      (choice) => choice.id === action.choiceId && !choice.disabled
     )
       ? null
       : "That choice is no longer available";

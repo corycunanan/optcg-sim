@@ -240,9 +240,10 @@ describe("OP07-118 Sabo dual-target KO", () => {
       cardDb,
     );
     expect(step4.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (step4.pendingPrompt?.options.promptType !== "PLAYER_CHOICE") throw new Error("Expected ordering prompt");
     const step5 = resumeFromStack(
       step4.state,
-      { type: "PLAYER_CHOICE", choiceId: "0" },
+      { type: "PLAYER_CHOICE", choiceId: step4.pendingPrompt.options.choices[0].id },
       cardDb,
     );
 

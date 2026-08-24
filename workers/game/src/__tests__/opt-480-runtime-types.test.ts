@@ -58,6 +58,107 @@ describe("OPT-480 runtime type boundaries", () => {
     expect(parsed.pregameMode).toBe("PRIORITY_ROLL");
   });
 
+  it("round-trips ordering prompt disabled rows and parent description", () => {
+    const stored = storedFixture();
+    const orderingIds = ["elder:first:0", "elder:second:0", "elder:third:0", "elder:fourth:0"];
+    const triggers = orderingIds.map((orderingId, index) => ({
+      sourceCardInstanceId: `elder-${index}`,
+      orderingId,
+      controller: 0 as const,
+      effectBlock: {
+        id: `elder-effect-${index}`,
+        category: "auto" as const,
+        actions: [],
+      },
+      triggeringEvent: {
+        type: "CARD_PLAYED" as const,
+        playerIndex: 0 as const,
+        payload: {
+          cardId: CARDS.VANILLA.id,
+          cardInstanceId: `elder-${index}`,
+          zone: "CHARACTER" as const,
+          source: "EFFECT",
+        },
+      },
+    }));
+    stored.state.effectStack = [{
+      id: "ordering-frame",
+      sourceCardInstanceId: "elder-1",
+      controller: 0,
+      effectBlock: triggers[1].effectBlock,
+      phase: "AWAITING_TRIGGER_ORDER_SELECTION",
+      pausedAction: null,
+      remainingActions: [],
+      resultRefs: [],
+      validTargets: [],
+      costs: [],
+      currentCostIndex: 0,
+      costsPaid: true,
+      oncePerTurnMarked: false,
+      costResultRefs: [],
+      pendingTriggers: [],
+      simultaneousTriggers: [triggers[1], triggers[3]],
+      triggerOrderingGroup: {
+        triggers,
+        resolvedTriggerIds: [orderingIds[0], orderingIds[2]],
+      },
+      accumulatedEvents: [],
+    }];
+    stored.state.pendingPrompt = {
+      options: {
+        promptType: "PLAYER_CHOICE",
+        effectDescription: "Choose which effect to activate first",
+        sourceEffectDescription: "Five Elders",
+        confirmOrSkip: true,
+        choices: [
+          { id: orderingIds[0], label: "First Elder", disabled: true },
+          { id: orderingIds[1], label: "Second Elder" },
+          { id: orderingIds[2], label: "Third Elder", disabled: true },
+          { id: orderingIds[3], label: "Fourth Elder" },
+        ],
+      },
+      respondingPlayer: 0,
+      resumeContext: "ordering-frame",
+    };
+
+    const parsed = parseStoredSession(structuredClone(stored));
+
+    expect(parsed.state.pendingPrompt?.options).toEqual(
+      stored.state.pendingPrompt.options
+    );
+    expect(parsed.state.effectStack[0].triggerOrderingGroup).toEqual(
+      stored.state.effectStack[0].triggerOrderingGroup
+    );
+  });
+
+  it.each([
+    ["disabled", 1],
+    ["sourceEffectDescription", 1],
+  ] as const)("rejects wrong-type ordering prompt %s", (field, value) => {
+    const stored = storedFixture();
+    stored.state.pendingPrompt = {
+      options: {
+        promptType: "PLAYER_CHOICE",
+        effectDescription: "Choose which effect to activate first",
+        sourceEffectDescription: "Five Elders",
+        choices: [{ id: "elder:first:0", label: "First Elder" }],
+      },
+      respondingPlayer: 0,
+      resumeContext: "ordering-frame",
+    };
+    if (field === "disabled") {
+      const options = stored.state.pendingPrompt.options;
+      if (options.promptType !== "PLAYER_CHOICE") throw new Error("narrow");
+      Reflect.set(options.choices[0], field, value);
+    } else {
+      Reflect.set(stored.state.pendingPrompt.options, field, value);
+    }
+
+    expect(() => parseStoredSession(stored)).toThrow(
+      "Stored session state has an invalid core shape"
+    );
+  });
+
   it("rejects unknown persisted pregame modes", () => {
     const malformed = {
       ...storedFixture(),

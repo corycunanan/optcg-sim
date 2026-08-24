@@ -198,8 +198,15 @@ const PromptOptions = z.discriminatedUnion("promptType", [
   }),
   z.strictObject({
     promptType: z.literal("PLAYER_CHOICE"),
-    choices: z.array(z.strictObject({ id: z.string(), label: z.string() })),
+    choices: z.array(
+      z.strictObject({
+        id: z.string(),
+        label: z.string(),
+        disabled: z.boolean().optional(),
+      })
+    ),
     effectDescription: z.string(),
+    sourceEffectDescription: z.string().optional(),
     source: z.enum(["PREGAME", "EFFECT"]).optional(),
     confirmOrSkip: z.boolean().optional(),
     donReturn: z
@@ -327,7 +334,7 @@ const StackFrameCore = z.strictObject({
   triggerOrderingGroup: z
     .strictObject({
       triggers: z.array(z.unknown()),
-      resolvedSourceInstanceIds: StringArray,
+      resolvedTriggerIds: StringArray,
     })
     .optional(),
   accumulatedEvents: z.array(z.unknown()),

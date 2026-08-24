@@ -262,7 +262,7 @@ export interface EffectStackFrame {
   // Full ordering group retained while chosen effects and nested prompts resolve
   triggerOrderingGroup?: {
     triggers: QueuedTrigger[];
-    resolvedSourceInstanceIds: string[];
+    resolvedTriggerIds: string[];
   };
 
   // Events accumulated during partial execution
@@ -303,6 +303,7 @@ export interface EffectStackFrame {
 
 export interface QueuedTrigger {
   sourceCardInstanceId: string;
+  orderingId?: string;
   groupSourceInstanceId?: string;
   controller: 0 | 1;
   effectBlock: import("./engine/effect-types.js").EffectBlock;
