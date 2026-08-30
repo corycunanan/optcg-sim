@@ -30,6 +30,7 @@ function withPlayer(
 
 function setupStageKO(
   schema: EffectSchema = OP17_018_THE_POWER_TO_DESTROY_THE_WORLD,
+  effectText = "[Main] K.O. up to 1 of your opponent's Stages.",
 ): {
   state: GameState;
   cardDb: Map<string, CardData>;
@@ -42,7 +43,7 @@ function setupStageKO(
     id: schema.card_id!,
     name: schema.card_name!,
     cost: 0,
-    effectText: "[Main] K.O. up to 1 of your opponent's Stages.",
+    effectText,
     effectSchema: schema,
   };
   cardDb.set(eventData.id, eventData);
@@ -96,6 +97,41 @@ function offerStageTarget(
 }
 
 describe("OPT-723 Stage K.O.", () => {
+  it("scopes a SELECT_TARGET prompt to the active effect clause", () => {
+    const { state, cardDb, event } = setupStageKO(
+      OP17_018_THE_POWER_TO_DESTROY_THE_WORLD,
+      "[Main] K.O. up to 1 of your opponent's Stages. [Trigger] Draw 1 card.",
+    );
+    const optional = runPipeline(
+      state,
+      { type: "PLAY_CARD", cardInstanceId: event.instanceId },
+      cardDb,
+      0,
+    );
+    expect(optional.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    const activeFrame = optional.state.effectStack.at(-1)!;
+    const stateWithActiveClause = {
+      ...optional.state,
+      effectStack: [activeFrame, ...optional.state.effectStack],
+    };
+
+    const offered = resumeFromStack(
+      stateWithActiveClause,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      cardDb,
+    );
+
+    expect(offered.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    if (offered.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+      expect(offered.pendingPrompt.options.effectDescription).toBe(
+        "[Main] K.O. up to 1 of your opponent's Stages."
+      );
+      expect(offered.pendingPrompt.options.effectDescription).not.toContain(
+        "[Trigger] Draw 1 card."
+      );
+    }
+  });
+
   it("moves a Stage to its owner's trash and emits CARD_KO through the pipeline", () => {
     const { state, cardDb, event, stage } = setupStageKO();
 

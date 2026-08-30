@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { EffectBlock } from "../engine/effect-types.js";
-import { extractEffectDescription } from "../engine/effect-resolver/action-utils.js";
+import type { CardInstance, EffectStackFrame } from "../types.js";
+import {
+  extractEffectDescription,
+  promptEffectDescription,
+} from "../engine/effect-resolver/action-utils.js";
+import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
 function block(
   keyword: "ACTIVATE_MAIN" | "ON_PLAY" | "WHEN_ATTACKING",
@@ -87,6 +92,58 @@ describe("extractEffectDescription", () => {
     };
 
     expect(extractEffectDescription(effectText, unknownKeywordBlock)).toBe(
+      effectText
+    );
+  });
+});
+
+describe("promptEffectDescription", () => {
+  const effectText =
+    "[On Play] Draw 1 card. [When Attacking] K.O. up to 1 of your opponent's Characters.";
+
+  function setup() {
+    const cardDb = createTestCardDb();
+    const sourceData = {
+      ...cardDb.values().next().value!,
+      id: "TEST-PROMPT-SOURCE",
+      effectText,
+    };
+    cardDb.set(sourceData.id, sourceData);
+    const source: CardInstance = {
+      instanceId: "prompt-source",
+      cardId: sourceData.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+      controller: 0,
+      owner: 0,
+    };
+    const state = createBattleReadyState(cardDb);
+    state.players[0].characters[0] = source;
+    return { state, cardDb, source };
+  }
+
+  it("returns the clause from the topmost matching effect frame", () => {
+    const { state, cardDb, source } = setup();
+    const frame = {
+      sourceCardInstanceId: source.instanceId,
+      effectBlock: block("WHEN_ATTACKING"),
+    } as EffectStackFrame;
+    state.effectStack = [
+      { ...frame, effectBlock: block("ON_PLAY") },
+      frame,
+    ];
+
+    expect(promptEffectDescription(state, cardDb, source.instanceId)).toBe(
+      "[When Attacking] K.O. up to 1 of your opponent's Characters."
+    );
+  });
+
+  it("returns the full card text when no matching frame exists", () => {
+    const { state, cardDb, source } = setup();
+
+    expect(promptEffectDescription(state, cardDb, source.instanceId)).toBe(
       effectText
     );
   });
