@@ -38,6 +38,7 @@ import { getPortalContainer } from "./scaled-board";
 import { GameButton } from "./game-button";
 import { Card } from "./card";
 import { useRovingFocus } from "@/hooks/use-roving-focus";
+import { EffectText } from "@/components/cards/effect-text";
 
 const arrangeScreenReaderInstructions: ScreenReaderInstructions = {
   draggable:
@@ -47,7 +48,7 @@ const arrangeScreenReaderInstructions: ScreenReaderInstructions = {
 export function getArrangeEscapeAction(
   activeId: string | null,
   selectedId: string | null,
-  step: 1 | 2,
+  step: 1 | 2
 ): "cancel-drag" | "clear-selection" | "hide" {
   if (activeId) return "cancel-drag";
   if (step === 1 && selectedId) return "clear-selection";
@@ -56,7 +57,7 @@ export function getArrangeEscapeAction(
 
 export function getArrangeDestinations(
   restDestination: string | undefined,
-  canSendToBottom: boolean,
+  canSendToBottom: boolean
 ): ("top" | "bottom")[] {
   if (restDestination?.toUpperCase() === "TOP_OR_BOTTOM") {
     return ["bottom", "top"];
@@ -130,11 +131,12 @@ function SortableModalCard({
       aria-label={cardDb[card.cardId]?.name ?? card.cardId}
       aria-pressed={selectable ? !!selected : attributes["aria-pressed"]}
       aria-disabled={selectable && dimmed}
-      aria-describedby={
-        [attributes["aria-describedby"], dimmed ? descriptionId : null]
-          .filter(Boolean)
-          .join(" ")
-      }
+      aria-describedby={[
+        attributes["aria-describedby"],
+        dimmed ? descriptionId : null,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onFocus={onRovingFocus}
       onKeyDown={handleKeyDown}
       onClick={() => {
@@ -148,9 +150,10 @@ function SortableModalCard({
       className={cn(
         // Zero padding and border around a fixed-size `<Card>`, so the drag and
         // selection rings trace the card's own outline.
-        "relative shrink-0 touch-none select-none rounded-card border-0 bg-transparent p-0 text-left cursor-grab focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gb-signal-eligible",
-        selected && "ring-2 ring-gb-accent-amber ring-offset-1 ring-offset-transparent",
-        dimmed && "opacity-40",
+        "rounded-card focus-visible:ring-gb-signal-eligible relative shrink-0 cursor-grab touch-none border-0 bg-transparent p-0 text-left select-none focus-visible:ring-2 focus-visible:outline-none",
+        selected &&
+          "ring-gb-accent-amber ring-2 ring-offset-1 ring-offset-transparent",
+        dimmed && "opacity-40"
       )}
     >
       <Card
@@ -161,9 +164,15 @@ function SortableModalCard({
         interaction={isDragging ? { tooltipDisabled: true } : undefined}
       />
       {selected && (
-        <div className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-gb-accent-amber flex items-center justify-center">
+        <div className="bg-gb-accent-amber absolute top-1 right-1 z-10 flex h-4 w-4 items-center justify-center rounded-full">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M2 5l2 2 4-4" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M2 5l2 2 4-4"
+              stroke="black"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
       )}
@@ -205,7 +214,8 @@ export function ArrangeTopCardsModal({
 }: ArrangeTopCardsModalProps) {
   // maxKeep 0 = pure reorder (OPT-371 cost arrangement) — no pick step.
   const [step, setStep] = useState<1 | 2>(maxKeep === 0 ? 2 : 1);
-  const [orderedCards, setOrderedCards] = useState<CardInstance[]>(initialCards);
+  const [orderedCards, setOrderedCards] =
+    useState<CardInstance[]>(initialCards);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [keptIds, setKeptIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -214,16 +224,16 @@ export function ArrangeTopCardsModal({
   const destinations = getArrangeDestinations(restDestination, canSendToBottom);
   const dragTilt = useDragTilt({ disabled: reducedMotion });
   const rovingFocus = useRovingFocus<HTMLButtonElement>(
-    orderedCards.map((card) => card.instanceId),
+    orderedCards.map((card) => card.instanceId)
   );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const announcements = useMemo<Announcements>(() => {
     const labelFor = (id: string | number) => {
       const card = orderedCards.find((item) => item.instanceId === String(id));
-      return card ? cardDb[card.cardId]?.name ?? card.cardId : "card";
+      return card ? (cardDb[card.cardId]?.name ?? card.cardId) : "card";
     };
     return {
       onDragStart: ({ active }) => `${labelFor(active.id)} picked up.`,
@@ -297,11 +307,16 @@ export function ArrangeTopCardsModal({
       : `Put the remaining ${orderedCards.length} card${orderedCards.length !== 1 ? "s" : ""} back`;
 
   const activeCard = activeId
-    ? orderedCards.find((c) => c.instanceId === activeId) ?? null
+    ? (orderedCards.find((c) => c.instanceId === activeId) ?? null)
     : null;
 
   return (
-    <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
+    <Dialog
+      open={!isHidden}
+      onOpenChange={(open) => {
+        if (!open) onHide();
+      }}
+    >
       <DialogContent
         aria-describedby={undefined}
         showCloseButton={false}
@@ -311,11 +326,11 @@ export function ArrangeTopCardsModal({
           event.preventDefault();
           if (action === "clear-selection") setSelectedId(null);
         }}
-        className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[520px] p-0 gap-0"
+        className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[520px]"
       >
-        <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
-          <DialogTitle className="text-gb-text-bright">
-            {title}
+        <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
+          <DialogTitle asChild className="text-gb-text-bright">
+            <EffectText text={title} className="text-gb-text-bright text-sm" />
           </DialogTitle>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
@@ -339,7 +354,7 @@ export function ArrangeTopCardsModal({
                 items={orderedCards.map((c) => c.instanceId)}
                 strategy={rectSortingStrategy}
               >
-                <div className="flex items-center justify-center gap-3 flex-wrap">
+                <div className="flex flex-wrap items-center justify-center gap-3">
                   {orderedCards.map((card) => (
                     <SortableModalCard
                       key={card.instanceId}
@@ -364,7 +379,7 @@ export function ArrangeTopCardsModal({
                       onSelect={() => {
                         if (step === 1 && canSelectCard(card.instanceId)) {
                           setSelectedId((prev) =>
-                            prev === card.instanceId ? null : card.instanceId,
+                            prev === card.instanceId ? null : card.instanceId
                           );
                         }
                       }}
@@ -374,9 +389,13 @@ export function ArrangeTopCardsModal({
               </SortableContext>
 
               {step === 2 && (
-                <div className="flex justify-between mt-3">
-                  <span className="text-sm text-gb-text-dim">← top of deck</span>
-                  <span className="text-sm text-gb-text-dim">bottom of deck →</span>
+                <div className="mt-3 flex justify-between">
+                  <span className="text-gb-text-dim text-sm">
+                    ← top of deck
+                  </span>
+                  <span className="text-gb-text-dim text-sm">
+                    bottom of deck →
+                  </span>
                 </div>
               )}
             </div>
@@ -400,18 +419,22 @@ export function ArrangeTopCardsModal({
                       <Card
                         variant="modal"
                         size="field"
-                        data={{ card: activeCard, cardId: activeCard.cardId, cardDb }}
+                        data={{
+                          card: activeCard,
+                          cardId: activeCard.cardId,
+                          cardDb,
+                        }}
                         interaction={{ tooltipDisabled: true }}
                       />
                     </motion.div>
                   )}
                 </DragOverlay>,
-                getPortalContainer() ?? document.body,
+                getPortalContainer() ?? document.body
               )}
           </DndContext>
         </TooltipProvider>
 
-        <DialogFooter className="flex-row items-center justify-end gap-2 px-4 py-3 border-t border-gb-border pt-3">
+        <DialogFooter className="border-gb-border flex-row items-center justify-end gap-2 border-t px-4 py-3 pt-3">
           {step === 1 && (
             <>
               {(validTargets !== undefined || maxKeep > 1) && (
@@ -425,7 +448,9 @@ export function ArrangeTopCardsModal({
                 disabled={!selectedId}
                 onClick={handleAddToHand}
               >
-                {maxKeep > 1 ? `Take (${keptIds.length}/${maxKeep})` : "Add to Hand"}
+                {maxKeep > 1
+                  ? `Take (${keptIds.length}/${maxKeep})`
+                  : "Add to Hand"}
               </GameButton>
             </>
           )}

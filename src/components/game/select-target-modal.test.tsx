@@ -63,6 +63,29 @@ afterEach(() => {
 });
 
 describe("SelectTargetModal card-state semantics", () => {
+  it("renders effect notation through EffectText", () => {
+    act(() => {
+      renderer = create(
+        <SelectTargetModal
+          cards={[target]}
+          validTargets={[target.instanceId]}
+          effectDescription="[Activate: Main] Choose a Character"
+          countMin={1}
+          countMax={1}
+          ctaLabel="Choose"
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    expect(
+      renderer?.root.findByProps({ "data-effect-notation": "timing" }).children
+    ).toEqual(["Activate: Main"]);
+  });
+
   it("announces rested and selected state on an interactive target card", () => {
     act(() => {
       renderer = create(
