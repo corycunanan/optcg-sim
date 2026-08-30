@@ -329,9 +329,10 @@ export function ArrangeTopCardsModal({
         className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[520px]"
       >
         <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
-          <DialogTitle asChild className="text-gb-text-bright">
+          <div>
+            <DialogTitle className="sr-only">{title}</DialogTitle>
             <EffectText text={title} className="text-gb-text-bright text-sm" />
-          </DialogTitle>
+          </div>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
           </GameButton>

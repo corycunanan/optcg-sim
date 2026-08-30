@@ -6,9 +6,20 @@ vi.mock("@/components/ui", () => {
   const Wrapper = ({ children }: PropsWithChildren) => <>{children}</>;
   return {
     Dialog: Wrapper,
-    DialogContent: Wrapper,
+    DialogContent: ({ children }: PropsWithChildren) => (
+      <div role="dialog" aria-labelledby="test-dialog-title">
+        {children}
+      </div>
+    ),
     DialogHeader: Wrapper,
-    DialogTitle: Wrapper,
+    DialogTitle: ({
+      children,
+      className,
+    }: PropsWithChildren<{ className?: string }>) => (
+      <h2 id="test-dialog-title" className={className}>
+        {children}
+      </h2>
+    ),
   };
 });
 
@@ -67,6 +78,12 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
     expect(
       renderer.root.findByProps({ "data-effect-notation": "timing" }).children
     ).toEqual(["Activate: Main"]);
+    const dialog = renderer.root.findByProps({ role: "dialog" });
+    const heading = renderer.root.findByProps({
+      id: dialog.props["aria-labelledby"],
+    });
+    expect(heading.type).toBe("h2");
+    expect(heading.props.className).toBe("sr-only");
   });
 
   it("shows the source effect and keeps resolved rows disabled in place", async () => {

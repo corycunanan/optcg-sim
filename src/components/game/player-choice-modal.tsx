@@ -121,12 +121,11 @@ export function PlayerChoiceModal({
       >
         <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
           <div className="space-y-1">
-            <DialogTitle asChild className="text-gb-text-bright">
-              <EffectText
-                text={effectDescription}
-                className="text-gb-text-bright text-sm"
-              />
-            </DialogTitle>
+            <DialogTitle className="sr-only">{effectDescription}</DialogTitle>
+            <EffectText
+              text={effectDescription}
+              className="text-gb-text-bright text-sm"
+            />
             {sourceEffectDescription && (
               <p className="text-gb-text-dim text-sm">
                 {sourceEffectDescription}

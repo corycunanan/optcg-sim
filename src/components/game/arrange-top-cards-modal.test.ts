@@ -13,9 +13,22 @@ vi.mock("@/components/ui", () => {
     React.createElement(React.Fragment, null, children);
   return {
     Dialog: Wrapper,
-    DialogContent: Wrapper,
+    DialogContent: ({ children }: React.PropsWithChildren) =>
+      React.createElement(
+        "div",
+        { role: "dialog", "aria-labelledby": "test-dialog-title" },
+        children
+      ),
     DialogHeader: Wrapper,
-    DialogTitle: Wrapper,
+    DialogTitle: ({
+      children,
+      className,
+    }: React.PropsWithChildren<{ className?: string }>) =>
+      React.createElement(
+        "h2",
+        { id: "test-dialog-title", className },
+        children
+      ),
     DialogFooter: Wrapper,
     TooltipProvider: Wrapper,
   };
@@ -76,6 +89,12 @@ describe("ArrangeTopCardsModal effect description", () => {
     expect(
       renderer.root.findByProps({ "data-effect-notation": "timing" }).children
     ).toEqual(["Activate: Main"]);
+    const dialog = renderer.root.findByProps({ role: "dialog" });
+    const heading = renderer.root.findByProps({
+      id: dialog.props["aria-labelledby"],
+    });
+    expect(heading.type).toBe("h2");
+    expect(heading.props.className).toBe("sr-only");
     act(() => renderer.unmount());
   });
 });
