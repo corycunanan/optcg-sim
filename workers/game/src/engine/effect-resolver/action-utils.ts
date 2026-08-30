@@ -190,6 +190,10 @@ export function extractEffectDescription(
   effectText: string,
   block: EffectBlock,
 ): string {
+  if (typeof block.source_text === "string" && block.source_text.trim()) {
+    return block.source_text;
+  }
+
   if (!effectText) return "You may activate this effect.";
 
   // Get the bracket text for this block's trigger
@@ -214,9 +218,9 @@ export function extractEffectDescription(
   const bracket = KEYWORD_BRACKETS[keyword];
   if (!bracket) return effectText;
 
-  // Split on <br> tags first, then further split on trigger bracket boundaries.
-  // Card text may use <br> between effects OR just concatenate them with spaces.
-  const brSegments = effectText.split(/<br\s*\/?>/i);
+  // Split on line breaks first, then further split on trigger bracket boundaries.
+  // Card text may use <br> or newlines between effects, or concatenate them.
+  const brSegments = effectText.split(/<br\s*\/?>|\r?\n/i);
 
   // All bracket strings that can start an effect section
   const allBrackets = Object.values(KEYWORD_BRACKETS);
@@ -242,7 +246,13 @@ export function extractEffectDescription(
     }
 
     if (starts.length <= 1) {
-      sections.push(seg.trim());
+      const start = starts[0];
+      if (start !== undefined && start > 0) {
+        sections.push(seg.substring(0, start).trim());
+        sections.push(seg.substring(start).trim());
+      } else {
+        sections.push(seg.trim());
+      }
     } else {
       const sorted = [...new Set(starts)].sort((a, b) => a - b);
       for (let i = 0; i < sorted.length; i++) {
