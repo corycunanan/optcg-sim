@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import { GameButton } from "./game-button";
 import { Card } from "./card";
+import { EffectText } from "@/components/cards/effect-text";
 
 interface RevealTriggerModalProps {
   cards: CardInstance[];
@@ -32,16 +33,19 @@ export function RevealTriggerModal({
 }: RevealTriggerModalProps) {
   const firstCard = cards[0];
   return (
-    <Dialog open={!isHidden} onOpenChange={(open) => { if (!open) onHide(); }}>
+    <Dialog
+      open={!isHidden}
+      onOpenChange={(open) => {
+        if (!open) onHide();
+      }}
+    >
       <DialogContent
         aria-describedby="reveal-trigger-modal-description"
         showCloseButton={false}
-        className="bg-gb-surface border-gb-border-strong text-gb-text sm:max-w-[400px] p-0 gap-0"
+        className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[400px]"
       >
-        <DialogHeader className="flex-row items-center justify-between px-4 py-3 border-b border-gb-border space-y-0">
-          <DialogTitle className="text-gb-text-subtle">
-            Trigger
-          </DialogTitle>
+        <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
+          <DialogTitle className="text-gb-text-subtle">Trigger</DialogTitle>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
           </GameButton>
@@ -57,9 +61,12 @@ export function RevealTriggerModal({
                 className="shrink-0"
               />
             )}
-            <p id="reveal-trigger-modal-description" className="flex-1 text-sm text-gb-text leading-snug pt-1">
-              {effectDescription}
-            </p>
+            <div id="reveal-trigger-modal-description" className="flex-1 pt-1">
+              <EffectText
+                text={effectDescription}
+                className="text-gb-text text-sm leading-snug"
+              />
+            </div>
           </div>
         </TooltipProvider>
 

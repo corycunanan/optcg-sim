@@ -6,9 +6,20 @@ vi.mock("@/components/ui", () => {
   const Wrapper = ({ children }: PropsWithChildren) => <>{children}</>;
   return {
     Dialog: Wrapper,
-    DialogContent: Wrapper,
+    DialogContent: ({ children }: PropsWithChildren) => (
+      <div role="dialog" aria-labelledby="test-dialog-title">
+        {children}
+      </div>
+    ),
     DialogHeader: Wrapper,
-    DialogTitle: Wrapper,
+    DialogTitle: ({
+      children,
+      className,
+    }: PropsWithChildren<{ className?: string }>) => (
+      <h2 id="test-dialog-title" className={className}>
+        {children}
+      </h2>
+    ),
   };
 });
 
@@ -50,6 +61,31 @@ function findButton(renderer: ReactTestRenderer, label: string) {
 }
 
 describe("PlayerChoiceModal confirmed selection mode", () => {
+  it("renders effect notation through EffectText", async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <PlayerChoiceModal
+          effectDescription="[Activate: Main] Choose a branch"
+          choices={choices}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    expect(
+      renderer.root.findByProps({ "data-effect-notation": "timing" }).children
+    ).toEqual(["Activate: Main"]);
+    const dialog = renderer.root.findByProps({ role: "dialog" });
+    const heading = renderer.root.findByProps({
+      id: dialog.props["aria-labelledby"],
+    });
+    expect(heading.type).toBe("h2");
+    expect(heading.props.className).toBe("sr-only");
+  });
+
   it("shows the source effect and keeps resolved rows disabled in place", async () => {
     const onAction = vi.fn();
     let renderer!: ReactTestRenderer;
@@ -70,9 +106,10 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
       );
     });
 
-    expect(renderer.root.findAllByType("p")[0].children).toEqual([
-      "Five Elders",
-    ]);
+    expect(
+      renderer.root.findByProps({ className: "text-gb-text-dim text-sm" })
+        .children
+    ).toEqual(["Five Elders"]);
     expect(findButton(renderer, "Elder 1 — Resolved").props.disabled).toBe(
       true
     );

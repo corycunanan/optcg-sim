@@ -23,6 +23,7 @@ import {
 import { GameButton } from "./game-button";
 import { Card } from "./card";
 import { useRovingFocus } from "@/hooks/use-roving-focus";
+import { EffectText } from "@/components/cards/effect-text";
 
 const CARD_W = 80;
 
@@ -78,7 +79,7 @@ function TargetCard({
         // Zero padding and border around a fixed-size `<Card>`, so this button's
         // box is the card's box and its focus/selection rings trace that card's
         // outline (SHAPE-LANGUAGE.md §The card radius).
-        "focus-visible:ring-gb-signal-eligible relative shrink-0 rounded-card border-0 bg-transparent p-0 text-left transition-[box-shadow] duration-150 select-none focus-visible:ring-2 focus-visible:outline-none",
+        "focus-visible:ring-gb-signal-eligible rounded-card relative shrink-0 border-0 bg-transparent p-0 text-left transition-[box-shadow] duration-150 select-none focus-visible:ring-2 focus-visible:outline-none",
         blocked && "cursor-not-allowed opacity-30",
         !blocked &&
           selection.selected &&
@@ -211,9 +212,13 @@ export function SelectTargetModal({
         className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[520px]"
       >
         <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
-          <DialogTitle className="text-gb-text-bright">
-            {effectDescription}
-          </DialogTitle>
+          <div>
+            <DialogTitle className="sr-only">{effectDescription}</DialogTitle>
+            <EffectText
+              text={effectDescription}
+              className="text-gb-text-bright text-sm"
+            />
+          </div>
           <GameButton variant="ghost" size="sm" onClick={onHide}>
             Hide
           </GameButton>

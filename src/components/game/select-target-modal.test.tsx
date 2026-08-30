@@ -17,9 +17,23 @@ vi.mock("@/components/ui", () => {
   );
   return {
     Dialog: Wrapper,
-    DialogContent: Div,
+    DialogContent: ({
+      children,
+      ...props
+    }: PropsWithChildren<HTMLAttributes<HTMLDivElement>>) => (
+      <div role="dialog" aria-labelledby="test-dialog-title" {...props}>
+        {children}
+      </div>
+    ),
     DialogHeader: Div,
-    DialogTitle: Div,
+    DialogTitle: ({
+      children,
+      ...props
+    }: PropsWithChildren<HTMLAttributes<HTMLHeadingElement>>) => (
+      <h2 id="test-dialog-title" {...props}>
+        {children}
+      </h2>
+    ),
     DialogFooter: Div,
     TooltipProvider: Wrapper,
   };
@@ -63,6 +77,61 @@ afterEach(() => {
 });
 
 describe("SelectTargetModal card-state semantics", () => {
+  it("renders effect notation through EffectText", () => {
+    act(() => {
+      renderer = create(
+        <SelectTargetModal
+          cards={[target]}
+          validTargets={[target.instanceId]}
+          effectDescription="[Activate: Main] Choose a Character"
+          countMin={1}
+          countMax={1}
+          ctaLabel="Choose"
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    expect(
+      renderer?.root.findByProps({ "data-effect-notation": "timing" }).children
+    ).toEqual(["Activate: Main"]);
+    const dialog = renderer?.root.findByProps({ role: "dialog" });
+    const heading = renderer?.root.findByProps({
+      id: dialog?.props["aria-labelledby"],
+    });
+    expect(heading?.type).toBe("h2");
+    expect(heading?.props.className).toBe("sr-only");
+  });
+
+  it("keeps the dialog title target when the effect description is empty", () => {
+    act(() => {
+      renderer = create(
+        <SelectTargetModal
+          cards={[target]}
+          validTargets={[target.instanceId]}
+          effectDescription=""
+          countMin={1}
+          countMax={1}
+          ctaLabel="Choose"
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    const dialog = renderer?.root.findByProps({ role: "dialog" });
+    const heading = renderer?.root.findByProps({
+      id: dialog?.props["aria-labelledby"],
+    });
+    expect(heading?.type).toBe("h2");
+    expect(heading?.children).toEqual([]);
+  });
+
   it("announces rested and selected state on an interactive target card", () => {
     act(() => {
       renderer = create(

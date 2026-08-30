@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui";
 import { GameButton } from "./game-button";
+import { EffectText } from "@/components/cards/effect-text";
 
 interface PlayerChoiceModalProps {
   effectDescription: string;
@@ -120,9 +121,11 @@ export function PlayerChoiceModal({
       >
         <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
           <div className="space-y-1">
-          <DialogTitle className="text-gb-text-bright">
-            {effectDescription}
-          </DialogTitle>
+            <DialogTitle className="sr-only">{effectDescription}</DialogTitle>
+            <EffectText
+              text={effectDescription}
+              className="text-gb-text-bright text-sm"
+            />
             {sourceEffectDescription && (
               <p className="text-gb-text-dim text-sm">
                 {sourceEffectDescription}
