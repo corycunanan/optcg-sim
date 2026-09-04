@@ -38,6 +38,7 @@ import {
   markOncePerTurnUsed,
   extractEffectDescription,
   resolveAmount,
+  sourceTextForBlock,
 } from "./action-utils.js";
 import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import {
@@ -359,8 +360,7 @@ export function resolveEffect(
   // Extract block-specific effect description for prompts
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const fullText =
-    sourceCardData?.triggerText ?? sourceCardData?.effectText ?? "";
+  const fullText = sourceTextForBlock(sourceCardData, block);
   const blockDescription = extractEffectDescription(fullText, block);
 
   // Step 1: Evaluate block-level conditions

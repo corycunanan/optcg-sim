@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EffectBlock } from "../engine/effect-types.js";
-import type { CardInstance, EffectStackFrame } from "../types.js";
+import type { CardData, CardInstance, EffectStackFrame } from "../types.js";
 import {
   extractEffectDescription,
   promptEffectDescription,
+  sourceTextForBlock,
 } from "../engine/effect-resolver/action-utils.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
@@ -145,6 +146,31 @@ describe("promptEffectDescription", () => {
 
     expect(promptEffectDescription(state, cardDb, source.instanceId)).toBe(
       effectText
+    );
+  });
+});
+
+describe("sourceTextForBlock", () => {
+  const cardData = {
+    effectText: "[On Play] Draw 1 card.",
+    triggerText: "[Trigger] Draw 2 cards.",
+  } as CardData;
+
+  it("uses effectText for a non-TRIGGER block when both fields exist", () => {
+    expect(sourceTextForBlock(cardData, block("ON_PLAY"))).toBe(
+      "[On Play] Draw 1 card."
+    );
+  });
+
+  it("uses triggerText for a TRIGGER block when both fields exist", () => {
+    const triggerBlock: EffectBlock = {
+      id: "trigger_effect",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+    };
+
+    expect(sourceTextForBlock(cardData, triggerBlock)).toBe(
+      "[Trigger] Draw 2 cards."
     );
   });
 });

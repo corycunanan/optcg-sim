@@ -270,6 +270,24 @@ export function extractEffectDescription(
   return effectText;
 }
 
+/** Select the printed text field that owns an effect block. */
+export function sourceTextForBlock(
+  cardData: CardData | undefined,
+  block: EffectBlock,
+): string {
+  const trigger = block.trigger;
+  const isTriggerBlock = !!trigger && (
+    ("keyword" in trigger && trigger.keyword === "TRIGGER") ||
+    ("any_of" in trigger && trigger.any_of.some(
+      (candidate) => "keyword" in candidate && candidate.keyword === "TRIGGER",
+    ))
+  );
+
+  return isTriggerBlock
+    ? cardData?.triggerText ?? cardData?.effectText ?? ""
+    : cardData?.effectText ?? "";
+}
+
 /** Clause-scoped description for a prompt raised by the active effect.
  * Finds the effect block for sourceCardInstanceId on the effect stack
  * (topmost matching frame) and extracts its clause; falls back to the
@@ -281,7 +299,6 @@ export function promptEffectDescription(
 ): string {
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const fullEffectText = sourceCardData?.effectText ?? "";
   let block: EffectBlock | undefined;
   for (let index = state.effectStack.length - 1; index >= 0; index -= 1) {
     const candidate = state.effectStack[index];
@@ -290,17 +307,7 @@ export function promptEffectDescription(
       break;
     }
   }
-  if (!block) return fullEffectText;
+  if (!block) return sourceCardData?.effectText ?? "";
 
-  const trigger = block.trigger;
-  const isTriggerBlock = !!trigger && (
-    ("keyword" in trigger && trigger.keyword === "TRIGGER") ||
-    ("any_of" in trigger && trigger.any_of.some(
-      (candidate) => "keyword" in candidate && candidate.keyword === "TRIGGER",
-    ))
-  );
-  const text = isTriggerBlock
-    ? sourceCardData?.triggerText ?? fullEffectText
-    : fullEffectText;
-  return extractEffectDescription(text, block);
+  return extractEffectDescription(sourceTextForBlock(sourceCardData, block), block);
 }
