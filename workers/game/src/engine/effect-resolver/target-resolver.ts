@@ -29,6 +29,7 @@ import { getEffectivePower, getEffectiveCostForRead } from "../modifiers.js";
 import { findCardInstance } from "../state.js";
 import type { ActionResult } from "./types.js";
 import { isPresent } from "../type-guards.js";
+import { promptEffectDescription } from "./action-utils.js";
 
 export interface LifeCardTargetContext {
   owner: 0 | 1;
@@ -704,9 +705,11 @@ export function buildSelectTargetPrompt(
     if (c) cards.push(c);
   }
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceCardData?.effectText ?? "";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "";
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,

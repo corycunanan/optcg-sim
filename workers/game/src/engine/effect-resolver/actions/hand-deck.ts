@@ -7,8 +7,11 @@ import type { ActionOf, EffectResult } from "../../effect-types.js";
 import { getActionParams } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { getSearchAndPlayPickLimit, resolveAmount } from "../action-utils.js";
-import { findCardInstance } from "../../state.js";
+import {
+  getSearchAndPlayPickLimit,
+  promptEffectDescription,
+  resolveAmount,
+} from "../action-utils.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { shuffleWithEngineContext } from "../../execution-context.js";
@@ -409,9 +412,11 @@ export function executeSearchAndPlay(
     return { state: nextState, events, succeeded: false };
   }
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceCardData?.effectText ?? "Search and play a card.";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "Search and play a card.";
 
   // Tag the action with destination=FIELD so resume knows to play it
   const taggedAction = { ...action, params: { ...sap, destination: "FIELD" } };

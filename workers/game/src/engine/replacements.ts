@@ -38,6 +38,7 @@ import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
+import { extractEffectDescription } from "./effect-resolver/action-utils.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -431,7 +432,12 @@ export function buildBatchReplacementPrompt(
   const effect = effects.find((e) => e.id === effectId);
   const sourceCard = effect ? findCardInstance(state, effect.sourceCardInstanceId) : undefined;
   const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceData?.effectText ?? describeReplacementEvent(event);
+  const block = sourceData?.effectSchema?.effects.find(
+    (candidate) => candidate.id === effect?.sourceEffectBlockId,
+  );
+  const effectDescription = sourceData && block
+    ? extractEffectDescription(sourceData.effectText, block)
+    : describeReplacementEvent(event);
   const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
   return {
     options: { promptType: "OPTIONAL_EFFECT", effectDescription, cards },
@@ -689,7 +695,12 @@ function buildReplacementPrompt(
 ): ReplacementCheckResult {
   const sourceCard = findCardInstance(state, effect.sourceCardInstanceId);
   const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceData?.effectText ?? describeReplacementEvent(event);
+  const block = sourceData?.effectSchema?.effects.find(
+    (candidate) => candidate.id === effect.sourceEffectBlockId,
+  );
+  const effectDescription = sourceData && block
+    ? extractEffectDescription(sourceData.effectText, block)
+    : describeReplacementEvent(event);
 
   const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
 

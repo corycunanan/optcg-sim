@@ -14,6 +14,7 @@ import type { CardData, GameState } from "../../types.js";
 import { matchesFilter } from "../conditions.js";
 import type { ExpiryTiming } from "../effect-types.js";
 import { resolveDynamicValue } from "../dynamic-values.js";
+import { findCardInstance } from "../state.js";
 
 export { getActionParams } from "../effect-types.js";
 
@@ -267,4 +268,46 @@ export function extractEffectDescription(
   if (match) return match;
 
   return effectText;
+}
+
+/** Select the printed text field that owns an effect block. */
+export function sourceTextForBlock(
+  cardData: CardData | undefined,
+  block: EffectBlock,
+): string {
+  const trigger = block.trigger;
+  const isTriggerBlock = !!trigger && (
+    ("keyword" in trigger && trigger.keyword === "TRIGGER") ||
+    ("any_of" in trigger && trigger.any_of.some(
+      (candidate) => "keyword" in candidate && candidate.keyword === "TRIGGER",
+    ))
+  );
+
+  return isTriggerBlock
+    ? cardData?.triggerText ?? cardData?.effectText ?? ""
+    : cardData?.effectText ?? "";
+}
+
+/** Clause-scoped description for a prompt raised by the active effect.
+ * Finds the effect block for sourceCardInstanceId on the effect stack
+ * (topmost matching frame) and extracts its clause; falls back to the
+ * card's full text when no frame or block is found. */
+export function promptEffectDescription(
+  state: GameState,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+): string {
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
+  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  let block: EffectBlock | undefined;
+  for (let index = state.effectStack.length - 1; index >= 0; index -= 1) {
+    const candidate = state.effectStack[index];
+    if (candidate?.sourceCardInstanceId === sourceCardInstanceId) {
+      block = candidate.effectBlock;
+      break;
+    }
+  }
+  if (!block) return sourceCardData?.effectText ?? "";
+
+  return extractEffectDescription(sourceTextForBlock(sourceCardData, block), block);
 }

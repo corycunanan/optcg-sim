@@ -12,7 +12,7 @@ import type {
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
-import { resolveAmount } from "../action-utils.js";
+import { promptEffectDescription, resolveAmount } from "../action-utils.js";
 import { findCardInstance } from "../../state.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
@@ -83,9 +83,11 @@ export function executeSearchDeck(
 
   const validTargets = matching.map((c) => c.instanceId);
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck.";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "Look at the top cards of your deck.";
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
@@ -136,9 +138,11 @@ export function executeSearchTrashTheRest(
 
   const validTargets = matching.map((c) => c.instanceId);
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck.";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "Look at the top cards of your deck.";
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,

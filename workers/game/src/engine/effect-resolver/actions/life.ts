@@ -21,7 +21,7 @@ import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
-import { resolveAmount } from "../action-utils.js";
+import { promptEffectDescription, resolveAmount } from "../action-utils.js";
 
 export function executeAddToLifeFromDeck(
   state: GameState,
@@ -632,8 +632,6 @@ export function executeLifeScry(
     },
   });
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
   const resumeCtx: import("../../../types.js").ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
     controller,
@@ -649,7 +647,11 @@ export function executeLifeScry(
         owner,
         visibility: "ENGINE_INTERNAL",
       })],
-      effectDescription: sourceData?.effectText ?? "Place the Life card at the top or bottom.",
+      effectDescription: promptEffectDescription(
+        state,
+        cardDb,
+        sourceCardInstanceId,
+      ) || "Place the Life card at the top or bottom.",
       canSendToBottom: true,
       validTargets: [selectedId],
     },
@@ -728,9 +730,11 @@ export function executeReorderAllLife(
     owner: targetController,
   }));
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceData?.effectText ?? "Rearrange your Life cards in any order.";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "Rearrange your Life cards in any order.";
 
   const resumeCtx: import("../../../types.js").ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
