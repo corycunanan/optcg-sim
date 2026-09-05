@@ -86,6 +86,33 @@ describe("writeToDatabase", () => {
     });
   });
 
+  it("leaves a flagged stub and flag untouched when another stub arrives", async () => {
+    const { prisma, upsert } = makePrisma([
+      {
+        id: "ST31-004",
+        imageUrl: "https://cdn.example.com/cards/ST31-004.webp",
+        imageIsVariantFallback: true,
+      },
+    ]);
+
+    await writeToDatabase(
+      prisma,
+      [
+        makeBaseCard({
+          imageUrl: "https://example.com/cards/ST31-004_p2.png",
+          imageIsVariantFallback: true,
+        }),
+      ],
+      [],
+      []
+    );
+
+    expect(upsert.mock.calls[0][0].update).not.toHaveProperty("imageUrl");
+    expect(upsert.mock.calls[0][0].update).not.toHaveProperty(
+      "imageIsVariantFallback"
+    );
+  });
+
   it("leaves an unflagged base image and flag untouched when a stub arrives", async () => {
     const { prisma, upsert } = makePrisma([
       {
