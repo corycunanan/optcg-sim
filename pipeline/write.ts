@@ -39,18 +39,22 @@ export async function writeToDatabase(
       async (tx) => {
         const existingCards = await tx.card.findMany({
           where: { id: { in: batch.map((card) => card.id) } },
-          select: { id: true, imageUrl: true },
+          select: {
+            id: true,
+            imageUrl: true,
+            imageIsVariantFallback: true,
+          },
         });
-        const existingImageUrls = new Map(
-          existingCards.map((card) => [card.id, card.imageUrl])
+        const existingCardsById = new Map(
+          existingCards.map((card) => [card.id, card])
         );
 
         await Promise.all(
           batch.map((card) => {
-            const existingImageUrl = existingImageUrls.get(card.id);
+            const existingCard = existingCardsById.get(card.id);
             const replaceStubImage =
-              existingImageUrl !== undefined &&
-              shouldReplaceStubImage(existingImageUrl, card);
+              existingCard !== undefined &&
+              shouldReplaceStubImage(existingCard, card);
 
             return tx.card.upsert({
               where: { id: card.id },
@@ -70,6 +74,7 @@ export async function writeToDatabase(
                 effectText: card.effectText,
                 triggerText: card.triggerText,
                 imageUrl: card.imageUrl,
+                imageIsVariantFallback: card.imageIsVariantFallback,
                 blockNumber: card.blockNumber,
                 isReprint: card.isReprint,
               },
@@ -86,7 +91,12 @@ export async function writeToDatabase(
                 rarity: card.rarity,
                 effectText: card.effectText,
                 triggerText: card.triggerText,
-                ...(replaceStubImage ? { imageUrl: card.imageUrl } : {}),
+                ...(replaceStubImage
+                  ? {
+                      imageUrl: card.imageUrl,
+                      imageIsVariantFallback: false,
+                    }
+                  : {}),
                 // Otherwise preserve CDN URLs set by migrate-images.
                 blockNumber: card.blockNumber,
               },
