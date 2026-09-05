@@ -132,6 +132,7 @@ model Card {
   triggerText  String?
   effectSchema Json? // Parsed effect JSON (nullable in M0)
   imageUrl     String // CDN URL for base card image
+  imageIsVariantFallback Boolean @default(false)
   blockNumber  Int // Block rotation (1, 2, 3, 4)
   banStatus    BanStatus @default(LEGAL)
   isReprint    Boolean   @default(false) // True if card ID prefix doesn't match origin pack

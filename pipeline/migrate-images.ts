@@ -2,8 +2,8 @@
  * Image Migration: Database → Cloudflare R2
  *
  * Reads all card and art-variant image URLs from the database,
- * downloads any that aren't already hosted on R2, uploads them
- * to Cloudflare R2, and updates the database with the new CDN URLs.
+ * downloads every off-CDN source, uploads it to Cloudflare R2,
+ * and updates the database with the new CDN URL.
  *
  * Usage:
  *   pnpm pipeline:migrate-images [--dry-run] [--concurrency <n>] [--limit <n>]
@@ -17,7 +17,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeCdnUrl } from "./image-hosting";
 
 // ─── Config ─────────────────────────────────────────────────────────────────
@@ -132,18 +132,6 @@ async function downloadImage(url: string, attempt = 1): Promise<Buffer> {
 }
 
 /**
- * Check if a key already exists in R2 (for resumability without DB check).
- */
-async function existsInR2(key: string): Promise<boolean> {
-  try {
-    await s3.send(new HeadObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Upload a buffer to R2 and return the CDN URL.
  */
 async function uploadToR2(key: string, data: Buffer): Promise<string> {
@@ -178,14 +166,10 @@ async function processJob(job: ImageJob): Promise<MigrationResult> {
   }
 
   try {
-    // Check if already uploaded to R2 (resumability)
-    const alreadyUploaded = await existsInR2(job.r2Key);
+    // An off-CDN database URL is authoritative; overwrite missing or stale bytes.
+    const imageData = await downloadImage(job.sourceUrl);
+    await uploadToR2(job.r2Key, imageData);
     const newUrl = cdnUrl(job.r2Key);
-
-    if (!alreadyUploaded) {
-      const imageData = await downloadImage(job.sourceUrl);
-      await uploadToR2(job.r2Key, imageData);
-    }
 
     // Update DB
     if (job.type === "card") {

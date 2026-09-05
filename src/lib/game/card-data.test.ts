@@ -20,6 +20,7 @@ function makeCard(overrides: Partial<Card> = {}): Card {
     triggerText: null,
     effectSchema: null,
     imageUrl: "https://example.test/OP13-079.png",
+    imageIsVariantFallback: false,
     blockNumber: 13,
     banStatus: "LEGAL",
     isReprint: false,

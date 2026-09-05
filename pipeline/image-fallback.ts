@@ -1,14 +1,13 @@
 export function shouldReplaceStubImage(
-  existingImageUrl: string,
+  existing: { imageUrl: string; imageIsVariantFallback: boolean },
   incoming: { imageUrl: string; imageIsVariantFallback: boolean }
 ): boolean {
   if (incoming.imageIsVariantFallback) return false;
 
-  const path = existingImageUrl.split(/[?#]/, 1)[0];
+  const path = existing.imageUrl.split(/[?#]/, 1)[0];
   const filename = path.slice(path.lastIndexOf("/") + 1);
   const stem = filename.replace(/\.(?:png|webp)$/i, "");
 
-  // Migrated stubs use cards/<cardId>.webp, which loses the _p marker and is
-  // therefore not detectable from its URL. Replacing those stubs is out of scope.
-  return /_p\d+$/i.test(stem);
+  // Keep URL detection as a secondary signal for legacy, unflagged stubs.
+  return existing.imageIsVariantFallback || /_p\d+$/i.test(stem);
 }

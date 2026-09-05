@@ -38,6 +38,7 @@ function makeCard(id: string, overrides: Partial<Card> = {}): Card {
     triggerText: null,
     effectSchema: null,
     imageUrl: `https://example.test/${id}.png`,
+    imageIsVariantFallback: false,
     blockNumber: 1,
     banStatus: "LEGAL",
     isReprint: false,
