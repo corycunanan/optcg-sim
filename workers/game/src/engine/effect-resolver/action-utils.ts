@@ -9,6 +9,7 @@ import type {
   DynamicValue,
   EffectResult,
   EffectBlock,
+  StartOfGameEffect,
 } from "../effect-types.js";
 import type { CardData, GameState } from "../../types.js";
 import { matchesFilter } from "../conditions.js";
@@ -310,4 +311,20 @@ export function promptEffectDescription(
   if (!block) return sourceCardData?.effectText ?? "";
 
   return extractEffectDescription(sourceTextForBlock(sourceCardData, block), block);
+}
+
+/** Player-facing clause for a START_OF_GAME_EFFECT prompt. */
+export function startOfGameEffectDescription(
+  rule: StartOfGameEffect,
+  cardData: CardData | undefined,
+): string {
+  if (typeof rule.prompt_text === "string" && rule.prompt_text.trim()) {
+    return rule.prompt_text;
+  }
+  const lines = (cardData?.effectText ?? "")
+    .split(/<br\s*\/?>|\r?\n/i)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const preamble = lines.find((line) => !/\[[^\]]+\]/.test(line));
+  return preamble ?? "Start-of-game effect";
 }

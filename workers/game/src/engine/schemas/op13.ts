@@ -2807,6 +2807,7 @@ export const OP13_079_IMU: EffectSchema = {
     },
     {
       rule_type: "START_OF_GAME_EFFECT",
+      prompt_text: "At the start of the game, play up to 1 {Mary Geoise} type Stage card from your deck.",
       actions: [
         {
           type: "SEARCH_AND_PLAY",
