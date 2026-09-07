@@ -1442,6 +1442,8 @@ export const OP11_039_VAGABOND_DRILL: EffectSchema = {
 // DON!! cards on your field, look at 5 cards from the top of your deck; reveal
 // up to 1 {Straw Hat Crew} type card and add it to your hand. Then, place the
 // rest at the top or bottom of the deck in any order.
+// Official Q&A: activation at the start of the Refresh Phase is optional. A
+// player may attempt it below 8 DON!!, but this schema only prompts when it fires.
 
 export const OP11_040_MONKEY_D_LUFFY: EffectSchema = {
   card_id: "OP11-040",
@@ -1451,7 +1453,9 @@ export const OP11_040_MONKEY_D_LUFFY: EffectSchema = {
     {
       id: "start_of_turn_search",
       category: "auto",
+      source_text: "This effect can be activated at the start of your turn. If you have 8 or more DON!! cards on your field, look at 5 cards from the top of your deck; reveal up to 1 {Straw Hat Crew} type card and add it to your hand. Then, place the rest at the top or bottom of the deck in any order.",
       trigger: { keyword: "START_OF_TURN" },
+      flags: { optional: true },
       conditions: {
         type: "DON_FIELD_COUNT",
         controller: "SELF",
