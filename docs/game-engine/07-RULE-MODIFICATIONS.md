@@ -420,12 +420,14 @@ Actions performed during game setup after the first player is decided but before
 interface StartOfGameEffect {
   rule_type: "START_OF_GAME_EFFECT";
   actions: Action[];
+  prompt_text?: string;
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `actions` | [`Action[]`](./04-ACTIONS.md) | Ordered actions to execute during setup |
+| `prompt_text` | `string` | Optional player-facing clause for prompts raised during setup. May be a fragment of the printed line. Not used for highlighting. |
 
 The `actions` array uses the same [Action](./04-ACTIONS.md) type as auto/activate effects, supporting full targeting, filtering, and chaining.
 
