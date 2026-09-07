@@ -13,7 +13,7 @@ import type {
   ResumeContext,
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { resolveAmount } from "../action-utils.js";
+import { promptEffectDescription, resolveAmount } from "../action-utils.js";
 import { koCharacter, returnToHand, returnToDeck, trashCharacter } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt, matchesFilterForTarget } from "../target-resolver.js";
 import { processBatchReplacements } from "../../replacements.js";
@@ -250,8 +250,6 @@ export function executeReturnToDeck(
     : undefined;
   if (pendingOwner !== undefined) {
     const ownerCards = sourceCards.filter((card) => card.owner === pendingOwner);
-    const sourceCard = findCardInstance(state, sourceCardInstanceId);
-    const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
     const resumeContext: ResumeContext = {
       effectSourceInstanceId: sourceCardInstanceId,
       controller,
@@ -265,7 +263,11 @@ export function executeReturnToDeck(
       options: {
         promptType: "ARRANGE_TOP_CARDS",
         cards: ownerCards,
-        effectDescription: sourceData?.effectText ?? `Place the cards at the ${position === "TOP" ? "top" : "bottom"} of the deck in any order`,
+        effectDescription: promptEffectDescription(
+          state,
+          cardDb,
+          sourceCardInstanceId,
+        ) || `Place the cards at the ${position === "TOP" ? "top" : "bottom"} of the deck in any order`,
         canSendToBottom: position === "BOTTOM",
         validTargets: [],
         maxKeep: 0,

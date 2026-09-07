@@ -13,7 +13,6 @@ import type {
 import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
 import { promptEffectDescription, resolveAmount } from "../action-utils.js";
-import { findCardInstance } from "../../state.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { shuffleWithEngineContext } from "../../execution-context.js";
@@ -243,9 +242,11 @@ export function executeFullDeckSearch(
   }
 
   // Build a prompt for the player to pick from matching cards
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceCardData?.effectText ?? "Search your deck.";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "Search your deck.";
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
@@ -287,9 +288,11 @@ export function executeDeckScry(
 
   const topCards = player.deck.slice(0, count);
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceCardData?.effectText ?? "Look at the top cards of your deck and rearrange them.";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "Look at the top cards of your deck and rearrange them.";
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,

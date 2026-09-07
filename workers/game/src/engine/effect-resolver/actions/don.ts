@@ -24,7 +24,7 @@ import {
   needsPlayerTargetSelection,
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
-import { resolveAmount } from "../action-utils.js";
+import { promptEffectDescription, resolveAmount } from "../action-utils.js";
 
 export function executeGiveDon(
   state: GameState,
@@ -663,10 +663,11 @@ export function executeRedistributeDon(
     return { state, events, succeeded: false };
   }
 
-  const sourceCard = state.players[controller].characters.find((c) => c?.instanceId === sourceCardInstanceId)
-    ?? (state.players[controller].leader.instanceId === sourceCardInstanceId ? state.players[controller].leader : null);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const effectDescription = sourceCardData?.effectText ?? "";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "";
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
