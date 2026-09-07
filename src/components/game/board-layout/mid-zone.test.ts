@@ -26,7 +26,6 @@ describe("getPromptAnnouncement", () => {
           countLabel: "Choose 1",
           selectedCount: 1,
           aggregateLabel: null,
-          ctaLabel: "Confirm",
           canConfirm: true,
           canSkip: false,
           onConfirm: () => {},

@@ -107,6 +107,7 @@ export const selectTargetScenario: Scenario = {
       prompt: {
         promptType: "SELECT_TARGET",
         cards: [OPP_CHAR_1, OPP_CHAR_2, OPP_CHAR_3],
+        sourceCard: { cardId: "OP01-001", instanceId: "p0-leader" },
         validTargets: [...VALID_TARGET_IDS],
         effectDescription: "Select 1 of opponent's Characters",
         countMin: 1,

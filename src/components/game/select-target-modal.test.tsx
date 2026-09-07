@@ -34,6 +34,7 @@ vi.mock("@/components/ui", () => {
         {children}
       </h2>
     ),
+    DialogDescription: Wrapper,
     DialogFooter: Div,
     TooltipProvider: Wrapper,
   };
@@ -86,7 +87,6 @@ describe("SelectTargetModal card-state semantics", () => {
           effectDescription="[Activate: Main] Choose a Character"
           countMin={1}
           countMax={1}
-          ctaLabel="Choose"
           cardDb={cardDb}
           isHidden={false}
           onHide={vi.fn()}
@@ -103,7 +103,7 @@ describe("SelectTargetModal card-state semantics", () => {
       id: dialog?.props["aria-labelledby"],
     });
     expect(heading?.type).toBe("h2");
-    expect(heading?.props.className).toBe("sr-only");
+    expect(heading?.children).toEqual(["Card Effect: Activate: Main"]);
   });
 
   it("keeps the dialog title target when the effect description is empty", () => {
@@ -115,7 +115,6 @@ describe("SelectTargetModal card-state semantics", () => {
           effectDescription=""
           countMin={1}
           countMax={1}
-          ctaLabel="Choose"
           cardDb={cardDb}
           isHidden={false}
           onHide={vi.fn()}
@@ -129,7 +128,56 @@ describe("SelectTargetModal card-state semantics", () => {
       id: dialog?.props["aria-labelledby"],
     });
     expect(heading?.type).toBe("h2");
-    expect(heading?.children).toEqual([]);
+    expect(heading?.children).toEqual(["Card Effect"]);
+  });
+
+  it("renders Skip disabled for a required pick and enabled for an optional one", () => {
+    const onAction = vi.fn();
+    act(() => {
+      renderer = create(
+        <SelectTargetModal
+          cards={[target]}
+          validTargets={[target.instanceId]}
+          effectDescription="[On Play] Choose a Character"
+          countMin={1}
+          countMax={1}
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={onAction}
+        />
+      );
+    });
+    const buttons = () => renderer!.root.findAllByType("button");
+    const skip = buttons().find((b) => b.children.join("") === "Skip")!;
+    expect(skip.props.disabled).toBe(true);
+    expect(
+      buttons().find((b) => b.children.join("") === "Confirm")!.props.disabled
+    ).toBe(true);
+    act(() => renderer?.unmount());
+
+    act(() => {
+      renderer = create(
+        <SelectTargetModal
+          cards={[target]}
+          validTargets={[target.instanceId]}
+          effectDescription="[On Play] Choose up to 1 Character"
+          countMin={0}
+          countMax={1}
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={onAction}
+        />
+      );
+    });
+    const optionalSkip = buttons().find((b) => b.children.join("") === "Skip")!;
+    expect(optionalSkip.props.disabled).toBe(false);
+    act(() => optionalSkip.props.onClick());
+    expect(onAction).toHaveBeenCalledWith({
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [],
+    });
   });
 
   it("announces rested and selected state on an interactive target card", () => {
@@ -141,7 +189,6 @@ describe("SelectTargetModal card-state semantics", () => {
           effectDescription="Choose a Character"
           countMin={1}
           countMax={1}
-          ctaLabel="Choose"
           cardDb={cardDb}
           isHidden={false}
           onHide={vi.fn()}
@@ -175,7 +222,6 @@ describe("SelectTargetModal card-state semantics", () => {
           effectDescription="Choose a Character"
           countMin={1}
           countMax={1}
-          ctaLabel="Choose"
           cardDb={cardDb}
           isHidden={false}
           onHide={vi.fn()}

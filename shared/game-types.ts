@@ -712,6 +712,16 @@ export type PromptOptions =
   | PlayerChoicePrompt
   | OptionalEffectPrompt;
 
+/**
+ * The card whose effect raised a prompt. Attached by the session right before
+ * a prompt is sent so every effect modal can name its source card. Absent for
+ * pregame decisions and battle-step prompts that have no effect source.
+ */
+export interface PromptSourceCard {
+  cardId: string;
+  instanceId: string;
+}
+
 export interface SelectBlockerPrompt {
   promptType: "SELECT_BLOCKER";
   validTargets: string[];
@@ -721,6 +731,7 @@ export interface SelectBlockerPrompt {
 
 export interface RevealTriggerPrompt {
   promptType: "REVEAL_TRIGGER";
+  sourceCard?: PromptSourceCard;
   cards: CardInstance[];
   effectDescription: string;
   optional: boolean;
@@ -729,6 +740,7 @@ export interface RevealTriggerPrompt {
 
 export interface ArrangeTopCardsPrompt {
   promptType: "ARRANGE_TOP_CARDS";
+  sourceCard?: PromptSourceCard;
   cards: CardInstance[];
   effectDescription: string;
   canSendToBottom: boolean;
@@ -740,6 +752,7 @@ export interface ArrangeTopCardsPrompt {
 
 export interface SelectTargetPrompt {
   promptType: "SELECT_TARGET";
+  sourceCard?: PromptSourceCard;
   cards: CardInstance[];
   validTargets: string[];
   effectDescription: string;
@@ -761,6 +774,7 @@ export interface SelectTargetPrompt {
 
 export interface RedistributeDonPrompt {
   promptType: "REDISTRIBUTE_DON";
+  sourceCard?: PromptSourceCard;
   validSourceCardIds: string[];
   validTargetCardIds: string[];
   maxTransfers: number;
@@ -769,6 +783,7 @@ export interface RedistributeDonPrompt {
 
 export interface PlayerChoicePrompt {
   promptType: "PLAYER_CHOICE";
+  sourceCard?: PromptSourceCard;
   choices: { id: string; label: string; disabled?: boolean }[];
   effectDescription: string;
   sourceEffectDescription?: string;
@@ -788,6 +803,7 @@ export interface PlayerChoicePrompt {
 
 export interface OptionalEffectPrompt {
   promptType: "OPTIONAL_EFFECT";
+  sourceCard?: PromptSourceCard;
   effectDescription: string;
   cards?: CardInstance[];
 }

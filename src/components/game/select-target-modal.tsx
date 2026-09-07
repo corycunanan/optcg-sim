@@ -5,25 +5,17 @@ import type {
   CardDb,
   CardInstance,
   GameAction,
+  PromptSourceCard,
   SelectTargetPrompt,
 } from "@shared/game-types";
 import { cn } from "@/lib/utils";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  TooltipProvider,
-} from "@/components/ui";
-import {
   buildTargetSelectionModel,
   type TargetCardSelectionState,
 } from "@/lib/game/target-selection";
-import { GameButton } from "./game-button";
 import { Card } from "./card";
+import { EffectPromptDialog } from "./effect-prompt-dialog";
 import { useRovingFocus } from "@/hooks/use-roving-focus";
-import { EffectText } from "@/components/cards/effect-text";
 
 const CARD_W = 80;
 
@@ -122,9 +114,9 @@ interface SelectTargetModalProps {
   cards: CardInstance[];
   validTargets: string[];
   effectDescription: string;
+  sourceCard?: PromptSourceCard;
   countMin: number;
   countMax: number;
-  ctaLabel: string;
   aggregateConstraint?: {
     property: "power" | "cost";
     operator: "<=" | ">=" | "==";
@@ -145,9 +137,9 @@ export function SelectTargetModal({
   cards,
   validTargets,
   effectDescription,
+  sourceCard,
   countMin,
   countMax,
-  ctaLabel,
   aggregateConstraint,
   uniquenessConstraint,
   namedDistribution,
@@ -165,7 +157,7 @@ export function SelectTargetModal({
     effectDescription,
     countMin,
     countMax,
-    ctaLabel,
+    ctaLabel: "Confirm",
     aggregateConstraint,
     uniquenessConstraint,
     namedDistribution,
@@ -194,90 +186,68 @@ export function SelectTargetModal({
     });
   }
 
+  // "Up to N" effects accept an empty selection; a required pick does not.
+  const handleSkip =
+    countMin === 0
+      ? () => onAction({ type: "SELECT_TARGET", selectedInstanceIds: [] })
+      : undefined;
+
   return (
-    <Dialog
-      open={!isHidden}
-      onOpenChange={(open) => {
-        if (!open) onHide();
+    <EffectPromptDialog
+      effectDescription={effectDescription}
+      sourceCard={sourceCard}
+      cardDb={cardDb}
+      isHidden={isHidden}
+      onHide={onHide}
+      onConfirm={handleConfirm}
+      confirmDisabled={!model.canConfirm}
+      onSkip={handleSkip}
+      onEscapeKeyDown={(event) => {
+        if (selectedIds.size === 0) return;
+        event.preventDefault();
+        setSelectedIds(new Set());
       }}
+      status={
+        <>
+          {model.countLabel}
+          {model.selectedCount > 0 && (
+            <span className="text-gb-text-subtle ml-1">
+              &mdash; {model.selectedCount} selected
+            </span>
+          )}
+          {model.aggregateLabel && (
+            <span className="text-gb-text-bright ml-2 font-medium">
+              &middot; {model.aggregateLabel}
+            </span>
+          )}
+        </>
+      }
     >
-      <DialogContent
-        aria-describedby={undefined}
-        showCloseButton={false}
-        onEscapeKeyDown={(event) => {
-          if (selectedIds.size === 0) return;
-          event.preventDefault();
-          setSelectedIds(new Set());
-        }}
-        className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[520px]"
+      <div
+        className={cn(
+          "flex flex-wrap gap-2",
+          cards.length <= 5 ? "justify-center" : "justify-start"
+        )}
+        style={{ maxWidth: `${CARD_W * 5 + 8 * 4}px`, margin: "0 auto" }}
       >
-        <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
-          <div>
-            <DialogTitle className="sr-only">{effectDescription}</DialogTitle>
-            <EffectText
-              text={effectDescription}
-              className="text-gb-text-bright text-sm"
-            />
-          </div>
-          <GameButton variant="ghost" size="sm" onClick={onHide}>
-            Hide
-          </GameButton>
-        </DialogHeader>
-
-        <TooltipProvider delayDuration={0} disableHoverableContent>
-          <div className="overflow-y-auto px-4 py-4" style={{ maxHeight: 300 }}>
-            <div
-              className={cn(
-                "flex flex-wrap gap-2",
-                cards.length <= 5 ? "justify-center" : "justify-start"
-              )}
-              style={{ maxWidth: `${CARD_W * 5 + 8 * 4}px`, margin: "0 auto" }}
-            >
-              {cards.map((card) => (
-                <TargetCard
-                  key={card.instanceId}
-                  card={card}
-                  cardDb={cardDb}
-                  selection={model.byId.get(card.instanceId)!}
-                  rovingTabIndex={rovingFocus.getTabIndex(card.instanceId)}
-                  onRovingFocus={() => rovingFocus.onFocus(card.instanceId)}
-                  onRovingKeyDown={(event) =>
-                    rovingFocus.onKeyDown(event, card.instanceId)
-                  }
-                  setRovingRef={(node) =>
-                    rovingFocus.setItemRef(card.instanceId, node)
-                  }
-                  onToggle={() => toggleCard(card.instanceId)}
-                />
-              ))}
-            </div>
-          </div>
-        </TooltipProvider>
-
-        <DialogFooter className="border-gb-border flex-row items-center justify-between border-t px-4 py-3 pt-3">
-          <span className="text-gb-text-dim text-sm">
-            {model.countLabel}
-            {model.selectedCount > 0 && (
-              <span className="text-gb-text-subtle ml-1">
-                \u2014 {model.selectedCount} selected
-              </span>
-            )}
-            {model.aggregateLabel && (
-              <span className="text-gb-text-bright ml-2 font-medium">
-                \u00b7 {model.aggregateLabel}
-              </span>
-            )}
-          </span>
-          <GameButton
-            variant={model.canConfirm ? "amber" : "secondary"}
-            size="sm"
-            onClick={handleConfirm}
-            disabled={!model.canConfirm}
-          >
-            {ctaLabel}
-          </GameButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {cards.map((card) => (
+          <TargetCard
+            key={card.instanceId}
+            card={card}
+            cardDb={cardDb}
+            selection={model.byId.get(card.instanceId)!}
+            rovingTabIndex={rovingFocus.getTabIndex(card.instanceId)}
+            onRovingFocus={() => rovingFocus.onFocus(card.instanceId)}
+            onRovingKeyDown={(event) =>
+              rovingFocus.onKeyDown(event, card.instanceId)
+            }
+            setRovingRef={(node) =>
+              rovingFocus.setItemRef(card.instanceId, node)
+            }
+            onToggle={() => toggleCard(card.instanceId)}
+          />
+        ))}
+      </div>
+    </EffectPromptDialog>
   );
 }

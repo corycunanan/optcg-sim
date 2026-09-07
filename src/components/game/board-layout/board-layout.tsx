@@ -505,7 +505,6 @@ function BoardLayoutInner({
                     countLabel: modalRouting.targetSelection.model.countLabel,
                     selectedCount: modalRouting.targetSelection.model.selectedCount,
                     aggregateLabel: modalRouting.targetSelection.model.aggregateLabel,
-                    ctaLabel: modalRouting.targetSelection.prompt.ctaLabel,
                     canConfirm: modalRouting.targetSelection.model.canConfirm,
                     canSkip: modalRouting.targetSelection.prompt.countMin === 0,
                     onConfirm: modalRouting.targetSelection.confirm,

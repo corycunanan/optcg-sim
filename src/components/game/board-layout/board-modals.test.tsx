@@ -11,6 +11,9 @@ vi.mock("@/components/ui", () => {
     DialogContent: Wrapper,
     DialogHeader: Wrapper,
     DialogTitle: Wrapper,
+    DialogDescription: Wrapper,
+    DialogFooter: Wrapper,
+    TooltipProvider: Wrapper,
   };
 });
 

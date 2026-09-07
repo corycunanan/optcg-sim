@@ -1,297 +1,81 @@
 # OPTCG Simulator — Interruption Modals
-_Created 2026-03-25_
+_Created 2026-03-25 · Rewritten 2026-09-07 for the shared prompt frame_
 
 ---
 
 ## Purpose
 
-This document defines the design, behavior, and component structure for **interruption modals** — UI overlays that block gameplay and require the active player to make a decision before the game can continue.
+This document defines the design, behavior, and component structure for **interruption modals** — UI overlays that block gameplay and require a player to make a decision before the game can continue.
 
-These modals correspond to server-sent `game:prompt` events and map 1:1 to `PromptType` values.
-
----
-
-## Shared Behavior
-
-All interruption modals share the following behavior:
-
-### Dismissible (Hide)
-- Every modal has a **[ Hide ]** button in the header.
-- Hiding collapses the modal and returns the player to the board view.
-- While hidden, **all board actions are disabled**.
-- The mid-zone displays a persistent locked state:
-  ```
-  ⚡ ACTION REQUIRED   [ Show Prompt ]
-  ```
-- Clicking "Show Prompt" reopens the modal in its prior state (selections preserved).
-- There is no full-dismiss — the modal cannot be closed until a valid choice is submitted.
-
-### Header
-- Left: effect description string (e.g., "Look at the top 4 cards of your deck")
-- Right: **[ Hide ]** button
-
-### Footer
-- Contains 1–2 CTA buttons aligned to the right.
-- CTAs are disabled until the minimum selection requirement is met (where applicable).
-- Exception: **PLAYER_CHOICE** has no footer — selecting an option submits immediately.
-
-### Opponent View
-- While a prompt is active for the active player, the opponent sees a non-interactive "Waiting for opponent..." overlay on the mid-zone.
-- Card faces inside modals are never visible to the opponent.
+Modals correspond to server-sent `game:prompt` events. Five of the seven `PromptType` values render as modals; the other two (`SELECT_BLOCKER`, `REDISTRIBUTE_DON`) are in-board affordances covered by `docs/design/INTERACTION-GRAMMAR.md`. A `SELECT_TARGET` prompt whose candidates all sit on the battlefield also resolves in place on the board, with the same Confirm and Skip actions in the mid-zone.
 
 ---
 
-## Modal Specifications
+## The shared frame
 
----
-
-### 1. ARRANGE_TOP_CARDS
-
-**Prompt type:** `ARRANGE_TOP_CARDS`
-
-A two-step flow triggered by effects that say "look at the top N cards of your deck, add 1 to your hand, then put the rest on top or bottom."
-
-**Step 1 — Select a card to keep**
+Every modal renders through `src/components/game/effect-prompt-dialog.tsx`. One frame, one order, one pair of actions:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Look at the top 4 cards                  [ Hide ]   │
+│  Card Effect: On Play                     [ Hide ]   │  ← title
 │─────────────────────────────────────────────────────│
+│  Monkey.D.Luffy                                      │  ← source card name
+│  [On Play] Look at 5 cards from the top of your      │  ← effect text
+│  deck; play up to 1 {Straw Hat Crew} Character.      │
 │                                                      │
-│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐            │
-│  │      │  │      │  │ ████ │  │      │            │
-│  │      │  │      │  │ ████ │  │      │            │
-│  │      │  │      │  │      │  │      │            │
-│  └──────┘  └──────┘  └──────┘  └──────┘            │
-│               ↑ drag to reorder   ↑ selected         │
-│                                                      │
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  │  ← selectable content
+│  │      │  │ ████ │  │      │  │      │  │      │  │
+│  └──────┘  └──────┘  └──────┘  └──────┘  └──────┘  │
 │─────────────────────────────────────────────────────│
-│                              [ Add Card to Hand ]    │
+│  1 of 1 selected                  [ Skip ] [Confirm] │  ← status + actions
 └─────────────────────────────────────────────────────┘
 ```
 
-- Cards are displayed in a horizontal row and are **drag-to-reorder**.
-- Click a card to select it (highlighted). Only one card can be selected at a time.
-- CTA is disabled until a card is selected.
-- Clicking "Add Card to Hand" removes the selected card from the row and advances to Step 2.
-- The order of remaining cards carries over into Step 2 (gap closed).
+1. **Title** — `Card Effect: <effect type>`. The effect type is the leading timing token of the effect text (`On Play`, `Activate: Main`, `When Attacking`, `Trigger`, `Counter`). A `[DON!! x1]` or `[Once Per Turn]` prefix is skipped. When the description opens with prose (cost payment, a choice question), the title is `Card Effect`. Helper: `promptDialogTitle` in `src/lib/game/prompt-presentation.ts`.
+2. **Source card name** — the printed name of the card whose effect raised the prompt. The session attaches `sourceCard` to every effect prompt right before sending it (`workers/game/src/engine/prompt-source.ts`); the client looks the name up in `cardDb`. Blocker and pregame prompts have no source and omit the line.
+3. **Effect text** — the prompt's `effectDescription`, rendered through `EffectText` so notation chips match the printed card. A prompt may add one secondary line under it (a source effect for trigger ordering, an instruction for Skip).
+4. **Selectable content** — cards, choice rows, or steppers. This is the only part that varies by prompt type.
+5. **Footer** — a status string on the left (`1 of 2 selected`, `Choose up to 2`), then **[Skip] [Confirm]** on the right. The labels never change. Confirm is disabled until the selection is valid. Skip is always rendered; it is disabled when the prompt cannot be declined.
 
-**Step 2 — Order and send remaining cards**
+### Hide
+- Every modal has a **[Hide]** button in the header. Hiding collapses the modal and returns the player to the board.
+- While hidden, board actions stay disabled and the mid-zone shows `⚡ ACTION REQUIRED [Show Prompt]`. Show reopens the modal with its selection intact.
+- There is no full dismiss. The prompt closes only when Skip or Confirm sends a valid response.
 
-```
-┌─────────────────────────────────────────────────────┐
-│  Put the remaining 3 cards back        [ Hide ]      │
-│─────────────────────────────────────────────────────│
-│                                                      │
-│  ┌──────┐  ┌──────┐  ┌──────┐                      │
-│  │      │  │      │  │      │                      │
-│  │      │  │      │  │      │                      │
-│  │      │  │      │  │      │                      │
-│  └──────┘  └──────┘  └──────┘                      │
-│  ← top of deck             bottom of deck →          │
-│                                                      │
-│─────────────────────────────────────────────────────│
-│              [ Send to Bottom ]  [ Send to Top ]     │
-└─────────────────────────────────────────────────────┘
-```
+### Opponent view
+- While a prompt is active for one player, the other sees a non-interactive waiting state on the mid-zone.
+- Card faces inside modals are never visible to the opponent. Spectator visibility follows `workers/game/src/engine/visibility.ts`.
 
-- Cards arrive in the order established in Step 1.
-- Still drag-to-reorder. Leftmost card = top of deck.
-- No per-card top/bottom toggle — all cards go to the same destination.
-- Both CTAs are always enabled. Clicking either submits immediately.
+---
 
-**PromptOptions shape:**
+## Per-prompt content and actions
+
+| Prompt type | Content | Skip | Confirm |
+|---|---|---|---|
+| `SELECT_TARGET` | Card grid, max 5 per row, scrolls vertically. Invalid targets are dimmed and inert. Status shows the count rule and the running count or aggregate. | Sends an empty selection. Enabled only when `countMin` is 0. | Sends the selected instance ids. Enabled when count, aggregate, uniqueness, and dual-slot rules pass. |
+| `ARRANGE_TOP_CARDS` step 1 | Revealed cards in a draggable row. Click toggles a pick, up to `maxKeep`. Cards outside `validTargets` are dimmed. | Keeps nothing and moves to step 2. Enabled for "up to N" effects (`validTargets` present or `maxKeep` > 1). | Locks the picks and moves to step 2. If no cards remain and the destination is fixed, submits immediately. |
+| `ARRANGE_TOP_CARDS` step 2 | Remaining cards, drag to reorder; leftmost is the top of the deck. When both top and bottom are legal, a Top/Bottom toggle sits under the row. | Disabled. | Submits picks, order, and destination. Disabled until a destination is chosen. |
+| `PLAYER_CHOICE` | Full-width option rows. Clicking a row selects it; nothing is sent on click. Disabled rows read `— Resolved`. DON!! return prompts show a stepper per source with an `x of n selected` status. | Sends the `skip` choice. Enabled only when the prompt is `confirmOrSkip`. | Sends the selected choice id. Disabled until a row is selected, or until the DON!! count matches. |
+| `OPTIONAL_EFFECT` | The source card. | Declines the effect (`PASS`). | Activates the effect; may chain into the next prompt. |
+| `REVEAL_TRIGGER` | The revealed Life card, with the note "Skip adds the card to your hand without activating its trigger." | Adds the card to hand. | Reveals and activates the trigger. |
+
+Pregame decisions (`PLAYER_CHOICE` with `source: "PREGAME"`) are owned by `PregameOverlay` and do not use this frame.
+
+---
+
+## Prompt chaining
+
+Some prompts resolve into a subsequent prompt (`OPTIONAL_EFFECT` → `SELECT_TARGET`). The current modal closes, the next opens immediately, and the mid-zone `ACTION REQUIRED` state persists through the chain. Each modal is keyed on its prompt identity so selection state never leaks between prompts.
+
+---
+
+## Wire contract
+
+`PromptOptions` in `shared/game-types.ts`. Every effect prompt carries:
+
 ```ts
-{
-  cards: CardInstance[];
-  effectDescription: string;
-  canSendToBottom: boolean; // if false, Step 2 only shows "Send to Top"
-}
+effectDescription: string;        // effect text, timing token first
+sourceCard?: { cardId: string; instanceId: string };
 ```
 
----
-
-### 2. SELECT_TARGET
-
-**Prompt type:** `SELECT_TARGET`
-
-Used when an effect requires the player to select one or more cards from a pool (hand, trash, deck, or field cards not selectable via board interaction).
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Select 2 Characters with cost 3 or less  [ Hide ]  │
-│─────────────────────────────────────────────────────│
-│ ┌─────────────────────────────────────────────────┐ │
-│ │ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐             │ │
-│ │ │    │ │████│ │    │ │    │ │    │             │ │
-│ │ │    │ │████│ │    │ │    │ │    │             │ │
-│ │ └────┘ └────┘ └────┘ └────┘ └────┘             │ │
-│ │ ┌────┐ ┌────┐ ┌────┐                           │ │
-│ │ │    │ │    │ │    │  ↑ scrolls if more rows   │ │
-│ │ │    │ │    │ │    │                            │ │
-│ │ └────┘ └────┘ └────┘                            │ │
-│ └──────────────────────────── (scrollable body) ──┘ │
-│  Selected: 1 of 2                                    │
-│─────────────────────────────────────────────────────│
-│                               [ Confirm Selection ]  │
-└─────────────────────────────────────────────────────┘
-```
-
-- Card grid: **maximum 5 cards per row**.
-- Body is a **fixed-height scrollable container** — overflows vertically, never horizontally.
-- Invalid targets are visually grayed out and non-interactive.
-- Selected count is shown above the footer.
-- CTA label varies by effect action (e.g., "Add to Hand", "Trash Selected", "Confirm Selection").
-- CTA is disabled until the minimum selection count is met.
-- For single-select effects, confirming immediately after selection is valid.
-
-**PromptOptions shape:**
-```ts
-{
-  cards: CardInstance[];
-  effectDescription: string;
-  countMin: number;
-  countMax: number;
-  ctaLabel: string; // e.g. "Add to Hand", "Confirm Selection"
-}
-```
-
----
-
-### 3. PLAYER_CHOICE
-
-**Prompt type:** `PLAYER_CHOICE`
-
-Used when an effect offers the player a choice between 2–3 discrete named options.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Choose an effect                         [ Hide ]   │
-│─────────────────────────────────────────────────────│
-│                                                      │
-│  ┌─────────────────────────────────────────────┐    │
-│  │  Draw 2 cards                               │    │
-│  └─────────────────────────────────────────────┘    │
-│                                                      │
-│  ┌─────────────────────────────────────────────┐    │
-│  │  Give 1 DON!! to your Leader                │    │
-│  └─────────────────────────────────────────────┘    │
-│                                                      │
-│  ┌─────────────────────────────────────────────┐    │
-│  │  Return 1 opponent's Character to hand      │    │
-│  └─────────────────────────────────────────────┘    │
-│                                                      │
-└─────────────────────────────────────────────────────┘
-```
-
-- **No footer.** Clicking an option submits the choice immediately.
-- Options are full-width tap targets.
-- Maximum 3 options (per OPTCG rules structure).
-- Hide is still available in the header.
-
-**PromptOptions shape:**
-```ts
-{
-  effectDescription: string;
-  choices: { id: string; label: string }[];
-}
-```
-
----
-
-### 4. OPTIONAL_EFFECT
-
-**Prompt type:** `OPTIONAL_EFFECT`
-
-Used when a triggered or activated effect is flagged as optional (`flags.optional = true`). The player may activate or skip it.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Optional effect triggered                [ Hide ]   │
-│─────────────────────────────────────────────────────│
-│                                                      │
-│  ┌──────────┐   Card Name                           │
-│  │          │   ───────────────────────────────     │
-│  │          │   You may KO 1 of your Characters.    │
-│  │ card art │   If you do, draw 2 cards.            │
-│  │          │                                       │
-│  │          │                                       │
-│  └──────────┘                                       │
-│                                                      │
-│─────────────────────────────────────────────────────│
-│                        [ Skip ]  [ Activate ]        │
-└─────────────────────────────────────────────────────┘
-```
-
-- Card art displayed on the left (portrait orientation).
-- Card name and effect text displayed on the right.
-- "Skip" dismisses the effect without resolving it.
-- "Activate" resolves the effect — may chain into a subsequent prompt (e.g., SELECT_TARGET) if the effect requires targeting.
-
-**PromptOptions shape:**
-```ts
-{
-  sourceCard: CardInstance;
-  effectDescription: string; // human-readable effect text
-}
-```
-
----
-
-### 5. REVEAL_TRIGGER
-
-**Prompt type:** `REVEAL_TRIGGER`
-
-Used when a life card is revealed during damage and has a TRIGGER keyword effect. The player chooses to activate the effect or simply add the card to hand.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Trigger activated!                       [ Hide ]   │
-│─────────────────────────────────────────────────────│
-│                                                      │
-│  ┌──────────┐   Card Name                           │
-│  │          │   ───────────────────────────────     │
-│  │          │   [TRIGGER] When this card is         │
-│  │ card art │   revealed from your Life cards,      │
-│  │          │   you may play it for free.           │
-│  │          │                                       │
-│  └──────────┘                                       │
-│                                                      │
-│─────────────────────────────────────────────────────│
-│              [ Add to Hand ]  [ Activate ]           │
-└─────────────────────────────────────────────────────┘
-```
-
-- Same layout as OPTIONAL_EFFECT: card art left, text right.
-- "Add to Hand" adds the card without activating the Trigger effect.
-- "Activate" resolves the Trigger effect — may chain into a subsequent prompt.
-
-**PromptOptions shape:**
-```ts
-{
-  sourceCard: CardInstance;
-  effectDescription: string;
-}
-```
-
----
-
-## Prompt Chaining
-
-Some prompts resolve into a subsequent prompt (e.g., OPTIONAL_EFFECT → SELECT_TARGET). When this occurs:
-- The current modal closes.
-- The next modal opens immediately.
-- The mid-zone "ACTION REQUIRED" indicator remains active throughout the chain.
-
----
-
-## Summary Table
-
-| Modal | Prompt Type | Body | Scrollable | Footer |
-|---|---|---|---|---|
-| Arrange Top Cards — Step 1 | `ARRANGE_TOP_CARDS` | Card row (draggable) | No | "Add Card to Hand" |
-| Arrange Top Cards — Step 2 | `ARRANGE_TOP_CARDS` | Card row (draggable) | No | "Send to Bottom / Send to Top" |
-| Select Target | `SELECT_TARGET` | Card grid (max 5/row) | Yes | CTA label varies |
-| Player Choice | `PLAYER_CHOICE` | Option list | No | None — click to submit |
-| Optional Effect | `OPTIONAL_EFFECT` | Card art + effect text | No | "Skip / Activate" |
-| Reveal Trigger | `REVEAL_TRIGGER` | Card art + effect text | No | "Add to Hand / Activate" |
+`SelectTargetPrompt.ctaLabel` is still sent by the worker but the client no longer reads it; the confirm label is fixed. It can be removed from the wire in a follow-up.

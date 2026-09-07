@@ -1,95 +1,57 @@
 "use client";
 
 import React from "react";
-import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  TooltipProvider,
-} from "@/components/ui";
-import { GameButton } from "./game-button";
+import type {
+  CardDb,
+  CardInstance,
+  GameAction,
+  PromptSourceCard,
+} from "@shared/game-types";
 import { Card } from "./card";
-import { EffectText } from "@/components/cards/effect-text";
+import { EffectPromptDialog } from "./effect-prompt-dialog";
 
 interface OptionalEffectModalProps {
   effectDescription: string;
   card?: CardInstance;
+  sourceCard?: PromptSourceCard;
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
   onAction: (action: GameAction) => void;
 }
 
+/** "You may …" effects: Confirm activates the effect, Skip declines it. */
 export function OptionalEffectModal({
   effectDescription,
   card,
+  sourceCard,
   cardDb,
   isHidden,
   onHide,
   onAction,
 }: OptionalEffectModalProps) {
   return (
-    <Dialog
-      open={!isHidden}
-      onOpenChange={(open) => {
-        if (!open) onHide();
-      }}
+    <EffectPromptDialog
+      effectDescription={effectDescription}
+      sourceCard={sourceCard ?? card}
+      cardDb={cardDb}
+      isHidden={isHidden}
+      onHide={onHide}
+      onConfirm={() =>
+        onAction({ type: "PLAYER_CHOICE", choiceId: "activate" })
+      }
+      onSkip={() => onAction({ type: "PASS" })}
+      className="sm:max-w-[400px]"
     >
-      <DialogContent
-        aria-describedby="optional-effect-modal-description"
-        showCloseButton={false}
-        className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[400px]"
-      >
-        <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
-          <DialogTitle className="text-gb-text-subtle">
-            Optional Effect
-          </DialogTitle>
-          <GameButton variant="ghost" size="sm" onClick={onHide}>
-            Hide
-          </GameButton>
-        </DialogHeader>
-
-        <TooltipProvider delayDuration={0} disableHoverableContent>
-          <div className="flex items-start gap-4 px-4 py-4">
-            {card && (
-              <Card
-                variant="modal"
-                size="field"
-                data={{ card, cardId: card.cardId, cardDb }}
-                className="shrink-0"
-              />
-            )}
-            <div id="optional-effect-modal-description" className="flex-1 pt-1">
-              <EffectText
-                text={effectDescription}
-                className="text-gb-text text-sm leading-snug"
-              />
-            </div>
-          </div>
-        </TooltipProvider>
-
-        <DialogFooter className="flex-row gap-2 px-4 pt-0 pb-4">
-          <GameButton
-            variant="primary"
-            onClick={() =>
-              onAction({ type: "PLAYER_CHOICE", choiceId: "activate" })
-            }
-            className="flex-1"
-          >
-            Activate
-          </GameButton>
-          <GameButton
-            variant="secondary"
-            onClick={() => onAction({ type: "PASS" })}
-            className="flex-1"
-          >
-            Skip
-          </GameButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {card && (
+        <div className="flex justify-center">
+          <Card
+            variant="modal"
+            size="field"
+            data={{ card, cardId: card.cardId, cardDb }}
+          />
+        </div>
+      )}
+    </EffectPromptDialog>
   );
 }
