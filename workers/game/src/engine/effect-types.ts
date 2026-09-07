@@ -1478,6 +1478,10 @@ export interface LossConditionMod {
 export interface StartOfGameEffect {
   rule_type: "START_OF_GAME_EFFECT";
   actions: Action[];
+  /** Player-facing clause shown on prompts raised by these actions.
+   * Prompt-only. Unlike EffectBlock.source_text this may be a sub-clause
+   * fragment and is never used for clause highlighting. */
+  prompt_text?: string;
 }
 
 export interface TriggerTypeNegation {

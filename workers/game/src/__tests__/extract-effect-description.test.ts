@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { EffectBlock } from "../engine/effect-types.js";
+import type { EffectBlock, StartOfGameEffect } from "../engine/effect-types.js";
 import type { CardData, CardInstance, EffectStackFrame } from "../types.js";
 import {
   extractEffectDescription,
   promptEffectDescription,
   sourceTextForBlock,
+  startOfGameEffectDescription,
 } from "../engine/effect-resolver/action-utils.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
@@ -171,6 +172,35 @@ describe("sourceTextForBlock", () => {
 
     expect(sourceTextForBlock(cardData, triggerBlock)).toBe(
       "[Trigger] Draw 2 cards."
+    );
+  });
+});
+
+describe("startOfGameEffectDescription", () => {
+  const rule: StartOfGameEffect = {
+    rule_type: "START_OF_GAME_EFFECT",
+    actions: [],
+  };
+  const cardData = {
+    effectText: "Printed preamble.<br>[Activate: Main] Printed effect.",
+  } as CardData;
+
+  it("uses authored prompt_text when present", () => {
+    expect(startOfGameEffectDescription(
+      { ...rule, prompt_text: "Authored start-of-game clause." },
+      cardData,
+    )).toBe("Authored start-of-game clause.");
+  });
+
+  it("returns the printed preamble without authored prompt_text", () => {
+    expect(startOfGameEffectDescription(rule, cardData)).toBe(
+      "Printed preamble.",
+    );
+  });
+
+  it("returns the placeholder without printed text", () => {
+    expect(startOfGameEffectDescription(rule, undefined)).toBe(
+      "Start-of-game effect",
     );
   });
 });
