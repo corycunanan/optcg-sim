@@ -140,6 +140,7 @@ export function handleSelectTargetRuleTrashForPlay(
     remainingActions,
     ruleTrashForPlay,
     effectSourceInstanceId,
+    effectDescription,
   } = resumeCtx;
   if (
     action.type !== "SELECT_TARGET" ||
@@ -272,6 +273,7 @@ export function handleSelectTargetRuleTrashForPlay(
       triggers,
       remainingActions,
       resultRefs,
+      effectDescription,
     );
     return {
       kind: "terminal",
@@ -300,7 +302,8 @@ export function handleSelectTargetRuleTrashForPlay(
       effectSourceInstanceId,
       controller,
       cardDb,
-      resultRefs
+      resultRefs,
+      effectDescription,
     );
     nextState = chainResult.state;
     events.push(...chainResult.events);
@@ -344,6 +347,7 @@ export function handleSelectTarget(
     validTargets,
     remainingActions,
     effectSourceInstanceId,
+    effectDescription,
   } = resumeCtx;
   if (action.type !== "SELECT_TARGET" || !pausedAction) {
     return null;
@@ -450,7 +454,8 @@ export function handleSelectTarget(
       marker,
       triggers,
       remainingActions,
-      resultRefs
+      resultRefs,
+      effectDescription,
     );
     if (isEngineTerminated(nextState)) {
       return {

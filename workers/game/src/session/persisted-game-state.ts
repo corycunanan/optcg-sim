@@ -295,6 +295,7 @@ const StackFrameCore = z.strictObject({
   id: z.string(),
   sourceCardInstanceId: z.string(),
   controller: PlayerIndex,
+  effectDescription: z.string().optional(),
   remainingActionsController: PlayerIndex.optional(),
   effectBlock: z.unknown(),
   phase: z.enum([

@@ -427,7 +427,19 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
   });
 
   it("preserves a non-optional replacement batch while its Trash return is arranged", () => {
+    const outerDescription =
+      "[On Play] K.O. up to 1 of your opponent's Characters.";
+    const replacementDescription =
+      "[On K.O.] Return 3 cards from your trash to the bottom of your deck.";
     const cardDb = createTestCardDb();
+    cardDb.set(CARDS.LEADER.id, {
+      ...CARDS.LEADER,
+      effectText: `${outerDescription}\n[Trigger] Draw 1 card.`,
+    });
+    cardDb.set(CARDS.VANILLA.id, {
+      ...CARDS.VANILLA,
+      effectText: replacementDescription,
+    });
     const base = createBattleReadyState(cardDb);
     const protectedTarget = base.players[1].characters.find((card) => card !== null)!;
     const trash = [CARDS.VANILLA, CARDS.RUSH, CARDS.BLOCKER].map((card, index): CardInstance => ({
@@ -485,6 +497,7 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
     const block: EffectBlock = {
       id: "ko-then-draw-after-replacement",
       category: "auto",
+      source_text: outerDescription,
       actions: [
         {
           type: "KO",
@@ -506,6 +519,9 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
 
     expect(first.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
     expect(first.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(first.pendingPrompt?.options).toMatchObject({
+      effectDescription: replacementDescription,
+    });
     expect(first.state.effectStack).toHaveLength(2);
     expect(first.state.effectStack.at(-1)?.replacementBatchContinuation).toBeDefined();
     expect(findCardInstance(first.state, protectedTarget.instanceId)?.zone).toBe("CHARACTER");

@@ -381,6 +381,7 @@ export function resolveEffect(
       id: frameId.id,
       sourceCardInstanceId,
       controller,
+      effectDescription: blockDescription,
       effectBlock: block,
       phase: "AWAITING_OPTIONAL_RESPONSE",
       pausedAction: null,
@@ -611,6 +612,7 @@ function promptForSimultaneousSelection(
     id: frameId.id,
     sourceCardInstanceId,
     controller,
+    effectDescription: plan.effectDescription,
     effectBlock: CONTINUATION_EFFECT_BLOCK,
     phase: "AWAITING_TARGET_SELECTION",
     pausedAction: action,
@@ -889,21 +891,29 @@ export function executeActionChain(
         result.state.effectStack.length > stackDepthBeforeAction
       ) {
         const remainingActions = actions.slice(i + 1);
-        const nestedState = remainingActions.length > 0
+        const nestedState = remainingActions.length > 0 || effectDescription
           ? updateTopFrame(result.state, {
-              remainingActions: [
-                ...nestedPromptFrame.remainingActions,
-                ...remainingActions,
-              ],
-              ...(action.type === "OPPONENT_ACTION"
-                ? { remainingActionsController: controller }
+              ...(remainingActions.length > 0
+                ? {
+                    remainingActions: [
+                      ...nestedPromptFrame.remainingActions,
+                      ...remainingActions,
+                    ],
+                    ...(action.type === "OPPONENT_ACTION"
+                      ? { remainingActionsController: controller }
+                      : {}),
+                  }
                 : {}),
+              ...(effectDescription ? { effectDescription } : {}),
             })
           : result.state;
         return {
           state: nestedState,
           events,
-          pendingPrompt: result.pendingPrompt,
+          pendingPrompt: withChainDescription(
+            result.pendingPrompt,
+            effectDescription,
+          ),
         };
       }
       if (nestedPromptFrame?.replacementBatchContinuation) {
@@ -916,6 +926,7 @@ export function executeActionChain(
           id: frameId.id,
           sourceCardInstanceId,
           controller,
+          effectDescription,
           effectBlock: CONTINUATION_EFFECT_BLOCK,
           phase: "INTERRUPTED_BY_TRIGGERS",
           pausedAction: action,
@@ -944,6 +955,8 @@ export function executeActionChain(
           : {
               state: restoredPromptState,
               events,
+              // The nested prompt belongs to the replacement substitute, so
+              // preserve its own description instead of the outer chain's.
               pendingPrompt: result.pendingPrompt,
             };
       }
@@ -960,6 +973,7 @@ export function executeActionChain(
           id: frameId.id,
           sourceCardInstanceId,
           controller,
+          effectDescription,
           effectBlock: CONTINUATION_EFFECT_BLOCK,
           phase: "INTERRUPTED_BY_TRIGGERS",
           pausedAction: action,
@@ -1001,6 +1015,7 @@ export function executeActionChain(
         sourceCardInstanceId,
         controller: resumeController,
         remainingActionsController: controller,
+        effectDescription,
         effectBlock: CONTINUATION_EFFECT_BLOCK,
         phase: phaseForPrompt,
         pausedAction: ctx.pausedAction,
@@ -1022,15 +1037,12 @@ export function executeActionChain(
       const updatedState = pushFrame(frameId.state, frame);
       if (isEngineTerminated(updatedState))
         return { state: updatedState, events };
-      const prompt = { ...result.pendingPrompt, resumeContext: frame.id };
       // Override with block-specific description so prompts show the triggered
       // effect text rather than the full card text
-      if (effectDescription && prompt.options) {
-        prompt.options = {
-          ...prompt.options,
-          effectDescription,
-        } as typeof prompt.options;
-      }
+      const prompt = withChainDescription(
+        { ...result.pendingPrompt, resumeContext: frame.id },
+        effectDescription,
+      );
       return { state: updatedState, events, pendingPrompt: prompt };
     }
 
@@ -1049,7 +1061,8 @@ export function executeActionChain(
         marker,
         triggers,
         actions.slice(i + 1),
-        resultRefs
+        resultRefs,
+        effectDescription,
       );
       if (isEngineTerminated(stateWithFrame))
         return { state: stateWithFrame, events };
@@ -1074,6 +1087,17 @@ export function executeActionChain(
   }
 
   return { state, events };
+}
+
+function withChainDescription(
+  prompt: PendingPromptState,
+  effectDescription: string | undefined,
+): PendingPromptState {
+  if (!effectDescription || !prompt.options) return prompt;
+  return {
+    ...prompt,
+    options: { ...prompt.options, effectDescription } as typeof prompt.options,
+  };
 }
 
 function costResultToRefs(
