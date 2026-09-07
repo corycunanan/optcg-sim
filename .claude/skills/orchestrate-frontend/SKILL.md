@@ -5,9 +5,9 @@ description: Run a Linear scope of frontend/UI work through a design-aware orche
 
 # Orchestrate Frontend — design-aware implementation pipeline
 
-Variant of `/orchestrate` for frontend/UI scopes. Inherit everything from `.claude/skills/orchestrate/SKILL.md` (dispatch runtime, scope resolution, queue discipline, monitoring, close-out, hard rules) except where overridden below. Canonical policy: `docs/project/ORCHESTRATION-CHARTER.md`; recall `project-codex-orchestration` memory for sandbox/VQA recipes.
+Variant of `/orchestrate` for frontend/UI scopes. Inherit everything from `.claude/skills/orchestrate/SKILL.md` (dispatch runtime, scope resolution, queue discipline, monitoring, close-out, hard rules) except where overridden below. Canonical policy: `docs/project/ORCHESTRATION-CHARTER.md`; sandbox and VQA recipes: `../orchestrate/GOTCHAS.md` (Dispatch, Environments).
 
-**Charter amendment (this skill only):** the base rule "Claude never authors implementation code" is replaced by the two-track model below. Claude authors implementation code on the design-lead track. State this explicitly at kickoff and get in-session ratification, including the merge-consent ritual naming both cases in plain words: "Codex-authored PRs merged with no human review" AND "Claude-authored PRs merged with cross-family Codex review but no human review."
+**Charter amendment (this skill only):** the base rule "Claude never authors implementation code" is replaced by the two-track model below. Claude authors implementation code on the design-lead track. Ratify it in the base skill's kickoff `AskUserQuestion`: the merge-consent option label names both cases in plain words — "Codex-authored PRs merged with no human review of the diffs" AND "Claude-authored PRs merged with cross-family Codex review but no human review."
 
 ## Design authorities (read before triage, cite in every brief)
 
@@ -31,7 +31,7 @@ For each ticket, the orchestrator answers one question: **would two reasonable i
 - Token/class swaps, copy changes, prop plumbing, dead-code removal
 - Applying an existing component pattern to a new location (pattern cited by file:line)
 - Bugfixes with defined expected behavior; design-system normalization sweeps
-- Dispatch flag: add `-c model_reasoning_effort="low"` to the `codex exec` invocation. Sol, not Terra — only Sol reliably completes commit/push/PR (memory: `.git` sandbox denial stops Terra).
+- Dispatch flag: `-c model_reasoning_effort="low"` replaces the base skill's `high` on the `codex exec` invocation. Sol, not Terra — only Sol reliably completes commit/push/PR (GOTCHAS: Dispatch, `.git` sandbox denial).
 
 Route on **design ambiguity, not size**. A one-line spacing change on the game board hero is design-lead; a 40-file mechanical token rename is spec-execute. When in doubt, design-lead. Tickets already labelled `Spec-execute` or `Design-lead` (by `/triage-feedback`) keep that routing unless you state a reason to change it; apply the label to the rest once ratified so escalations and later runs inherit it. Present the routing table at kickoff for ratification. The base skill's readiness gate (`Ready for agent`) applies before routing.
 
@@ -43,11 +43,11 @@ Route on **design ambiguity, not size**. A one-line spacing change on the game b
 - Implementation by an **Opus subagent** (`model: "opus"`, always — never Fable, and the orchestrator never implements) with `isolation: "worktree"`. Worktrees are fine here — the clone-not-worktree rule is a Codex-sandbox constraint only.
 - **Fable cost discipline:** the Fable orchestrator does only planning, alignment, briefing, review, and VQA. Design judgment reaches implementation through the design brief, not through Fable writing code. Design-lead tickets get the same latitude-removing brief as spec-execute tickets — the difference is the implementer's ability to fill remaining gaps tastefully and the tighter feedback loop (SendMessage), not a thinner brief.
 - Same deliverable spec as base: commit suffix `(OPT-NNN)`, push, `gh pr create` ready-for-review, before/after screenshots embedded in the PR body, no merge, no Linear writes by the subagent.
-- Cross-family review is mandatory: Codex adversarial review (fresh read-only `codex exec` with the hunt brief below) reviews every Claude-authored PR. Same-family Claude review alone is insufficient — Claude reviewers share the implementer's blind spots.
+- Cross-family review is mandatory: Codex adversarial review (fresh `codex exec --sandbox workspace-write` with the hunt brief below and the base skill's `--output-schema` findings contract) reviews every Claude-authored PR. Same-family Claude review alone is insufficient — Claude reviewers share the implementer's blind spots.
 
 **Spec-execute (Codex Sol low):**
-- Claude first authors a **design brief** that removes all design latitude, embedded in the dispatch prompt: exact tokens/semantic roles, Tailwind spacing steps, radius values, type-scale sizes, the reference component by file:line, every interaction state enumerated (hover/focus-visible/active/disabled/loading/empty/error), chrome-vs-scaled-board context called out with the §13 floor values where applicable, an ASCII wireframe for any spatial change (§2b), and acceptance stated as observable criteria ("X is nameable from a static screenshot"), not vibes. Memory precedent: a PM-authored technique brief succeeded where two unaided Codex attempts failed.
-- Standard brief boilerplate from memory: embed full ticket text + acceptance criteria verbatim; "Do NOT use Linear/MCP/network — missing external access is not grounds to withhold a verdict/stop work"; "deps are installed, do NOT run any install command; EPERM there is an environment artifact."
+- Claude first authors a **design brief** that removes all design latitude, embedded in the dispatch prompt: exact tokens/semantic roles, Tailwind spacing steps, radius values, type-scale sizes, the reference component by file:line, every interaction state enumerated (hover/focus-visible/active/disabled/loading/empty/error), chrome-vs-scaled-board context called out with the §13 floor values where applicable, an ASCII wireframe for any spatial change (§2b), and acceptance stated as observable criteria ("X is nameable from a static screenshot"), not vibes. Precedent (OPT-323 holofoil, 2026-07-17): a PM-authored technique brief succeeded where two unaided Codex attempts failed.
+- Standard brief boilerplate (base skill §2.3 environment facts): embed full ticket text + acceptance criteria verbatim; "Do NOT use Linear/MCP/network — missing external access is not grounds to withhold a verdict/stop work"; "deps are installed, do NOT run any install command; EPERM there is an environment artifact."
 - Clone + dispatch mechanics unchanged from base skill.
 
 ## 2b. ASCII wireframes (use liberally for layout & information decisions)
@@ -65,7 +65,9 @@ Conventions: box-drawing characters (`┌─┐│└┘`), region labels in cap
 
 ## 3. VQA gate (every frontend PR, both tracks, before merge)
 
-Run by the orchestrator with Chrome MCP against a local dev server (`pnpm dev`; may land on port 3001). Do not delegate VQA to Codex computer-use — the orchestrator's own eyes are the point of this skill.
+Run by the orchestrator with Chrome MCP against a local dev server (`pnpm dev`; may land on port 3001). Do not delegate VQA to Codex computer-use — the orchestrator's own eyes are the point of this skill. VQA stays in the main loop, never in a fork or subagent: Chrome MCP has one shared page cursor.
+
+Chrome MCP tools are deferred; load the set in ONE `ToolSearch` call before the first capture: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__tabs_close_mcp`. Viewport and animation caveats: GOTCHAS: Environments.
 
 1. Capture the touched surface at rest and in each interaction state the ticket affects. Pause/wait out animations (0.5–1.5s stabilization); re-hover after element appearance (pointerenter quirk — hover out then back in); cross-check pointer-driven CSS custom props via javascript_tool computed styles rather than trusting screenshots alone.
 2. Judge against the design authorities: token discipline, hierarchy, brand tone (warm navy, not gloomy/neon), motion restraint (one animation per interaction), §13 floor inside `ScaledBoard`.
