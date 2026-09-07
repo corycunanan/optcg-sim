@@ -32,6 +32,8 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 
 `source_text` is a complete clause-line copy, never a fragment or paraphrase. It must equal one full line of `effectText`, or one full line of `triggerText` for a `[Trigger]` block. If the authoritative card line is missing or uncertain, defer the field rather than guessing; the client will keep using its conservative bracket heuristic.
 
+`prompt_text` on `START_OF_GAME_EFFECT` is the one place a fragment is allowed because rule modifications are never highlighted. Use it only for the player-facing clause shown by prompts raised during setup.
+
 ---
 
 ## Category Classification
