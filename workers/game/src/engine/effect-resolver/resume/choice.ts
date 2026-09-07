@@ -169,7 +169,8 @@ export function handlePlayerChoiceStateDistribution(
       marker,
       triggers,
       resumeCtx.remainingActions,
-      resultRefs
+      resultRefs,
+      resumeCtx.effectDescription,
     );
     return {
       kind: "terminal",
@@ -319,7 +320,8 @@ export function handlePlayerChoiceBranch(
       effectSourceInstanceId,
       controller,
       cardDb,
-      resultRefs
+      resultRefs,
+      resumeCtx.effectDescription,
     );
     nextState = branchResult.state;
     events.push(...branchResult.events);
@@ -442,6 +444,7 @@ export function handleAwaitingOptionalResponse(
           pendingTriggers: topFrame.pendingTriggers,
           resultRefs: topFrame.resultRefs,
           triggerOrderingGroup: topFrame.triggerOrderingGroup,
+          effectDescription: topFrame.effectDescription,
         });
       }
       return {
@@ -514,7 +517,8 @@ export function handleAwaitingOptionalResponse(
       sourceCardInstanceId,
       controller,
       cardDb,
-      actionRefs.size > 0 ? actionRefs : undefined
+      actionRefs.size > 0 ? actionRefs : undefined,
+      topFrame.effectDescription,
     );
     nextState = chainResult.state;
     events.push(...chainResult.events);

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Action } from "../engine/effect-types.js";
+import type { GameState } from "../types.js";
 import { executeActionChain } from "../engine/effect-resolver/resolver.js";
+import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { CARDS, createBattleReadyState, createTestCardDb } from "./helpers.js";
 
 const FULL =
@@ -62,5 +64,75 @@ describe("OPT-765 nested choice prompt descriptions", () => {
       throw new Error("Expected a target-selection prompt");
     }
     expect(prompt.effectDescription).toBe(FULL);
+  });
+
+  it("preserves the chain description across an interactive choice and two target prompts", () => {
+    const cardDb = createTestCardDb();
+    cardDb.set(CARDS.LEADER.id, { ...CARDS.LEADER, effectText: FULL });
+    const state = createBattleReadyState(cardDb);
+    const leaderId = state.players[0].leader.instanceId;
+    const choice: Action = {
+      type: "PLAYER_CHOICE",
+      params: {
+        options: [
+          [KO, KO],
+          [{ type: "DRAW", params: { amount: 1 } }],
+        ],
+      },
+    };
+
+    const started = executeActionChain(
+      state,
+      [choice],
+      leaderId,
+      0,
+      cardDb,
+      undefined,
+      CLAUSE,
+    );
+    expect(started.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+
+    const firstTarget = resumeFromStack(
+      JSON.parse(JSON.stringify(started.state)) as GameState,
+      { type: "PLAYER_CHOICE", choiceId: "0" },
+      cardDb,
+    );
+    expect(firstTarget.pendingPrompt?.options).toMatchObject({
+      promptType: "SELECT_TARGET",
+      effectDescription: CLAUSE,
+    });
+
+    const firstTargetId = state.players[1].characters[0]!.instanceId;
+    const secondTarget = resumeFromStack(
+      JSON.parse(JSON.stringify(firstTarget.state)) as GameState,
+      { type: "SELECT_TARGET", selectedInstanceIds: [firstTargetId] },
+      cardDb,
+    );
+    expect(secondTarget.pendingPrompt?.options).toMatchObject({
+      promptType: "SELECT_TARGET",
+      effectDescription: CLAUSE,
+    });
+  });
+
+  it("overrides a normal-path handler description with the chain description", () => {
+    const cardDb = createTestCardDb();
+    cardDb.set(CARDS.LEADER.id, { ...CARDS.LEADER, effectText: FULL });
+    const state = createBattleReadyState(cardDb);
+    const leaderId = state.players[0].leader.instanceId;
+
+    const result = executeActionChain(
+      state,
+      [{ type: "DECK_SCRY", params: { look_at: 3 } }],
+      leaderId,
+      0,
+      cardDb,
+      undefined,
+      CLAUSE,
+    );
+
+    expect(result.pendingPrompt?.options).toMatchObject({
+      promptType: "ARRANGE_TOP_CARDS",
+      effectDescription: CLAUSE,
+    });
   });
 });

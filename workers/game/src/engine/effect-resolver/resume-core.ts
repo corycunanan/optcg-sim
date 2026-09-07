@@ -78,6 +78,7 @@ export function resumeEffectChain(
   const {
     effectSourceInstanceId,
     controller,
+    effectDescription,
     pausedAction,
     remainingActions,
     resultRefs: resultRefsEntries,
@@ -279,7 +280,7 @@ export function resumeEffectChain(
       remainingActionsController,
       cardDb,
       resultRefs,
-      undefined,
+      effectDescription,
       pausedActionSucceeded
     );
     nextState = chainResult.state;
@@ -407,6 +408,7 @@ export function resumeFromStack(
       const legacyCtx: ResumeContext = {
         effectSourceInstanceId: sourceCardInstanceId,
         controller,
+        effectDescription: topFrame.effectDescription,
         remainingActionsController: topFrame.remainingActionsController,
         pausedAction: topFrame.pausedAction,
         remainingActions: topFrame.remainingActions,
@@ -569,7 +571,7 @@ export function resumeFromStack(
           controller,
           cardDb,
           resultRefs,
-          undefined,
+          topFrame.effectDescription,
           topFrame.priorActionSucceeded ?? true
         );
         nextState = chainResult.state;

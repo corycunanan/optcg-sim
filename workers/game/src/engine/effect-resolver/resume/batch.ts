@@ -91,6 +91,7 @@ export function reenterBatchResume(
           id: generated.id,
           sourceCardInstanceId: top.sourceCardInstanceId,
           controller: top.controller,
+          effectDescription: top.effectDescription,
           effectBlock: CONTINUATION_EFFECT_BLOCK,
           phase: "INTERRUPTED_BY_TRIGGERS",
           pausedAction: marker.pausedAction,
@@ -121,6 +122,7 @@ export function reenterBatchResume(
         sourceCardInstanceId: context.effectSourceInstanceId,
         controller: context.controller,
         remainingActionsController: top.controller,
+        effectDescription: top.effectDescription,
         effectBlock: CONTINUATION_EFFECT_BLOCK,
         phase: promptTypeToPhase(actionResult.pendingPrompt.options.promptType),
         pausedAction: context.pausedAction,
@@ -165,7 +167,8 @@ export function reenterBatchResume(
         nextMarker,
         triggers,
         top.remainingActions,
-        resultRefs
+        resultRefs,
+        top.effectDescription,
       );
       return services.processRemainingTriggers(
         nextState,
@@ -206,7 +209,8 @@ export function reenterBatchResume(
         top.sourceCardInstanceId,
         top.controller,
         cardDb,
-        resultRefs
+        resultRefs,
+        top.effectDescription,
       );
       nextState = chainResult.state;
       events.push(...chainResult.events);
@@ -329,13 +333,15 @@ export function pushBatchResumeFrame(
   marker: BatchResumeMarker,
   triggers: QueuedTrigger[],
   remainingActions: Action[],
-  resultRefs: Map<string, EffectResult>
+  resultRefs: Map<string, EffectResult>,
+  effectDescription?: string,
 ): GameState {
   const generated = generateFrameId(state);
   const frame: EffectStackFrame = {
     id: generated.id,
     sourceCardInstanceId,
     controller,
+    effectDescription,
     effectBlock,
     phase: "AWAITING_BATCH_RESUME",
     pausedAction: marker.pausedAction,

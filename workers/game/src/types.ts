@@ -129,6 +129,8 @@ export interface PhaseBoundaryContinuation {
 export interface ResumeContext {
   effectSourceInstanceId: string;
   controller: 0 | 1;
+  /** Clause-scoped description to retain across paused action-chain resumes. */
+  effectDescription?: string;
   /** Outer effect owner when the paused action temporarily uses another controller. */
   remainingActionsController?: 0 | 1;
   pausedAction: import("./engine/effect-types.js").Action | null;
@@ -219,6 +221,8 @@ export interface EffectStackFrame {
   id: string;
   sourceCardInstanceId: string;
   controller: 0 | 1;
+  /** Clause-scoped description to retain across persisted continuations. */
+  effectDescription?: string;
   /** Controller for the chain after a responder-controlled paused action. */
   remainingActionsController?: 0 | 1;
   effectBlock: import("./engine/effect-types.js").EffectBlock;

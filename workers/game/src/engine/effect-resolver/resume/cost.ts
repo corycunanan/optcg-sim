@@ -202,7 +202,8 @@ function finishCostsAndRunActions(
       sourceCardInstanceId,
       controller,
       cardDb,
-      refsForActions
+      refsForActions,
+      topFrame.effectDescription,
     );
     state = chainResult.state;
     events.push(...chainResult.events);
