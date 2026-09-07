@@ -15,7 +15,11 @@ import type {
   ResumeContext,
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { describeActionBranch, resolveAmount } from "../action-utils.js";
+import {
+  describeActionBranch,
+  promptEffectDescription,
+  resolveAmount,
+} from "../action-utils.js";
 import { getActionParams } from "../../effect-types.js";
 import { findCardInstance } from "../../state.js";
 import type { EffectResolverServices } from "../services.js";
@@ -84,9 +88,11 @@ export function executePlayerChoice(
     label: explicitLabels?.[originalIndex] ?? describeActionBranch(branch),
   }));
 
-  const choiceSourceCard = findCardInstance(state, sourceCardInstanceId);
-  const choiceSourceData = choiceSourceCard ? cardDb.get(choiceSourceCard.cardId) : undefined;
-  const effectDescription = choiceSourceData?.effectText ?? "Choose one";
+  const effectDescription = promptEffectDescription(
+    state,
+    cardDb,
+    sourceCardInstanceId,
+  ) || "Choose one";
 
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
@@ -177,14 +183,16 @@ export function executeChooseValue(
     return { state, events: [], succeeded: false };
   }
 
-  const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
   const validTargets = values.map((value) => `choose-value:${value}`);
   const pendingPrompt: PendingPromptState = {
     options: {
       promptType: "PLAYER_CHOICE",
       choices: values.map((value) => ({ id: `choose-value:${value}`, label: String(value) })),
-      effectDescription: sourceData?.effectText ?? "Choose a value.",
+      effectDescription: promptEffectDescription(
+        state,
+        cardDb,
+        sourceCardInstanceId,
+      ) || "Choose a value.",
       source: "EFFECT",
     },
     respondingPlayer: controller,

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { EffectBlock, StartOfGameEffect } from "../engine/effect-types.js";
 import type { CardData, CardInstance, EffectStackFrame } from "../types.js";
+import type { EffectResolverServices } from "../engine/effect-resolver/services.js";
 import {
   extractEffectDescription,
   promptEffectDescription,
   sourceTextForBlock,
   startOfGameEffectDescription,
 } from "../engine/effect-resolver/action-utils.js";
+import { executePlayerChoice } from "../engine/effect-resolver/actions/choice.js";
+import { executeDeckScry } from "../engine/effect-resolver/actions/draw-search.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
 function block(
@@ -147,6 +150,68 @@ describe("promptEffectDescription", () => {
 
     expect(promptEffectDescription(state, cardDb, source.instanceId)).toBe(
       effectText
+    );
+  });
+
+  it("scopes a direct DECK_SCRY prompt to its resumed effect frame", () => {
+    const { state, cardDb, source } = setup();
+    state.effectStack = [{
+      sourceCardInstanceId: source.instanceId,
+      effectBlock: block("WHEN_ATTACKING"),
+    } as EffectStackFrame];
+
+    const result = executeDeckScry(
+      state,
+      { type: "DECK_SCRY", params: { look_at: 3 } },
+      source.instanceId,
+      0,
+      cardDb,
+      new Map(),
+    );
+
+    const prompt = result.pendingPrompt?.options;
+    expect(prompt?.promptType).toBe("ARRANGE_TOP_CARDS");
+    if (!prompt || prompt.promptType !== "ARRANGE_TOP_CARDS") {
+      throw new Error("Expected an arrange-top-cards prompt");
+    }
+    expect(prompt.effectDescription).toBe(
+      "[When Attacking] K.O. up to 1 of your opponent's Characters."
+    );
+  });
+
+  it("scopes a direct PLAYER_CHOICE prompt to its resumed effect frame", () => {
+    const { state, cardDb, source } = setup();
+    state.effectStack = [{
+      sourceCardInstanceId: source.instanceId,
+      effectBlock: block("WHEN_ATTACKING"),
+    } as EffectStackFrame];
+
+    const result = executePlayerChoice(
+      state,
+      {
+        type: "PLAYER_CHOICE",
+        params: {
+          options: [
+            [{ type: "DRAW", params: { amount: 1 } }],
+            [{ type: "DRAW", params: { amount: 2 } }],
+          ],
+        },
+      },
+      source.instanceId,
+      0,
+      cardDb,
+      new Map(),
+      undefined,
+      {} as EffectResolverServices,
+    );
+
+    const prompt = result.pendingPrompt?.options;
+    expect(prompt?.promptType).toBe("PLAYER_CHOICE");
+    if (!prompt || prompt.promptType !== "PLAYER_CHOICE") {
+      throw new Error("Expected a player-choice prompt");
+    }
+    expect(prompt.effectDescription).toBe(
+      "[When Attacking] K.O. up to 1 of your opponent's Characters."
     );
   });
 });
