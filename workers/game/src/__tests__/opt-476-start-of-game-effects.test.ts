@@ -19,6 +19,10 @@ const IMU: CardData = {
   id: "OP13-079",
   name: "Imu",
   types: ["The Five Elders"],
+  effectText: [
+    "Under the rules of this game, you cannot include Events with a cost of 2 or more in your deck and at the start of the game, play up to 1 {Mary Geoise} type Stage card from your deck.",
+    "[Activate: Main] [Once Per Turn] You may trash 1 of your {Celestial Dragons} type Characters or 1 card from your hand: Draw 1 card.",
+  ].join("\n"),
 };
 
 const MARY_GEOISE: CardData = {
@@ -137,6 +141,14 @@ describe("OPT-476 start-of-game effects", () => {
 
     expect(prompted.pregame?.phase).toBe("START_OF_GAME_FX");
     expect(prompted.pendingPrompt?.respondingPlayer).toBe(0);
+    const prompt = prompted.pendingPrompt;
+    if (!prompt || prompt.options.promptType !== "ARRANGE_TOP_CARDS") {
+      throw new Error("Expected Mary Geoise search prompt");
+    }
+    expect(prompt.options.effectDescription).toBe(
+      "At the start of the game, play up to 1 {Mary Geoise} type Stage card from your deck.",
+    );
+    expect(prompt.options.effectDescription).not.toContain("[Activate: Main]");
     expect(prompted.players[0].hand).toHaveLength(0);
     expect(prompted.players[1].hand).toHaveLength(0);
     expect(prompted.pregame?.startOfGameEffectsResolved).toEqual([true, false]);

@@ -29,10 +29,11 @@ import type {
   PlayerChoicePrompt,
   PregameState,
 } from "../../../../shared/game-types.js";
-import type { Action, StartOfGameEffect } from "./effect-types.js";
+import type { StartOfGameEffect } from "./effect-types.js";
 import { dealOpeningHand, placeLifeCards, applyMulligan } from "./setup.js";
 import { emitPendingEvent } from "./events.js";
 import { executeActionChain } from "./effect-resolver/resolver.js";
+import { startOfGameEffectDescription } from "./effect-resolver/action-utils.js";
 import { takeEngineRandom } from "./execution-context.js";
 
 const PRIORITY_ROLL_TIMEOUT_MS = 60_000;
@@ -260,18 +261,6 @@ export function isPregamePromptResponse(state: GameState): boolean {
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
-function startOfGameActionsForPlayer(
-  state: GameState,
-  playerIndex: 0 | 1,
-  cardDb: Map<string, CardData>,
-): Action[] {
-  const leader = state.players[playerIndex].leader;
-  const schema = cardDb.get(leader.cardId)?.effectSchema ?? null;
-  return (schema?.rule_modifications ?? [])
-    .filter((rule): rule is StartOfGameEffect => rule.rule_type === "START_OF_GAME_EFFECT")
-    .flatMap((rule) => rule.actions);
-}
-
 function advanceStartOfGameEffects(
   state: GameState,
   cardDb: Map<string, CardData>,
@@ -304,26 +293,32 @@ function advanceStartOfGameEffects(
     ...state,
     pregame: { ...pregame, startOfGameEffectsResolved: resolved },
   };
-  const actions = startOfGameActionsForPlayer(markedState, controller, cardDb);
-  if (actions.length === 0) return markedState;
-
   const leader = markedState.players[controller].leader;
-  const result = executeActionChain(
-    markedState,
-    actions,
-    leader.instanceId,
-    controller,
-    cardDb,
-    undefined,
-    cardDb.get(leader.cardId)?.effectText ?? "Start-of-game effect",
-  );
-  let nextState = result.state;
-  for (const event of result.events) {
-    nextState = emitPendingEvent(nextState, event, controller);
+  const leaderData = cardDb.get(leader.cardId);
+  const rules = (leaderData?.effectSchema?.rule_modifications ?? [])
+    .filter((rule): rule is StartOfGameEffect => rule.rule_type === "START_OF_GAME_EFFECT");
+  let nextState = markedState;
+  for (const rule of rules) {
+    const result = executeActionChain(
+      nextState,
+      rule.actions,
+      leader.instanceId,
+      controller,
+      cardDb,
+      undefined,
+      startOfGameEffectDescription(rule, leaderData),
+    );
+    nextState = result.state;
+    for (const event of result.events) {
+      nextState = emitPendingEvent(nextState, event, controller);
+    }
+    // A prompt stops this loop. Only one rule is authored today, so no later
+    // rule needs continuation metadata to resume after the prompt drains.
+    if (result.pendingPrompt) {
+      return { ...nextState, pendingPrompt: result.pendingPrompt };
+    }
   }
-  return result.pendingPrompt
-    ? { ...nextState, pendingPrompt: result.pendingPrompt }
-    : nextState;
+  return nextState;
 }
 
 /**
