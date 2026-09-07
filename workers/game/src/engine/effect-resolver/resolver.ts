@@ -903,7 +903,10 @@ export function executeActionChain(
         return {
           state: nestedState,
           events,
-          pendingPrompt: result.pendingPrompt,
+          pendingPrompt: withChainDescription(
+            result.pendingPrompt,
+            effectDescription,
+          ),
         };
       }
       if (nestedPromptFrame?.replacementBatchContinuation) {
@@ -944,7 +947,10 @@ export function executeActionChain(
           : {
               state: restoredPromptState,
               events,
-              pendingPrompt: result.pendingPrompt,
+              pendingPrompt: withChainDescription(
+                result.pendingPrompt,
+                effectDescription,
+              ),
             };
       }
 
@@ -1022,15 +1028,12 @@ export function executeActionChain(
       const updatedState = pushFrame(frameId.state, frame);
       if (isEngineTerminated(updatedState))
         return { state: updatedState, events };
-      const prompt = { ...result.pendingPrompt, resumeContext: frame.id };
       // Override with block-specific description so prompts show the triggered
       // effect text rather than the full card text
-      if (effectDescription && prompt.options) {
-        prompt.options = {
-          ...prompt.options,
-          effectDescription,
-        } as typeof prompt.options;
-      }
+      const prompt = withChainDescription(
+        { ...result.pendingPrompt, resumeContext: frame.id },
+        effectDescription,
+      );
       return { state: updatedState, events, pendingPrompt: prompt };
     }
 
@@ -1074,6 +1077,17 @@ export function executeActionChain(
   }
 
   return { state, events };
+}
+
+function withChainDescription(
+  prompt: PendingPromptState,
+  effectDescription: string | undefined,
+): PendingPromptState {
+  if (!effectDescription || !prompt.options) return prompt;
+  return {
+    ...prompt,
+    options: { ...prompt.options, effectDescription } as typeof prompt.options,
+  };
 }
 
 function costResultToRefs(
