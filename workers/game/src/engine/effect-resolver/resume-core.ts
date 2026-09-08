@@ -61,6 +61,7 @@ import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { promptTypeToPhase } from "./cost-handler.js";
 import { isEngineTerminated } from "../engine-limits.js";
 import { replacePendingEventReferences } from "../events.js";
+import { withChainDescription } from "./resolver.js";
 
 // Re-export the stable public API so existing imports keep working.
 export { processRemainingTriggers } from "./resume/triggers.js";
@@ -353,7 +354,10 @@ export function resumeFromStack(
         ...(reprompt.pendingPrompt
           ? {
               pendingPrompt: {
-                ...reprompt.pendingPrompt,
+                ...withChainDescription(
+                  reprompt.pendingPrompt,
+                  topFrame.effectDescription,
+                ),
                 resumeContext: topFrame.id,
               },
             }

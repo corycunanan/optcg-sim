@@ -56,6 +56,7 @@ export function payCostsWithSelection(
   sourceCardInstanceId: string,
   effectBlock: EffectBlock,
   services: EffectResolverServices,
+  effectDescription?: string,
   transactionBaseline?: CostTransactionState,
   priorEvents: PendingEvent[] = [],
 ): CostSelectionResult {
@@ -73,6 +74,7 @@ export function payCostsWithSelection(
   ): void => {
     nextState = pushFrame(nextState, {
       ...frame,
+      effectDescription,
       accumulatedEvents: [...events],
       costTransactionState: captureCostTransactionState(stagedState),
     });
