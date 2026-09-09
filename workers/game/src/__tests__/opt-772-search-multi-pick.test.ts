@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { Action, ActionOf } from "../engine/effect-types.js";
 import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
+import { handleArrangeSearchDeck } from "../engine/effect-resolver/resume/deck.js";
 import { OP04_046_QUEEN } from "../engine/schemas/op04.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import type {
   CardData,
   GameAction,
   GameState,
+  PendingEvent,
   PendingPromptState,
   PlayerState,
 } from "../types.js";
@@ -145,6 +147,44 @@ describe("OPT-772 search multi-pick", () => {
     expect(prompt.options.maxKeep).toBe(2);
   });
 
+  it("routes two SEARCH_DECK picks to resume and rejects a third", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const handBefore = state.players[0].hand.length;
+    const action: ActionOf<"SEARCH_DECK"> = {
+      type: "SEARCH_DECK",
+      params: { look_at: 5, pick: { up_to: 2 }, filter: {} },
+    };
+    const { result, prompt } = startSearch(state, cardDb, action);
+    const revealedIds = prompt.options.cards.map((card) => card.instanceId);
+    const promptedState = { ...result.state, pendingPrompt: prompt };
+    const coordinator = new SessionCoordinator();
+    const acceptedResponse = arrangeResponse(
+      revealedIds,
+      revealedIds.slice(0, 2)
+    );
+
+    const accepted = coordinator.routePromptResponse(
+      promptedState,
+      0,
+      acceptedResponse
+    );
+    expect(accepted.kind).toBe("resume");
+    if (accepted.kind !== "resume") {
+      throw new Error(`Expected two picks to resume, got ${accepted.kind}`);
+    }
+    const resumed = resumeFromStack(accepted.state, acceptedResponse, cardDb);
+    expect(resumed.state.players[0].hand).toHaveLength(handBefore + 2);
+
+    const rejectedResponse = arrangeResponse(
+      revealedIds,
+      revealedIds.slice(0, 3)
+    );
+    expect(
+      coordinator.routePromptResponse(promptedState, 0, rejectedResponse)
+    ).toMatchObject({ kind: "reject", reason: "Too many cards were selected" });
+  });
+
   it("keeps two SEARCH_TRASH_THE_REST cards and sends the remainder to rest_destination", () => {
     const cardDb = createTestCardDb();
     const state = createBattleReadyState(cardDb);
@@ -170,6 +210,44 @@ describe("OPT-772 search multi-pick", () => {
     expect(
       resumed.state.players[0].deck.map((card) => card.instanceId)
     ).not.toEqual(expect.arrayContaining(revealedIds));
+  });
+
+  it("keeps two SEARCH_TRASH_THE_REST cards while bottoming the arranged remainder", () => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const handBefore = state.players[0].hand.length;
+    const action: ActionOf<"SEARCH_TRASH_THE_REST"> = {
+      type: "SEARCH_TRASH_THE_REST",
+      params: {
+        look_at: 5,
+        pick: { up_to: 2 },
+        filter: {},
+        rest_destination: "BOTTOM",
+      },
+    };
+    const { result, prompt } = startSearch(state, cardDb, action);
+    const revealedIds = prompt.options.cards.map((card) => card.instanceId);
+    const keptIds = [revealedIds[0], revealedIds[2]];
+    const orderedRemainder = [revealedIds[4], revealedIds[1], revealedIds[3]];
+    const response: Extract<GameAction, { type: "ARRANGE_TOP_CARDS" }> = {
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: keptIds[0],
+      keptCardInstanceIds: keptIds,
+      // Keep the selected ids in the raw ordering to pin the resume handler's
+      // defensive overlap filter; the remaining cards retain this order.
+      orderedInstanceIds: [...orderedRemainder, ...keptIds],
+      destination: "bottom",
+    };
+
+    const resumed = resumeFromStack(result.state, response, cardDb);
+
+    expect(resumed.state.players[0].hand).toHaveLength(handBefore + 2);
+    expect(
+      resumed.state.players[0].deck.slice(-3).map((card) => card.instanceId)
+    ).toEqual(orderedRemainder);
+    expect(
+      resumed.state.players[0].deck.map((card) => card.instanceId)
+    ).not.toEqual(expect.arrayContaining(keptIds));
   });
 
   it("rejects three kept ids when pick.up_to is two", () => {
@@ -210,5 +288,38 @@ describe("OPT-772 search multi-pick", () => {
       kind: "reject",
       reason: "That card is not a valid pick",
     });
+  });
+
+  it("moves only valid kept ids when the resume handler receives a mixed request", () => {
+    const { cardDb, state } = createQueenSearchSetup();
+    const handBefore = state.players[0].hand.length;
+    const validId = "search-card-0";
+    const invalidId = "search-card-2";
+    const revealedIds = state.players[0].deck
+      .slice(0, 7)
+      .map((card) => card.instanceId);
+    const events: PendingEvent[] = [];
+    const next = handleArrangeSearchDeck(
+      state,
+      arrangeResponse(revealedIds, [validId, invalidId]),
+      productionQueenSearch(),
+      0,
+      [validId],
+      events
+    );
+
+    expect(next).not.toBeNull();
+    expect(next!.players[0].hand).toHaveLength(handBefore + 1);
+    expect(next!.players[0].hand.at(-1)?.cardId).toBe("PLAGUE-ROUNDS");
+    expect(next!.players[0].deck.map((card) => card.instanceId)).toContain(
+      invalidId
+    );
+    expect(events.filter((event) => event.type === "CARDS_REVEALED")).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          cards: [{ instanceId: validId, cardId: "PLAGUE-ROUNDS" }],
+        }),
+      }),
+    ]);
   });
 });
