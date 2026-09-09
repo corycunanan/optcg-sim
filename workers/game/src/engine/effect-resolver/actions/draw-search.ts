@@ -12,7 +12,11 @@ import type {
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
-import { promptEffectDescription, resolveAmount } from "../action-utils.js";
+import {
+  getSearchAndPlayPickLimit,
+  promptEffectDescription,
+  resolveAmount,
+} from "../action-utils.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { shuffleWithEngineContext } from "../../execution-context.js";
@@ -103,6 +107,7 @@ export function executeSearchDeck(
       effectDescription,
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
       validTargets,
+      maxKeep: getSearchAndPlayPickLimit(p_, validTargets.length),
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,
@@ -159,6 +164,7 @@ export function executeSearchTrashTheRest(
       canSendToBottom: restDest.toUpperCase() === "BOTTOM",
       validTargets,
       restDestination: restDest,
+      maxKeep: getSearchAndPlayPickLimit(p_, validTargets.length),
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,
