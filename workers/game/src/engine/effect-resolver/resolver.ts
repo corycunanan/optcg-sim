@@ -433,7 +433,8 @@ export function resolveEffect(
       cardDb,
       sourceCardInstanceId,
       block,
-      resolverExecutionServices
+      resolverExecutionServices,
+      blockDescription,
     );
 
     if (costPayResult.cannotPay) {
@@ -1089,7 +1090,7 @@ export function executeActionChain(
   return { state, events };
 }
 
-function withChainDescription(
+export function withChainDescription(
   prompt: PendingPromptState,
   effectDescription: string | undefined,
 ): PendingPromptState {

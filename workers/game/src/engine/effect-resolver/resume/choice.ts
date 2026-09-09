@@ -413,7 +413,8 @@ export function handleAwaitingOptionalResponse(
       cardDb,
       sourceCardInstanceId,
       block,
-      services
+      services,
+      topFrame.effectDescription,
     );
 
     if (costResult.cannotPay) {

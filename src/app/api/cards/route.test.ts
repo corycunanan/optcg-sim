@@ -9,12 +9,24 @@ const findManyMock = vi.fn();
 const countMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 
+function applyTopLevelSelect(row: unknown, query: unknown) {
+  if (!row || typeof row !== "object") return row;
+
+  const select = (query as { select?: Record<string, unknown> }).select;
+  if (!select) return row;
+
+  return Object.fromEntries(
+    Object.keys(select).map((key) => [key, (row as Record<string, unknown>)[key]]),
+  );
+}
+
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     card: {
       findUnique: (...args: unknown[]) => findUniqueMock(...args),
-      create: (...args: unknown[]) => createMock(...args),
+      create: async (...args: unknown[]) =>
+        applyTopLevelSelect(await createMock(...args), args[0]),
       findMany: (...args: unknown[]) => findManyMock(...args),
       count: (...args: unknown[]) => countMock(...args),
     },
@@ -197,5 +209,25 @@ describe("POST /api/cards admin gate", () => {
     const res = await POST(buildRequest());
     expect(res.status).toBe(201);
     expect(createMock).toHaveBeenCalledOnce();
+  });
+
+  it("omits pipeline-only image fallback state from created cards", async () => {
+    authMock.mockResolvedValue({
+      user: { id: "admin-1", isAdmin: true },
+    });
+    findUniqueMock.mockResolvedValue(null);
+    createMock.mockResolvedValue({
+      id: "OP99-999",
+      name: "Test Card",
+      imageIsVariantFallback: true,
+      artVariants: [],
+      cardSets: [],
+    });
+
+    const res = await POST(buildRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.data).not.toHaveProperty("imageIsVariantFallback");
   });
 });

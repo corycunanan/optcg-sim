@@ -77,6 +77,67 @@ function resolveRestDestination(
   return normalized === "TOP" ? "top" : "bottom";
 }
 
+function moveSearchPicksToDestination(
+  state: GameState,
+  keptCards: CardInstance[],
+  controller: 0 | 1,
+  pickDestination: string | undefined,
+  face: "UP" | "DOWN" | undefined,
+  events: PendingEvent[],
+): GameState {
+  const pickDest = (pickDestination ?? "HAND").toUpperCase();
+  let nextState = state;
+
+  switch (pickDest) {
+    case "TRASH": {
+      const trashedEvents: PendingEvent[] = [];
+      for (const kept of [...keptCards].reverse()) {
+        const moved = transitionCard(nextState, kept.instanceId, "TRASH", {
+          position: "TOP",
+        });
+        if (moved) {
+          nextState = moved.state;
+          trashedEvents.unshift({
+            type: "CARD_TRASHED",
+            playerIndex: controller,
+            payload: {
+              cardInstanceId: moved.fact.oldInstanceId,
+              newCardInstanceId: moved.fact.newInstanceId,
+              cardId: moved.fact.cardId,
+              reason: "search_trash",
+            },
+          });
+        }
+      }
+      events.push(...trashedEvents);
+      return nextState;
+    }
+    case "LIFE":
+    case "LIFE_TOP": {
+      for (const kept of keptCards) {
+        // OP16-119: picked card goes to the top of Life (face-down unless the
+        // schema says otherwise).
+        const lifeFace = face ?? "DOWN";
+        const moved = transitionCard(nextState, kept.instanceId, "LIFE", {
+          position: "TOP",
+          lifeFace,
+        });
+        if (moved) nextState = moved.state;
+      }
+      return nextState;
+    }
+    default:
+      for (const kept of keptCards) {
+        const moved = transitionCard(nextState, kept.instanceId, "HAND");
+        if (moved) {
+          nextState = moved.state;
+          events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
+        }
+      }
+      return nextState;
+    }
+}
+
 // ─── Branch handlers ────────────────────────────────────────────────────────
 
 export function handleArrangeReturnToDeck(
@@ -148,46 +209,38 @@ export function handleArrangeSearchDeck(
   const restDest = sp.rest_destination ?? "BOTTOM";
 
   const p = state.players[controller];
-  const keptId = action.keptCardInstanceId;
-  const ordered = action.orderedInstanceIds ?? [];
-
-  // An explicit empty validTargets means the search matched nothing.
   const searchValid = validTargets ?? [];
-  const validatedKeptId = keptId && searchValid.includes(keptId)
-    ? keptId
-    : undefined;
+  const requestedKept = action.keptCardInstanceIds?.length
+    ? action.keptCardInstanceIds
+    : (action.keptCardInstanceId ? [action.keptCardInstanceId] : []);
+  const pickLimit = getSearchAndPlayPickLimit(sp, searchValid.length);
+  const keptIds = [...new Set(requestedKept)]
+    .filter((id) => searchValid.includes(id))
+    .slice(0, pickLimit);
+  const ordered = (action.orderedInstanceIds ?? []).filter((id) => !keptIds.includes(id));
 
-  const { restOfDeck, arrangedCards, kept } = computeArrangeContext(p.deck, validatedKeptId, ordered);
+  const { restOfDeck, arrangedCards, keptCards } = computeArrangeContext(p.deck, keptIds, ordered);
 
-  const pickDest = (sp.pick_destination ?? "HAND").toUpperCase();
   let nextState = state;
-  if (validatedKeptId && kept) {
+  if (keptCards.length > 0) {
     events.push({
       type: "CARDS_REVEALED",
       playerIndex: controller,
       payload: {
-        cards: [{ instanceId: kept.instanceId, cardId: kept.cardId }],
+        cards: keptCards.map((card) => ({ instanceId: card.instanceId, cardId: card.cardId })),
         source: "search",
         visibility: "BOTH",
       },
     });
-    if (pickDest === "LIFE" || pickDest === "LIFE_TOP") {
-      // OP16-119: picked card goes to the top of Life (face-down unless the
-      // schema says otherwise).
-      const face = (sp.face as "UP" | "DOWN") ?? "DOWN";
-      const moved = transitionCard(nextState, kept.instanceId, "LIFE", {
-        position: "TOP",
-        lifeFace: face,
-      });
-      if (moved) nextState = moved.state;
-    } else {
-      const moved = transitionCard(nextState, kept.instanceId, "HAND");
-      if (moved) {
-        nextState = moved.state;
-        events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
-      }
-    }
   }
+  nextState = moveSearchPicksToDestination(
+    nextState,
+    keptCards,
+    controller,
+    sp.pick_destination,
+    sp.face as "UP" | "DOWN" | undefined,
+    events,
+  );
 
   const destination = resolveRestDestination(restDest, action.destination);
   const newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
@@ -214,36 +267,42 @@ export function handleArrangeSearchTrashTheRest(
   const restDest = sp.rest_destination ?? "TRASH";
 
   const p = state.players[controller];
-  const keptId = action.keptCardInstanceId;
-  const ordered = action.orderedInstanceIds ?? [];
   const searchValid = validTargets ?? [];
-  const validatedKeptId = keptId && searchValid.includes(keptId)
-    ? keptId
-    : undefined;
+  const requestedKept = action.keptCardInstanceIds?.length
+    ? action.keptCardInstanceIds
+    : (action.keptCardInstanceId ? [action.keptCardInstanceId] : []);
+  const pickLimit = getSearchAndPlayPickLimit(sp, searchValid.length);
+  const keptIds = [...new Set(requestedKept)]
+    .filter((id) => searchValid.includes(id))
+    .slice(0, pickLimit);
+  const ordered = (action.orderedInstanceIds ?? []).filter((id) => !keptIds.includes(id));
 
-  const { restOfDeck, arrangedCards: remainingCards, kept } = computeArrangeContext(
+  const { restOfDeck, arrangedCards: remainingCards, keptCards } = computeArrangeContext(
     p.deck,
-    validatedKeptId,
+    keptIds,
     ordered,
   );
 
   let nextState = state;
-  if (validatedKeptId && kept) {
+  if (keptCards.length > 0) {
     events.push({
       type: "CARDS_REVEALED",
       playerIndex: controller,
       payload: {
-        cards: [{ instanceId: kept.instanceId, cardId: kept.cardId }],
+        cards: keptCards.map((card) => ({ instanceId: card.instanceId, cardId: card.cardId })),
         source: "search",
         visibility: "BOTH",
       },
     });
-    const moved = transitionCard(nextState, kept.instanceId, "HAND");
-    if (moved) {
-      nextState = moved.state;
-      events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
-    }
   }
+  nextState = moveSearchPicksToDestination(
+    nextState,
+    keptCards,
+    controller,
+    sp.pick_destination,
+    undefined,
+    events,
+  );
 
   let newDeck: CardInstance[];
 

@@ -1,17 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { CARD_PUBLIC_SELECT } from "@/lib/cards/card-select";
 
 const authMock = vi.fn();
 const findUniqueMock = vi.fn();
 const updateMock = vi.fn();
 const rateLimitMock = vi.fn(async () => ({ limited: false, remaining: 99 }));
 
+function applyTopLevelSelect(row: unknown, query: unknown) {
+  if (!row || typeof row !== "object") return row;
+
+  const select = (query as { select?: Record<string, unknown> }).select;
+  if (!select) return row;
+
+  return Object.fromEntries(
+    Object.keys(select).map((key) => [key, (row as Record<string, unknown>)[key]]),
+  );
+}
+
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     card: {
-      update: (...args: unknown[]) => updateMock(...args),
-      findUnique: (...args: unknown[]) => findUniqueMock(...args),
+      update: async (...args: unknown[]) =>
+        applyTopLevelSelect(await updateMock(...args), args[0]),
+      findUnique: async (...args: unknown[]) =>
+        applyTopLevelSelect(await findUniqueMock(...args), args[0]),
     },
   },
 }));
@@ -63,13 +77,34 @@ describe("GET /api/cards/[id] detail contract", () => {
     expect(res.status).toBe(200);
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { id: "OP01-075" },
-      include: {
+      select: {
+        ...CARD_PUBLIC_SELECT,
         artVariants: true,
         cardSets: { orderBy: { isOrigin: "desc" } },
         erratas: { orderBy: { date: "desc" } },
       },
     });
     expect(await res.json()).toEqual({ data: detailCard });
+  });
+
+  it("omits pipeline-only image fallback state", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "OP01-075",
+      name: "Pacifista",
+      imageIsVariantFallback: true,
+      artVariants: [],
+      cardSets: [],
+      erratas: [],
+    });
+
+    const res = await GET(
+      new NextRequest("http://localhost/api/cards/OP01-075"),
+      { params: Promise.resolve({ id: "OP01-075" }) },
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data).not.toHaveProperty("imageIsVariantFallback");
   });
 });
 
@@ -98,5 +133,24 @@ describe("PATCH /api/cards/[id] admin gate", () => {
     const res = await PATCH(buildRequest(), { params });
     expect(res.status).toBe(200);
     expect(updateMock).toHaveBeenCalledOnce();
+  });
+
+  it("omits pipeline-only image fallback state from updates", async () => {
+    authMock.mockResolvedValue({
+      user: { id: "admin-1", isAdmin: true },
+    });
+    updateMock.mockResolvedValue({
+      id: "OP01-001",
+      name: "Updated",
+      imageIsVariantFallback: true,
+      artVariants: [],
+      cardSets: [],
+    });
+
+    const res = await PATCH(buildRequest(), { params });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data).not.toHaveProperty("imageIsVariantFallback");
   });
 });

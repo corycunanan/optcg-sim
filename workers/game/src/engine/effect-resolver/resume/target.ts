@@ -33,6 +33,7 @@ import { pushBatchResumeFrame } from "./batch.js";
 import { isEngineTerminated } from "../../engine-limits.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { CONTINUATION_EFFECT_BLOCK } from "../../effect-stack.js";
+import { withChainDescription } from "../resolver.js";
 
 export interface TargetFallthrough {
   kind: "fallthrough";
@@ -372,7 +373,9 @@ export function handleSelectTarget(
         state: nextState,
         events,
         resolved: false,
-        pendingPrompt: reprompt.pendingPrompt,
+        pendingPrompt: reprompt.pendingPrompt
+          ? withChainDescription(reprompt.pendingPrompt, effectDescription)
+          : undefined,
         rejected: true,
       },
     };
@@ -404,7 +407,9 @@ export function handleSelectTarget(
         state: nextState,
         events,
         resolved: false,
-        pendingPrompt: reprompt.pendingPrompt,
+        pendingPrompt: reprompt.pendingPrompt
+          ? withChainDescription(reprompt.pendingPrompt, effectDescription)
+          : undefined,
         rejected: true,
       },
     };
