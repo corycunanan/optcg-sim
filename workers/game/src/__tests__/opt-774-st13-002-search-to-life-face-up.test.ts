@@ -192,7 +192,7 @@ export const OPT_774_SPREAD_FIXTURE = {
     actions: [{
       type: "SCHEDULE_ACTION",
       params: {
-        timing: "END_OF_TURN",
+        timing: "END_OF_THIS_TURN",
         action: {
           type: "SEARCH_DECK",
           params: {
