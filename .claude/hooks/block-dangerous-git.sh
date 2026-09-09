@@ -5,7 +5,8 @@
 # Why: a `git restore` on uncommitted agent work in a clone has already cost a
 # transcript-diff recovery (see memory: op17-orchestrate-run-learnings). These
 # commands are never needed by the ticket/orchestrate pipeline, which merges via
-# `gh pr merge` and syncs with `git branch -f main origin/main`.
+# `gh pr merge` and syncs with `git branch -f main origin/main` or
+# `git merge --ff-only origin/main`.
 #
 # Bypass: prefix the whole command with `GIT_GUARDRAILS_OK=1 ` after looking at
 # what the target holds (`git status`, `git stash list`) and saying so in the
@@ -49,7 +50,8 @@ BLOCKED by .claude/hooks/block-dangerous-git.sh: the command matches '$pattern'.
 This command can discard uncommitted or unpushed work. Look at what the target
 holds first (git status / git stash list / git log), then either pick a
 non-destructive alternative (git stash, a new branch, git branch -f main
-origin/main) or, if discarding is really intended and you have said so in your
+origin/main, or git merge --ff-only origin/main on a branch with no commits of
+its own) or, if discarding is really intended and you have said so in your
 reply, re-run with the prefix GIT_GUARDRAILS_OK=1.
 MSG
     exit 2
