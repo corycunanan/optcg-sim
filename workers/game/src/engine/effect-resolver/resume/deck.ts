@@ -77,6 +77,13 @@ function resolveRestDestination(
   return normalized === "TOP" ? "top" : "bottom";
 }
 
+export const SEARCH_PICK_DESTINATIONS = [
+  "HAND",
+  "TRASH",
+  "LIFE",
+  "LIFE_TOP",
+] as const;
+
 function moveSearchPicksToDestination(
   state: GameState,
   keptCards: CardInstance[],
@@ -85,7 +92,10 @@ function moveSearchPicksToDestination(
   face: "UP" | "DOWN" | undefined,
   events: PendingEvent[],
 ): GameState {
-  const pickDest = (pickDestination ?? "HAND").toUpperCase();
+  const normalizedDestination = (pickDestination ?? "HAND").toUpperCase();
+  const pickDest = SEARCH_PICK_DESTINATIONS.find(
+    (destination) => destination === normalizedDestination,
+  ) ?? "HAND";
   let nextState = state;
 
   switch (pickDest) {

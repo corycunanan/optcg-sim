@@ -1,6 +1,12 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  getNestedActions,
+  type Action,
+  type EffectSchema,
+} from "../effect-types.js";
+import { SEARCH_PICK_DESTINATIONS } from "../effect-resolver/resume/deck.js";
 import {
   collectExportedSchemas,
   validateSchemaSourceParity,
@@ -70,7 +76,7 @@ function hasAttachedDonEncoding(value: unknown): boolean {
 }
 
 function findDonIntentViolations(
-  schemas: Record<string, import("../effect-types.js").EffectSchema>,
+  schemas: Record<string, EffectSchema>,
 ): string[] {
   const bracketedDonCardIds = loadBracketedDonCardIds();
   const violations: string[] = [];
@@ -82,6 +88,69 @@ function findDonIntentViolations(
       violations.push(
         `${cardId}: canonical [DON!! xN] requires DON_GIVEN/SPECIFIC_CARD or trigger.don_requirement`,
       );
+    }
+  }
+
+  return violations;
+}
+
+function findPickDestinationViolations(
+  modules: readonly SchemaSourceModule[],
+): string[] {
+  const violations: string[] = [];
+
+  for (const sourceModule of modules) {
+    const source = basename(sourceModule.path);
+    for (const [cardId, schema] of Object.entries(sourceModule.schemas)) {
+      const actionGroups = schema.effects.map((block) => ({
+        id: block.id,
+        actions: [
+          ...(block.actions ?? []),
+          ...(block.replacement_actions ?? []),
+          ...(block.rule?.rule_type === "START_OF_GAME_EFFECT"
+            ? block.rule.actions
+            : []),
+        ],
+      }));
+      for (const [index, rule] of (schema.rule_modifications ?? []).entries()) {
+        if (rule.rule_type === "START_OF_GAME_EFFECT") {
+          actionGroups.push({
+            id: `rule_modification[${index}]`,
+            actions: rule.actions,
+          });
+        }
+      }
+
+      for (const group of actionGroups) {
+        const pending: Action[] = [...group.actions];
+        let actionIndex = 0;
+
+        while (pending.length > 0) {
+          const action = pending.shift();
+          if (!action) continue;
+          const currentIndex = actionIndex++;
+          pending.unshift(...getNestedActions(action));
+
+          const params = action.params as
+            | Record<string, unknown>
+            | undefined;
+          const value = params?.pick_destination;
+          if (value === undefined) continue;
+
+          const normalized = typeof value === "string" ? value.toUpperCase() : "";
+          if (
+            SEARCH_PICK_DESTINATIONS.some(
+              (destination) => destination === normalized,
+            )
+          ) {
+            continue;
+          }
+
+          violations.push(
+            `${source} ${cardId} ${group.id} action[${currentIndex}] pick_destination "${String(value)}" is not handled by moveSearchPicksToDestination; allowed: ${SEARCH_PICK_DESTINATIONS.join(", ")}`,
+          );
+        }
+      }
     }
   }
 
@@ -140,6 +209,7 @@ async function main(): Promise<void> {
       categoryCheckedSchemas,
     ),
     ...findDonIntentViolations(schemas),
+    ...findPickDestinationViolations(modules),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
   ];
   if (diagnostics.length > 0) {
