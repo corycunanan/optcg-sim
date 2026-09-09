@@ -17,6 +17,8 @@ const baseCard = {
   attribute: ["Special"],
   effectText: "This card may be included any number of times.",
   triggerText: null,
+  effectTags: ["category:rule_modification"],
+  effectTraits: ["Navy"],
   rarity: "C",
   originSet: "OP-01",
 };
@@ -48,6 +50,8 @@ describe("card API response contracts", () => {
       attribute: baseCard.attribute,
       effectText: baseCard.effectText,
       triggerText: baseCard.triggerText,
+      effectTags: baseCard.effectTags,
+      effectTraits: baseCard.effectTraits,
       imageUrl: baseCard.imageUrl,
     });
   });

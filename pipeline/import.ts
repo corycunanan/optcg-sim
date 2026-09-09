@@ -17,6 +17,7 @@ import { buildSetMembership } from "./build-set-membership";
 import { writeToDatabase } from "./write";
 import { verify } from "./verify";
 import { syncEffectSchemas } from "./sync-effect-schemas";
+import { syncEffectFacets } from "./sync-effect-facets";
 import { selectPipelineDatabaseUrl } from "./database-url";
 
 const DEFAULT_DATA_DIR = "data/vegapull-full/json";
@@ -109,6 +110,23 @@ async function main() {
     if (syncResult.missingInDb.length > 0) {
       console.log(
         `  ⚠ Authored schemas for cards not in DB: ${syncResult.missingInDb.join(", ")}`
+      );
+    }
+
+    // Step 8: Sync Tier 1 facets from authored schemas
+    console.log("━━━ Step 8: Syncing effect facets ━━━");
+    const facetSyncResult = await syncEffectFacets(prisma, { mode: "write" });
+    console.log(
+      `  Facets synced:        ${facetSyncResult.updated.length + facetSyncResult.cleared.length} (${facetSyncResult.unchanged} unchanged)`
+    );
+    if (facetSyncResult.missingInDb.length > 0) {
+      console.log(
+        `  ⚠ Authored facets for cards not in DB: ${facetSyncResult.missingInDb.join(", ")}`
+      );
+    }
+    if (facetSyncResult.resolvedVariantIds.length > 0) {
+      console.log(
+        `  ⚠ Authored variant schema IDs resolved to base cards: ${facetSyncResult.resolvedVariantIds.join(", ")}`
       );
     }
   } finally {

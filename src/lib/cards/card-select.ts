@@ -17,6 +17,8 @@ export const CARD_PUBLIC_SELECT = {
   effectText: true,
   triggerText: true,
   effectSchema: true,
+  effectTags: true,
+  effectTraits: true,
   imageUrl: true,
   blockNumber: true,
   banStatus: true,
@@ -39,6 +41,8 @@ export const CARD_SEARCH_SELECT = {
   attribute: true,
   effectText: true,
   triggerText: true,
+  effectTags: true,
+  effectTraits: true,
   imageUrl: true,
 } as const satisfies Prisma.CardSelect;
 

@@ -62,6 +62,8 @@ describe("GET /api/cards/[id] detail contract", () => {
           { rule_type: "COPY_LIMIT_OVERRIDE", limit: "UNLIMITED" },
         ],
       },
+      effectTags: ["category:rule_modification"],
+      effectTraits: [],
       artVariants: [{ id: "art-1", imageUrl: "https://cdn.example.com/art.png" }],
       cardSets: [{ id: "set-1", setLabel: "OP-01" }],
       erratas: [],

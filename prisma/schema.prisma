@@ -131,6 +131,8 @@ model Card {
   effectText   String
   triggerText  String?
   effectSchema Json? // Parsed effect JSON (nullable in M0)
+  effectTags   String[] @default([])
+  effectTraits String[] @default([])
   imageUrl     String // CDN URL for base card image
   imageIsVariantFallback Boolean @default(false)
   blockNumber  Int // Block rotation (1, 2, 3, 4)
@@ -150,6 +152,8 @@ model Card {
   @@index([banStatus])
   @@index([blockNumber])
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "cards_name_trgm_idx")
+  @@index([effectTags], type: Gin)
+  @@index([effectTraits], type: Gin)
   @@map("cards")
 }
 
