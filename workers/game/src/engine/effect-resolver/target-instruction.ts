@@ -27,7 +27,12 @@ export const TARGET_ACTION_PRESENTATION: Partial<
   SET_REST: { verb: () => "Rest" },
   SET_ACTIVE: { verb: () => "Set active" },
   RETURN_TO_HAND: { verb: () => "Return to hand" },
-  RETURN_TO_DECK: { verb: () => "Return to the bottom of the deck" },
+  RETURN_TO_DECK: {
+    verb: (action) =>
+      action.type === "RETURN_TO_DECK"
+        ? `Return to the ${action.params?.position === "TOP" ? "top" : "bottom"} of the deck`
+        : undefined,
+  },
   TRASH_CARD: { verb: () => "Trash" },
   TRASH_FROM_HAND: { verb: () => "Trash" },
   TRASH_FROM_LIFE: { verb: () => "Trash" },
@@ -286,6 +291,18 @@ function renderQualifiers(
     return undefined;
   }
 
+  // The compact grammar cannot faithfully collapse simultaneous color/state
+  // predicates. Keep the printed clause rather than silently dropping one.
+  if (
+    (filter.color && filter.color_includes) ||
+    filter.is_rested === false ||
+    filter.is_active === false ||
+    [filter.state, filter.is_rested, filter.is_active].filter(
+      (value) => value !== undefined
+    ).length > 1
+  ) {
+    return undefined;
+  }
   const qualifiers: string[] = [];
   const cost = numericQualifier(filter, "cost");
   const power = numericQualifier(filter, "power");
@@ -390,7 +407,7 @@ export function generateTargetInstruction(
   const tail = renderConstraintTail(target);
   if (!qualifiers || !tail) return undefined;
 
-  const count = noun.plural ? renderCount(countMin, countMax) : undefined;
+  const count = renderCount(countMin, countMax);
   return [
     verb,
     count,
@@ -420,6 +437,7 @@ export function collectTargetInstructionCoverage(
   const rendered: string[] = [];
   const fallbacks: string[] = [];
   let targetCount = 0;
+  const visitedTargets = new Set<Target>();
 
   const walk = (
     cardId: string,
@@ -430,6 +448,7 @@ export function collectTargetInstructionCoverage(
     actions.forEach((action, index) => {
       const actionPath = `${path}[${index}]`;
       if (action.target) {
+        visitedTargets.add(action.target);
         targetCount += 1;
         const instruction = generateTargetInstruction(
           action,
@@ -464,6 +483,30 @@ export function collectTargetInstructionCoverage(
         walk(cardId, `rule_modification[${index}]`, rule.actions, "actions");
       }
     }
+  }
+
+  // Costs, conditions and modifiers can also carry target blocks. They are
+  // not action instructions, so explicitly inventory them as printed-text
+  // fallbacks instead of silently omitting them from the golden coverage.
+  const inventoryOtherTargets = (value: unknown, path: string): void => {
+    if (!value || typeof value !== "object") return;
+    for (const [key, child] of Object.entries(value)) {
+      const childPath = `${path}.${key}`;
+      if (
+        key === "target" &&
+        child &&
+        typeof child === "object" &&
+        !visitedTargets.has(child as Target)
+      ) {
+        targetCount += 1;
+        visitedTargets.add(child as Target);
+        fallbacks.push(`${childPath} (non-action target)`);
+      }
+      inventoryOtherTargets(child, childPath);
+    }
+  };
+  for (const [cardId, schema] of Object.entries(schemas)) {
+    inventoryOtherTargets(schema, cardId);
   }
 
   return {
