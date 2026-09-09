@@ -46,6 +46,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 - [Encoding Guide](./game-engine/11-ENCODING-GUIDE.md) — condensed pattern-matching reference for card encoding
 - [Game Engine Requirements](./game-engine/GAME-ENGINE-REQUIREMENTS.md) — rules-to-engine mapping from Comprehensive Rules v1.2.0
 - [Card Analysis Findings](./game-engine/CARD-ANALYSIS-FINDINGS.md) — ~200 distinct card effect patterns across all 51 sets
+- [Effect Facet Taxonomy](./cards/EFFECT-FACET-TAXONOMY.md) — Tier 1 tags, schema derivations, trait-reference roles, and product decisions
 
 ## Design
 
