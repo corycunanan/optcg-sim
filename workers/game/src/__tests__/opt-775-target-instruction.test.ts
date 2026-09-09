@@ -154,6 +154,17 @@ describe("OPT-775 target instructions", () => {
     ]);
   });
 
+  it("renders OP08-043's conditional override action in golden coverage", () => {
+    const schema = getAllAuthoredSchemas()["OP08-043"];
+    const coverage = collectTargetInstructionCoverage({ "OP08-043": schema });
+    expect(coverage.targetCount).toBe(2);
+    expect(coverage.generatedCount).toBe(2);
+    expect(coverage.fallbacks).toEqual([]);
+    expect(coverage.instructions).toContain(
+      "Trash 2 of your opponent's cards in hand."
+    );
+  });
+
   it.each([
     ["TOP", "top"],
     ["BOTTOM", "bottom"],
