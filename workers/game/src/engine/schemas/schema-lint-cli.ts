@@ -94,6 +94,28 @@ function findDonIntentViolations(
   return violations;
 }
 
+function findStartOfGameEffectRuleCountViolations(
+  modules: readonly SchemaSourceModule[],
+): string[] {
+  const violations: string[] = [];
+
+  for (const sourceModule of modules) {
+    const source = basename(sourceModule.path);
+    for (const [cardId, schema] of Object.entries(sourceModule.schemas)) {
+      const ruleCount = (schema.rule_modifications ?? []).filter(
+        (rule) => rule.rule_type === "START_OF_GAME_EFFECT",
+      ).length;
+      if (ruleCount <= 1) continue;
+
+      violations.push(
+        `${source} ${cardId}: ${ruleCount} START_OF_GAME_EFFECT rules are unsupported; see workers/game/src/engine/pregame.ts limitation comment`,
+      );
+    }
+  }
+
+  return violations;
+}
+
 function findPickDestinationViolations(
   modules: readonly SchemaSourceModule[],
 ): string[] {
@@ -209,6 +231,7 @@ async function main(): Promise<void> {
       categoryCheckedSchemas,
     ),
     ...findDonIntentViolations(schemas),
+    ...findStartOfGameEffectRuleCountViolations(modules),
     ...findPickDestinationViolations(modules),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
   ];

@@ -312,8 +312,8 @@ function advanceStartOfGameEffects(
     for (const event of result.events) {
       nextState = emitPendingEvent(nextState, event, controller);
     }
-    // A prompt stops this loop. Only one rule is authored today, so no later
-    // rule needs continuation metadata to resume after the prompt drains.
+    // A prompt stops this loop. findStartOfGameEffectRuleCountViolations
+    // rejects later rules because no continuation metadata resumes them.
     if (result.pendingPrompt) {
       return { ...nextState, pendingPrompt: result.pendingPrompt };
     }
