@@ -35,6 +35,8 @@ Run scripts with `tsx` (e.g. `pnpm pipeline:import`). The main entry point orche
 | `classify.ts` | Classify art variants (base / parallel / reprint), detect cross-set reprints |
 | `build-set-membership.ts` | Build Card ↔ Set many-to-many membership from pack metadata |
 | `write.ts` | Upsert transformed cards, sets, variants, and errata into PostgreSQL via Prisma |
+| `sync-effect-schemas.ts` | Sync authored rule modifications into `Card.effectSchema` |
+| `sync-effect-facets.ts` | Sync authored Tier 1 tags and referenced traits into card facet columns |
 | `migrate-images.ts` | Download card images from vegapull CDN and upload to Cloudflare R2 |
 | `check-images.ts` | Fail unless every card and art variant image is hosted on the configured CDN |
 | `verify.ts` | Post-import sanity checks — counts, missing images, orphaned records |
@@ -50,7 +52,16 @@ pnpm pipeline:migrate-images [--dry-run] [--concurrency <n>] [--limit <n>]
 
 # Hard gate after image migration
 pnpm pipeline:check-images
+
+# Sync authored rule modifications (default writes pending changes)
+pnpm pipeline:sync-schemas [--check | --dry-run]
+
+# Sync authored Tier 1 facets (default writes pending changes)
+pnpm pipeline:sync-facets [--check | --dry-run]
 ```
+
+Both sync commands write pending changes by default. `--check` writes nothing and exits
+1 when the database is behind. `--dry-run` writes nothing and prints the pending count.
 
 An import is not complete until `pnpm pipeline:migrate-images` has run and
 `pnpm pipeline:check-images` passes. The official host sends
