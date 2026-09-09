@@ -34,6 +34,30 @@ beforeEach(() => {
 });
 
 describe("getCardBrowserData", () => {
+  it("passes effect facets and counter ranges through without a default set", async () => {
+    const filters = {
+      effectTags: "trigger:on_play,removal:ko,removal:bounce",
+      effectTraits: "Straw Hat Crew",
+      counterMin: "0",
+      counterMax: "2000",
+    };
+    const data = await getCardBrowserData(filters);
+    const where = {
+      AND: [
+        { effectTags: { hasSome: ["trigger:on_play"] } },
+        { effectTags: { hasSome: ["removal:ko", "removal:bounce"] } },
+      ],
+      effectTraits: { hasSome: ["Straw Hat Crew"] },
+      counter: { gte: 0, lte: 2000 },
+    };
+    expect(data.currentFilters).toMatchObject({ ...filters, set: "" });
+    expect(setFindFirstMock).not.toHaveBeenCalled();
+    expect(cardCountMock).toHaveBeenCalledWith({ where });
+    expect(cardFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where, select: CARD_BROWSER_SELECT })
+    );
+  });
+
   it("defaults an unfiltered browser to the latest booster set", async () => {
     const data = await getCardBrowserData({});
 

@@ -11,6 +11,7 @@ import {
 } from "@/lib/cards/browser-params";
 import { CARD_BROWSER_SELECT } from "@/lib/cards/card-select";
 import { getLatestBoosterSet } from "@/lib/cards/latest-set";
+import { buildCardWhereClause } from "@/lib/cards/search";
 import type { CardBrowserProps } from "@/components/cards/card-browser";
 
 export type CardBrowserSearchParams = Record<
@@ -44,12 +45,26 @@ export async function getCardBrowserData(
   const browseAllSets = rawSet === ALL_CARD_SETS_FILTER;
   const set = browseAllSets ? "" : rawSet;
   const block = firstParam(params.block);
+  const effectTags = firstParam(params.effectTags);
+  const effectTraits = firstParam(params.effectTraits);
+  const counterMin = firstParam(params.counterMin);
+  const counterMax = firstParam(params.counterMax);
   const originOnly = firstParam(params.originOnly);
   const requestedPage = parseCardBrowserPage(firstParam(params.page) || "1");
   const limit = 20;
 
   const hasAnyFilter =
-    browseAllSets || q || color || type || set || block || originOnly;
+    browseAllSets ||
+    q ||
+    color ||
+    type ||
+    set ||
+    block ||
+    effectTags ||
+    effectTraits ||
+    counterMin ||
+    counterMax ||
+    originOnly;
   const effectiveSet = browseAllSets
     ? ""
     : set || (!hasAnyFilter ? await getLatestBoosterSet() : "");
@@ -86,6 +101,15 @@ export async function getCardBrowserData(
   if (block) {
     where.blockNumber = { in: block.split(",").map(Number) };
   }
+  Object.assign(
+    where,
+    buildCardWhereClause({
+      effectTags,
+      effectTraits,
+      counterMin,
+      counterMax,
+    })
+  );
 
   const [sets, total] = await Promise.all([
     prisma.cardSet.findMany({
@@ -120,6 +144,10 @@ export async function getCardBrowserData(
       type,
       set: effectiveSet,
       block,
+      effectTags,
+      effectTraits,
+      counterMin,
+      counterMax,
       originOnly,
     },
   };
