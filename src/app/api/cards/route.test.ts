@@ -60,6 +60,8 @@ const searchCard = {
   attribute: ["Strike"],
   effectText: "[Your Turn] All of your Characters gain +1000 power.",
   triggerText: null,
+  effectTags: ["category:permanent", "stat:power_up:self"],
+  effectTraits: ["Straw Hat Crew"],
   imageUrl: "https://cdn.example.com/OP01-001.png",
 };
 
@@ -142,6 +144,8 @@ describe("GET /api/cards search", () => {
       attribute: true,
       effectText: true,
       triggerText: true,
+      effectTags: true,
+      effectTraits: true,
       imageUrl: true,
     });
   });
@@ -172,6 +176,8 @@ describe("GET /api/cards search", () => {
         "attribute",
         "effectText",
         "triggerText",
+        "effectTags",
+        "effectTraits",
         "imageUrl",
       ].sort(),
     );

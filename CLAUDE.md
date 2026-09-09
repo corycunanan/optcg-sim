@@ -85,6 +85,8 @@ Server component by default. Use `"use client"` only when interactivity is requi
 
 **New custom hook** → `src/hooks/`
 
+**New schema-lint rule** → `workers/game/src/engine/schemas/schema-lint-cli.ts`, as a `find*Violations` function over the evaluated schema objects next to the existing rules, with any allowlist imported from the engine module that consumes it. `lint-schemas.sh` is the compatibility entry point only; a regex over schema source misses constant- and spread-built values and was rejected in review (PR #637).
+
 ### Import Conventions
 
 ```ts

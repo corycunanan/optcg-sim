@@ -43,6 +43,7 @@
     "pipeline:migrate-images": "tsx pipeline/migrate-images.ts",
     "pipeline:check-images": "tsx pipeline/check-images.ts",
     "pipeline:sync-schemas": "tsx pipeline/sync-effect-schemas.ts",
+    "pipeline:sync-facets": "tsx pipeline/sync-effect-facets.ts",
     "worker:deploy": "cd workers/images && pnpm install && pnpm run deploy",
     "worker:deploy:game": "cd workers/game && pnpm install && pnpm run deploy"
   },
