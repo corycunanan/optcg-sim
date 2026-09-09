@@ -285,6 +285,7 @@ function resumeAfterBranchPick(
     sourceCardInstanceId,
     block,
     services,
+    topFrame.effectDescription,
     transactionBaseline,
     events,
   );
@@ -420,6 +421,7 @@ export function handleAwaitingCostSelection(
         sourceCardInstanceId,
         topFrame.effectBlock,
         services,
+        topFrame.effectDescription,
         transactionBaseline,
         events,
       );
@@ -1123,6 +1125,7 @@ export function handleAwaitingCostSelection(
       sourceCardInstanceId,
       block,
       services,
+      topFrame.effectDescription,
       transactionBaseline,
       events,
     );
