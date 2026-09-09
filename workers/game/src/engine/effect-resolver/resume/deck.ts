@@ -77,6 +77,67 @@ function resolveRestDestination(
   return normalized === "TOP" ? "top" : "bottom";
 }
 
+function moveSearchPicksToDestination(
+  state: GameState,
+  keptCards: CardInstance[],
+  controller: 0 | 1,
+  pickDestination: string | undefined,
+  face: "UP" | "DOWN" | undefined,
+  events: PendingEvent[],
+): GameState {
+  const pickDest = (pickDestination ?? "HAND").toUpperCase();
+  let nextState = state;
+
+  switch (pickDest) {
+    case "TRASH": {
+      const trashedEvents: PendingEvent[] = [];
+      for (const kept of [...keptCards].reverse()) {
+        const moved = transitionCard(nextState, kept.instanceId, "TRASH", {
+          position: "TOP",
+        });
+        if (moved) {
+          nextState = moved.state;
+          trashedEvents.unshift({
+            type: "CARD_TRASHED",
+            playerIndex: controller,
+            payload: {
+              cardInstanceId: moved.fact.oldInstanceId,
+              newCardInstanceId: moved.fact.newInstanceId,
+              cardId: moved.fact.cardId,
+              reason: "search_trash",
+            },
+          });
+        }
+      }
+      events.push(...trashedEvents);
+      return nextState;
+    }
+    case "LIFE":
+    case "LIFE_TOP": {
+      for (const kept of keptCards) {
+        // OP16-119: picked card goes to the top of Life (face-down unless the
+        // schema says otherwise).
+        const lifeFace = face ?? "DOWN";
+        const moved = transitionCard(nextState, kept.instanceId, "LIFE", {
+          position: "TOP",
+          lifeFace,
+        });
+        if (moved) nextState = moved.state;
+      }
+      return nextState;
+    }
+    default:
+      for (const kept of keptCards) {
+        const moved = transitionCard(nextState, kept.instanceId, "HAND");
+        if (moved) {
+          nextState = moved.state;
+          events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
+        }
+      }
+      return nextState;
+    }
+}
+
 // ─── Branch handlers ────────────────────────────────────────────────────────
 
 export function handleArrangeReturnToDeck(
@@ -160,7 +221,6 @@ export function handleArrangeSearchDeck(
 
   const { restOfDeck, arrangedCards, keptCards } = computeArrangeContext(p.deck, keptIds, ordered);
 
-  const pickDest = (sp.pick_destination ?? "HAND").toUpperCase();
   let nextState = state;
   if (keptCards.length > 0) {
     events.push({
@@ -173,24 +233,14 @@ export function handleArrangeSearchDeck(
       },
     });
   }
-  for (const kept of keptCards) {
-    if (pickDest === "LIFE" || pickDest === "LIFE_TOP") {
-      // OP16-119: picked card goes to the top of Life (face-down unless the
-      // schema says otherwise).
-      const face = (sp.face as "UP" | "DOWN") ?? "DOWN";
-      const moved = transitionCard(nextState, kept.instanceId, "LIFE", {
-        position: "TOP",
-        lifeFace: face,
-      });
-      if (moved) nextState = moved.state;
-    } else {
-      const moved = transitionCard(nextState, kept.instanceId, "HAND");
-      if (moved) {
-        nextState = moved.state;
-        events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
-      }
-    }
-  }
+  nextState = moveSearchPicksToDestination(
+    nextState,
+    keptCards,
+    controller,
+    sp.pick_destination,
+    sp.face as "UP" | "DOWN" | undefined,
+    events,
+  );
 
   const destination = resolveRestDestination(restDest, action.destination);
   const newDeck = placeArrangedInDeck(restOfDeck, arrangedCards, destination);
@@ -245,13 +295,14 @@ export function handleArrangeSearchTrashTheRest(
       },
     });
   }
-  for (const kept of keptCards) {
-    const moved = transitionCard(nextState, kept.instanceId, "HAND");
-    if (moved) {
-      nextState = moved.state;
-      events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: kept.cardId, cardInstanceId: moved.fact.newInstanceId, source: "search" } });
-    }
-  }
+  nextState = moveSearchPicksToDestination(
+    nextState,
+    keptCards,
+    controller,
+    sp.pick_destination,
+    undefined,
+    events,
+  );
 
   let newDeck: CardInstance[];
 
