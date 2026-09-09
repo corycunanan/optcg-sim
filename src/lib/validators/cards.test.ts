@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CardDetailResponseSchema, CardSearchResponseSchema } from "./cards";
+import { CARD_SELECT } from "@/lib/decks/card-select";
+import {
+  CardDetailResponseSchema,
+  CardSearchResponseSchema,
+  DeckDetailResponseSchema,
+} from "./cards";
 
 const baseCard = {
   id: "OP01-075",
@@ -17,6 +22,8 @@ const baseCard = {
   attribute: ["Special"],
   effectText: "This card may be included any number of times.",
   triggerText: null,
+  effectTags: ["category:rule_modification"],
+  effectTraits: ["Navy"],
   rarity: "C",
   originSet: "OP-01",
 };
@@ -48,6 +55,8 @@ describe("card API response contracts", () => {
       attribute: baseCard.attribute,
       effectText: baseCard.effectText,
       triggerText: baseCard.triggerText,
+      effectTags: baseCard.effectTags,
+      effectTraits: baseCard.effectTraits,
       imageUrl: baseCard.imageUrl,
     });
   });
@@ -87,5 +96,47 @@ describe("card API response contracts", () => {
     expect(parsed.data.effectSchema).toEqual(effectSchema);
     expect(parsed.data.artVariants).toHaveLength(1);
     expect(parsed.data.cardSets).toHaveLength(1);
+  });
+
+  it("keeps the deck card projection aligned with the response contract", () => {
+    const cardRow: Record<string, unknown> = {
+      ...baseCard,
+      effectSchema: null,
+    };
+    const selectedCard = Object.fromEntries(
+      Object.keys(CARD_SELECT).map((field) => [field, cardRow[field]])
+    );
+
+    expect(Object.keys(selectedCard).sort()).toEqual(
+      Object.keys(CARD_SELECT).sort()
+    );
+
+    const result = DeckDetailResponseSchema.safeParse({
+      data: {
+        id: "deck-1",
+        name: "Pacifista Deck",
+        format: "Standard",
+        leaderId: baseCard.id,
+        leaderArtUrl: null,
+        sleeveUrl: null,
+        donArtUrl: null,
+        testOrder: null,
+        updatedAt: "2026-09-09T00:00:00.000Z",
+        cards: [
+          {
+            cardId: baseCard.id,
+            quantity: 4,
+            selectedArtUrl: null,
+            card: selectedCard,
+          },
+        ],
+        leader: selectedCard,
+      },
+    });
+
+    expect(
+      result.success,
+      result.success ? undefined : JSON.stringify(result.error.issues)
+    ).toBe(true);
   });
 });

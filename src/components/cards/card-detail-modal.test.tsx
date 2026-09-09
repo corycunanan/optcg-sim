@@ -44,6 +44,8 @@ const baseCard: CardDetail = {
   rarity: "Super Rare",
   originSet: "OP16",
   effectSchema: null,
+  effectTags: [],
+  effectTraits: [],
   artVariants: [],
   cardSets: [],
 };

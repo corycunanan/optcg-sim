@@ -56,6 +56,8 @@ export const CardResponseSchema = z.object({
   rarity: z.string(),
   originSet: z.string(),
   effectSchema: z.unknown().nullable().optional(),
+  effectTags: z.array(z.string()),
+  effectTraits: z.array(z.string()),
 });
 
 export type CardResponse = z.infer<typeof CardResponseSchema>;
@@ -74,6 +76,8 @@ export const CardSearchResultSchema = z.object({
   attribute: z.array(z.string()),
   effectText: z.string(),
   triggerText: z.string().nullable(),
+  effectTags: z.array(z.string()),
+  effectTraits: z.array(z.string()),
   imageUrl: z.string(),
 });
 

@@ -24,4 +24,6 @@ export const CARD_SELECT = {
   rarity: true,
   originSet: true,
   effectSchema: true,
+  effectTags: true,
+  effectTraits: true,
 } as const;
