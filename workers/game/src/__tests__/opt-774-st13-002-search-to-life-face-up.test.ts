@@ -12,11 +12,16 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ActionOf } from "../engine/effect-types.js";
 import { executeSearchDeck } from "../engine/effect-resolver/actions/draw-search.js";
+import {
+  handleArrangeSearchDeck,
+  SEARCH_PICK_DESTINATIONS,
+} from "../engine/effect-resolver/resume/deck.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
 import { ST13_002_PORTGAS_D_ACE } from "../engine/schemas/st13.js";
 import type {
   CardInstance,
   GameState,
+  PendingEvent,
   PlayerState,
   ResumeContext,
 } from "../types.js";
@@ -127,13 +132,16 @@ function st13SearchAction(): ActionOf<"SEARCH_DECK"> {
   return action;
 }
 
-function fixtureSource(pickDestination: string): string {
-  return `export const OPT_774_FIXTURE = {
-  card_id: "TEST-774",
-  card_name: "Schema lint fixture",
+function invalidFixtureSource(): string {
+  return `const SHARED_UNKNOWN_DESTINATION = "CONSTANT_UNKNOWN";
+const SPREAD_PARAMS = { pick_destination: SHARED_UNKNOWN_DESTINATION };
+
+export const OPT_774_LITERAL_FIXTURE = {
+  card_id: "TEST-774-LITERAL",
+  card_name: "Literal schema lint fixture",
   card_type: "Leader",
   effects: [{
-    id: "activate_search",
+    id: "literal_unknown",
     category: "activate",
     trigger: { keyword: "ACTIVATE_MAIN" },
     actions: [{
@@ -141,10 +149,96 @@ function fixtureSource(pickDestination: string): string {
       params: {
         look_at: 5,
         pick: { up_to: 1 },
-        pick_destination: "${pickDestination}",
+        pick_destination: "LITERAL_UNKNOWN",
         rest_destination: "BOTTOM"
       }
     }]
+  }]
+};
+
+export const OPT_774_CONSTANT_FIXTURE = {
+  card_id: "TEST-774-CONSTANT",
+  card_name: "Constant schema lint fixture",
+  card_type: "Leader",
+  effects: [{
+    id: "constant_unknown",
+    category: "activate",
+    trigger: { keyword: "ACTIVATE_MAIN" },
+    actions: [{
+      type: "PLAYER_CHOICE",
+      params: {
+        options: [[{
+          type: "SEARCH_DECK",
+          params: {
+            look_at: 5,
+            pick: { up_to: 1 },
+            pick_destination: SHARED_UNKNOWN_DESTINATION,
+            rest_destination: "BOTTOM"
+          }
+        }]]
+      }
+    }]
+  }]
+};
+
+export const OPT_774_SPREAD_FIXTURE = {
+  card_id: "TEST-774-SPREAD",
+  card_name: "Spread schema lint fixture",
+  card_type: "Leader",
+  effects: [{
+    id: "spread_unknown",
+    category: "activate",
+    trigger: { keyword: "ACTIVATE_MAIN" },
+    actions: [{
+      type: "SCHEDULE_ACTION",
+      params: {
+        timing: "END_OF_TURN",
+        action: {
+          type: "SEARCH_DECK",
+          params: {
+            look_at: 5,
+            pick: { up_to: 1 },
+            ...SPREAD_PARAMS,
+            rest_destination: "BOTTOM"
+          }
+        }
+      }
+    }]
+  }]
+};
+
+export const OPT_774_VALID_FIXTURE = {
+  card_id: "TEST-774-VALID",
+  card_name: "Valid schema lint fixture",
+  card_type: "Leader",
+  effects: [{
+    id: "valid_life_top",
+    category: "activate",
+    trigger: { keyword: "ACTIVATE_MAIN" },
+    actions: [{
+      type: "SEARCH_DECK",
+      params: {
+        look_at: 5,
+        pick: { up_to: 1 },
+        pick_destination: "LIFE_TOP",
+        rest_destination: "BOTTOM"
+      }
+    }]
+  }]
+};
+`;
+}
+
+function validFixtureSource(): string {
+  return `export const OPT_774_VALID_FIXTURE = {
+  card_id: "TEST-774-VALID",
+  card_name: "Valid schema lint fixture",
+  card_type: "Leader",
+  effects: [{
+    id: "valid_life_top",
+    category: "activate",
+    trigger: { keyword: "ACTIVATE_MAIN" },
+    actions: [{ type: "SEARCH_DECK", params: { pick_destination: "LIFE_TOP" } }]
   }]
 };
 `;
@@ -205,12 +299,64 @@ describe("OPT-774: ST13-002 search to face-up Life", () => {
     expect(result.state.players[0].hand).toHaveLength(0);
   });
 
+  it("keeps the exported search destinations in lockstep with resume routing", () => {
+    expect(SEARCH_PICK_DESTINATIONS).toEqual([
+      "HAND",
+      "TRASH",
+      "LIFE",
+      "LIFE_TOP",
+    ]);
+
+    for (const pickDestination of SEARCH_PICK_DESTINATIONS) {
+      const state = makeState();
+      const events: PendingEvent[] = [];
+      const next = handleArrangeSearchDeck(
+        state,
+        {
+          type: "ARRANGE_TOP_CARDS",
+          keptCardInstanceId: "deck-3",
+          orderedInstanceIds: ["deck-1", "deck-2", "deck-4", "deck-5"],
+          destination: "bottom",
+        },
+        {
+          ...st13SearchAction(),
+          params: {
+            ...st13SearchAction().params,
+            pick_destination: pickDestination,
+            face: "UP",
+          },
+        },
+        0,
+        ["deck-3"],
+        events,
+      );
+
+      expect(next).not.toBeNull();
+      const player = next!.players[0];
+      switch (pickDestination) {
+        case "HAND":
+          expect(player.hand[0]?.cardId).toBe("COST-5");
+          break;
+        case "TRASH":
+          expect(player.trash[0]?.cardId).toBe("COST-5");
+          break;
+        case "LIFE":
+        case "LIFE_TOP":
+          expect(player.life[0]).toMatchObject({
+            cardId: "COST-5",
+            face: "UP",
+          });
+          break;
+      }
+    }
+  });
+
   it("rejects an unknown pick_destination and accepts LIFE_TOP", () => {
     const fixtureDirectory = mkdtempSync(join(tmpdir(), "opt774-lint-"));
     const invalidFixture = join(fixtureDirectory, "invalid.ts");
     const validFixture = join(fixtureDirectory, "valid.ts");
-    writeFileSync(invalidFixture, fixtureSource("LIFE_TOP_FACE_UP"));
-    writeFileSync(validFixture, fixtureSource("LIFE_TOP"));
+    writeFileSync(invalidFixture, invalidFixtureSource());
+    writeFileSync(validFixture, validFixtureSource());
 
     try {
       let output = "";
@@ -221,9 +367,16 @@ describe("OPT-774: ST13-002 search to face-up Life", () => {
         output = `${commandError.stdout ?? ""}${commandError.stderr ?? ""}`;
       }
 
-      expect(output).toContain("invalid.ts");
-      expect(output).toContain("TEST-774");
-      expect(output).toContain('pick_destination "LIFE_TOP_FACE_UP"');
+      expect(output).toContain(
+        'invalid.ts TEST-774-LITERAL literal_unknown action[0] pick_destination "LITERAL_UNKNOWN"',
+      );
+      expect(output).toContain(
+        'invalid.ts TEST-774-CONSTANT constant_unknown action[1] pick_destination "CONSTANT_UNKNOWN"',
+      );
+      expect(output).toContain(
+        'invalid.ts TEST-774-SPREAD spread_unknown action[1] pick_destination "CONSTANT_UNKNOWN"',
+      );
+      expect(output).not.toContain("TEST-774-VALID valid_life_top");
       expect(execFileSync("node", [linter, validFixture], execOptions)).toContain(
         "Schema validation clean — 1 card(s).",
       );
