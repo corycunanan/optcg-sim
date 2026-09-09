@@ -469,7 +469,11 @@ export function collectTargetInstructionCoverage(
         action.type === "APPLY_PROHIBITION"
           ? action.params?.conditional_override
           : undefined;
-      if (override && "action" in override) {
+      if (
+        override &&
+        "action" in override &&
+        typeof override.action === "object"
+      ) {
         walk(
           cardId,
           blockId,
