@@ -78,6 +78,54 @@ afterEach(() => {
 });
 
 describe("SelectTargetModal card-state semantics", () => {
+  it("shows the worker instruction before the existing selection suffixes", () => {
+    act(() => {
+      renderer = create(
+        <SelectTargetModal
+          cards={[target]}
+          validTargets={[target.instanceId]}
+          effectDescription="[On Play] Choose a Character"
+          instruction="KO up to 1 of your opponent's Characters."
+          countMin={0}
+          countMax={1}
+          aggregateConstraint={{ property: "cost", operator: "<=", value: 8 }}
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onAction={vi.fn()}
+        />
+      );
+    });
+
+    const footerStatus = renderer?.root
+      .findAllByType("span")
+      .find((span) =>
+        span.children.includes("KO up to 1 of your opponent's Characters."),
+      );
+    expect(footerStatus?.children).toContain(
+      "KO up to 1 of your opponent's Characters.",
+    );
+    expect(footerStatus?.children.join("")).not.toContain("Select up to 1");
+
+    const availableTarget = renderer?.root.findByProps({
+      "aria-label": "Nami. rested. eligible for selection",
+    });
+    act(() => availableTarget?.props.onClick());
+
+    expect(
+      renderer?.root
+        .findAllByType("span")
+        .find((span) => span.props.className?.includes("text-gb-text-subtle"))
+        ?.children.join(""),
+    ).toContain("1 selected");
+    expect(
+      renderer?.root
+        .findAllByType("span")
+        .find((span) => span.props.className?.includes("text-gb-text-bright"))
+        ?.children.join(""),
+    ).toContain("Total cost: 0 <= 8");
+  });
+
   it("renders effect notation through EffectText", () => {
     act(() => {
       renderer = create(

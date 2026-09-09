@@ -756,6 +756,7 @@ export interface SelectTargetPrompt {
   cards: CardInstance[];
   validTargets: string[];
   effectDescription: string;
+  instruction?: string;
   countMin: number;
   countMax: number;
   ctaLabel: string;
