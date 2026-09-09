@@ -20,6 +20,9 @@ vi.mock("@/components/ui", () => {
         {children}
       </h2>
     ),
+    DialogDescription: Wrapper,
+    DialogFooter: Wrapper,
+    TooltipProvider: Wrapper,
   };
 });
 
@@ -68,6 +71,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
         <PlayerChoiceModal
           effectDescription="[Activate: Main] Choose a branch"
           choices={choices}
+          cardDb={{}}
           isHidden={false}
           onHide={vi.fn()}
           onAction={vi.fn()}
@@ -83,7 +87,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
       id: dialog.props["aria-labelledby"],
     });
     expect(heading.type).toBe("h2");
-    expect(heading.props.className).toBe("sr-only");
+    expect(heading.children).toEqual(["Card Effect: Activate: Main"]);
   });
 
   it("shows the source effect and keeps resolved rows disabled in place", async () => {
@@ -99,6 +103,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
             { id: "elder-2", label: "Elder 2" },
           ]}
           confirmOrSkip
+          cardDb={{}}
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
@@ -107,8 +112,9 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
     });
 
     expect(
-      renderer.root.findByProps({ className: "text-gb-text-dim text-sm" })
-        .children
+      renderer.root
+        .findAllByProps({ className: "text-gb-text-dim text-sm" })
+        .find((node) => node.type === "p")?.children
     ).toEqual(["Five Elders"]);
     expect(findButton(renderer, "Elder 1 — Resolved").props.disabled).toBe(
       true
@@ -134,6 +140,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
           effectDescription="Choose how many DON!! cards to rest"
           choices={choices}
           confirmOrSkip
+          cardDb={{}}
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
@@ -169,6 +176,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
           effectDescription="Choose how many DON!! cards to rest"
           choices={choices}
           confirmOrSkip
+          cardDb={{}}
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
@@ -186,7 +194,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
     expect(choices.some((choice) => choice.id === "skip")).toBe(false);
   });
 
-  it("preserves click-to-submit for existing PLAYER_CHOICE prompts", async () => {
+  it("requires Confirm for every choice prompt instead of submitting on click", async () => {
     const onAction = vi.fn();
     let renderer!: ReactTestRenderer;
     await act(async () => {
@@ -194,6 +202,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
         <PlayerChoiceModal
           effectDescription="Choose a branch"
           choices={choices}
+          cardDb={{}}
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}
@@ -201,18 +210,20 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
       );
     });
 
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
+    expect(findButton(renderer, "Skip").props.disabled).toBe(true);
     await act(async () => {
       findButton(renderer, "Rest 1 → +2000").props.onClick();
+    });
+    expect(onAction).not.toHaveBeenCalled();
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(false);
+    await act(async () => {
+      findButton(renderer, "Confirm").props.onClick();
     });
     expect(onAction).toHaveBeenCalledWith({
       type: "PLAYER_CHOICE",
       choiceId: "don-rest:1",
     });
-    expect(
-      renderer.root
-        .findAllByType("button")
-        .some((button) => button.children.join("") === "Confirm")
-    ).toBe(false);
   });
 
   it("does not auto-submit a lone confirmed choice", async () => {
@@ -224,6 +235,7 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
           effectDescription="Choose how many DON!! cards to rest"
           choices={choices.slice(0, 1)}
           confirmOrSkip
+          cardDb={{}}
           isHidden={false}
           onHide={vi.fn()}
           onAction={onAction}

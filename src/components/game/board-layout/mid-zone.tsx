@@ -91,7 +91,6 @@ export interface TargetSelectionMode {
   countLabel: string;
   selectedCount: number;
   aggregateLabel: string | null;
-  ctaLabel: string;
   canConfirm: boolean;
   canSkip: boolean;
   onConfirm: () => void;
@@ -298,7 +297,7 @@ export const MidZone = React.memo(function MidZone({
             disabled={!targetSelectionMode.canConfirm}
             onClick={targetSelectionMode.onConfirm}
           >
-            {targetSelectionMode.ctaLabel}
+            Confirm
           </GameButton>
           {targetSelectionMode.canSkip && (
             <GameButton

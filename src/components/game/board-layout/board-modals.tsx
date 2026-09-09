@@ -66,6 +66,7 @@ export function BoardModals({
             key={activePrompt.cards.map((c) => c.instanceId).join(",")}
             cards={activePrompt.cards}
             effectDescription={activePrompt.effectDescription}
+            sourceCard={activePrompt.sourceCard}
             canSendToBottom={activePrompt.canSendToBottom}
             restDestination={activePrompt.restDestination}
             validTargets={activePrompt.validTargets}
@@ -85,9 +86,9 @@ export function BoardModals({
             cards={activePrompt.cards}
             validTargets={activePrompt.validTargets}
             effectDescription={activePrompt.effectDescription}
+            sourceCard={activePrompt.sourceCard}
             countMin={activePrompt.countMin}
             countMax={activePrompt.countMax}
-            ctaLabel={activePrompt.ctaLabel}
             aggregateConstraint={activePrompt.aggregateConstraint}
             uniquenessConstraint={activePrompt.uniquenessConstraint}
             namedDistribution={activePrompt.namedDistribution}
@@ -108,9 +109,11 @@ export function BoardModals({
             key={activePromptId ?? "player-choice"}
             effectDescription={activePrompt.effectDescription}
             sourceEffectDescription={activePrompt.sourceEffectDescription}
+            sourceCard={activePrompt.sourceCard}
             choices={activePrompt.choices}
             donReturn={activePrompt.donReturn}
             confirmOrSkip={activePrompt.confirmOrSkip}
+            cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}
             onAction={onAction}
@@ -131,6 +134,7 @@ export function BoardModals({
         <OptionalEffectModal
           effectDescription={activePrompt.effectDescription}
           card={activePrompt.cards?.[0]}
+          sourceCard={activePrompt.sourceCard}
           cardDb={cardDb}
           isHidden={isPromptHidden}
           onHide={onHide}
@@ -143,6 +147,7 @@ export function BoardModals({
           <RevealTriggerModal
             cards={activePrompt.cards}
             effectDescription={activePrompt.effectDescription}
+            sourceCard={activePrompt.sourceCard}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}

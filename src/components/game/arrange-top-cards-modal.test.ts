@@ -29,6 +29,7 @@ vi.mock("@/components/ui", () => {
         { id: "test-dialog-title", className },
         children
       ),
+    DialogDescription: Wrapper,
     DialogFooter: Wrapper,
     TooltipProvider: Wrapper,
   };
@@ -94,7 +95,7 @@ describe("ArrangeTopCardsModal effect description", () => {
       id: dialog.props["aria-labelledby"],
     });
     expect(heading.type).toBe("h2");
-    expect(heading.props.className).toBe("sr-only");
+    expect(heading.children).toEqual(["Card Effect: Activate: Main"]);
     act(() => renderer.unmount());
   });
 });

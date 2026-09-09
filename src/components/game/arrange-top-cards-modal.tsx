@@ -23,22 +23,19 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { motion, useReducedMotion } from "motion/react";
-import type { CardDb, CardInstance, GameAction } from "@shared/game-types";
+import type {
+  CardDb,
+  CardInstance,
+  GameAction,
+  PromptSourceCard,
+} from "@shared/game-types";
 import { useDragTilt } from "@/hooks/use-drag-tilt";
 import { cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  TooltipProvider,
-} from "@/components/ui";
 import { getPortalContainer } from "./scaled-board";
 import { GameButton } from "./game-button";
 import { Card } from "./card";
+import { EffectPromptDialog } from "./effect-prompt-dialog";
 import { useRovingFocus } from "@/hooks/use-roving-focus";
-import { EffectText } from "@/components/cards/effect-text";
 
 const arrangeScreenReaderInstructions: ScreenReaderInstructions = {
   draggable:
@@ -188,11 +185,12 @@ function SortableModalCard({
 interface ArrangeTopCardsModalProps {
   cards: CardInstance[];
   effectDescription: string;
+  sourceCard?: PromptSourceCard;
   canSendToBottom: boolean;
   restDestination?: string;
-  /** If provided, only these instanceIds may be selected to add to hand */
+  /** If provided, only these instanceIds may be picked in the choose step. */
   validTargets?: string[];
-  /** How many cards may be kept ("up to N"). Defaults to 1. */
+  /** How many cards may be kept ("up to N"). Defaults to 1. 0 = reorder only. */
   maxKeep?: number;
   cardDb: CardDb;
   isHidden: boolean;
@@ -200,9 +198,16 @@ interface ArrangeTopCardsModalProps {
   onAction: (action: GameAction) => void;
 }
 
+/**
+ * Two steps behind one frame. Step 1 picks up to `maxKeep` cards from the
+ * revealed row; Step 2 orders whatever remains and chooses where it goes. The
+ * effect's own text (in the description) says what happens to the picks, so
+ * the footer stays Skip / Confirm.
+ */
 export function ArrangeTopCardsModal({
   cards: initialCards,
   effectDescription,
+  sourceCard,
   canSendToBottom,
   restDestination,
   validTargets,
@@ -216,12 +221,15 @@ export function ArrangeTopCardsModal({
   const [step, setStep] = useState<1 | 2>(maxKeep === 0 ? 2 : 1);
   const [orderedCards, setOrderedCards] =
     useState<CardInstance[]>(initialCards);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [keptIds, setKeptIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const reducedMotion = useReducedMotion() ?? false;
   const destinations = getArrangeDestinations(restDestination, canSendToBottom);
+  const [destination, setDestination] = useState<"top" | "bottom" | null>(
+    destinations.length === 1 ? destinations[0] : null
+  );
   const dragTilt = useDragTilt({ disabled: reducedMotion });
   const rovingFocus = useRovingFocus<HTMLButtonElement>(
     orderedCards.map((card) => card.instanceId)
@@ -249,9 +257,11 @@ export function ArrangeTopCardsModal({
     };
   }, [cardDb, orderedCards]);
 
-  // If validTargets is provided, only those cards can be selected
+  // If validTargets is provided, only those cards can be picked.
   const canSelectCard = (instanceId: string) =>
     validTargets === undefined || validTargets.includes(instanceId);
+  // "Up to N" effects may keep nothing; an exact single pick may not.
+  const canKeepNone = validTargets !== undefined || maxKeep > 1;
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
@@ -277,197 +287,198 @@ export function ArrangeTopCardsModal({
     setActiveId(null);
   }
 
-  function handleAddToHand() {
-    if (!selectedId) return;
-    const next = [...keptIds, selectedId];
-    setKeptIds(next);
-    setOrderedCards((prev) => prev.filter((c) => c.instanceId !== selectedId));
-    setSelectedId(null);
-    if (next.length >= maxKeep) setStep(2);
-  }
-
-  function handleSkip() {
-    setSelectedId(null);
-    setStep(2);
-  }
-
-  function handleSend(destination: "top" | "bottom") {
-    onAction({
-      type: "ARRANGE_TOP_CARDS",
-      keptCardInstanceId: keptIds[0] ?? "",
-      keptCardInstanceIds: keptIds,
-      orderedInstanceIds: orderedCards.map((c) => c.instanceId),
-      destination,
+  function toggleSelected(instanceId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(instanceId)) next.delete(instanceId);
+      else if (next.size < maxKeep) next.add(instanceId);
+      return next;
     });
   }
 
-  const title =
-    step === 1 || maxKeep === 0
-      ? effectDescription
-      : `Put the remaining ${orderedCards.length} card${orderedCards.length !== 1 ? "s" : ""} back`;
+  function submit(
+    kept: string[],
+    remaining: CardInstance[],
+    sendTo: "top" | "bottom"
+  ) {
+    onAction({
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: kept[0] ?? "",
+      keptCardInstanceIds: kept,
+      orderedInstanceIds: remaining.map((c) => c.instanceId),
+      destination: sendTo,
+    });
+  }
+
+  function advanceToArrange(kept: string[]) {
+    const remaining = orderedCards.filter((c) => !kept.includes(c.instanceId));
+    setKeptIds(kept);
+    setSelectedIds(new Set());
+    // Nothing left to order: the only remaining decision is already fixed.
+    if (remaining.length === 0 && destinations.length === 1) {
+      submit(kept, remaining, destinations[0]);
+      return;
+    }
+    setOrderedCards(remaining);
+    setStep(2);
+  }
+
+  function handleConfirm() {
+    if (step === 1) {
+      if (selectedIds.size === 0) return;
+      advanceToArrange(
+        orderedCards
+          .filter((c) => selectedIds.has(c.instanceId))
+          .map((c) => c.instanceId)
+      );
+      return;
+    }
+    if (!destination) return;
+    submit(keptIds, orderedCards, destination);
+  }
+
+  const handleSkip =
+    step === 1 && canKeepNone ? () => advanceToArrange([]) : undefined;
+
+  const firstSelectedId = selectedIds.values().next().value ?? null;
+  const confirmDisabled =
+    step === 1 ? selectedIds.size === 0 : destination === null;
+  const remainingLabel = `${orderedCards.length} card${orderedCards.length !== 1 ? "s" : ""}`;
 
   const activeCard = activeId
     ? (orderedCards.find((c) => c.instanceId === activeId) ?? null)
     : null;
 
   return (
-    <Dialog
-      open={!isHidden}
-      onOpenChange={(open) => {
-        if (!open) onHide();
+    <EffectPromptDialog
+      effectDescription={effectDescription}
+      sourceCard={sourceCard}
+      cardDb={cardDb}
+      isHidden={isHidden}
+      onHide={onHide}
+      onConfirm={handleConfirm}
+      confirmDisabled={confirmDisabled}
+      onSkip={handleSkip}
+      onEscapeKeyDown={(event) => {
+        const action = getArrangeEscapeAction(activeId, firstSelectedId, step);
+        if (action === "hide") return;
+        event.preventDefault();
+        if (action === "clear-selection") setSelectedIds(new Set());
       }}
+      status={
+        step === 1
+          ? `${selectedIds.size} of ${maxKeep} selected`
+          : `Order the remaining ${remainingLabel}`
+      }
     >
-      <DialogContent
-        aria-describedby={undefined}
-        showCloseButton={false}
-        onEscapeKeyDown={(event) => {
-          const action = getArrangeEscapeAction(activeId, selectedId, step);
-          if (action === "hide") return;
-          event.preventDefault();
-          if (action === "clear-selection") setSelectedId(null);
+      <DndContext
+        sensors={sensors}
+        accessibility={{
+          announcements,
+          screenReaderInstructions: arrangeScreenReaderInstructions,
         }}
-        className="bg-gb-surface border-gb-border-strong text-gb-text gap-0 p-0 sm:max-w-[520px]"
+        onDragStart={handleDragStart}
+        onDragMove={dragTilt.handleDragMove}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
-        <DialogHeader className="border-gb-border flex-row items-center justify-between space-y-0 border-b px-4 py-3">
-          <div>
-            <DialogTitle className="sr-only">{title}</DialogTitle>
-            <EffectText text={title} className="text-gb-text-bright text-sm" />
-          </div>
-          <GameButton variant="ghost" size="sm" onClick={onHide}>
-            Hide
-          </GameButton>
-        </DialogHeader>
-
-        <TooltipProvider delayDuration={0} disableHoverableContent>
-          <DndContext
-            sensors={sensors}
-            accessibility={{
-              announcements,
-              screenReaderInstructions: arrangeScreenReaderInstructions,
-            }}
-            onDragStart={handleDragStart}
-            onDragMove={dragTilt.handleDragMove}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
+        <div className="py-1">
+          <SortableContext
+            items={orderedCards.map((c) => c.instanceId)}
+            strategy={rectSortingStrategy}
           >
-            <div className="px-4 py-5">
-              <SortableContext
-                items={orderedCards.map((c) => c.instanceId)}
-                strategy={rectSortingStrategy}
-              >
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  {orderedCards.map((card) => (
-                    <SortableModalCard
-                      key={card.instanceId}
-                      card={card}
-                      cardDb={cardDb}
-                      selected={step === 1 && selectedId === card.instanceId}
-                      disabledReason={
-                        step === 1 && !canSelectCard(card.instanceId)
-                          ? "This card cannot be chosen for this effect."
-                          : undefined
-                      }
-                      selectable={step === 1}
-                      reducedMotion={reducedMotion}
-                      rovingTabIndex={rovingFocus.getTabIndex(card.instanceId)}
-                      onRovingFocus={() => rovingFocus.onFocus(card.instanceId)}
-                      onRovingKeyDown={(event) =>
-                        rovingFocus.onKeyDown(event, card.instanceId)
-                      }
-                      setRovingRef={(node) =>
-                        rovingFocus.setItemRef(card.instanceId, node)
-                      }
-                      onSelect={() => {
-                        if (step === 1 && canSelectCard(card.instanceId)) {
-                          setSelectedId((prev) =>
-                            prev === card.instanceId ? null : card.instanceId
-                          );
-                        }
-                      }}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-
-              {step === 2 && (
-                <div className="mt-3 flex justify-between">
-                  <span className="text-gb-text-dim text-sm">
-                    ← top of deck
-                  </span>
-                  <span className="text-gb-text-dim text-sm">
-                    bottom of deck →
-                  </span>
-                </div>
-              )}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {orderedCards.map((card) => (
+                <SortableModalCard
+                  key={card.instanceId}
+                  card={card}
+                  cardDb={cardDb}
+                  selected={step === 1 && selectedIds.has(card.instanceId)}
+                  disabledReason={
+                    step === 1 && !canSelectCard(card.instanceId)
+                      ? "This card cannot be chosen for this effect."
+                      : undefined
+                  }
+                  selectable={step === 1}
+                  reducedMotion={reducedMotion}
+                  rovingTabIndex={rovingFocus.getTabIndex(card.instanceId)}
+                  onRovingFocus={() => rovingFocus.onFocus(card.instanceId)}
+                  onRovingKeyDown={(event) =>
+                    rovingFocus.onKeyDown(event, card.instanceId)
+                  }
+                  setRovingRef={(node) =>
+                    rovingFocus.setItemRef(card.instanceId, node)
+                  }
+                  onSelect={() => {
+                    if (step === 1 && canSelectCard(card.instanceId)) {
+                      toggleSelected(card.instanceId);
+                    }
+                  }}
+                />
+              ))}
             </div>
+          </SortableContext>
 
-            {/* Portal the overlay outside Radix Dialog's translate(-50%,-50%)
-                wrapper so DragOverlay's position:fixed tracking isn't broken by
-                a transformed ancestor. Targets `<PortalRoot>` when shells mount
-                it (OPT-309/317); falls back to body until then. React context is
-                preserved through portals, so DndContext still sees it. */}
-            {typeof document !== "undefined" &&
-              createPortal(
-                <DragOverlay dropAnimation={null}>
-                  {activeCard && (
-                    <motion.div
-                      style={{
-                        transformPerspective: 1000,
-                        rotateX: dragTilt.tiltX,
-                        rotateY: dragTilt.tiltY,
-                      }}
-                    >
-                      <Card
-                        variant="modal"
-                        size="field"
-                        data={{
-                          card: activeCard,
-                          cardId: activeCard.cardId,
-                          cardDb,
-                        }}
-                        interaction={{ tooltipDisabled: true }}
-                      />
-                    </motion.div>
-                  )}
-                </DragOverlay>,
-                getPortalContainer() ?? document.body
-              )}
-          </DndContext>
-        </TooltipProvider>
-
-        <DialogFooter className="border-gb-border flex-row items-center justify-end gap-2 border-t px-4 py-3 pt-3">
-          {step === 1 && (
-            <>
-              {(validTargets !== undefined || maxKeep > 1) && (
-                <GameButton variant="secondary" size="sm" onClick={handleSkip}>
-                  {keptIds.length > 0 ? "Done" : "Keep None"}
-                </GameButton>
-              )}
-              <GameButton
-                variant="amber"
-                size="sm"
-                disabled={!selectedId}
-                onClick={handleAddToHand}
-              >
-                {maxKeep > 1
-                  ? `Take (${keptIds.length}/${maxKeep})`
-                  : "Add to Hand"}
-              </GameButton>
-            </>
+          {step === 2 && (
+            <div className="text-gb-text-dim mt-4 flex items-center justify-between text-sm">
+              <span aria-hidden="true">&larr; top of deck</span>
+              <span aria-hidden="true">bottom of deck &rarr;</span>
+            </div>
           )}
-          {step === 2 &&
-            destinations.map((destination) => (
-              <GameButton
-                key={destination}
-                variant="amber"
-                size="sm"
-                onClick={() => handleSend(destination)}
-              >
-                {destination === "bottom" ? "Place at Bottom" : "Place on Top"}
-              </GameButton>
-            ))}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+          {step === 2 && destinations.length > 1 && (
+            <div
+              role="group"
+              aria-label="Where to place the remaining cards"
+              className="mt-4 flex items-center justify-center gap-2"
+            >
+              {destinations.map((option) => (
+                <GameButton
+                  key={option}
+                  variant={destination === option ? "amber" : "secondary"}
+                  size="sm"
+                  aria-pressed={destination === option}
+                  onClick={() => setDestination(option)}
+                >
+                  {option === "bottom" ? "Bottom of deck" : "Top of deck"}
+                </GameButton>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Portal the overlay outside Radix Dialog's translate(-50%,-50%)
+            wrapper so DragOverlay's position:fixed tracking isn't broken by
+            a transformed ancestor. Targets `<PortalRoot>` when shells mount
+            it (OPT-309/317); falls back to body until then. React context is
+            preserved through portals, so DndContext still sees it. */}
+        {typeof document !== "undefined" &&
+          createPortal(
+            <DragOverlay dropAnimation={null}>
+              {activeCard && (
+                <motion.div
+                  style={{
+                    transformPerspective: 1000,
+                    rotateX: dragTilt.tiltX,
+                    rotateY: dragTilt.tiltY,
+                  }}
+                >
+                  <Card
+                    variant="modal"
+                    size="field"
+                    data={{
+                      card: activeCard,
+                      cardId: activeCard.cardId,
+                      cardDb,
+                    }}
+                    interaction={{ tooltipDisabled: true }}
+                  />
+                </motion.div>
+              )}
+            </DragOverlay>,
+            getPortalContainer() ?? document.body
+          )}
+      </DndContext>
+    </EffectPromptDialog>
   );
 }

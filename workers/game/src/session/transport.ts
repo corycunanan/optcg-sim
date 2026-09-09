@@ -7,6 +7,7 @@ import type {
   ServerMessage,
 } from "../types.js";
 import { filterPromptOptionsForPlayer } from "../engine/visibility.js";
+import { withPromptSourceCard } from "../engine/prompt-source.js";
 import { log } from "../lib/log.js";
 import {
   SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
@@ -468,19 +469,21 @@ export class SessionTransport {
     return build(filteredState, recipientPlayerIndex);
   }
 
-  sendEffectPrompt(prompt: PendingPromptState): void {
+  /** Sends an effect prompt to its responder, naming the source card. */
+  sendEffectPrompt(prompt: PendingPromptState, state: GameState): void {
     const ws = this.playerSocket(prompt.respondingPlayer);
     if (!ws) return;
+    const attributed = withPromptSourceCard(state, prompt);
     this.send(ws, {
       type: "game:prompt",
-      promptId: prompt.promptId,
-      options: filterPromptOptionsForPlayer(prompt.options),
+      promptId: attributed.promptId,
+      options: filterPromptOptionsForPlayer(attributed.options),
     });
   }
 
   sendPendingPrompts(state: GameState, cardDb: Map<string, CardData>): void {
     if (state.pendingPrompt) {
-      this.sendEffectPrompt(state.pendingPrompt);
+      this.sendEffectPrompt(state.pendingPrompt, state);
       return;
     }
     if (state.effectStack.length > 0) return;

@@ -804,7 +804,7 @@ export class GameSession implements DurableObject {
   }
 
   private sendEffectPrompt(prompt: PendingPromptState): void {
-    this.transport.sendEffectPrompt(prompt);
+    this.transport.sendEffectPrompt(prompt, this.gameState!);
   }
 
   private sendPendingPrompts(): void {
