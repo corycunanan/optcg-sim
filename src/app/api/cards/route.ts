@@ -16,7 +16,7 @@ import {
   buildCardOrderBy,
   buildCardPagination,
 } from "@/lib/cards/search";
-import { CARD_SEARCH_SELECT } from "@/lib/cards/card-select";
+import { CARD_PUBLIC_SELECT, CARD_SEARCH_SELECT } from "@/lib/cards/card-select";
 
 export async function GET(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
@@ -113,7 +113,8 @@ export async function POST(request: NextRequest) {
         banStatus: body.banStatus || "LEGAL",
         isReprint: false,
       },
-      include: {
+      select: {
+        ...CARD_PUBLIC_SELECT,
         artVariants: true,
         cardSets: true,
       },
