@@ -6,6 +6,8 @@
 
 **Traversal.** The extractor reads `actions`, `replacement_actions`, and nested `PLAYER_CHOICE` and `OPPONENT_CHOICE` options. It reads `modifiers` where a rule below says so. It lowercases schema discriminants when building tags.
 
+**Deliberately untagged discriminants.** Tier 1 assigns no facet to `APPLY_ONE_TIME_MODIFIER`, `CHOOSE_VALUE`, `EXTRA_TURN`, `OPPONENT_ACTION`, `PLAY_SELF`, `REPLACEMENT_EFFECT`, `SCHEDULE_ACTION`, `SET_POWER`, `SHUFFLE_DECK`, or `WIN_GAME`. These authored action and modifier discriminants remain outside the approved taxonomy, so the extractor does not invent tags for them.
+
 ---
 
 ## Trigger
@@ -90,7 +92,7 @@
 
 **Scry.** `LIFE_SCRY` and `REORDER_ALL_LIFE` produce `life:scry`, `life:scry:self`, or `life:scry:opponent`.
 
-**Damage.** `SELF_TAKE_DAMAGE` and `DEAL_DAMAGE` produce `life:damage`, `life:damage:self`, or `life:damage:opponent`.
+**Damage.** `SELF_TAKE_DAMAGE` produces `life:damage:self`, while `DEAL_DAMAGE` produces `life:damage:opponent`. No unqualified damage tag exists because both actions identify the affected controller.
 
 **Drain.** `DRAIN_LIFE_TO_THRESHOLD` produces `life:drain`, `life:drain:self`, or `life:drain:opponent`.
 
@@ -116,7 +118,7 @@
 
 **Reuse and counter.** `ACTIVATE_EVENT_FROM_HAND`, `ACTIVATE_EVENT_FROM_TRASH`, or `REUSE_EFFECT` produces `hand:event_reuse`. `GRANT_COUNTER` produces `hand:grant_counter`.
 
-**Play source.** A `PLAY_CARD.params.source_zone` of `HAND` produces `hand:play_from_hand`; `TRASH` produces `hand:play_from_trash`; `DECK` or `DECK_TOP` produces `hand:play_from_deck`; and `LIFE` produces `hand:play_from_life`. `HAND_OR_TRASH` produces both matching tags. `SEARCH_AND_PLAY` produces the deck tag, and `PLAY_FROM_LIFE` produces the Life tag.
+**Play source.** A `PLAY_CARD` reads `params.source_zone`, falling back to `target.source_zone` when the parameter is absent. The fallback accepts one zone or an array. `HAND` produces `hand:play_from_hand`; `TRASH` produces `hand:play_from_trash`; `DECK` or `DECK_TOP` produces `hand:play_from_deck`; and `LIFE` produces `hand:play_from_life`. `HAND_OR_TRASH` or an array containing both zones produces both matching tags. `FIELD` and `DON_DECK` produce no hand facet. `SEARCH_AND_PLAY` produces the deck tag, and `PLAY_FROM_LIFE` produces the Life tag.
 
 ---
 

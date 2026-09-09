@@ -174,7 +174,6 @@ export const EFFECT_FACET_GROUPS = [
       ["scry", "Scry"],
       ["scry:self", "Scry — Self"],
       ["scry:opponent", "Scry — Opponent"],
-      ["damage", "Damage"],
       ["damage:self", "Damage — Self"],
       ["damage:opponent", "Damage — Opponent"],
       ["drain", "Drain"],

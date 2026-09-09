@@ -345,18 +345,26 @@ function visitHandAction(action: Action, tags: Set<EffectFacetTag>): void {
   if (value) addTag(tags, `hand:${value}`);
 
   if (action.type !== "PLAY_CARD") return;
-  const sourceZone = action.params?.source_zone;
-  if (sourceZone === "HAND_OR_TRASH") {
-    addTag(tags, "hand:play_from_hand");
-    addTag(tags, "hand:play_from_trash");
-  } else if (sourceZone === "HAND") {
-    addTag(tags, "hand:play_from_hand");
-  } else if (sourceZone === "TRASH") {
-    addTag(tags, "hand:play_from_trash");
-  } else if (sourceZone === "DECK" || sourceZone === "DECK_TOP") {
-    addTag(tags, "hand:play_from_deck");
-  } else if (sourceZone === "LIFE") {
-    addTag(tags, "hand:play_from_life");
+  const configuredSource =
+    action.params?.source_zone ?? action.target?.source_zone;
+  const sourceZones = Array.isArray(configuredSource)
+    ? configuredSource
+    : configuredSource
+      ? [configuredSource]
+      : [];
+  for (const sourceZone of sourceZones) {
+    if (sourceZone === "HAND_OR_TRASH") {
+      addTag(tags, "hand:play_from_hand");
+      addTag(tags, "hand:play_from_trash");
+    } else if (sourceZone === "HAND") {
+      addTag(tags, "hand:play_from_hand");
+    } else if (sourceZone === "TRASH") {
+      addTag(tags, "hand:play_from_trash");
+    } else if (sourceZone === "DECK" || sourceZone === "DECK_TOP") {
+      addTag(tags, "hand:play_from_deck");
+    } else if (sourceZone === "LIFE") {
+      addTag(tags, "hand:play_from_life");
+    }
   }
 }
 

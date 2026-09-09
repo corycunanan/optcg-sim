@@ -76,6 +76,8 @@ describe("extractCardFacets", () => {
     expectTags("EB01-009", ["hand:play_from_deck"]);
     expectTags("OP10-022", ["hand:play_from_life"]);
     expectTags("EB04-041", ["hand:play_from_hand", "hand:play_from_trash"]);
+    expectTags("EB01-060", ["hand:play_from_hand", "hand:play_from_trash"]);
+    expectTags("OP05-033", ["hand:play_from_hand"]);
     expectTags("EB01-001", ["category:rule_modification"]);
     expectTags("EB01-008", ["category:replacement"]);
   });
