@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { UpdateCardSchema } from "@/lib/validators/cards";
 import { parseBody, isErrorResponse } from "@/lib/validators/helpers";
 import { apiLimiter } from "@/lib/rate-limit";
+import { CARD_PUBLIC_SELECT } from "@/lib/cards/card-select";
 
 export async function GET(
   _request: NextRequest,
@@ -18,7 +19,8 @@ export async function GET(
   try {
     const card = await prisma.card.findUnique({
       where: { id },
-      include: {
+      select: {
+        ...CARD_PUBLIC_SELECT,
         artVariants: true,
         cardSets: { orderBy: { isOrigin: "desc" } },
         erratas: { orderBy: { date: "desc" } },
@@ -67,7 +69,8 @@ export async function PATCH(
     const card = await prisma.card.update({
       where: { id },
       data: updateData,
-      include: {
+      select: {
+        ...CARD_PUBLIC_SELECT,
         artVariants: true,
         cardSets: { orderBy: { isOrigin: "desc" } },
       },

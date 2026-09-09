@@ -1,5 +1,28 @@
 import type { Prisma } from "@prisma/client";
 
+/** Public card fields shared by detail and mutation responses. */
+export const CARD_PUBLIC_SELECT = {
+  id: true,
+  originSet: true,
+  name: true,
+  color: true,
+  type: true,
+  cost: true,
+  power: true,
+  counter: true,
+  attribute: true,
+  life: true,
+  traits: true,
+  rarity: true,
+  effectText: true,
+  triggerText: true,
+  effectSchema: true,
+  imageUrl: true,
+  blockNumber: true,
+  banStatus: true,
+  isReprint: true,
+} as const satisfies Prisma.CardSelect;
+
 /**
  * Card projection for the deck-builder search grid and card-info tooltip.
  */
