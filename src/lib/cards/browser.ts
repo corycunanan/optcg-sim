@@ -53,6 +53,13 @@ export async function getCardBrowserData(
   const requestedPage = parseCardBrowserPage(firstParam(params.page) || "1");
   const limit = 20;
 
+  const facetWhere = buildCardWhereClause({
+    effectTags,
+    effectTraits,
+    counterMin,
+    counterMax,
+  });
+
   const hasAnyFilter =
     browseAllSets ||
     q ||
@@ -60,7 +67,7 @@ export async function getCardBrowserData(
     type ||
     set ||
     block ||
-    effectTags ||
+    facetWhere.AND ||
     effectTraits ||
     counterMin ||
     counterMax ||
@@ -101,15 +108,7 @@ export async function getCardBrowserData(
   if (block) {
     where.blockNumber = { in: block.split(",").map(Number) };
   }
-  Object.assign(
-    where,
-    buildCardWhereClause({
-      effectTags,
-      effectTraits,
-      counterMin,
-      counterMax,
-    })
-  );
+  Object.assign(where, facetWhere);
 
   const [sets, total] = await Promise.all([
     prisma.cardSet.findMany({

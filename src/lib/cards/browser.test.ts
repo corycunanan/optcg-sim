@@ -67,6 +67,39 @@ describe("getCardBrowserData", () => {
     });
   });
 
+  it.each(["", "trigger:unknown", "unknown:tag,removal:unknown"])(
+    "keeps the latest booster fallback for ignored effectTags %s",
+    async (effectTags) => {
+      const data = await getCardBrowserData({ effectTags });
+      expect(data.currentFilters.set).toBe("OP16");
+      expect(cardCountMock).toHaveBeenCalledWith({
+        where: { cardSets: { some: { setLabel: "OP16" } } },
+      });
+    }
+  );
+
+  it.each(["trigger:on_play", "trigger:unknown,trigger:on_play"])(
+    "searches all sets when effectTags contains a valid tag: %s",
+    async (effectTags) => {
+      const data = await getCardBrowserData({ effectTags });
+      expect(data.currentFilters.set).toBe("");
+      expect(setFindFirstMock).not.toHaveBeenCalled();
+      expect(cardCountMock).toHaveBeenCalledWith({
+        where: { AND: [{ effectTags: { hasSome: ["trigger:on_play"] } }] },
+      });
+    }
+  );
+
+  it("preserves explicit all sets with unknown-only effect tags", async () => {
+    const data = await getCardBrowserData({
+      set: "all",
+      effectTags: "trigger:unknown",
+    });
+    expect(data.currentFilters.set).toBe("");
+    expect(setFindFirstMock).not.toHaveBeenCalled();
+    expect(cardCountMock).toHaveBeenCalledWith({ where: {} });
+  });
+
   it.each(["0", "-1", "abc", "1.5"])(
     "defaults invalid page %s to the first page",
     async (requestedPage) => {
