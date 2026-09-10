@@ -233,6 +233,30 @@ export const DeckImportResponseSchema = z.object({
 
 export type DeckImportResponse = z.infer<typeof DeckImportResponseSchema>;
 
+/** GET /api/cards/facets response envelope. */
+export const CardFacetVocabularySchema = z.object({
+  data: z.object({
+    traits: z.array(z.string()),
+    effectTraits: z.array(z.string()),
+    groups: z.array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        tags: z.array(
+          z.object({
+            id: z.string(),
+            label: z.string(),
+          }),
+        ),
+      }),
+    ),
+  }),
+});
+
+export type CardFacetVocabulary = z.infer<
+  typeof CardFacetVocabularySchema
+>["data"];
+
 // ─── Input schemas ──────────────────────────────────────────
 
 export const CreateCardSchema = z.object({
