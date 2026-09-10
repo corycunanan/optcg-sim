@@ -130,6 +130,7 @@ export function reenterBatchResume(
         resultRefs: context.resultRefs,
         validTargets: context.validTargets,
         returnToDeckArrangement: context.returnToDeckArrangement,
+        fieldToLifeTargetIds: context.fieldToLifeTargetIds,
         costs: [],
         currentCostIndex: 0,
         costsPaid: true,

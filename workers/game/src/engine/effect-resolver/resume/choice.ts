@@ -44,6 +44,7 @@ import { markOncePerTurnUsed } from "../action-utils.js";
 import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { postCostConditionsMet } from "../post-cost.js";
+import { executeAddToLifeFromField } from "../actions/life.js";
 import { executePlayCard } from "../actions/play.js";
 import {
   applyFieldDonReturn,
@@ -235,6 +236,51 @@ export function handlePlayerChoiceDonReturn(
   const applied = applyFieldDonReturn(state, opp, decoded.plan);
   events.push(...applied.events);
   return { kind: "fallthrough", state: applied.state };
+}
+
+/** Resume exactly the selected field cards with a concrete destination. */
+export function handleFieldToLifePosition(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+): (EffectResolverResult & { succeeded?: boolean }) | null {
+  const {
+    pausedAction,
+    fieldToLifeTargetIds,
+    validTargets,
+    controller,
+    effectSourceInstanceId,
+  } = resumeCtx;
+  if (pausedAction?.type !== "ADD_TO_LIFE_FROM_FIELD" || !fieldToLifeTargetIds)
+    return null;
+  if (
+    action.type !== "PLAYER_CHOICE" ||
+    !validTargets.includes(action.choiceId)
+  ) {
+    return { state, events: [], resolved: false, rejected: true };
+  }
+  const position =
+    action.choiceId === `field-life:${JSON.stringify(fieldToLifeTargetIds)}:TOP`
+      ? "TOP"
+      : action.choiceId ===
+          `field-life:${JSON.stringify(fieldToLifeTargetIds)}:BOTTOM`
+        ? "BOTTOM"
+        : null;
+  if (!position) return { state, events: [], resolved: false, rejected: true };
+  const result = executeAddToLifeFromField(
+    state,
+    { ...pausedAction, params: { ...pausedAction.params, position } },
+    effectSourceInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    fieldToLifeTargetIds,
+  );
+  if (pausedAction.result_ref && result.result)
+    resultRefs.set(pausedAction.result_ref, result.result);
+  return { ...result, resolved: true };
 }
 
 export function handleChooseValue(

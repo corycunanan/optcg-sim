@@ -114,6 +114,7 @@ interface SelectTargetModalProps {
   cards: CardInstance[];
   validTargets: string[];
   effectDescription: string;
+  instruction?: string;
   sourceCard?: PromptSourceCard;
   countMin: number;
   countMax: number;
@@ -137,6 +138,7 @@ export function SelectTargetModal({
   cards,
   validTargets,
   effectDescription,
+  instruction,
   sourceCard,
   countMin,
   countMax,
@@ -155,6 +157,7 @@ export function SelectTargetModal({
     cards,
     validTargets,
     effectDescription,
+    instruction,
     countMin,
     countMax,
     ctaLabel: "Confirm",
@@ -209,7 +212,7 @@ export function SelectTargetModal({
       }}
       status={
         <>
-          {model.countLabel}
+          {instruction ?? model.countLabel}
           {model.selectedCount > 0 && (
             <span className="text-gb-text-subtle ml-1">
               &mdash; {model.selectedCount} selected

@@ -21,6 +21,7 @@ import {
   findSchemasWithMultipleTriggerBlocks,
   type CardTextManifest,
 } from "../trigger-schema-coverage.js";
+import { collectTargetInstructionCoverage } from "../effect-resolver/target-instruction.js";
 
 const repoRoot = resolve(__dirname, "../../../../../");
 
@@ -218,6 +219,17 @@ async function main(): Promise<void> {
         Object.entries(schemas).filter(([cardId]) => cardTextManifest[cardId]),
       )
     : schemas;
+  const targetInstructions = collectTargetInstructionCoverage(schemas);
+  if (targetInstructions.fallbacks.length > 0) {
+    console.log(
+      `WARNING: ${targetInstructions.fallbacks.length} of ${targetInstructions.targetCount} target spec(s) fell back to effectDescription:`,
+    );
+    console.log(targetInstructions.fallbacks.join("\n"));
+  } else {
+    console.log(
+      `Target instruction coverage complete — ${targetInstructions.targetCount} target spec(s), 0 fallbacks.`,
+    );
+  }
   const diagnostics = [
     ...Object.entries(schemas).flatMap(([cardId, schema]) =>
       validateEffectSchema(schema, cardId),

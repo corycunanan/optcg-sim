@@ -23,9 +23,7 @@ import { checkReplacements } from "./replacements.js";
 import {
   matchTriggersForEvent,
   orderMatchedTriggers,
-  registerTriggersForCard,
-  registerReplacementsForCard,
-  registerPermanentEffectsForCard,
+  registerCardEnteredField,
   deregisterTriggersForCard,
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver/index.js";
@@ -457,9 +455,7 @@ function registerNewCardTriggers(
         ? findCardInstance(state, cardInstanceId)
         : findNewlyPlayedCard(state, cardId);
       if (instance) {
-        state = registerTriggersForCard(state, instance, cardData);
-        state = registerReplacementsForCard(state, instance, cardData);
-        state = registerPermanentEffectsForCard(state, instance, cardData);
+        state = registerCardEnteredField(state, instance, cardData);
       }
     }
   }
