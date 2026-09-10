@@ -4,6 +4,7 @@
  * remaining-batch state carried on the frame's batchResumeMarker.
  */
 
+import { unpublishedEvents, retainEventsOnFrame } from "./events.js";
 import type { Action, EffectBlock, EffectResult } from "../../effect-types.js";
 import type {
   BatchResumeMarker,
@@ -60,7 +61,15 @@ export function reenterBatchResume(
     // frame's pendingTriggers snapshot is stale at this point; we pop and
     // re-invoke unconditionally.
 
+    // The saved prefix precedes events from the trigger drain. Shared
+    // references are one occurrence, while equal-payload events remain distinct.
+    events.splice(
+      0,
+      events.length,
+      ...new Set([...unpublishedEvents(top.accumulatedEvents), ...events]),
+    );
     nextState = popFrame(nextState);
+    const stackDepth = nextState.effectStack.length;
     const marker = top.batchResumeMarker;
     const resultRefs = new Map<string, EffectResult>(top.resultRefs);
 
@@ -215,6 +224,7 @@ export function reenterBatchResume(
       nextState = chainResult.state;
       events.push(...chainResult.events);
       if (chainResult.pendingPrompt) {
+        nextState = retainEventsOnFrame(nextState, stackDepth, events);
         return {
           state: nextState,
           events,

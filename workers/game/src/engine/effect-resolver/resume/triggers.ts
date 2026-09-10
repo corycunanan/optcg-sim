@@ -11,6 +11,7 @@ import type {
   PendingEvent,
   QueuedTrigger,
 } from "../../../types.js";
+import { unpublishedEvents } from "./events.js";
 import { peekFrame, updateTopFrame } from "../../effect-stack.js";
 import {
   emitEvent,
@@ -28,8 +29,19 @@ export function processRemainingTriggers(
   priorEvents: PendingEvent[] = [],
   triggerOrderingGroup?: import("../../../types.js").EffectStackFrame["triggerOrderingGroup"]
 ): EffectResolverResult {
-  const events = [...priorEvents];
-  let nextState = state;
+  const batchFrame = peekFrame(state);
+  const ownsBatchPrefix = batchFrame?.phase === "AWAITING_BATCH_RESUME";
+  const events = [
+    ...new Set([
+      ...(ownsBatchPrefix ? unpublishedEvents(batchFrame.accumulatedEvents) : []),
+      ...priorEvents,
+    ]),
+  ];
+  // Consume the saved batch prefix before immutable publication copies are
+  // made below; re-entry must not recover the original unflagged references.
+  let nextState = ownsBatchPrefix
+    ? updateTopFrame(state, { accumulatedEvents: [] })
+    : state;
 
   for (let index = 0; index < events.length; index++) {
     const event = events[index];
