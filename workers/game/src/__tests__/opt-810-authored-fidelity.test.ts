@@ -549,7 +549,11 @@ it.each([{ action: "UNKNOWN_ACTION" }, { source_zone: "UNKNOWN_ZONE" }])(
     activateRosinante(f);
     // Persistence deliberately treats appliesTo as opaque. Exercise runtime
     // compatibility defensively using an authored modifier with a future scope.
-    Object.assign(f.state.oneTimeModifiers[0].appliesTo, unknownScope);
+    f.state.oneTimeModifiers[0].appliesTo = Object.assign(
+      {},
+      f.state.oneTimeModifiers[0].appliesTo,
+      unknownScope
+    );
     const law = f.put("LAW", 0, "HAND", "unknown");
     await f.persist();
     const before = readyDon(f);
