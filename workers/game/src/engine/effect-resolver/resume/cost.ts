@@ -198,7 +198,7 @@ function finishCostsAndRunActions(
 
   if (topFrame.remainingActions.length > 0) {
     const stackDepth = state.effectStack.length;
-    const chainResult = services.executeActionChain(
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
       state,
       topFrame.remainingActions,
       sourceCardInstanceId,

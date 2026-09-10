@@ -1,3 +1,4 @@
+import { emitPendingEvent, withEventLogEmitted } from "../../events.js";
 import type { GameState, PendingEvent } from "../../../types.js";
 
 /** A continuation owns only events that have not reached the public log yet. */
@@ -51,4 +52,18 @@ export function takeInterruptedEvents(state: GameState): {
     return { ...frame, accumulatedEvents: [] };
   });
   return { state: events.length ? { ...state, effectStack } : state, events };
+}
+
+/** Publish a caller-owned committed accumulator without mutating event objects. */
+export function publishCommittedEvents(
+  state: GameState,
+  events: PendingEvent[]
+): GameState {
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
+    if (event.propagation?.eventLogEmitted) continue;
+    state = emitPendingEvent(state, event, state.turn.activePlayerIndex);
+    events[index] = withEventLogEmitted(event);
+  }
+  return state;
 }

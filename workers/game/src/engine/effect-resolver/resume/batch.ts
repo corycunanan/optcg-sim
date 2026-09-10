@@ -80,7 +80,7 @@ export function reenterBatchResume(
       top.controller,
       cardDb,
       resultRefs,
-      services
+      services.withCommittedEvents(events)
     );
     nextState = actionResult.state;
     events.push(...actionResult.events);
@@ -213,7 +213,7 @@ export function reenterBatchResume(
     // Continue any remainingActions queued behind this batch. Matches
     // chain-continuation in other resume branches.
     if (top.remainingActions.length > 0) {
-      const chainResult = services.executeActionChain(
+      const chainResult = services.withCommittedEvents(events).executeActionChain(
         nextState,
         top.remainingActions,
         top.sourceCardInstanceId,

@@ -96,6 +96,7 @@ export function resumeEffectChain(
 
   const resultRefs = new Map<string, EffectResult>(resultRefsEntries);
   const events: PendingEvent[] = [];
+  services = services.withCommittedEvents(events);
   let nextState = state;
   let pausedActionSucceeded: boolean | undefined;
 
@@ -288,7 +289,7 @@ export function resumeEffectChain(
   // ── Tail: execute remainingActions (also handles OPTIONAL_EFFECT resume
   //         where pausedAction is null) ────────────────────────────────────
   if (remainingActions.length > 0) {
-    const chainResult = services.executeActionChain(
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
       nextState,
       remainingActions,
       effectSourceInstanceId,
@@ -381,17 +382,15 @@ export function resumeFromStack(
 
     const locks = [...plan.locks];
     locks[actionIndex] = { execute: true, targetInstanceIds: selected };
-    const result = services.continueSimultaneousGroup(
+    const events = unpublishedEvents(topFrame.accumulatedEvents);
+    const result = services.withCommittedEvents(events).continueSimultaneousGroup(
       popFrame(state),
       { ...plan, locks, nextActionIndex: actionIndex + 1 },
       sourceCardInstanceId,
       controller,
       cardDb
     );
-    const events = [
-      ...unpublishedEvents(topFrame.accumulatedEvents),
-      ...result.events,
-    ];
+    events.push(...result.events);
     let nextState = result.pendingPrompt
       ? retainEventsOnFrame(result.state, state.effectStack.length - 1, events)
       : result.state;
@@ -455,7 +454,7 @@ export function resumeFromStack(
         legacyCtx,
         action,
         cardDb,
-        services
+        services.withCommittedEvents(events)
       );
       nextState = result.state;
       events.push(...result.events);
@@ -494,10 +493,7 @@ export function resumeFromStack(
             phase: "INTERRUPTED_BY_TRIGGERS",
             validTargets: [],
             priorActionSucceeded: false,
-            accumulatedEvents: [
-              ...topFrame.accumulatedEvents,
-              ...result.events,
-            ],
+            accumulatedEvents: [...events],
           };
           nextState = pushFrame(nextState, continuationFrame);
           if (isEngineTerminated(nextState)) {
@@ -519,10 +515,7 @@ export function resumeFromStack(
             validTargets: promptCtx.validTargets,
             returnToDeckArrangement: promptCtx.returnToDeckArrangement,
             fieldToLifeTargetIds: promptCtx.fieldToLifeTargetIds,
-            accumulatedEvents: [
-              ...topFrame.accumulatedEvents,
-              ...result.events,
-            ],
+            accumulatedEvents: [...events],
             ruleTrashForPlay: promptCtx.ruleTrashForPlay,
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,
           };
@@ -598,7 +591,7 @@ export function resumeFromStack(
 
       if (topFrame.remainingActions.length > 0) {
         const resultRefs = new Map<string, EffectResult>(topFrame.resultRefs);
-        const chainResult = services.executeActionChain(
+        const chainResult = services.withCommittedEvents(events).executeActionChain(
           nextState,
           topFrame.remainingActions,
           sourceCardInstanceId,

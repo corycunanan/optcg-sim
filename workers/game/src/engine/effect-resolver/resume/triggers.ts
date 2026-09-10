@@ -11,7 +11,7 @@ import type {
   PendingEvent,
   QueuedTrigger,
 } from "../../../types.js";
-import { unpublishedEvents, takeInterruptedEvents } from "./events.js";
+import { unpublishedEvents, takeInterruptedEvents, publishCommittedEvents } from "./events.js";
 import { peekFrame, updateTopFrame } from "../../effect-stack.js";
 import {
   emitEvent,
@@ -33,7 +33,8 @@ export function processRemainingTriggers(
   // or finishes/abandons its cost. Earlier committed effects publish first;
   // staged cost frames are not interrupted frames and remain untouched.
   const prefix = takeInterruptedEvents(state);
-  state = prefix.state;
+  state = publishCommittedEvents(prefix.state, prefix.events);
+  state = services.publishCommittedEvents(state);
   const batchFrame = peekFrame(state);
   const ownsBatchPrefix = batchFrame?.phase === "AWAITING_BATCH_RESUME";
   const events = [
@@ -158,6 +159,7 @@ export function processRemainingTriggers(
 
     // Emit events from this trigger's resolution
     for (const event of result.events) {
+      if (event.propagation?.eventLogEmitted) continue;
       nextState = emitEvent(
         nextState,
         event.type,
@@ -224,6 +226,7 @@ export function processRemainingTriggers(
 
     // Emit events from this trigger's resolution
     for (const event of result.events) {
+      if (event.propagation?.eventLogEmitted) continue;
       nextState = emitEvent(
         nextState,
         event.type,
