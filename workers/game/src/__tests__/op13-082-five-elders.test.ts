@@ -315,7 +315,6 @@ describe("OPT-698: OP13-082 Five Elders", () => {
     const activeDonBefore = scenario.state.players[0].donCostArea.filter(
       (don) => don.state === "ACTIVE"
     ).length;
-    const events: PendingEvent[] = [];
 
     const activation = runPipeline(
       scenario.state,
@@ -337,7 +336,6 @@ describe("OPT-698: OP13-082 Five Elders", () => {
       { type: "PLAYER_CHOICE", choiceId: "accept" },
       scenario.cardDb
     );
-    events.push(...result.events);
 
     expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
@@ -350,7 +348,6 @@ describe("OPT-698: OP13-082 Five Elders", () => {
       { type: "SELECT_TARGET", selectedInstanceIds: [handCardId] },
       scenario.cardDb
     );
-    events.push(...result.events);
 
     expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
@@ -368,7 +365,6 @@ describe("OPT-698: OP13-082 Five Elders", () => {
       { type: "SELECT_TARGET", selectedInstanceIds: elderInstanceIds },
       scenario.cardDb
     );
-    events.push(...result.events);
 
     const player = result.state.players[0];
     expect(
@@ -383,7 +379,9 @@ describe("OPT-698: OP13-082 Five Elders", () => {
       scenario.vanillaB.instanceId,
       scenario.fiveElders.instanceId,
     ]);
-    const boardRemovalEvents = events.filter((event) => {
+    // Inspect this continuation's output once. Events from earlier pending
+    // returns are retained by its frame and must not be concatenated again.
+    const boardRemovalEvents = result.events.filter((event) => {
       const instanceId = eventInstanceId(event, "cardInstanceId");
       return (
         instanceId !== undefined && trashedBoardInstanceIds.has(instanceId)

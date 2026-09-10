@@ -62,6 +62,11 @@ import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { promptTypeToPhase } from "./cost-handler.js";
 import { isEngineTerminated } from "../engine-limits.js";
 import { replacePendingEventReferences } from "../events.js";
+import {
+  pendingPropagationEvents,
+  retainEventsOnFrame,
+  takeInterruptedEvents,
+} from "./resume/events.js";
 import { withChainDescription } from "./resolver.js";
 
 // Re-export the stable public API so existing imports keep working.
@@ -91,6 +96,7 @@ export function resumeEffectChain(
 
   const resultRefs = new Map<string, EffectResult>(resultRefsEntries);
   const events: PendingEvent[] = [];
+  services = services.withCommittedEvents(events);
   let nextState = state;
   let pausedActionSucceeded: boolean | undefined;
 
@@ -283,7 +289,7 @@ export function resumeEffectChain(
   // ── Tail: execute remainingActions (also handles OPTIONAL_EFFECT resume
   //         where pausedAction is null) ────────────────────────────────────
   if (remainingActions.length > 0) {
-    const chainResult = services.executeActionChain(
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
       nextState,
       remainingActions,
       effectSourceInstanceId,
@@ -376,17 +382,27 @@ export function resumeFromStack(
 
     const locks = [...plan.locks];
     locks[actionIndex] = { execute: true, targetInstanceIds: selected };
-    const result = services.continueSimultaneousGroup(
+    const events = pendingPropagationEvents(topFrame.accumulatedEvents);
+    const result = services.withCommittedEvents(events).continueSimultaneousGroup(
       popFrame(state),
       { ...plan, locks, nextActionIndex: actionIndex + 1 },
       sourceCardInstanceId,
       controller,
       cardDb
     );
+    events.push(...result.events);
+    let nextState = result.pendingPrompt
+      ? retainEventsOnFrame(result.state, state.effectStack.length - 1, events)
+      : result.state;
+    if (!result.pendingPrompt) {
+      const prefix = takeInterruptedEvents(nextState);
+      nextState = prefix.state;
+      events.unshift(...prefix.events);
+    }
     return {
-      state: result.state,
-      events: result.events,
-      resolved: !result.pendingPrompt && !isEngineTerminated(result.state),
+      state: nextState,
+      events,
+      resolved: !result.pendingPrompt && !isEngineTerminated(nextState),
       ...(result.pendingPrompt ? { pendingPrompt: result.pendingPrompt } : {}),
     };
   }
@@ -414,7 +430,7 @@ export function resumeFromStack(
     case "AWAITING_TARGET_SELECTION":
     case "AWAITING_ARRANGE_CARDS":
     case "AWAITING_PLAYER_CHOICE": {
-      const events: PendingEvent[] = [];
+      const events = pendingPropagationEvents(topFrame.accumulatedEvents);
       let nextState = popFrame(state);
       const stackDepthAfterPop = nextState.effectStack.length;
 
@@ -438,7 +454,7 @@ export function resumeFromStack(
         legacyCtx,
         action,
         cardDb,
-        services
+        services.withCommittedEvents(events)
       );
       nextState = result.state;
       events.push(...result.events);
@@ -477,10 +493,7 @@ export function resumeFromStack(
             phase: "INTERRUPTED_BY_TRIGGERS",
             validTargets: [],
             priorActionSucceeded: false,
-            accumulatedEvents: [
-              ...topFrame.accumulatedEvents,
-              ...result.events,
-            ],
+            accumulatedEvents: [...events],
           };
           nextState = pushFrame(nextState, continuationFrame);
           if (isEngineTerminated(nextState)) {
@@ -502,10 +515,7 @@ export function resumeFromStack(
             validTargets: promptCtx.validTargets,
             returnToDeckArrangement: promptCtx.returnToDeckArrangement,
             fieldToLifeTargetIds: promptCtx.fieldToLifeTargetIds,
-            accumulatedEvents: [
-              ...topFrame.accumulatedEvents,
-              ...result.events,
-            ],
+            accumulatedEvents: [...events],
             ruleTrashForPlay: promptCtx.ruleTrashForPlay,
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,
           };
@@ -518,6 +528,7 @@ export function resumeFromStack(
             resumeContext: replacementFrame.id,
           };
         } else {
+          nextState = retainEventsOnFrame(nextState, stackDepthAfterPop, events);
           const replacementFrame = peekFrame(nextState);
           if (replacementFrame) {
             nextState = updateTopFrame(nextState, {
@@ -574,12 +585,13 @@ export function resumeFromStack(
 
     // ── Interrupted by nested triggers (triggers have completed, resume) ─
     case "INTERRUPTED_BY_TRIGGERS": {
-      const events: PendingEvent[] = [];
+      const events = pendingPropagationEvents(topFrame.accumulatedEvents);
       let nextState = popFrame(state);
+      const stackDepthAfterPop = nextState.effectStack.length;
 
       if (topFrame.remainingActions.length > 0) {
         const resultRefs = new Map<string, EffectResult>(topFrame.resultRefs);
-        const chainResult = services.executeActionChain(
+        const chainResult = services.withCommittedEvents(events).executeActionChain(
           nextState,
           topFrame.remainingActions,
           sourceCardInstanceId,
@@ -593,6 +605,7 @@ export function resumeFromStack(
         events.push(...chainResult.events);
 
         if (chainResult.pendingPrompt) {
+          nextState = retainEventsOnFrame(nextState, stackDepthAfterPop, events);
           const nestedFrame = peekFrame(nextState);
           if (nestedFrame && topFrame.replacementBatchContinuation) {
             nextState = updateTopFrame(nextState, {
@@ -607,33 +620,21 @@ export function resumeFromStack(
             pendingPrompt: chainResult.pendingPrompt,
           };
         }
+      }
 
-        // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)
-        if (chainResult.events.length > 0) {
-          const chainScan = scanEventsForTriggers(
+      // Publication and trigger scanning are independent obligations. A saved
+      // prefix may already be logged, including an event-only continuation.
+      if (events.length > 0) {
+        const scan = scanEventsForTriggers(nextState, events, controller, cardDb);
+        nextState = scan.state;
+        events.splice(0, events.length, ...scan.events);
+        if (scan.triggers.length > 0) {
+          return services.processRemainingTriggers(
             nextState,
-            chainResult.events,
-            controller,
-            cardDb
+            [...scan.triggers, ...topFrame.pendingTriggers],
+            cardDb,
+            events
           );
-          nextState = chainScan.state;
-          replacePendingEventReferences(
-            events,
-            chainResult.events,
-            chainScan.events
-          );
-          if (chainScan.triggers.length > 0) {
-            const allTriggers = [
-              ...chainScan.triggers,
-              ...topFrame.pendingTriggers,
-            ];
-            return services.processRemainingTriggers(
-              nextState,
-              allTriggers,
-              cardDb,
-              events
-            );
-          }
         }
       }
 

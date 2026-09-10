@@ -1,3 +1,4 @@
+import { takeInterruptedEvents } from "../engine/effect-resolver/resume/events.js";
 import type {
   CardData,
   EffectStackFrame,
@@ -395,13 +396,16 @@ function finishReplacementBatchResult(
     batch.finalizedIds.length > 0,
     batch.finalizedIds
   );
-  if (batch.events.length === 0) return { state };
+  const prefix = takeInterruptedEvents(state);
+  state = prefix.state;
+  const events = [...prefix.events, ...batch.events];
+  if (events.length === 0) return { state };
 
   const outerContinuation =
     state.effectStack.at(-1)?.replacementBatchContinuation;
   const pipeline = continuePipelineFromExecution(
     state,
-    { state, events: batch.events },
+    { state, events },
     cardDb,
     context.causingController
   );
