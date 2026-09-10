@@ -1,28 +1,42 @@
-# OPT-820 — committed events across prompt continuations
+# OPT-820 — committed events across nested execution and prompt continuations
 
-Implemented; independent review and final integration gates remain coordinator-owned. Implementation commit `fa21930f` follows RED regression `02711fbc`; branch `corymcunanan/opt-820-accumulated-events-replay` (PR link in run ledger/PR body).
+PR #651, branch `corymcunanan/opt-820-accumulated-events-replay`. The resumed implementation is `f23b7bce5c960b3016b501be9b05f93067456707`; current main `9087d2b1` was integrated normally in `05335ff598e6498e8d2d3d6b3969416d9d5ee2a6`. Fresh independent review and readiness remain coordinator-owned. PR stays draft until all gates pass.
 
-Read `resume-core.ts`, `resume/events.ts`, `resume/batch.ts`, `resume/cost.ts`, and `session/prompt-lifecycle.ts` first. A frame retains only unpublished committed events; terminal resumes replay them before new events. Successor frames inherit the prefix without duplicating shared references. Existing publication boundaries take and clear committed interrupted prefixes before publishing child events: the trigger drain, a completed simultaneous target plan, and raw replacement batch completion. Rejected targets and unfinished costs never reach those boundaries, so their prefix owners remain unchanged. Batch trigger drains consume their prefix before creating immutable publication copies. Staged cost transactions are excluded; cost events transfer only after successful payment.
+## Problem and ownership contract
 
-Canonical behavior: OP13-082 pays one active DON!! and one hand card, trashes all allied Characters (not K.O.), then plays distinct 5000-power Five Elders from Trash. OP13-080 registers one attack effect and one permanent effect after play. Sources: `docs/cards/OP-13.md` OP13-079/080/082; supported comprehensive rules v1.2.0 §§3-1-6, 8-3-1-1/3/5, 8-6-1-1; `ZONE-TRANSITION-CONTRACT.md`. Zone mutation semantics are unchanged.
+Five Elders' hand payment and allied trash events were lost when its later play prompted. The first fix recovered saved frame events, but a nonoptional replacement could publish its played Character while an earlier outer draw still existed only in a caller accumulator. Retaining that draw after nested execution returned restored completeness but inverted chronology.
 
-| Clause / continuation | Evidence |
+Read `effect-resolver/resolver.ts`, `resume/events.ts`, `resume/triggers.ts`, and `resume-core.ts` first. Each synchronous caller now passes scoped resolver services into nested execution before it starts. The scope exposes that caller's **committed** events to existing publication boundaries, in ancestor-first order. Publication replaces entries in the caller-owned array with immutable flagged copies; events remain available for the existing independent trigger scan. No function/callback is serialized, no shared mutable dispatcher is introduced, and no new event IDs or wire fields are required.
+
+If execution pauses before publication, existing frames become the durable owner. Initial recursive AND/resource expansion, simultaneous suffixes, nested choices, paid effect actions and resumed chains retain their prefixes on the first successor frame. Frame replay filters published events, deduplicates shared references without conflating equal payloads, and clears interrupted/batch prefixes at publication. Resumed rejected responses do not reach publication and preserve their input state.
+
+This does **not** eagerly emit after each action. A terminal replacement draw without a nested drain still returns its pending events to the normal pipeline. `emitEvent` also advances timestamps and records Character K.O.s; its publication boundaries remain unchanged. Existing nested boundaries now see the earlier committed prefix before publishing their own event, as required by chronological ordering. Direct trigger-result loops respect `eventLogEmitted` to avoid re-emitting events published by descendants.
+
+Unpaid staged costs remain outside committed scopes. Cost accumulators enter the scope only after full payment commits and actions begin; incomplete or abandoned transactions retain the existing rollback behavior. No card movement, trigger-priority, registration, schema, client animation or spectator contract changes are intended.
+
+## Acceptance evidence
+
+| Requirement | Retained verification |
 | --- | --- |
-| Hand payment, allied trash, Elder play in order, no K.O. | New real Imu/Five Elders `runPipeline` + every `resumePromptLifecycle` response; final eventLog, zones and one registration each |
-| Repeated target, AND planning, interrupted and batch suffix prompts | New focused continuation tests; full persisted SessionRepository round trip, illegal targets and wrong-player routing |
-| Replacement child and raw optional replacement | Persisted nested arrangement, terminal substitute, and replacement play with an On Play hand-cost regressions (pay/decline); outer draw precedes play, payment, child draw and final outer draw |
-| Exactly once / immutable events | Batch-prefix/trigger-drain overlap, already published prefix and frozen inputs; original OPT-468/757 suites unchanged |
+| Five Elders logs hand cost, all allied trash and Elder play exactly once | `opt-820-accumulated-events-replay.test.ts` drives `runPipeline` and every `resumePromptLifecycle` response, checking final zones, no K.O. and one Nusjuro registration each |
+| Earlier caller event precedes nonoptional nested publication | `opt-820-nested-publication.test.ts`: outer DRAW → replacement PLAY → On Play hand cost/DRAW → outer DRAW; optional/nonoptional pair |
+| Real persistence and rejected responses | New nested pair restores through a new `SessionRepository` before every response and rejects wrong-player, stale and duplicate responses; original states stay immutable |
+| Recursive initial callers keep prefixes | New DRAW → AND target planning → DRAW and DRAW → up-to resource choice → target → DRAW, with repository round trip before each response |
+| Normal terminal behavior remains ordered | Paired optional/nonoptional replacement DRAW; nonoptional path asserts no premature eventLog publication before pipeline continuation |
+| Existing cost and ordering behavior | Full worker coverage includes transactional-cost suites and unchanged OPT-468 event immutability / OPT-757 ordering suites |
 
-The hand-cost producer intentionally emits one aggregate `CARD_TRASHED {count:1, reason:"cost", from:"HAND"}` without a private card identity. The regression checks that payload plus the exact paid fixture card leaving Hand and entering Trash, preserving the existing client animation contract (`use-card-transitions.ts`). The older Five Elders test now inspects one continuation output instead of concatenating outputs from pending returns, which double-count replayed events.
+Canonical source: OP13-079/080/082 in `docs/cards/OP-13.md`; comprehensive rules v1.2.0 §§3-1-6, 8-3-1-1/3/5, 8-6-1-1; `ZONE-TRANSITION-CONTRACT.md`. The new replacement tests are shared continuation probes, not new authored-card claims. Aggregate hand-cost `CARD_TRASHED {count:1, reason:"cost", from:"HAND"}` is intentionally unchanged; the Five Elders regression also checks actual Hand→Trash state.
 
-Shared inventory (generated registry plus `getNestedActions`): 2,472 schemas, 3,606 blocks, 3,820 actions across 73 types; PLAY_CARD 261, KO 324, RETURN_TO_DECK 74. This is a shared continuation change, not a card encoding sweep. Full worker baseline after implementation: 221 files / 2,361 passed, five pre-existing skips, exit 0; new OPT-820 scenarios cover fourteen tests. Required full `pnpm run verify` and final SHA evidence are recorded in the PR body.
+## Validation record
 
-No schema/wire changes, migrations, client animation changes or spectator changes. OPT-818/819 prerequisites are merged. No remaining scoped successor; OPT-821's independent field-to-Life choice continuation must survive final main integration. No production repair or manual deployment is required.
+- Previous code baseline `9210ee3f`: retained paired replacement test is RED, one failed/one passed, exit 1; observed `play1,draw0,trash1,draw1,draw0`, expected `draw0,play1,trash1,draw1,draw0`. `/private/tmp/opt820-redesign-red.log`.
+- Candidate `f23b7bce`: focused new/existing ownership plus resolver-service architecture suites, **19 passed, exit 0**; worker type-check **exit 0**. `/private/tmp/opt820-redesign-focused.log`, `/private/tmp/opt820-redesign-types.log`.
+- First broader worker check: 2,397 passed / five existing skips and one services-shape expectation failure. The new service methods were added to the architecture contract test; its focused rerun passes. This earlier run is not the final gate.
+- Sandbox full verify skipped database tests despite the correct URL and was stopped; its result is **incomplete**. A database-enabled pre-integration rerun was also stopped when main advanced. Neither is claimed as final verification.
+- Final required `pnpm verify` will run against integrated main using the coordinator's disposable PostgreSQL server at port 55439. Record actual counts, numeric exit and tested head in this handoff/PR body after completion.
 
-## Blocked after final independent review
+Generated registry plus recursive `getNestedActions` inventory was rerun using `node --import tsx`: 2,472 schemas / 3,606 blocks; DRAW 398, PLAY_CARD 261, KO 324, RETURN_TO_DECK 74, PLAYER_CHOICE 36, OPPONENT_CHOICE 8, OPPONENT_ACTION 54. Artifact `/private/tmp/opt820-redesign-inventory.json`; canonical schema inventory also runs in `pnpm verify`. Affected consumers include replacement actions, normal/recursive chains, simultaneous groups, cost-completed actions, target/choice/arrangement resumes, batch reentry, trigger ordering, and session persistence. OPT-818/819 prerequisites are merged; current-main OPT-821 field-to-Life continuation is retained.
 
-The required local gate passes at code head `3000fb5a485de6d3eac05c7cbe875c9a093f454e`, but this PR is **not merge-ready**. Final independent review confirmed the same chronology defect in a naturally reachable **non-optional** replacement: outer DRAW → K.O. attempt → replacement PLAY_CARD → On Play hand cost / DRAW → outer suffix DRAW. The substitute's CARD_PLAYED reaches the log before the earlier outer CARD_DRAWN. The optional replacement variant passes; the non-optional variant retains the prefix only in the outer caller while the nested drain runs, then stores it on an interrupted frame too late.
+## Follow-ups
 
-Evidence: `/private/tmp/opt820-independent-feedback.log`, reviewer scratch `review820-feedback.test.ts`, and advisory thread `PRRT_kwDORn6rD86g6Bgh` on PR #651. This is a material unresolved acceptance failure, not deferred cleanup. The bounded review/delta cycle is exhausted; the coordinator halted implementation and merging for approach reassessment. The PR is draft.
-
-Next approach to assess: propagate caller-held committed prefixes before entering a nested drain, with one explicit event owner across caller, frame and publication boundaries. No implementation of that broader approach has been made. Preserve existing regression evidence and prove the non-optional whole-chain case before renewing review and readiness. Local full verification at the unchanged code head passed (app 2,367, pipeline 48, worker 2,396 / five existing skips, real disposable PostgreSQL, exit 0); passing suites do not close this independently reproduced gap.
+No new out-of-scope findings. The prior confirmed nonoptional chronology finding has a retained passing regression at the implementation candidate; fresh independent review must validate the correction before the coordinator dispositions feedback or merges. No production repair, migration, separate deployment, Linear mutation or merge was performed by the implementer.
