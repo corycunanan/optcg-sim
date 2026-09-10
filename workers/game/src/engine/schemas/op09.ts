@@ -3114,6 +3114,8 @@ export const OP09_093_MARSHALL_D_TEACH: EffectSchema = {
         },
         {
           type: "APPLY_PROHIBITION",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } },
+          conditions: { type: "REVEALED_CARD_PROPERTY", result_ref: "negated_character", filter: { card_type: "CHARACTER" } },
           target_ref: "negated_character",
           params: { prohibition_type: "CANNOT_ATTACK" },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
@@ -3289,9 +3291,9 @@ export const OP09_098_BLACK_HOLE: EffectSchema = {
           type: "KO",
           target_ref: "negated_character",
           conditions: {
-            type: "CARD_ON_FIELD",
-            controller: "OPPONENT",
-            filter: { cost_max: 4 },
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "negated_character",
+            filter: { card_type: "CHARACTER", cost_max: 4 },
           },
           chain: "THEN",
         },
