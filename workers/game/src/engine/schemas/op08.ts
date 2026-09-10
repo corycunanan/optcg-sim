@@ -2437,7 +2437,7 @@ export const OP08_069_CHARLOTTE_LINLIN: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 6 },
           },
-          params: { face: "UP" },
+          params: { face: "UP", position: "TOP_OR_BOTTOM" },
           chain: "THEN",
         },
       ],

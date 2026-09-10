@@ -53,6 +53,7 @@ import {
   handlePlayerChoiceStateDistribution,
   handlePlayerChoiceDonReturn,
   handleChooseValue,
+  handleFieldToLifePosition,
   handlePlayerChoiceBranch,
   handleAwaitingOptionalResponse,
   handleAwaitingTriggerOrderSelection,
@@ -184,6 +185,14 @@ export function resumeEffectChain(
         pendingPrompt: returnToDeck.pendingPrompt,
       };
     }
+  }
+
+  const fieldToLife = handleFieldToLifePosition(nextState, action, resumeCtx, resultRefs, cardDb);
+  if (fieldToLife) {
+    if (fieldToLife.rejected) return fieldToLife;
+    nextState = fieldToLife.state;
+    events.push(...fieldToLife.events);
+    pausedActionSucceeded = fieldToLife.succeeded;
   }
 
   // ── PLAYER_CHOICE branches ────────────────────────────────────────────────
@@ -436,6 +445,7 @@ export function resumeFromStack(
         resultRefs: topFrame.resultRefs,
         validTargets: topFrame.validTargets,
         returnToDeckArrangement: topFrame.returnToDeckArrangement,
+        fieldToLifeTargetIds: topFrame.fieldToLifeTargetIds,
         ruleTrashForPlay: topFrame.ruleTrashForPlay,
         stateDistributionForPlay: topFrame.stateDistributionForPlay,
       };
@@ -508,6 +518,7 @@ export function resumeFromStack(
             resultRefs: promptCtx.resultRefs,
             validTargets: promptCtx.validTargets,
             returnToDeckArrangement: promptCtx.returnToDeckArrangement,
+            fieldToLifeTargetIds: promptCtx.fieldToLifeTargetIds,
             accumulatedEvents: [
               ...topFrame.accumulatedEvents,
               ...result.events,

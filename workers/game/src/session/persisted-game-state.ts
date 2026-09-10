@@ -325,6 +325,7 @@ const StackFrameCore = z.strictObject({
   resultRefs: z.array(z.tuple([z.string(), z.unknown()])),
   validTargets: StringArray,
   returnToDeckArrangement: ReturnToDeckArrangement.optional(),
+  fieldToLifeTargetIds: StringArray.optional(),
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
   replacementBatchContinuation: z.unknown().optional(),
