@@ -41,8 +41,12 @@ describe("OPT-473 authored action inventory", () => {
     expect(inventory.missingHandlers).toEqual([]);
     expect(inventory.missingExecutionTests).toEqual([]);
     expect(inventory.authoredUses).toBeGreaterThan(0);
+    // Every authored action needs execution coverage. Supported/tested actions
+    // can temporarily have no authored consumers (e.g. a corrected card cost).
+    expect(EXECUTED_ACTION_TYPES).toEqual(
+      expect.arrayContaining(inventory.authoredTypes)
+    );
     expect(inventory).toMatchObject({
-      authoredTypes: expect.arrayContaining([...EXECUTED_ACTION_TYPES]),
       handledTypes: inventory.authoredTypes,
       executedTypes: inventory.authoredTypes,
     });
