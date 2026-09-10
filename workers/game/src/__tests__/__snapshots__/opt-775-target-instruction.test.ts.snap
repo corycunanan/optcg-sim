@@ -2,7 +2,7 @@
 
 exports[`OPT-775 target instructions > snapshots every authored action target and the distinct wording set 1`] = `
 {
-  "fallbackCount": 557,
+  "fallbackCount": 559,
   "fallbacks": [
     "EB01-008 :: ko_replacement :: replacement_actions[0] (TRASH_FROM_HAND)",
     "EB01-013 :: activate_play_and_draw :: actions[0] (PLAY_CARD)",
@@ -18,6 +18,8 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "EB01-059 :: trigger_ko :: actions[0] (KO)",
     "EB02-002 :: activate_power_buff :: actions[0] (MODIFY_POWER)",
     "EB02-003.effects.0.modifiers.0.target (non-action target)",
+    "EB02-005.effects.0.modifiers.0.target (non-action target)",
+    "EB02-005.effects.1.modifiers.0.target (non-action target)",
     "EB02-012.effects.0.modifiers.0.target (non-action target)",
     "EB02-019.effects.0.modifiers.0.target (non-action target)",
     "EB02-022 :: on_play_play_character :: actions[0] (PLAY_CARD)",
@@ -562,7 +564,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST30-001.effects.1.modifiers.0.target (non-action target)",
     "ST30-003.effects.0.modifiers.0.target (non-action target)",
   ],
-  "generatedCount": 1978,
+  "generatedCount": 1976,
   "instructions": [
     "Add to Life 1 of your opponent's Characters with a cost of 3 or less.",
     "Add to Life this card.",
