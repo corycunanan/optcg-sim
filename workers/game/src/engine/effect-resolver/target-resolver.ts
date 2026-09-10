@@ -30,6 +30,7 @@ import { findCardInstance } from "../state.js";
 import type { ActionResult } from "./types.js";
 import { isPresent } from "../type-guards.js";
 import { promptEffectDescription } from "./action-utils.js";
+import { generateTargetInstruction } from "./target-instruction.js";
 
 export interface LifeCardTargetContext {
   owner: 0 | 1;
@@ -728,6 +729,9 @@ export function buildSelectTargetPrompt(
   const namedDistribution = target?.named_distribution
     ? { names: target.named_distribution.names }
     : undefined;
+  const instruction = target
+    ? generateTargetInstruction(action, target, countMin, countMax)
+    : undefined;
 
   const pendingPrompt: PendingPromptState = {
     options: {
@@ -735,6 +739,7 @@ export function buildSelectTargetPrompt(
       cards,
       validTargets: allValidIds,
       effectDescription,
+      ...(instruction ? { instruction } : {}),
       countMin,
       countMax,
       ctaLabel: "Confirm",

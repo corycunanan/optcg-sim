@@ -105,6 +105,7 @@ function playOneCharacter(
         cards,
         validTargets: ownCharIds,
         effectDescription: "Character area is full. Choose one of your Characters to trash (rule 3-7-6-1).",
+        instruction: "Trash 1 of your Characters.",
         countMin: 1,
         countMax: 1,
         ctaLabel: "Confirm",
