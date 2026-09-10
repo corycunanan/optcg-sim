@@ -230,7 +230,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "OP08-102 :: on_play_ko :: actions[0] (KO)",
     "OP08-112 :: on_play_cannot_attack :: actions[0] (APPLY_PROHIBITION)",
     "OP08-114.effects.0.modifiers.0.target (non-action target)",
-    "OP08-118 :: on_play_debuff_and_ko :: actions[0] (MODIFY_POWER)",
+    "OP08-118 :: on_play_debuff_and_ko :: actions[1] (MODIFY_POWER)",
     "OP08-119 :: when_attacking_wipe :: actions[0] (KO)",
     "OP09-004.effects.0.modifiers.0.target (non-action target)",
     "OP09-017.effects.0.modifiers.0.target (non-action target)",
@@ -563,7 +563,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST30-001.effects.1.modifiers.0.target (non-action target)",
     "ST30-003.effects.0.modifiers.0.target (non-action target)",
   ],
-  "generatedCount": 1977,
+  "generatedCount": 1978,
   "instructions": [
     "Add to Life 1 of your opponent's Characters with a cost of 3 or less.",
     "Add to Life this card.",
@@ -661,6 +661,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Choose your opponent's Characters with a cost of 7 or less that are rested.",
     "Choose your opponent's Characters with a power of 2000 or less.",
     "Choose your opponent's Characters.",
+    "Choose your opponent's Leader that is rested.",
     "Choose your opponent's Leader.",
     "Choose your opponent's card on top of the deck.",
     "Choose your opponent.",
@@ -1247,6 +1248,6 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Trash your Characters.",
     "Trash your cards in hand.",
   ],
-  "targetCount": 2535,
+  "targetCount": 2536,
 }
 `;
