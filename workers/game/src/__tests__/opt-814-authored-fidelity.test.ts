@@ -483,4 +483,37 @@ describe("OPT-814 registered authored-card pipeline", () => {
       true
     );
   });
+  it("PRB02-009 ignores being rested by your own Dragon Twister effect", () => {
+    const f = fixture();
+    const mr3 = f.put("PRB02-009", 0);
+    f.put(CARDS.VANILLA.id, 1);
+    const schema = getEffectSchema("OP07-036")!;
+    f.db.set("OP07-036", {
+      ...CARDS.VANILLA,
+      id: "OP07-036",
+      type: "Event",
+      cost: 2,
+      effectText:
+        "[Main] Up to 1 of your Leader or Character cards gains +3000 power during this turn. Then, you may rest 1 of your Characters with a cost of 3 or more. If you do, rest up to 1 of your opponent's Characters with a cost of 5 or less.",
+      effectSchema: schema,
+    });
+    const n = f.state.players[0].hand.length;
+    f.play("OP07-036");
+    f.choose("accept");
+    f.select([]);
+    if (
+      f.state.pendingPrompt?.options.promptType === "SELECT_TARGET" &&
+      f.state.pendingPrompt.options.validTargets.includes(mr3.instanceId)
+    )
+      f.select([mr3.instanceId]);
+    if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
+      f.select([]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[0].hand).toHaveLength(n);
+    expect(
+      f.state.players[0].characters.find(
+        (c) => c?.instanceId === mr3.instanceId
+      )?.state
+    ).toBe("RESTED");
+  });
 });
