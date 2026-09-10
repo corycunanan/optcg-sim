@@ -306,9 +306,11 @@ Example:
 
 Bandai FAQs distinguish three activation paths that share the surface wording "an Event is activated":
 
-1. **`EVENT_ACTIVATED_FROM_HAND`** — normal play of an Event card from hand (pay cost, resolve [Main]).
-2. **`EVENT_MAIN_RESOLVED_FROM_TRASH`** — a Character activates the [Main] of an Event card from trash (OP12-041 Sanji, EB03-031 Reiju). Inline DON!! cost is paid; the Event's printed cost is skipped; the Event is trashed after.
+1. **`EVENT_ACTIVATED_FROM_HAND`** — activation of an Event card from hand (pay its printed cost, resolve [Main] or [Counter]). Character counters do not emit this class.
+2. **`EVENT_MAIN_RESOLVED_FROM_TRASH`** — a Character activates the [Main] of an Event card from trash (EB03-031 Reiju). The Character's inline cost is paid; the Event's printed cost is skipped; the Event remains in trash.
 3. **`EVENT_TRIGGER_RESOLVED`** — an Event card's [Trigger] effect resolves from Life.
+
+For root Main/Counter plays, committed activation events are published before the Event effect emits its own events, but activation watchers are scanned only after the complete Event effect resolves. A prompted Event retains private `pendingEventActivationEvents` trigger-scan debt in durable state; resume clears it before scanning, so a watcher prompt cannot replay it. Counter effects resolve directly before watcher ordering, just like Main effects (OPT-805).
 
 For "when your opponent activates an Event" rulings (Usopp, Page One, Lucy, Luffy, Crocodile Leader), Bandai clarifies that classes 1 and 2 count but class 3 does NOT. Cards subscribe to the exact set of classes they care about via a `CompoundTrigger`:
 

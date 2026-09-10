@@ -119,6 +119,20 @@ export function runPipeline(
   }
 
   if (execResult.pendingPrompt) {
+    // Main/Counter execution owns its activation notification. Resolver frame
+    // accumulators own their own prefixes and may scan them before the Event's
+    // suffix finishes, so keep only the outer debt in a separate root barrier.
+    if (execResult.events.some(event => event.type === "EVENT_ACTIVATED_FROM_HAND")) {
+      const frameOwned = new Set(nextState.effectStack.flatMap(frame => frame.accumulatedEvents));
+      nextState = {
+        ...nextState,
+        pendingEventActivationEvents: execResult.events.filter(event =>
+          !frameOwned.has(event) &&
+          (!event.propagation?.eventLogEmitted || !event.propagation?.triggerScanned)
+        ),
+      };
+      nextState = recordAction(nextState, actionToExecute, actedCard);
+    }
     nextState = { ...nextState, pendingPrompt: execResult.pendingPrompt };
     log("pipeline.end", {
       ...logCtx,
@@ -200,27 +214,6 @@ function fireEventsAndTriggers(
       payload: pendingEvent.payload ?? {},
       timestamp: timed.timestamp,
     } as GameEvent;
-
-    // Counter event cards go hand → trash and are never registered in the
-    // trigger registry. Inject their COUNTER_EVENT effect blocks directly.
-    if (pendingEvent.type === "COUNTER_USED" && pendingEvent.payload?.type === "event") {
-      const { cardId, cardInstanceId = "" } = pendingEvent.payload;
-      const controller = (pendingEvent.playerIndex ?? pi) as 0 | 1;
-      const counterCardData = cardDb.get(cardId);
-      if (counterCardData?.effectSchema) {
-        const schema = counterCardData.effectSchema;
-        for (const block of schema.effects) {
-          if (block.category === "auto" && block.trigger && "keyword" in block.trigger && block.trigger.keyword === "COUNTER_EVENT") {
-            triggerQueue.push({
-              sourceCardInstanceId: cardInstanceId,
-              controller,
-              effectBlock: block,
-              triggeringEvent: pendingEvent,
-            });
-          }
-        }
-      }
-    }
 
     const matched = matchTriggersForEvent(state, gameEvent, cardDb);
     if (matched.length === 0) continue;
@@ -565,6 +558,7 @@ function finishPipeline(
     state = {
       ...state,
       status: "FINISHED",
+      pendingEventActivationEvents: undefined,
       winner: defeat.winner,
       winReason: defeat.reason,
     };

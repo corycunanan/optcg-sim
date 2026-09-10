@@ -606,7 +606,11 @@ export function filterStateForPlayer(
     [Field in PlayerViewRewrittenField]: GameState[Field];
   };
 
-  return { ...state, ...playerViewOverrides };
+  const visible = { ...state, ...playerViewOverrides };
+  // Root execution debt is private, just like effectStack; it can contain
+  // resolver prefixes with hidden-zone identities and must not cross sockets.
+  delete visible.pendingEventActivationEvents;
+  return visible;
 }
 
 // ─── Player state helpers ─────────────────────────────────────────────────────

@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { CardData, CardInstance, GameAction } from "../types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameAction,
+  GameState,
+} from "../types.js";
+import {
+  SessionRepository,
+  parseStoredSession,
+  type SessionStorage,
+} from "../session/persistence.js";
+import { filterStateForPlayer } from "../engine/state.js";
+import { visibleStateForSpectator } from "../session/visibility.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
@@ -15,6 +27,39 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+
+class ActivationMemory implements SessionStorage {
+  data = new Map<string, unknown>();
+  async get<T>(key: string) {
+    return this.data.get(key) as T | undefined;
+  }
+  async put(key: string | Record<string, unknown>, value?: unknown) {
+    for (const [k, v] of Object.entries(
+      typeof key === "string" ? { [key]: value } : key
+    ))
+      this.data.set(k, JSON.parse(JSON.stringify(v)));
+  }
+  async setAlarm() {}
+  async deleteAlarm() {}
+}
+async function activationRoundTrip(
+  state: GameState,
+  cardDb: Map<string, CardData>
+) {
+  const storage = new ActivationMemory();
+  const config = { nextJsUrl: "https://example.test", workerSecret: "test" };
+  await new SessionRepository(storage, config).save({
+    state,
+    cardDb,
+    undoHistory: [],
+    mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
+    testPriorityRolls: null,
+  });
+  const loaded = await new SessionRepository(storage, config).load();
+  expect(loaded).not.toBeNull();
+  return loaded!;
+}
 
 const text: Record<string, string> = {
   "OP01-062":
@@ -33,6 +78,8 @@ const text: Record<string, string> = {
 function fixture() {
   const db = createTestCardDb();
   for (const [id, cost] of [
+    ["OP01-004", 2],
+    ["OP11-012", 4],
     ["OP01-062", 0],
     ["OP02-071", 0],
     ["OP01-069", 4],
@@ -94,6 +141,10 @@ function fixture() {
     player: 0 | 1 = state.turn.activePlayerIndex
   ) {
     if (state.pendingPrompt) {
+      action = {
+        ...action,
+        promptId: state.pendingPrompt.promptId,
+      } as GameAction;
       expect(
         new SessionCoordinator().routePromptResponse(
           state,
@@ -142,6 +193,11 @@ function fixture() {
     choose,
     select,
     play,
+    async reload() {
+      const loaded = await activationRoundTrip(state, db);
+      state = loaded.state;
+      for (const [id, data] of loaded.cardDb) db.set(id, data);
+    },
     get state() {
       return state;
     },
@@ -511,4 +567,414 @@ describe("OPT805 authored trash-Event publication", () => {
       true
     );
   });
+});
+
+describe("OPT805 Event activation lifecycle regressions", () => {
+  it("Counter Event Ulti-Mortar must offer Crocodile after its draw", () => {
+    const f = fixture();
+    const croc = f.put("OP01-062", 1, "LEADER");
+    attach(f, croc);
+    f.state.players[1].hand = f.state.players[1].hand.slice(0, 2);
+    const attacker = f.put(CARDS.VANILLA.id, 0);
+    const event = f.put("OP01-118", 1, "HAND");
+    f.act({
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: attacker.instanceId,
+      targetInstanceId: croc.instanceId,
+    });
+    f.act({ type: "PASS" }, 1);
+    f.act(
+      {
+        type: "USE_COUNTER_EVENT",
+        cardInstanceId: event.instanceId,
+        counterTargetInstanceId: croc.instanceId,
+      },
+      1
+    );
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.choose("accept"); // Event DON -2 cost, not Crocodile
+    if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
+      f.select([]);
+    expect(f.state.players[1].hand).toHaveLength(3); // Event draw resolved
+    expect(f.state.players[1].leader.attachedDon).toHaveLength(1);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.choose("accept");
+    expect(f.state.players[1].hand).toHaveLength(4);
+  });
+  it.each([0, 1])(
+    "SMILE real search pause selecting %i must retain Crocodile activation",
+    async (count) => {
+      const f = fixture();
+      const croc = f.put("OP01-062", 0, "LEADER");
+      attach(f, croc);
+      f.state.players[0].hand = f.state.players[0].hand.slice(0, 2);
+      f.db.set("review-smile", {
+        ...CARDS.VANILLA,
+        id: "review-smile",
+        name: "review SMILE",
+        types: ["SMILE"],
+        cost: 3,
+        effectSchema: null,
+      });
+      f.state.players[0].deck[0] = {
+        ...f.state.players[0].deck[0],
+        cardId: "review-smile",
+      };
+      f.play("OP01-116");
+      expect(
+        f.state.pendingEventActivationEvents?.some(
+          (e) => e.type === "EVENT_ACTIVATED_FROM_HAND"
+        )
+      ).toBe(true);
+      expect(
+        f.state.eventLog.findIndex(
+          (e) => e.type === "CARD_PLAYED" && e.payload.cardId === "OP01-116"
+        )
+      ).toBeLessThan(
+        f.state.eventLog.findIndex(
+          (e) => e.type === "EVENT_ACTIVATED_FROM_HAND"
+        )
+      );
+      expect(filterStateForPlayer(f.state, 0)).not.toHaveProperty(
+        "pendingEventActivationEvents"
+      );
+      expect(filterStateForPlayer(f.state, 1)).not.toHaveProperty(
+        "pendingEventActivationEvents"
+      );
+      expect(visibleStateForSpectator(f.state, f.db)).not.toHaveProperty(
+        "pendingEventActivationEvents"
+      );
+      await f.reload();
+      const o = f.state.pendingPrompt!.options;
+      expect(o.promptType).toBe("ARRANGE_TOP_CARDS");
+      if (o.promptType !== "ARRANGE_TOP_CARDS") throw Error("search");
+      const keep = count ? [o.validTargets![0]] : [];
+      f.act({
+        type: "ARRANGE_TOP_CARDS",
+        keptCardInstanceId: keep[0] ?? "",
+        keptCardInstanceIds: keep,
+        orderedInstanceIds: o.cards
+          .filter((c) => !keep.includes(c.instanceId))
+          .map((c) => c.instanceId),
+        destination: "bottom",
+      });
+      expect(
+        f.state.players[0].characters.filter(
+          (c) => c?.cardId === "review-smile"
+        )
+      ).toHaveLength(count);
+      if (count)
+        expect(
+          f.state.eventLog.findIndex(
+            (e) => e.type === "EVENT_ACTIVATED_FROM_HAND"
+          )
+        ).toBeLessThan(
+          f.state.eventLog.findIndex(
+            (e) =>
+              e.type === "CARD_PLAYED" && e.payload.cardId === "review-smile"
+          )
+        );
+      expect(f.state.players[0].hand).toHaveLength(2);
+      expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+      expect(f.state.pendingEventActivationEvents).toBeUndefined();
+      await f.reload();
+      f.choose("accept");
+      expect(f.state.players[0].hand).toHaveLength(3);
+      expect(f.state.pendingPrompt).toBeNull();
+      expect(
+        f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+      ).toHaveLength(1);
+      expect(
+        f.state.eventLog.filter(
+          (e) => e.type === "CARD_PLAYED" && e.payload.cardId === "OP01-116"
+        )
+      ).toHaveLength(1);
+      expect(
+        f.state.turn.actionsPerformedThisTurn.filter(
+          (a) => a.actionType === "PLAY_CARD"
+        )
+      ).toHaveLength(1);
+      await f.reload();
+      expect(f.state.pendingEventActivationEvents).toBeUndefined();
+    }
+  );
+});
+
+function counterFixture(hand: number, usopp = false) {
+  const f = fixture();
+  const croc = f.put("OP01-062", 1, "LEADER");
+  attach(f, croc);
+  if (usopp) attach(f, f.put("OP01-004", 0));
+  f.state.players[1].hand = f.state.players[1].hand.slice(0, hand);
+  const attacker = f.put(CARDS.VANILLA.id, 0);
+  const event = f.put("OP01-118", 1, "HAND");
+  f.act({
+    type: "DECLARE_ATTACK",
+    attackerInstanceId: attacker.instanceId,
+    targetInstanceId: croc.instanceId,
+  });
+  f.act({ type: "PASS" }, 1);
+  return { f, event, croc };
+}
+describe("OPT805 persisted Counter Event ordering", () => {
+  it.each([2, 4])(
+    "resumes all Event prompts before checking Crocodile with initial hand %i",
+    async (hand) => {
+      const { f, event, croc } = counterFixture(hand, true);
+      const attackerHand = f.state.players[0].hand.length;
+      f.act(
+        {
+          type: "USE_COUNTER_EVENT",
+          cardInstanceId: event.instanceId,
+          counterTargetInstanceId: croc.instanceId,
+        },
+        1
+      );
+      expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+      expect(f.state.players[0].hand).toHaveLength(attackerHand); // Usopp waits for the Counter.
+      await f.reload();
+      f.choose("accept");
+      expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      expect(f.state.players[0].hand).toHaveLength(attackerHand);
+      await f.reload();
+      f.select([]); // Event then draws one; active-player Usopp must precede Crocodile.
+      expect(f.state.players[1].hand).toHaveLength(hand + 1);
+      expect(f.state.players[0].hand).toHaveLength(attackerHand + 1);
+      if (hand === 2) {
+        expect(f.state.pendingPrompt?.options.promptType).toBe(
+          "OPTIONAL_EFFECT"
+        );
+        expect(f.state.pendingEventActivationEvents).toBeUndefined();
+        await f.reload();
+        f.choose("accept");
+        expect(f.state.players[1].hand).toHaveLength(4);
+      }
+      expect(f.state.pendingPrompt).toBeNull();
+      expect(
+        f.state.eventLog.filter((e) => e.type === "COUNTER_USED")
+      ).toHaveLength(1);
+      expect(
+        f.state.eventLog.findIndex((e) => e.type === "COUNTER_USED")
+      ).toBeLessThan(
+        f.state.eventLog.findIndex(
+          (e) => e.type === "EVENT_ACTIVATED_FROM_HAND"
+        )
+      );
+      expect(
+        f.state.eventLog.findIndex(
+          (e) => e.type === "EVENT_ACTIVATED_FROM_HAND"
+        )
+      ).toBeLessThan(
+        f.state.eventLog.findIndex((e) => e.type === "CARD_DRAWN")
+      );
+      expect(
+        f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+      ).toHaveLength(1);
+      expect(
+        f.state.turn.actionsPerformedThisTurn.filter(
+          (a) => a.actionType === "USE_COUNTER_EVENT"
+        )
+      ).toHaveLength(1);
+      await f.reload();
+      expect(f.state.pendingEventActivationEvents).toBeUndefined();
+    }
+  );
+  it("declining the Event's optional cost still completes activation without its draw", async () => {
+    const { f, event, croc } = counterFixture(2);
+    f.act(
+      {
+        type: "USE_COUNTER_EVENT",
+        cardInstanceId: event.instanceId,
+        counterTargetInstanceId: croc.instanceId,
+      },
+      1
+    );
+    await f.reload();
+    f.choose("skip");
+    expect(f.state.players[1].hand).toHaveLength(2);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.choose("skip");
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[1].hand).toHaveLength(2);
+    expect(f.state.pendingEventActivationEvents).toBeUndefined();
+  });
+  it("Character counters do not create an Event activation", () => {
+    const { f } = counterFixture(2);
+    const card = f.put(CARDS.COUNTER.id, 1, "HAND");
+    f.act(
+      {
+        type: "USE_COUNTER",
+        cardInstanceId: card.instanceId,
+        counterTargetInstanceId: f.state.players[1].leader.instanceId,
+      },
+      1
+    );
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(
+      f.state.eventLog.some((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+    ).toBe(false);
+    expect(f.state.pendingEventActivationEvents).toBeUndefined();
+  });
+});
+
+describe("OPT805 activation barrier edge cases", () => {
+  it("ends a pending Counter activation on concede without firing its watchers", async () => {
+    const { f, event, croc } = counterFixture(2);
+    f.act(
+      {
+        type: "USE_COUNTER_EVENT",
+        cardInstanceId: event.instanceId,
+        counterTargetInstanceId: croc.instanceId,
+      },
+      1
+    );
+    await f.reload();
+    const r = runPipeline(f.state, { type: "CONCEDE" }, f.db, 1);
+    expect(r.valid).toBe(true);
+    expect(r.gameOver).toBeDefined();
+    expect(r.state.pendingEventActivationEvents).toBeUndefined();
+    expect(
+      r.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+    ).toHaveLength(1);
+    expect(r.state.players[1].hand).toHaveLength(2);
+    await activationRoundTrip(r.state, f.db);
+  });
+  it("treats an Event without an authored Counter block as an activation", () => {
+    const { f, event, croc } = counterFixture(2);
+    f.db.set(event.cardId, { ...f.db.get(event.cardId)!, effectSchema: null });
+    f.act(
+      {
+        type: "USE_COUNTER_EVENT",
+        cardInstanceId: event.instanceId,
+        counterTargetInstanceId: croc.instanceId,
+      },
+      1
+    );
+    expect(f.state.players[1].hand).toHaveLength(2);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.choose("accept");
+    expect(f.state.players[1].hand).toHaveLength(3);
+    expect(f.state.pendingPrompt).toBeNull();
+  });
+  it("retains same-player watcher ordering across reload after the Counter finishes", async () => {
+    const { f, event, croc } = counterFixture(2, true);
+    f.put("OP11-012", 0);
+    const hand = f.state.players[0].hand.length;
+    f.act(
+      {
+        type: "USE_COUNTER_EVENT",
+        cardInstanceId: event.instanceId,
+        counterTargetInstanceId: croc.instanceId,
+      },
+      1
+    );
+    f.choose("accept");
+    f.select([]);
+    expect(f.state.players[1].hand).toHaveLength(3);
+    expect(f.state.pendingEventActivationEvents).toBeUndefined();
+    expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    let selections = 0;
+    while (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+      await f.reload();
+      const opts = f.state.pendingPrompt!.options;
+      if (opts.promptType !== "PLAYER_CHOICE") throw Error("ordering");
+      f.choose(opts.choices.find((c) => !c.disabled)!.id);
+      expect(++selections).toBeLessThan(4);
+    }
+    expect(f.state.players[0].hand).toHaveLength(hand + 1);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    await f.reload();
+    f.choose("accept");
+    expect(f.state.players[1].hand).toHaveLength(4);
+    expect(
+      f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+    ).toHaveLength(1);
+  });
+  it("accepts old snapshots and rejects malformed new activation queues/payloads", () => {
+    const f = fixture();
+    const base = {
+      formatVersion: 1,
+      state: f.state,
+      cardDb: Object.fromEntries(f.db),
+      undoHistory: [],
+    };
+    expect(
+      parseStoredSession(JSON.parse(JSON.stringify(base))).state
+        .pendingEventActivationEvents
+    ).toBeUndefined();
+    for (const queue of [
+      "invalid",
+      [{ type: "NOT_AN_EVENT" }],
+      [
+        {
+          type: "EVENT_ACTIVATED_FROM_HAND",
+          playerIndex: 2,
+          payload: { cardInstanceId: "x" },
+        },
+      ],
+      [
+        {
+          type: "EVENT_ACTIVATED_FROM_HAND",
+          payload: { cardInstanceId: "x", ignored: true },
+        },
+      ],
+      [
+        {
+          type: "EVENT_ACTIVATED_FROM_HAND",
+          payload: { cardInstanceId: "x" },
+          ignored: true,
+        },
+      ],
+      [
+        {
+          type: "EVENT_ACTIVATED_FROM_HAND",
+          payload: { cardInstanceId: "x" },
+          propagation: { triggerScanned: false },
+        },
+      ],
+    ])
+      expect(() =>
+        parseStoredSession(
+          JSON.parse(
+            JSON.stringify({
+              ...base,
+              state: { ...f.state, pendingEventActivationEvents: queue },
+            })
+          )
+        )
+      ).toThrow();
+  });
+});
+
+it("Crocodile can decline a Counter activation, accept the next, then draws only once", async () => {
+  const { f, event, croc } = counterFixture(2);
+  for (let index = 0; index < 3; index++) {
+    const current =
+      index === 0 ? event : f.put("OP01-118", 1, "HAND", String(index));
+    f.act(
+      {
+        type: "USE_COUNTER_EVENT",
+        cardInstanceId: current.instanceId,
+        counterTargetInstanceId: croc.instanceId,
+      },
+      1
+    );
+    f.choose("skip"); // Decline the Counter effect's DON-minus cost.
+    if (index < 2) {
+      expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+      await f.reload();
+      f.choose(index === 0 ? "skip" : "accept");
+    }
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.pendingEventActivationEvents).toBeUndefined();
+  }
+  expect(f.state.players[1].hand).toHaveLength(3);
+  expect(
+    f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+  ).toHaveLength(3);
+  expect(
+    f.state.turn.actionsPerformedThisTurn.filter(
+      (a) => a.actionType === "USE_COUNTER_EVENT"
+    )
+  ).toHaveLength(3);
 });
