@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { CardInstance, GameAction } from "../types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameAction,
+  GameState,
+} from "../types.js";
+import {
+  SessionRepository,
+  parseStoredSession,
+  type SessionStorage,
+} from "../session/persistence.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
@@ -14,6 +24,36 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+
+class RestMemory implements SessionStorage {
+  data = new Map<string, unknown>();
+  async get<T>(key: string) {
+    return this.data.get(key) as T | undefined;
+  }
+  async put(key: string | Record<string, unknown>, value?: unknown) {
+    for (const [k, v] of Object.entries(
+      typeof key === "string" ? { [key]: value } : key
+    ))
+      this.data.set(k, JSON.parse(JSON.stringify(v)));
+  }
+  async setAlarm() {}
+  async deleteAlarm() {}
+}
+async function roundTripRest(state: GameState, cardDb: Map<string, CardData>) {
+  const storage = new RestMemory();
+  const config = { nextJsUrl: "https://example.test", workerSecret: "test" };
+  await new SessionRepository(storage, config).save({
+    state,
+    cardDb,
+    undoHistory: [],
+    mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
+    testPriorityRolls: null,
+  });
+  const loaded = await new SessionRepository(storage, config).load();
+  expect(loaded).not.toBeNull();
+  return loaded!;
+}
 
 // Expectations: docs/cards/{EB-03,EB-04,PRB-02,UNKNOWN}.md and PRB02-004/006 FAQ.
 function fixture() {
@@ -515,5 +555,98 @@ describe("OPT-814 registered authored-card pipeline", () => {
         (c) => c?.instanceId === mr3.instanceId
       )?.state
     ).toBe("RESTED");
+  });
+  it.each([false, true])(
+    "rest event survives durable save/load and Mr.3 continues once; resumed batch%s",
+    async (batch) => {
+      const f = fixture();
+      const mr3 = f.put("PRB02-009", 1);
+      const n = f.state.players[1].hand.length;
+      if (batch) {
+        f.leaderTypes(["Navy"]);
+        const schema = getEffectSchema("OP10-023")!;
+        f.db.set("OP10-023", {
+          ...CARDS.VANILLA,
+          id: "OP10-023",
+          effectSchema: schema,
+        });
+        const zoro = f.put("PRB02-006", 1);
+        f.put(CARDS.VANILLA.id, 1);
+        f.play("OP10-023");
+        f.select([zoro.instanceId, mr3.instanceId]);
+        f.choose("skip");
+      } else {
+        f.play("OP01-033");
+        f.select([mr3.instanceId]);
+      }
+      expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+      const loaded = await roundTripRest(f.state, f.db);
+      const events = loaded.state.eventLog.filter(
+        (e) =>
+          e.type === "CARD_STATE_CHANGED" &&
+          e.payload.targetInstanceId === mr3.instanceId
+      );
+      expect(events).toHaveLength(1);
+      expect(events[0].payload).toMatchObject({
+        newState: "RESTED",
+        cause: "EFFECT",
+        causingController: 0,
+      });
+      const resolved = resumePromptLifecycle(
+        loaded.state,
+        { type: "PLAYER_CHOICE", choiceId: "accept" },
+        loaded.cardDb,
+        { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }
+      );
+      expect(resolved.responseRejected).toBe(false);
+      expect(resolved.state.pendingPrompt).toBeNull();
+      const completed = await roundTripRest(resolved.state, loaded.cardDb);
+      expect(completed.state.players[1].hand).toHaveLength(n + 2);
+      expect(
+        completed.state.players[1].trash.filter((c) => c.cardId === mr3.cardId)
+      ).toHaveLength(1);
+    }
+  );
+
+  it("legacy declaration rest without cause/controller remains loadable", async () => {
+    const f = fixture();
+    const attacker = f.put(CARDS.VANILLA.id, 0);
+    f.act({
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: attacker.instanceId,
+      targetInstanceId: f.state.players[1].leader.instanceId,
+    });
+    const loaded = await roundTripRest(f.state, f.db);
+    const event = loaded.state.eventLog.find(
+      (e) => e.type === "CARD_STATE_CHANGED"
+    );
+    expect(event?.payload).toEqual({
+      cardInstanceId: attacker.instanceId,
+      newState: "RESTED",
+    });
+  });
+  it.each([
+    { cause: "COST" },
+    { cause: 1 },
+    { causingController: 2 },
+    { causingController: "0" },
+    { unexpectedProvenance: true },
+  ])("strict rest event decoding rejects invalid provenance %j", (patch) => {
+    const f = fixture();
+    const target = f.put(CARDS.VANILLA.id, 1);
+    f.play("OP01-033");
+    f.select([target.instanceId]);
+    const raw = JSON.parse(
+      JSON.stringify({
+        state: f.state,
+        cardDb: Object.fromEntries(f.db),
+        mode: "PVP",
+      })
+    );
+    const event = raw.state.eventLog.find(
+      (e: { type: string }) => e.type === "CARD_STATE_CHANGED"
+    );
+    Object.assign(event.payload, patch);
+    expect(() => parseStoredSession(raw)).toThrow("unknown event variant");
   });
 });
