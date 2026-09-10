@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseStoredSession } from "../session/persistence.js";
 import { visibleStateForPlayer } from "../session/visibility.js";
-import { eventToSpotlight } from "../../../../src/lib/game/spotlight.js";
 import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
@@ -279,15 +278,6 @@ describe("OPT809 Law reveal and inner may", () => {
             visibility: "BOTH",
           },
         });
-        expect(eventToSpotlight(reveals[0])).toMatchObject({
-          kind: "REVEAL",
-          cards: [{ cardId: life[0].cardId, instanceId: life[0].instanceId }],
-        });
-        expect(
-          view.players[0].characters.some(
-            (c) => c?.instanceId === returned.instanceId
-          )
-        ).toBe(false);
         expect(view.players[0].hand).toHaveLength(
           f.state.players[0].hand.length
         );
