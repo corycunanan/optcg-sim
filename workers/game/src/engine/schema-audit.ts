@@ -51,7 +51,9 @@ const HIGH_RISK_PATTERNS: readonly RiskPattern[] = [
     name: "BASE_POWER_BECOMES",
     textPattern: /base power becomes/i,
     suspicious: (types) =>
-      !types.has("SET_BASE_POWER") && !types.has("MODIFIER:SET_BASE_POWER"),
+      !types.has("SET_BASE_POWER") &&
+      !types.has("MODIFIER:SET_BASE_POWER") &&
+      !types.has("MODIFIER:SET_POWER"),
   },
   {
     name: "SWAP_POWER",
