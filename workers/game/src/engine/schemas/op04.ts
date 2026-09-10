@@ -349,9 +349,9 @@ export const OP04_011_NAMI: EffectSchema = {
           params: { amount: 3000 },
           duration: { type: "THIS_TURN" },
           chain: "THEN",
-          // Checks if revealed card is a Character with 6000+ power; needs engine support for reveal-check pattern
           conditions: {
-            type: "BOARD_WIDE_EXISTENCE",
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed_card",
             filter: { card_type: "CHARACTER", power_min: 6000 },
           },
         },
@@ -3343,15 +3343,26 @@ export const OP04_094_TRUENO_BASTARDO: EffectSchema = {
       id: "main_conditional_ko",
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
-      // KO cost 4 or less; if trash >= 15, KO cost 6 or less instead. Conditional upgrade needs engine support.
+      // Exactly one branch applies; the Event is already in its controller's trash.
       actions: [
         {
           type: "KO",
+          conditions: { type: "TRASH_COUNT", controller: "SELF", operator: "<", value: 15 },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
             filter: { cost_max: 4 },
+          },
+        },
+        {
+          type: "KO",
+          conditions: { type: "TRASH_COUNT", controller: "SELF", operator: ">=", value: 15 },
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            filter: { cost_max: 6 },
           },
         },
       ],
