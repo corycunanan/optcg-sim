@@ -63,7 +63,7 @@ import { promptTypeToPhase } from "./cost-handler.js";
 import { isEngineTerminated } from "../engine-limits.js";
 import { replacePendingEventReferences } from "../events.js";
 import {
-  unpublishedEvents,
+  pendingPropagationEvents,
   retainEventsOnFrame,
   takeInterruptedEvents,
 } from "./resume/events.js";
@@ -382,7 +382,7 @@ export function resumeFromStack(
 
     const locks = [...plan.locks];
     locks[actionIndex] = { execute: true, targetInstanceIds: selected };
-    const events = unpublishedEvents(topFrame.accumulatedEvents);
+    const events = pendingPropagationEvents(topFrame.accumulatedEvents);
     const result = services.withCommittedEvents(events).continueSimultaneousGroup(
       popFrame(state),
       { ...plan, locks, nextActionIndex: actionIndex + 1 },
@@ -430,7 +430,7 @@ export function resumeFromStack(
     case "AWAITING_TARGET_SELECTION":
     case "AWAITING_ARRANGE_CARDS":
     case "AWAITING_PLAYER_CHOICE": {
-      const events = unpublishedEvents(topFrame.accumulatedEvents);
+      const events = pendingPropagationEvents(topFrame.accumulatedEvents);
       let nextState = popFrame(state);
       const stackDepthAfterPop = nextState.effectStack.length;
 
@@ -585,7 +585,7 @@ export function resumeFromStack(
 
     // ── Interrupted by nested triggers (triggers have completed, resume) ─
     case "INTERRUPTED_BY_TRIGGERS": {
-      const events = unpublishedEvents(topFrame.accumulatedEvents);
+      const events = pendingPropagationEvents(topFrame.accumulatedEvents);
       let nextState = popFrame(state);
       const stackDepthAfterPop = nextState.effectStack.length;
 
@@ -620,33 +620,21 @@ export function resumeFromStack(
             pendingPrompt: chainResult.pendingPrompt,
           };
         }
+      }
 
-        // Scan chain events for new triggers (e.g., PLAY_CARD → ON_PLAY)
-        if (chainResult.events.length > 0) {
-          const chainScan = scanEventsForTriggers(
+      // Publication and trigger scanning are independent obligations. A saved
+      // prefix may already be logged, including an event-only continuation.
+      if (events.length > 0) {
+        const scan = scanEventsForTriggers(nextState, events, controller, cardDb);
+        nextState = scan.state;
+        events.splice(0, events.length, ...scan.events);
+        if (scan.triggers.length > 0) {
+          return services.processRemainingTriggers(
             nextState,
-            chainResult.events,
-            controller,
-            cardDb
+            [...scan.triggers, ...topFrame.pendingTriggers],
+            cardDb,
+            events
           );
-          nextState = chainScan.state;
-          replacePendingEventReferences(
-            events,
-            chainResult.events,
-            chainScan.events
-          );
-          if (chainScan.triggers.length > 0) {
-            const allTriggers = [
-              ...chainScan.triggers,
-              ...topFrame.pendingTriggers,
-            ];
-            return services.processRemainingTriggers(
-              nextState,
-              allTriggers,
-              cardDb,
-              events
-            );
-          }
         }
       }
 

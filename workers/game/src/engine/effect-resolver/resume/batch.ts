@@ -4,7 +4,7 @@
  * remaining-batch state carried on the frame's batchResumeMarker.
  */
 
-import { unpublishedEvents, retainEventsOnFrame } from "./events.js";
+import { pendingPropagationEvents, retainEventsOnFrame } from "./events.js";
 import type { Action, EffectBlock, EffectResult } from "../../effect-types.js";
 import type {
   BatchResumeMarker,
@@ -66,7 +66,7 @@ export function reenterBatchResume(
     events.splice(
       0,
       events.length,
-      ...new Set([...unpublishedEvents(top.accumulatedEvents), ...events]),
+      ...new Set([...pendingPropagationEvents(top.accumulatedEvents), ...events]),
     );
     nextState = popFrame(nextState);
     const stackDepth = nextState.effectStack.length;

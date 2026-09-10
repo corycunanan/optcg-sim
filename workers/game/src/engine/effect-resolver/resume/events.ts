@@ -1,11 +1,22 @@
+import {
+  generateFrameId,
+  pushFrame,
+  CONTINUATION_EFFECT_BLOCK,
+} from "../../effect-stack.js";
 import { emitPendingEvent, withEventLogEmitted } from "../../events.js";
 import type { GameState, PendingEvent } from "../../../types.js";
 
-/** A continuation owns only events that have not reached the public log yet. */
-export function unpublishedEvents(
+/** Retain events until both independent propagation obligations are complete.
+ * Publication can precede a prompt while trigger scanning still belongs to the
+ * resumed continuation; an emitted event is not necessarily finished work.
+ */
+export function pendingPropagationEvents(
   events: readonly PendingEvent[]
 ): PendingEvent[] {
-  return events.filter((event) => !event.propagation?.eventLogEmitted);
+  return events.filter(
+    (event) =>
+      !event.propagation?.eventLogEmitted || !event.propagation?.triggerScanned
+  );
 }
 
 /**
@@ -28,8 +39,8 @@ export function retainEventsOnFrame(
   );
   const accumulatedEvents = [
     ...new Set([
-      ...unpublishedEvents(events),
-      ...unpublishedEvents(frame.accumulatedEvents),
+      ...pendingPropagationEvents(events),
+      ...pendingPropagationEvents(frame.accumulatedEvents),
     ]),
   ].filter((event) => !nestedEvents.has(event));
   return {
@@ -48,7 +59,7 @@ export function takeInterruptedEvents(state: GameState): {
   const events: PendingEvent[] = [];
   const effectStack = state.effectStack.map((frame) => {
     if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") return frame;
-    events.push(...unpublishedEvents(frame.accumulatedEvents));
+    events.push(...pendingPropagationEvents(frame.accumulatedEvents));
     return { ...frame, accumulatedEvents: [] };
   });
   return { state: events.length ? { ...state, effectStack } : state, events };
@@ -66,4 +77,49 @@ export function publishCommittedEvents(
     events[index] = withEventLogEmitted(event);
   }
   return state;
+}
+
+/** A trigger drain may pause again after detaching an ancestor's event debt.
+ * Keep that committed work below the new prompt, never in a staged cost frame.
+ * Interrupted resumes scan their complete prefix even with no suffix actions.
+ */
+export function retainPropagationBeforePrompt(
+  state: GameState,
+  events: PendingEvent[]
+): GameState {
+  const pending = pendingPropagationEvents(events);
+  if (pending.length === 0) return state;
+  const ownerIndex = state.effectStack.findIndex(
+    (frame) => frame.phase === "INTERRUPTED_BY_TRIGGERS"
+  );
+  if (ownerIndex >= 0) return retainEventsOnFrame(state, ownerIndex, pending);
+  const child = state.effectStack.at(-1);
+  if (!child) return state;
+  const generated = generateFrameId(state);
+  const withOwner = pushFrame(generated.state, {
+    id: generated.id,
+    sourceCardInstanceId: child.sourceCardInstanceId,
+    controller: child.controller,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "INTERRUPTED_BY_TRIGGERS",
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: [],
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: pending,
+  });
+  if (withOwner.effectStack.length !== state.effectStack.length + 1)
+    return withOwner;
+  const owner = withOwner.effectStack.at(-1)!;
+  return {
+    ...withOwner,
+    effectStack: [...state.effectStack.slice(0, -1), owner, child],
+  };
 }

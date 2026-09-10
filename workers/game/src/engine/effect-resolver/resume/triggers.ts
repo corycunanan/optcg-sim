@@ -11,7 +11,7 @@ import type {
   PendingEvent,
   QueuedTrigger,
 } from "../../../types.js";
-import { unpublishedEvents, takeInterruptedEvents, publishCommittedEvents } from "./events.js";
+import { pendingPropagationEvents, takeInterruptedEvents, publishCommittedEvents, retainPropagationBeforePrompt } from "./events.js";
 import { peekFrame, updateTopFrame } from "../../effect-stack.js";
 import {
   emitEvent,
@@ -40,7 +40,7 @@ export function processRemainingTriggers(
   const events = [
     ...new Set([
       ...prefix.events,
-      ...(ownsBatchPrefix ? unpublishedEvents(batchFrame.accumulatedEvents) : []),
+      ...(ownsBatchPrefix ? pendingPropagationEvents(batchFrame.accumulatedEvents) : []),
       ...priorEvents,
     ]),
   ];
@@ -91,7 +91,7 @@ export function processRemainingTriggers(
         triggerOrderingGroup
       );
       return {
-        state: promptResult.state,
+        state: retainPropagationBeforePrompt(promptResult.state, events),
         events,
         resolved: false,
         pendingPrompt: promptResult.pendingPrompt,
@@ -118,7 +118,7 @@ export function processRemainingTriggers(
       cardDb
     );
     return {
-      state: promptResult.state,
+      state: retainPropagationBeforePrompt(promptResult.state, events),
       events,
       resolved: false,
       pendingPrompt: promptResult.pendingPrompt,
@@ -150,7 +150,7 @@ export function processRemainingTriggers(
         });
       }
       return {
-        state: nextState,
+        state: retainPropagationBeforePrompt(nextState, events),
         events,
         resolved: false,
         pendingPrompt: result.pendingPrompt,
@@ -185,7 +185,7 @@ export function processRemainingTriggers(
       cardDb
     );
     return {
-      state: promptResult.state,
+      state: retainPropagationBeforePrompt(promptResult.state, events),
       events,
       resolved: false,
       pendingPrompt: promptResult.pendingPrompt,
@@ -217,7 +217,7 @@ export function processRemainingTriggers(
         });
       }
       return {
-        state: nextState,
+        state: retainPropagationBeforePrompt(nextState, events),
         events,
         resolved: false,
         pendingPrompt: result.pendingPrompt,

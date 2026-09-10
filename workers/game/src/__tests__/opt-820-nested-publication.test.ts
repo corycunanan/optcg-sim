@@ -1,3 +1,6 @@
+import { processRemainingTriggers } from "../engine/effect-resolver/resume.js";
+import { getEffectivePower } from "../engine/modifiers.js";
+import { registerTriggersForCard } from "../engine/triggers.js";
 import { continuePipelineFromExecution } from "../engine/pipeline.js";
 import {
   SessionRepository,
@@ -55,10 +58,53 @@ async function restore(state: GameState, cardDb: Map<string, CardData>) {
   expect(loaded).not.toBeNull();
   return loaded!.state;
 }
-it.each([false, true])(
-  "replacement play with on-play cost preserves outer prefix (optional=%s)",
-  async (optional) => {
+it.each([
+  [false, false, true],
+  [true, false, true],
+  [false, true, false],
+  [false, true, true],
+  [true, true, false],
+  [true, true, true],
+])(
+  "replacement prefix preserves publication and scan obligations (optional=%s, siblings=%s, pay=%s)",
+  async (optional, siblings, pay) => {
     const { state, db } = fixture();
+    const watcher: CardData = {
+      ...CARDS.LEADER,
+      id: "DRAW-WATCHER",
+      name: "Draw Watcher",
+      effectSchema: {
+        card_id: "DRAW-WATCHER",
+        effects: [
+          {
+            id: "observe-draw",
+            category: "auto",
+            trigger: {
+              event: "DRAW_OUTSIDE_DRAW_PHASE",
+              filter: { controller: "SELF" },
+            },
+            actions: [
+              {
+                type: "MODIFY_POWER",
+                target: { type: "SELF" },
+                params: { amount: 1000 },
+                duration: { type: "THIS_TURN" },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    db.set(watcher.id, watcher);
+    state.players[0].leader = {
+      ...state.players[0].leader,
+      cardId: watcher.id,
+    };
+    state.triggerRegistry = registerTriggersForCard(
+      state,
+      state.players[0].leader,
+      watcher
+    ).triggerRegistry;
     const target = state.players[1].characters.find(Boolean)!;
     state.players[1].characters = padChars([target]);
     const playedCard: CardData = {
@@ -67,15 +113,14 @@ it.each([false, true])(
       name: "Review Cost",
       effectSchema: {
         card_id: "REVIEW-COST",
-        effects: [
-          {
-            id: "on-play-cost",
-            category: "auto",
-            trigger: { keyword: "ON_PLAY" },
-            costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
-            actions: [draw],
-          },
-        ],
+        effects: Array.from({ length: siblings ? 2 : 1 }, (_, index) => ({
+          id: `on-play-cost-${index}`,
+          category: "auto" as const,
+          trigger: { keyword: "ON_PLAY" as const },
+          flags: { optional: siblings },
+          costs: [{ type: "TRASH_FROM_HAND" as const, amount: 1 }],
+          actions: [draw],
+        })),
       },
     };
     db.set(playedCard.id, playedCard);
@@ -147,7 +192,7 @@ it.each([false, true])(
       pendingPrompt: result.pendingPrompt!,
     };
     let prompts = 0;
-    for (let i = 0; next.pendingPrompt && i < 8; i++) {
+    for (let i = 0; next.pendingPrompt && i < 24; i++) {
       prompts++;
       next = await restore(next, db);
       const p = next.pendingPrompt!.options;
@@ -157,7 +202,30 @@ it.each([false, true])(
               type: "SELECT_TARGET",
               selectedInstanceIds: p.validTargets.slice(0, p.countMax),
             }
-          : { type: "PLAYER_CHOICE", choiceId: "accept" };
+          : {
+              type: "PLAYER_CHOICE",
+              choiceId:
+                !pay &&
+                p.promptType === "OPTIONAL_EFFECT" &&
+                next.effectStack
+                  .at(-1)
+                  ?.effectBlock.id.startsWith("on-play-cost")
+                  ? "skip"
+                  : p.promptType === "PLAYER_CHOICE"
+                    ? p.choices.find((choice) => choice.id !== "decline")!.id
+                    : "accept",
+            };
+      if (p.promptType === "SELECT_TARGET") {
+        const before = JSON.stringify(next);
+        const rejected = resumePromptLifecycle(
+          next,
+          { type: "SELECT_TARGET", selectedInstanceIds: ["invalid"] },
+          db,
+          hooks
+        );
+        expect(rejected.responseRejected).toBe(true);
+        expect(JSON.stringify(rejected.state)).toBe(before);
+      }
       action.promptId = next.pendingPrompt!.promptId;
       const coordinator = new SessionCoordinator();
       const before = JSON.stringify(next);
@@ -178,11 +246,19 @@ it.each([false, true])(
       const resumed = resumePromptLifecycle(next, action, db, hooks);
       expect(resumed.responseRejected).toBe(false);
       expect(JSON.stringify(next)).toBe(before);
-      next = resumed.state;
+      // Production persists the next prompt (assigning its id) before accepting
+      // another response. A raw resolver result has no prompt id yet.
+      next = await restore(resumed.state, db);
       expect(coordinator.routePromptResponse(next, owner, action).kind).toBe(
         "reject"
       );
     }
+    expect(
+      next.eventLog.filter((event) => event.type === "POWER_MODIFIED")
+    ).toHaveLength(2);
+    expect(getEffectivePower(next.players[0].leader, watcher, next, db)).toBe(
+      watcher.power! + 2000
+    );
     expect(prompts).toBeGreaterThan(0);
     expect(next.pendingPrompt).toBeNull();
     expect(next.effectStack).toEqual([]);
@@ -195,8 +271,18 @@ it.each([false, true])(
     ).toEqual([
       ["CARD_DRAWN", 0],
       ["CARD_PLAYED", 1],
-      ["CARD_TRASHED", 1],
-      ["CARD_DRAWN", 1],
+      ...(pay
+        ? [
+            ["CARD_TRASHED", 1],
+            ["CARD_DRAWN", 1],
+          ]
+        : []),
+      ...(siblings && pay
+        ? [
+            ["CARD_TRASHED", 1],
+            ["CARD_DRAWN", 1],
+          ]
+        : []),
       ["CARD_DRAWN", 0],
     ]);
   }
@@ -473,3 +559,137 @@ it("two-level replacement plays publish outer and both On Play prefixes once", (
     ["CARD_DRAWN", 0],
   ]);
 });
+
+it.each([false, true])(
+  "an event-only owner survives a child cost prompt (pay=%s)",
+  async (pay) => {
+    const { state, db } = fixture();
+    const watcher: CardData = {
+      ...CARDS.LEADER,
+      id: "DRAIN-WATCHER",
+      name: "Drain Watcher",
+      effectSchema: {
+        card_id: "DRAIN-WATCHER",
+        effects: [
+          {
+            id: "drain-watch",
+            category: "auto",
+            trigger: {
+              event: "DRAW_OUTSIDE_DRAW_PHASE",
+              filter: { controller: "SELF" },
+            },
+            actions: [
+              {
+                type: "MODIFY_POWER",
+                target: { type: "SELF" },
+                params: { amount: 1000 },
+                duration: { type: "THIS_TURN" },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    db.set(watcher.id, watcher);
+    state.players[0].leader = {
+      ...state.players[0].leader,
+      cardId: watcher.id,
+    };
+    state.triggerRegistry = registerTriggersForCard(
+      state,
+      state.players[0].leader,
+      watcher
+    ).triggerRegistry;
+    const prefix = executeActionChain(
+      state,
+      [draw],
+      state.players[0].leader.instanceId,
+      0,
+      db
+    );
+    // Enter the real trigger-drain API with an earlier committed event and a
+    // child that pauses. No stack frame is fabricated by this fixture.
+    const drained = processRemainingTriggers(
+      prefix.state,
+      [
+        {
+          sourceCardInstanceId: state.players[1].leader.instanceId,
+          triggeringEvent: prefix.events.find(event => event.type === "DRAW_OUTSIDE_DRAW_PHASE")!,
+          controller: 1,
+          effectBlock: {
+            id: "child-cost",
+            category: "auto",
+            flags: { optional: true },
+            costs: [
+              { type: "REST_DON", amount: 1 },
+              { type: "TRASH_FROM_HAND", amount: 1 },
+            ],
+            actions: [draw],
+          },
+        },
+      ],
+      db,
+      prefix.events
+    );
+    let next: GameState = {
+      ...drained.state,
+      pendingPrompt: drained.pendingPrompt!,
+    };
+    expect(
+      next.effectStack.some(
+        (frame) =>
+          frame.phase === "INTERRUPTED_BY_TRIGGERS" &&
+          frame.remainingActions.length === 0
+      )
+    ).toBe(true);
+    let prompts = 0;
+    while (next.pendingPrompt && prompts++ < 8) {
+      next = await restore(next, db);
+      const p = next.pendingPrompt!.options;
+      const costFrame = next.effectStack.find(
+        (frame) => frame.phase === "AWAITING_COST_SELECTION"
+      );
+      if (costFrame) {
+        expect(
+          costFrame.accumulatedEvents.some(
+            (event) =>
+              event.type === "CARD_DRAWN" ||
+              event.type === "DRAW_OUTSIDE_DRAW_PHASE"
+          )
+        ).toBe(false);
+        expect(
+          next.eventLog.some(
+            (event) =>
+              event.type === "DON_RESTED" || event.type === "CARD_TRASHED"
+          )
+        ).toBe(false);
+      }
+      const action: GameAction =
+        p.promptType === "SELECT_TARGET"
+          ? {
+              type: "SELECT_TARGET",
+              selectedInstanceIds: p.validTargets.slice(0, p.countMax),
+            }
+          : { type: "PLAYER_CHOICE", choiceId: pay ? "accept" : "skip" };
+      const resumed = resumePromptLifecycle(next, action, db, hooks);
+      expect(resumed.responseRejected).toBe(false);
+      next = resumed.state;
+    }
+    expect(next.pendingPrompt).toBeNull();
+    expect(next.effectStack).toEqual([]);
+    expect(
+      next.eventLog
+        .filter((event) => event.type === "CARD_DRAWN")
+        .map((event) => event.playerIndex)
+    ).toEqual(pay ? [0, 1] : [0]);
+    expect(
+      next.eventLog.filter((event) => event.type === "POWER_MODIFIED")
+    ).toHaveLength(1);
+    expect(getEffectivePower(next.players[0].leader, watcher, next, db)).toBe(
+      watcher.power! + 1000
+    );
+    expect(
+      next.eventLog.filter((event) => event.type === "CARD_TRASHED")
+    ).toHaveLength(pay ? 1 : 0);
+  }
+);
