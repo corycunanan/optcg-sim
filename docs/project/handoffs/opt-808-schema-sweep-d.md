@@ -9,7 +9,7 @@ and schema-shape assertions, no Chessmarimo). Its exact original is preserved at
 `/private/tmp/opt808-recovered-original.test.ts`; this PR replaces it with actual
 registered-schema pipeline scenarios. Integrated main
 `15cad98bd139fc0d8cea075c809e4f8a7b45f507`, including OPT-821 and OPT-820.
-No sibling branch was imported. No merge or Linear writes are authorized here.
+No unmerged sibling branch was imported. The implementer never merges PRs or writes Linear; the coordinator owns current run authorization and final gates.
 
 ## Sources and interpretation
 
@@ -103,3 +103,12 @@ to the second action, and Thatch's extra replacement adds one target. Focused
 snapshot regeneration passed. Final complete gate must run on the follow-up
 commit. Database suites are skipped by the repository without TEST_DATABASE_URL;
 this card-only change adds no database requirement.
+
+
+### Main integration after OPT-811 and OPT-812 delivery (2026-09-10)
+
+Normally merged main `bf2d967bd7eb3453bb1830c50ee059fc7f2885bd` into previously reviewed OPT-808 head `e6f1805fc9c424fb1c338cec4a23efb70cd2677a`. The two conflicts were generated artifacts. Regenerated the registry, then proved all2472 entries equal the exact union of five owned OP07/08 corrections and15 incoming OP13–16 corrections, without overlap or dropped entries (`/private/tmp/opt808-integration-registry-union.json`). Regenerated the target-instruction snapshot: existing Foxy rested-Leader wording, Rayleigh fallback and Thatch replacement remain, while Issho adds its Character/Stage fallback (relative to OPT-808: fallback557→558, generated1979→1978). Snapshot generation passed19 tests.
+
+The sole overlapping handwritten file, effect-types.ts, merged cleanly: existing TRASH_COUNT.filter and incoming source-snapshot reference/type additions both remain. No manual behavior change was required. Both incoming authored suites and all existing OPT-808/821 regressions were preserved. Updated recursive TRASH_COUNT inventory now has37 uses in31 cards: two filtered Chessmarimo clauses and35 unfiltered uses. The one new unfiltered consumer is incoming OP14-092 Mr.3; its authored regression runs in the combined gate.
+
+Focused combined OPT-808/811/812, OPT-821, OPT-820, rest/blocker and target-instruction verification:11 files,184 tests passed (`/private/tmp/opt808-main812-focused.log`). Full `pnpm verify` is renewed on the committed integration/handoff head, with its exact SHA/outcome in PR657 body and coordinator receipt after completion. Historical independent review covers unchanged OPT-808 implementation; the new integrated tree still requires coordinator delta assessment and fresh required CI. No PR merge was performed by the implementer.
