@@ -453,4 +453,34 @@ describe("OPT-814 registered authored-card pipeline", () => {
       expect(f.state.pendingPrompt).toBeNull();
     }
   );
+  it("PRB02-009 preserves opponent effect provenance after batch Zoro replacement is declined", () => {
+    const f = fixture();
+    f.leaderTypes(["Navy"]);
+    const schema = getEffectSchema("OP10-023")!;
+    f.db.set("OP10-023", {
+      ...CARDS.VANILLA,
+      id: "OP10-023",
+      effectSchema: schema,
+    });
+    const zoro = f.put("PRB02-006", 1);
+    const mr3 = f.put("PRB02-009", 1);
+    f.put(CARDS.VANILLA.id, 1);
+    const n = f.state.players[1].hand.length;
+    f.play("OP10-023");
+    f.select([zoro.instanceId, mr3.instanceId]);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.choose("skip");
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.choose("accept");
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[1].hand).toHaveLength(n + 2);
+    expect(
+      f.state.players[1].characters.find(
+        (c) => c?.instanceId === zoro.instanceId
+      )?.state
+    ).toBe("RESTED");
+    expect(f.state.players[1].trash.some((c) => c.cardId === mr3.cardId)).toBe(
+      true
+    );
+  });
 });
