@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { parseStoredSession } from "../session/persistence.js";
+import { visibleStateForPlayer } from "../session/visibility.js";
+import { eventToSpotlight } from "../../../../src/lib/game/spotlight.js";
 import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
-import { isCardNegated } from "../engine/modifiers.js";
+import { getEffectiveCost, isCardNegated } from "../engine/modifiers.js";
 import {
   CARDS,
   createBattleReadyState,
@@ -69,7 +72,15 @@ function fixture() {
     expect(result.valid, result.error).toBe(!rejected);
     state = result.state;
   }
+  function persist() {
+    state = parseStoredSession(
+      JSON.parse(
+        JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+      )
+    ).state;
+  }
   function choice(action: GameAction, rejected = false) {
+    persist();
     const result = resumePromptLifecycle(state, action, db, {
       drainPregame: (s) => s,
       advanceStartOfTurn: (s) => s,
@@ -95,6 +106,7 @@ function fixture() {
   }
   return {
     db,
+    persist,
     data,
     put,
     act,
@@ -249,12 +261,52 @@ describe("OPT809 Law reveal and inner may", () => {
       });
       if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
         f.choice({ type: "PLAYER_CHOICE", choiceId: "activate" });
+      expect(f.state.eventLog.some((e) => e.type === "CARDS_REVEALED")).toBe(
+        false
+      );
       f.select([returned.instanceId]);
       expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+      f.persist();
+      for (const player of [0, 1] as const) {
+        const view = visibleStateForPlayer(f.state, f.db, player);
+        const reveals = view.eventLog.filter(
+          (e) => e.type === "CARDS_REVEALED"
+        );
+        expect(reveals).toHaveLength(1);
+        expect(reveals[0]).toMatchObject({
+          payload: {
+            cards: [{ cardId: life[0].cardId, instanceId: life[0].instanceId }],
+            visibility: "BOTH",
+          },
+        });
+        expect(eventToSpotlight(reveals[0])).toMatchObject({
+          kind: "REVEAL",
+          cards: [{ cardId: life[0].cardId, instanceId: life[0].instanceId }],
+        });
+        expect(
+          view.players[0].characters.some(
+            (c) => c?.instanceId === returned.instanceId
+          )
+        ).toBe(false);
+        expect(view.players[0].hand).toHaveLength(
+          f.state.players[0].hand.length
+        );
+      }
+      expect(
+        visibleStateForPlayer(f.state, f.db, 1).players[0].life[0].cardId
+      ).toBe("hidden");
       f.choice({
         type: "PLAYER_CHOICE",
         choiceId: decision === "accept" ? "0" : "1",
       });
+      f.persist();
+      expect(
+        f.state.eventLog.filter((e) => e.type === "CARDS_REVEALED")
+      ).toHaveLength(1);
+      // Returning this selectable cost mutates zones without a movement event.
+      expect(f.state.players[0].hand.some((c) => c.cardId === "return")).toBe(
+        true
+      );
       expect(f.state.pendingPrompt).toBeNull();
       expect(f.state.players[0].hand.some((c) => c.cardId === "return")).toBe(
         true
@@ -338,4 +390,69 @@ describe("OPT809 Law reveal and inner may", () => {
       expect(f.state.players[0].life).toEqual(life);
     }
   );
+});
+
+describe("OPT809 unchanged authored PLAYER_CHOICE", () => {
+  it.each(["0", "1"])(
+    "EB02-051 still resolves branch %s after persistence",
+    (branch) => {
+      const f = fixture();
+      f.data("EB02-051", {
+        type: "Event",
+        cost: 1,
+        power: null,
+        effectText: "[Main]",
+      });
+      const event = f.put("EB02-051", 0, "HAND");
+      f.data("legacy-target", { cost: 2 });
+      const target = f.put("legacy-target", 1);
+      f.act({ type: "PLAY_CARD", cardInstanceId: event.instanceId });
+      expect(f.state.pendingPrompt?.respondingPlayer).toBe(0);
+      expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+      f.choice({ type: "PLAYER_CHOICE", choiceId: branch });
+      f.select([target.instanceId]);
+      expect(f.state.pendingPrompt).toBeNull();
+      if (branch === "0")
+        expect(
+          f.state.players[1].trash.some((c) => c.cardId === target.cardId)
+        ).toBe(true);
+      else
+        expect(
+          getEffectiveCost(
+            f.db.get(target.cardId)!,
+            f.state,
+            target.instanceId,
+            f.db
+          )
+        ).toBe(0);
+    }
+  );
+});
+
+it("legacy Speed Jil publishes play before reveal before its placement decision, exactly once", () => {
+  const f = fixture();
+  f.data("OP08-049", { cost: 3 });
+  const jil = f.put("OP08-049", 0, "HAND");
+  const top = structuredClone(f.state.players[0].deck[0]);
+  f.act({ type: "PLAY_CARD", cardInstanceId: jil.instanceId });
+  expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+  f.persist();
+  for (const player of [0, 1] as const) {
+    const events = visibleStateForPlayer(f.state, f.db, player).eventLog.filter(
+      (e) => ["CARD_PLAYED", "CARDS_REVEALED"].includes(e.type)
+    );
+    expect(events.map((e) => e.type)).toEqual([
+      "CARD_PLAYED",
+      "CARDS_REVEALED",
+    ]);
+    expect(events[1].payload).toMatchObject({
+      cards: [{ cardId: top.cardId }],
+    });
+  }
+  f.choice({ type: "PLAYER_CHOICE", choiceId: "1" });
+  expect(f.state.pendingPrompt).toBeNull();
+  expect(f.state.players[0].deck.at(-1)?.cardId).toBe(top.cardId);
+  expect(
+    f.state.eventLog.filter((e) => e.type === "CARDS_REVEALED")
+  ).toHaveLength(1);
 });
