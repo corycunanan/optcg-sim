@@ -12,6 +12,7 @@ import {
   getEffectiveCostForRead,
   getEffectiveFieldCost,
   getEffectivePower,
+  getEffectiveBasePower,
   hasGrantedAttribute,
 } from "./modifiers.js";
 import { hasEffectiveKeyword } from "./keywords.js";
@@ -20,6 +21,7 @@ export type ConditionContext = Omit<QueryConditionContext, "queries">;
 
 const conditionQueries: ConditionQueryServices = {
   getEffectivePower,
+  getEffectiveBasePower,
   getEffectiveCostForRead,
   getEffectiveFieldCost,
   hasGrantedAttribute,
@@ -45,7 +47,8 @@ export function matchesFilter(
   state: GameState,
   resultRefs?: Map<string, EffectResult>,
   costOverride?: number,
-  filterController?: 0 | 1
+  filterController?: 0 | 1,
+  basePowerOverride?: number
 ): boolean {
   return matchesFilterQuery(
     card,
@@ -55,7 +58,8 @@ export function matchesFilter(
     resultRefs,
     costOverride,
     filterController,
-    conditionQueries
+    conditionQueries,
+    basePowerOverride
   );
 }
 
