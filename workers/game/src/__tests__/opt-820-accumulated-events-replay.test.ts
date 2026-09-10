@@ -5,10 +5,7 @@ import {
 } from "../session/persistence.js";
 import type { EffectStackFrame, PendingEvent } from "../types.js";
 import type { Action } from "../engine/effect-types.js";
-import {
-  executeActionChain,
-  resolveEffect,
-} from "../engine/effect-resolver/resolver.js";
+import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { withEventLogEmitted, emitEvent } from "../engine/events.js";
 
