@@ -2207,7 +2207,8 @@ export const OP12_061_DONQUIXOTE_ROSINANTE: EffectSchema = {
               params: { amount: -2 },
             },
             applies_to: {
-              action: "MODIFY_COST",
+              action: "PLAY_CARD",
+              source_zone: "HAND",
               filter: { name: "Trafalgar Law", cost_min: 4 },
             },
           },
@@ -3092,9 +3093,10 @@ export const OP12_087_NICO_ROBIN: EffectSchema = {
       id: "OP12-087_permanent",
       category: "permanent",
       conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Koala" },
+        any_of: [
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { name: "Koala" } },
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { name: "Monkey.D.Luffy" } },
+        ],
       },
       modifiers: [
         {

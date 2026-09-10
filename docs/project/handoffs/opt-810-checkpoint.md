@@ -1,0 +1,11 @@
+# OPT-810 implementation checkpoint (not review-ready)
+
+Branch codex/opt-810-card-fidelity, base 15cad98. Paused by coordinator to fix confirmed OPT-805 review findings. No PR or final gate yet.
+
+Four source changes: Jinbe Fish-Man OR Merfolk via explicit LEADER_PROPERTY any_of; Robin Koala OR Luffy likewise; Megalo removes unprinted active-state gate; Rosinante explicit PLAY_CARD/HAND one-time cost scope. Runtime scope matching uses original instance before movement at effective-cost and consumption; counter-event callers explicitly identify their action. Legacy MODIFY_COST remains accepted. Unknown action/source scopes fail closed in matching. The alternative keys suggested by ticket are not LeaderPropertyCheck fields: actual pipeline and typecheck caught them, hence full any_of clauses.
+
+Baseline /private/tmp/opt810-red.log: 10 authored pipeline tests,4 failures (Merfolk/Luffy/rested Megalo/trash Law quote). After generation /private/tmp/opt810-green.log:10 pass. This is a checkpoint only; worker typecheck rerun after nullable-card correction pending below, full verify not run.
+
+Remaining: authored Rosinante unrelated and low-cost Law nonconsumption, second activation, turn expiry, opponent/counter scope, free effect HAND/TRASH plays matching official OP12 FAQ, actual SessionRepository save/load discount scope (including prompt), legacy Kinemon pipeline, Jinbe cost5/6 and zero target, Megalo own-turn/wrong-Leader and actual rest transition; recursive producer inventory executable receipt; persistence/visibility/read-callsite inventory; documentation and final handoff, schema gate, full gate, commit/push/PR.
+
+Inventory so far: three authored APPLY_ONE_TIME_MODIFIER producers only (OP02-025 Kinemon legacy cost, OP12-061 Rosinante cost, EB02-030 replacement). Runtime modifiers.ts matching/cleanup/expiry; effects.ts producer; execute.ts sole consumption caller; battle.ts and validation.ts counter cost readers; visibility.ts hand quote default PLAY_CARD; field cost/target/condition readers use getEffectiveCostForRead/getEffectiveFieldCost excluding OTM. Session persisted-game-state.ts stores OTM as z.unknown array, persistence.ts validates modification only; visibility/history and cost transaction copy state. No strict appliesTo schema exists. Need roundtrip regression rather than assuming this stays opaque.

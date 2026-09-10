@@ -359,7 +359,7 @@ export function executeUseCounterEvent(
 
   const found = findCardInState(state, cardInstanceId)!;
   const cardData = cardDb.get(found.card.cardId)!;
-  const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb);
+  const cost = getEffectiveCost(cardData, state, cardInstanceId, cardDb, true, undefined, "USE_COUNTER_EVENT");
 
   // Pay cost
   let nextState = restDonForCost(state, inactiveIdx, cost)!;

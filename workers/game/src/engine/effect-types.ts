@@ -1594,7 +1594,9 @@ export interface RuntimeScheduledAction {
 export interface RuntimeOneTimeModifier {
   id: string;
   appliesTo: {
-    action?: ModifierType;
+    // PLAY_CARD is an explicit paid-play scope; MODIFY_COST remains a legacy scope.
+    action?: ModifierType | "PLAY_CARD";
+    source_zone?: "HAND";
     filter?: TargetFilter;
     controller?: Controller;
     card_type?: "CHARACTER" | "EVENT" | "STAGE" | "LEADER";

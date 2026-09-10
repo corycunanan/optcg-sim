@@ -1114,9 +1114,10 @@ export const OP11_031_JINBE: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Fish-Man" },
+        any_of: [
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Fish-Man" } },
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Merfolk" } },
+        ],
       },
       actions: [
         {
@@ -3610,7 +3611,7 @@ export const OP11_112_MEGALO: EffectSchema = {
         controller: "SELF",
         property: { name: "Shirahoshi" },
       },
-      duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "OPPONENT" }, { type: "SELF_STATE", required_state: "ACTIVE" }] } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
       modifiers: [
         {
           type: "MODIFY_POWER",
