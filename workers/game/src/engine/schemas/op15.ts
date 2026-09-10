@@ -1031,7 +1031,10 @@ export const OP15_024_USOPP: EffectSchema = {
       prohibitions: [
         {
           type: "CANNOT_BE_RESTED",
-          scope: { cause: "BY_OPPONENT_EFFECT" },
+          scope: {
+            cause: "BY_OPPONENT_EFFECT",
+            source_filter: { card_type: ["LEADER", "CHARACTER"] },
+          },
         },
       ],
       modifiers: [
@@ -1252,7 +1255,7 @@ export const OP15_029_BARTHOLOMEW_KUMA: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 5 },
           },
-          params: { prohibition_type: "CANNOT_ATTACK" },
+          params: { prohibition_type: "CANNOT_BE_RESTED" },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
         },
       ],
@@ -2915,8 +2918,8 @@ export const OP15_073_YAMA: EffectSchema = {
             count: { up_to: 1 },
             filter: {
               any_of: [
-                { name: "Heavenly Warriors", cost_max: 1 },
-                { traits: ["Vassals"], cost_max: 1 },
+                { name: "Heavenly Warriors", cost_exact: 1 },
+                { traits: ["Vassals"], cost_exact: 1 },
               ],
             },
           },
@@ -3750,6 +3753,7 @@ export const OP15_092_MONKEY_D_LUFFY: EffectSchema = {
           params: { amount: 7000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "OP15-092_trash_30",
