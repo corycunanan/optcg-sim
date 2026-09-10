@@ -7,6 +7,7 @@
  * and finally executes the effect's action chain.
  */
 
+import { retainEventsOnFrame } from "./events.js";
 import type {
   ChoiceCost,
   Cost,
@@ -196,7 +197,8 @@ function finishCostsAndRunActions(
   }
 
   if (topFrame.remainingActions.length > 0) {
-    const chainResult = services.executeActionChain(
+    const stackDepth = state.effectStack.length;
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
       state,
       topFrame.remainingActions,
       sourceCardInstanceId,
@@ -209,6 +211,7 @@ function finishCostsAndRunActions(
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
+      state = retainEventsOnFrame(state, stackDepth, events);
       const newTop = peekFrame(state);
       if (newTop) {
         state = updateTopFrame(state, { pendingTriggers });

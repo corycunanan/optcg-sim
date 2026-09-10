@@ -1,3 +1,4 @@
+import { retainEventsOnFrame } from "./events.js";
 /**
  * PLAYER_CHOICE resume handlers.
  *
@@ -360,7 +361,7 @@ export function handlePlayerChoiceBranch(
   const chosenIndex = parseInt(action.choiceId, 10);
   const chosenBranch = options[chosenIndex];
   if (chosenBranch) {
-    const branchResult = services.executeActionChain(
+    const branchResult = services.withCommittedEvents(events).executeActionChain(
       nextState,
       chosenBranch,
       effectSourceInstanceId,
@@ -558,7 +559,8 @@ export function handleAwaitingOptionalResponse(
   if (topFrame.remainingActions.length > 0) {
     const actionRefs = new Map<string, EffectResult>(topFrame.resultRefs);
     for (const [key, value] of costRefs ?? []) actionRefs.set(key, value);
-    const chainResult = services.executeActionChain(
+    const stackDepth = nextState.effectStack.length;
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
       nextState,
       topFrame.remainingActions,
       sourceCardInstanceId,
@@ -571,6 +573,7 @@ export function handleAwaitingOptionalResponse(
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
+      nextState = retainEventsOnFrame(nextState, stackDepth, events);
       const newTop = peekFrame(nextState);
       if (newTop) {
         nextState = updateTopFrame(nextState, {
@@ -721,7 +724,7 @@ export function handleAwaitingTriggerOrderSelection(
   nextState = popFrame(nextState);
 
   // Resolve the chosen trigger
-  const result = services.resolveEffect(
+  const result = services.withCommittedEvents(events).resolveEffect(
     nextState,
     chosenTrigger.effectBlock,
     chosenTrigger.sourceCardInstanceId,
@@ -758,6 +761,7 @@ export function handleAwaitingTriggerOrderSelection(
   // Emit events from the resolved trigger
   for (let index = 0; index < result.events.length; index++) {
     const event = result.events[index];
+    if (event.propagation?.eventLogEmitted) continue;
     nextState = emitEvent(
       nextState,
       event.type,
@@ -829,7 +833,7 @@ export function handleAwaitingTriggerOrderSelection(
 
   if (remaining.length === 1) {
     // Auto-resolve the last one
-    const lastResult = services.resolveEffect(
+    const lastResult = services.withCommittedEvents(events).resolveEffect(
       nextState,
       remaining[0].effectBlock,
       remaining[0].sourceCardInstanceId,
@@ -857,6 +861,7 @@ export function handleAwaitingTriggerOrderSelection(
     // Emit events from the last trigger
     for (let index = 0; index < lastResult.events.length; index++) {
       const event = lastResult.events[index];
+      if (event.propagation?.eventLogEmitted) continue;
       nextState = emitEvent(
         nextState,
         event.type,
