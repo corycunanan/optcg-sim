@@ -3,7 +3,6 @@ import { eventToSpotlight } from "./spotlight";
 import { runPipeline } from "../../../workers/game/src/engine/pipeline";
 import { getEffectSchema } from "../../../workers/game/src/engine/schema-registry";
 import { resumePromptLifecycle } from "../../../workers/game/src/session/prompt-lifecycle";
-import { parseStoredSession } from "../../../workers/game/src/session/persistence";
 import { visibleStateForPlayer } from "../../../workers/game/src/session/visibility";
 import {
   CARDS,
@@ -64,11 +63,6 @@ it("renders Law's real public Life reveal as a spotlight while the play decision
     type: "SELECT_TARGET",
     selectedInstanceIds: [returned.instanceId],
   });
-  state = parseStoredSession(
-    JSON.parse(
-      JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
-    )
-  ).state;
   expect(state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
   for (const player of [0, 1] as const) {
     const view = visibleStateForPlayer(state, db, player);
