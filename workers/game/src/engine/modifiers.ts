@@ -563,7 +563,8 @@ export function getEffectiveCost(
   cardInstanceId?: string,
   cardDb?: Map<string, CardData>,
   playTimeAdjustments = true,
-  diagnostics?: CostEvaluationDiagnostics
+  diagnostics?: CostEvaluationDiagnostics,
+  costAction: "PLAY_CARD" | "USE_COUNTER_EVENT" = "PLAY_CARD"
 ): number {
   // Layer 0
   let cost = cardData.cost ?? 0;
@@ -642,7 +643,7 @@ export function getEffectiveCost(
       for (const otm of oneTimeModifiers) {
         if (otm.consumed) continue;
         if (otm.modification.type !== "MODIFY_COST") continue;
-        if (!matchesOneTimeFilter(otm, cardData, state)) continue;
+        if (!matchesOneTimeFilter(otm, cardData, card, costAction)) continue;
 
         const amount = numericModifierParam(otm.modification, "amount");
         if (amount !== undefined) cost += amount;
@@ -683,8 +684,8 @@ export function getEffectiveFieldCost(
  * One-time "next play" discounts modify what you PAY when playing a card —
  * never the card's cost property (CR 1-3-9-1 defines cost as the printed
  * value; 2-7-6 lets effects change it, but e.g. OP02-025's discount is
- * expressly scoped to "play ... from your hand"). matchesOneTimeFilter has
- * no zone restriction, so without this gate a pending discount shifted cost
+ * expressly scoped to "play ... from your hand"). Legacy modifiers can lack
+ * a zone restriction, so without this gate a pending discount shifted cost
  * predicates in EVERY zone: a cost-5 permanent matched "K.O. cost ≤ 4", and
  * a printed-cost-4 deck card matched Oden's "play a cost-3 from your deck".
  *
@@ -935,7 +936,8 @@ export function getBattleDefenderPower(
 export function consumeOneTimeModifiers(
   state: GameState,
   cardData: CardData,
-  controller: 0 | 1
+  controller: 0 | 1,
+  sourceCard?: CardInstance
 ): GameState {
   const modifiers = state.oneTimeModifiers;
   let changed = false;
@@ -944,7 +946,7 @@ export function consumeOneTimeModifiers(
     if (otm.consumed) return otm;
     if (otm.controller !== controller) return otm;
     if (otm.modification.type !== "MODIFY_COST") return otm;
-    if (!matchesOneTimeFilter(otm, cardData, state)) return otm;
+    if (!matchesOneTimeFilter(otm, cardData, sourceCard, "PLAY_CARD")) return otm;
 
     changed = true;
     return { ...otm, consumed: true };
@@ -981,9 +983,21 @@ export function expireOneTimeModifiers(state: GameState): GameState {
 function matchesOneTimeFilter(
   otm: RuntimeOneTimeModifier,
   cardData: CardData,
-  _state: GameState
+  sourceCard: CardInstance | null | undefined,
+  costAction: "PLAY_CARD" | "USE_COUNTER_EVENT"
 ): boolean {
-  const filter = otm.appliesTo.filter;
+  // The original instance is read before payment moves it. Free effect plays
+  // never enter this paid-play calculation or consumption path (OP12 FAQ).
+  const scope = otm.appliesTo;
+  if (scope.action === "PLAY_CARD") {
+    if (costAction !== "PLAY_CARD" || !sourceCard || sourceCard.controller !== otm.controller)
+      return false;
+  } else if (scope.action !== undefined && scope.action !== "MODIFY_COST") {
+    return false;
+  }
+  if (scope.source_zone !== undefined &&
+      (scope.source_zone !== "HAND" || sourceCard?.zone !== "HAND")) return false;
+  const filter = scope.filter;
   if (!filter) return true;
 
   if (typeof filter.cost_max === "number") {

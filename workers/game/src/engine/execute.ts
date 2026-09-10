@@ -87,7 +87,7 @@ function executePlayCard(
   let nextState = restDonForCost(state, pi, cost)!;
 
   // Consume any one-time cost modifiers that applied
-  nextState = consumeOneTimeModifiers(nextState, cardData, pi);
+  nextState = consumeOneTimeModifiers(nextState, cardData, pi, found.card);
 
   if (cardData.type === "Character") {
     // Handle 5-card overflow: trash the character at the specified position
