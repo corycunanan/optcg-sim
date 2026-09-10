@@ -226,6 +226,18 @@ describe("OPT-698: OP13-082 Five Elders", () => {
     expect(
       result.pendingPrompt.options.choices.every((choice) => !choice.disabled)
     ).toBe(true);
+    // The real Saturn and Mars permanent blocks already exist while their
+    // simultaneous On Play effects are awaiting player ordering.
+    for (const id of [saturn.id, mars.id]) {
+      const played = result.state.players[0].characters.find(
+        (c) => c?.cardId === id
+      )!;
+      expect(
+        result.state.prohibitions.filter(
+          (e) => e.sourceCardInstanceId === played.instanceId
+        )
+      ).toHaveLength(1);
+    }
     const initialChoiceIds = result.pendingPrompt.options.choices.map(
       (choice) => choice.id
     );
@@ -264,6 +276,37 @@ describe("OPT-698: OP13-082 Five Elders", () => {
         (choice) => choice.id === marsChoice.id
       )?.disabled
     ).toBe(true);
+    for (let i = 0; result.pendingPrompt && i < 30; i++) {
+      const options = result.pendingPrompt.options;
+      let response: GameAction;
+      if (options.promptType === "PLAYER_CHOICE")
+        response = {
+          type: "PLAYER_CHOICE",
+          choiceId: options.choices.find((choice) => !choice.disabled)!.id,
+        };
+      else if (options.promptType === "OPTIONAL_EFFECT")
+        response = { type: "PLAYER_CHOICE", choiceId: "skip" };
+      else if (options.promptType === "ARRANGE_TOP_CARDS")
+        response = {
+          type: "ARRANGE_TOP_CARDS",
+          keptCardInstanceId: "",
+          orderedInstanceIds: options.cards.map((card) => card.instanceId),
+          destination: "bottom",
+        };
+      else throw new Error(`Unexpected remaining prompt ${options.promptType}`);
+      result = resumeFromStack(result.state, response, scenario.cardDb);
+    }
+    expect(result.pendingPrompt).toBeUndefined();
+    for (const id of [saturn.id, mars.id]) {
+      const played = result.state.players[0].characters.find(
+        (c) => c?.cardId === id
+      )!;
+      expect(
+        result.state.prohibitions.filter(
+          (e) => e.sourceCardInstanceId === played.instanceId
+        )
+      ).toHaveLength(1);
+    }
   });
 
   it("trashes all allied Characters without K.O. events, then plays five distinct Elders", () => {

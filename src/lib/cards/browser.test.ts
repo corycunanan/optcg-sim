@@ -34,6 +34,30 @@ beforeEach(() => {
 });
 
 describe("getCardBrowserData", () => {
+  it("passes effect facets and counter ranges through without a default set", async () => {
+    const filters = {
+      effectTags: "trigger:on_play,removal:ko,removal:bounce",
+      effectTraits: "Straw Hat Crew",
+      counterMin: "0",
+      counterMax: "2000",
+    };
+    const data = await getCardBrowserData(filters);
+    const where = {
+      AND: [
+        { effectTags: { hasSome: ["trigger:on_play"] } },
+        { effectTags: { hasSome: ["removal:ko", "removal:bounce"] } },
+      ],
+      effectTraits: { hasSome: ["Straw Hat Crew"] },
+      counter: { gte: 0, lte: 2000 },
+    };
+    expect(data.currentFilters).toMatchObject({ ...filters, set: "" });
+    expect(setFindFirstMock).not.toHaveBeenCalled();
+    expect(cardCountMock).toHaveBeenCalledWith({ where });
+    expect(cardFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where, select: CARD_BROWSER_SELECT })
+    );
+  });
+
   it("defaults an unfiltered browser to the latest booster set", async () => {
     const data = await getCardBrowserData({});
 
@@ -41,6 +65,39 @@ describe("getCardBrowserData", () => {
     expect(cardCountMock).toHaveBeenCalledWith({
       where: { cardSets: { some: { setLabel: "OP16" } } },
     });
+  });
+
+  it.each(["", "trigger:unknown", "unknown:tag,removal:unknown"])(
+    "keeps the latest booster fallback for ignored effectTags %s",
+    async (effectTags) => {
+      const data = await getCardBrowserData({ effectTags });
+      expect(data.currentFilters.set).toBe("OP16");
+      expect(cardCountMock).toHaveBeenCalledWith({
+        where: { cardSets: { some: { setLabel: "OP16" } } },
+      });
+    }
+  );
+
+  it.each(["trigger:on_play", "trigger:unknown,trigger:on_play"])(
+    "searches all sets when effectTags contains a valid tag: %s",
+    async (effectTags) => {
+      const data = await getCardBrowserData({ effectTags });
+      expect(data.currentFilters.set).toBe("");
+      expect(setFindFirstMock).not.toHaveBeenCalled();
+      expect(cardCountMock).toHaveBeenCalledWith({
+        where: { AND: [{ effectTags: { hasSome: ["trigger:on_play"] } }] },
+      });
+    }
+  );
+
+  it("preserves explicit all sets with unknown-only effect tags", async () => {
+    const data = await getCardBrowserData({
+      set: "all",
+      effectTags: "trigger:unknown",
+    });
+    expect(data.currentFilters.set).toBe("");
+    expect(setFindFirstMock).not.toHaveBeenCalled();
+    expect(cardCountMock).toHaveBeenCalledWith({ where: {} });
   });
 
   it.each(["0", "-1", "abc", "1.5"])(

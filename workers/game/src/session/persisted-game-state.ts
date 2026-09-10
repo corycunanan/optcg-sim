@@ -170,6 +170,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
     cards: z.array(CardInstance),
     validTargets: StringArray,
     effectDescription: z.string(),
+    instruction: z.string().optional(),
     countMin: NonNegativeInteger,
     countMax: NonNegativeInteger,
     ctaLabel: z.string(),

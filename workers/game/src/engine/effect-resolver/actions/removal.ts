@@ -475,6 +475,9 @@ export function executeTrashFromHand(
           effectDescription: optional
             ? `You may trash up to ${amount} card(s) from hand`
             : `Choose ${amount} card(s) to trash from hand`,
+          instruction: optional
+            ? `Trash up to ${amount} of your cards in hand.`
+            : `Trash ${amount} of your cards in hand.`,
           ctaLabel: "Trash",
           cards: candidates.filter((c) => validTargets.includes(c.instanceId)),
         },

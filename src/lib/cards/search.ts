@@ -11,6 +11,7 @@ import {
   isSubstringSearchQueryTooShort,
   normalizeSubstringSearchQuery,
 } from "@/lib/search-query";
+import { EFFECT_FACET_GROUPS } from "@shared/effect-facets";
 
 export interface CardSearchParams {
   q?: string;
@@ -20,11 +21,15 @@ export interface CardSearchParams {
   costMax?: string;
   powerMin?: string;
   powerMax?: string;
+  counterMin?: string;
+  counterMax?: string;
   set?: string;
   block?: string;
   rarity?: string;
   ban?: string;
   traits?: string;
+  effectTags?: string;
+  effectTraits?: string;
   attribute?: string;
   page?: string;
   limit?: string;
@@ -44,6 +49,13 @@ const VALID_SORT_FIELDS = [
 const VALID_SORT_FIELD_SET = new Set<string>(VALID_SORT_FIELDS);
 const CARD_TYPES = new Set<string>(Object.values(CardType));
 const BAN_STATUSES = new Set<string>(Object.values(BanStatus));
+const EFFECT_FACET_TAG_GROUPS = new Map<string, string>();
+
+for (const group of EFFECT_FACET_GROUPS) {
+  for (const tag of group.tags) {
+    EFFECT_FACET_TAG_GROUPS.set(tag.id, group.id);
+  }
+}
 
 function isCardType(value: string): value is CardType {
   return CARD_TYPES.has(value);
@@ -100,6 +112,14 @@ export function buildCardWhereClause(
     if (!isNaN(max)) where.power.lte = max;
   }
 
+  if (params.counterMin || params.counterMax) {
+    where.counter = {};
+    const min = parseInt(params.counterMin || "");
+    const max = parseInt(params.counterMax || "");
+    if (!isNaN(min)) where.counter.gte = min;
+    if (!isNaN(max)) where.counter.lte = max;
+  }
+
   if (params.set) {
     where.cardSets = { some: { setLabel: params.set } };
   }
@@ -119,6 +139,31 @@ export function buildCardWhereClause(
 
   if (params.traits) {
     where.traits = { hasSome: params.traits.split(",") };
+  }
+
+  if (params.effectTags) {
+    const tagsByGroup = new Map<string, string[]>();
+
+    for (const tag of params.effectTags.split(",")) {
+      const group = EFFECT_FACET_TAG_GROUPS.get(tag);
+      if (!group) continue;
+
+      const groupTags = tagsByGroup.get(group);
+      if (groupTags) {
+        groupTags.push(tag);
+      } else {
+        tagsByGroup.set(group, [tag]);
+      }
+    }
+
+    const effectTagClauses = Array.from(tagsByGroup.values(), (tags) => ({
+      effectTags: { hasSome: tags },
+    }));
+    if (effectTagClauses.length > 0) where.AND = effectTagClauses;
+  }
+
+  if (params.effectTraits) {
+    where.effectTraits = { hasSome: params.effectTraits.split(",") };
   }
 
   if (params.attribute) {
