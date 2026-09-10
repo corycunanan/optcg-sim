@@ -430,7 +430,7 @@ export const OP06_015_LILY_CARNATION: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [
-        { type: "KO_OWN_CHARACTER", amount: 1, filter: { power_min: 6000 } },
+        { type: "TRASH_OWN_CHARACTER", amount: 1, filter: { power_min: 6000 } },
       ],
       actions: [
         {
@@ -2720,7 +2720,8 @@ export const OP06_074_ZEPHYR: EffectSchema = {
           type: "KO",
           target_ref: "negated_character",
           conditions: {
-            type: "BOARD_WIDE_EXISTENCE",
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "negated_character",
             filter: { power_max: 5000 },
           },
           chain: "THEN",
@@ -3222,9 +3223,9 @@ export const OP06_088_SAI: EffectSchema = {
             property: { trait: "Dressrosa" },
           },
           {
-            type: "LEADER_PROPERTY",
+            type: "CARD_ON_FIELD",
             controller: "SELF",
-            property: { power: { operator: ">=", value: 0 } },
+            filter: { card_type: "LEADER", is_active: true },
           },
         ],
       },
@@ -3360,8 +3361,9 @@ export const OP06_092_BROOK: EffectSchema = {
                   type: "OPPONENT_ACTION",
                   params: {
                     action: {
-                      type: "PLACE_HAND_TO_DECK",
-                      params: { amount: 3, position: "BOTTOM" },
+                      type: "RETURN_TO_DECK",
+                      target: { type: "CARD_IN_TRASH", controller: "SELF", count: { exact: 3 } },
+                      params: { position: "BOTTOM" },
                     },
                   },
                 },
@@ -3975,7 +3977,7 @@ export const OP06_107_KOUZUKI_MOMONOSUKE: EffectSchema = {
               exclude_name: "Kouzuki Momonosuke",
             },
           },
-          params: { face: "UP" },
+          params: { face: "UP", position: "TOP_OR_BOTTOM" },
         },
       ],
     },

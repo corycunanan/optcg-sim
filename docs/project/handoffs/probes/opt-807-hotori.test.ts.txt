@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
+import { resumeFromStack } from "../engine/effect-resolver/resume.js";
+import { getEffectivePower } from "../engine/modifiers.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { registerCardEnteredField } from "../engine/triggers.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+
+function fixture(id: string) {
+  const cardDb = createTestCardDb();
+  const schema = getEffectSchema(id)!;
+  const data: CardData = { ...CARDS.VANILLA, id, name: schema.card_name!, cost: 1, effectSchema: schema };
+  cardDb.set(id, data);
+  let state = createBattleReadyState(cardDb);
+  state.players[0].characters = padChars([]);
+  state.players[1].characters = padChars([]);
+  const source: CardInstance = { ...state.players[0].leader, cardId: id, instanceId: "source", zone: "HAND", turnPlayed: 0, attachedDon: [] };
+  state.players[0].hand.push(source);
+  const act = (action: GameAction, player: 0 | 1 = 0) => {
+    if (state.pendingPrompt) {
+      expect(state.pendingPrompt.respondingPlayer).toBe(player);
+      const result = resumePromptLifecycle(state, action, cardDb, { drainPregame: s => s, advanceStartOfTurn: s => s });
+      expect(result.responseRejected).toBe(false);
+      state = result.state;
+    } else {
+      const result = runPipeline(state, action, cardDb, player);
+      expect(result.valid, result.error).toBe(true);
+      state = result.state;
+    }
+    return state;
+  };
+  const fieldSource = () => {
+    state.players[0].hand = state.players[0].hand.filter(c => c.instanceId !== source.instanceId);
+    source.zone = "CHARACTER";
+    state.players[0].characters[0] = source;
+    state = registerCardEnteredField(state, source, data);
+  };
+  return { cardDb, source, act, fieldSource, get state() { return state; } };
+}
+
+it("OPT-845 Hotori must pay by playing Kotori before Life target choice", () => {
+  const f = fixture("OP05-111");
+  f.cardDb.set("kotori", { ...CARDS.VANILLA, id: "kotori", name: "Kotori" });
+  f.state.players[0].hand.push({ ...f.source, cardId: "kotori", instanceId: "kotori" });
+  f.cardDb.set("life-target", { ...CARDS.VANILLA, id: "life-target", cost: 3 });
+  f.state.players[1].characters[0] = { ...f.source, cardId: "life-target", instanceId: "life-target", zone: "CHARACTER", controller: 1, owner: 1 };
+  f.act({ type: "PLAY_CARD", cardInstanceId: "source" });
+  if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT") f.act({ type: "PLAYER_CHOICE", choiceId: "activate" });
+  expect(f.state.players[0].characters.some(c => c?.cardId === "kotori")).toBe(true);
+  expect(f.state.players[0].hand.some(c => c.cardId === "kotori")).toBe(false);
+  expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+});
