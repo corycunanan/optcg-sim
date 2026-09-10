@@ -1738,9 +1738,10 @@ export const OP01_061_KAIDO_LEADER: EffectSchema = {
   ],
 };
 
-// ─── OP01-062 Crocodile (Leader) — DON!!×1 draw when a cost-reduced Event is played
-// [DON!! x1] Once per turn, when you play an Event whose cost was reduced by
-// an effect, you may draw 1 card if you have 4 or less cards in your hand.
+// ─── OP01-062 Crocodile (Leader) — own Event activation draw
+// [DON!! x1] When you activate an Event, you may draw 1 card if you have 4 or
+// less cards in your hand and haven't drawn a card using this Leader's effect
+// during this turn.
 // Event activation includes hand activation and resolving an Event Main from trash.
 // No cost-reduction condition is printed; the hand-count gate is checked after
 // the Event resolves (OP01-062 FAQ), and declining does not spend the draw slot.
