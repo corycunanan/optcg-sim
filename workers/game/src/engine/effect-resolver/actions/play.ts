@@ -484,7 +484,7 @@ export function executeSetRest(
     if (preRest && preRest.state !== "ACTIVE") continue;
 
     nextState = setCardState(nextState, id, "RESTED");
-    const evt: PendingEvent = { type: "CARD_STATE_CHANGED", playerIndex: controller, payload: { targetInstanceId: id, newState: "RESTED" } };
+    const evt: PendingEvent = { type: "CARD_STATE_CHANGED", playerIndex: controller, payload: { targetInstanceId: id, newState: "RESTED", cause: "EFFECT", causingController: controller } };
     events.push(evt);
     restedIds.push(id);
   }

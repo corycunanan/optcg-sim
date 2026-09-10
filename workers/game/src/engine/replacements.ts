@@ -932,7 +932,7 @@ function finalizeTarget(
         events: [{
           type: "CARD_STATE_CHANGED",
           playerIndex: causingController,
-          payload: { targetInstanceId: targetId, newState: "RESTED" },
+          payload: { targetInstanceId: targetId, newState: "RESTED", cause: "EFFECT", causingController },
         }],
       };
     }

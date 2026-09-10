@@ -671,32 +671,21 @@ Example:
 
 ### CHARACTER_BECOMES_RESTED
 
-Fires when this Character transitions from active to rested state. Supports cause filtering for source-specific variants.
+Matches a field Character transition to rested, including attack/block declarations, costs, and effects. It is **not implicitly host-scoped**. Use `filter.target: "SELF"` for “this Character”; omit it for a watcher of other Characters.
 
 ```typescript
 {
   event: "CHARACTER_BECOMES_RESTED",
-  filter?: {
-    cause?: EventCause   // "BY_OPPONENT_EFFECT", "BY_CHARACTER_EFFECT", "ANY"
+  filter: {
+    target: "SELF",
+    cause: "BY_OPPONENT_EFFECT"
   }
 }
 ```
 
-| Text Pattern | Example Cards |
-|-------------|---------------|
-| "When this Character becomes rested" | OP14-119 Dracule Mihawk |
-| "When this Character becomes rested by your opponent's Character's effect" | OP14-070 Buffalo |
+PRB02-009 Mr.3(Galdino) uses this host-scoped form. Effect-rest events carry `cause: "EFFECT"` and `causingController`, including continuation after a replacement is declined. Declaration/cost rests do not carry effect provenance. Active-state changes and non-Character subjects never match.
 
-Example — OP14-070 Buffalo:
-
-```json
-{
-  "trigger": {
-    "event": "CHARACTER_BECOMES_RESTED",
-    "filter": { "cause": "BY_OPPONENT_EFFECT" }
-  }
-}
-```
+Current supported provenance matching is deliberately limited to explicitly host-scoped rest triggers (`target: "SELF"`): `BY_EFFECT`, `BY_YOUR_EFFECT`, `BY_OPPONENT_EFFECT`, or `ANY`. `BY_CHARACTER_EFFECT` is unsupported. Existing unscoped cause filters retain their prior behavior pending source-kind support; OPT-814 does not activate OP14-070 Buffalo with an incomplete “opponent's Character's effect” check. OP07-031 Bartolomeo and OP10-036 Perona also remain unscoped cause-filter consumers awaiting their own execution correction. Other unscoped rest watchers continue to observe Character rest transitions.
 
 ---
 
