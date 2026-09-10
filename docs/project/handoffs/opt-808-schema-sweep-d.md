@@ -91,3 +91,15 @@ original OPT-808 description. Do not fold those behaviors into this sweep.
 Complete the final project gate and push reviewable PR, then independently
 review the exact final head. Stop at merge-ready; do not merge. This handoff is
 committed before final verification so the gate can run against its final SHA.
+
+### First full-gate result
+
+`pnpm verify` at `eca0afa6b3e9ee0b13b3370b799a70e7e1b84ce4` passed lint,
+types, bundle, schema, app tests, and pipeline tests. Worker coverage reached
+2508 passing / 5 skipped with one expected authored-target snapshot mismatch;
+build did not run. Log: `/private/tmp/opt808-verify.log`. Updated only the
+OPT-775 snapshot: rested-Leader wording, Rayleigh fallback moves from the first
+to the second action, and Thatch's extra replacement adds one target. Focused
+snapshot regeneration passed. Final complete gate must run on the follow-up
+commit. Database suites are skipped by the repository without TEST_DATABASE_URL;
+this card-only change adds no database requirement.
