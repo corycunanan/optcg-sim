@@ -356,7 +356,11 @@ export function resolveEffect(
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
   const sourceSnapshotRef: [string, EffectResult][] = sourceCard
-    ? [[EFFECT_SOURCE_SNAPSHOT_REF, { targetInstanceIds: [], count: 0, sourceCardSnapshot: structuredClone(sourceCard) }]]
+    ? [[EFFECT_SOURCE_SNAPSHOT_REF, {
+        targetInstanceIds: [],
+        count: 0,
+        sourceCardSnapshot: structuredClone(sourceCard),
+      }]]
     : [];
   const fullText = sourceTextForBlock(sourceCardData, block);
   const blockDescription = extractEffectDescription(fullText, block);
@@ -387,7 +391,9 @@ export function resolveEffect(
       resultRefs: [
         ...sourceSnapshotRef,
         ...(triggeringCardInstanceId
-          ? [[TRIGGERING_CARD_REF, { targetInstanceIds: [triggeringCardInstanceId], count: 1 }] as [string, EffectResult]]
+          ? [[TRIGGERING_CARD_REF, {
+              targetInstanceIds: [triggeringCardInstanceId], count: 1,
+            }] as [string, EffectResult]]
           : []),
       ],
       validTargets: [],
@@ -447,7 +453,13 @@ export function resolveEffect(
       // Seed the newly-created cost continuation with the pre-payment source.
       const frame = state.effectStack.at(-1);
       if (frame && sourceSnapshotRef.length > 0) {
-        state = { ...state, effectStack: [...state.effectStack.slice(0, -1), { ...frame, resultRefs: [...frame.resultRefs, ...sourceSnapshotRef] }] };
+        state = {
+          ...state,
+          effectStack: [
+            ...state.effectStack.slice(0, -1),
+            { ...frame, resultRefs: [...frame.resultRefs, ...sourceSnapshotRef] },
+          ],
+        };
       }
       log("effect.prompt", { ...logCtx, phase: "cost_selection" });
       return {
