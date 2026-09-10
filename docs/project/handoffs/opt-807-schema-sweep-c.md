@@ -29,6 +29,7 @@ The shared SEARCH_AND_PLAY fix only lets a nonempty, non-full-deck zero-match TO
 - Shared untouched-main baseline `caf29b1`: coordinator-supplied OPT-811 `pnpm verify` passed every pre-build gate; sandbox build could not fetch fonts; elevated `pnpm build` passed. Logs `/private/tmp/opt811-baseline-verify.log` and `/private/tmp/opt811-baseline-build.log`. This is shared evidence, not an independently rerun baseline.
 - Original-main mutation: temporarily restored the five edited source files and generated registry from HEAD, retaining ticket regressions; focused suite exited1 with21 failures /12 passes. Restored all edited bytes in `finally`. `/private/tmp/opt807-all-regressions-red.log`.
 - Final focused: `pnpm --filter optcg-game exec vitest run src/__tests__/opt-807-authored-pipeline.test.ts src/__tests__/opt-821-field-life-position.test.ts --maxWorkers=1` passed49 tests (35 new +14 existing). `/private/tmp/opt807-focused.log`.
+- Target-instruction snapshot initially failed solely because Brook adds one explicit trash target: generatedCount1978→1979, targetCount2535→2536; regenerated and inspected those two numeric deltas,19 tests pass.
 - `pnpm --filter optcg-game schema:generate` regenerated production registry. Worker type check passed before the final test-only additions; final required `pnpm verify` is pending the coordinator's serialized resource slot.
 - Executed Hotori probe fails its actual paid-cost Character-zone assertion. `/private/tmp/opt807-hotori-blocked.log`. To reproduce without adding a failing suite to normal CI:
 
