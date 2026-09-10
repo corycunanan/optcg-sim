@@ -1,0 +1,278 @@
+{
+  "flips": [
+    {
+      "path": "EB01-040.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "EB02-060.effects[0].costs[1]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "EB03-053.effects[1].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "EB03-056.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "EB04-059.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "OP08-058.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 2
+    },
+    {
+      "path": "OP08-063.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1
+    },
+    {
+      "path": "OP10-099.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "OP11-022.effects[1].costs[1]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "OP11-100.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1
+    },
+    {
+      "path": "OP11-103.effects[0].costs[1]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1
+    },
+    {
+      "path": "OP11-104.effects[1].costs[0]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1
+    },
+    {
+      "path": "OP11-107.effects[1].costs[0]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1
+    },
+    {
+      "path": "OP11-108.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1
+    },
+    {
+      "path": "OP11-117.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "OP15-099.effects[1].costs[0]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1,
+      "position": "TOP"
+    },
+    {
+      "path": "OP15-114.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1,
+      "position": "TOP"
+    },
+    {
+      "path": "P-106.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    },
+    {
+      "path": "ST13-009.effects[0].costs[0]",
+      "type": "TURN_LIFE_FACE_DOWN",
+      "amount": 1
+    },
+    {
+      "path": "ST20-001.effects[1].costs[0]",
+      "type": "TURN_LIFE_FACE_UP",
+      "amount": 1
+    }
+  ],
+  "prohibitions": [
+    {
+      "path": "EB02-011.effects[0].actions[1].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "EB03-017.effects[0].actions[1].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "OP11-034.effects[0].actions[0].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "OP11-046.effects[1].prohibitions[1]",
+      "type": "CANNOT_BE_RESTED",
+      "scope": {
+        "cause": "BY_OPPONENT_EFFECT"
+      }
+    },
+    {
+      "path": "OP12-021.effects[1].prohibitions[0]",
+      "type": "CANNOT_BE_RESTED",
+      "scope": {
+        "cause": "BY_OPPONENT_EFFECT"
+      }
+    },
+    {
+      "path": "OP13-032.effects[0].actions[0].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "OP14-033.effects[0].actions[0].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "OP14-069.effects[0].actions[0].params.options[1][0].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "OP14-119.effects[0].actions[0].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "OP15-024.effects[0].prohibitions[0]",
+      "type": "CANNOT_BE_RESTED",
+      "scope": {
+        "cause": "BY_OPPONENT_EFFECT",
+        "source_filter": {
+          "card_type": [
+            "LEADER",
+            "CHARACTER"
+          ]
+        }
+      }
+    },
+    {
+      "path": "OP15-029.effects[0].actions[0].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    },
+    {
+      "path": "OP16-032.effects[1].actions[0].params",
+      "prohibition_type": "CANNOT_BE_RESTED"
+    }
+  ],
+  "rests": [
+    {
+      "path": "OP03-021.effects[0].actions[1]",
+      "type": "SET_REST",
+      "target": {
+        "type": "CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+          "up_to": 1
+        },
+        "filter": {
+          "cost_max": 5
+        }
+      }
+    },
+    {
+      "path": "OP06-020.effects[0].actions[0]",
+      "type": "SET_REST",
+      "target": {
+        "type": "LEADER_OR_CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+          "up_to": 1
+        },
+        "filter": {
+          "any_of": [
+            {
+              "card_type": "CHARACTER",
+              "cost_max": 3
+            }
+          ]
+        },
+        "mixed_pool": {
+          "types": [
+            "CHARACTER",
+            "DON_IN_COST_AREA"
+          ],
+          "total_count": {
+            "up_to": 1
+          }
+        }
+      }
+    },
+    {
+      "path": "OP06-021.effects[0].actions[0].params.options[0][0]",
+      "type": "SET_REST",
+      "target": {
+        "type": "CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+          "up_to": 1
+        },
+        "filter": {
+          "cost_max": 4
+        }
+      }
+    },
+    {
+      "path": "OP06-041.effects[0].actions[0]",
+      "type": "SET_REST",
+      "target": {
+        "type": "ALL_OPPONENT_CHARACTERS"
+      }
+    },
+    {
+      "path": "OP07-019.effects[0].actions[0]",
+      "type": "SET_REST",
+      "target": {
+        "type": "LEADER_OR_CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+          "up_to": 1
+        }
+      }
+    },
+    {
+      "path": "OP08-021.effects[0].actions[0]",
+      "type": "SET_REST",
+      "target": {
+        "type": "CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+          "up_to": 1
+        },
+        "filter": {
+          "cost_max": 5
+        }
+      }
+    },
+    {
+      "path": "OP15-001.effects[1].actions[0]",
+      "type": "SET_REST",
+      "target": {
+        "type": "CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+          "up_to": 1
+        },
+        "filter": {
+          "don_given_count": {
+            "operator": ">=",
+            "value": 2
+          }
+        }
+      }
+    }
+  ]
+}

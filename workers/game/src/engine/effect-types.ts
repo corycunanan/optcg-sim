@@ -1089,6 +1089,8 @@ void _allTargetTypesCoverUnion;
  * Seeded by resolveEffect; consumed by the TRIGGERING_CARD target type.
  */
 export const TRIGGERING_CARD_REF = "__triggering_card";
+/** Reserved provenance reference; never a selectable target result. */
+export const EFFECT_SOURCE_SNAPSHOT_REF = "__effect_source_snapshot";
 
 export type CountMode =
   | { exact: number }
@@ -1633,6 +1635,8 @@ export interface RevealedCardSnapshot {
 }
 
 export interface EffectResult {
+  /** Last-known effect source, retained across cost payment and prompts. */
+  sourceCardSnapshot?: import("../types.js").CardInstance;
   targetInstanceIds: string[];
   count: number;
   value?: unknown;

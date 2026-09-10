@@ -1031,7 +1031,10 @@ export const OP15_024_USOPP: EffectSchema = {
       prohibitions: [
         {
           type: "CANNOT_BE_RESTED",
-          scope: { cause: "BY_OPPONENT_EFFECT" },
+          scope: {
+            cause: "BY_OPPONENT_EFFECT",
+            source_filter: { card_type: ["LEADER", "CHARACTER"] },
+          },
         },
       ],
       modifiers: [
@@ -1252,7 +1255,7 @@ export const OP15_029_BARTHOLOMEW_KUMA: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 5 },
           },
-          params: { prohibition_type: "CANNOT_ATTACK" },
+          params: { prohibition_type: "CANNOT_BE_RESTED" },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
         },
       ],
@@ -2915,8 +2918,8 @@ export const OP15_073_YAMA: EffectSchema = {
             count: { up_to: 1 },
             filter: {
               any_of: [
-                { name: "Heavenly Warriors", cost_max: 1 },
-                { traits: ["Vassals"], cost_max: 1 },
+                { name: "Heavenly Warriors", cost_exact: 1 },
+                { traits: ["Vassals"], cost_exact: 1 },
               ],
             },
           },
@@ -3722,9 +3725,9 @@ export const OP15_092_MONKEY_D_LUFFY: EffectSchema = {
       },
       modifiers: [
         {
-          type: "SET_BASE_POWER",
+          type: "SET_POWER",
           target: { type: "SELF" },
-          params: { amount: 9000 },
+          params: { value: 9000 },
         },
         {
           type: "MODIFY_COST",
@@ -3745,11 +3748,12 @@ export const OP15_092_MONKEY_D_LUFFY: EffectSchema = {
       },
       modifiers: [
         {
-          type: "SET_BASE_POWER",
+          type: "SET_POWER",
           target: { type: "YOUR_LEADER" },
-          params: { amount: 7000 },
+          params: { value: 7000 },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
     {
       id: "OP15-092_trash_30",
@@ -4092,13 +4096,9 @@ export const OP15_099_UROUGE: EffectSchema = {
       id: "OP15-099_activate",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "TRASH_FROM_LIFE", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1, position: "TOP" }],
       flags: { optional: true },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_DOWN",
-          params: { amount: 1 },
-        },
         {
           type: "GIVE_DON",
           target: {
@@ -4107,7 +4107,6 @@ export const OP15_099_UROUGE: EffectSchema = {
             count: { up_to: 1 },
           },
           params: { amount: 1, don_state: "RESTED" },
-          chain: "THEN",
         },
       ],
     },
@@ -4527,13 +4526,9 @@ export const OP15_114_WYPER: EffectSchema = {
       id: "OP15-114_on_play",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      costs: [{ type: "TRASH_FROM_LIFE", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       flags: { optional: true },
       actions: [
-        {
-          type: "TURN_LIFE_FACE_UP",
-          params: { amount: 1, position: "TOP" },
-        },
         {
           type: "MODIFY_POWER",
           target: { type: "ALL_OPPONENT_CHARACTERS" },

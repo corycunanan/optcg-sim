@@ -86,6 +86,7 @@ import {
   ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
   ALL_ACTION_TYPES,
   TRIGGERING_CARD_REF,
+  EFFECT_SOURCE_SNAPSHOT_REF,
   isOncePerTurnBlock,
   type ActionType,
 } from "../effect-types.js";
@@ -354,6 +355,13 @@ export function resolveEffect(
   // Extract block-specific effect description for prompts
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const sourceSnapshotRef: [string, EffectResult][] = sourceCard
+    ? [[EFFECT_SOURCE_SNAPSHOT_REF, {
+        targetInstanceIds: [],
+        count: 0,
+        sourceCardSnapshot: structuredClone(sourceCard),
+      }]]
+    : [];
   const fullText = sourceTextForBlock(sourceCardData, block);
   const blockDescription = extractEffectDescription(fullText, block);
 
@@ -380,14 +388,14 @@ export function resolveEffect(
       phase: "AWAITING_OPTIONAL_RESPONSE",
       pausedAction: null,
       remainingActions: block.actions ?? [],
-      resultRefs: triggeringCardInstanceId
-        ? [
-            [
-              TRIGGERING_CARD_REF,
-              { targetInstanceIds: [triggeringCardInstanceId], count: 1 },
-            ],
-          ]
-        : [],
+      resultRefs: [
+        ...sourceSnapshotRef,
+        ...(triggeringCardInstanceId
+          ? [[TRIGGERING_CARD_REF, {
+              targetInstanceIds: [triggeringCardInstanceId], count: 1,
+            }] as [string, EffectResult]]
+          : []),
+      ],
       validTargets: [],
       costs: block.costs ?? [],
       currentCostIndex: 0,
@@ -442,6 +450,17 @@ export function resolveEffect(
     costResult = costPayResult.costResult;
 
     if (costPayResult.pendingPrompt) {
+      // Seed the newly-created cost continuation with the pre-payment source.
+      const frame = state.effectStack.at(-1);
+      if (frame && sourceSnapshotRef.length > 0) {
+        state = {
+          ...state,
+          effectStack: [
+            ...state.effectStack.slice(0, -1),
+            { ...frame, resultRefs: [...frame.resultRefs, ...sourceSnapshotRef] },
+          ],
+        };
+      }
       log("effect.prompt", { ...logCtx, phase: "cost_selection" });
       return {
         state,
@@ -476,6 +495,10 @@ export function resolveEffect(
   }
   if (block.actions && block.actions.length > 0) {
     let initialRefs = costResultToRefs(costResult);
+    if (sourceSnapshotRef.length > 0) {
+      initialRefs = initialRefs ?? new Map<string, EffectResult>();
+      for (const [key, value] of sourceSnapshotRef) initialRefs.set(key, value);
+    }
     if (triggeringCardInstanceId) {
       initialRefs = initialRefs ?? new Map<string, EffectResult>();
       initialRefs.set(TRIGGERING_CARD_REF, {
