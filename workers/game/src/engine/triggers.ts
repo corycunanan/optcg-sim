@@ -631,6 +631,16 @@ function matchesCustomTrigger(
   _cardDb: Map<string, CardData>,
 ): boolean {
   if (!customEventMatchesGameEvent(trigger.event, event)) return false;
+  if (trigger.event === "CHARACTER_BECOMES_RESTED") {
+    if (event.type !== "CARD_STATE_CHANGED" || event.payload.newState !== "RESTED") return false;
+    const targetId = event.payload.targetInstanceId ?? event.payload.cardInstanceId;
+    const target = targetId ? findCardInstance(state, targetId) : undefined;
+    if (target?.zone !== "CHARACTER") return false;
+  }
+  if (trigger.filter?.target === "SELF") {
+    const payload = event.payload as { targetInstanceId?: string; cardInstanceId?: string };
+    if ((payload.targetInstanceId ?? payload.cardInstanceId) !== sourceCard.instanceId) return false;
+  }
 
   // Turn restriction
   if (trigger.turn_restriction) {
@@ -644,9 +654,21 @@ function matchesCustomTrigger(
     if (sourceCard.attachedDon.length < trigger.don_requirement) return false;
   }
 
-  // Event filter
+  // Host-scoped rest effects opt into rest provenance. Unscoped cause filters
+  // retain their existing behavior: notably Buffalo also needs Character-source
+  // provenance, which the generic replacement/rest contracts cannot yet provide.
   if (trigger.filter) {
-    if (!matchesEventFilter(trigger.filter, event, sourceCard.controller, state, _cardDb)) return false;
+    let filter = trigger.filter;
+    if (trigger.event === "CHARACTER_BECOMES_RESTED" && filter.target === "SELF" && event.type === "CARD_STATE_CHANGED") {
+      const isEffect = event.payload.cause === "EFFECT";
+      const causingController = event.payload.causingController;
+      if (filter.cause === "BY_EFFECT" && !isEffect) return false;
+      if (filter.cause === "BY_YOUR_EFFECT" && (!isEffect || causingController !== sourceCard.controller)) return false;
+      if (filter.cause === "BY_OPPONENT_EFFECT" && (!isEffect || causingController === undefined || causingController === sourceCard.controller)) return false;
+      if (filter.cause && !["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
+      filter = { ...filter, cause: undefined };
+    }
+    if (!matchesEventFilter(filter, event, sourceCard.controller, state, _cardDb)) return false;
   }
 
   // Quantity threshold

@@ -114,7 +114,7 @@ export function computeCostTargets(
       const candidates = getRestCostCandidates(player, cost.filter);
       return candidates
         .filter((c) => c.state === "ACTIVE")
-        .filter((c) => !isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb))
+        .filter((c) => !isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId }))
         .filter((c) => !cost.filter || matchesFilter(c, cost.filter, cardDb, state, undefined, undefined, controller))
         .map((c) => c.instanceId);
     }
@@ -125,7 +125,7 @@ export function computeCostTargets(
       // Include matching active characters
       for (const c of player.characters) {
         if (!c || c.state !== "ACTIVE") continue;
-        if (isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb)) continue;
+        if (isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) continue;
         if (nameFilter) {
           const data = cardDb.get(c.cardId);
           if (!data || data.name !== nameFilter) continue;
@@ -134,7 +134,7 @@ export function computeCostTargets(
       }
       // Include leader if active and matches name filter
       if (player.leader.state === "ACTIVE" &&
-          !isProhibitedForCard(state, player.leader.instanceId, "CANNOT_BE_RESTED", cardDb)) {
+          !isProhibitedForCard(state, player.leader.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) {
         if (nameFilter) {
           const leaderData = cardDb.get(player.leader.cardId);
           if (leaderData && leaderData.name === nameFilter) {

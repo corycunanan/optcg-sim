@@ -180,7 +180,7 @@ export const PRB02_004_JEWELRY_BONNEY: EffectSchema = {
       id: "on_opponent_attack_set_don_active",
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
-      flags: { once_per_turn: true, optional: true, lock_on_decline: true },
+      flags: { once_per_turn: true },
       actions: [
         {
           type: "SET_DON_ACTIVE",
@@ -249,8 +249,11 @@ export const PRB02_006_RORONOA_ZORO: EffectSchema = {
     {
       id: "rest_replacement",
       category: "replacement",
-      // OPPONENT_TURN-scoped replacement; cause is specifically opponent's Character effect
+      // The turn gate is enforced. Character-source restriction remains unsupported:
+      // replacements currently receive only cause/controller, not source-kind
+      // provenance. See OPT-814 handoff and its executable source-kind gap probe.
       flags: { optional: true },
+      conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       replaces: {
         event: "WOULD_BE_RESTED",
         cause_filter: { by: "OPPONENT_EFFECT" },
@@ -374,7 +377,7 @@ export const PRB02_009_MR_3_GALDINO: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
-        filter: { cause: "BY_OPPONENT_EFFECT" },
+        filter: { cause: "BY_OPPONENT_EFFECT", target: "SELF" },
       },
       costs: [{ type: "TRASH_SELF" }],
       flags: { optional: true },

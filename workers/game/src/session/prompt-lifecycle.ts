@@ -238,6 +238,18 @@ export function resumePromptLifecycle(
     gameOver = terminalEngineOutcome(state);
   }
 
+  if (state.status !== "IN_PROGRESS" || gameOver) {
+    state = { ...state, pendingEventActivationEvents: undefined };
+  } else if (!responseRejected && !state.pendingPrompt && state.effectStack.length === 0 &&
+      state.pendingEventActivationEvents?.length) {
+    const events = state.pendingEventActivationEvents;
+    // Clear before scanning: a watcher may itself prompt, persist, or end play.
+    state = { ...state, pendingEventActivationEvents: undefined };
+    const activation = continuePipelineFromExecution(state, { state, events }, cardDb, respondingPlayer);
+    state = activation.state;
+    gameOver = activation.gameOver;
+  }
+
   if (
     !state.pendingPrompt &&
     state.effectStack.length === 0 &&

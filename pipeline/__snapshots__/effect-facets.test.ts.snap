@@ -220,7 +220,6 @@ exports[`extractCardFacets > snapshots every distinct authored tag and rejects u
   "don:return:self",
   "don:untap",
   "don:untap:self",
-  "flag:lock_on_decline",
   "flag:once_per_turn",
   "flag:optional",
   "hand:discard",

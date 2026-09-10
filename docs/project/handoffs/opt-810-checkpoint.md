@@ -1,6 +1,6 @@
 # OPT-810 — Leader alternatives and next paid hand-play scope
 
-Base main `15cad98bd139fc0d8cea075c809e4f8a7b45f507` (remote rechecked2026-09-10). Exclusive branch `codex/opt-810-card-fidelity`, clone `/private/tmp/optcg-opt810`. Recovered predecessor checkpoint90059ed; preserved its four card fixes and completed behavior/persistence coverage. No sibling unmerged commits imported. Implementer never merges; the coordinator now has user authorization for non-frontend merges in this run. Final committed SHA and gate results belong in the PR body.
+Original base main `15cad98bd139fc0d8cea075c809e4f8a7b45f507`; integrated merged main `4b9535750fd88209fd3e1a65110c6a07b0e3dfcc` on2026-09-10. Exclusive branch `codex/opt-810-card-fidelity`, clone `/private/tmp/optcg-opt810`. Recovered predecessor checkpoint90059ed; preserved its four card fixes and completed behavior/persistence coverage. No sibling unmerged commits imported. Implementer never merges; the coordinator now has user authorization for non-frontend merges in this run. Final committed SHA and gate results belong in the PR body.
 
 ## Sources and resulting behavior
 
@@ -31,7 +31,11 @@ Shared baseline caf29b1: `/private/tmp/opt811-baseline-verify.log` passed lint/t
 
 Initial predecessor10-case red run failed4 (`opt810-red.log`). Final suite has22 cases and passes with corrected metadata (`opt810-expanded-final.log`); worker types pass (`opt810-final-types.log`). Nine semantic mutations each run all22 cases: original Jinbe3fail, Megalo2, Robin1, Rosinante2; missing source check1, action/controller check1, consumption match5, Law minimum1, unknown-action rejection1. Script `/private/tmp/opt810-mutations.py`, results `/private/tmp/opt810-mutations.json`, adjacent logs. Restored source/generated registry after every mutation. Restored focused83 cases across six suites pass (`opt810-final-focused.log`); schema gate passes34 tests,2472 cards and generated parity (`opt810-final-schema.log`). No new skipped tests.
 
-One existing direct-consumption fixture now supplies the required original HAND instance for its explicit PLAY_CARD scope; the consumed assertion remains intact, and production fails closed without an instance. Full gate will run at the final committed head. Independent review, coordinator final diff review, publication and current CI remain required; this document is implementation evidence, not merge-ready status.
+One existing direct-consumption fixture now supplies the required original HAND instance for its explicit PLAY_CARD scope; the consumed assertion remains intact, and production fails closed without an instance. Independent review of production and final fixture correction is clean at4d57a066. The unknown-scope fixture now copies appliesTo before overriding it, avoiding shared registry contamination. Reviewer runs all22 followed by two extra controller/rejected-payment probes in one module:24pass. Removing the source-zone guard now fails2/22 (outside-hand and independent UNKNOWN_ZONE); earlier nine-mutation counts above are historical evidence before this fixture isolation correction. Final restored83 cases pass.
+
+Integration with merged main4b953575 preserves incoming811/812/808/814/805 behavior. Only generated registry conflicted; regenerated from source, decoded all2472 cards and proved exact equality with incoming main except the four owned cards, each equal to reviewed4d57a066. Shared types merged cleanly. Incoming805's Main/Counter Event publication and root activation barrier remain intact;810 still passes the original HAND instance to consumption before movement and supplies USE_COUNTER_EVENT to both Counter quotes. No new production changes needed. Combined16-suite run passes300 cases (`/private/tmp/opt810-integrated-focused.log`):810,805,238, three820 continuation suites, legacy/cost/persistence suites and incoming808/811/812/814 cases.
+
+Full gate will run at the committed integration head. Coordinator integration review, publication and current CI remain required; this document is implementation evidence, not merge-ready status.
 
 ## Follow-ups
 
