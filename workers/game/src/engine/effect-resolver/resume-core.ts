@@ -61,7 +61,11 @@ import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { promptTypeToPhase } from "./cost-handler.js";
 import { isEngineTerminated } from "../engine-limits.js";
 import { replacePendingEventReferences } from "../events.js";
-import { unpublishedEvents, retainEventsOnFrame } from "./resume/events.js";
+import {
+  unpublishedEvents,
+  retainEventsOnFrame,
+  takeInterruptedEvents,
+} from "./resume/events.js";
 import { withChainDescription } from "./resolver.js";
 
 // Re-export the stable public API so existing imports keep working.
@@ -309,50 +313,6 @@ export function resumeFromStack(
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
 ): EffectResolverResult {
-  const originalState = state;
-  let transferredPrefix = false;
-  const current = peekFrame(state);
-  // A replacement can leave a committed outer prefix below its own prompt.
-  // Move that prefix ahead of the child's events before it publishes them.
-  // Cost transactions remain separate: only mid-action frames receive it.
-  if (
-    current &&
-    (current.phase === "AWAITING_TARGET_SELECTION" ||
-      current.phase === "AWAITING_ARRANGE_CARDS" ||
-      current.phase === "AWAITING_PLAYER_CHOICE")
-  ) {
-    const prefix: PendingEvent[] = [];
-    const effectStack = state.effectStack.map((frame, index) => {
-      if (
-        index < state.effectStack.length - 1 &&
-        frame.phase === "INTERRUPTED_BY_TRIGGERS"
-      ) {
-        prefix.push(...unpublishedEvents(frame.accumulatedEvents));
-        return { ...frame, accumulatedEvents: [] };
-      }
-      return frame;
-    });
-    if (prefix.length > 0) {
-      transferredPrefix = true;
-      state = retainEventsOnFrame(
-        { ...state, effectStack },
-        effectStack.length - 1,
-        prefix,
-      );
-    }
-  }
-  const result = resumeFrame(state, action, cardDb, services);
-  return result.rejected && transferredPrefix
-    ? { ...result, state: originalState }
-    : result;
-}
-
-function resumeFrame(
-  state: GameState,
-  action: GameAction,
-  cardDb: Map<string, CardData>,
-  services: EffectResolverServices,
-): EffectResolverResult {
   const topFrame = peekFrame(state);
   if (!topFrame) {
     return { state, events: [], resolved: true };
@@ -423,9 +383,14 @@ function resumeFrame(
       ...unpublishedEvents(topFrame.accumulatedEvents),
       ...result.events,
     ];
-    const nextState = result.pendingPrompt
+    let nextState = result.pendingPrompt
       ? retainEventsOnFrame(result.state, state.effectStack.length - 1, events)
       : result.state;
+    if (!result.pendingPrompt) {
+      const prefix = takeInterruptedEvents(nextState);
+      nextState = prefix.state;
+      events.unshift(...prefix.events);
+    }
     return {
       state: nextState,
       events,

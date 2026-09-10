@@ -8,7 +8,12 @@ import type {
   EffectBlock,
   RuntimeActiveEffect,
 } from "../engine/effect-types.js";
-import type { CardInstance, GameState } from "../types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameState,
+  GameAction,
+} from "../types.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { findCardInstance } from "../engine/state.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
@@ -295,3 +300,191 @@ it("publishes the outer prefix before an optional replacement that completes wit
       .map((e) => e.playerIndex)
   ).toEqual([0, 1, 0]);
 });
+
+it.each([true, false])(
+  "keeps an outer prefix before replacement play and a persisted On Play cost, pay=%s",
+  async (pay) => {
+    const cardDb = createTestCardDb();
+    const state = createBattleReadyState(cardDb);
+    const target = state.players[1].characters.find((c) => c !== null)!;
+    state.players[1].characters = padChars([target]);
+    const playedCard: CardData = {
+      ...CARDS.VANILLA,
+      id: "OPT820-COST",
+      name: "Prompt Cost",
+      effectSchema: {
+        card_id: "OPT820-COST",
+        card_name: "Prompt Cost",
+        card_type: "Character",
+        effects: [
+          {
+            id: "on-play-cost",
+            category: "auto",
+            trigger: { keyword: "ON_PLAY" },
+            flags: { optional: true },
+            costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          },
+        ],
+      },
+    };
+    cardDb.set(playedCard.id, playedCard);
+    state.players[1].hand = [
+      { ...state.players[1].hand[0], cardId: playedCard.id },
+      ...state.players[1].hand.slice(1),
+    ];
+    state.activeEffects = [
+      {
+        id: "replacement",
+        sourceCardInstanceId: target.instanceId,
+        sourceEffectBlockId: "replacement",
+        category: "replacement",
+        modifiers: [
+          {
+            type: "REPLACEMENT_EFFECT",
+            params: {
+              trigger: "WOULD_BE_KO",
+              cause_filter: { by: "ANY" },
+              target_filter: null,
+              replacement_actions: [
+                {
+                  type: "PLAY_CARD",
+                  target: {
+                    type: "CHARACTER_CARD",
+                    source_zone: "HAND",
+                    controller: "SELF",
+                    count: { exact: 1 },
+                    filter: { name: "Prompt Cost" },
+                  },
+                },
+              ],
+              optional: true,
+              once_per_turn: false,
+            },
+          },
+        ],
+        duration: { type: "PERMANENT" },
+        expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+        controller: 1,
+        appliesTo: [target.instanceId],
+        timestamp: 1,
+      },
+    ];
+    const first = resolveEffect(
+      state,
+      {
+        id: "outer",
+        category: "auto",
+        actions: [
+          { type: "DRAW", params: { amount: 1 } },
+          {
+            type: "KO",
+            target: {
+              type: "CHARACTER",
+              controller: "OPPONENT",
+              count: { exact: 1 },
+            },
+          },
+          { type: "DRAW", params: { amount: 1 } },
+        ],
+      },
+      state.players[0].leader.instanceId,
+      0,
+      cardDb
+    );
+    let next: GameState = {
+      ...first.state,
+      pendingPrompt: first.pendingPrompt!,
+    };
+    let restoredChild = false;
+    const data = new Map<string, unknown>();
+    const storage: SessionStorage = {
+      async get<T>(key: string) {
+        return data.get(key) as T | undefined;
+      },
+      async put(key: string | Record<string, unknown>, value?: unknown) {
+        for (const [k, v] of Object.entries(
+          typeof key === "string" ? { [key]: value } : key
+        ))
+          data.set(k, JSON.parse(JSON.stringify(v)));
+      },
+      async setAlarm() {},
+      async deleteAlarm() {},
+    };
+    const repository = new SessionRepository(storage, {
+      nextJsUrl: "https://example.test",
+      workerSecret: "test",
+    });
+    for (let i = 0; next.pendingPrompt && i < 8; i++) {
+      const child = next.effectStack.at(-1)?.effectBlock.id === "on-play-cost";
+      if (child && !restoredChild) {
+        await repository.save({
+          state: next,
+          cardDb,
+          mode: "PVP",
+          pregameMode: "PRIORITY_ROLL",
+          testPriorityRolls: null,
+          undoHistory: [],
+        });
+        const restored = await repository.load();
+        expect(restored).not.toBeNull();
+        next = restored!.state;
+        restoredChild = true;
+      }
+      const options = next.pendingPrompt!.options;
+      if (child && options.promptType === "SELECT_TARGET") {
+        const invalid = resumePromptLifecycle(
+          next,
+          { type: "SELECT_TARGET", selectedInstanceIds: ["invalid"] },
+          cardDb,
+          { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }
+        );
+        expect(invalid.responseRejected).toBe(true);
+        expect(invalid.state.players).toEqual(next.players);
+        expect(invalid.state.eventLog).toEqual(next.eventLog);
+        expect(invalid.state.effectStack).toEqual(next.effectStack);
+      }
+      const action: GameAction =
+        options.promptType === "SELECT_TARGET"
+          ? {
+              type: "SELECT_TARGET",
+              selectedInstanceIds: options.validTargets.slice(
+                0,
+                options.countMax
+              ),
+            }
+          : {
+              type: "PLAYER_CHOICE",
+              choiceId: child && !pay ? "skip" : "accept",
+            };
+      next = resumePromptLifecycle(next, action, cardDb, {
+        drainPregame: (s) => s,
+        advanceStartOfTurn: (s) => s,
+      }).state;
+    }
+    expect(restoredChild).toBe(true);
+    expect(next.pendingPrompt).toBeNull();
+    expect(next.effectStack).toEqual([]);
+    expect(
+      next.eventLog
+        .filter(
+          (e) =>
+            e.type === "CARD_DRAWN" ||
+            e.type === "CARD_PLAYED" ||
+            e.type === "CARD_TRASHED"
+        )
+        .map((e) => [e.type, e.playerIndex])
+    ).toEqual([
+      ["CARD_DRAWN", 0],
+      ["CARD_PLAYED", 1],
+      ...(pay
+        ? [
+            ["CARD_TRASHED", 1],
+            ["CARD_DRAWN", 1],
+          ]
+        : []),
+      ["CARD_DRAWN", 0],
+    ]);
+    expect(next.players[1].hand).toHaveLength(state.players[1].hand.length - 1);
+  }
+);

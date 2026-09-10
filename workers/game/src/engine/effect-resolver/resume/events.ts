@@ -39,7 +39,7 @@ export function retainEventsOnFrame(
   };
 }
 
-/** Detach already committed outer events before a replacement publishes its result. */
+/** Detach committed outer events at an accepted continuation publication boundary. */
 export function takeInterruptedEvents(state: GameState): {
   state: GameState;
   events: PendingEvent[];

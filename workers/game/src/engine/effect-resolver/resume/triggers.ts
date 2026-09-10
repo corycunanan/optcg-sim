@@ -11,7 +11,7 @@ import type {
   PendingEvent,
   QueuedTrigger,
 } from "../../../types.js";
-import { unpublishedEvents } from "./events.js";
+import { unpublishedEvents, takeInterruptedEvents } from "./events.js";
 import { peekFrame, updateTopFrame } from "../../effect-stack.js";
 import {
   emitEvent,
@@ -29,10 +29,16 @@ export function processRemainingTriggers(
   priorEvents: PendingEvent[] = [],
   triggerOrderingGroup?: import("../../../types.js").EffectStackFrame["triggerOrderingGroup"]
 ): EffectResolverResult {
+  // This is a publication boundary reached after a child accepts its action
+  // or finishes/abandons its cost. Earlier committed effects publish first;
+  // staged cost frames are not interrupted frames and remain untouched.
+  const prefix = takeInterruptedEvents(state);
+  state = prefix.state;
   const batchFrame = peekFrame(state);
   const ownsBatchPrefix = batchFrame?.phase === "AWAITING_BATCH_RESUME";
   const events = [
     ...new Set([
+      ...prefix.events,
       ...(ownsBatchPrefix ? unpublishedEvents(batchFrame.accumulatedEvents) : []),
       ...priorEvents,
     ]),
