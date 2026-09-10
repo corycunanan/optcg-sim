@@ -218,6 +218,24 @@ describe("OPT-471 schema source and disposition gates", () => {
     expect(missing).toEqual([]);
   });
 
+  it("recognizes runtime base settings without accepting additive power as a base setting (OPT-833)", () => {
+    const text = new Map([["TEST-BASE", "This Character's base power becomes 8000."]]);
+    const setting: EffectSchema = {
+      effects: [{ id: "base", category: "permanent", modifiers: [
+        { type: "SET_POWER", target: { type: "SELF" }, params: { value: 8000 } },
+      ] }],
+    };
+    expect(findLowConfidenceFindings(text, { "TEST-BASE": setting })).toEqual([]);
+    const additive: EffectSchema = {
+      effects: [{ id: "base", category: "permanent", modifiers: [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 8000 } },
+      ] }],
+    };
+    expect(findLowConfidenceFindings(text, { "TEST-BASE": additive })).toEqual([
+      { cardId: "TEST-BASE", pattern: "BASE_POWER_BECOMES" },
+    ]);
+  });
+
   it("requires every low-confidence finding to have a checked-in disposition", () => {
     const cardsDir = resolve(repoRoot, "docs/cards");
     const cardTexts = new Map<string, string>();

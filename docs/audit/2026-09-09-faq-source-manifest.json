@@ -1,0 +1,75 @@
+{
+  "importedAt": "2026-09-09",
+  "documents": [
+    {
+      "file": "qa_st-30.pdf",
+      "pages": 3,
+      "questions": 15,
+      "cards": 14,
+      "sha256": "f5377c14017da1940f7a9e90c341778d10df3d47898ceeaca4ab2ac46d5549b7"
+    },
+    {
+      "file": "qa_op14_eb04.pdf",
+      "pages": 10,
+      "questions": 64,
+      "cards": 53,
+      "sha256": "1308cc51cb124015155abc1f4d0cd1e5d21db6e774c74779faa193f144be9de5"
+    },
+    {
+      "file": "qa_st-31.pdf",
+      "pages": 1,
+      "questions": 4,
+      "cards": 3,
+      "sha256": "294aa2023cd90313cfd0c83e0b70c8bda3fb4c1cb08e469051ac3dfca720c813"
+    },
+    {
+      "file": "qa_st-32.pdf",
+      "pages": 1,
+      "questions": 2,
+      "cards": 2,
+      "sha256": "de97ea5a79671d47039a16add56bd7f829337c63728f4033041b8e7c5ff424ef"
+    },
+    {
+      "file": "qa_st-33.pdf",
+      "pages": 1,
+      "questions": 5,
+      "cards": 4,
+      "sha256": "93f8171ea2816551009ca3a24bbc3e6dafb0ebb4f9f523bf0b0fb6226545fc91"
+    },
+    {
+      "file": "qa_st-35.pdf",
+      "pages": 1,
+      "questions": 2,
+      "cards": 1,
+      "sha256": "53d0cb9f1ffc45c7aaaa60a7c08f1ecc7513ad249770fe4739f176a97d0f5a0f"
+    },
+    {
+      "file": "qa_st-36.pdf",
+      "pages": 1,
+      "questions": 6,
+      "cards": 5,
+      "sha256": "4506d191124254e663590d2ad1492f5fd9729ca4dec1e6bd264715277685807b"
+    },
+    {
+      "file": "qa_st-34.pdf",
+      "pages": 1,
+      "questions": 5,
+      "cards": 3,
+      "sha256": "47286fc37416f5ba6c1fe8dce1b44e801e958079ad58c4a602821201b4e3570e"
+    },
+    {
+      "file": "qa_op16.pdf",
+      "pages": 9,
+      "questions": 60,
+      "cards": 51,
+      "sha256": "b42026fc26f9cf6140c27914846f79e65ffafa3cf802e756b20eaf820179f6a0"
+    },
+    {
+      "file": "qa_op17.pdf",
+      "pages": 9,
+      "questions": 60,
+      "cards": 43,
+      "sha256": "2502fee9464727d870076e2e6687138e39c4dee4b5e9e299d9d4fcb6719a3442"
+    }
+  ]
+}

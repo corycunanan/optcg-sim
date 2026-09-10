@@ -22,11 +22,15 @@ export const CardSearchParamsSchema = z.object({
   costMax: z.string().optional(),
   powerMin: z.string().optional(),
   powerMax: z.string().optional(),
+  counterMin: z.string().optional(),
+  counterMax: z.string().optional(),
   set: z.string().optional(),
   block: z.string().optional(),
   rarity: z.string().optional(),
   ban: z.string().optional(),
   traits: z.string().optional(),
+  effectTags: z.string().optional(),
+  effectTraits: z.string().optional(),
   attribute: z.string().optional(),
   page: z.string().optional(),
   limit: z.string().optional(),
@@ -228,6 +232,30 @@ export const DeckImportResponseSchema = z.object({
 });
 
 export type DeckImportResponse = z.infer<typeof DeckImportResponseSchema>;
+
+/** GET /api/cards/facets response envelope. */
+export const CardFacetVocabularySchema = z.object({
+  data: z.object({
+    traits: z.array(z.string()),
+    effectTraits: z.array(z.string()),
+    groups: z.array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        tags: z.array(
+          z.object({
+            id: z.string(),
+            label: z.string(),
+          }),
+        ),
+      }),
+    ),
+  }),
+});
+
+export type CardFacetVocabulary = z.infer<
+  typeof CardFacetVocabularySchema
+>["data"];
 
 // ─── Input schemas ──────────────────────────────────────────
 

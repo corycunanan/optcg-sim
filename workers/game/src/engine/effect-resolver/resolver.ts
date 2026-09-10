@@ -1024,6 +1024,7 @@ export function executeActionChain(
         resultRefs: [...resultRefs.entries()],
         validTargets: ctx.validTargets,
         returnToDeckArrangement: ctx.returnToDeckArrangement,
+        fieldToLifeTargetIds: ctx.fieldToLifeTargetIds,
         costs: [],
         currentCostIndex: 0,
         costsPaid: true, // costs already paid before action chain

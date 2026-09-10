@@ -159,3 +159,7 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 - Implementation agents never merge PRs and never write to Linear.
 - Record deferred or out-of-scope findings in the PR body's **Follow-ups** section.
 - Record validation baselines and results in every PR body.
+
+## Track orchestration
+
+For 1–N Linear issues, use `.agents/skills/orchestrate/SKILL.md` and the canonical `docs/project/ORCHESTRATION-CHARTER.md`. The no-merge rule above applies to implementation agents. A coordinating agent may merge only with explicit user authorization for the current run's issue scope and after every readiness gate passes; merge mode defaults off. Codex and Claude coordinators may update Linear issues and create relevant tickets. Document every issue update in a comment on that issue; for new tickets arising from implementation, also comment on the original ticket with the new ticket link and rationale. Follow the charter audit-trail and recovery requirements. Existing authorization persists for that run; unrelated PRs never block isolated tracks.

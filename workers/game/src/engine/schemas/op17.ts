@@ -3886,7 +3886,7 @@ export const OP17_112_CHARLOTTE_LINLIN: EffectSchema = {
       category: "permanent",
       modifiers: [
         {
-          type: "SET_BASE_POWER",
+          type: "SET_POWER",
           target: {
             type: "CHARACTER",
             controller: "SELF",
