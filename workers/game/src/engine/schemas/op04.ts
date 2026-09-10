@@ -3343,26 +3343,25 @@ export const OP04_094_TRUENO_BASTARDO: EffectSchema = {
       id: "main_conditional_ko",
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
-      // Exactly one branch applies; the Event is already in its controller's trash.
+      // Choose the eligible branch once, before any K.O. triggers can change trash.
       actions: [
         {
-          type: "KO",
-          conditions: { type: "TRASH_COUNT", controller: "SELF", operator: "<", value: 15 },
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { cost_max: 4 },
-          },
-        },
-        {
-          type: "KO",
-          conditions: { type: "TRASH_COUNT", controller: "SELF", operator: ">=", value: 15 },
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { up_to: 1 },
-            filter: { cost_max: 6 },
+          type: "PLAYER_CHOICE",
+          params: {
+            option_conditions: [
+              { type: "TRASH_COUNT", controller: "SELF", operator: "<", value: 15 },
+              { type: "TRASH_COUNT", controller: "SELF", operator: ">=", value: 15 },
+            ],
+            options: [
+              [{
+                type: "KO",
+                target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 }, filter: { cost_max: 4 } },
+              }],
+              [{
+                type: "KO",
+                target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 }, filter: { cost_max: 6 } },
+              }],
+            ],
           },
         },
       ],

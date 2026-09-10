@@ -134,6 +134,34 @@ describe("OPT-806 authored card pipeline", () => {
     ).toEqual(remaining);
     expect(f.state.pendingPrompt).toBeNull();
   });
+  it("Trueno selects one branch before Laboon's K.O. trigger raises trash to15", () => {
+    const f = fixture();
+    f.data("OP04-094", {
+      type: "Event",
+      cost: 4,
+      power: null,
+      effectText: "[Main]",
+    });
+    const event = f.put("OP04-094", 0, "HAND");
+    for (let i = 0; i < 13; i++) f.put(CARDS.VANILLA.id, 0, "TRASH");
+    f.data("EB01-047", { cost: 2 });
+    f.put("EB01-047", 0);
+    const first = f.put(CARDS.VANILLA.id, 1);
+    f.data("cost6", { cost: 6 });
+    const second = f.put("cost6", 1);
+    const discard = f.put(CARDS.VANILLA.id, 0, "HAND");
+    f.act({ type: "PLAY_CARD", cardInstanceId: event.instanceId });
+    f.select([first.instanceId]);
+    f.select([discard.instanceId]);
+    expect(f.state.players[0].trash).toHaveLength(15);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(
+      f.state.players[1].characters.some(
+        (c) => c?.instanceId === second.instanceId
+      )
+    ).toBe(true);
+    expect(f.state.players[1].trash).toHaveLength(1);
+  });
   it.each([13, 14, 15])("Trueno starts with %i trash cards", (count) => {
     const f = fixture();
     f.data("OP04-094", {

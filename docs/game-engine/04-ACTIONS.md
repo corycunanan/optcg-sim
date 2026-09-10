@@ -1554,8 +1554,11 @@ Present the controller with a choice between two or more action branches. The pl
 ```typescript
 interface PlayerChoiceParams {
   options: Action[][];
+  option_conditions?: Condition[];
 }
 ```
+
+`option_conditions`, when present, must contain one condition object per option. Conditions are evaluated with the effect controller, source and prior result references before branch selection. Ineligible branches are omitted; one eligible branch runs automatically, zero executes nothing. The selected branch is fixed through subsequent target/replacement/trigger continuations. Conditions are not reevaluated after a choice or an intervening trigger. Omission preserves ordinary player choice. The same contract applies to `OPPONENT_CHOICE`; conditions still use the effect controller, while the opponent chooses.
 
 | Field | Value |
 |-------|-------|
