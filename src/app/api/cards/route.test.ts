@@ -87,6 +87,23 @@ beforeEach(() => {
 });
 
 describe("GET /api/cards search", () => {
+  it("returns the existing rate-limit response before Prisma", async () => {
+    rateLimitMock.mockResolvedValue({ limited: true, remaining: 0 });
+
+    const res = await GET(
+      new NextRequest("http://localhost/api/cards?effectTags=trigger:on_play", {
+        headers: { "x-forwarded-for": "127.0.0.1" },
+      }),
+    );
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({
+      error: "Too many requests. Try again later.",
+    });
+    expect(findManyMock).not.toHaveBeenCalled();
+    expect(countMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a 1-2 character name query before Prisma", async () => {
     const res = await GET(
       new NextRequest("http://localhost/api/cards?q=lu", {
@@ -119,6 +136,25 @@ describe("GET /api/cards search", () => {
     expect(countMock).toHaveBeenCalledWith({
       where: { name: { contains: "luf", mode: "insensitive" } },
     });
+  });
+
+  it("passes effect facets and a counter range into the Prisma query", async () => {
+    const res = await GET(
+      new NextRequest(
+        "http://localhost/api/cards?effectTags=trigger:on_play&effectTraits=Straw%20Hat%20Crew&counterMin=1000",
+      ),
+    );
+
+    const where = {
+      AND: [{ effectTags: { hasSome: ["trigger:on_play"] } }],
+      effectTraits: { hasSome: ["Straw Hat Crew"] },
+      counter: { gte: 1000 },
+    };
+    expect(res.status).toBe(200);
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where }),
+    );
+    expect(countMock).toHaveBeenCalledWith({ where });
   });
 
   it("uses the explicit tooltip-ready Prisma select", async () => {
