@@ -562,7 +562,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST30-001.effects.1.modifiers.0.target (non-action target)",
     "ST30-003.effects.0.modifiers.0.target (non-action target)",
   ],
-  "generatedCount": 1978,
+  "generatedCount": 1979,
   "instructions": [
     "Add to Life 1 of your opponent's Characters with a cost of 3 or less.",
     "Add to Life this card.",
@@ -1246,6 +1246,6 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Trash your Characters.",
     "Trash your cards in hand.",
   ],
-  "targetCount": 2535,
+  "targetCount": 2536,
 }
 `;

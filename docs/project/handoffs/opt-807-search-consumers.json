@@ -1,0 +1,333 @@
+[
+  {
+    "card": "EB01-009",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "card_type": "CHARACTER",
+        "traits": [
+          "Animal"
+        ],
+        "cost_max": 3
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "EB02-025",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "card_type": "CHARACTER",
+        "cost_max": 2
+      },
+      "rest_destination": "BOTTOM",
+      "entry_state": "RESTED"
+    }
+  },
+  {
+    "card": "EB02-056",
+    "path": "schema.effects.1.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "card_type": "CHARACTER",
+        "traits": [
+          "Scientist"
+        ],
+        "cost_max": 5,
+        "exclude_name": "Vegapunk"
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP01-069",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "search_full_deck": true,
+      "filter": {
+        "name": "Smiley"
+      },
+      "shuffle_after": true
+    }
+  },
+  {
+    "card": "OP01-116",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "traits": [
+          "SMILE"
+        ],
+        "card_type": "CHARACTER",
+        "cost_max": 3
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP02-030",
+    "path": "schema.effects.1.actions.0",
+    "params": {
+      "search_full_deck": true,
+      "filter": {
+        "color": "GREEN",
+        "traits": [
+          "Land of Wano"
+        ],
+        "card_type": "CHARACTER",
+        "cost_exact": 3
+      },
+      "shuffle_after": true
+    }
+  },
+  {
+    "card": "OP03-094",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "card_type": "CHARACTER",
+        "traits_contains": [
+          "CP"
+        ],
+        "cost_max": 5
+      },
+      "rest_destination": "TRASH"
+    }
+  },
+  {
+    "card": "OP04-084",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 3,
+      "pick": {
+        "up_to": 1
+      },
+      "filter": {
+        "card_type": "CHARACTER",
+        "traits_contains": [
+          "CP"
+        ],
+        "exclude_name": "Stussy",
+        "cost_max": 2
+      },
+      "cost_override": "FREE",
+      "rest_destination": "TRASH"
+    }
+  },
+  {
+    "card": "OP06-003",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 3,
+      "filter": {
+        "traits": [
+          "Revolutionary Army"
+        ],
+        "card_type": "CHARACTER",
+        "power_max": 5000
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP06-057",
+    "path": "schema.effects.0.actions.1",
+    "params": {
+      "look_at": 1,
+      "filter": {
+        "card_type": "CHARACTER",
+        "cost_exact": 2
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP06-119",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 1,
+      "filter": {
+        "card_type": "CHARACTER",
+        "cost_max": 9,
+        "exclude_name": "Sanji"
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP08-007",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "traits": [
+          "Animal"
+        ],
+        "card_type": "CHARACTER",
+        "power_max": 4000
+      },
+      "rest_destination": "BOTTOM",
+      "entry_state": "RESTED"
+    }
+  },
+  {
+    "card": "OP08-052",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 1,
+      "filter": {
+        "traits_contains": [
+          "Whitebeard Pirates"
+        ],
+        "card_type": "CHARACTER",
+        "cost_max": 4
+      },
+      "rest_destination": "TOP_OR_BOTTOM"
+    }
+  },
+  {
+    "card": "OP08-054",
+    "path": "schema.effects.0.actions.1",
+    "params": {
+      "look_at": 1,
+      "filter": {
+        "traits_contains": [
+          "Whitebeard Pirates"
+        ],
+        "card_type": "CHARACTER",
+        "cost_max": 3
+      },
+      "rest_destination": "TOP_OR_BOTTOM"
+    }
+  },
+  {
+    "card": "OP08-100",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 7,
+      "filter": {
+        "name": "Upper Yard"
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP11-051",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "traits": [
+          "Straw Hat Crew"
+        ],
+        "card_type": "CHARACTER",
+        "cost_max": 5
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP13-079",
+    "path": "schema.rule_modifications.1.actions.0",
+    "params": {
+      "search_full_deck": true,
+      "filter": {
+        "traits": [
+          "Mary Geoise"
+        ],
+        "card_type": "STAGE"
+      },
+      "shuffle_after": true
+    }
+  },
+  {
+    "card": "OP14-010",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "filter": {
+        "card_type": "CHARACTER",
+        "traits": [
+          "Supernovas"
+        ],
+        "power_max": 2000,
+        "exclude_name": "Basil Hawkins"
+      },
+      "rest_destination": "BOTTOM"
+    }
+  },
+  {
+    "card": "OP16-059",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 5,
+      "pick": {
+        "up_to": 2
+      },
+      "filter": {
+        "traits": [
+          "Impel Down"
+        ],
+        "card_type": "CHARACTER",
+        "power_max": 6000
+      },
+      "rest_destination": "BOTTOM",
+      "cost_override": "FREE"
+    }
+  },
+  {
+    "card": "ST03-007",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "search_full_deck": true,
+      "filter": {
+        "name": "Pacifista",
+        "cost_max": 4
+      },
+      "shuffle_after": true
+    }
+  },
+  {
+    "card": "ST12-010",
+    "path": "schema.effects.0.actions.0",
+    "params": {
+      "look_at": 1,
+      "filter": {
+        "card_type": "CHARACTER",
+        "cost_exact": 2
+      },
+      "rest_destination": "TOP_OR_BOTTOM"
+    }
+  },
+  {
+    "card": "ST12-013",
+    "path": "schema.effects.1.actions.0",
+    "params": {
+      "look_at": 1,
+      "filter": {
+        "card_type": "CHARACTER",
+        "cost_exact": 2
+      },
+      "rest_destination": "TOP_OR_BOTTOM",
+      "entry_state": "RESTED"
+    }
+  },
+  {
+    "card": "ST12-017",
+    "path": "schema.effects.0.actions.1",
+    "params": {
+      "look_at": 1,
+      "filter": {
+        "card_type": "CHARACTER",
+        "cost_exact": 2
+      },
+      "rest_destination": "TOP_OR_BOTTOM"
+    }
+  }
+]
