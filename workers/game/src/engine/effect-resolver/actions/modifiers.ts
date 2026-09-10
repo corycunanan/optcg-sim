@@ -370,20 +370,44 @@ export function executeSetPowerToZero(
   resultRefs: Map<string, EffectResult>,
   preselectedTargets?: string[],
 ): ActionResult {
-  const zeroAction: ActionOf<"SET_BASE_POWER"> = {
-    ...action,
-    type: "SET_BASE_POWER",
-    params: { value: 0 },
+  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  const targetIds = autoSelectTargets(action.target, allValidIds);
+  if (targetIds.length === 0) return { state, events: [], succeeded: false };
+
+  // §4-12: capture each target's current total power from the same state.
+  // This is a fixed reduction, not a competing base-power setting. A target
+  // already at zero or below must not gain power or receive a new modifier.
+  const reductions = targetIds.flatMap((id) => {
+    const target = findCardInstance(state, id);
+    const data = target && cardDb.get(target.cardId);
+    if (!target || !data) return [];
+    const power = getEffectivePower(target, data, state, cardDb);
+    return power > 0 ? [{ id, amount: -power }] : [];
+  });
+  let nextState = state;
+  const events: PendingEvent[] = [];
+  for (const { id, amount } of reductions) {
+    const reduced = executeModifyPower(
+      nextState,
+      { ...action, type: "MODIFY_POWER", params: { amount } },
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      [id],
+    );
+    nextState = reduced.state;
+    events.push(...reduced.events);
+  }
+  return {
+    state: nextState,
+    events,
+    succeeded: true,
+    result: { targetInstanceIds: targetIds, count: targetIds.length },
   };
-  return executeSetBasePower(
-    state,
-    zeroAction,
-    sourceCardInstanceId,
-    controller,
-    cardDb,
-    resultRefs,
-    preselectedTargets
-  );
 }
 
 // ─── COPY_POWER ──────────────────────────────────────────────────────────────
