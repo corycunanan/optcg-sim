@@ -7,8 +7,8 @@
  *     the effect resolves. Layer 2 buffs layer on top of the resulting SET_POWER.
  *   - If one of the pair is K.O.'d mid-turn, the survivor keeps the swapped base
  *     until end of turn — the two SET_POWER effects are independent.
- *   - A later SWAP_BASE_POWER (or SET_BASE_POWER) beats an earlier one on the
- *     same Character: last base-setter wins.
+ *   - Competing settings use the highest value (§4-9-2-1; OPT-832).
+ *     Effective-base capture for previously modified targets is OPT-833 scope.
  *   - At end of turn (or end of battle) both Layer-1 effects expire; Layer-0
  *     restores.
  */
@@ -197,7 +197,7 @@ describe("OPT-225: SWAP_BASE_POWER captures Layer 0 at resolution", () => {
     expect(getEffectivePower(charB, dataB, state, cardDb)).toBe(3000);
   });
 
-  it("a second swap on the same Character wins — last base-setter applies", () => {
+  it("a higher second swap wins, and a lower subsequent swap cannot overwrite it", () => {
     const { state, cardDb, charA, charB, dataA } = buildPairState(3000, 5000);
 
     // Add a third character to swap A with.
@@ -223,6 +223,10 @@ describe("OPT-225: SWAP_BASE_POWER captures Layer 0 at resolution", () => {
       swap1.state, SWAP_ACTION, "leader-0", 0, cardDb, new Map(), [charA.instanceId, charC.instanceId],
     );
     expect(getEffectivePower(charA, dataA, swap2.state, cardDb)).toBe(8000);
+    const swap3 = executeSwapBasePower(
+      swap2.state, SWAP_ACTION, "leader-0", 0, cardDb, new Map(), [charA.instanceId, charB.instanceId],
+    );
+    expect(getEffectivePower(charA, dataA, swap3.state, cardDb)).toBe(8000);
   });
 
   it("both Layer-1 SET_POWER effects expire at end of turn — bases restore", () => {

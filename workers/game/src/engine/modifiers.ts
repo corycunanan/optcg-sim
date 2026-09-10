@@ -403,8 +403,8 @@ export function isModifierConditionMet(
 /**
  * OPT-241: Within a single modifier layer, simultaneous effects resolve
  * turn-player-first, non-turn-player-second. For "last wins" layers
- * (SET_POWER, SET_COST) this places the non-turn-player's effect last so
- * it wins the tie, matching Bandai's ruling.
+ * (SET_COST) this places the non-turn-player's effect last. Base-power
+ * setters instead use highest-value precedence under §4-9-2-1.
  */
 function sortByTurnPlayerPriority<T extends { controller: 0 | 1 }>(
   items: T[],
@@ -448,40 +448,31 @@ export function getEffectivePower(
 
   // Layer 1: base-setting effects
   const effects = state.activeEffects;
-  const baseSetters = sortByTurnPlayerPriority(
-    effects.filter(
-      (e) =>
-        e.modifiers?.some(
-          (m) =>
-            m.type === "SET_POWER" &&
-            modifierAppliesToCard(e, m, card, state, cardDb) &&
-            isModifierConditionMet(e, m, state, cardDb)
-        )
-    ),
-    turnPlayerIndex
-  );
-  if (baseSetters.length > 0) {
-    // Last base-setter wins (timestamp/priority order). Turn-player resolves
-    // first, non-turn-player resolves last and therefore clobbers.
-    const lastSetter = baseSetters[baseSetters.length - 1];
-    const mod = lastSetter.modifiers?.find(
-      (m) =>
-        m.type === "SET_POWER" &&
-        modifierAppliesToCard(lastSetter, m, card, state, cardDb) &&
-        isModifierConditionMet(lastSetter, m, state, cardDb)
-    );
-    const value = mod
-      ? permanentModifierParam(
-          mod,
-          "value",
-          state,
-          lastSetter.controller,
-          cardDb,
-          lastSetter.sourceEffectBlockId,
-        )
-      : undefined;
-    if (value !== undefined) power = value;
+  // §4-9-2-1: the highest applicable setting replaces printed power,
+  // independent of registration order and controller. Printed power is not
+  // a competing setter (a lone zero setting must still reduce a 10000 base).
+  let highestSetting: number | undefined;
+  for (const effect of effects) {
+    for (const mod of effect.modifiers ?? []) {
+      if (mod.type !== "SET_POWER") continue;
+      if (!modifierAppliesToCard(effect, mod, card, state, cardDb)) continue;
+      if (!isModifierConditionMet(effect, mod, state, cardDb)) continue;
+      const value = permanentModifierParam(
+        mod,
+        "value",
+        state,
+        effect.controller,
+        cardDb,
+        effect.sourceEffectBlockId,
+      );
+      if (value !== undefined) {
+        highestSetting = highestSetting === undefined
+          ? value
+          : Math.max(highestSetting, value);
+      }
+    }
   }
+  if (highestSetting !== undefined) power = highestSetting;
 
   // Layer 2: additive/subtractive modifiers (commutative, but sort for
   // determinism and to make ordering visible in event traces).
