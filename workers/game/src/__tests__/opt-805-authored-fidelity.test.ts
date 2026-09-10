@@ -978,3 +978,127 @@ it("Crocodile can decline a Counter activation, accept the next, then draws only
     )
   ).toHaveLength(3);
 });
+
+it("persists authored Punk Gibson Counter rest and Mr.3's trigger across the integrated activation boundary", async () => {
+  const f = fixture();
+  // Printed metadata: docs/cards/{OP-01,PRB-02,ST-02,ST-03}.md;
+  // Official PRB02-009 metadata (cost 2, power/counter 1000):
+  // https://en.onepiece-cardgame.com/cardlist/?series=569302
+  // The blue Mr.3 belongs to the blue Leader; the green Counter belongs to Kid.
+  for (const [id, color] of [
+    ["ST03-001", "Blue"],
+    ["ST02-001", "Green"],
+  ] as const) {
+    const schema = getEffectSchema(id)!;
+    f.db.set(id, {
+      ...CARDS.LEADER,
+      id,
+      name: schema.card_name!,
+      color: [color],
+      effectSchema: schema,
+    });
+  }
+  const punk = getEffectSchema("OP01-058")!;
+  f.db.set("OP01-058", {
+    ...CARDS.VANILLA,
+    id: "OP01-058",
+    name: "Punk Gibson",
+    type: "Event",
+    color: ["Green"],
+    cost: 2,
+    power: null,
+    counter: null,
+    types: ["Supernovas", "Kid Pirates"],
+    effectText:
+      "[Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle. Then, rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+    effectSchema: punk,
+  });
+  const mr3 = getEffectSchema("PRB02-009")!;
+  f.db.set("PRB02-009", {
+    ...CARDS.VANILLA,
+    id: "PRB02-009",
+    name: mr3.card_name!,
+    color: ["Blue"],
+    cost: 2,
+    power: 1000,
+    counter: 1000,
+    attribute: ["Special"],
+    types: ["Former Baroque Works", "Cross Guild"],
+    effectText:
+      "This effect can be activated when this Character is rested by your opponent's effect. You may trash this Character and draw 2 cards.\n[Blocker]",
+    effectSchema: mr3,
+  });
+  const attacker = f.put("ST03-001", 0, "LEADER");
+  const defender = f.put("ST02-001", 1, "LEADER");
+  const host = f.put("PRB02-009", 0);
+  const event = f.put("OP01-058", 1, "HAND");
+  const handBefore = f.state.players[0].hand.length;
+  f.act({
+    type: "DECLARE_ATTACK",
+    attackerInstanceId: attacker.instanceId,
+    targetInstanceId: defender.instanceId,
+  });
+  f.act({ type: "PASS" }, 1);
+  f.act(
+    {
+      type: "USE_COUNTER_EVENT",
+      cardInstanceId: event.instanceId,
+      counterTargetInstanceId: defender.instanceId,
+    },
+    1
+  );
+  expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  await f.reload();
+  f.select([defender.instanceId]);
+  await f.reload();
+  f.select([host.instanceId]);
+  expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+  expect(f.state.pendingPrompt?.respondingPlayer).toBe(0);
+  expect(
+    f.state.players[0].characters.some(
+      (c) => c?.instanceId === host.instanceId && c.state === "RESTED"
+    )
+  ).toBe(true);
+  expect(f.state.players[0].hand).toHaveLength(handBefore);
+  await f.reload();
+  f.choose("accept");
+  expect(
+    f.state.players[0].characters.some((c) => c?.cardId === "PRB02-009")
+  ).toBe(false);
+  expect(
+    f.state.players[0].trash.filter((c) => c.cardId === "PRB02-009")
+  ).toHaveLength(1);
+  expect(f.state.players[0].hand).toHaveLength(handBefore + 2);
+  expect(f.state.pendingPrompt).toBeNull();
+  expect(f.state.effectStack).toHaveLength(0);
+  expect(f.state.pendingEventActivationEvents).toBeUndefined();
+  const restEvents = f.state.eventLog.filter(
+    (e) =>
+      e.type === "CARD_STATE_CHANGED" &&
+      e.payload.targetInstanceId === host.instanceId
+  );
+  expect(restEvents).toHaveLength(1);
+  expect(restEvents[0].payload).toMatchObject({
+    newState: "RESTED",
+    cause: "EFFECT",
+    causingController: 1,
+  });
+  expect(
+    f.state.eventLog.filter((e) => e.type === "COUNTER_USED")
+  ).toHaveLength(1);
+  expect(
+    f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+  ).toHaveLength(1);
+  expect(
+    f.state.eventLog.findIndex((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+  ).toBeLessThan(f.state.eventLog.indexOf(restEvents[0]));
+  expect(
+    f.state.turn.actionsPerformedThisTurn.filter(
+      (a) => a.actionType === "USE_COUNTER_EVENT"
+    )
+  ).toHaveLength(1);
+  await f.reload();
+  expect(f.state.players[0].hand).toHaveLength(handBefore + 2);
+  expect(f.state.pendingPrompt).toBeNull();
+  expect(f.state.pendingEventActivationEvents).toBeUndefined();
+});

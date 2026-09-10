@@ -138,7 +138,7 @@ export function isCostPayable(
       if (cost.target?.type === "YOUR_LEADER") {
         const leader = player.leader;
         if (leader.state !== "ACTIVE") return false;
-        return !isProhibitedForCard(state, leader.instanceId, "CANNOT_BE_RESTED", cardDb);
+        return !isProhibitedForCard(state, leader.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId });
       }
       // OPT-250: a source under CANNOT_BE_RESTED can't pay this cost
       // (qa_op13.md:77-79 — [Activate: Main] rest-self effects are gated).
@@ -148,7 +148,7 @@ export function isCostPayable(
         : player.characters.find((card) => card?.instanceId === sourceCardInstanceId)
           ?? (player.stage?.instanceId === sourceCardInstanceId ? player.stage : null);
       if (!source || source.state !== "ACTIVE") return false;
-      if (isProhibitedForCard(state, sourceCardInstanceId, "CANNOT_BE_RESTED", cardDb)) return false;
+      if (isProhibitedForCard(state, sourceCardInstanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) return false;
       return true;
     }
 
@@ -176,12 +176,14 @@ export function isCostPayable(
 
     case "TURN_LIFE_FACE_UP": {
       const amt = resolveAmount(cost);
-      return player.life.filter((l) => l.face === "DOWN").length >= amt;
+      const candidates = cost.position === "TOP" ? player.life.slice(0, amt) : player.life;
+      return candidates.filter((l) => l.face === "DOWN").length >= amt;
     }
 
     case "TURN_LIFE_FACE_DOWN": {
       const amt = resolveAmount(cost);
-      return player.life.filter((l) => l.face === "UP").length >= amt;
+      const candidates = cost.position === "TOP" ? player.life.slice(0, amt) : player.life;
+      return candidates.filter((l) => l.face === "UP").length >= amt;
     }
 
     case "LEADER_POWER_REDUCTION":

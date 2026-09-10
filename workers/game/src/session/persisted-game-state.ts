@@ -481,6 +481,8 @@ const EventPayloadSchemas = {
     targetInstanceId: z.string().optional(),
     newState: z.string().optional(),
     error: z.string().optional(),
+    cause: z.literal("EFFECT").optional(),
+    causingController: PlayerIndex.optional(),
   }),
   POWER_MODIFIED: z.strictObject({
     targetInstanceId: z.string(),
