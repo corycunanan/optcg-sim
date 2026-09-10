@@ -230,13 +230,10 @@ export const OP14_009_TRAFALGAR_LAW: EffectSchema = {
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "SELF",
-            count: { exact: 2 },
-            filter: {
-              any_of: [
-                { card_type: "LEADER" },
-                { card_type: "CHARACTER" },
-              ],
-            },
+            dual_targets: [
+              { filter: { card_type: "LEADER" }, count: { exact: 1 } },
+              { filter: { card_type: "CHARACTER" }, count: { exact: 1 } },
+            ],
           },
           duration: { type: "THIS_BATTLE" },
         },
@@ -484,6 +481,7 @@ export const OP14_016_X_DRAKE: EffectSchema = {
     {
       id: "OP14-016_replacement",
       category: "replacement",
+      conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       flags: { once_per_turn: true, optional: true },
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
@@ -739,10 +737,10 @@ export const OP14_021_ISSHO: EffectSchema = {
         {
           type: "APPLY_PROHIBITION",
           target: {
-            type: "LEADER_OR_CHARACTER",
+            type: "FIELD_CARD",
             controller: "OPPONENT",
             count: { up_to: 1 },
-            filter: { is_rested: true },
+            filter: { is_rested: true, card_type: ["CHARACTER", "STAGE"] },
           },
           params: { prohibition_type: "CANNOT_REFRESH" },
           duration: { type: "SKIP_NEXT_REFRESH" },
@@ -767,9 +765,10 @@ export const OP14_022_USOPP: EffectSchema = {
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
       conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { trait: "Straw Hat Crew" },
+        any_of: [
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "FILM" } },
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { trait: "Straw Hat Crew" } },
+        ],
       },
       actions: [
         {
@@ -1019,6 +1018,7 @@ export const OP14_029_TASHIGI: EffectSchema = {
     {
       id: "OP14-029_replacement",
       category: "replacement",
+      conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       flags: { optional: true },
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
@@ -1529,7 +1529,7 @@ export const OP14_041_BOA_HANCOCK: EffectSchema = {
       trigger: {
         event: "CHARACTER_PLAYED",
         turn_restriction: "OPPONENT_TURN",
-        filter: {},
+        filter: { controller: "SELF" },
       },
       actions: [
         {
@@ -3538,19 +3538,25 @@ export const OP14_092_MR_3: EffectSchema = {
     {
       id: "OP14-092_replacement",
       category: "replacement",
+      conditions: {
+        all_of: [
+          { type: "IS_MY_TURN", controller: "OPPONENT" },
+          { type: "TRASH_COUNT", controller: "SELF", operator: ">=", value: 3 },
+        ],
+      },
       flags: { once_per_turn: true, optional: true },
       replaces: {
         event: "WOULD_BE_KO",
       },
       replacement_actions: [
         {
-          type: "PLACE_HAND_TO_DECK",
+          type: "RETURN_TO_DECK",
           target: {
             type: "CARD_IN_TRASH",
             controller: "SELF",
             count: { exact: 3 },
           },
-          params: { amount: 3, position: "BOTTOM" },
+          params: { position: "BOTTOM" },
         },
       ],
       zone: "FIELD",

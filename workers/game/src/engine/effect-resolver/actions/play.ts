@@ -18,6 +18,7 @@ import type {
   QueuedTrigger,
   ResumeContext,
 } from "../../../types.js";
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 import type { ActionResult } from "../types.js";
 import { setCardState } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
@@ -443,7 +444,7 @@ export function executeSetRest(
   // auto-selecting. Rest-as-consequence is a silent no-op on protected
   // cards (qa_op13.md:85-87) — the effect proceeds for the remainder.
   const allValidIds = rawValidIds.filter(
-    (id) => !isProhibitedForCard(state, id, "CANNOT_BE_RESTED", cardDb),
+    (id) => !isProhibitedForCard(state, id, "CANNOT_BE_RESTED", cardDb, { causingController: controller, sourceCardInstanceId, sourceCardSnapshot: resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot }),
   );
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);

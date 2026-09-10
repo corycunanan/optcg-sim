@@ -1,0 +1,112 @@
+[
+  {
+    "mutation": "original-production-registry",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 17 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Yama cost 0 chooses warriors",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 10 turn 0 sets leader to 5000",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 10 turn 1 sets leader to 5000",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 19 turn 1 sets leader to 5000",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 20 turn 0 sets leader to 5000",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 30 turn 0 sets leader to 5000",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 20 turn 1 sets leader to 7000",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Ace grants rush to Monkey.D.Luffy [] power 4000 eligible true",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Urouge Life top UP preserves Life and only pays legal top",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Urouge Life top DOWN preserves Life and only pays legal top",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Wyper Life top DOWN gates debuff and subsequent KO",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Wyper Life top UP gates debuff and subsequent KO",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Usopp rest by authored OP02-047",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Kuma cost 5 protection prevents subsequent rest",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Usopp permits Stage source controlled by 0",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > OP15-099 rechecks top face before actual payment",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > OP15-114 rechecks top face before actual payment",
+      "Tests  17 failed | 24 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-original-production-registry.log"
+  },
+  {
+    "mutation": "payment-top-guard",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Wyper Life top UP gates debuff and subsequent KO",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > OP15-099 rechecks top face before actual payment",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > OP15-114 rechecks top face before actual payment",
+      "Tests  3 failed | 38 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-payment-top-guard.log"
+  },
+  {
+    "mutation": "payability-top-guard",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Urouge Life top DOWN preserves Life and only pays legal top",
+      "Tests  1 failed | 40 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-payability-top-guard.log"
+  },
+  {
+    "mutation": "rest-source-filter",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Usopp rest by authored OP02-047",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Usopp permits Stage source controlled by 0",
+      "Tests  2 failed | 39 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-rest-source-filter.log"
+  },
+  {
+    "mutation": "source-snapshot-fallback",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Usopp remains protected after opposing Law trashes itself as cost",
+      "Tests  1 failed | 40 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-source-snapshot-fallback.log"
+  },
+  {
+    "mutation": "own-rest-cost-context",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Usopp pays the authored OP14-036 counter's own rest cost",
+      "Tests  1 failed | 40 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-own-rest-cost-context.log"
+  },
+  {
+    "mutation": "shared-blocker-scope",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Usopp can activate Blocker on the opponent's turn",
+      "Tests  1 failed | 40 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-shared-blocker-scope.log"
+  },
+  {
+    "mutation": "luffy-opponent-duration",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 20 turn 0 sets leader to 5000",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Luffy trash 30 turn 0 sets leader to 5000",
+      "Tests  2 failed | 39 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-luffy-opponent-duration.log"
+  },
+  {
+    "mutation": "otama-either-controller",
+    "exit": 1,
+    "evidence": [
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      "FAIL  src/__tests__/opt-812-authored-pipeline.test.ts > OPT-812 authored card pipeline > Otama checks opponent cost-8 Character after paying rest",
+      "Tests  1 failed | 40 passed (41)"
+    ],
+    "log": "/private/tmp/opt812-mutation-otama-either-controller.log"
+  }
+]

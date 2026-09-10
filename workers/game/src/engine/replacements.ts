@@ -573,7 +573,7 @@ function canSetRestSucceed(
     const source = findCardInstance(state, effect.sourceCardInstanceId);
     if (!source) return false;
     if (source.state !== "ACTIVE") return false;
-    if (isProhibitedForCard(state, source.instanceId, "CANNOT_BE_RESTED", cardDb)) return false;
+    if (isProhibitedForCard(state, source.instanceId, "CANNOT_BE_RESTED", cardDb, { causingController: effect.controller, sourceCardInstanceId: effect.sourceCardInstanceId })) return false;
     return true;
   }
 
@@ -585,7 +585,7 @@ function canSetRestSucceed(
   for (const candidate of candidates) {
     if (candidate.state !== "ACTIVE") continue;
     if (target.filter?.exclude_self && candidate.instanceId === effect.sourceCardInstanceId) continue;
-    if (isProhibitedForCard(state, candidate.instanceId, "CANNOT_BE_RESTED", cardDb)) continue;
+    if (isProhibitedForCard(state, candidate.instanceId, "CANNOT_BE_RESTED", cardDb, { causingController: effect.controller, sourceCardInstanceId: effect.sourceCardInstanceId })) continue;
     if (target.filter && !matchesFilter(candidate, target.filter, cardDb, state)) continue;
     usable++;
     if (usable >= needed) return true;
