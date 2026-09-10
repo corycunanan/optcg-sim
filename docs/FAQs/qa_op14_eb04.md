@@ -387,6 +387,20 @@
 **A:** No, you cannot.
 
 
+## OP14-020 — Dracule Mihawk
+
+**Q:** If neither I nor my opponent has a Character with a cost of 5 or more on the field, can I still activate this [Activate: Main] effect to rest 1 of my cards?
+
+**A:** Yes, you can. In this case, you will not set any of your DON!! cards as active after resting 1 of your cards, and the "Then, you cannot play Character cards during this turn." part of the effect will not be applied.
+
+
+## OP14-041 — Boa Hancock
+
+**Q:** If an effect allows me to play 2 or more of my Characters at the same time during my opponent's turn, how many cards will I be able to draw using this Leader's [Opponent's Turn] effect?
+
+**A:** In this case, the effect will be activated for each Character played simultaneously. For example, if you use the [Trigger] effect of "OP16-105 Gecko Moria" to play 3 Characters at once, you draw 3 cards in total.
+
+
 ## EB04-022 — Issho
 
 **Q:** If my opponent has 5 or less cards in their hand, can I still use this card's [On Play] effect to trash 2 cards from my hand?
@@ -394,7 +408,7 @@
 **A:** Yes, you can. In this situation, your opponent does not place 2 cards from their hand at the bottom of their deck in any order.
 
 
-## EB04-034 EB04-038 — Charlotte Pudding Rosinante & Law
+## EB04-034 — Charlotte Pudding
 
 **Q:** If I activate this card's [On Your Opponent's Attack] effect while I have 3 cards in my trash, then use it to discard 1 more card so I have 4 cards in my trash, can I give up to 1 of my Leader or Character cards +2000 power for this battle?
 
