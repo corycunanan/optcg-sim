@@ -684,8 +684,8 @@ export function getEffectiveFieldCost(
  * One-time "next play" discounts modify what you PAY when playing a card —
  * never the card's cost property (CR 1-3-9-1 defines cost as the printed
  * value; 2-7-6 lets effects change it, but e.g. OP02-025's discount is
- * expressly scoped to "play ... from your hand"). matchesOneTimeFilter has
- * no zone restriction, so without this gate a pending discount shifted cost
+ * expressly scoped to "play ... from your hand"). Legacy modifiers can lack
+ * a zone restriction, so without this gate a pending discount shifted cost
  * predicates in EVERY zone: a cost-5 permanent matched "K.O. cost ≤ 4", and
  * a printed-cost-4 deck card matched Oden's "play a cost-3 from your deck".
  *
@@ -736,8 +736,7 @@ function applyLayer2CostModifiers(
   cardDb: Map<string, CardData> | undefined,
   effects: RuntimeActiveEffect[],
   turnPlayerIndex: 0 | 1,
-  diagnostics?: CostEvaluationDiagnostics,
-  costAction: "PLAY_CARD" | "USE_COUNTER_EVENT" = "PLAY_CARD"
+  diagnostics?: CostEvaluationDiagnostics
 ): number {
   let cost = startingCost;
 

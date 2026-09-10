@@ -649,7 +649,8 @@ describe("4. One-Time Modifiers / NEXT_EVENT_COST_REDUCTION", () => {
       controller: 0,
     }] as any;
 
-    const updatedState = consumeOneTimeModifiers(state, eventCard, 0);
+    const original = makeInstance(eventCard.id, "HAND", 0);
+    const updatedState = consumeOneTimeModifiers(state, eventCard, 0, original);
     const otm = updatedState.oneTimeModifiers[0] as any;
     expect(otm.consumed).toBe(true);
   });
