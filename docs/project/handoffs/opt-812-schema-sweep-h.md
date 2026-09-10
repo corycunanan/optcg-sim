@@ -2,7 +2,7 @@
 
 ## Status and recovery
 
-Stop at merge-ready; no merge authorization. Implementation recovered in `/private/tmp/optcg-opt812`, branch `corymcunanan/opt-812-schema-sweep-h-op15op16-op15-029-wrong-prohibition-op15`. Preserved all interrupted edits and the original four schema tests in commit `91fc93a`, then merged main `caf29b1058dddf3dd26357c708ae42f9743e3426`. Original shape tests remain as supplemental coverage. Production registry regenerated using `pnpm --filter optcg-game schema:generate`.
+Implementation agents never merge or write Linear; the coordinator owns current run authorization and final merge gates. Implementation recovered in `/private/tmp/optcg-opt812`, branch `corymcunanan/opt-812-schema-sweep-h-op15op16-op15-029-wrong-prohibition-op15`. Preserved all interrupted edits and the original four schema tests in commit `91fc93a`, then merged main `caf29b1058dddf3dd26357c708ae42f9743e3426`. Original shape tests remain as supplemental coverage. Production registry regenerated using `pnpm --filter optcg-game schema:generate`.
 
 Implementation and focused verification complete. Full `pnpm verify` ran at `599cc31817a94ef4362e9ffdde2888dab9faf6b4`: all gates before worker coverage passed, then2530 worker tests passed/1 failed on an inverted authored-action inventory assertion. Build was not reached. The inventory correction below is complete; renewed worker coverage/build, independent review, GitHub checks and readiness receipt remain pending at this snapshot. Final results and exact tested commit will be recorded in the PR body/coordinator receipt. This document does not claim readiness.
 
@@ -57,3 +57,12 @@ No browser visual change; shared board eligibility behavior is covered by actual
 Run `node --import tsx workers/game/scripts/opt812-source-inventory.ts` to recursively walk the complete generated authored registry, including nested arrays/options/costs. [Captured inventory](opt-812/consumer-inventory.json):20 flip-cost sites (2 newly explicit TOP),12 rest-prohibition sites and7 Leader rest-action sites, no Stage rest-action sites. Unconditional rest behavior is pinned by existing OPT-250 gates; rest source scope is exercised by authored/supplemental sources above.
 
 Follow-up required outside OPT-812:18 legacy flip-cost sites still omit position and retain scanning behavior. At least EB01-040 Kyros and OP08-063 Katakuri explicitly print TOP in their source comments/card text, so incorrect lower-card substitution remains there. Audit the full captured list against printed text/FAQ and add per-card TOP encodings/regressions in a separately scoped ticket. Do not claim all20 consumers fixed. Coordinator owns Linear follow-up creation and required origin comments.
+
+
+## Main integration after OPT-811 delivery (2026-09-10)
+
+Integrated main `8adc44b9b507b464beaf7deee6b769c681ee54a3` (OPT-811 PR655) by normal merge into the previously reviewed OPT-812 head `6bdcb2dd7d28924b21972e62ad9f7b3b1ed2aeaa`. The only conflict was the generated registry; regenerated from retained source modules. A semantic comparison of all2472 entries proves the exact union of seven OPT-812 cards (OP15-024/029/073/092/099/114, OP16-001) and eight OPT-811 cards (OP13-016, OP14-009/016/021/022/029/041/092), with no overlapping card edits or dropped entries. Receipt `/private/tmp/opt812-integration-registry-union.json`.
+
+Preserved both authored pipeline suites and the main target-instruction snapshot, whose sole semantic change is Issho's Character/Stage target using source wording instead of generated wording. No manual shared resolver, source-snapshot, cost, blocker or schema edits were needed. Compared all non-registry incoming files to merged main and the original OPT-812 implementation remains intact.
+
+Combined OPT-811/812 authored, preserved shape, target-instruction, rest/blocker and OPT-820 continuation suites: nine files,147 tests passed (`/private/tmp/opt812-main811-focused.log`). Full `pnpm verify` is renewed on the committed integration tree; its exact head, outcome and current-base CI/review receipt are recorded in PR656 body/coordinator ledger after completion. Earlier independent review remains evidence for unchanged OPT-812 implementation; this new combined tree still requires the coordinator's integration assessment and current remote checks. No PR merge was performed by the implementer.
