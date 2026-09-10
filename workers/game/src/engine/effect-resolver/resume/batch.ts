@@ -4,6 +4,7 @@
  * remaining-batch state carried on the frame's batchResumeMarker.
  */
 
+import { pendingPropagationEvents, retainEventsOnFrame } from "./events.js";
 import type { Action, EffectBlock, EffectResult } from "../../effect-types.js";
 import type {
   BatchResumeMarker,
@@ -60,7 +61,15 @@ export function reenterBatchResume(
     // frame's pendingTriggers snapshot is stale at this point; we pop and
     // re-invoke unconditionally.
 
+    // The saved prefix precedes events from the trigger drain. Shared
+    // references are one occurrence, while equal-payload events remain distinct.
+    events.splice(
+      0,
+      events.length,
+      ...new Set([...pendingPropagationEvents(top.accumulatedEvents), ...events]),
+    );
     nextState = popFrame(nextState);
+    const stackDepth = nextState.effectStack.length;
     const marker = top.batchResumeMarker;
     const resultRefs = new Map<string, EffectResult>(top.resultRefs);
 
@@ -71,7 +80,7 @@ export function reenterBatchResume(
       top.controller,
       cardDb,
       resultRefs,
-      services
+      services.withCommittedEvents(events)
     );
     nextState = actionResult.state;
     events.push(...actionResult.events);
@@ -204,7 +213,7 @@ export function reenterBatchResume(
     // Continue any remainingActions queued behind this batch. Matches
     // chain-continuation in other resume branches.
     if (top.remainingActions.length > 0) {
-      const chainResult = services.executeActionChain(
+      const chainResult = services.withCommittedEvents(events).executeActionChain(
         nextState,
         top.remainingActions,
         top.sourceCardInstanceId,
@@ -216,6 +225,7 @@ export function reenterBatchResume(
       nextState = chainResult.state;
       events.push(...chainResult.events);
       if (chainResult.pendingPrompt) {
+        nextState = retainEventsOnFrame(nextState, stackDepth, events);
         return {
           state: nextState,
           events,
