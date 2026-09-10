@@ -292,6 +292,7 @@ export interface HandCountCondition {
 
 export interface TrashCountCondition {
   type: "TRASH_COUNT";
+  filter?: TargetFilter;
   controller: Controller;
   operator: NumericOperator;
   value: number;

@@ -2079,6 +2079,7 @@ export const OP07_059_FOXY: EffectSchema = {
           type: "APPLY_PROHIBITION",
           target: {
             type: "OPPONENT_LEADER",
+            filter: { is_rested: true },
           },
           params: { prohibition_type: "CANNOT_REFRESH" },
           duration: { type: "SKIP_NEXT_REFRESH" },
