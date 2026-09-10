@@ -340,3 +340,136 @@ it.each([false, true])(
     ).toEqual([0, 1, 0]);
   }
 );
+it("two-level replacement plays publish outer and both On Play prefixes once", () => {
+  const { state, db } = fixture();
+  const target = state.players[1].characters.find(Boolean)!;
+  state.players[1].characters = padChars([target]);
+  const playedCard: CardData = {
+    ...CARDS.VANILLA,
+    id: "REVIEW-COST",
+    name: "Review Cost",
+    effectSchema: {
+      card_id: "REVIEW-COST",
+      effects: [
+        {
+          id: "on-play-cost",
+          category: "auto",
+          trigger: { keyword: "ON_PLAY" },
+          actions: [
+            draw,
+            {
+              type: "PLAY_CARD",
+              target: {
+                type: "CHARACTER_CARD",
+                source_zone: "HAND",
+                controller: "SELF",
+                count: { exact: 1 },
+                filter: { name: "Second Child" },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  };
+  db.set(playedCard.id, playedCard);
+  state.players[1].hand = [
+    { ...state.players[1].hand[0], cardId: playedCard.id },
+    ...state.players[1].hand.slice(1),
+  ];
+  const second: CardData = {
+    ...CARDS.VANILLA,
+    id: "SECOND-CHILD",
+    name: "Second Child",
+    effectSchema: {
+      card_id: "SECOND-CHILD",
+      effects: [
+        {
+          id: "second-onplay",
+          category: "auto",
+          trigger: { keyword: "ON_PLAY" },
+          actions: [draw],
+        },
+      ],
+    },
+  };
+  db.set(second.id, second);
+  state.players[1].hand[1] = { ...state.players[1].hand[1], cardId: second.id };
+  state.activeEffects = [
+    {
+      id: "replacement",
+      sourceCardInstanceId: target.instanceId,
+      sourceEffectBlockId: "replacement",
+      category: "replacement",
+      modifiers: [
+        {
+          type: "REPLACEMENT_EFFECT",
+          params: {
+            trigger: "WOULD_BE_KO",
+            cause_filter: { by: "ANY" },
+            target_filter: null,
+            replacement_actions: [
+              {
+                type: "PLAY_CARD",
+                target: {
+                  type: "CHARACTER_CARD",
+                  source_zone: "HAND",
+                  controller: "SELF",
+                  count: { exact: 1 },
+                  filter: { name: "Review Cost" },
+                },
+              },
+            ],
+            optional: false,
+            once_per_turn: false,
+          },
+        },
+      ],
+      duration: { type: "PERMANENT" },
+      expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+      controller: 1,
+      appliesTo: [target.instanceId],
+      timestamp: 1,
+    },
+  ];
+  const result = resolveEffect(
+    state,
+    {
+      id: "outer",
+      category: "auto",
+      actions: [
+        draw,
+        {
+          type: "KO",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { exact: 1 },
+          },
+        },
+        draw,
+      ],
+    },
+    state.players[0].leader.instanceId,
+    0,
+    db
+  );
+  expect(result.pendingPrompt).toBeUndefined();
+  const next = continuePipelineFromExecution(result.state, result, db, 0).state;
+  expect(next.pendingPrompt).toBeNull();
+  expect(next.effectStack).toEqual([]);
+  expect(
+    next.eventLog
+      .filter((e) =>
+        ["CARD_DRAWN", "CARD_PLAYED", "CARD_TRASHED"].includes(e.type)
+      )
+      .map((e) => [e.type, e.playerIndex])
+  ).toEqual([
+    ["CARD_DRAWN", 0],
+    ["CARD_PLAYED", 1],
+    ["CARD_DRAWN", 1],
+    ["CARD_PLAYED", 1],
+    ["CARD_DRAWN", 1],
+    ["CARD_DRAWN", 0],
+  ]);
+});
