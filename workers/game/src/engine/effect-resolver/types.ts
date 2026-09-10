@@ -35,6 +35,10 @@ export interface SimultaneousGroupPlan {
 
 /** Executable dependencies passed across recursive resolver boundaries. */
 export interface EffectResolverServices {
+  /** Synchronous committed caller prefixes; never serialized or used for staged costs. */
+  withCommittedEvents(events: PendingEvent[]): EffectResolverServices;
+  publishCommittedEvents(state: GameState): GameState;
+
   executeActionChain(
     state: GameState,
     actions: Action[],

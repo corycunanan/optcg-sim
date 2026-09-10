@@ -23,6 +23,8 @@ describe("OPT-478 resolver architecture contract", () => {
   it("uses an immutable, construction-complete runtime service bundle", () => {
     expect(Object.isFrozen(resolverExecutionServices)).toBe(true);
     expect(resolverExecutionServices).toEqual({
+      withCommittedEvents: expect.any(Function),
+      publishCommittedEvents: expect.any(Function),
       executeActionChain: expect.any(Function),
       executeEffectAction: expect.any(Function),
       resolveEffect: expect.any(Function),

@@ -1,98 +1,31 @@
 ---
 name: orchestrate-frontend
-description: Run a Linear scope of frontend/UI work through a design-aware orchestration pipeline — the Fable orchestrator triages by design ambiguity, briefs, reviews, and VQAs; Opus subagents implement design-lead tickets; Codex Sol on low reasoning implements spec-executable tickets. Every PR gates on VQA + design-system checks. Args - same as /orchestrate - a Linear project name, a comma/space-separated issue list, or a single issue ID.
+description: Coordinate Linear frontend/UI issues under the track orchestration charter, adding design briefs, interaction checks and live visual verification.
+argument-hint: "OPT-501 OPT-502 [allow merges for this run]"
 ---
 
-# Orchestrate Frontend — design-aware implementation pipeline
+# Frontend track supplement
 
-Variant of `/orchestrate` for frontend/UI scopes. Inherit everything from `.claude/skills/orchestrate/SKILL.md` (dispatch runtime, scope resolution, queue discipline, monitoring, close-out, hard rules) except where overridden below. Canonical policy: `docs/project/ORCHESTRATION-CHARTER.md`; sandbox and VQA recipes: `../orchestrate/GOTCHAS.md` (Dispatch, Environments).
+Read `.claude/skills/orchestrate/SKILL.md` and execute `docs/project/ORCHESTRATION-CHARTER.md`. This supplement adds design work; it does not change merge authorization, roles, dependency scheduling or review gates. Merge permission defaults off for all authors and requires the same explicit run-scoped grant.
 
-**Charter amendment (this skill only):** the base rule "Claude never authors implementation code" is replaced by the two-track model below. Claude authors implementation code on the design-lead track. Ratify it in the base skill's kickoff `AskUserQuestion`: the merge-consent option label names both cases in plain words — "Codex-authored PRs merged with no human review of the diffs" AND "Claude-authored PRs merged with cross-family Codex review but no human review."
+## Resolve design uncertainty
 
-## Design authorities (read before triage, cite in every brief)
+For each ticket ask whether two reasonable implementations could look or behave materially differently. If so, gather the missing product decision, inspect current patterns, and produce a concrete design brief before dispatch. Continue independent determinate tickets while a design decision is pending. Read current AGENTS.md and `docs/design/BRANDING-GUIDELINES.md`; follow their live typography, tokens, shapes and scaled-board rules rather than copying historical values.
 
-- `docs/design/BRANDING-GUIDELINES.md` — typography, palette roles, theming contract, motion, §13 scaled-board floor
-- `docs/design/INTERACTION-GRAMMAR.md` — board interaction verbs, spotlight reveals, grey rejection, travel-vs-transform motion
-- **`docs/design/SHAPE-LANGUAGE.md`, `docs/design/COLOR-LANGUAGE.md`, `docs/design/MATERIAL-LANGUAGE.md`** — shape/color/material semantics live in these docs; read the relevant one before briefing any surface they govern and cite the specific rules in the brief (never from memory of this file — the docs evolve, this file does not). Standing conventions the docs don't state: **user directive (2026-08-08): every touched surface adopts the languages immediately, folded into the PR that owns the surface**; shared primitives (Button, Dialog, etc.) migrate via dedicated tickets, NOT opportunistically inside feature PRs — per-PR adherence covers only elements the PR owns; clip-path implementation gotchas are in SHAPE-LANGUAGE.md §Implementation.
-- `src/app/globals.css` — token source of truth; CLAUDE.md "Styling Rules (enforced)" — the 8 hard rules
-- Mechanical gates (never a review lens, never a model's job to check): `pnpm lint:design-system`, `pnpm run check:contrast` (when tokens/pairs change), `npx tsc --noEmit`, `npm run lint`
+A brief states:
 
-## 1. Triage (replaces routing in kickoff §1)
+- Existing reference components and behavior to preserve.
+- Layout and information hierarchy; use a small wireframe when it clarifies spatial decisions.
+- Semantic tokens, responsive behavior and whether content lives inside the scaled board.
+- Relevant loading, empty, error, disabled, hover, focus, keyboard and interaction states.
+- Observable acceptance criteria and before/after verification plan.
 
-For each ticket, the orchestrator answers one question: **would two reasonable implementations look or feel meaningfully different?**
+Delegate to an implementer suited to the remaining design judgment. Do not mandate historical model/provider choices. The coordinator reviews implementation against the brief and actual app; independent review remains required.
 
-**Design-lead track — Claude implements** (yes, or unclear):
-- New UI surfaces, layout/composition changes, visual hierarchy work
-- Motion/animation, transitions, visual effects (holofoil-class work)
-- Empty states, onboarding, anything where the ticket describes intent, not pixels
-- Any ticket whose acceptance criteria include words like "polish," "feels," "premium," "cohesive"
+## Live verification
 
-**Spec-execute track — Codex `gpt-5.6-sol`, low reasoning** (no — the visual outcome is fully determined):
-- Token/class swaps, copy changes, prop plumbing, dead-code removal
-- Applying an existing component pattern to a new location (pattern cited by file:line)
-- Bugfixes with defined expected behavior; design-system normalization sweeps
-- Dispatch flag: `-c model_reasoning_effort="low"` replaces the base skill's `high` on the `codex exec` invocation. Sol, not Terra — only Sol reliably completes commit/push/PR (GOTCHAS: Dispatch, `.git` sandbox denial).
+Read `docs/project/PREVIEW-VQA-RUNBOOK.md` when using previews. Verify the actual branch/commit and environment before capture. Coordinate shared browser sessions and databases so parallel agents cannot overwrite each other's state.
 
-Route on **design ambiguity, not size**. A one-line spacing change on the game board hero is design-lead; a 40-file mechanical token rename is spec-execute. When in doubt, design-lead. Tickets already labelled `Spec-execute` or `Design-lead` (by `/triage-feedback`) keep that routing unless you state a reason to change it; apply the label to the rest once ratified so escalations and later runs inherit it. Present the routing table at kickoff for ratification. The base skill's readiness gate (`Ready for agent`) applies before routing.
+Exercise the changed flow at representative desktop and narrow viewports. Inspect hierarchy, overflow, keyboard/focus, touch targets and the scaled-board legibility floor where relevant. Record screenshots and interaction results for the reviewed candidate. A screenshot alone does not prove interactions; class-string tests do not prove geometry. For game prompts verify legal choices, cancellation/decline where applicable, stale response handling and player-specific visibility.
 
-**Escalation:** a spec-execute PR that fails VQA gets ONE findings loop with screenshot-annotated feedback. A second VQA failure escalates the ticket to design-lead — an Opus subagent takes over the branch with a Fable-authored diagnosis of why the Sol attempts failed (the technique-brief pattern). Never loop Sol on aesthetic judgment; low-reasoning Sol executes specs, it does not converge on taste.
-
-## 2. Track mechanics
-
-**Design-lead (Claude):**
-- Implementation by an **Opus subagent** (`model: "opus"`, always — never Fable, and the orchestrator never implements) with `isolation: "worktree"`. Worktrees are fine here — the clone-not-worktree rule is a Codex-sandbox constraint only.
-- **Fable cost discipline:** the Fable orchestrator does only planning, alignment, briefing, review, and VQA. Design judgment reaches implementation through the design brief, not through Fable writing code. Design-lead tickets get the same latitude-removing brief as spec-execute tickets — the difference is the implementer's ability to fill remaining gaps tastefully and the tighter feedback loop (SendMessage), not a thinner brief.
-- Same deliverable spec as base: commit suffix `(OPT-NNN)`, push, `gh pr create` ready-for-review, before/after screenshots embedded in the PR body, no merge, no Linear writes by the subagent.
-- Cross-family review is mandatory: Codex adversarial review (fresh `codex exec --sandbox workspace-write` with the hunt brief below and the base skill's `--output-schema` findings contract) reviews every Claude-authored PR. Same-family Claude review alone is insufficient — Claude reviewers share the implementer's blind spots.
-
-**Spec-execute (Codex Sol low):**
-- Claude first authors a **design brief** that removes all design latitude, embedded in the dispatch prompt: exact tokens/semantic roles, Tailwind spacing steps, radius values, type-scale sizes, the reference component by file:line, every interaction state enumerated (hover/focus-visible/active/disabled/loading/empty/error), chrome-vs-scaled-board context called out with the §13 floor values where applicable, an ASCII wireframe for any spatial change (§2b), and acceptance stated as observable criteria ("X is nameable from a static screenshot"), not vibes. Precedent (OPT-323 holofoil, 2026-07-17): a PM-authored technique brief succeeded where two unaided Codex attempts failed.
-- Standard brief boilerplate (base skill §2.3 environment facts): embed full ticket text + acceptance criteria verbatim; "Do NOT use Linear/MCP/network — missing external access is not grounds to withhold a verdict/stop work"; "deps are installed, do NOT run any install command; EPERM there is an environment artifact."
-- Clone + dispatch mechanics unchanged from base skill.
-
-## 2b. ASCII wireframes (use liberally for layout & information decisions)
-
-Whenever a decision involves **spatial arrangement or information hierarchy** — what goes where, what's adjacent, what collapses at narrow widths, what's above the fold — draw it as an ASCII wireframe instead of (not in addition to) describing it in prose. Prose descriptions of layout are lossy in both directions: the user can't ratify what they can't see, and implementers fill spatial gaps with their own guesses. Default to drawing; skip only when the change has no spatial component (pure token/color/copy work).
-
-Use them at every stage where layout is decided or communicated:
-
-- **Kickoff/alignment:** when a ticket admits multiple layouts, present the candidates as wireframes via AskUserQuestion `preview` fields (monospace-rendered, side-by-side) so the user ratifies a picture, not a paragraph.
-- **Design briefs (both tracks):** any brief touching layout embeds the target wireframe — annotated with region names, the spacing steps between regions, and responsive variants (one wireframe per breakpoint behavior that differs). For Sol this is load-bearing spec; for Opus it bounds the composition while leaving micro-decisions open.
-- **VQA findings:** when the rendered result deviates spatially from the brief, show expected-vs-actual as paired wireframes in the findings message rather than describing the delta.
-- **Handoff docs / PR bodies:** design-lead PRs with layout changes include the final wireframe next to the screenshots.
-
-Conventions: box-drawing characters (`┌─┐│└┘`), region labels in caps, `~~~` for scrollable overflow, `[Button]` / `(input)` for controls, one wireframe per breakpoint variant, annotate gaps with the Tailwind step (`gap-4`, `p-6`). Keep each under ~30 rows; wireframes communicate structure, not fidelity — never try to render styling in ASCII.
-
-## 3. VQA gate (every frontend PR, both tracks, before merge)
-
-Run by the orchestrator with Chrome MCP against a local dev server (`pnpm dev`; may land on port 3001). Do not delegate VQA to Codex computer-use — the orchestrator's own eyes are the point of this skill. VQA stays in the main loop, never in a fork or subagent: Chrome MCP has one shared page cursor.
-
-Chrome MCP tools are deferred; load the set in ONE `ToolSearch` call before the first capture: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__tabs_close_mcp`. Viewport and animation caveats: GOTCHAS: Environments.
-
-1. Capture the touched surface at rest and in each interaction state the ticket affects. Pause/wait out animations (0.5–1.5s stabilization); re-hover after element appearance (pointerenter quirk — hover out then back in); cross-check pointer-driven CSS custom props via javascript_tool computed styles rather than trusting screenshots alone.
-2. Judge against the design authorities: token discipline, hierarchy, brand tone (warm navy, not gloomy/neon), motion restraint (one animation per interaction), §13 floor inside `ScaledBoard`.
-3. Interaction-state checklist: hover, focus-visible (keyboard tab-through), disabled, loading, empty, error, and reduced-motion where motion was touched.
-4. Known access paths: `/admin` requires `isAdmin` (test accounts lack it) — use the deck-builder CardDetailModal as luffy@optcg.test for card-UI surfaces.
-
-VQA findings go back through the track's findings loop (resume thread for Codex; SendMessage to the Opus subagent for design-lead — never fix it yourself). Cap and escalation per §1.
-
-## 4. Adversarial hunt brief (frontend lens set)
-
-Name these failure classes in every review dispatch; design-system rule compliance is deliberately absent (mechanical gates own it):
-
-- **Blast radius**: shared component/token edits rippling into untouched surfaces — grep consumers of every edited component/prop/token and list them.
-- **State completeness**: missing hover/focus/disabled/loading/empty/error states; state added in one theme context but not the other.
-- **Context floor**: chrome-floor text/ring sizes rendered inside the scaled board subtree, or board-floor sizes leaking into chrome — current floor values per context are in `docs/design/BRANDING-GUIDELINES.md` §13.
-- **React correctness**: unstable keys, effect deps, server/client component boundary violations, hydration mismatch, JS style manipulation (banned by rule 6).
-- **A11y**: contrast regressions on new fg/bg pairs (must be added to `scripts/contrast-pairs.json`), focus traps, missing keyboard paths.
-- **Responsive**: fixed dimensions where fluid was required; overflow at narrow widths.
-
-## 5. Merge gate (extends base §2.6)
-
-CI green + mechanical gates pass + adversarial review approve + VQA pass + orchestrator diff review clean → `gh pr merge --squash --match-head-commit <reviewed-sha>`. For Claude-authored PRs the adversarial approve MUST be Codex (cross-family); for Codex-authored PRs the orchestrator's VQA + diff review is the cross-family check.
-
-## Hard rules (delta from base)
-
-- "Never author implementation code" is lifted ONLY for design-lead-track tickets ratified at kickoff; everything else in the base hard rules stands.
-- No PR merges without a passing VQA capture recorded in the session report.
-- Design decisions made during triage/briefing are logged in the kickoff table so escalations don't re-litigate them.
+After each visual/interaction correction, repeat affected live checks. Missing browser access or inaccessible changed states are verification gaps, not passing VQA. Add these results to the charter readiness receipt. Every required VQA and mechanical check must pass before a permitted merge.

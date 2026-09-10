@@ -280,7 +280,7 @@ export interface GameEventPayloadMap {
   TURN_STARTED: Record<string, never>;
   TURN_ENDED: Record<string, never>;
   CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
-  CARD_KO: { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; cardType?: "STAGE" };
+  CARD_KO: { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; cardType?: "STAGE" };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
   CARD_TRASHED: { cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
   CARD_RETURNED_TO_HAND: { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
@@ -756,6 +756,7 @@ export interface SelectTargetPrompt {
   cards: CardInstance[];
   validTargets: string[];
   effectDescription: string;
+  instruction?: string;
   countMin: number;
   countMax: number;
   ctaLabel: string;

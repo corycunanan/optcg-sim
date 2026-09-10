@@ -1289,7 +1289,8 @@ function executeDamageStep(
           const koResult = koCharacter(
             nextState,
             targetInstanceId,
-            pi as 0 | 1
+            pi as 0 | 1,
+            cardDb
           );
           if (koResult) {
             nextState = koResult.state;

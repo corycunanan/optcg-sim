@@ -14,8 +14,7 @@ import type { QueuedTrigger, EffectStackFrame } from "../types.js";
 import {
   matchTriggersForEvent,
   orderMatchedTriggers,
-  registerTriggersForCard,
-  registerReplacementsForCard,
+  registerCardEnteredField,
 } from "./triggers.js";
 import { pushFrame, generateFrameId } from "./effect-stack.js";
 import { isEngineTerminated } from "./engine-limits.js";
@@ -41,7 +40,7 @@ export function scanEventsForTriggers(
   let nextState = state;
   const scannedEvents = events.map(withTriggerScanned);
 
-  // Register triggers for newly played cards before matching
+  // Register every field-entry effect before matching simultaneous triggers.
   for (let index = 0; index < events.length; index++) {
     const event = events[index];
     if (event.type === "CARD_PLAYED") {
@@ -53,8 +52,7 @@ export function scanEventsForTriggers(
 
       const instance = findCardInstance(nextState, cardInstanceId);
       if (instance) {
-        nextState = registerTriggersForCard(nextState, instance, cardData);
-        nextState = registerReplacementsForCard(nextState, instance, cardData);
+        nextState = registerCardEnteredField(nextState, instance, cardData);
       }
     }
   }

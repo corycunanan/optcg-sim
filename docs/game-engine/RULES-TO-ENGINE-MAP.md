@@ -223,7 +223,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **4-9-2.** "Base" = printed value on card | **IMPL** | `modifiers.ts` Layer 0 reads `cardData.power` / `cardData.cost` | |
+| **4-9-2.** Base power can be changed by effects | **IMPL** | `modifiers.ts` `getEffectiveBasePower` reads the highest applicable setting, otherwise printed power; excludes additive/DON. Field filters and K.O. event snapshots use changed base; off-field identity reads printed power. | OPT-833; OP17-112 / OP14-053 FAQs |
 | **4-9-2-1.** Multiple base-setting effects: use highest | **IMPL** | `modifiers.ts → getEffectivePower()` Layer 1 | Base-setting effects resolved; highest value wins |
 | **4-9-2-2.** Multiple base-setting effects for cost: use highest | **IMPL** | `modifiers.ts → getEffectiveCost()` Layer 1 | Same as above for cost |
 

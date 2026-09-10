@@ -139,6 +139,8 @@ export interface ResumeContext {
   validTargets: string[];
   /** Per-owner Rule 3-1-7 ordering choices collected before a deck-return batch commits. */
   returnToDeckArrangement?: ReturnToDeckArrangement;
+  /** Selected field identities waiting for a Life destination choice. */
+  fieldToLifeTargetIds?: string[];
   // Rule 3-7-6-1: when an effect-driven play hits a full board, the prompt asks
   // the controller to pick one of their own Characters to trash before the play
   // resolves. On resume, the chosen victim is rule-trashed (no On K.O. triggers
@@ -235,6 +237,8 @@ export interface EffectStackFrame {
   validTargets: string[];
   /** Persisted per-owner Rule 3-1-7 ordering progress for RETURN_TO_DECK. */
   returnToDeckArrangement?: ReturnToDeckArrangement;
+  /** Selected field identities waiting for a Life destination choice. */
+  fieldToLifeTargetIds?: string[];
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;
   /** AND transaction waiting for all snapshot-locked target choices. */

@@ -1,0 +1,384 @@
+{
+  "reviewedAt": "2026-09-09",
+  "team": "OPT",
+  "states": [
+    "unstarted",
+    "backlog",
+    "started",
+    "triage"
+  ],
+  "issues": [
+    {
+      "id": "OPT-809",
+      "title": "Schema sweep E — OP09/OP10: OP09-093 missing result_ref, OP09-098 board-wide gate, OP10-022 revealed-Life gate + inner \"may\"",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-809/schema-sweep-e-op09op10-op09-093-missing-result-ref-op09-098-board"
+    },
+    {
+      "id": "OPT-811",
+      "title": "Schema sweep G — OP13/OP14: OP13-002 don_requirement, OP13-016 Sabo-only, OP14-009 Leader+1 target, OP14-016/029/092 turn gates, OP14-021 Stage target, OP14-022 FILM, OP14-041 empty filter",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-811/schema-sweep-g-op13op14-op13-002-don-requirement-op13-016-sabo-only"
+    },
+    {
+      "id": "OPT-807",
+      "title": "Schema sweep C — OP05/OP06/ST09/ST12: OP05-030 turn gate, OP06-015 KO-vs-trash, OP06-074 negated-target gate, OP06-088 \"active\" as power≥0, OP06-092 hand-vs-trash, 7 TOP_OR_BOTTOM omissions",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-807/schema-sweep-c-op05op06st09st12-op05-030-turn-gate-op06-015-ko-vs"
+    },
+    {
+      "id": "OPT-830",
+      "title": "Include all 41 Trigger-only cards in committed card-text docs and add a coverage gate",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-830/include-all-41-trigger-only-cards-in-committed-card-text-docs-and-add"
+    },
+    {
+      "id": "OPT-823",
+      "title": "Reconcile stale agent/design instructions and rules-map claims against merged code",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-823/reconcile-stale-agentdesign-instructions-and-rules-map-claims-against"
+    },
+    {
+      "id": "OPT-812",
+      "title": "Schema sweep H — OP15/OP16: OP15-029 wrong prohibition, OP15-099/114 trash Life instead of turning it, OP15-092 missing opponent-turn duration, OP15-024/073, OP16-001/081",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-812/schema-sweep-h-op15op16-op15-029-wrong-prohibition-op15-099114-trash"
+    },
+    {
+      "id": "OPT-806",
+      "title": "Schema sweep B — OP04/ST05/ST06: OP04-011 revealed-card gate, OP04-094 missing 15-trash upgrade clause, ST05-017 selected-card gate, ST06-004 effect scope",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-806/schema-sweep-b-op04st05st06-op04-011-revealed-card-gate-op04-094"
+    },
+    {
+      "id": "OPT-789",
+      "title": "Engine: PLAY_STATE_MOD unenforced — OP09-022 Lim's Characters are played active instead of rested",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-789/engine-play-state-mod-unenforced-op09-022-lims-characters-are-played"
+    },
+    {
+      "id": "OPT-783",
+      "title": "Public facet vocabulary endpoint: distinct traits, effect traits, and tag groups",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-783/public-facet-vocabulary-endpoint-distinct-traits-effect-traits-and-tag"
+    },
+    {
+      "id": "OPT-805",
+      "title": "Schema sweep A — OP01/OP02/ST03: OP01-062 spurious cost_reduced, OP02-071 missing SELF filter, 4 SEARCH_AND_PLAY missing pick.up_to",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-805/schema-sweep-a-op01op02st03-op01-062-spurious-cost-reduced-op02-071"
+    },
+    {
+      "id": "OPT-821",
+      "title": "Honor TOP/BOTTOM choice for field-to-Life effects before schema position sweeps",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-821/honor-topbottom-choice-for-field-to-life-effects-before-schema"
+    },
+    {
+      "id": "OPT-814",
+      "title": "Schema sweep J — EB03/EB04/P/PRB02: unprinted active gates (EB03-018, EB04-003), EB04-035 SELF filter, EB04-038 block-level if, P-085 position, PRB02-004/006/009 trigger fidelity",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-814/schema-sweep-j-eb03eb04pprb02-unprinted-active-gates-eb03-018-eb04-003"
+    },
+    {
+      "id": "OPT-808",
+      "title": "Schema sweep D — OP07/OP08: OP07-059 rested-Leader filter, OP08-006 trash-vs-field, OP08-020 unprinted active gate, OP08-045 cause, OP08-069 Life position, OP08-118 distinct −3000/−2000 targets",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-808/schema-sweep-d-op07op08-op07-059-rested-leader-filter-op08-006-trash"
+    },
+    {
+      "id": "OPT-779",
+      "title": "Modal titles name the effect action instead of the timing: \"Card Effect: KO Characters\"",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-779/modal-titles-name-the-effect-action-instead-of-the-timing-card-effect"
+    },
+    {
+      "id": "OPT-791",
+      "title": "Engine: DAMAGE_RULE_MOD unenforced — ST13-003 Luffy's face-up Life cards go to hand instead of deck bottom",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-791/engine-damage-rule-mod-unenforced-st13-003-luffys-face-up-life-cards"
+    },
+    {
+      "id": "OPT-790",
+      "title": "Engine: DON_PHASE_BEHAVIOR unenforced — OP13-003 Gol.D.Roger never gives a DON!! to the Leader during the DON!! Phase",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-790/engine-don-phase-behavior-unenforced-op13-003-goldroger-never-gives-a"
+    },
+    {
+      "id": "OPT-788",
+      "title": "Engine: NAME_ALIAS rule modification is never enforced — 8 \"also treated as [X]\" cards never match name filters",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-788/engine-name-alias-rule-modification-is-never-enforced-8-also-treated"
+    },
+    {
+      "id": "OPT-829",
+      "title": "Encode the two preview effect cards ST31-004 and ST32-002 already present in the manifest",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-829/encode-the-two-preview-effect-cards-st31-004-and-st32-002-already"
+    },
+    {
+      "id": "OPT-828",
+      "title": "Cost slice: place an opponent's cost-3-or-less Character into their Life for OP09-101",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-828/cost-slice-place-an-opponents-cost-3-or-less-character-into-their-life"
+    },
+    {
+      "id": "OPT-827",
+      "title": "Result-reference slice: gate OP08-096 on the card actually milled",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-827/result-reference-slice-gate-op08-096-on-the-card-actually-milled"
+    },
+    {
+      "id": "OPT-826",
+      "title": "Attack-scope slice: bind granted Blocker prohibition to the previously selected attacker",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-826/attack-scope-slice-bind-granted-blocker-prohibition-to-the-previously"
+    },
+    {
+      "id": "OPT-825",
+      "title": "Replacement slice: restrict OP10-034 Franky to battle K.O.",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-825/replacement-slice-restrict-op10-034-franky-to-battle-ko"
+    },
+    {
+      "id": "OPT-824",
+      "title": "Cost slice: give active DON!! to a selected Leader or Character before resolving the effect",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-824/cost-slice-give-active-don-to-a-selected-leader-or-character-before"
+    },
+    {
+      "id": "OPT-822",
+      "title": "Apply ST13-003 Life replacement to effects and replaced activation costs (FAQ follow-up)",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-822/apply-st13-003-life-replacement-to-effects-and-replaced-activation"
+    },
+    {
+      "id": "OPT-813",
+      "title": "Schema sweep I — EB01/EB02: EB02-005 continuous [Your Turn]/[Opponent's Turn] authored as start-of-turn autos; EB01-058 unprinted ACTIVE_DON_COUNT",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-813/schema-sweep-i-eb01eb02-eb02-005-continuous-your-turnopponents-turn"
+    },
+    {
+      "id": "OPT-810",
+      "title": "Schema sweep F — OP11/OP12: OP11-031 and OP12-087 collapsed Leader alternatives, OP11-112 unprinted active gate, OP12-061 one-time modifier scope",
+      "status": "Todo",
+      "url": "https://linear.app/optcg-sim/issue/OPT-810/schema-sweep-f-op11op12-op11-031-and-op12-087-collapsed-leader"
+    },
+    {
+      "id": "OPT-799",
+      "title": "Engine: action-level optional (\"Then, you may…\") — OP14-079 and EB04-001 force the second clause",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-799/engine-action-level-optional-then-you-may-op14-079-and-eb04-001-force"
+    },
+    {
+      "id": "OPT-815",
+      "title": "ArrangeTopCardsModal is keyed by card-ID list, not prompt id — back-to-back searches over the same cards reuse stale modal state",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-815/arrangetopcardsmodal-is-keyed-by-card-id-list-not-prompt-id-back-to"
+    },
+    {
+      "id": "OPT-816",
+      "title": "Harden the pick_destination schema lint: walk conditional_override actions and fail the routing test on unhandled constants",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-816/harden-the-pick-destination-schema-lint-walk-conditional-override"
+    },
+    {
+      "id": "OPT-817",
+      "title": "Ignore .cache/ and .corepack/ in the ESLint config so in-clone validation caches cannot break pnpm lint",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-817/ignore-cache-and-corepack-in-the-eslint-config-so-in-clone-validation"
+    },
+    {
+      "id": "OPT-795",
+      "title": "Engine: add a \"card trashed from your hand by an effect\" trigger event — OP14-045/049/056 are authored on the inverse event",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-795/engine-add-a-card-trashed-from-your-hand-by-an-effect-trigger-event"
+    },
+    {
+      "id": "OPT-734",
+      "title": "Lobby at 640px heights: seats region cannot fit host seat + guest panel; 84px of chrome rides on pendingInvite",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-734/lobby-at-640px-heights-seats-region-cannot-fit-host-seat-guest-panel"
+    },
+    {
+      "id": "OPT-506",
+      "title": "User-facing holofoil tuning with a curated control subset",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-506/user-facing-holofoil-tuning-with-a-curated-control-subset"
+    },
+    {
+      "id": "OPT-579",
+      "title": "Enable spectator target highlighting (commentator view)",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-579/enable-spectator-target-highlighting-commentator-view"
+    },
+    {
+      "id": "OPT-787",
+      "title": "Range sliders for removal, buff, draw, and search depth, plus a same-ability scoping toggle",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-787/range-sliders-for-removal-buff-draw-and-search-depth-plus-a-same"
+    },
+    {
+      "id": "OPT-786",
+      "title": "Tier 2: CardEffectFacet table with numeric values, trait roles, and range query params",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-786/tier-2-cardeffectfacet-table-with-numeric-values-trait-roles-and-range"
+    },
+    {
+      "id": "OPT-793",
+      "title": "Engine: \"until you have N\" semantics — until_count is never read (OP14-054, OP05-058 trash the wrong amount; OP08-074 returns every DON!!)",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-793/engine-until-you-have-n-semantics-until-count-is-never-read-op14-054"
+    },
+    {
+      "id": "OPT-800",
+      "title": "Replacement target_filter without controller wildcards to both players — 9 proxy replacements (OP15 ×8, ST29-008) protect the opponent's Characters",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-800/replacement-target-filter-without-controller-wildcards-to-both-players"
+    },
+    {
+      "id": "OPT-803",
+      "title": "Data: ST31-004 and ST32-002 have effect text but no schema; ST31/ST32 sets not imported; docs/cards omits 41 Trigger-only cards",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-803/data-st31-004-and-st32-002-have-effect-text-but-no-schema-st31st32"
+    },
+    {
+      "id": "OPT-804",
+      "title": "Engine: small vocabulary gaps blocking 8 schema fixes — GIVE_DON cost, BATTLE cause filter, when_attacking scope bound to the selected card, MILL result_ref, opponent-Life placement cost",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-804/engine-small-vocabulary-gaps-blocking-8-schema-fixes-give-don-cost"
+    },
+    {
+      "id": "OPT-831",
+      "title": "Import full ST31/ST32 sets after canonical source availability is verified",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-831/import-full-st31st32-sets-after-canonical-source-availability-is"
+    },
+    {
+      "id": "OPT-798",
+      "title": "Engine: MILL cost primitive and either-player Character-to-deck cost — five \"you may trash N from top of deck:\" cards and two \"place 1 Character…owner's deck\" costs are mis-encoded",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-798/engine-mill-cost-primitive-and-either-player-character-to-deck-cost"
+    },
+    {
+      "id": "OPT-818",
+      "title": "Engine: make field-entry registration idempotent — effect-played Nusjuro registers WHEN_ATTACKING 3× and prompts a spurious ordering choice",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-818/engine-make-field-entry-registration-idempotent-effect-played-nusjuro"
+    },
+    {
+      "id": "OPT-819",
+      "title": "Engine: register permanent effects at field entry — Nusjuro played off Five Elders never gains Rush; every Elder in a batch with an ON_PLAY loses its permanent block",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-819/engine-register-permanent-effects-at-field-entry-nusjuro-played-off"
+    },
+    {
+      "id": "OPT-794",
+      "title": "Engine: CHARACTER_REMOVED_FROM_FIELD only observes K.O. and trash — bounce, bottom-deck and Life placement never fire \"removed from the field\" triggers",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-794/engine-character-removed-from-field-only-observes-ko-and-trash-bounce"
+    },
+    {
+      "id": "OPT-820",
+      "title": "Engine: replay pre-prompt accumulatedEvents on mid-action frame resume — Five Elders' \"trash all your Characters\" never reaches the event log",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-820/engine-replay-pre-prompt-accumulatedevents-on-mid-action-frame-resume"
+    },
+    {
+      "id": "OPT-570",
+      "title": "Spectator event-log merge under-reveals if an event ever carries private identities from both players",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-570/spectator-event-log-merge-under-reveals-if-an-event-ever-carries"
+    },
+    {
+      "id": "OPT-785",
+      "title": "Effect filter UI: grouped facet chips, effect-trait picker, and counter range",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-785/effect-filter-ui-grouped-facet-chips-effect-trait-picker-and-counter"
+    },
+    {
+      "id": "OPT-802",
+      "title": "Tech debt: dead schema params with no engine consumer (cost_override, mandatory, life_controller, source_text) and dead CardActionMenuContent props",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-802/tech-debt-dead-schema-params-with-no-engine-consumer-cost-override"
+    },
+    {
+      "id": "OPT-796",
+      "title": "Engine: source-bound \"this Character's attack deals damage\" trigger — OP03-041/043/047/051 fire on the Leader's attacks",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-796/engine-source-bound-this-characters-attack-deals-damage-trigger-op03"
+    },
+    {
+      "id": "OPT-797",
+      "title": "Engine: battle-target and replacement-target references — \"the Character you battled with\" (OP04-047, ST08-013) and Bege's proxy (OP11-101) act on the wrong card",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-797/engine-battle-target-and-replacement-target-references-the-character"
+    },
+    {
+      "id": "OPT-801",
+      "title": "Schema + lint: OP11-041 Leader authored on unmapped LIFE_CARD_REMOVED event — draw never fires; lint must reject custom events outside the trigger map",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-801/schema-lint-op11-041-leader-authored-on-unmapped-life-card-removed"
+    },
+    {
+      "id": "OPT-792",
+      "title": "Engine + board: support target.mixed_pool so \"rest up to N of your opponent's Characters or DON!!\" can pick DON!! cards",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-792/engine-board-support-targetmixed-pool-so-rest-up-to-n-of-your"
+    },
+    {
+      "id": "OPT-784",
+      "title": "Card-trait filter control in the deck builder search and card browser filters",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-784/card-trait-filter-control-in-the-deck-builder-search-and-card-browser"
+    },
+    {
+      "id": "OPT-776",
+      "title": "Top-of-board prompt banner: instruction, count, source card inspect, Skip and Confirm over the opponent's hand",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-776/top-of-board-prompt-banner-instruction-count-source-card-inspect-skip"
+    },
+    {
+      "id": "OPT-778",
+      "title": "Retire SelectTargetPrompt.ctaLabel from the wire and finish the prompt design docs",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-778/retire-selecttargetpromptctalabel-from-the-wire-and-finish-the-prompt"
+    },
+    {
+      "id": "OPT-777",
+      "title": "Optional \"you may\" effects resolve in-board: source card glow plus activate question in the top banner",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-777/optional-you-may-effects-resolve-in-board-source-card-glow-plus"
+    },
+    {
+      "id": "OPT-623",
+      "title": "Reserve cards: builder UI, state, and validation",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-623/reserve-cards-builder-ui-state-and-validation"
+    },
+    {
+      "id": "OPT-622",
+      "title": "Reserve cards: schema, API, and gameplay isolation",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-622/reserve-cards-schema-api-and-gameplay-isolation"
+    },
+    {
+      "id": "OPT-588",
+      "title": "Coverage: compare the remaining six mockup preview states against live",
+      "status": "Backlog",
+      "url": "https://linear.app/optcg-sim/issue/OPT-588/coverage-compare-the-remaining-six-mockup-preview-states-against-live"
+    },
+    {
+      "id": "OPT-782",
+      "title": "Card search API accepts effectTags, effectTraits, and counter range params",
+      "status": "In Progress",
+      "url": "https://linear.app/optcg-sim/issue/OPT-782/card-search-api-accepts-effecttags-effecttraits-and-counter-range"
+    },
+    {
+      "id": "OPT-775",
+      "title": "Generate a succinct target instruction on the worker and send it with every SELECT_TARGET prompt",
+      "status": "In Progress",
+      "url": "https://linear.app/optcg-sim/issue/OPT-775/generate-a-succinct-target-instruction-on-the-worker-and-send-it-with"
+    }
+  ]
+}

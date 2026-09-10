@@ -297,7 +297,7 @@ export function handleSelectTargetRuleTrashForPlay(
 
   // Skip the generic SELECT_TARGET branch below
   if (remainingActions.length > 0) {
-    const chainResult = services.executeActionChain(
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
       nextState,
       remainingActions,
       effectSourceInstanceId,

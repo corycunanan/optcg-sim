@@ -823,8 +823,8 @@ export const OP16_036_MR_2_BON_KUREI: EffectSchema = {
       id: "when_attacking_copy_leader_power",
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
-      // "becomes the same as your opponent's Leader" — the Leader's printed
-      // power, unlike OP16-055 which copies "your opponent's Leader's power".
+      // "becomes the same as your opponent's Leader" — the Leader's changed
+      // base, unlike OP16-055 which copies total power including adjustments.
       actions: [{ type: "COPY_POWER", target: { type: "SELF" }, params: { source: "OPPONENT_LEADER", source_power: "BASE" }, duration: { type: "THIS_TURN" } }],
     },
   ],

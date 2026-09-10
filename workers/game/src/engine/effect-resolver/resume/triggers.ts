@@ -11,6 +11,7 @@ import type {
   PendingEvent,
   QueuedTrigger,
 } from "../../../types.js";
+import { pendingPropagationEvents, takeInterruptedEvents, publishCommittedEvents, retainPropagationBeforePrompt } from "./events.js";
 import { peekFrame, updateTopFrame } from "../../effect-stack.js";
 import {
   emitEvent,
@@ -28,8 +29,26 @@ export function processRemainingTriggers(
   priorEvents: PendingEvent[] = [],
   triggerOrderingGroup?: import("../../../types.js").EffectStackFrame["triggerOrderingGroup"]
 ): EffectResolverResult {
-  const events = [...priorEvents];
-  let nextState = state;
+  // This is a publication boundary reached after a child accepts its action
+  // or finishes/abandons its cost. Earlier committed effects publish first;
+  // staged cost frames are not interrupted frames and remain untouched.
+  const prefix = takeInterruptedEvents(state);
+  state = publishCommittedEvents(prefix.state, prefix.events);
+  state = services.publishCommittedEvents(state);
+  const batchFrame = peekFrame(state);
+  const ownsBatchPrefix = batchFrame?.phase === "AWAITING_BATCH_RESUME";
+  const events = [
+    ...new Set([
+      ...prefix.events,
+      ...(ownsBatchPrefix ? pendingPropagationEvents(batchFrame.accumulatedEvents) : []),
+      ...priorEvents,
+    ]),
+  ];
+  // Consume the saved batch prefix before immutable publication copies are
+  // made below; re-entry must not recover the original unflagged references.
+  let nextState = ownsBatchPrefix
+    ? updateTopFrame(state, { accumulatedEvents: [] })
+    : state;
 
   for (let index = 0; index < events.length; index++) {
     const event = events[index];
@@ -72,7 +91,7 @@ export function processRemainingTriggers(
         triggerOrderingGroup
       );
       return {
-        state: promptResult.state,
+        state: retainPropagationBeforePrompt(promptResult.state, events),
         events,
         resolved: false,
         pendingPrompt: promptResult.pendingPrompt,
@@ -99,7 +118,7 @@ export function processRemainingTriggers(
       cardDb
     );
     return {
-      state: promptResult.state,
+      state: retainPropagationBeforePrompt(promptResult.state, events),
       events,
       resolved: false,
       pendingPrompt: promptResult.pendingPrompt,
@@ -131,7 +150,7 @@ export function processRemainingTriggers(
         });
       }
       return {
-        state: nextState,
+        state: retainPropagationBeforePrompt(nextState, events),
         events,
         resolved: false,
         pendingPrompt: result.pendingPrompt,
@@ -140,6 +159,7 @@ export function processRemainingTriggers(
 
     // Emit events from this trigger's resolution
     for (const event of result.events) {
+      if (event.propagation?.eventLogEmitted) continue;
       nextState = emitEvent(
         nextState,
         event.type,
@@ -165,7 +185,7 @@ export function processRemainingTriggers(
       cardDb
     );
     return {
-      state: promptResult.state,
+      state: retainPropagationBeforePrompt(promptResult.state, events),
       events,
       resolved: false,
       pendingPrompt: promptResult.pendingPrompt,
@@ -197,7 +217,7 @@ export function processRemainingTriggers(
         });
       }
       return {
-        state: nextState,
+        state: retainPropagationBeforePrompt(nextState, events),
         events,
         resolved: false,
         pendingPrompt: result.pendingPrompt,
@@ -206,6 +226,7 @@ export function processRemainingTriggers(
 
     // Emit events from this trigger's resolution
     for (const event of result.events) {
+      if (event.propagation?.eventLogEmitted) continue;
       nextState = emitEvent(
         nextState,
         event.type,

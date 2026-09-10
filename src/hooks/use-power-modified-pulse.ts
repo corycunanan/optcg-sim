@@ -22,8 +22,8 @@ const selectPowerTarget: TransientEventKeySelector<string> = (event) =>
 function readPowerChange(
   event: Extract<GameEvent, { type: "POWER_MODIFIED" }>,
 ): Omit<PowerModPulse, "nonce"> | null {
-  // Engine MODIFY_POWER emitters send an additive `amount`. SET_POWER,
-  // SET_POWER_TO_ZERO, COPY_POWER, and SWAP_POWER emit an absolute `value`;
+  // Engine MODIFY_POWER and SET_POWER_TO_ZERO emit an additive `amount`.
+  // SET_POWER, COPY_POWER, and SWAP_POWER emit an absolute `value`;
   // the client has no reliable pre-event effective power snapshot from which
   // to derive a true delta, so those events are labeled as replacements.
   if (event.payload.amount !== undefined) {

@@ -3852,7 +3852,7 @@ export const OP06_103_KAWAMATSU: EffectSchema = {
             count: { up_to: 1 },
             filter: { power_exact: 0 },
           },
-          params: { face: "UP" },
+          params: { face: "UP", position: "TOP_OR_BOTTOM" },
         },
       ],
     },

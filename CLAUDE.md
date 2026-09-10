@@ -220,3 +220,7 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 3. **Tight system, loose expression** — Every spacing, type, and color decision traces back to a token. Within that system, layouts can be expressive.
 4. **Motion earns its place** — Transitions communicate state. One clear animation per interaction, not stacked effects.
 5. **Progressive clarity** — Simple at rest, detailed on interaction. Dense information (stats, filters) is scannable through hierarchy, not visual noise.
+
+## Track orchestration
+
+For 1–N Linear issues, use `.claude/skills/orchestrate/SKILL.md` and the canonical `docs/project/ORCHESTRATION-CHARTER.md`. It supersedes legacy ticket lifecycle and standing merge assumptions. Merge mode defaults off; only a coordinator with explicit run-scoped user authorization may merge fully assessed PRs. Implementation agents never merge or write Linear. Codex and Claude coordinators may update Linear issues and create relevant tickets. Every update requires a documenting comment on that issue; implementation-discovered tickets also require a linked explanatory comment on the original ticket. Follow the charter audit-trail and recovery requirements.

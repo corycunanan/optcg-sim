@@ -2037,9 +2037,8 @@ Move a Character from the field to the Life area. Functions as a removal method 
 
 ```typescript
 interface AddToLifeFromFieldParams {
-  position: "TOP" | "BOTTOM";
-  face: "UP" | "DOWN";
-  owner: "SELF" | "OPPONENT";
+  position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM"; // default TOP
+  face?: "UP" | "DOWN"; // default DOWN
 }
 ```
 
@@ -2050,17 +2049,19 @@ interface AddToLifeFromFieldParams {
 | **Fired events** | `CARD_ADDED_TO_LIFE`, `CARD_REMOVED_FROM_FIELD` (does NOT fire `CARD_KO`) |
 | **Example cards** | OP03-123, OP06-103, OP06-107, OP08-069, ST07-017, ST09-015, ST13-001, EB01-053, EB02-057 |
 
-`owner` determines whose Life area receives the card. Most effects add to the controller's Life, but some add to the opponent's.
+The destination is the card owner's Life area, even if another player controls the Character. `TOP_OR_BOTTOM` prompts the effect controller after target selection; selected identities are persisted until the destination is chosen. Selecting zero or only prohibited targets produces no destination prompt. Existing Life cards retain their order and face.
+
+The fired-events row describes the intended event contract; generic field-removal event delivery remains tracked separately in OPT-794.
 
 ```json
 {
   "type": "ADD_TO_LIFE_FROM_FIELD",
   "target": {
     "controller": "SELF",
-    "card_type": "CHARACTER",
+    "type": "CHARACTER",
     "count": { "up_to": 1 }
   },
-  "params": { "position": "TOP", "face": "DOWN", "owner": "SELF" }
+  "params": { "position": "TOP", "face": "DOWN" }
 }
 ```
 

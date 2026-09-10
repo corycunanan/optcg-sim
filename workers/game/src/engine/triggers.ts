@@ -52,7 +52,12 @@ export function registerTriggersForCard(
   const newTriggers: RuntimeRegisteredTrigger[] = [];
   let nextState = state;
 
+  const registeredBlocks = new Set(state.triggerRegistry
+    .filter(trigger => trigger.sourceCardInstanceId === cardInstance.instanceId)
+    .map(trigger => trigger.effectBlockId));
+
   for (const block of schema.effects) {
+    if (registeredBlocks.has(block.id)) continue;
     // Only auto and activate categories have triggers
     if (block.category !== "auto" && block.category !== "activate") continue;
     if (!block.trigger) continue;
@@ -62,6 +67,7 @@ export function registerTriggersForCard(
     // Check if the card is in the right zone for this trigger
     if (!isCardInValidZone(cardInstance, zone)) continue;
 
+    registeredBlocks.add(block.id);
     const allocated = allocateEngineId(nextState, "trigger");
     nextState = allocated.state;
     newTriggers.push({
@@ -117,7 +123,14 @@ export function registerPermanentEffectsForCard(
   const newProhibitions: RuntimeProhibition[] = [];
   let nextState = state;
 
+  // Prohibition-only blocks have no active-effect row, so both registries
+  // contribute to the field-instance/block identity.
+  const registeredBlocks = new Set([...state.activeEffects, ...state.prohibitions]
+    .filter(effect => effect.sourceCardInstanceId === cardInstance.instanceId)
+    .map(effect => effect.sourceEffectBlockId));
+
   for (const block of schema.effects) {
+    if (registeredBlocks.has(block.id)) continue;
     if (block.category !== "permanent") continue;
 
     const hasModifiers = block.modifiers && block.modifiers.length > 0;
@@ -126,6 +139,8 @@ export function registerPermanentEffectsForCard(
 
     const zone: EffectZone = block.zone ?? "FIELD";
     if (!isCardInValidZone(cardInstance, zone)) continue;
+
+    registeredBlocks.add(block.id);
 
     // Determine expiry from duration
     const duration = block.duration ?? { type: "PERMANENT" as const };
@@ -246,12 +261,19 @@ export function registerReplacementsForCard(
   const newEffects: RuntimeActiveEffect[] = [];
   let nextState = state;
 
+  const registeredBlocks = new Set(state.activeEffects
+    .filter(effect => effect.sourceCardInstanceId === cardInstance.instanceId)
+    .map(effect => effect.sourceEffectBlockId));
+
   for (const block of schema.effects) {
+    if (registeredBlocks.has(block.id)) continue;
     if (block.category !== "replacement") continue;
     if (!block.replaces) continue;
 
     const zone: EffectZone = block.zone ?? "FIELD";
     if (!isCardInValidZone(cardInstance, zone)) continue;
+
+    registeredBlocks.add(block.id);
 
     // If the schema declares a target_filter, the replacement protects any
     // instance matching that filter — register with empty appliesTo (wildcard)
@@ -291,6 +313,17 @@ export function registerReplacementsForCard(
     ...nextState,
     activeEffects: [...state.activeEffects, ...newEffects],
   };
+}
+
+/** Register each field-entry effect once for this card instance. */
+export function registerCardEnteredField(
+  state: GameState,
+  cardInstance: CardInstance,
+  cardData: CardData,
+): GameState {
+  state = registerTriggersForCard(state, cardInstance, cardData);
+  state = registerReplacementsForCard(state, cardInstance, cardData);
+  return registerPermanentEffectsForCard(state, cardInstance, cardData);
 }
 
 // ─── Matching ─────────────────────────────────────────────────────────────────
@@ -792,9 +825,10 @@ function matchesEventFilter(
       "targetInstanceId" in event.payload ? (event.payload as { targetInstanceId?: string }).targetInstanceId : undefined
     );
     if (targetId) {
+      const basePowerSnapshot = event.type === "CARD_KO" ? event.payload.preKO_basePower : undefined;
       const card = findCardInstance(state, targetId);
       if (card) {
-        if (!matchesFilter(card, filter.target_filter, cardDb, state)) return false;
+        if (!matchesFilter(card, filter.target_filter, cardDb, state, undefined, undefined, undefined, basePowerSnapshot)) return false;
       } else {
         // OPT-453: field exits into the deck re-id the card (rules §3-1-6),
         // so the event's pre-transition instanceId is unresolvable by design
@@ -815,7 +849,7 @@ function matchesEventFilter(
           controller: event.playerIndex,
           owner: event.playerIndex,
         };
-        if (!matchesFilter(snapshot, filter.target_filter, cardDb, state)) return false;
+        if (!matchesFilter(snapshot, filter.target_filter, cardDb, state, undefined, undefined, undefined, basePowerSnapshot)) return false;
       }
     }
   }

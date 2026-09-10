@@ -86,6 +86,7 @@ export function BoardModals({
             cards={activePrompt.cards}
             validTargets={activePrompt.validTargets}
             effectDescription={activePrompt.effectDescription}
+            instruction={activePrompt.instruction}
             sourceCard={activePrompt.sourceCard}
             countMin={activePrompt.countMin}
             countMax={activePrompt.countMax}

@@ -7,6 +7,10 @@ export interface CardBrowserFilters {
   type: string;
   set: string;
   block: string;
+  effectTags?: string;
+  effectTraits?: string;
+  counterMin?: string;
+  counterMax?: string;
   originOnly: string;
 }
 

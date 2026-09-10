@@ -1,3 +1,4 @@
+import { retainEventsOnFrame } from "./events.js";
 /**
  * PLAYER_CHOICE resume handlers.
  *
@@ -44,6 +45,7 @@ import { markOncePerTurnUsed } from "../action-utils.js";
 import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { postCostConditionsMet } from "../post-cost.js";
+import { executeAddToLifeFromField } from "../actions/life.js";
 import { executePlayCard } from "../actions/play.js";
 import {
   applyFieldDonReturn,
@@ -237,6 +239,51 @@ export function handlePlayerChoiceDonReturn(
   return { kind: "fallthrough", state: applied.state };
 }
 
+/** Resume exactly the selected field cards with a concrete destination. */
+export function handleFieldToLifePosition(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+): (EffectResolverResult & { succeeded?: boolean }) | null {
+  const {
+    pausedAction,
+    fieldToLifeTargetIds,
+    validTargets,
+    controller,
+    effectSourceInstanceId,
+  } = resumeCtx;
+  if (pausedAction?.type !== "ADD_TO_LIFE_FROM_FIELD" || !fieldToLifeTargetIds)
+    return null;
+  if (
+    action.type !== "PLAYER_CHOICE" ||
+    !validTargets.includes(action.choiceId)
+  ) {
+    return { state, events: [], resolved: false, rejected: true };
+  }
+  const position =
+    action.choiceId === `field-life:${JSON.stringify(fieldToLifeTargetIds)}:TOP`
+      ? "TOP"
+      : action.choiceId ===
+          `field-life:${JSON.stringify(fieldToLifeTargetIds)}:BOTTOM`
+        ? "BOTTOM"
+        : null;
+  if (!position) return { state, events: [], resolved: false, rejected: true };
+  const result = executeAddToLifeFromField(
+    state,
+    { ...pausedAction, params: { ...pausedAction.params, position } },
+    effectSourceInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    fieldToLifeTargetIds,
+  );
+  if (pausedAction.result_ref && result.result)
+    resultRefs.set(pausedAction.result_ref, result.result);
+  return { ...result, resolved: true };
+}
+
 export function handleChooseValue(
   state: GameState,
   action: GameAction,
@@ -314,7 +361,7 @@ export function handlePlayerChoiceBranch(
   const chosenIndex = parseInt(action.choiceId, 10);
   const chosenBranch = options[chosenIndex];
   if (chosenBranch) {
-    const branchResult = services.executeActionChain(
+    const branchResult = services.withCommittedEvents(events).executeActionChain(
       nextState,
       chosenBranch,
       effectSourceInstanceId,
@@ -512,7 +559,8 @@ export function handleAwaitingOptionalResponse(
   if (topFrame.remainingActions.length > 0) {
     const actionRefs = new Map<string, EffectResult>(topFrame.resultRefs);
     for (const [key, value] of costRefs ?? []) actionRefs.set(key, value);
-    const chainResult = services.executeActionChain(
+    const stackDepth = nextState.effectStack.length;
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
       nextState,
       topFrame.remainingActions,
       sourceCardInstanceId,
@@ -525,6 +573,7 @@ export function handleAwaitingOptionalResponse(
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
+      nextState = retainEventsOnFrame(nextState, stackDepth, events);
       const newTop = peekFrame(nextState);
       if (newTop) {
         nextState = updateTopFrame(nextState, {
@@ -675,7 +724,7 @@ export function handleAwaitingTriggerOrderSelection(
   nextState = popFrame(nextState);
 
   // Resolve the chosen trigger
-  const result = services.resolveEffect(
+  const result = services.withCommittedEvents(events).resolveEffect(
     nextState,
     chosenTrigger.effectBlock,
     chosenTrigger.sourceCardInstanceId,
@@ -712,6 +761,7 @@ export function handleAwaitingTriggerOrderSelection(
   // Emit events from the resolved trigger
   for (let index = 0; index < result.events.length; index++) {
     const event = result.events[index];
+    if (event.propagation?.eventLogEmitted) continue;
     nextState = emitEvent(
       nextState,
       event.type,
@@ -783,7 +833,7 @@ export function handleAwaitingTriggerOrderSelection(
 
   if (remaining.length === 1) {
     // Auto-resolve the last one
-    const lastResult = services.resolveEffect(
+    const lastResult = services.withCommittedEvents(events).resolveEffect(
       nextState,
       remaining[0].effectBlock,
       remaining[0].sourceCardInstanceId,
@@ -811,6 +861,7 @@ export function handleAwaitingTriggerOrderSelection(
     // Emit events from the last trigger
     for (let index = 0; index < lastResult.events.length; index++) {
       const event = lastResult.events[index];
+      if (event.propagation?.eventLogEmitted) continue;
       nextState = emitEvent(
         nextState,
         event.type,

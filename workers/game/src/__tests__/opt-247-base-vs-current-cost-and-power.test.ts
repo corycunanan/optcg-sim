@@ -3,11 +3,11 @@
  *
  * Bandai rulings:
  *   • "cost of N or less" / "power of N or less" → CURRENT (post-modifier) value.
- *   • "base cost of N or less" / "base power of N or less" → printed Layer 0.
+ *   • "base cost" → printed cost; "base power" → changed base, excluding additive/DON.
  *
  * The engine encodes the split via flat filter keys:
  *   cost_*  / power_*        → current (effective)
- *   base_cost_* / base_power_* → base (printed)
+ *   base_cost_* → printed; base_power_* → effective setting layer
  *
  * OPT-247 also fixes a default-flip bug: cost_* filters previously evaluated
  * against base cost when no costOverride was passed, contradicting the FAQ.
@@ -169,7 +169,7 @@ describe("OPT-248: power_* reads current (effective) power", () => {
   });
 });
 
-describe("OPT-248: base_power_* reads printed Layer 0 power regardless of modifiers", () => {
+describe("OPT-248/833: base_power_* excludes additive power modifiers", () => {
   it("OP13-077 shape: base 5000 with +2000 buff to 7000 → base_power_max:5000 matches", () => {
     const { state, cardDb, card } = buildTarget(3, 5000, [{ type: "MODIFY_POWER", amount: 2000 }]);
     expect(matchesFilter(card, { base_power_max: 5000 }, cardDb, state)).toBe(true);

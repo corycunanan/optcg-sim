@@ -5,7 +5,7 @@
  * They are never stored as mutated values on the card.
  *
  * Layer 0: Base printed value (from card DB)
- * Layer 1: Base-setting effects (SET_POWER, e.g., "This Character's power becomes 0")
+ * Layer 1: Base-setting effects (SET_POWER; highest applicable setting)
  * Layer 2: Additive/subtractive modifiers (MODIFY_POWER from effect resolver)
  * DON!! bonus: +1000 × attachedDon, owner's turn only (rules §6-5-5-2)
  */
@@ -40,6 +40,7 @@ export interface CostEvaluationDiagnostics {
 }
 
 const modifierConditionQueries: ConditionQueryServices = {
+  getEffectiveBasePower,
   getEffectivePower: (card, data, state, cardDb) =>
     getEffectivePower(card, data, state, cardDb),
   getEffectiveCostForRead: (card, data, state, cardDb) =>
@@ -138,6 +139,7 @@ function permanentModifierParam(
     controller,
     cardDb,
     matchesFilter,
+    getEffectiveBasePower,
   });
   if (resolution.resolved) return resolution.value;
   if (resolution.reason === "MISSING_CARD_DB") return undefined;
@@ -403,8 +405,8 @@ export function isModifierConditionMet(
 /**
  * OPT-241: Within a single modifier layer, simultaneous effects resolve
  * turn-player-first, non-turn-player-second. For "last wins" layers
- * (SET_POWER, SET_COST) this places the non-turn-player's effect last so
- * it wins the tie, matching Bandai's ruling.
+ * (SET_COST) this places the non-turn-player's effect last. Base-power
+ * setters instead use highest-value precedence under §4-9-2-1.
  */
 function sortByTurnPlayerPriority<T extends { controller: 0 | 1 }>(
   items: T[],
@@ -420,10 +422,10 @@ function sortByTurnPlayerPriority<T extends { controller: 0 | 1 }>(
 }
 
 /**
- * Returns the effective power of a card in the current game state.
- * Power can be negative — no floor (rules §1-3-6-1).
+ * Returns field base power after setting effects, before additive power or DON!!.
+ * Off-field identities read printed power. Values may be negative (§1-3-6-1).
  */
-export function getEffectivePower(
+export function getEffectiveBasePower(
   card: CardInstance,
   cardData: CardData,
   state: GameState,
@@ -444,44 +446,68 @@ export function getEffectivePower(
     card.zone === "STAGE";
   if (!onField) return power;
 
-  const turnPlayerIndex = state.turn.activePlayerIndex;
-
   // Layer 1: base-setting effects
   const effects = state.activeEffects;
-  const baseSetters = sortByTurnPlayerPriority(
-    effects.filter(
-      (e) =>
-        e.modifiers?.some(
-          (m) =>
-            m.type === "SET_POWER" &&
-            modifierAppliesToCard(e, m, card, state, cardDb) &&
-            isModifierConditionMet(e, m, state, cardDb)
-        )
-    ),
-    turnPlayerIndex
-  );
-  if (baseSetters.length > 0) {
-    // Last base-setter wins (timestamp/priority order). Turn-player resolves
-    // first, non-turn-player resolves last and therefore clobbers.
-    const lastSetter = baseSetters[baseSetters.length - 1];
-    const mod = lastSetter.modifiers?.find(
-      (m) =>
-        m.type === "SET_POWER" &&
-        modifierAppliesToCard(lastSetter, m, card, state, cardDb) &&
-        isModifierConditionMet(lastSetter, m, state, cardDb)
-    );
-    const value = mod
-      ? permanentModifierParam(
-          mod,
-          "value",
-          state,
-          lastSetter.controller,
-          cardDb,
-          lastSetter.sourceEffectBlockId,
-        )
-      : undefined;
-    if (value !== undefined) power = value;
+  // §4-9-2-1: the highest applicable setting replaces printed power,
+  // independent of registration order and controller. Printed power is not
+  // a competing setter (a lone zero setting must still reduce a 10000 base).
+  let highestSetting: number | undefined;
+  for (const effect of effects) {
+    for (const mod of effect.modifiers ?? []) {
+      if (mod.type !== "SET_POWER") continue;
+      // Evaluate a setting without feeding its own output back into eligibility.
+      // This immutable, query-local view also bounds nested dependency reads;
+      // other modifiers remain visible, independent of registration order.
+      const sourceCardId = findCardInstance(state, effect.sourceCardInstanceId)?.cardId;
+      const evaluationState = {
+        ...state,
+        activeEffects: state.activeEffects.map((candidate) => {
+          // Duplicate copies of one authored aura are the same setting. They
+          // must not invalidate one another (e.g. two OP17-112 Linlins).
+          const sameAuthoredAura = effect.category === "permanent" &&
+            candidate.category === "permanent" && sourceCardId !== undefined &&
+            candidate.controller === effect.controller &&
+            candidate.sourceEffectBlockId === effect.sourceEffectBlockId &&
+            findCardInstance(state, candidate.sourceCardInstanceId)?.cardId === sourceCardId;
+          if (candidate !== effect && !sameAuthoredAura) return candidate;
+          return { ...candidate, modifiers: candidate.modifiers?.filter((item) =>
+            item !== mod && !(sameAuthoredAura && JSON.stringify(item) === JSON.stringify(mod))
+          ) };
+        }),
+      };
+      if (!modifierAppliesToCard(effect, mod, card, evaluationState, cardDb)) continue;
+      if (!isModifierConditionMet(effect, mod, evaluationState, cardDb)) continue;
+      const value = permanentModifierParam(
+        mod,
+        "value",
+        evaluationState,
+        effect.controller,
+        cardDb,
+        effect.sourceEffectBlockId,
+      );
+      if (value !== undefined) {
+        highestSetting = highestSetting === undefined
+          ? value
+          : Math.max(highestSetting, value);
+      }
+    }
   }
+  if (highestSetting !== undefined) power = highestSetting;
+
+  return power;
+}
+
+/** Total field power adds adjustments and DON!! to the effective base. */
+export function getEffectivePower(
+  card: CardInstance,
+  cardData: CardData,
+  state: GameState,
+  cardDb?: Map<string, CardDataType>
+): number {
+  let power = getEffectiveBasePower(card, cardData, state, cardDb);
+  if (!["CHARACTER", "LEADER", "STAGE"].includes(card.zone)) return power;
+  const effects = state.activeEffects;
+  const turnPlayerIndex = state.turn.activePlayerIndex;
 
   // Layer 2: additive/subtractive modifiers (commutative, but sort for
   // determinism and to make ordering visible in event traces).

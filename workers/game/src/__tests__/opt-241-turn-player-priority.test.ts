@@ -1,16 +1,7 @@
 /**
- * OPT-241 D3 — Turn-player priority for simultaneous permanent effects.
- *
- * When two permanent effects of the same modifier layer are active
- * simultaneously, the turn player's effect resolves FIRST and the opponent's
- * resolves SECOND. For "last-wins" layers (SET_POWER / SET_COST) this means
- * the opponent's effect clobbers. Verifies both layers respect priority
- * across power and cost paths.
- *
- * Per Bandai: "when continuous effects resolve simultaneously, the turn
- * player's effect resolves first." Particularly relevant when one side uses
- * SET_* and the other uses MODIFY_* — or when both use SET_* and the tie
- * must be broken by turn ownership rather than registration order.
+ * OPT-241 D3 — Turn-player priority remains relevant to SET_COST and trigger
+ * ordering. OPT-832 corrects SET_POWER: §4-9-2-1 gives the highest setting
+ * precedence regardless of turn player or registration order.
  */
 
 import { describe, it, expect } from "vitest";
@@ -77,8 +68,8 @@ describe("OPT-241 D3: Turn-player priority in modifier layers", () => {
     timestamp: 1,
   });
 
-  it("opponent's SET_POWER wins when both players have one (turn player 0)", () => {
-    // P0 is turn player → P0's SET_POWER applies first, P1's applies last = wins.
+  it("highest SET_POWER wins when both players have one (turn player 0)", () => {
+    // P1 has the higher setting.
     const p0SetsTo = makeSetPower(0, 1000, "p0");
     const p1SetsTo = makeSetPower(1, 9000, "p1");
     const { state, cardDb, target } = createDualAuraState([p0SetsTo, p1SetsTo], 0);
@@ -87,8 +78,8 @@ describe("OPT-241 D3: Turn-player priority in modifier layers", () => {
     expect(getEffectivePower(target, data, state, cardDb)).toBe(9000);
   });
 
-  it("order of registration does NOT affect outcome — only turn player does", () => {
-    // Swap registration order. Result should still be P1's value because P1 is non-turn-player.
+  it("order of registration does not affect highest SET_POWER", () => {
+    // Swap registration order. P1 still has the higher setting.
     const p0SetsTo = makeSetPower(0, 1000, "p0");
     const p1SetsTo = makeSetPower(1, 9000, "p1");
     const { state, cardDb, target } = createDualAuraState([p1SetsTo, p0SetsTo], 0);
@@ -97,14 +88,14 @@ describe("OPT-241 D3: Turn-player priority in modifier layers", () => {
     expect(getEffectivePower(target, data, state, cardDb)).toBe(9000);
   });
 
-  it("flipping the turn player flips which SET_POWER wins", () => {
-    // Now P1 is turn player → P1's applies first, P0's wins.
+  it("flipping the turn player preserves the highest SET_POWER", () => {
+    // P1 remains the higher setting even on its own turn.
     const p0SetsTo = makeSetPower(0, 1000, "p0");
     const p1SetsTo = makeSetPower(1, 9000, "p1");
     const { state, cardDb, target } = createDualAuraState([p0SetsTo, p1SetsTo], 1);
 
     const data = cardDb.get(target.cardId)!;
-    expect(getEffectivePower(target, data, state, cardDb)).toBe(1000);
+    expect(getEffectivePower(target, data, state, cardDb)).toBe(9000);
   });
 
   // ─── Power: Layer 1 (SET) always before Layer 2 (MODIFY) ───────────────────
@@ -170,6 +161,15 @@ describe("OPT-241 D3: Turn-player priority in modifier layers", () => {
 
     const data = cardDb.get(target.cardId)!;
     expect(getEffectiveCost(data, state, target.instanceId, cardDb)).toBe(7);
+  });
+
+  it("SET_COST keeps turn-player priority even when the winning setting is lower", () => {
+    const effects = [makeSetCost(0, 7, "p0-cost"), makeSetCost(1, 2, "p1-cost")];
+    for (const turnPlayer of [0, 1] as const) {
+      const { state, cardDb, target } = createDualAuraState(effects, turnPlayer);
+      expect(getEffectiveCost(cardDb.get(target.cardId)!, state, target.instanceId, cardDb))
+        .toBe(turnPlayer === 0 ? 2 : 7);
+    }
   });
 
   it("SET_COST (layer 1) applies before MODIFY_COST (layer 2)", () => {

@@ -1,4 +1,6 @@
-# Orchestrate — validated gotchas
+# Orchestrate — historical runtime gotchas
+
+**Policy:** `docs/project/ORCHESTRATION-CHARTER.md` supersedes lifecycle, authority, sandbox and scheduling advice here. Entries describe past machines; verify current capabilities and never use these notes to bypass an approval denial.
 
 Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the section the current step needs. Each entry is a rule that cost a retry or a bad merge; the date is when it was validated. This file, not project memory, is where a validated rule lives — memory holds run history only.
 
@@ -10,7 +12,7 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 - A codex session that writes nothing to its output file for >1h is hung: TaskStop it and re-dispatch fresh with a priority-ordered prompt.
 - **macOS tmp reaper deletes `/private/tmp` clone files untouched for ~3 days** (2026-09-03): it kills in-flight resumed sessions and destroys uncommitted work, and the harness reports it as a "killed" task. For runs spanning days push WIP daily; recover by rebuilding the clone from the origin branch and dispatching fresh — resume cannot recover a deleted working tree.
 - A clone with `node_modules` measures ~2 GB (1.9 GB on 2026-09-06 with pnpm hardlinks). Check `df -h /private/tmp` in preflight; Codex crashes on ENOSPC leaving uncommitted work in the clone. Re-dispatch with "inventory `git diff` first, do not discard". Never `git restore` agent work (hook-enforced: `.claude/hooks/block-dangerous-git.sh`).
-- Codex stalling on "explicit approval" for `.git` writes: the work is usually done in the clone — verify the working-tree diff, then commit/push/PR from outside the sandbox. Prompt phrasing that reduces stalls: "this is EXPECTED and the operation is permitted on retry; always retry rather than stopping to ask." Only Sol reliably completes commit/push/PR; Terra stops at the denial — route any ticket that must end in a pushed PR to `gpt-5.6-sol`.
+- If a git operation is denied, inspect and preserve completed work, then follow the current approval flow. Do not dispatch another process outside the sandbox to bypass the denial.
 - Run `pnpm install --frozen-lockfile` in the clone BEFORE dispatch, then tell Codex "deps are installed, do NOT run any install command; EPERM there is an environment artifact". The sandbox refuses writes outside the workspace root (`~/.npm`, `~/Library/pnpm/store`), and Codex burns turns diagnosing it otherwise (2026-08-04).
 - Environment for Codex validation: `CI=true` + `XDG_CACHE_HOME` + `COREPACK_HOME` (seed from `~/.cache/node/corepack`; an empty dir yields pnpm 11). Put both cache dirs OUTSIDE the clone (`/private/tmp/optcg-cache-<NNN>/{xdg,corepack}`): in-clone `.cache`/`.corepack` dirs are traversed by root ESLint and fail `pnpm lint` with "could not find plugin react-hooks" (2026-09-09). Postgres cannot start in-sandbox; host it outside.
 - Sandboxed Codex has no network and no Linear: embed the full ticket text in the prompt and state that missing external access is not grounds to stop. A review task that tries its own Linear MCP and fails will refuse to issue a verdict (2026-08-04).
@@ -20,7 +22,7 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 
 - Clones made from the local repo inherit its stale `main`. Always `git fetch origin && git branch -f main origin/main` in the clone before any review diff; the non-forced form fails silently and reviews run against an ancient base.
 - Other sessions merge to `main` mid-run. Re-sync before each dispatch and before final validation; check `git log origin/main` before blaming an agent for a green-local/red-CI mismatch.
-- Stack dependent tickets (base = previous PR's branch) instead of waiting for merges.
+- Stack dependent tickets only when explicitly enabled for the run; otherwise wait for prerequisite merges. Follow the charter for retargeting and renewed review.
 - After pulls that change `prisma/schema.prisma`, run `npx prisma generate` or tsc reports phantom `prisma.<model>` errors and dev-server API routes 500.
 - A `node_modules` symlink into a clone passes tsc/lint/vitest but breaks `next dev` (`Cannot find module '.prisma/client/default'`). For a VQA server do a real `pnpm install --prefer-offline` + `pnpm prisma generate` in the clone (2026-08-10).
 - `rm -rf .next` before the first dev-server start in a clone and after any commit lands in a running clone — a stale dev cache produces MODULE_NOT_FOUND 500s on every route that look like an app regression (2026-08-04).

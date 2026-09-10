@@ -8,6 +8,7 @@ import type {
   CardInstance,
   GameState,
   PendingEvent,
+  ResumeContext,
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
 import {
@@ -384,36 +385,126 @@ export function executeAddToLifeFromField(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  const allValidIds =
+    preselectedTargets ??
+    computeAllValidTargets(
+      state,
+      action.target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs,
+    );
+  if (
+    !preselectedTargets &&
+    needsPlayerTargetSelection(action.target, allValidIds)
+  ) {
+    return buildSelectTargetPrompt(
+      state,
+      action,
+      allValidIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+    );
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   const params = action.params ?? {};
   const face = params.face ?? "DOWN";
-  let nextState = state;
+  const position = params.position ?? "TOP";
+  const movableIds = targetIds.filter((id) => {
+    const card = findCardInstance(state, id);
+    return (
+      card?.zone === "CHARACTER" &&
+      !isRemovalProhibited(
+        state,
+        id,
+        {
+          action: "TO_LIFE",
+          cause: "EFFECT",
+          causingController: controller,
+          sourceCardInstanceId,
+        },
+        cardDb,
+      )
+    );
+  });
+  if (movableIds.length === 0) return { state, events, succeeded: false };
 
+  if (position === "TOP_OR_BOTTOM") {
+    // Bind responses to the already-selected identities. No card moves until
+    // the destination is chosen; this continuation survives session restore.
+    const choices = (["TOP", "BOTTOM"] as const).map((end) => ({
+      id: `field-life:${JSON.stringify(movableIds)}:${end}`,
+      label: end === "TOP" ? "Top" : "Bottom",
+    }));
+    return {
+      state,
+      events,
+      succeeded: false,
+      pendingPrompt: {
+        options: {
+          promptType: "PLAYER_CHOICE",
+          choices,
+          effectDescription: promptEffectDescription(
+            state,
+            cardDb,
+            sourceCardInstanceId,
+          ),
+          source: "EFFECT",
+        },
+        respondingPlayer: controller,
+        resumeContext: {
+          effectSourceInstanceId: sourceCardInstanceId,
+          controller,
+          pausedAction: action,
+          remainingActions: [],
+          resultRefs: [...resultRefs.entries()],
+          validTargets: choices.map((choice) => choice.id),
+          fieldToLifeTargetIds: movableIds,
+        } satisfies ResumeContext,
+      },
+    };
+  }
+
+  let nextState = state;
+  const movedIds: string[] = [];
   for (const id of targetIds) {
     const card = findCardInstance(nextState, id);
-    if (!card || card.zone !== "CHARACTER") continue;
-    if (isRemovalProhibited(nextState, id, {
-      action: "TO_LIFE",
-      cause: "EFFECT",
-      causingController: controller,
-      sourceCardInstanceId,
-    }, cardDb)) continue;
-
+    if (
+      card?.zone !== "CHARACTER" ||
+      isRemovalProhibited(
+        nextState,
+        id,
+        {
+          action: "TO_LIFE",
+          cause: "EFFECT",
+          causingController: controller,
+          sourceCardInstanceId,
+        },
+        cardDb,
+      )
+    )
+      continue;
     const moved = transitionCard(nextState, id, "LIFE", {
-      position: "TOP",
+      position,
       lifeFace: face,
       preserveSourceTriggers: true,
     });
-    if (moved) nextState = moved.state;
+    if (moved) {
+      nextState = moved.state;
+      movedIds.push(moved.fact.newInstanceId);
+    }
   }
-
-  return { state: nextState, events, succeeded: true };
+  return {
+    state: nextState,
+    events,
+    succeeded: movedIds.length > 0,
+    result: { targetInstanceIds: movedIds, count: movedIds.length },
+  };
 }
 
 export function executePlayFromLife(

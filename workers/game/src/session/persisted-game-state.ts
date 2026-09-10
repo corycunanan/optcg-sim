@@ -170,6 +170,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
     cards: z.array(CardInstance),
     validTargets: StringArray,
     effectDescription: z.string(),
+    instruction: z.string().optional(),
     countMin: NonNegativeInteger,
     countMax: NonNegativeInteger,
     ctaLabel: z.string(),
@@ -324,6 +325,7 @@ const StackFrameCore = z.strictObject({
   resultRefs: z.array(z.tuple([z.string(), z.unknown()])),
   validTargets: StringArray,
   returnToDeckArrangement: ReturnToDeckArrangement.optional(),
+  fieldToLifeTargetIds: StringArray.optional(),
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
   replacementBatchContinuation: z.unknown().optional(),
@@ -400,6 +402,7 @@ const EventPayloadSchemas = {
     causingController: PlayerIndex.optional(),
     causeCardInstanceId: z.string().optional(),
     preKO_donCount: FiniteNumber,
+    preKO_basePower: FiniteNumber.optional(),
     cardType: z.literal("STAGE").optional(),
   }),
   CARD_DRAWN: z.strictObject({
