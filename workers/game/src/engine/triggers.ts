@@ -825,9 +825,10 @@ function matchesEventFilter(
       "targetInstanceId" in event.payload ? (event.payload as { targetInstanceId?: string }).targetInstanceId : undefined
     );
     if (targetId) {
+      const basePowerSnapshot = event.type === "CARD_KO" ? event.payload.preKO_basePower : undefined;
       const card = findCardInstance(state, targetId);
       if (card) {
-        if (!matchesFilter(card, filter.target_filter, cardDb, state)) return false;
+        if (!matchesFilter(card, filter.target_filter, cardDb, state, undefined, undefined, undefined, basePowerSnapshot)) return false;
       } else {
         // OPT-453: field exits into the deck re-id the card (rules §3-1-6),
         // so the event's pre-transition instanceId is unresolvable by design
@@ -848,7 +849,7 @@ function matchesEventFilter(
           controller: event.playerIndex,
           owner: event.playerIndex,
         };
-        if (!matchesFilter(snapshot, filter.target_filter, cardDb, state)) return false;
+        if (!matchesFilter(snapshot, filter.target_filter, cardDb, state, undefined, undefined, undefined, basePowerSnapshot)) return false;
       }
     }
   }

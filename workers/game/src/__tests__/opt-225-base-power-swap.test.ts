@@ -1,14 +1,13 @@
 /**
- * OPT-225 — SWAP_BASE_POWER captures Layer 0 base power at resolution time
+ * OPT-225 — SWAP_BASE_POWER captures effective base power at resolution time
  * and persists across removal of either target until its duration expires.
  *
  * FAQ rulings (Bandai):
- *   - Swap reads the Layer 0 (printed) base power of each target at the moment
+ *   - Swap reads the effective base power of each target at the moment
  *     the effect resolves. Layer 2 buffs layer on top of the resulting SET_POWER.
  *   - If one of the pair is K.O.'d mid-turn, the survivor keeps the swapped base
  *     until end of turn — the two SET_POWER effects are independent.
  *   - Competing settings use the highest value (§4-9-2-1; OPT-832).
- *     Effective-base capture for previously modified targets is OPT-833 scope.
  *   - At end of turn (or end of battle) both Layer-1 effects expire; Layer-0
  *     restores.
  */
@@ -100,7 +99,7 @@ const SWAP_ACTION = {
   duration: { type: "THIS_TURN" as const },
 };
 
-describe("OPT-225: SWAP_BASE_POWER captures Layer 0 at resolution", () => {
+describe("OPT-225: SWAP_BASE_POWER captures effective base at resolution", () => {
   it("swaps two Characters' base powers (3000 ↔ 5000)", () => {
     const { state, cardDb, charA, charB, dataA, dataB } = buildPairState(3000, 5000);
 
@@ -113,7 +112,7 @@ describe("OPT-225: SWAP_BASE_POWER captures Layer 0 at resolution", () => {
     expect(getEffectivePower(charB, dataB, result.state, cardDb)).toBe(3000);
   });
 
-  it("captures Layer 0 base only — pre-existing MODIFY_POWER aura does not leak into the captured value", () => {
+  it("captures base only — pre-existing MODIFY_POWER aura does not leak into the captured value", () => {
     // Setup a +1000 aura (Layer 2) already active on both characters.
     const { state: base, cardDb, charA, charB, dataA, dataB } = buildPairState(3000, 5000);
     const aura: RuntimeActiveEffect = {

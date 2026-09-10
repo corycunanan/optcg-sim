@@ -14,6 +14,7 @@ import type {
 import type { CardData, GameState } from "../../types.js";
 import { matchesFilter } from "../conditions.js";
 import type { ExpiryTiming } from "../effect-types.js";
+import { getEffectiveBasePower } from "../modifiers.js";
 import { resolveDynamicValue } from "../dynamic-values.js";
 import { findCardInstance } from "../state.js";
 
@@ -90,6 +91,7 @@ export function resolveAmount(
     controller,
     cardDb,
     matchesFilter,
+    getEffectiveBasePower,
   });
   if (resolution.resolved) return resolution.value;
 
