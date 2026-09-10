@@ -300,7 +300,7 @@ export interface GameEventPayloadMap {
   DON_DETACHED: { count?: number };
   DON_PLACED_ON_FIELD: { count: number };
   DON_STATE_CHANGED: Record<string, never>;
-  CARD_STATE_CHANGED: { cardInstanceId?: string; targetInstanceId?: string; newState?: string; error?: string };
+  CARD_STATE_CHANGED: { cardInstanceId?: string; targetInstanceId?: string; newState?: string; error?: string; cause?: "EFFECT"; causingController?: 0 | 1 };
   POWER_MODIFIED: { targetInstanceId: string; amount?: number; value?: number };
   GAME_OVER: {
     winner?: 0 | 1 | null;

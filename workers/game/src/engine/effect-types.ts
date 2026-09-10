@@ -197,6 +197,8 @@ export type CustomEventType =
 export type KOCause = "ANY" | "BATTLE" | "EFFECT" | "OPPONENT_EFFECT";
 
 export interface EventFilter {
+  /** Scope the event subject to the Character hosting this trigger. */
+  target?: "SELF";
   controller?: Controller;
   cause?: EventCause;
   target_filter?: TargetFilter;
