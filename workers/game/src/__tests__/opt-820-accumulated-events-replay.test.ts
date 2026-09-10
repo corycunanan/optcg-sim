@@ -300,6 +300,20 @@ describe("durable continuation event ownership", () => {
     pending = restored!.state;
     const snapshot = JSON.stringify(pending);
     const coordinator = new SessionCoordinator();
+    const response: GameAction = {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["target"],
+      promptId: pending.pendingPrompt!.promptId,
+    };
+    expect(
+      coordinator.routePromptResponse(pending, 0, {
+        ...response,
+        promptId: "stale-prompt",
+      }).kind
+    ).toBe("reject");
+    expect(coordinator.routePromptResponse(pending, 0, response).kind).toBe(
+      "resume"
+    );
     expect(
       coordinator.routePromptResponse(pending, 1, {
         type: "SELECT_TARGET",
@@ -315,10 +329,9 @@ describe("durable continuation event ownership", () => {
     expect(invalid.responseRejected).toBe(true);
     expect(invalid.state.eventLog).toEqual(pending.eventLog);
     expect(JSON.stringify(pending)).toBe(snapshot);
-    const final = resume(
-      pending,
-      { type: "SELECT_TARGET", selectedInstanceIds: ["target"] },
-      db
+    const final = resume(pending, response, db);
+    expect(coordinator.routePromptResponse(final, 0, response).kind).toBe(
+      "reject"
     );
     expect(final.effectStack).toEqual([]);
     expect(final.eventLog.filter((e) => e.type === "CARD_DRAWN")).toHaveLength(
