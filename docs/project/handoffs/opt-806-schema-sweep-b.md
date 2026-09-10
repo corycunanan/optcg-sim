@@ -32,6 +32,8 @@ No UI, protocol or database shape changes. Existing environment-dependent databa
 
 ## Follow-ups
 
+OP01-038 Kanjuro: its current On K.O. schema makes the opponent trash from their own hand, while printed text requires the opponent to choose from Kanjuro controller's hand. The reviewer's authored probe exposes that discrepancy; correcting it is outside OPT-806. Coordinator should deduplicate/create a separate follow-up.
+
 The material Trueno double-K.O. finding is fixed within this ticket with coordinator-approved shared support; no new prerequisite is required. Ticket exclusions remain separate: OP03 damage triggers (OPT-796), battle/replacement references (OPT-797), mill and either-player cost primitives (OPT-798). The shared APPLY_PROHIBITION omitted-target behavior is unchanged and this card now uses its established explicit-target contract.
 
 
