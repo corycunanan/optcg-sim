@@ -614,7 +614,9 @@ it.each([false, true])(
       [
         {
           sourceCardInstanceId: state.players[1].leader.instanceId,
-          triggeringEvent: prefix.events.find(event => event.type === "DRAW_OUTSIDE_DRAW_PHASE")!,
+          triggeringEvent: prefix.events.find(
+            (event) => event.type === "DRAW_OUTSIDE_DRAW_PHASE"
+          )!,
           controller: 1,
           effectBlock: {
             id: "child-cost",
@@ -693,3 +695,70 @@ it.each([false, true])(
     ).toHaveLength(pay ? 1 : 0);
   }
 );
+
+it("an event-only owner excludes events already owned by its prompted child", async () => {
+  const { state, db } = fixture();
+  const target = state.players[1].characters.find(Boolean)!;
+  state.players[1].characters = padChars([
+    target,
+    { ...target, instanceId: "second-child-target" },
+  ]);
+  const prefix = executeActionChain(
+    state,
+    [draw],
+    state.players[0].leader.instanceId,
+    0,
+    db
+  );
+  const drained = processRemainingTriggers(
+    prefix.state,
+    [
+      {
+        sourceCardInstanceId: state.players[1].leader.instanceId,
+        controller: 1,
+        triggeringEvent: prefix.events[0],
+        effectBlock: {
+          id: "child-with-prefix",
+          category: "auto",
+          actions: [
+            draw,
+            {
+              type: "MODIFY_POWER",
+              target: {
+                type: "CHARACTER",
+                controller: "SELF",
+                count: { exact: 1 },
+              },
+              params: { amount: 1000 },
+              duration: { type: "THIS_TURN" },
+            },
+          ],
+        },
+      },
+    ],
+    db,
+    prefix.events
+  );
+  let next = await restore(
+    { ...drained.state, pendingPrompt: drained.pendingPrompt! },
+    db
+  );
+  expect(
+    next.effectStack
+      .flatMap((frame) => frame.accumulatedEvents)
+      .filter((event) => event.type === "CARD_DRAWN" && event.playerIndex === 1)
+  ).toHaveLength(1);
+  next = resumePromptLifecycle(
+    next,
+    { type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] },
+    db,
+    hooks
+  ).state;
+  expect(next.pendingPrompt).toBeNull();
+  expect(next.effectStack).toEqual([]);
+  expect(
+    next.eventLog
+      .filter((event) => event.type === "CARD_DRAWN")
+      .map((event) => event.playerIndex)
+  ).toEqual([0, 1]);
+});

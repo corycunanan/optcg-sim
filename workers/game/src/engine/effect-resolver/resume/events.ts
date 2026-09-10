@@ -94,7 +94,11 @@ export function retainPropagationBeforePrompt(
   );
   if (ownerIndex >= 0) return retainEventsOnFrame(state, ownerIndex, pending);
   const child = state.effectStack.at(-1);
-  if (!child) return state;
+  if (
+    !child ||
+    pending.every((event) => child.accumulatedEvents.includes(event))
+  )
+    return state;
   const generated = generateFrameId(state);
   const withOwner = pushFrame(generated.state, {
     id: generated.id,
@@ -113,13 +117,20 @@ export function retainPropagationBeforePrompt(
     costResultRefs: [],
     pendingTriggers: [],
     simultaneousTriggers: [],
-    accumulatedEvents: pending,
+    accumulatedEvents: [],
   });
   if (withOwner.effectStack.length !== state.effectStack.length + 1)
     return withOwner;
   const owner = withOwner.effectStack.at(-1)!;
-  return {
-    ...withOwner,
-    effectStack: [...state.effectStack.slice(0, -1), owner, child],
-  };
+  // The child may already own a committed prefix of its own. Transfer through
+  // the same ownership filter used for existing frames before persistence can
+  // turn shared references into two independent serialized occurrences.
+  return retainEventsOnFrame(
+    {
+      ...withOwner,
+      effectStack: [...state.effectStack.slice(0, -1), owner, child],
+    },
+    state.effectStack.length - 1,
+    pending
+  );
 }
