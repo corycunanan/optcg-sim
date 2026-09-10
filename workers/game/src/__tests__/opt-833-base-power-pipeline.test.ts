@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameEvent } from "../types.js";
+import { transitionCard } from "../engine/zone-transition.js";
+import { expireEndOfTurnEffects } from "../engine/duration-tracker.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { registerCardEnteredField, matchTriggersForEvent } from "../engine/triggers.js";
@@ -12,8 +14,12 @@ import { koCharacter, trashCharacter } from "../engine/effect-resolver/card-muta
 import { parseStoredSession } from "../session/persistence.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
-// Official cardlist series 569113/569114/569117, checked 2026-09-09.
+// Official cardlist series 569113/569114/569116/569117 and EB04/ST06 searches, checked 2026-09-09.
 const printedText: Record<string, string> = {
+  "OP16-036": "[On Play] Rest up to 1 of your opponent's Characters with a cost of 4 or less.\n[When Attacking] This Character's base power becomes the same as your opponent's Leader during this turn.",
+  "EB04-003": "[Rush] (This card can attack on the turn in which it is played.)\n[Opponent's Turn] Your {Navy} type Leader's base power becomes 7000.",
+  "ST06-001": "[Activate: Main] [Once Per Turn] ③ (You may rest the specified number of DON!! cards in your cost area.) You may trash 1 card from your hand: K.O. up to 1 of your opponent's Characters with a cost of 0.",
+
   "OP13-091": "If you have 7 or more cards in your trash, this Character cannot be removed from the field by your opponent's effects and gains [Blocker].\n[On Play] You may trash 1 card from your hand: K.O. up to 1 of your opponent's Characters with a base cost of 5 or less.",
   "OP13-084": "If you have 7 or more cards in your trash, this Character cannot be removed from the field by your opponent's effects.\n[Your Turn] If you have 10 or more cards in your trash, set the base power of all of your {Five Elders} type Characters to 7000.",
   "OP14-003": "This Character cannot be K.O.'d by effects of your opponent's Characters with 5000 base power or less.",
@@ -23,6 +29,9 @@ const printedText: Record<string, string> = {
 };
 
 const cards: CardData[] = [
+  { ...CARDS.VANILLA, id: "OP16-036", name: "Mr.2.Bon.Kurei(Bentham)", cost: 4, power: 1000, color: ["Green"], attribute: ["Strike"], types: ["Impel Down", "Former Baroque Works"] },
+  { ...CARDS.VANILLA, id: "EB04-003", name: "Smoker & Tashigi", cost: 8, power: 8000, counter: null, color: ["Red"], attribute: ["Slash", "Special"], types: ["Punk Hazard", "Navy"], keywords: { ...CARDS.VANILLA.keywords, rush: true } },
+  { ...CARDS.LEADER, id: "ST06-001", name: "Sakazuki", power: 5000, life: 5, color: ["Black"], attribute: ["Special"], types: ["Navy"] },
   { ...CARDS.VANILLA, id: "OP13-091", name: "St. Marcus Mars", cost: 6, power: 5000, color: ["Black"], attribute: ["Special"], types: ["Celestial Dragons", "Five Elders"] },
   { ...CARDS.VANILLA, id: "OP13-084", name: "St. Shepherd Ju Peter", cost: 7, power: 5000, counter: 2000, color: ["Black"], attribute: ["Special"], types: ["Celestial Dragons", "Five Elders"] },
   { ...CARDS.VANILLA, id: "OP14-003", name: 'Capone"Gang"Bege', cost: 1, power: 2000, color: ["Red"], attribute: ["Ranged"], types: ["Supernovas", "Firetank Pirates"] },
@@ -190,5 +199,35 @@ describe("OPT-833 entry and batch boundaries", () => {
     const ko = result.events.filter((e) => e.type === "CARD_KO");
     expect(ko).toHaveLength(2);
     expect(ko.map((e) => e.payload?.preKO_basePower)).toEqual([7000, 7000]);
+  });
+});
+
+
+describe("OPT-833: authored base-copy attack", () => {
+  it.each([true, false])("Bon Kurei captures changed Leader base, active Navy aura %s", (withAura) => {
+    const f = fixture();
+    const leader = f.put("ST06-001", 1, "LEADER");
+    const aura = withAura ? f.put("EB04-003", 1) : undefined;
+    const attacker = f.put("OP16-036", 0);
+    attacker.attachedDon = [{ instanceId: "bon-don", state: "ACTIVE", attachedTo: attacker.instanceId }];
+    leader.attachedDon = [{ instanceId: "leader-don", state: "ACTIVE", attachedTo: leader.instanceId }];
+    f.state.activeEffects.push({
+      id: "leader-additive", sourceCardInstanceId: leader.instanceId, sourceEffectBlockId: "buff", category: "auto", controller: 1,
+      appliesTo: [leader.instanceId], modifiers: [{ type: "MODIFY_POWER", params: { amount: 2000 } }],
+      duration: { type: "THIS_TURN" }, expiresAt: { wave: "END_OF_TURN", turn: f.state.turn.number }, timestamp: 1,
+    });
+    const expectedBase = withAura ? 7000 : 5000;
+    expect(getEffectiveBasePower(leader, f.cardDb.get(leader.cardId)!, f.state, f.cardDb)).toBe(expectedBase);
+    expect(getEffectivePower(leader, f.cardDb.get(leader.cardId)!, f.state, f.cardDb)).toBe(withAura ? 9000 : 7000);
+    const attacked = runPipeline(f.state, { type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: leader.instanceId }, f.cardDb, 0);
+    expect(attacked.valid).toBe(true);
+    expect(attacked.pendingPrompt).toBeUndefined();
+    expect(attacked.state.players[0].characters.find((card) => card?.instanceId === attacker.instanceId)?.state).toBe("RESTED");
+    expect(getEffectiveBasePower(attacker, f.cardDb.get(attacker.cardId)!, attacked.state, f.cardDb)).toBe(expectedBase);
+    expect(getEffectivePower(attacker, f.cardDb.get(attacker.cardId)!, attacked.state, f.cardDb)).toBe(withAura ? 8000 : 6000);
+    const afterSourceExit = aura ? transitionCard(attacked.state, aura.instanceId, "TRASH")!.state : attacked.state;
+    expect(getEffectiveBasePower(leader, f.cardDb.get(leader.cardId)!, afterSourceExit, f.cardDb)).toBe(5000);
+    expect(getEffectiveBasePower(attacker, f.cardDb.get(attacker.cardId)!, afterSourceExit, f.cardDb)).toBe(expectedBase);
+    expect(getEffectiveBasePower(attacker, f.cardDb.get(attacker.cardId)!, expireEndOfTurnEffects(afterSourceExit), f.cardDb)).toBe(1000);
   });
 });

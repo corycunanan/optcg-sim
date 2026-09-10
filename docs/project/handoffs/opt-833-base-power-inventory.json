@@ -225,5 +225,33 @@
       "OP14-009:schema.effects.1.actions.0",
       "OP14-017:schema.effects.0.actions.0"
     ]
+  },
+  "basePowerCopies": {
+    "nodes": 1,
+    "cards": [
+      "OP16-036"
+    ],
+    "paths": [
+      "OP16-036:schema.effects.1.actions.0"
+    ]
+  },
+  "otherPowerCopies": {
+    "nodes": 6,
+    "cards": [
+      "EB01-061",
+      "EB04-052",
+      "OP04-069",
+      "OP06-009",
+      "OP16-055",
+      "OP16-104"
+    ],
+    "paths": [
+      "EB01-061:schema.effects.1.actions.0",
+      "EB04-052:schema.effects.0.actions.0",
+      "OP04-069:schema.effects.0.actions.0",
+      "OP06-009:schema.effects.1.actions.0",
+      "OP16-055:schema.effects.1.actions.0",
+      "OP16-104:schema.effects.0.actions.0"
+    ]
   }
 }
