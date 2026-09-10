@@ -37,6 +37,7 @@ import {
 } from "../../../../shared/target-filter.js";
 
 export interface ConditionQueryServices {
+  getEffectiveBasePower(card: CardInstance, cardData: CardData, state: GameState, cardDb: Map<string, CardData>): number;
   getEffectivePower(
     card: CardInstance,
     cardData: CardData,
@@ -1026,14 +1027,15 @@ export function cardTreatsAsAll(
  */
 function toSharedTargetFilterCard(
   card: CardInstance,
-  data: CardData
+  data: CardData,
+  readBasePower?: () => number
 ): SharedTargetFilterCard {
   return {
     controller: card.controller,
     cost: data.cost ?? 0,
     baseCost: data.cost ?? 0,
     power: data.power ?? 0,
-    basePower: data.power ?? 0,
+    get basePower() { return readBasePower?.() ?? data.power ?? 0; },
     colors: data.color,
     traits: data.types ?? [],
     name: data.name,
@@ -1065,12 +1067,15 @@ export function matchesFilter(
   resultRefs?: Map<string, EffectResult>,
   costOverride?: number,
   filterController?: 0 | 1,
-  queries?: ConditionQueryServices
+  queries?: ConditionQueryServices,
+  basePowerOverride?: number
 ): boolean {
   const data = cardDb.get(card.cardId);
   if (!data) return false;
 
-  const sharedCard = toSharedTargetFilterCard(card, data);
+  const sharedCard = toSharedTargetFilterCard(card, data, () =>
+    basePowerOverride ?? queries?.getEffectiveBasePower(card, data, state, cardDb) ?? data.power ?? 0
+  );
   const getReferencedCard = (
     ref: string
   ): SharedTargetFilterCard | undefined => {
@@ -1080,7 +1085,9 @@ export function matchesFilter(
     if (!referenced) return undefined;
     const referencedData = cardDb.get(referenced.cardId);
     return referencedData
-      ? toSharedTargetFilterCard(referenced, referencedData)
+      ? toSharedTargetFilterCard(referenced, referencedData, () =>
+          queries?.getEffectiveBasePower(referenced, referencedData, state, cardDb) ?? referencedData.power ?? 0
+        )
       : undefined;
   };
 

@@ -34,6 +34,7 @@ export interface DynamicValueResolutionContext {
   state?: GameState;
   controller?: 0 | 1;
   cardDb?: Map<string, CardData>;
+  getEffectiveBasePower?: (card: CardInstance, data: CardData, state: GameState, cardDb: Map<string, CardData>) => number;
   matchesFilter?: (
     card: CardInstance,
     filter: TargetFilter,
@@ -188,7 +189,8 @@ export function resolveDynamicValue(
       context.state!,
       playerIndex,
       value.source,
-      context.cardDb
+      context.cardDb,
+      context.getEffectiveBasePower
     );
   }
 
@@ -259,7 +261,8 @@ export function resolvePermanentDynamicValue(
       context.state!,
       playerIndex,
       gameStateValue.source,
-      context.cardDb
+      context.cardDb,
+      context.getEffectiveBasePower
     );
   }
 
@@ -377,7 +380,8 @@ function resolveGameStateSource(
   state: GameState,
   playerIndex: 0 | 1,
   source: import("./effect-types.js").GameStateSource,
-  cardDb?: Map<string, CardData>
+  cardDb?: Map<string, CardData>,
+  getEffectiveBasePower?: DynamicValueResolutionContext["getEffectiveBasePower"]
 ): DynamicValueResolution {
   const player = state.players[playerIndex];
   const opponent = state.players[playerIndex === 0 ? 1 : 0];
@@ -431,7 +435,7 @@ function resolveGameStateSource(
           `card data not found for Leader '${player.leader.cardId}'`
         );
       }
-      return resolved(leaderData.power ?? 0);
+      return resolved(getEffectiveBasePower?.(player.leader, leaderData, state, cardDb) ?? leaderData.power ?? 0);
     default:
       return unresolved(
         "UNSUPPORTED_SOURCE",

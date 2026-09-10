@@ -17,7 +17,7 @@ import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
 import { resolveAmount, computeExpiry } from "../action-utils.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../target-resolver.js";
-import { getEffectivePower } from "../../modifiers.js";
+import { getEffectiveBasePower, getEffectivePower } from "../../modifiers.js";
 import { findCardInstance } from "../../state.js";
 import { allocateEngineRecord } from "../../execution-context.js";
 
@@ -449,10 +449,10 @@ export function executeCopyPower(
   const sourceCard = findCardInstance(state, sourceIds[0]);
   const sourceData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
   if (!sourceCard || !sourceData) return { state, events, succeeded: false };
-  // source_power: "BASE" copies the source's printed power, ignoring active
-  // modifiers ("base power becomes the same as…", e.g. OP16-036).
+  // Base copies capture the current setting layer, excluding additive power
+  // and DON!! (OP16-036). Default/effective copies still capture total power.
   const sourcePower = params.source_power === "BASE"
-    ? sourceData.power ?? 0
+    ? getEffectiveBasePower(sourceCard, sourceData, state, cardDb)
     : getEffectivePower(sourceCard, sourceData, state, cardDb);
 
   // Apply copied power to self or action target
@@ -560,10 +560,10 @@ export function executeSwapBasePower(
   const dataB = cardB ? cardDb.get(cardB.cardId) : undefined;
   if (!cardA || !cardB || !dataA || !dataB) return { state, events, succeeded: false };
 
-  // OPT-225: capture Layer 0 base power (printed value) — not effective power.
+  // Capture both effective bases before adding either setting (OPT-833).
   // Layer-2 MODIFY_POWER buffs layer on top of the swapped Layer-1 value.
-  const powerA = dataA.power ?? 0;
-  const powerB = dataB.power ?? 0;
+  const powerA = getEffectiveBasePower(cardA, dataA, state, cardDb);
+  const powerB = getEffectiveBasePower(cardB, dataB, state, cardDb);
   const expiry = computeExpiry(duration, state, controller);
 
   const allocatedA = allocateEngineRecord(state, "active-effect");

@@ -1,0 +1,257 @@
+{
+  "baseFilters": {
+    "nodes": 68,
+    "cards": [
+      "EB01-010",
+      "EB01-011",
+      "EB03-004",
+      "EB03-021",
+      "EB03-025",
+      "EB03-027",
+      "EB04-005",
+      "EB04-033",
+      "EB04-051",
+      "OP04-003",
+      "OP06-012",
+      "OP09-005",
+      "OP09-015",
+      "OP10-070",
+      "OP11-001",
+      "OP11-051",
+      "OP12-001",
+      "OP13-002",
+      "OP13-022",
+      "OP13-062",
+      "OP13-071",
+      "OP13-077",
+      "OP14-002",
+      "OP14-003",
+      "OP14-017",
+      "OP14-027",
+      "OP14-036",
+      "OP14-037",
+      "OP14-038",
+      "OP14-041",
+      "OP14-058",
+      "OP14-062",
+      "OP14-064",
+      "OP14-108",
+      "OP15-009",
+      "OP15-011",
+      "OP15-035",
+      "OP15-052",
+      "OP15-069",
+      "OP15-090",
+      "OP15-098",
+      "OP15-105",
+      "OP16-008",
+      "OP16-010",
+      "OP16-011",
+      "OP16-013",
+      "OP17-009",
+      "OP17-014",
+      "OP17-016",
+      "OP17-018",
+      "OP17-112",
+      "P-027",
+      "PRB02-001",
+      "ST21-011",
+      "ST23-002",
+      "ST23-003",
+      "ST26-001",
+      "ST30-001",
+      "ST30-003",
+      "ST30-009",
+      "ST30-011",
+      "ST30-014",
+      "ST30-015",
+      "ST30-016"
+    ],
+    "paths": [
+      "EB01-010:schema.effects.0.actions.0.target.filter",
+      "EB01-010:schema.effects.1.actions.0.target.filter",
+      "EB01-011:schema.effects.0.costs.1.filter",
+      "EB03-004:schema.effects.1.conditions.all_of.1.not.filter",
+      "EB03-021:schema.effects.0.actions.0.target.dual_targets.0.filter",
+      "EB03-025:schema.effects.0.actions.0.target.filter",
+      "EB03-027:schema.effects.0.actions.0.target.filter",
+      "EB04-005:schema.effects.0.prohibitions.0.conditional_override.filter",
+      "EB04-033:schema.effects.0.actions.0.target.filter",
+      "EB04-051:schema.effects.0.prohibitions.0.conditional_override.filter",
+      "OP04-003:schema.effects.0.actions.0.target.filter",
+      "OP06-012:schema.effects.0.conditions.filter",
+      "OP09-005:schema.effects.1.conditions.filter",
+      "OP09-015:schema.effects.1.actions.0.target.filter",
+      "OP10-070:schema.effects.1.actions.0.target.filter",
+      "OP11-001:schema.effects.1.replaces.target_filter",
+      "OP11-051:schema.effects.1.actions.0.target.filter",
+      "OP12-001:schema.effects.0.actions.0.target.filter",
+      "OP13-002:schema.effects.1.trigger.any_of.1.filter.target_filter",
+      "OP13-022:schema.effects.0.actions.0.target.filter",
+      "OP13-062:schema.effects.1.actions.0.target.filter",
+      "OP13-071:schema.effects.0.actions.0.target.filter",
+      "OP13-077:schema.effects.0.actions.0.target.dual_targets.0.filter",
+      "OP13-077:schema.effects.0.actions.0.target.dual_targets.1.filter",
+      "OP14-002:schema.effects.0.actions.1.target.filter",
+      "OP14-003:schema.effects.0.prohibitions.0.scope.source_filter",
+      "OP14-017:schema.effects.0.actions.0.target.filter",
+      "OP14-027:schema.effects.0.actions.0.target.filter",
+      "OP14-036:schema.effects.1.actions.0.target.filter",
+      "OP14-037:schema.effects.0.actions.0.target.filter",
+      "OP14-038:schema.effects.0.actions.1.target.filter",
+      "OP14-041:schema.effects.1.trigger.filter.target_filter",
+      "OP14-058:schema.effects.0.actions.1.target.filter",
+      "OP14-062:schema.effects.0.actions.0.params.options.0.0.target.filter",
+      "OP14-062:schema.effects.0.actions.0.params.options.1.0.target.filter",
+      "OP14-064:schema.effects.0.actions.1.target.filter",
+      "OP14-108:schema.effects.0.actions.0.target.filter",
+      "OP15-009:schema.effects.0.replaces.target_filter",
+      "OP15-011:schema.effects.1.actions.0.target.filter",
+      "OP15-035:schema.effects.0.replaces.target_filter",
+      "OP15-052:schema.effects.0.replaces.target_filter",
+      "OP15-069:schema.effects.0.replaces.target_filter",
+      "OP15-090:schema.effects.0.replaces.target_filter",
+      "OP15-098:schema.effects.0.replaces.target_filter",
+      "OP15-105:schema.effects.0.replaces.target_filter",
+      "OP16-008:schema.effects.0.costs.0.filter",
+      "OP16-010:schema.effects.0.actions.0.target.filter",
+      "OP16-011:schema.effects.1.actions.0.target.filter",
+      "OP16-013:schema.effects.0.actions.0.target.filter",
+      "OP17-009:schema.effects.1.actions.0.target.filter",
+      "OP17-014:schema.effects.0.actions.0.target.filter",
+      "OP17-016:schema.effects.0.actions.0.target.filter",
+      "OP17-018:schema.effects.1.conditions.filter",
+      "OP17-112:schema.effects.0.modifiers.0.target.filter",
+      "P-027:schema.effects.1.modifiers.0.target.filter",
+      "PRB02-001:schema.effects.1.actions.0.target.filter",
+      "ST21-011:schema.effects.0.modifiers.0.target.filter",
+      "ST23-002:schema.effects.0.conditions.filter",
+      "ST23-003:schema.effects.0.actions.0.target.filter",
+      "ST26-001:schema.effects.0.conditions.filter",
+      "ST30-001:schema.effects.0.conditions.filter",
+      "ST30-003:schema.effects.0.modifiers.0.target.filter",
+      "ST30-009:schema.effects.0.replaces.target_filter",
+      "ST30-011:schema.effects.0.replaces.target_filter",
+      "ST30-014:schema.effects.0.actions.0.target.filter",
+      "ST30-015:schema.effects.0.conditions.filter",
+      "ST30-016:schema.effects.0.actions.1.conditions.all_of.0.filter",
+      "ST30-016:schema.effects.0.actions.1.conditions.all_of.1.filter"
+    ]
+  },
+  "sourceBaseFilters": {
+    "nodes": 1,
+    "cards": [
+      "OP14-003"
+    ],
+    "paths": [
+      "OP14-003:schema.effects.0.prohibitions.0.scope.source_filter"
+    ]
+  },
+  "koBaseFilters": {
+    "nodes": 2,
+    "cards": [
+      "OP13-002",
+      "OP14-041"
+    ],
+    "paths": [
+      "OP13-002:schema.effects.1.trigger.any_of.1.filter.target_filter",
+      "OP14-041:schema.effects.1.trigger.filter.target_filter"
+    ]
+  },
+  "baseSensitivePermanent": {
+    "nodes": 4,
+    "cards": [
+      "OP17-112",
+      "P-027",
+      "ST21-011",
+      "ST30-003"
+    ],
+    "paths": [
+      "OP17-112:schema.effects.0.modifiers.0.target.filter",
+      "P-027:schema.effects.1.modifiers.0.target.filter",
+      "ST21-011:schema.effects.0.modifiers.0.target.filter",
+      "ST30-003:schema.effects.0.modifiers.0.target.filter"
+    ]
+  },
+  "setPowerModifiers": {
+    "nodes": 4,
+    "cards": [
+      "EB04-003",
+      "OP13-084",
+      "OP14-053",
+      "OP17-112"
+    ],
+    "paths": [
+      "EB04-003:schema.effects.1.modifiers.0",
+      "OP13-084:schema.effects.1.modifiers.0",
+      "OP14-053:schema.effects.1.modifiers.0",
+      "OP17-112:schema.effects.0.modifiers.0"
+    ]
+  },
+  "dormantBaseAliases": {
+    "nodes": 6,
+    "cards": [
+      "OP15-070",
+      "OP15-071",
+      "OP15-092"
+    ],
+    "paths": [
+      "OP15-070:schema.effects.1.modifiers.0",
+      "OP15-070:schema.effects.1.modifiers.1",
+      "OP15-071:schema.effects.1.modifiers.0",
+      "OP15-071:schema.effects.1.modifiers.1",
+      "OP15-092:schema.effects.0.modifiers.0",
+      "OP15-092:schema.effects.1.modifiers.0"
+    ]
+  },
+  "leaderBaseDynamic": {
+    "nodes": 1,
+    "cards": [
+      "OP14-053"
+    ],
+    "paths": [
+      "OP14-053:schema.effects.1.modifiers.0.params.value"
+    ]
+  },
+  "swaps": {
+    "nodes": 3,
+    "cards": [
+      "OP14-001",
+      "OP14-009",
+      "OP14-017"
+    ],
+    "paths": [
+      "OP14-001:schema.effects.0.actions.0",
+      "OP14-009:schema.effects.1.actions.0",
+      "OP14-017:schema.effects.0.actions.0"
+    ]
+  },
+  "basePowerCopies": {
+    "nodes": 1,
+    "cards": [
+      "OP16-036"
+    ],
+    "paths": [
+      "OP16-036:schema.effects.1.actions.0"
+    ]
+  },
+  "otherPowerCopies": {
+    "nodes": 6,
+    "cards": [
+      "EB01-061",
+      "EB04-052",
+      "OP04-069",
+      "OP06-009",
+      "OP16-055",
+      "OP16-104"
+    ],
+    "paths": [
+      "EB01-061:schema.effects.1.actions.0",
+      "EB04-052:schema.effects.0.actions.0",
+      "OP04-069:schema.effects.0.actions.0",
+      "OP06-009:schema.effects.1.actions.0",
+      "OP16-055:schema.effects.1.actions.0",
+      "OP16-104:schema.effects.0.actions.0"
+    ]
+  }
+}

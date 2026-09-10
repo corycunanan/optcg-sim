@@ -910,6 +910,8 @@ function finalizeTarget(
   kind: BatchActionKind,
   causingController: 0 | 1,
   returnToDeckPosition: "TOP" | "BOTTOM" | undefined,
+  cardDb: Map<string, CardData>,
+  snapshotState: GameState,
 ): {
   state: GameState;
   events: PendingEvent[];
@@ -917,7 +919,7 @@ function finalizeTarget(
 } | null {
   switch (kind) {
     case "KO":
-      return koCharacter(state, targetId, causingController);
+      return koCharacter(state, targetId, causingController, cardDb, snapshotState);
     case "RETURN_TO_HAND":
       return returnToHand(state, targetId);
     case "RETURN_TO_DECK":
@@ -1091,7 +1093,7 @@ function finishReplacementBatch(
   // All replacements resolved — finalize unprotected targets inline.
   const finalizedIds: string[] = [];
   for (const id of rest.unprotectedIds) {
-    const finalized = finalizeTarget(resumeState, id, ctx.actionKind, ctx.causingController, ctx.returnToDeckPosition);
+    const finalized = finalizeTarget(resumeState, id, ctx.actionKind, ctx.causingController, ctx.returnToDeckPosition, cardDb, rest.state);
     if (finalized) {
       resumeState = finalized.state;
       resumeEvents.push(...finalized.events);

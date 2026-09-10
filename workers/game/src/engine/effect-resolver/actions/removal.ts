@@ -88,7 +88,7 @@ export function executeKO(
 
   for (let i = 0; i < unprotectedIds.length; i++) {
     const id = unprotectedIds[i];
-    const result = koCharacter(nextState, id, controller);
+    const result = koCharacter(nextState, id, controller, cardDb, batch.state);
     if (result) {
       nextState = result.state;
       events.push(...result.events);
