@@ -5,6 +5,7 @@
  * All battle-related execution logic, extracted from execute.ts.
  */
 
+import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import type {
   CardData,
   GameState,
@@ -380,6 +381,29 @@ export function executeUseCounterEvent(
     },
   });
 
+  // Counter effects resolve before "when you activate an Event" auto effects,
+  // exactly as Main effects do. A Character counter never enters this path.
+  events.push({
+    type: "EVENT_ACTIVATED_FROM_HAND",
+    playerIndex: inactiveIdx,
+    payload: {
+      cardId: cardData.id,
+      cardInstanceId: moved.fact.newInstanceId,
+      costReducedAmount: Math.max(0, (cardData.cost ?? 0) - cost),
+    },
+  });
+  nextState = publishCommittedEvents(nextState, events);
+  const counterBlock = cardData.effectSchema?.effects.find(
+    (block) => block.category === "auto" && block.trigger &&
+      "keyword" in block.trigger && block.trigger.keyword === "COUNTER_EVENT"
+  );
+  if (counterBlock) {
+    const result = resolveEffect(nextState, counterBlock, moved.fact.newInstanceId, inactiveIdx, cardDb);
+    nextState = result.state;
+    events.push(...result.events);
+    if (result.pendingPrompt)
+      return { state: nextState, events, pendingPrompt: result.pendingPrompt };
+  }
   return { state: nextState, events };
 }
 

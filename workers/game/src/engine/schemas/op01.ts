@@ -1738,13 +1738,13 @@ export const OP01_061_KAIDO_LEADER: EffectSchema = {
   ],
 };
 
-// ─── OP01-062 Crocodile (Leader) — DON!!×1 draw when a cost-reduced Event is played
-// [DON!! x1] Once per turn, when you play an Event whose cost was reduced by
-// an effect, you may draw 1 card if you have 4 or less cards in your hand.
-// OPT-238: trigger fires only on class-1 activation (EVENT_ACTIVATED_FROM_HAND)
-// where costReducedAmount > 0. Class 2 (from trash) does not pay a cost and so
-// never qualifies. Once-per-turn re-arms only when the cost-reduction condition
-// is re-met; a full-cost play does not consume the slot.
+// ─── OP01-062 Crocodile (Leader) — own Event activation draw
+// [DON!! x1] When you activate an Event, you may draw 1 card if you have 4 or
+// less cards in your hand and haven't drawn a card using this Leader's effect
+// during this turn.
+// Event activation includes hand activation and resolving an Event Main from trash.
+// No cost-reduction condition is printed; the hand-count gate is checked after
+// the Event resolves (OP01-062 FAQ), and declining does not spend the draw slot.
 
 export const OP01_062_CROCODILE: EffectSchema = {
   card_id: "OP01-062",
@@ -1755,9 +1755,10 @@ export const OP01_062_CROCODILE: EffectSchema = {
       id: "OP01-062_event_draw",
       category: "auto",
       trigger: {
-        event: "EVENT_ACTIVATED_FROM_HAND",
-        filter: { controller: "SELF", cost_reduced: true },
-        don_requirement: 1,
+        any_of: [
+          { event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "SELF" }, don_requirement: 1 },
+          { event: "EVENT_MAIN_RESOLVED_FROM_TRASH", filter: { controller: "SELF" }, don_requirement: 1 },
+        ],
       },
       conditions: {
         type: "HAND_COUNT",
@@ -1925,6 +1926,7 @@ export const OP01_069_CAESAR_CLOWN: EffectSchema = {
         {
           type: "SEARCH_AND_PLAY",
           params: {
+            pick: { up_to: 1 },
             search_full_deck: true,
             filter: { name: "Smiley" },
             shuffle_after: true,
@@ -3044,6 +3046,7 @@ export const OP01_116_SMILE: EffectSchema = {
         {
           type: "SEARCH_AND_PLAY",
           params: {
+            pick: { up_to: 1 },
             look_at: 5,
             filter: { traits: ["SMILE"], card_type: "CHARACTER", cost_max: 3 },
             rest_destination: "BOTTOM",

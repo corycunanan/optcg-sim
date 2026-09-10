@@ -142,6 +142,7 @@ export const ST03_007_SENTOMARU: EffectSchema = {
         {
           type: "SEARCH_AND_PLAY",
           params: {
+            pick: { up_to: 1 },
             search_full_deck: true,
             filter: { name: "Pacifista", cost_max: 4 },
             shuffle_after: true,

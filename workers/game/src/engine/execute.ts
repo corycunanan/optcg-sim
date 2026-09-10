@@ -5,6 +5,7 @@
  * Main Phase actions (play card, attach DON!!) directly.
  */
 
+import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import type { CardData, GameAction, GameState, PendingEvent, ExecuteResult } from "../types.js";
 import {
   getActivePlayerIndex,
@@ -122,12 +123,16 @@ function executePlayCard(
     nextState = moved.state;
     const newEventInstanceId = moved.fact.newInstanceId;
     events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstanceId, zone: "TRASH", source: "FROM_HAND", sourceZone: "HAND" } });
-    // OPT-236 class 1: distinct event for "Event [Main] activated from hand".
+    // OPT-236 class 1: distinct event for an Event activated from hand.
     // Watchers subscribing to EVENT_ACTIVATED_FROM_HAND (Usopp-style) fire here
     // and NOT on class 2 (from trash) or class 3 (from life trigger).
     const printedCost = cardData.cost ?? 0;
     const costReducedAmount = Math.max(0, printedCost - cost);
     events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: newEventInstanceId, costReducedAmount } });
+
+    // Publish payment/activation before the effect's reveals or nested events.
+    // Trigger scanning remains owed until complete Event resolution.
+    nextState = publishCommittedEvents(nextState, events);
 
     // Resolve the event's MAIN_EVENT effect block (player-initiated, like ACTIVATE_MAIN)
     const schema = cardData.effectSchema;
@@ -202,6 +207,7 @@ function executeConcede(state: GameState, concedingPlayer: 0 | 1): ExecuteResult
     winner,
     winReason: `Player ${concedingPlayer + 1} conceded`,
     pendingPrompt: null,
+    pendingEventActivationEvents: undefined,
   };
   return {
     state: nextState,
