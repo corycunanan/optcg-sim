@@ -1,8 +1,8 @@
-# OPT-807 — independent schema corrections; Hotori blocked
+# OPT-807 — schema corrections with named-play prerequisite
 
-**Delivery is incomplete / draft.** OP05-111 Hotori depends on [OPT-845](https://linear.app/optcg-sim/issue/OPT-845/play-a-named-hand-character-as-hotoris-activation-cost-before). Its named-hand-character cost only verifies a name and never plays the card; current encoding also supplies `filter.name` where that cost expects `card_name`. No ignored Life parameter or unplayable schema edit is claimed as a fix. The remaining corrections are independently reviewable.
+**Recovered as a stacked draft; final gates remain pending.** Existing PR654 integrates OPT-845 parent `294648e114b02e9c0a12fef9aacb5bf95c30368d` by normal merge. OPT-845 supplies OP05-111 Hotori’s real named-character activation cost and Life Top/Bottom choice. The child owns the independent schema rows and SEARCH_AND_PLAY remainder correction below. No ignored `life_controller` parameter is introduced.
 
-Recovered clean workspace `/private/tmp/optcg-opt807`, original base `50331c89f742b4a0a04a6e6d8465b97e7999317f`, fast-forwarded to `caf29b1058dddf3dd26357c708ae42f9743e3426` before edits. No previous PR or ticket edits existed. Merge permission is off.
+Workspace `/private/tmp/optcg-opt807`; recovered child head `cbc36e3899c65689dc9653c5cf3b9ded4bcc41bf`, integration commit `ab4d066`. The coordinator has run-scoped merge authorization for OPT-845/OPT-807 after all readiness gates, and stacking is authorized. Implementation agents do not merge PRs or write Linear. This child must target main and renew integration validation after its parent merges.
 
 ## Sources and scenario interpretation
 
@@ -20,29 +20,28 @@ Canonical card text: `docs/cards/OP-05.md`, `OP-06.md`, `ST-09.md`, `ST-12.md`. 
 | OP06-107 | Actor picks own Wano Character excluding Momonosuke | Top/Bottom/skip; same-name candidate excluded; final Life order and field removal. |
 | ST09-015 | Actual Counter window; first +4000, then own Life<=2 condition | Category corrected from activate to auto so Counter pipeline executes it. Declare attack→pass→use Counter→target→Top/Bottom; Life3 and skip negatives; +4000 remains. |
 | ST12-010 / ST12-013 | Revealed cost2 Character only; actor arranges remainder | Match declined, no match, both Top/Bottom, selected card enters active/rested respectively; empty deck creates no prompt. |
-| OP05-111 | Requires actual Kotori play as activation cost | Blocked by OPT-845, unchanged. Executable red probe preserved below. |
+| OP05-111 | Actor pays optional On Play activation cost by playing a named Kotori before Life resolution | Delivered by parent OPT-845; combined-tree `opt-845-named-play-cost.test.ts` covers payment, legality, capacity, deferred On Play order, persistence, and Top/Bottom. Integrated rerun pending. |
 
 The shared SEARCH_AND_PLAY fix only lets a nonempty, non-full-deck zero-match TOP_OR_BOTTOM pool reach the established arrange/resume path. Fixed destinations and full-deck searches retain their old branch; the empty-pool early return precedes the change. Recursive registry inventory (including nested actions) found23 SEARCH_AND_PLAY consumers, of which5 use TOP_OR_BOTTOM: OP08-052, OP08-054, ST12-010, ST12-013, ST12-017. Each looks at1 card. Inventory is `opt-807-search-consumers.json`; OP08-052 additionally executes the zero-match Top/Bottom regression as an unchanged authored consumer.
 
-## Validation
+## Historical validation (before prerequisite integration)
 
 - Shared untouched-main baseline `caf29b1`: coordinator-supplied OPT-811 `pnpm verify` passed every pre-build gate; sandbox build could not fetch fonts; elevated `pnpm build` passed. Logs `/private/tmp/opt811-baseline-verify.log` and `/private/tmp/opt811-baseline-build.log`. This is shared evidence, not an independently rerun baseline.
 - Original-main mutation: temporarily restored the five edited source files and generated registry from HEAD, retaining ticket regressions; focused suite exited1 with21 failures /12 passes. Restored all edited bytes in `finally`. `/private/tmp/opt807-all-regressions-red.log`.
 - Final focused: `pnpm --filter optcg-game exec vitest run src/__tests__/opt-807-authored-pipeline.test.ts src/__tests__/opt-821-field-life-position.test.ts --maxWorkers=1` passed49 tests (35 new +14 existing). `/private/tmp/opt807-focused.log`.
 - Target-instruction snapshot initially failed solely because Brook adds one explicit trash target: generatedCount1978→1979, targetCount2535→2536; regenerated and inspected those two numeric deltas,19 tests pass.
 - `pnpm --filter optcg-game schema:generate` regenerated production registry. Worker type check passed before the final test-only additions; final required `pnpm verify` is pending the coordinator's serialized resource slot.
-- Executed Hotori probe fails its actual paid-cost Character-zone assertion. `/private/tmp/opt807-hotori-blocked.log`. To reproduce without adding a failing suite to normal CI:
+- The pre-OPT-845 Hotori probe failed its paid-cost Character-zone assertion (`/private/tmp/opt807-hotori-blocked.log`; independently repeated in `/private/tmp/opt807-review-hotori.log`). This is historical red evidence only. The stale probe assumed automatic payment without the now-required named-card selection and is retired; the parent’s registered pipeline suite supersedes it. The original probe remains available in git history at `cbc36e3`.
+- Prior independent review at `cbc36e3` found the implemented subset clean, with Hotori then blocked. It reran final35-case source mutation:23fail/12pass, isolated shared-handler mutation:4fail/31pass, and restored authored+OPT821+OPT775:68pass. These are historical observations, not claims of integrated-head verification.
 
-```sh
-cp docs/project/handoffs/probes/opt-807-hotori.test.ts.txt workers/game/src/__tests__/opt-807-hotori-probe.test.ts
-pnpm --filter optcg-game exec vitest run src/__tests__/opt-807-hotori-probe.test.ts --maxWorkers=1
-rm workers/game/src/__tests__/opt-807-hotori-probe.test.ts
-```
+## Prerequisite integration validation
 
-This is an explicit unresolved regression artifact, not a skipped passing test. Expected failure is at “Kotori is on the Character field before the Life target prompt.”
+- Production registry regenerated from merged source; card-text manifest refresh skipped because canonical card JSON is unavailable. No manifest change.
+- Target coverage regenerated directly from merged registry: targetCount2540, generatedCount1980, fallbackCount560. Relative to parent: +1 target/generated entry for Brook. Snapshot execution remains pending the serialized test slot.
+- Focused baseline/final rerun and final `pnpm verify` remain pending. Full gate is scheduled after parent merge/main integration to avoid duplicate expensive runs; independent review and GitHub checks are separate coordinator gates.
 
 ## Follow-ups and limitations
 
-- OPT-845 blocks OP05-111 and whole-ticket merge readiness. Requires named-card choice, prohibition/capacity/overflow handling, actual paid play, fresh identity/DON cleanup, deferred On Play ordering, continuation/persistence and no-payment negatives. Do not substitute an effect action for this cost.
+- OPT-845 is the stacked prerequisite. Its code is integrated; parent merge, renewed main integration, independent review and required checks still gate whole-ticket delivery.
 - As required by ticket: ST09-010 Ace still approximates top-or-bottom Life trash because TRASH_FROM_LIFE has no TOP_OR_BOTTOM; OP06-099 Aisa still lacks complete LIFE_SCRY destination/owner semantics. Neither is changed here.
-- No browser or live-session UI changes; evidence exercises engine pipeline and public prompt lifecycle. Independent review and GitHub checks remain coordinator gates. This draft is not merge-ready.
+- No browser or live-session UI changes; evidence exercises engine pipeline and public prompt lifecycle. Independent review and GitHub checks remain coordinator gates. This stacked draft is not merge-ready.

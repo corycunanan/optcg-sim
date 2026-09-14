@@ -47,6 +47,9 @@
     "card": "OP01-069",
     "path": "schema.effects.0.actions.0",
     "params": {
+      "pick": {
+        "up_to": 1
+      },
       "search_full_deck": true,
       "filter": {
         "name": "Smiley"
@@ -58,6 +61,9 @@
     "card": "OP01-116",
     "path": "schema.effects.0.actions.0",
     "params": {
+      "pick": {
+        "up_to": 1
+      },
       "look_at": 5,
       "filter": {
         "traits": [
@@ -73,6 +79,9 @@
     "card": "OP02-030",
     "path": "schema.effects.1.actions.0",
     "params": {
+      "pick": {
+        "up_to": 1
+      },
       "search_full_deck": true,
       "filter": {
         "color": "GREEN",
@@ -285,6 +294,9 @@
     "card": "ST03-007",
     "path": "schema.effects.0.actions.0",
     "params": {
+      "pick": {
+        "up_to": 1
+      },
       "search_full_deck": true,
       "filter": {
         "name": "Pacifista",
