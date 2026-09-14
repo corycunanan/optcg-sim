@@ -1,3 +1,5 @@
+import { effectSourceController } from "../engine/effect-resolver/action-utils.js";
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../engine/effect-types.js";
 import type { Cost } from "../engine/effect-types.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction } from "../types.js";
@@ -560,7 +562,7 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
   ] as const)("Hancock observes activation cost %s", (type) => {
     const f = fixture();
     f.put("OP07-038", 0, "LEADER");
-    const target = f.put("victim", 0, "CHARACTER", {
+    const target = f.put("ST03-004", 0, "CHARACTER", {
       name: "victim",
       power: 6000,
     });
@@ -582,6 +584,11 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
     f.select([target.instanceId]);
     f.accept();
     f.done();
+    expect(
+      f.state.triggerRegistry.some(
+        (r) => r.sourceCardInstanceId === target.instanceId
+      )
+    ).toBe(false);
     // Bounce itself adds the victim as well as Hancock's draw.
     expect(f.state.players[0].hand).toHaveLength(
       type === "RETURN_OWN_CHARACTER_TO_HAND" ? 2 : 1
@@ -591,10 +598,197 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
     );
     expect(event).toBeDefined();
     expect(hasValidEventPayload(event!.type, event!.payload)).toBe(true);
+    if (type === "TRASH_OWN_CHARACTER")
+      expect(
+        f.state.eventLog.filter((e) => e.type === "CARD_TRASHED")
+      ).toHaveLength(1);
     if (type === "KO_OWN_CHARACTER")
       expect(event?.payload).toMatchObject({
         preKO_basePower: 6000,
         preKO_donCount: 0,
       });
+  });
+
+  it.each(["TRASH_CARD", "KO"] as const)(
+    "Shakuyaku observes its own effect %s to an open area",
+    (removal) => {
+      const f = fixture();
+      const target = f.put("OP08-046");
+      for (let i = 0; i < 5; i++) f.put(`hand${i}`, 1, "HAND");
+      const source = f.put("trash-source", 0, "CHARACTER", {
+        effectSchema: {
+          effects: [
+            {
+              id: "trash",
+              category: "activate",
+              trigger: { keyword: "ACTIVATE_MAIN" },
+              actions: [
+                {
+                  type: removal,
+                  target: {
+                    type: "CHARACTER",
+                    controller: "SELF",
+                    count: { exact: 1 },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      });
+      f.activate(source, "trash");
+      f.select([target.instanceId]);
+      f.select([f.state.players[1].hand[0].instanceId]);
+      f.done();
+      expect(f.state.players[1].hand).toHaveLength(4);
+      expect(
+        f.state.triggerRegistry.some(
+          (r) => r.sourceCardInstanceId === target.instanceId
+        )
+      ).toBe(false);
+    }
+  );
+  it.each([
+    ["OP07-038", 0, "LEADER", []],
+    ["OP13-078", 1, "STAGE", ["Roger Pirates"]],
+    ["OP09-080", 1, "STAGE", ["Straw Hat Crew"]],
+  ] as const)(
+    "%s does not confuse battle KO with effect removal",
+    (id, owner, zone, traits) => {
+      const f = fixture();
+      f.put(id, owner, zone, { type: zone === "STAGE" ? "Stage" : "Leader" });
+      const target = f.put("victim", 1, "CHARACTER", {
+        types: [...traits],
+        power: 1000,
+      });
+      target.state = "RESTED";
+      f.act({
+        type: "DECLARE_ATTACK",
+        attackerInstanceId: f.state.players[0].leader.instanceId,
+        targetInstanceId: target.instanceId,
+      });
+      f.act({ type: "PASS" }, 1);
+      f.act({ type: "PASS" }, 1);
+      f.done();
+      expect(f.state.players[owner].hand).toHaveLength(0);
+    }
+  );
+
+  it("Hancock uses Tsuru's effect controller while opponent chooses its own bounce", () => {
+    const f = fixture();
+    f.put("OP07-038", 0, "LEADER");
+    const discard1 = f.put("discard1", 0, "HAND");
+    const discard2 = f.put("discard2", 0, "HAND");
+    const target = f.put("victim", 1);
+    f.put("other-victim", 1);
+    f.play(f.put("OP06-051", 0, "HAND", { cost: 0 }));
+    f.accept();
+    f.select([discard1.instanceId, discard2.instanceId]);
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(1);
+    f.roundTrip();
+    f.select([target.instanceId]);
+    f.accept();
+    f.done();
+    expect(f.state.players[0].hand).toHaveLength(1);
+    expect(
+      f.state.eventLog.find((e) => e.type === "CARD_RETURNED_TO_HAND")?.payload
+    ).toMatchObject({ causingController: 0, sourceController: 1 });
+  });
+  it("opponent-choice removal retains causal controller after its source leaves as cost", () => {
+    const f = fixture();
+    f.put("OP13-078", 1, "STAGE", { type: "Stage" });
+    const target = f.put("victim", 1, "CHARACTER", {
+      types: ["Roger Pirates"],
+    });
+    f.put("other-victim", 1);
+    const source = f.put("departing-source", 0, "CHARACTER", {
+      effectSchema: {
+        effects: [
+          {
+            id: "pay",
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            costs: [{ type: "TRASH_SELF" }],
+            flags: { optional: true },
+            actions: [
+              {
+                type: "OPPONENT_ACTION",
+                params: {
+                  action: {
+                    type: "RETURN_TO_HAND",
+                    target: {
+                      type: "CHARACTER",
+                      controller: "SELF",
+                      count: { exact: 1 },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const before = f.state.players[1].donCostArea.length;
+    f.activate(source, "pay");
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(1);
+    f.roundTrip();
+    f.select([target.instanceId]);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    f.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+    f.done();
+    expect(f.state.players[1].donCostArea).toHaveLength(before + 1);
+    expect(
+      f.state.eventLog.find((e) => e.type === "CARD_RETURNED_TO_HAND")?.payload
+    ).toMatchObject({ causingController: 0 });
+  });
+
+  it("a nested replacement cannot inherit a different source's causal controller", () => {
+    const f = fixture();
+    const source = f.put("replacement-source", 0);
+    const foreign = {
+      ...source,
+      instanceId: "foreign-source",
+      controller: 1 as const,
+    };
+    expect(
+      effectSourceController(
+        f.state,
+        source.instanceId,
+        1,
+        new Map([
+          [
+            EFFECT_SOURCE_SNAPSHOT_REF,
+            { targetInstanceIds: [], count: 0, sourceCardSnapshot: foreign },
+          ],
+        ])
+      )
+    ).toBe(0);
+  });
+
+  it("Tsuru's opponent-choice bounce respects Nusjuro's opponent-effect protection", () => {
+    const f = fixture();
+    const victim = f.put("OP13-080", 1);
+    f.put("other-victim", 1);
+    f.state.players[1].trash = Array.from({ length: 7 }, (_, i) => ({
+      ...victim,
+      instanceId: `trash-${i}`,
+      zone: "TRASH",
+    }));
+    const cost1 = f.put("cost1", 0, "HAND");
+    const cost2 = f.put("cost2", 0, "HAND");
+    f.play(f.put("OP06-051", 0, "HAND", { cost: 0 }));
+    f.accept();
+    f.select([cost1.instanceId, cost2.instanceId]);
+    f.select([victim.instanceId]);
+    f.done();
+    expect(
+      f.state.players[1].characters.some(
+        (c) => c?.instanceId === victim.instanceId
+      )
+    ).toBe(true);
+    expect(
+      f.state.eventLog.some((e) => e.type === "CARD_RETURNED_TO_HAND")
+    ).toBe(false);
   });
 });

@@ -1082,26 +1082,16 @@ export function handleAwaitingCostSelection(
 
     // Only trash payments publish CARD_TRASHED. Stage-side named-card payment
     // already emitted the canonical identity-bearing event via trashStage;
-    // hand-side payment retains the count-only bookkeeping event used by every
-    // other selectable hand trash. Other selectable costs use this same resume
+    // Character trash also emits one identity-bearing event per moved card.
+    // Hand-side payment emits one aggregate hand-trash event with causal
+    // provenance. Other selectable costs use this same resume
     // branch (including ST13-001's Character-to-Life cost), so emitting it
     // unconditionally fabricated a trash event for unrelated zone transitions.
     if (
       cost.type === "TRASH_FROM_HAND" ||
-      (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage) ||
-      cost.type === "TRASH_OWN_CHARACTER"
+      (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage)
     ) {
-      if (cost.type === "TRASH_FROM_HAND" || (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage)) {
-        if (selected.length > 0) events.push(handTrashEvent(state, controller, selected.length, "COST", sourceCardInstanceId, controller, new Map(topFrame.resultRefs)));
-      } else events.push({
-        type: "CARD_TRASHED",
-        playerIndex: controller,
-        payload: {
-          count: selected.length,
-          reason: "cost",
-          from: "CHARACTER",
-        },
-      });
+      if (selected.length > 0) events.push(handTrashEvent(state, controller, selected.length, "COST", sourceCardInstanceId, controller, new Map(topFrame.resultRefs)));
     }
   } else {
     return { state, events: [], resolved: false };

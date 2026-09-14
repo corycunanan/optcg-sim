@@ -22,7 +22,7 @@ import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
-import { promptEffectDescription, resolveAmount } from "../action-utils.js";
+import { effectSourceController, promptEffectDescription, resolveAmount } from "../action-utils.js";
 
 export function executeAddToLifeFromDeck(
   state: GameState,
@@ -385,6 +385,7 @@ export function executeAddToLifeFromField(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
+  const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const allValidIds =
     preselectedTargets ??
     computeAllValidTargets(
@@ -425,7 +426,7 @@ export function executeAddToLifeFromField(
         {
           action: "TO_LIFE",
           cause: "EFFECT",
-          causingController: controller,
+          causingController,
           sourceCardInstanceId,
         },
         cardDb,
@@ -482,7 +483,7 @@ export function executeAddToLifeFromField(
         {
           action: "TO_LIFE",
           cause: "EFFECT",
-          causingController: controller,
+          causingController,
           sourceCardInstanceId,
         },
         cardDb,
@@ -506,7 +507,7 @@ export function executeAddToLifeFromField(
           cardId: moved.fact.cardId,
           sourceZone: moved.fact.source,
           sourceController: moved.fact.controller,
-          causingController: controller,
+          causingController,
           movementCause: "EFFECT",
         },
       });
