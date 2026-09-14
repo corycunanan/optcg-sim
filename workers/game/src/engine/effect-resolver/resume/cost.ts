@@ -1,3 +1,4 @@
+import { completeHandTrashCostSources, handTrashEvent, isHandTrashByEffect } from "../../hand-trash.js";
 /**
  * AWAITING_COST_SELECTION resume — handles the player's response to a cost
  * prompt (CHOOSE_ONE_COST branch pick, CHOICE branch pick, LIFE_TO_HAND
@@ -153,13 +154,13 @@ function finishCostsAndRunActions(
   // OPT-224's becomes-rested watchers) queue exactly as they do when the same
   // cost auto-pays inside a pipeline run. `events` holds only events produced
   // by this resume invocation, so nothing is scanned twice.
-  // The legacy count-only CARD_TRASHED bookkeeping event (pushed for every
-  // generic SELECT_TARGET cost, including hand trashes) carries no instance
-  // id and must not reach trigger matching — ANY_CHARACTER_TRASHED watchers
-  // would false-fire on hand trashes. Instance-bearing trash events scan.
+  // Canonical hand-trash costs carry count + causal source, not a Character
+  // identity. Admit them alongside identity-bearing field exits; legacy
+  // bookkeeping events remain excluded. Character-only matchers reject HAND.
+  completeHandTrashCostSources(events, state, sourceCardInstanceId, controller, actionRefs);
   const scannable = events.filter(
     (e) =>
-    e.type !== "CARD_TRASHED" || Boolean(getEventCardInstanceId(e))
+    e.type !== "CARD_TRASHED" || Boolean(getEventCardInstanceId(e)) || isHandTrashByEffect(e)
   );
   let pendingTriggers = topFrame.pendingTriggers;
   if (scannable.length > 0) {
@@ -310,6 +311,7 @@ function resumeAfterBranchPick(
     const newTop = peekFrame(nextState);
     if (newTop) {
       nextState = updateTopFrame(nextState, {
+        resultRefs: topFrame.resultRefs,
         costResultRefs: topFrame.costResultRefs,
         pendingTriggers: topFrame.pendingTriggers,
       });
@@ -1089,15 +1091,15 @@ export function handleAwaitingCostSelection(
       (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage) ||
       cost.type === "TRASH_OWN_CHARACTER"
     ) {
-      events.push({
+      if (cost.type === "TRASH_FROM_HAND" || (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage)) {
+        if (selected.length > 0) events.push(handTrashEvent(state, controller, selected.length, "COST", sourceCardInstanceId, controller, new Map(topFrame.resultRefs)));
+      } else events.push({
         type: "CARD_TRASHED",
         playerIndex: controller,
         payload: {
           count: selected.length,
           reason: "cost",
-          from: cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE"
-            ? (selectedStage ? "STAGE" : "HAND")
-            : cost.type === "TRASH_FROM_HAND" ? "HAND" : "CHARACTER",
+          from: "CHARACTER",
         },
       });
     }
@@ -1149,6 +1151,7 @@ export function handleAwaitingCostSelection(
       const newTop = peekFrame(nextState);
       if (newTop) {
         nextState = updateTopFrame(nextState, {
+          resultRefs: topFrame.resultRefs,
           costResultRefs: [...accumulatedCostRefs.entries()].map(
             ([key, value]) => [key, value]
           ),

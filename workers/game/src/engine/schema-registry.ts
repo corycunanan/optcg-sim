@@ -350,7 +350,7 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
       errors.push(...validateAction(block.actions[i], `${prefix}.actions[${i}]`, i === 0));
     }
     errors.push(...validateActionConnectors(block.actions, `${prefix}.actions`));
-    errors.push(...validateResultReferences(block.actions, `${prefix}.actions`));
+    errors.push(...validateResultReferences(block.actions, `${prefix}.actions`, block.trigger && "event" in block.trigger && block.trigger.event === "CARD_TRASHED_FROM_HAND" ? new Set(["__triggering_hand_trash"]) : undefined));
   }
 
   if (block.replacement_actions) {
@@ -890,7 +890,7 @@ function walkActions(actions: Action[]): Action[] {
   return walked;
 }
 
-function validateResultReferences(actions: Action[], prefix: string): string[] {
+function validateResultReferences(actions: Action[], prefix: string, implicitRefs: ReadonlySet<string> = new Set()): string[] {
   const produced = new Set<string>();
   const consumed = new Set<string>();
 
@@ -906,7 +906,7 @@ function validateResultReferences(actions: Action[], prefix: string): string[] {
     }
   }
   for (const ref of consumed) {
-    if (!produced.has(ref) && !IMPLICIT_COST_RESULT_REFS.has(ref)) {
+    if (!produced.has(ref) && !IMPLICIT_COST_RESULT_REFS.has(ref) && !implicitRefs.has(ref)) {
       errors.push(`${prefix}: target_ref '${ref}' has no matching result_ref`);
     }
   }

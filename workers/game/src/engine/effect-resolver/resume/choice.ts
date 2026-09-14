@@ -1,3 +1,4 @@
+import { completeHandTrashCostSources, isHandTrashByEffect } from "../../hand-trash.js";
 import { retainEventsOnFrame } from "./events.js";
 /**
  * PLAYER_CHOICE resume handlers.
@@ -513,12 +514,13 @@ export function handleAwaitingOptionalResponse(
   // the pipeline's event scan — scan them here so event-watching auto effects
   // (e.g. CARD_REMOVED_FROM_LIFE watchers on auto-paid life-trash costs)
   // queue exactly as they do when the same cost pays inside a pipeline run.
-  // Same filter as resume/cost.ts: the count-only CARD_TRASHED bookkeeping
-  // event carries no instance id and must not reach trigger matching.
+  // Admit canonical hand-trash costs alongside identity-bearing field exits;
+  // unclassified legacy bookkeeping events remain excluded.
+  completeHandTrashCostSources(events, nextState, sourceCardInstanceId, controller, new Map(topFrame.resultRefs));
   let pendingTriggers = topFrame.pendingTriggers;
   if (events.length > 0) {
     const scannable = events.filter(
-      (e) => e.type !== "CARD_TRASHED" || Boolean(getEventCardInstanceId(e))
+      (e) => e.type !== "CARD_TRASHED" || Boolean(getEventCardInstanceId(e)) || isHandTrashByEffect(e)
     );
     if (scannable.length > 0) {
       const costScan = scanEventsForTriggers(
@@ -734,7 +736,8 @@ export function handleAwaitingTriggerOrderSelection(
       chosenTrigger.triggeringEvent?.payload as
         | { cardInstanceId?: string }
         | undefined
-    )?.cardInstanceId ?? null
+    )?.cardInstanceId ?? null,
+    chosenTrigger.triggeringEvent,
   );
   nextState = result.state;
   events.push(...result.events);

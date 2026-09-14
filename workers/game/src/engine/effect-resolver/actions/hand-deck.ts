@@ -1,3 +1,4 @@
+import { handTrashEvent } from "../../hand-trash.js";
 /**
  * Action handlers: PLACE_HAND_TO_DECK, RETURN_HAND_TO_DECK, HAND_WHEEL,
  * SHUFFLE_DECK, REVEAL, REVEAL_HAND, SEARCH_AND_PLAY
@@ -144,7 +145,7 @@ export function executeHandWheel(
     { position: "TOP" },
   ).state;
 
-  events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: toTrashCount, reason: "hand_wheel", from: "HAND" } });
+  if (toTrashCount > 0) events.push(handTrashEvent(state, controller, toTrashCount, "EFFECT", _sourceCardInstanceId, controller, resultRefs));
 
   // Draw cards
   const actualDraw = Math.min(drawCount, nextState.players[controller].deck.length);

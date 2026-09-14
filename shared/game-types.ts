@@ -290,7 +290,7 @@ export interface GameEventPayloadMap {
   CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
   CARD_KO: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; cardType?: "STAGE" };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
-  CARD_TRASHED: FieldMovementProvenance & { cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
+  CARD_TRASHED: FieldMovementProvenance & { effectSourceCardId?: string; effectSourceController?: 0 | 1; cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
   CARD_RETURNED_TO_HAND: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
   CARD_ADDED_TO_LIFE: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId: string; cardId: string };
   CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };

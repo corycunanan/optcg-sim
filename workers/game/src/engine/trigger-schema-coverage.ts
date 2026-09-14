@@ -118,3 +118,20 @@ export function findSchemasWithMultipleTriggerBlocks(
     .map(([cardId]) => cardId)
     .sort();
 }
+
+/** Printed hand-trash watchers must never use the inverse Life-to-hand event. */
+export function findHandTrashTriggerViolations(
+  cardText: string,
+  schema: EffectSchema,
+): string[] {
+  if (!/trashed from your hand/i.test(cardText)) return [];
+  const containsLifeEvent = (value: unknown): boolean => {
+    if (!value || typeof value !== "object") return false;
+    if (Array.isArray(value)) return value.some(containsLifeEvent);
+    const object = value as Record<string, unknown>;
+    return object.event === "CARD_ADDED_TO_HAND_FROM_LIFE" || Object.values(object).some(containsLifeEvent);
+  };
+  return schema.effects.filter(block => containsLifeEvent(block.trigger)).map(block =>
+    `${schema.card_id} ${block.id}: printed 'trashed from your hand' cannot use CARD_ADDED_TO_HAND_FROM_LIFE`,
+  );
+}

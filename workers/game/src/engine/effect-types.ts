@@ -186,6 +186,7 @@ export type CustomEventType =
   | "BATTLE_ABORTED"
   | "LIFE_COUNT_BECOMES_ZERO"
   | "CARD_ADDED_TO_HAND_FROM_LIFE"
+  | "CARD_TRASHED_FROM_HAND"
   | "DRAW_OUTSIDE_DRAW_PHASE"
   | "CHARACTER_BECOMES_RESTED"
   | "CHARACTER_RETURNED_TO_HAND"
@@ -201,6 +202,8 @@ export interface EventFilter {
   target?: "SELF";
   controller?: Controller;
   cause?: EventCause;
+  /** Causal effect source, distinct from the discarded card. */
+  effect_source?: { controller?: Controller; traits?: string[] };
   target_filter?: TargetFilter;
   source_zone?: string;
   includes_trigger_keyword?: boolean;

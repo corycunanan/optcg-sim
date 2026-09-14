@@ -423,6 +423,8 @@ const EventPayloadSchemas = {
     source: z.string().optional(),
   }),
   CARD_TRASHED: z.strictObject({
+    effectSourceCardId: z.string().optional(),
+    effectSourceController: PlayerIndex.optional(),
     sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
     sourceController: PlayerIndex.optional(),
     causingController: PlayerIndex.optional(),
