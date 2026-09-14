@@ -24,6 +24,11 @@ import {
 function fixture() {
   const db = createTestCardDb();
   for (const [id, cost] of [
+    ["EB03-012", 2],
+    ["EB03-061", 6],
+    ["OP04-021", 3],
+    ["OP06-062", 8],
+    ["OP06-035", 7],
     ["OP17-033", 2],
     ["OP07-036", 2],
     ["OP06-021", 0],
@@ -702,4 +707,182 @@ it("orders broad watchers once, completes both effects, and does not retrigger t
   f.select([second.instanceId]);
   expect(f.state.pendingPrompt).toBeNull();
   expect(f.state.players[0].deck.length).toBe(deck - 1);
+});
+
+it.each([0, 1] as const)(
+  "Judge rests an opposing DON with controller %s",
+  (controller) => {
+    const f = fixture();
+    f.state.turn.activePlayerIndex = controller;
+    const judge = f.put("OP06-062", controller),
+      opponent = controller === 0 ? 1 : 0;
+    const don = f.state.players[opponent].donCostArea.find(
+        (d) => d.state === "ACTIVE"
+      )!,
+      n = f.state.players[controller].donCostArea.length,
+      deck = f.state.players[controller].donDeck.length;
+    f.act({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: judge.instanceId,
+      effectId: "OP06-062_effect_2",
+    });
+    if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+      f.choose("accept");
+    f.select([don.instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(
+      f.state.players[opponent].donCostArea.find(
+        (d) => d.instanceId === don.instanceId
+      )?.state
+    ).toBe("RESTED");
+    expect(f.state.players[controller].donCostArea.length).toBe(n - 1);
+    expect(f.state.players[controller].donDeck.length).toBe(deck + 1);
+    expect(
+      f.state.eventLog.filter((e) => e.type === "DON_STATE_CHANGED")
+    ).toHaveLength(1);
+    expect(
+      f.state.eventLog.filter((e) => e.type === "CARD_STATE_CHANGED")
+    ).toHaveLength(0);
+  }
+);
+it("Viola pays two DON and rests the attacker's DON", () => {
+  const f = fixture();
+  f.put("OP04-021", 1);
+  const attacker = f.put(CARDS.VANILLA.id, 0),
+    don = f.state.players[0].donCostArea.find((d) => d.state === "ACTIVE")!;
+  f.act({
+    type: "DECLARE_ATTACK",
+    attackerInstanceId: attacker.instanceId,
+    targetInstanceId: f.state.players[1].leader.instanceId,
+  });
+  if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+    f.choose("accept");
+  f.select([don.instanceId]);
+  expect(f.state.pendingPrompt).toBeNull();
+  expect(
+    f.state.players[0].donCostArea.find((d) => d.instanceId === don.instanceId)
+      ?.state
+  ).toBe("RESTED");
+  expect(
+    f.state.players[1].donCostArea.filter((d) => d.state === "RESTED")
+  ).toHaveLength(2);
+});
+
+it.each([false, true])(
+  "Judge DON rest does not trigger Character watchers; already rested %s",
+  (rested) => {
+    const f = fixture();
+    f.put("OP07-031", 0);
+    f.put("OP10-036", 0);
+    const judge = f.put("OP06-062", 0),
+      don = f.state.players[1].donCostArea[0];
+    if (rested) don.state = "RESTED";
+    f.act({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: judge.instanceId,
+      effectId: "OP06-062_effect_2",
+    });
+    if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+      f.choose("accept");
+    f.select([don.instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(
+      f.state.players[1].donCostArea.find(
+        (d) => d.instanceId === don.instanceId
+      )?.state
+    ).toBe("RESTED");
+    expect(
+      f.state.eventLog.filter((e) => e.type === "DON_STATE_CHANGED")
+    ).toHaveLength(rested ? 0 : 1);
+    expect(
+      f.state.eventLog.filter((e) => e.type === "CARD_STATE_CHANGED")
+    ).toHaveLength(0);
+  }
+);
+
+it.each(["EB03-012", "EB03-061"])(
+  "%s preserves its eligible Character alternative",
+  (id) => {
+    const f = fixture(),
+      source = f.put(id, 0),
+      target = f.put(CARDS.VANILLA.id, 1);
+    f.db.set(CARDS.VANILLA.id, {
+      ...CARDS.VANILLA,
+      cost: 2,
+      types: ["Animal"],
+    });
+    f.act({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: source.instanceId,
+      effectId:
+        id === "EB03-012"
+          ? "activate_rest_opponent"
+          : "activate_don_active_rest",
+    });
+    if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+      f.choose("accept");
+    if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
+      f.choose("0");
+    f.select([target.instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(current(f, target)?.state).toBe("RESTED");
+  }
+);
+it("recursively accounts for all authored SET_REST DON consumers", async () => {
+  const { AUTHORED_SCHEMAS } =
+    await import("../engine/authored-schemas.generated.js");
+  const found: string[] = [];
+  function visit(value: unknown, id: string) {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach((v) => visit(v, id));
+      return;
+    }
+    const r = value as Record<string, unknown>;
+    if (r.type === "SET_REST" && JSON.stringify(r.target).includes("DON"))
+      found.push(id);
+    Object.values(r).forEach((v) => visit(v, id));
+  }
+  for (const [id, schema] of Object.entries(AUTHORED_SCHEMAS))
+    visit(schema, id);
+  expect(found.sort()).toEqual([
+    "EB03-012",
+    "EB03-061",
+    "OP04-021",
+    "OP06-020",
+    "OP06-035",
+    "OP06-062",
+    "OP09-036",
+    "OP12-037",
+  ]);
+});
+
+it("Judge rejects own and hidden-card IDs before resolving an opposing DON", () => {
+  const f = fixture(),
+    judge = f.put("OP06-062", 0);
+  f.act({
+    type: "ACTIVATE_EFFECT",
+    cardInstanceId: judge.instanceId,
+    effectId: "OP06-062_effect_2",
+  });
+  if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+    f.choose("accept");
+  for (const id of [
+    f.state.players[0].donCostArea[0].instanceId,
+    f.state.players[0].hand[0].instanceId,
+    "missing",
+  ]) {
+    const rejected = resumePromptLifecycle(
+      f.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [id] },
+      f.db,
+      { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }
+    );
+    expect(rejected.responseRejected).toBe(true);
+    expect(rejected.state).toEqual(f.state);
+  }
+  const don = f.state.players[1].donCostArea[0];
+  f.select([don.instanceId]);
+  expect(f.state.pendingPrompt).toBeNull();
+  expect(f.state.players[1].donCostArea[0].state).toBe("RESTED");
 });

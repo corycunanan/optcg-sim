@@ -1,0 +1,91 @@
+// Executable source-only gap probe. Rename .test.ts.txt to .test.ts to run.
+// Printed DON alternative is absent before/after OPT-847; independent target-selection follow-up.
+import { expect, it } from "vitest";
+import type { CardInstance, GameAction } from "../types.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { registerCardEnteredField } from "../engine/triggers.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import {
+  CARDS,
+  createBattleReadyState,
+  createTestCardDb,
+  padChars,
+} from "./helpers.js";
+
+it.each(["OP06-035", "EB03-012", "EB03-061"])(
+  "%s must offer its printed opposing DON alternative",
+  (id) => {
+    const db = createTestCardDb(),
+      schema = getEffectSchema(id)!;
+    db.set(id, {
+      ...CARDS.VANILLA,
+      id,
+      type: "Character",
+      cost: 3,
+      effectSchema: schema,
+    });
+    db.set(CARDS.VANILLA.id, { ...CARDS.VANILLA, cost: 2, types: ["Animal"] });
+    let state = createBattleReadyState(db);
+    const source: CardInstance = {
+      ...state.players[0].leader,
+      instanceId: "rest-source",
+      cardId: id,
+      zone: id === "OP06-035" ? "HAND" : "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+    };
+    const target: CardInstance = {
+      ...state.players[1].leader,
+      instanceId: "enemy-character",
+      cardId: CARDS.VANILLA.id,
+      zone: "CHARACTER",
+      state: "ACTIVE",
+      attachedDon: [],
+    };
+    state.players[0].characters = padChars(id === "OP06-035" ? [] : [source]);
+    state.players[1].characters = padChars([target]);
+    if (id === "OP06-035") state.players[0].hand.push(source);
+    else state = registerCardEnteredField(state, source, db.get(id)!);
+    const action: GameAction =
+      id === "OP06-035"
+        ? { type: "PLAY_CARD", cardInstanceId: source.instanceId }
+        : {
+            type: "ACTIVATE_EFFECT",
+            cardInstanceId: source.instanceId,
+            effectId:
+              id === "EB03-012"
+                ? "activate_rest_opponent"
+                : "activate_don_active_rest",
+          };
+    const result = runPipeline(state, action, db, 0);
+    expect(result.valid, result.error).toBe(true);
+    state = { ...result.state, pendingPrompt: result.pendingPrompt ?? null };
+    if (state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+      state = resumePromptLifecycle(
+        state,
+        { type: "PLAYER_CHOICE", choiceId: "accept" },
+        db,
+        { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }
+      ).state;
+    if (state.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+      const zero = state.pendingPrompt.options.choices.find(
+        (c) => c.label === "0"
+      )!;
+      state = resumePromptLifecycle(
+        state,
+        { type: "PLAYER_CHOICE", choiceId: zero.id },
+        db,
+        { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }
+      ).state;
+    }
+    const options = state.pendingPrompt?.options;
+    expect(options?.promptType).toBe("SELECT_TARGET");
+    if (options?.promptType !== "SELECT_TARGET")
+      throw new Error("Missing target prompt");
+    expect(options.validTargets).toContain(target.instanceId);
+    expect(options.validTargets).toContain(
+      state.players[1].donCostArea[0].instanceId
+    );
+  }
+);

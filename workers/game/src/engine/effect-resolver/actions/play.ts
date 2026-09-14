@@ -1,3 +1,4 @@
+import { isRestTargetActive, restFieldTarget } from "../../field-rest.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 /**
  * Action handlers: PLAY_CARD, PLAY_SELF, SET_ACTIVE, SET_REST,
@@ -452,7 +453,7 @@ export function executeSetRest(
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
   const targetIds = autoSelectTargets(action.target, allValidIds).filter(
-    (id) => findCardInstance(state, id)?.state === "ACTIVE",
+    (id) => isRestTargetActive(state, id),
   );
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
@@ -484,14 +485,10 @@ export function executeSetRest(
   for (let i = 0; i < unprotectedIds.length; i++) {
     const id = unprotectedIds[i];
 
-    // OPT-224: resting a Character that is already RESTED is a no-op —
-    // no state change, no CHARACTER_BECOMES_RESTED event, no ON_REST drain.
-    const preRest = findCardInstance(nextState, id);
-    if (preRest && preRest.state !== "ACTIVE") continue;
-
-    nextState = setCardState(nextState, id, "RESTED");
-    const evt: PendingEvent = { type: "CARD_STATE_CHANGED", playerIndex: controller, payload: { targetInstanceId: id, newState: "RESTED", cause: "EFFECT", causingController: controller, causingSource } };
-    events.push(evt);
+    const rested = restFieldTarget(nextState, id, controller, causingSource);
+    if (!rested) continue;
+    nextState = rested.state;
+    events.push(...rested.events);
     restedIds.push(id);
   }
 

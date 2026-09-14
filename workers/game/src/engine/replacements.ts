@@ -1,3 +1,4 @@
+import { restFieldTarget } from "./field-rest.js";
 import type { EffectSourceIdentity } from "../../../../shared/game-types.js";
 /**
  * M4 Replacement Effect Interceptor — Pipeline Step 3
@@ -36,7 +37,7 @@ import { updateTopFrame } from "./effect-stack.js";
 import { matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
 import { isProhibitedForCard } from "./prohibitions.js";
-import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
+import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
 import { extractEffectDescription } from "./effect-resolver/action-utils.js";
@@ -930,18 +931,8 @@ function finalizeTarget(
       return returnToHand(state, targetId);
     case "RETURN_TO_DECK":
       return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM");
-    case "SET_REST": {
-      const nextState = setCardState(state, targetId, "RESTED");
-      if (nextState === state) return null;
-      return {
-        state: nextState,
-        events: [{
-          type: "CARD_STATE_CHANGED",
-          playerIndex: causingController,
-          payload: { targetInstanceId: targetId, newState: "RESTED", cause: "EFFECT", causingController, causingSource },
-        }],
-      };
-    }
+    case "SET_REST":
+      return restFieldTarget(state, targetId, causingController, causingSource);
   }
 }
 
