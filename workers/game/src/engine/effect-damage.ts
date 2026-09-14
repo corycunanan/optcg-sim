@@ -8,6 +8,7 @@ import type {
 import { removeTopLifeCard } from "./state.js";
 import { hasTrigger } from "./keywords.js";
 import { isCostPayable } from "./effect-resolver/cost-handler.js";
+import { lifeToHandDestination } from "./life-destination.js";
 import { transitionDetachedCard } from "./zone-transition.js";
 
 export function popLifeForDamage(
@@ -73,6 +74,45 @@ export function moveLifeCardToHand(
   return { state: moved.state, events };
 }
 
+/** Apply the Leader's replacement before the damage Trigger window. */
+export function redirectDamageLifeCard(
+  state: GameState,
+  lifeCard: LifeCard,
+  owner: 0 | 1,
+  cardDb: Map<string, CardData>
+): { state: GameState; events: PendingEvent[] } | null {
+  const destination = lifeToHandDestination(state, owner, lifeCard, cardDb);
+  if (destination === "HAND") return null;
+  const moved = transitionDetachedCard(
+    state,
+    {
+      instanceId: lifeCard.instanceId,
+      cardId: lifeCard.cardId,
+      owner,
+      source: "LIFE",
+      lifeFace: lifeCard.face,
+    },
+    destination === "DECK_BOTTOM" ? "DECK" : "TRASH",
+    {
+      position: destination === "DECK_BOTTOM" ? "BOTTOM" : "TOP",
+    }
+  );
+  if (!moved) return { state, events: [] };
+  return {
+    state: moved.state,
+    events: [
+      {
+        type: "CARD_REMOVED_FROM_LIFE",
+        playerIndex: owner,
+        payload: {
+          cardInstanceId: moved.fact.oldInstanceId,
+          newCardInstanceId: moved.fact.newInstanceId,
+        },
+      },
+    ],
+  };
+}
+
 export function canOfferTrigger(
   state: GameState,
   cardId: string,
@@ -114,6 +154,17 @@ export function continueEffectDamageSequence(
     nextState = popResult.state;
     events.push(...popResult.events);
     const lifeCard = popResult.lifeCard;
+    const redirected = redirectDamageLifeCard(
+      nextState,
+      lifeCard,
+      damagedPlayerIndex,
+      cardDb
+    );
+    if (redirected) {
+      nextState = redirected.state;
+      events.push(...redirected.events);
+      continue;
+    }
     if (
       canOfferTrigger(
         nextState,
