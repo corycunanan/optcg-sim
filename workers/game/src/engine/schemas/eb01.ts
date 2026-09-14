@@ -2036,12 +2036,6 @@ export const EB01_058_MONT_BLANC_CRICKET: EffectSchema = {
             value: 1,
           },
           {
-            type: "ACTIVE_DON_COUNT",
-            controller: "SELF",
-            operator: ">=",
-            value: 1,
-          },
-          {
             type: "LIFE_COUNT",
             controller: "SELF",
             operator: "<=",

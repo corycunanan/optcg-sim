@@ -465,7 +465,7 @@ describe("OPT-603 — attached-DON permanent gates", () => {
     ).toBe(true);
   });
 
-  it("EB01-058 adds its source-attached DON!! gate without replacing its active-DON and Life conditions", () => {
+  it("EB01-058 keeps its source-attached DON!! and Life gates without an unprinted active-DON requirement", () => {
     expect(
       effectiveSourcePower(
         permanentFixture({
@@ -509,6 +509,6 @@ describe("OPT-603 — attached-DON permanent gates", () => {
           restedDonCount: 0,
         })
       )
-    ).toBe(6000);
+    ).toBe(8000);
   });
 });
