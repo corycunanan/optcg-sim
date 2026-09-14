@@ -957,6 +957,8 @@ export interface ActionParamsMap {
   };
   GRANT_ATTRIBUTE: { attribute: Attribute };
   TRASH_FROM_HAND: {
+    /** Relative to the effect controller; defaults to the hand owner. Cross-hand choices are blind. */
+    chooser?: "SELF" | "OPPONENT";
     amount?: number | DynamicValue;
     optional?: boolean;
     until_count?: number;
