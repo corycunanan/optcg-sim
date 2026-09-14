@@ -30,7 +30,9 @@ import type {
   GameEvent,
   GameEventType,
   GameState,
+  PendingEvent,
 } from "../types.js";
+import { expireSourceLeftZone, expireTargetLeftZone } from "./duration-tracker.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter, hasBaseEffect } from "./conditions.js";
 import { isCardNegated } from "./modifiers.js";
@@ -101,6 +103,23 @@ export function deregisterTriggersForCard(
   );
   if (filtered.length === state.triggerRegistry.length) return state;
   return { ...state, triggerRegistry: filtered };
+}
+
+/** Release pre-transition registrations after the complete event set is matched.
+ * Both pipeline and prompt continuations must retire the OLD identity; looking
+ * up the destination by cardId can accidentally clean a different/new card.
+ */
+export function deregisterDepartedSources(state: GameState, events: PendingEvent[]): GameState {
+  let nextState = state;
+  for (const event of events) {
+    if (!["CARD_KO", "CARD_TRASHED", "CARD_RETURNED_TO_HAND", "CARD_RETURNED_TO_DECK", "CARD_ADDED_TO_LIFE"].includes(event.type)) continue;
+    const id = (event.payload as { cardInstanceId?: string }).cardInstanceId;
+    if (!id) continue;
+    nextState = deregisterTriggersForCard(nextState, id);
+    nextState = expireSourceLeftZone(nextState, id);
+    nextState = expireTargetLeftZone(nextState, id);
+  }
+  return nextState;
 }
 
 // ─── Permanent Effect Registration ───────────────────────────────────────────
@@ -420,7 +439,11 @@ export function matchTriggersForEvent(
       event.payload?.cardInstanceId === reg.sourceCardInstanceId &&
       isOnKOTrigger(reg.trigger);
 
-    if (!isOnKOSelfTrigger && !isCardInValidZone(sourceCard, reg.zone)) continue;
+    // A moved source's removal auto can activate in open Trash (§8-4-5),
+    // while hand/deck/Life destinations remain invalid for that source.
+    const isOpenRemovalSelfTrigger = transitionedSourceId !== undefined &&
+      sourceCard.zone === "TRASH" && containsRemovalTrigger(reg.trigger);
+    if (!isOnKOSelfTrigger && !isOpenRemovalSelfTrigger && !isCardInValidZone(sourceCard, reg.zone)) continue;
 
     // OPT-253: skip triggers whose source Character is currently effect-negated.
     // [Trigger] on Life (ON_TRIGGER_FROM_LIFE) is exempt — field-level negation
@@ -748,6 +771,11 @@ function getSourceFilteredAttackCardId(
     return event.payload.targetInstanceId;
   }
   return null;
+}
+
+function containsRemovalTrigger(trigger: Trigger): boolean {
+  if ("event" in trigger) return trigger.event === "CHARACTER_REMOVED_FROM_FIELD";
+  return "any_of" in trigger && trigger.any_of.some(containsRemovalTrigger);
 }
 
 /** Check if a trigger contains ON_KO (direct keyword or inside compound any_of). */

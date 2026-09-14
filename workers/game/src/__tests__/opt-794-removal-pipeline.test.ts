@@ -560,7 +560,7 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
   ] as const)("Hancock observes activation cost %s", (type) => {
     const f = fixture();
     f.put("OP07-038", 0, "LEADER");
-    const target = f.put("victim", 0, "CHARACTER", {
+    const target = f.put("ST03-004", 0, "CHARACTER", {
       name: "victim",
       power: 6000,
     });
@@ -582,6 +582,11 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
     f.select([target.instanceId]);
     f.accept();
     f.done();
+    expect(
+      f.state.triggerRegistry.some(
+        (r) => r.sourceCardInstanceId === target.instanceId
+      )
+    ).toBe(false);
     // Bounce itself adds the victim as well as Hancock's draw.
     expect(f.state.players[0].hand).toHaveLength(
       type === "RETURN_OWN_CHARACTER_TO_HAND" ? 2 : 1
@@ -601,4 +606,69 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
         preKO_donCount: 0,
       });
   });
+
+  it.each(["TRASH_CARD", "KO"] as const)(
+    "Shakuyaku observes its own effect %s to an open area",
+    (removal) => {
+      const f = fixture();
+      const target = f.put("OP08-046");
+      for (let i = 0; i < 5; i++) f.put(`hand${i}`, 1, "HAND");
+      const source = f.put("trash-source", 0, "CHARACTER", {
+        effectSchema: {
+          effects: [
+            {
+              id: "trash",
+              category: "activate",
+              trigger: { keyword: "ACTIVATE_MAIN" },
+              actions: [
+                {
+                  type: removal,
+                  target: {
+                    type: "CHARACTER",
+                    controller: "SELF",
+                    count: { exact: 1 },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      });
+      f.activate(source, "trash");
+      f.select([target.instanceId]);
+      f.select([f.state.players[1].hand[0].instanceId]);
+      f.done();
+      expect(f.state.players[1].hand).toHaveLength(4);
+      expect(
+        f.state.triggerRegistry.some(
+          (r) => r.sourceCardInstanceId === target.instanceId
+        )
+      ).toBe(false);
+    }
+  );
+  it.each([
+    ["OP07-038", 0, "LEADER", []],
+    ["OP13-078", 1, "STAGE", ["Roger Pirates"]],
+    ["OP09-080", 1, "STAGE", ["Straw Hat Crew"]],
+  ] as const)(
+    "%s does not confuse battle KO with effect removal",
+    (id, owner, zone, traits) => {
+      const f = fixture();
+      f.put(id, owner, zone, { type: zone === "STAGE" ? "Stage" : "Leader" });
+      const target = f.put("victim", 1, "CHARACTER", {
+        types: [...traits],
+        power: 1000,
+      });
+      target.state = "RESTED";
+      f.act({
+        type: "DECLARE_ATTACK",
+        attackerInstanceId: f.state.players[0].leader.instanceId,
+        targetInstanceId: target.instanceId,
+      });
+      f.act({ type: "PASS" }, 1);
+      f.act({ type: "PASS" }, 1);
+      f.done();
+      expect(f.state.players[owner].hand).toHaveLength(0);
+    }
+  );
 });

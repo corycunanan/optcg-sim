@@ -24,7 +24,7 @@ import {
   matchTriggersForEvent,
   orderMatchedTriggers,
   registerCardEnteredField,
-  deregisterTriggersForCard,
+  deregisterDepartedSources,
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { peekFrame as peekStackFrame, updateTopFrame as updateStackTopFrame } from "./effect-stack.js";
@@ -32,8 +32,6 @@ import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
 import {
-  expireSourceLeftZone,
-  expireTargetLeftZone,
   evaluateWhileConditions,
 } from "./duration-tracker.js";
 import { log } from "../lib/log.js";
@@ -230,7 +228,7 @@ function fireEventsAndTriggers(
   }
 
   // Deregister triggers for cards that left the field AFTER matching
-  state = deregisterLeftFieldTriggers(state, execResult);
+  state = deregisterDepartedSources(state, execResult.events);
 
   // Group triggers by controller — turn player resolves first (§8-6),
   // and within each group the player chooses the order.
@@ -452,49 +450,6 @@ function registerNewCardTriggers(
       }
     }
   }
-  return state;
-}
-
-/** Deregister triggers for cards that left the field (KO, bounce, trash, to-deck). */
-function deregisterLeftFieldTriggers(
-  state: GameState,
-  execResult: ExecuteResult,
-): GameState {
-  const cleanupInstance = (s: GameState, id: string): GameState => {
-    s = deregisterTriggersForCard(s, id);
-    s = expireSourceLeftZone(s, id);
-    // OPT-256: also strip the leaving instanceId from every effect/prohibition
-    // target list so fresh-instance invariants hold on re-summon.
-    s = expireTargetLeftZone(s, id);
-    return s;
-  };
-
-  for (const event of execResult.events) {
-    if (
-      event.type === "CARD_KO" ||
-      event.type === "CARD_RETURNED_TO_HAND" ||
-      event.type === "CARD_RETURNED_TO_DECK" ||
-      event.type === "CARD_ADDED_TO_LIFE"
-    ) {
-      const instanceId = event.payload?.cardInstanceId;
-      if (!instanceId) continue;
-      state = cleanupInstance(state, instanceId);
-    }
-
-    if (event.type === "CARD_TRASHED") {
-      const cardId = event.payload?.cardId;
-      if (cardId) {
-        for (const player of state.players) {
-          const trashed = player.trash.find((c) => c.cardId === cardId);
-          if (trashed) {
-            state = cleanupInstance(state, trashed.instanceId);
-            break;
-          }
-        }
-      }
-    }
-  }
-
   return state;
 }
 
