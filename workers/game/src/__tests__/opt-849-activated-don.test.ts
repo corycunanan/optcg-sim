@@ -143,6 +143,7 @@ describe("OPT-849 authored activated DON eligibility", () => {
             JSON.parse(JSON.stringify(result.state)),
             {
               type: "ARRANGE_TOP_CARDS",
+              keptCardInstanceId: "",
               orderedInstanceIds: originalDeck.slice(0, 5),
               destination: "bottom",
             },
