@@ -754,6 +754,14 @@ function validateAction(action: Action, prefix: string, firstInChain = false): s
   // Validate nested actions in PLAYER_CHOICE/OPPONENT_CHOICE
   if ((action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") && action.params?.options) {
     const options = action.params.options as Action[][];
+    const optionConditions = action.params.option_conditions;
+    if (optionConditions !== undefined && (
+      !Array.isArray(optionConditions) || !Array.isArray(options) || optionConditions.length !== options.length ||
+      optionConditions.some((condition) => !condition || typeof condition !== "object" || Array.isArray(condition))
+    )) {
+      errors.push(`${prefix}: 'option_conditions' must contain one condition object per option`);
+    }
+
     if (!Array.isArray(options)) {
       errors.push(`${prefix}: 'options' must be an array of action arrays`);
     } else {

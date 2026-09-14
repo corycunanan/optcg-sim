@@ -2211,7 +2211,7 @@ export const P_085_JEWELRY_BONNEY: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 4 },
           },
-          params: { face: "UP" },
+          params: { face: "UP", position: "TOP_OR_BOTTOM" },
         },
       ],
     },

@@ -863,6 +863,7 @@ export const OP02_030_ODEN: EffectSchema = {
         {
           type: "SEARCH_AND_PLAY",
           params: {
+            pick: { up_to: 1 },
             search_full_deck: true,
             filter: {
               color: "GREEN",
@@ -2255,6 +2256,7 @@ export const OP02_071_MAGELLAN: EffectSchema = {
       id: "don_return_buff",
       category: "auto",
       trigger: {
+        // Official OP02-071 FAQ includes opponent DON returned to opponent deck.
         event: "DON_RETURNED_TO_DON_DECK",
         turn_restriction: "YOUR_TURN",
         once_per_turn: true,

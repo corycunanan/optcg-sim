@@ -136,7 +136,7 @@ export const EB04_003_SMOKER_AND_TASHIGI: EffectSchema = {
         },
       ],
       zone: "FIELD",
-      duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "OPPONENT" }, { type: "SELF_STATE", required_state: "ACTIVE" }] } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };
@@ -1611,6 +1611,7 @@ export const EB04_035_HITOKIRI_KAMAZO: EffectSchema = {
       category: "auto",
       trigger: {
         event: "DON_RETURNED_TO_DON_DECK",
+        filter: { controller: "SELF" },
         turn_restriction: "YOUR_TURN",
         once_per_turn: true,
       },
@@ -1746,15 +1747,11 @@ export const EB04_038_ROSINANTE_AND_LAW: EffectSchema = {
       id: "on_play_draw_add_don",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
+      conditions: { type: "COMPARATIVE", metric: "DON_FIELD_COUNT", operator: "<=" },
       actions: [
         {
           type: "DRAW",
           params: { amount: 1 },
-          conditions: {
-            type: "COMPARATIVE",
-            metric: "DON_FIELD_COUNT",
-            operator: "<=",
-          },
         },
         {
           type: "ADD_DON_FROM_DECK",

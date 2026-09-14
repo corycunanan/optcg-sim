@@ -372,6 +372,15 @@ const PersistedGameStateV2 = z.strictObject({
   pendingPrompt: PendingPrompt.nullable(),
   promptRespondingPlayer: PlayerIndex.nullable().optional(),
   effectStack: z.array(StackFrameCore),
+  pendingEventActivationEvents: z.array(z.strictObject({
+    type: z.string(),
+    playerIndex: PlayerIndex.optional(),
+    payload: z.unknown().optional(),
+    propagation: z.strictObject({
+      triggerScanned: z.literal(true).optional(),
+      eventLogEmitted: z.literal(true).optional(),
+    }).optional(),
+  })).optional(),
   eventLog: z.array(z.unknown()),
   status: z.enum(["IN_PROGRESS", "FINISHED", "ABANDONED"]),
   winner: PlayerIndex.nullable(),
@@ -472,6 +481,8 @@ const EventPayloadSchemas = {
     targetInstanceId: z.string().optional(),
     newState: z.string().optional(),
     error: z.string().optional(),
+    cause: z.literal("EFFECT").optional(),
+    causingController: PlayerIndex.optional(),
   }),
   POWER_MODIFIED: z.strictObject({
     targetInstanceId: z.string(),

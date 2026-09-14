@@ -85,7 +85,7 @@ export const ST06_004_SMOKER: EffectSchema = {
       category: "permanent",
       source_text: "This Character cannot be K.O.'d by effects.",
       prohibitions: [
-        { type: "CANNOT_BE_KO", target: { type: "SELF" }, scope: { cause: "BY_OPPONENT_EFFECT" } },
+        { type: "CANNOT_BE_KO", target: { type: "SELF" }, scope: { cause: "EFFECT" } },
       ],
     },
     {

@@ -166,7 +166,10 @@ function evaluateSimple(
         state,
         cond.controller,
         ctx.controller
-      ).trash.filter((c) => !stagingIds.has(c.instanceId)).length;
+      ).trash.filter((c) =>
+        !stagingIds.has(c.instanceId) &&
+        (!cond.filter || matchesFilter(c, cond.filter, ctx.cardDb, state, undefined, undefined, ctx.controller, ctx.queries))
+      ).length;
       return compareNum(trashCount, cond.operator, cond.value);
     }
 

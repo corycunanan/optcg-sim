@@ -699,10 +699,6 @@ export const EB03_018_TASHIGI: EffectSchema = {
         {
           type: "CANNOT_BE_KO",
           scope: { cause: "BY_OPPONENT_EFFECT" },
-          conditions: {
-            type: "SELF_STATE",
-            required_state: "ACTIVE",
-          },
         },
       ],
       modifiers: [

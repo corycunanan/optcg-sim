@@ -27,3 +27,13 @@ Full `pnpm verify`, independent review and required CI remain pending. Work chec
 ## Follow-ups
 
 None newly required. EB01-051 remains excluded under OPT-798. Sanji's separate conditions remain outside this ticket and unchanged.
+
+## Landed-main integration (2026-09-13)
+
+Merged landed main `ff2217ceb3cb62850b393257ed684dfd829d65f7` normally into reviewed `e44f03efdfac601c58245847f97909e0b3f45dc4`, preserving delivered OPT805/806/808/809/810/811/812/814. Only generated registry and target snapshot conflicted. Regeneration proves the exact 2,472-card union: EB01-058/EB02-005 match the reviewed implementation; all 44 incoming changed cards match main. Eighty other incoming files are byte-identical to main. No production behavior was modified during integration.
+
+Relative to current main, the generated target snapshot adds only the two EB02-005 permanent modifier fallbacks, moving fallbackCount 558→560 and generatedCount 1981→1979. Total targets, instruction text and all incoming derivative changes remain intact, including OPT809 Teach's explicit target. The original OPT603 Cricket expectation correction and all Sanji coverage are preserved.
+
+Combined integration coverage passes 224 tests across 15 suites (`/private/tmp/opt813-main809-focused.log`): all 11 authored OPT813 cases and both OPT603 suites, OPT812 continuous/base-power and source/prohibition cases, OPT810 turn-power/cost cases, OPT805/809 Event and public-choice continuation, OPT806 eligibility and authored effects, OPT820 event propagation, and the target snapshot. Own/opponent entry, repeated turn transitions, Life/attached-DON boundaries, resting and real Jinbe/Luffy effect paths remain observable pipeline proof. No additional integration regression was needed; existing suites cover the unchanged interactions.
+
+Prior original independent specification/correctness/domain review and seven reproduced guard mutations remain evidence for unchanged implementation. Required full verification runs at the committed integration head; the final SHA/result and independent integration review belong in the prepared PR body. Earlier pending-check and merge-mode statements are historical. The user has explicitly approved publication after checks and coordinator non-frontend merges after all readiness gates; the implementer does not merge or write Linear. OPT798's EB01-051 exclusion and the run's separate OPT845–850 follow-ups are not imported into this scope.

@@ -202,7 +202,7 @@ describe("promptEffectDescription", () => {
       cardDb,
       new Map(),
       undefined,
-      {} as EffectResolverServices,
+      { publishCommittedEvents: (currentState) => currentState } as EffectResolverServices,
     );
 
     const prompt = result.pendingPrompt?.options;
