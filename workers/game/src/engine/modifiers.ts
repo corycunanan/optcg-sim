@@ -1,3 +1,4 @@
+import { cardHasName, cardNameAliases } from "../../../../shared/card-names.js";
 /**
  * Modifier Layer System
  *
@@ -21,6 +22,7 @@ import type {
 } from "./effect-types.js";
 import type { CardData as CardDataType } from "../types.js";
 import {
+  cardTreatsAsAll,
   evaluateCondition as evaluateConditionQuery,
   matchesFilter as matchesFilterQuery,
   type ConditionContext as QueryConditionContext,
@@ -1016,7 +1018,11 @@ function matchesOneTimeFilter(
       return false;
   }
   if (filter.name) {
-    if (cardData.name !== filter.name) return false;
+    if (!cardHasName({
+      name: cardData.name,
+      nameAliases: cardNameAliases(cardData.effectSchema),
+      treatsAsAllNames: cardTreatsAsAll(cardData, "names"),
+    }, filter.name)) return false;
   }
   if (filter.card_type) {
     const allowedTypes = Array.isArray(filter.card_type)
