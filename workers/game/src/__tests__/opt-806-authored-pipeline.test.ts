@@ -3,6 +3,7 @@ import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import {
@@ -98,6 +99,9 @@ function fixture() {
     select,
     accept,
     targets,
+    persist() {
+      state = parseStoredSession(JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" }))).state;
+    },
     get state() {
       return state;
     },
@@ -151,8 +155,11 @@ describe("OPT-806 authored card pipeline", () => {
     const second = f.put("cost6", 1);
     const discard = f.put(CARDS.VANILLA.id, 0, "HAND");
     f.act({ type: "PLAY_CARD", cardInstanceId: event.instanceId });
+    f.persist();
     f.select([first.instanceId]);
+    f.persist();
     f.select([discard.instanceId]);
+    f.persist();
     expect(f.state.players[0].trash).toHaveLength(15);
     expect(f.state.pendingPrompt).toBeNull();
     expect(

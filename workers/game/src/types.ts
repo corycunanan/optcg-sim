@@ -95,6 +95,8 @@ export interface GameState extends Omit<
   triggerRegistry: RuntimeRegisteredTrigger[];
   pendingPrompt: PendingPromptState | null;
   effectStack: EffectStackFrame[];
+  /** Root Event activation debt, scanned only after its complete effect chain. */
+  pendingEventActivationEvents?: PendingEvent[];
 }
 
 /** Alias for the shared PendingGameEvent — used throughout the engine. */

@@ -199,12 +199,16 @@ export const OP08_006_CHESSMARIMO: EffectSchema = {
       conditions: {
         all_of: [
           {
-            type: "CARD_ON_FIELD",
+            type: "TRASH_COUNT",
+            operator: ">=",
+            value: 1,
             controller: "SELF",
             filter: { name: "Kuromarimo" },
           },
           {
-            type: "CARD_ON_FIELD",
+            type: "TRASH_COUNT",
+            operator: ">=",
+            value: 1,
             controller: "SELF",
             filter: { name: "Chess" },
           },
@@ -217,22 +221,10 @@ export const OP08_006_CHESSMARIMO: EffectSchema = {
           params: { amount: 2000 },
         },
       ],
-      duration: { type: "WHILE_CONDITION", condition: { all_of: [{ type: "IS_MY_TURN", controller: "SELF" }, { type: "SELF_STATE", required_state: "ACTIVE" }] } },
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
   ],
 };
-
-// NOTE: OP08-006 says "in your trash" — re-encoding with correct zone check.
-// The condition checks trash, not field. Using CARD_TYPE_IN_ZONE would be more
-// appropriate but the names need specific checking. We'll encode with a comment
-// noting the trash zone check. The CARD_ON_FIELD type doesn't fit for trash;
-// however, the schema system doesn't have a "CARD_IN_TRASH" condition type.
-// We'll use the closest available approach.
-
-// Re-encode OP08-006 properly:
-// Actually looking at the conditions available, there's no "CARD_IN_ZONE" by name.
-// The card text says "in your trash" so this is checking the trash zone for named cards.
-// We need to note this is a limitation. Let's keep it encoded but mark the zone context.
 
 // ─── OP08-007 Tony Tony.Chopper ─────────────────────────────────────────────
 // [Your Turn] [On Play]/[When Attacking] Look at 5 cards from the top of your
@@ -715,10 +707,6 @@ export const OP08_020_DRUM_KINGDOM: EffectSchema = {
     {
       id: "opponent_turn_aura",
       category: "permanent",
-      conditions: {
-        type: "SELF_STATE",
-        required_state: "ACTIVE",
-      },
       modifiers: [
         {
           type: "MODIFY_POWER",
@@ -1588,11 +1576,29 @@ export const OP08_045_THATCH: EffectSchema = {
   card_type: "Character",
   effects: [
     {
+      id: "replacement_ko",
+      category: "replacement",
+      replaces: {
+        event: "WOULD_BE_KO",
+      },
+      replacement_actions: [
+        {
+          type: "TRASH_CARD",
+          target: { type: "SELF" },
+        },
+        {
+          type: "DRAW",
+          params: { amount: 1 },
+          chain: "THEN",
+        },
+      ],
+    },
+    {
       id: "replacement_removal",
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        cause_filter: { by: "ANY" },
+        cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
         {
@@ -4229,13 +4235,10 @@ export const OP08_118_SILVERS_RAYLEIGH: EffectSchema = {
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
-            count: { up_to: 2 },
-            dual_targets: [
-              { filter: {}, count: { up_to: 1 } },
-              { filter: {}, count: { up_to: 1 } },
-            ],
+            count: { up_to: 1 },
           },
           params: { amount: -3000 },
+          result_ref: "minus_3000",
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },
         },
         {
@@ -4244,6 +4247,7 @@ export const OP08_118_SILVERS_RAYLEIGH: EffectSchema = {
             type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
+            filter: { exclude_ref: "minus_3000" },
           },
           params: { amount: -2000 },
           duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_TURN" },

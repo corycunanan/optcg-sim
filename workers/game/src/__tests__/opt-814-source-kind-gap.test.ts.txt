@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+import type { CardInstance, GameAction } from "../types.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
+import { registerCardEnteredField, matchTriggersForEvent } from "../engine/triggers.js";
+import { getEffectiveBasePower } from "../engine/modifiers.js";
+import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+
+// Expectations: docs/cards/{EB-03,EB-04,PRB-02,UNKNOWN}.md and PRB02-004/006 FAQ.
+function fixture() {
+  const db = createTestCardDb();
+  for (const [id, cost] of [["EB03-018", 4], ["EB04-003", 8], ["EB04-035", 3], ["EB04-038", 3], ["P-085", 3], ["PRB02-004", 3], ["PRB02-006", 4], ["PRB02-009", 3], ["OP01-033", 3], ["OP01-054", 5], ["EB04-030", 8], ["OP10-036", 3], ["OP01-117", 2], ["OP01-118", 1], ["OP01-058", 2]] as const) {
+    const schema = getEffectSchema(id)!;
+    db.set(id, { ...CARDS.VANILLA, id, name: schema.card_name!, effectText: id === "OP01-117" ? "[Main] DON!! −1: Rest up to 1 of your opponent’s Characters with a cost of 6 or less." : id === "OP01-058" ? "[Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle. Then, rest up to 1 of your opponent’s Characters with a cost of 4 or less." : id === "OP01-118" ? "[Counter] DON!! −2: Up to 1 of your Leader or Character cards gains +2000 power during this battle. Then, draw 1 card." : "", cost, type: schema.card_type === "Event" ? "Event" : "Character", effectSchema: schema });
+  }
+  let state = createBattleReadyState(db);
+  state.players[0].characters = padChars([]);
+  state.players[1].characters = padChars([]);
+  function put(id: string, controller: 0 | 1, zone: CardInstance["zone"] = "CHARACTER") {
+    const c: CardInstance = { ...state.players[controller].leader, cardId: id, instanceId: `${id}-${controller}-${zone}`, controller, owner: controller, zone, state: "ACTIVE", attachedDon: [], turnPlayed: 0 };
+    if (zone === "HAND") state.players[controller].hand.push(c);
+    else { state.players[controller].characters[state.players[controller].characters.indexOf(null)] = c; state = registerCardEnteredField(state, c, db.get(id)!); }
+    return c;
+  }
+  function act(action: GameAction, player: 0 | 1 = state.turn.activePlayerIndex) {
+    if (state.pendingPrompt) {
+      const r = resumePromptLifecycle(state, action, db, { drainPregame:s=>s, advanceStartOfTurn:s=>s });
+      expect(r.responseRejected).not.toBe(true);
+      state = { ...r.state, pendingPrompt: r.state.pendingPrompt ?? null };
+    } else {
+      const r = runPipeline(state, action, db, player);
+      expect(r.valid, r.error).toBe(true);
+      state = { ...r.state, pendingPrompt: r.pendingPrompt ?? null };
+    }
+  }
+  const select = (ids: string[]) => act({ type: "SELECT_TARGET", selectedInstanceIds: ids });
+  const choose = (choiceId: string) => { const options=state.pendingPrompt?.options; const id=options?.promptType === "PLAYER_CHOICE" ? options.choices.find(c=>c.label===choiceId)?.id ?? choiceId : choiceId; act({ type: "PLAYER_CHOICE", choiceId:id }); };
+  function play(id: string) { const c = put(id, state.turn.activePlayerIndex, "HAND"); act({ type: "PLAY_CARD", cardInstanceId: c.instanceId }); return c; }
+  function leaderTypes(types: string[]) { db.set(CARDS.LEADER.id, { ...CARDS.LEADER, types }); }
+  return { db, put, act, select, choose, play, leaderTypes, get state() { return state; } };
+}
+
+  it("documented PRB02-006 source-kind gap: Sheep's Horn Event must not offer Zoro replacement",()=>{
+    const f=fixture();const zoro=f.put("PRB02-006",1);f.put(CARDS.VANILLA.id,1);
+    f.play("OP01-117");f.choose("accept");f.select([zoro.instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[1].characters.find(c=>c?.instanceId===zoro.instanceId)?.state).toBe("RESTED");
+  });

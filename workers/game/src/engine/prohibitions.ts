@@ -333,6 +333,8 @@ function matchesProhibition(
     }
 
     case "CANNOT_BE_RESTED": {
+      // Attacking and Blocker rest as a cost, never an opposing card effect.
+      if ((scope.cause && scope.cause !== "ANY") || scope.source_filter) return null;
       // OPT-250: attacking rests the source card, so a "cannot be rested"
       // prohibition transitively blocks the attack (qa_op13.md:73-87).
       if (action.type === "DECLARE_ATTACK") {
@@ -485,6 +487,12 @@ export function isProhibitedForCard(
   targetInstanceId: string,
   prohibitionType: ProhibitionType,
   cardDb: Map<string, CardData>,
+  restEffectContext?: {
+    cause?: "EFFECT" | "COST";
+    causingController: 0 | 1;
+    sourceCardInstanceId?: string;
+    sourceCardSnapshot?: CardInstance;
+  },
 ): boolean {
   const prohibitions = state.prohibitions;
 
@@ -492,6 +500,23 @@ export function isProhibitedForCard(
     if (p.prohibitionType !== prohibitionType) continue;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
     if (!isProhibitionConditionMet(p, state, cardDb)) continue;
+    // All production rest callers supply cost/effect provenance. A card's
+    // own costs and Event/Stage effects must not inherit protection printed
+    // only against opposing Leader/Character effects.
+    if (prohibitionType === "CANNOT_BE_RESTED" && restEffectContext) {
+      const target = findCardOnField(state, targetInstanceId);
+      if (!target) continue;
+      if (!scopeControllerMatches(p.controller, target.controller, p.scope?.controller)) continue;
+      if (!causeMatches(p.scope?.cause ?? "ANY", { ...restEffectContext, cause: restEffectContext.cause ?? "EFFECT" }, target.controller)) continue;
+      if (p.scope?.source_filter) {
+        if (restEffectContext.cause === "COST" || !restEffectContext.sourceCardInstanceId) continue;
+        const snapshot = restEffectContext.sourceCardSnapshot;
+        const source = findCardInState(state, restEffectContext.sourceCardInstanceId)?.card ??
+          (snapshot?.instanceId === restEffectContext.sourceCardInstanceId ? snapshot : undefined);
+        if (!source || !matchesFilter(source, p.scope.source_filter, cardDb, state)) continue;
+      }
+    }
+
 
     // Check if this prohibition applies to the target
     if (p.appliesTo && p.appliesTo.length > 0) {
@@ -729,7 +754,7 @@ function defaultCauseForType(type: ProhibitionType): string {
 
 function causeMatches(
   declaredCause: string,
-  context: RemovalContext,
+  context: { cause: "EFFECT" | "BATTLE" | "COST"; causingController: 0 | 1 },
   targetController: 0 | 1,
 ): boolean {
   switch (declaredCause) {

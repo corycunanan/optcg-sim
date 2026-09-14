@@ -2,7 +2,7 @@
 
 ## Scope and sources
 
-Recovered the interrupted four helper regressions unchanged in `27e6c8c`, then integrated main `15cad98bd139fc0d8cea075c809e4f8a7b45f507` in `0a23f5e8db850d135b3907a1fdb155088d8b12a2`. No sibling branch was imported. Implementation covers OP04-011, OP04-094, ST05-017 and ST06-004, their generated registry/tests, and narrowly scoped conditional branch support required by the independent review finding. Merge mode is off.
+Recovered the interrupted four helper regressions unchanged in `27e6c8c`, then integrated main `15cad98bd139fc0d8cea075c809e4f8a7b45f507` in `0a23f5e8db850d135b3907a1fdb155088d8b12a2`. No sibling branch was imported. Implementation covers OP04-011, OP04-094, ST05-017 and ST06-004, their generated registry/tests, and narrowly scoped conditional branch support required by the independent review finding. The user authorized coordinator merges for non-frontend PRs in this run and explicitly approved publication after checks on2026-09-13. Implementer never merges.
 
 Canonical sources read: `docs/cards/OP-04.md`, `ST-05.md`, `ST-06.md`; official rulings mirrored in `docs/FAQs/qa_op04.md`, `qa_st-05.md`, `qa_st-06.md`. Supported Comprehensive Rules v1.2.0: §2-7-3 (Event enters trash on activation), §7-1-3-2-2 (Counter Event), §7-1-4-1-2 (battle K.O.). Engine reference: `04-ACTIONS.md` APPLY_PROHIBITION, resolver result-reference handling, condition-query REVEALED_CARD_PROPERTY and `06-PROHIBITIONS-AND-REPLACEMENTS.md`.
 
@@ -32,7 +32,7 @@ No UI, protocol or database shape changes. Existing environment-dependent databa
 
 ## Follow-ups
 
-OP01-038 Kanjuro: its current On K.O. schema makes the opponent trash from their own hand, while printed text requires the opponent to choose from Kanjuro controller's hand. The reviewer's authored probe exposes that discrepancy; correcting it is outside OPT-806. Coordinator should deduplicate/create a separate follow-up.
+OP01-038 Kanjuro: its current On K.O. schema makes the opponent trash from their own hand, while printed text requires the opponent to choose from Kanjuro controller's hand. The reviewer's authored probe exposes that discrepancy; correcting it is outside OPT-806. Tracked separately in [OPT-848](https://linear.app/optcg-sim/issue/OPT-848/make-op01-038-kanjuros-opponent-choose-from-kanjuro-controllers-hand).
 
 The material Trueno double-K.O. finding is fixed within this ticket with coordinator-approved shared support; no new prerequisite is required. Ticket exclusions remain separate: OP03 damage triggers (OPT-796), battle/replacement references (OPT-797), mill and either-player cost primitives (OPT-798). The shared APPLY_PROHIBITION omitted-target behavior is unchanged and this card now uses its established explicit-target contract.
 
@@ -48,3 +48,16 @@ Recursive JSON traversal through every dictionary/list in the generated registry
 No canonical15→14 own-trash decrease triggered by an opponent K.O. was found in the authored trigger inventory: current K.O.-triggered trash-retrieval actions belong to the K.O.'d card's owner. This search is rung2, not a universal impossibility claim. Branch continuation pinning is separately executed by the contract test.
 
 Required full verification and independent delta review remain pending; final tested revision/results belong in the PR body. Publication was rejected twice by automatic approval review despite verified configured public repository ownership; no push succeeded and no bypass attempted.
+
+
+## Current-main integration (2026-09-13)
+
+Recovered reviewed020b5b331fb6bb6e02495d7e6cd85f1076f176d1 unchanged and merged main92808c7dad10bf875b0134623181b9a0d8b2bd42. The prior full gate and independent delta review were clean at020b5b3; historical pending statements above describe earlier checkpoints. Previous publication denials are resolved by the user's explicit approval to publish reviewed items after checks on2026-09-13; coordinator retains the non-frontend merge grant. No unmerged sibling branch imported.
+
+Only generated registry and target-count snapshot conflicted. Regenerated registry and decoded all2472 cards: every incoming main card is unchanged except OP04-011/OP04-094/ST05-017/ST06-004, each exactly equal to reviewed020b5b3. Current-main snapshot changes only generated1978→1980 and targets2536→2538; strings/fallback inventory unchanged. Recursive choice inventory remains exactly the committed45 nodes (44 legacy, Trueno only conditional), with no producer migration.
+
+Shared conditional-choice, schema validation and type contracts retain their reviewed implementation. Incoming805 Main/Counter activation publication and root event debt,812 source snapshots,810 original-instance paid-play scope and strict persisted-session reader all remain intact. No substantive source conflicts or new production support required. The Laboon/Trueno scenario now round-trips JSON through the strict parseStoredSession boundary before the K.O. response, between K.O. and Laboon discard, and after completion. It still ends at own trash15 with precisely one opponent K.O. and no residual prompt. This is strict saved-state parsing/resume evidence, not live Cloudflare hibernation.
+
+Combined15 suites pass272 tests (`/private/tmp/opt806-integrated-focused.log`):806's authored/recovered/conditional contracts, legacy730/732,805/810, three820 propagation suites and808/811/812/814. Snapshot19 tests pass. Reverting just Trueno to the old sequential actions fails1/18 against the integrated engine, detecting the extra cost6 prompt after the persisted Laboon discard; restored18/18 pass, recorded in `opt806-integrated-restored.log`, with mutation output in `opt806-integrated-sequential-mutation.log`.
+
+Renewed required pnpm verify will run at the committed integration head. Coordinator full-diff/integration review and independent delta review precede publication; final SHA/gate outcome belong in the PR body. Current CI/fresh feedback remain coordinator readiness gates. No database, UI or unrelated schema changes.
