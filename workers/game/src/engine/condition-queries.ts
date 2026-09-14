@@ -1,3 +1,4 @@
+import { cardNameAliases } from "../../../../shared/card-names.js";
 /**
  * M4 Condition Evaluator
  *
@@ -243,7 +244,8 @@ function evaluateSimple(
         );
       });
       // unique_names: count distinct card names (OP16-038 "5 Characters with
-      // different card names"), not card instances.
+      // different card names"), not card instances. OP16-034 FAQ: aliases
+      // affect eligibility above, never expand or merge printed-name identities.
       const matchCount = cond.filter?.unique_names
         ? new Set(
             matching.map((c) => ctx.cardDb.get(c.cardId)?.name ?? c.cardId)
@@ -262,7 +264,7 @@ function evaluateSimple(
       return cond.names.every((name) =>
         cards.some((c) => {
           const data = ctx.cardDb.get(c.cardId);
-          return data?.name === name || cardTreatsAsAll(data, "names");
+          return data && matchesFilter(c, { name }, ctx.cardDb, state);
         })
       );
     }
@@ -274,7 +276,7 @@ function evaluateSimple(
         const data = ctx.cardDb.get(c.cardId);
         if (!data) return false;
         const nameMatches =
-          data.name === cond.name || cardTreatsAsAll(data, "names");
+          matchesFilter(c, { name: cond.name }, ctx.cardDb, state);
         if (!nameMatches) return false;
         if (cond.property.power) {
           const power = ctx.queries.getEffectivePower(
@@ -359,11 +361,11 @@ function evaluateSimple(
       }
       if ("name" in prop) {
         if (cardTreatsAsAll(data, "names")) return true;
-        return data.name === prop.name;
+        return matchesFilter(p.leader, { name: prop.name }, ctx.cardDb, state);
       }
       if ("name_includes" in prop) {
         if (cardTreatsAsAll(data, "names")) return true;
-        return data.name.includes(prop.name_includes as string);
+        return matchesFilter(p.leader, { name_includes: prop.name_includes as string }, ctx.cardDb, state);
       }
       if ("multicolored" in prop) {
         const isMulti = data.color.length > 1;
@@ -1042,6 +1044,7 @@ function toSharedTargetFilterCard(
     colors: data.color,
     traits: data.types ?? [],
     name: data.name,
+    nameAliases: cardNameAliases(data.effectSchema),
     attributes: data.attribute ?? [],
     cardType: data.type,
     state: card.state,

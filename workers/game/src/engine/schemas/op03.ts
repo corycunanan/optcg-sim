@@ -4075,14 +4075,9 @@ export const OP03_122_SOGEKING: EffectSchema = {
   card_name: "Sogeking",
   card_type: "Character",
   rule_modifications: [
-    { rule_type: "NAME_ALIAS", aliases: ["Usopp"] } as never,
+    { rule_type: "NAME_ALIAS", aliases: ["Usopp"] },
   ],
   effects: [
-    {
-      id: "name_alias",
-      category: "rule_modification",
-      rule: { rule_type: "NAME_ALIAS", aliases: ["Usopp"] } as never,
-    },
     {
       id: "on_play_return_draw_trash",
       category: "auto",
