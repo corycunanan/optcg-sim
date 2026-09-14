@@ -10,7 +10,7 @@ Read first: `cost/named-play.ts`, `resume/cost.ts`, `cost/feasibility.ts` under 
 
 ## Necessary support and successor scope
 
-- OPT-845 absorbs Hotori's `TOP_OR_BOTTOM` schema row from OPT-807, since OPT-845 explicitly requires registered Hotori tests at both Life ends. OPT-807 retains its other six card rows.
+- OPT-845 absorbs Hotori's `TOP_OR_BOTTOM` schema row from OPT-807, since OPT-845 explicitly requires registered Hotori tests at both Life ends. OPT-807 retains its remaining schema corrections.
 - The zero-target scenario exposed Kotori using the candidate's controller to interpret `OPPONENT_LIFE_COUNT`, offering illegal K.O. targets against opponent Life 1. `computeAllValidTargets` now passes the effect controller through its filter wrapper; `condition-queries.ts` uses an explicit filter controller when available. Callers omitting context keep their old candidate-controller fallback. Numeric/static filters are unchanged.
 - A recursive registry walk finds one `PLAY_NAMED_CARD_FROM_HAND` consumer: `OP05-111.effects.0.costs.0`. The retained regression walks all nested objects, including choice branches. The accompanying JSON inventories all 19 authored `GAME_STATE` numeric filter uses (Life and DON!! families); target resolution now supplies context for these. The registered Katakuri hand target checks the non-Life, opponent-DON perspective without changing its schema.
 
@@ -37,9 +37,9 @@ The play event uses the existing effect-play convention `source: BY_EFFECT`, `so
 - Before edits: cost payability/type baseline 66/66 passed, `/private/tmp/opt845-baseline.log`.
 - Original registered Hotori pipeline regression failed before schema/engine repair, `/private/tmp/opt845-red.log`; no payment prompt appeared because the authored cost used `filter.name` while the handler expected `card_name`.
 - Expanded zero-target regression failed before filter-context repair, `/private/tmp/opt845-zero.log`; paused frame proved it was Kotori's K.O. prompt, not repeated Hotori activation.
-- Focused suite (28 new scenarios + 66 existing) and worker type check are rerun after final cleanup; results are recorded in `/private/tmp/opt845-focused-final.log` and `/private/tmp/opt845-types-final.log`.
+- After final cleanup, the focused suite passed 94/94 (28 new scenarios + 66 existing) and worker type checking passed; results are recorded in `/private/tmp/opt845-focused-final.log` and `/private/tmp/opt845-types-final.log`.
 - Decisive temporary mutations: fake named movement, removal of live-state eligibility guard, and restoration of candidate-controller dynamic lookup. Logs: `/private/tmp/opt845-mutation-{movement,live-guard,filter-context}.log`. Each mutation is restored before final checks. The initial stale test shared live/staged references and did not kill the live guard; serializing/restoring before changing live state makes the regression meaningful.
-- The first full `pnpm verify` stopped at a new test's missing `computeAllValidTargets` result-ref argument; fixed before final commit. Final full gate runs against the immutable implementation SHA, with results in the PR/coordinator receipt; no full-gate success is claimed here.
+- The first full `pnpm verify` stopped at a new test's missing `computeAllValidTargets` result-ref argument; fixed before the implementation commit. The immutable gate at `2c1a9c4fc470717b892e5f2cb2aac0546621a671` passed lint, both type checks, worker bundle, schema checks, app tests (2361 passed, 7 database tests skipped without TEST_DATABASE_URL), and pipeline tests (48 passed), then stopped during worker coverage with `ENOSPC`. Build was not reached. Log: `/private/tmp/opt845-verify-final.log`. Final full-gate success remains required and is not claimed here. This documentation-only follow-up changes no tested code.
 
 ## Follow-ups
 
