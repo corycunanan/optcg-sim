@@ -516,9 +516,11 @@ export const OP13_016_MONKEY_D_GARP: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       conditions: {
-        type: "LEADER_PROPERTY",
-        controller: "SELF",
-        property: { name: "Sabo" },
+        any_of: [
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { name: "Sabo" } },
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { name: "Portgas.D.Ace" } },
+          { type: "LEADER_PROPERTY", controller: "SELF", property: { name: "Monkey.D.Luffy" } },
+        ],
       },
       actions: [
         {

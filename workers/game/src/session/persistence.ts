@@ -641,6 +641,11 @@ function parseStoredGameState(raw: unknown): GameState {
   if (!hasValidPrompt(raw.pendingPrompt ?? null)) {
     throw new Error("Stored session state has an invalid prompt continuation");
   }
+  if (raw.pendingEventActivationEvents !== undefined &&
+      (!Array.isArray(raw.pendingEventActivationEvents) ||
+       !raw.pendingEventActivationEvents.every(isKnownPendingEvent))) {
+    throw new Error("Stored session contains an invalid pending Event activation");
+  }
   if (!Array.isArray(raw.eventLog) || !raw.eventLog.every(isKnownEvent)) {
     throw new Error("Stored session contains an unknown event variant");
   }

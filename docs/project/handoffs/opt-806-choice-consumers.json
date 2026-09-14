@@ -1,0 +1,227 @@
+[
+  {
+    "path": "EB01-052.effects.1.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "EB02-045.effects.1.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "EB02-051.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP03-028.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP03-096.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP04-040.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP04-043.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP04-082.effects.0.replacement_actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP04-094.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": true
+  },
+  {
+    "path": "OP05-096.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP05-096.effects.1.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP05-099.effects.0.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP06-021.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP06-039.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP06-065.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP06-092.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP06-093.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP06-116.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP07-097.effects.1.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP08-030.effects.1.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP08-049.effects.0.actions.1",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP08-057.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP09-084.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP11-050.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP12-060.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP13-035.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP14-062.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP14-069.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP14-104.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP15-054.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP15-055.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP15-059.effects.0.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP16-033.effects.0.replacement_actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP16-035.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP17-021.effects.0.replacement_actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP17-049.effects.0.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP17-099.effects.0.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP17-112.effects.1.actions.1",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "OP17-117.effects.1.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "ST07-010.effects.0.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "ST07-015.effects.0.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "ST11-003.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "ST12-006.effects.0.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "ST20-005.effects.0.actions.0",
+    "type": "OPPONENT_CHOICE",
+    "conditional": false
+  },
+  {
+    "path": "ST26-002.effects.1.actions.0",
+    "type": "PLAYER_CHOICE",
+    "conditional": false
+  }
+]

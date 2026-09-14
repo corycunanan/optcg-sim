@@ -1,17 +1,8 @@
 /**
- * OPT-238 — C3: Event cost-reduction once-per-turn semantics (OP01-062 Crocodile).
- *
- * Bandai ruling: OP01-062 Crocodile Leader's "when you play an Event" draw
- * trigger only fires when that Event's cost was reduced by an effect. It is
- * once per turn, and the slot re-arms only when the cost-reduction condition
- * is re-met — a full-cost play does NOT consume the trigger.
- *
- * Wiring verified here:
- *   • `EVENT_ACTIVATED_FROM_HAND` event payload now carries `costReducedAmount`
- *   • `EventFilter.cost_reduced` gates the trigger on that payload
- *   • Crocodile's trigger narrowly matches class 1 only (not class 2 from trash)
- *   • `don_requirement: 1` still gates registration activation
- *   • `flags.once_per_turn` blocks re-fire until the turn resets
+ * OPT-238 / OPT-805 — Crocodile Event activation classification.
+ * Corrected against OP01-062 printed text and FAQ: any own Event activation
+ * qualifies, subject to DON/hand/once-per-turn; no cost reduction is required.
+ * Authored pipeline coverage lives in opt-805-authored-fidelity.test.ts.
  */
 
 import { describe, it, expect } from "vitest";
@@ -34,7 +25,7 @@ function makeCrocodileLeaderCard(): CardData {
     life: 5,
     attribute: ["Special"],
     types: ["Baroque Works"],
-    effectText: "[DON!! x1] Once per turn, when you play an Event whose cost was reduced by an effect, you may draw 1 card if you have 4 or less cards in your hand.",
+    effectText: "[DON!! x1] When you activate an Event, you may draw 1 card if you have 4 or less cards in your hand and haven't drawn a card using this Leader's effect during this turn.",
     triggerText: null,
     keywords: { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false },
     effectSchema: OP01_062_CROCODILE,
@@ -96,7 +87,7 @@ function installCrocodile(
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", () => {
+describe("OPT-238 — Crocodile own Event activations", () => {
   it("fires when a SELF Event is activated from hand with costReducedAmount > 0", () => {
     const cardDb = createTestCardDb();
     const { state, crocLeader } = installCrocodile(cardDb);
@@ -112,7 +103,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(true);
   });
 
-  it("does NOT fire when the Event was played at full printed cost (costReducedAmount = 0)", () => {
+  it("fires when the Event was played at full printed cost (costReducedAmount = 0)", () => {
     const cardDb = createTestCardDb();
     const { state, crocLeader } = installCrocodile(cardDb);
 
@@ -124,15 +115,14 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     };
 
     const matched = matchTriggersForEvent(state, event, cardDb);
-    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(false);
+    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(true);
   });
 
-  it("does NOT fire when costReducedAmount is missing from the payload", () => {
+  it("fires when costReducedAmount is missing from the payload", () => {
     const cardDb = createTestCardDb();
     const { state, crocLeader } = installCrocodile(cardDb);
 
-    // Simulates a legacy emission that never populated the field; filter must
-    // fail-closed (treat undefined as no reduction).
+    // Legacy emissions do not need cost-reduction metadata for this Leader.
     const event: GameEvent = {
       type: "EVENT_ACTIVATED_FROM_HAND",
       playerIndex: 0,
@@ -141,7 +131,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     };
 
     const matched = matchTriggersForEvent(state, event, cardDb);
-    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(false);
+    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(true);
   });
 
   it("does NOT fire on opponent-activated Events (controller: SELF)", () => {
@@ -159,7 +149,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(false);
   });
 
-  it("does NOT fire on class-2 activations (EVENT_MAIN_RESOLVED_FROM_TRASH) — no cost paid", () => {
+  it("fires on class-2 activations (EVENT_MAIN_RESOLVED_FROM_TRASH)", () => {
     const cardDb = createTestCardDb();
     const { state, crocLeader } = installCrocodile(cardDb);
 
@@ -171,7 +161,7 @@ describe("OPT-238 — Crocodile fires only on cost-reduced Event activations", (
     };
 
     const matched = matchTriggersForEvent(state, event, cardDb);
-    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(false);
+    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(true);
   });
 
   it("does NOT fire when DON!!×1 is not attached to the Leader", () => {

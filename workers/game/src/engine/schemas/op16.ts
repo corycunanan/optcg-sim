@@ -25,7 +25,7 @@ export const OP16_001_PORTGAS_D_ACE: EffectSchema = {
             count: { up_to: 1 },
             filter: {
               any_of: [
-                { name: "Monkey.D.Luffy", power_min: 8000 },
+                { name: "Monkey.D.Luffy" },
                 { traits_contains: ["Whitebeard Pirates"], power_min: 8000 },
               ],
             },

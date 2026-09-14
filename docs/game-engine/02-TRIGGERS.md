@@ -306,9 +306,11 @@ Example:
 
 Bandai FAQs distinguish three activation paths that share the surface wording "an Event is activated":
 
-1. **`EVENT_ACTIVATED_FROM_HAND`** — normal play of an Event card from hand (pay cost, resolve [Main]).
-2. **`EVENT_MAIN_RESOLVED_FROM_TRASH`** — a Character activates the [Main] of an Event card from trash (OP12-041 Sanji, EB03-031 Reiju). Inline DON!! cost is paid; the Event's printed cost is skipped; the Event is trashed after.
+1. **`EVENT_ACTIVATED_FROM_HAND`** — activation of an Event card from hand (pay its printed cost, resolve [Main] or [Counter]). Character counters do not emit this class.
+2. **`EVENT_MAIN_RESOLVED_FROM_TRASH`** — a Character activates the [Main] of an Event card from trash (EB03-031 Reiju). The Character's inline cost is paid; the Event's printed cost is skipped; the Event remains in trash.
 3. **`EVENT_TRIGGER_RESOLVED`** — an Event card's [Trigger] effect resolves from Life.
+
+For root Main/Counter plays, committed activation events are published before the Event effect emits its own events, but activation watchers are scanned only after the complete Event effect resolves. A prompted Event retains private `pendingEventActivationEvents` trigger-scan debt in durable state; resume clears it before scanning, so a watcher prompt cannot replay it. Counter effects resolve directly before watcher ordering, just like Main effects (OPT-805).
 
 For "when your opponent activates an Event" rulings (Usopp, Page One, Lucy, Luffy, Crocodile Leader), Bandai clarifies that classes 1 and 2 count but class 3 does NOT. Cards subscribe to the exact set of classes they care about via a `CompoundTrigger`:
 
@@ -324,8 +326,7 @@ For "when your opponent activates an Event" rulings (Usopp, Page One, Lucy, Luff
 | Text Pattern | Subscribe to | Example Cards |
 |-------------|--------------|---------------|
 | "When your opponent activates an Event" | classes 1 + 2 | OP01-004 Usopp, OP06-044 Gion, OP04-053 Page One |
-| "When you activate an Event" | classes 1 + 2 | OP10-062 |
-| "When you play a cost-reduced Event" | class 1 only, with `cost_reduced: true` | OP01-062 Crocodile (Leader) |
+| "When you activate an Event" | classes 1 + 2 | OP01-062 Crocodile, OP10-062 |
 | "When your opponent activates an Event or [Trigger]" | classes 1 + 2 + `TRIGGER_ACTIVATED` | OP11-102 Camie |
 | "When your opponent activates an Event or [Blocker]" | classes 1 + 2 + `BLOCKER_ACTIVATED` | OP15-119 Monkey.D.Luffy |
 
@@ -356,7 +357,9 @@ Example — OP11-102 Camie (Event or any [Trigger]):
 }
 ```
 
-**`cost_reduced` filter (OPT-238).** `EVENT_ACTIVATED_FROM_HAND` carries `costReducedAmount: number` on its payload — the printed cost minus the actual paid cost, clamped at 0. Triggers that only want to fire when the Event's cost was reduced by an effect (OP01-062 Crocodile) use `filter: { cost_reduced: true }`. The filter is only meaningful on class 1: class 2 (from trash) skips cost entirely, so no reduction concept applies, and class 3 (from life) has no cost path at all. Effect-driven class-1 activation (`executeActivateEventFromHand`) emits `costReducedAmount: 0` because the cost-payment step is bypassed.
+**`cost_reduced` filter (OPT-238).** `EVENT_ACTIVATED_FROM_HAND` carries `costReducedAmount: number` on its payload — the printed cost minus the actual paid cost, clamped at 0. The generic `filter: { cost_reduced: true }` is reserved for an explicit printed cost-reduction restriction. OP01-062 Crocodile has no such restriction and does not use this filter (OPT-805). The filter is only meaningful on class 1: class 2 (from trash) skips cost entirely, so no reduction concept applies, and class 3 (from life) has no cost path at all. Effect-driven class-1 activation (`executeActivateEventFromHand`) emits `costReducedAmount: 0` because the cost-payment step is bypassed.
+
+Generic filter example (not Crocodile):
 
 ```json
 {
@@ -671,32 +674,21 @@ Example:
 
 ### CHARACTER_BECOMES_RESTED
 
-Fires when this Character transitions from active to rested state. Supports cause filtering for source-specific variants.
+Matches a field Character transition to rested, including attack/block declarations, costs, and effects. It is **not implicitly host-scoped**. Use `filter.target: "SELF"` for “this Character”; omit it for a watcher of other Characters.
 
 ```typescript
 {
   event: "CHARACTER_BECOMES_RESTED",
-  filter?: {
-    cause?: EventCause   // "BY_OPPONENT_EFFECT", "BY_CHARACTER_EFFECT", "ANY"
+  filter: {
+    target: "SELF",
+    cause: "BY_OPPONENT_EFFECT"
   }
 }
 ```
 
-| Text Pattern | Example Cards |
-|-------------|---------------|
-| "When this Character becomes rested" | OP14-119 Dracule Mihawk |
-| "When this Character becomes rested by your opponent's Character's effect" | OP14-070 Buffalo |
+PRB02-009 Mr.3(Galdino) uses this host-scoped form. Effect-rest events carry `cause: "EFFECT"` and `causingController`, including continuation after a replacement is declined. Declaration/cost rests do not carry effect provenance. Active-state changes and non-Character subjects never match.
 
-Example — OP14-070 Buffalo:
-
-```json
-{
-  "trigger": {
-    "event": "CHARACTER_BECOMES_RESTED",
-    "filter": { "cause": "BY_OPPONENT_EFFECT" }
-  }
-}
-```
+Current supported provenance matching is deliberately limited to explicitly host-scoped rest triggers (`target: "SELF"`): `BY_EFFECT`, `BY_YOUR_EFFECT`, `BY_OPPONENT_EFFECT`, or `ANY`. `BY_CHARACTER_EFFECT` is unsupported. Existing unscoped cause filters retain their prior behavior pending source-kind support; OPT-814 does not activate OP14-070 Buffalo with an incomplete “opponent's Character's effect” check. OP07-031 Bartolomeo and OP10-036 Perona also remain unscoped cause-filter consumers awaiting their own execution correction. Other unscoped rest watchers continue to observe Character rest transitions.
 
 ---
 

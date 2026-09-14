@@ -142,7 +142,7 @@ export function payCosts(
         if (cost.target?.type === "YOUR_LEADER") {
           const leader = nextState.players[controller].leader;
           if (leader.state !== "ACTIVE") return null;
-          if (isProhibitedForCard(nextState, leader.instanceId, "CANNOT_BE_RESTED", _cardDb)) {
+          if (isProhibitedForCard(nextState, leader.instanceId, "CANNOT_BE_RESTED", _cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) {
             return null;
           }
           nextState = setCardState(nextState, leader.instanceId, "RESTED");
@@ -162,7 +162,7 @@ export function payCosts(
         if (!source || source.state !== "ACTIVE") return null;
         // OPT-250: if the source is under CANNOT_BE_RESTED, the cost cannot
         // be paid — the entire effect fails (qa_op13.md:77-79).
-        if (isProhibitedForCard(nextState, sourceCardInstanceId, "CANNOT_BE_RESTED", _cardDb)) {
+        if (isProhibitedForCard(nextState, sourceCardInstanceId, "CANNOT_BE_RESTED", _cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) {
           return null;
         }
         nextState = setCardState(nextState, sourceCardInstanceId, "RESTED");
@@ -260,7 +260,7 @@ export function payCosts(
         const p = nextState.players[controller];
         // Find face-down life cards (from top)
         const faceDownIndices: number[] = [];
-        for (let i = 0; i < p.life.length && faceDownIndices.length < amount; i++) {
+        for (let i = 0; i < (cost.position === "TOP" ? Math.min(amount, p.life.length) : p.life.length) && faceDownIndices.length < amount; i++) {
           if (p.life[i].face === "DOWN") faceDownIndices.push(i);
         }
         if (faceDownIndices.length < amount) return null;
@@ -280,7 +280,7 @@ export function payCosts(
         const p = nextState.players[controller];
         // Find face-up life cards
         const faceUpIndices: number[] = [];
-        for (let i = 0; i < p.life.length && faceUpIndices.length < amount; i++) {
+        for (let i = 0; i < (cost.position === "TOP" ? Math.min(amount, p.life.length) : p.life.length) && faceUpIndices.length < amount; i++) {
           if (p.life[i].face === "UP") faceUpIndices.push(i);
         }
         if (faceUpIndices.length < amount) return null;

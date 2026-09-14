@@ -1,19 +1,8 @@
 /**
- * OPT-244 — D6: [On Your Opponent's Attack] declined → per-card lockout.
- *
- * Bandai ruling (PRB02-004 Jewelry Bonney): declining a [Once Per Turn] optional
- * trigger is irreversible for that card for the turn. A later opponent attack in
- * the same turn must NOT re-prompt the Bonney that already passed — but a *second*
- * Bonney (different instance) still gets its own prompt on that later attack.
- *
- * Wiring verified here:
- *   • `EffectFlags.lock_on_decline` exists and is set on PRB02-004's auto block
- *   • Dispatch gate (`matchTriggersForEvent`) filters a source whose (effectBlockId,
- *     instanceId) is already in `turn.oncePerTurnUsed`
- *   • `resumeFromStack` on AWAITING_OPTIONAL_RESPONSE + PASS marks the declined
- *     block/instance into `oncePerTurnUsed` when `lock_on_decline` is set
- *   • Blocks *without* `lock_on_decline` do NOT mark on decline (default behavior)
- *   • Locks clear between turns via `oncePerTurnUsed` reset
+ * OPT-244 / OPT-814 — per-card once-per-turn lockout.
+ * PRB02-004 FAQ: its auto activates mandatorily on the first opponent attack;
+ * choosing zero DON still consumes it. It has no optional activation/decline.
+ * Generic optional-effect decline behavior remains covered separately below.
  */
 
 import { describe, it, expect } from "vitest";
@@ -110,21 +99,21 @@ function attackEvent(): GameEvent {
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("OPT-244 — [On Opp Attack] per-card lockout on decline", () => {
-  it("PRB02-004 auto block carries lock_on_decline alongside once_per_turn + optional", () => {
+describe("OPT-244 — [On Opp Attack] per-card once-per-turn lockout", () => {
+  it("PRB02-004 is once-per-turn with mandatory activation and no decline flag", () => {
     const block = PRB02_004_JEWELRY_BONNEY.effects.find(
       (e) => e.id === "on_opponent_attack_set_don_active",
     ) as EffectBlock;
     expect(block.flags?.once_per_turn).toBe(true);
-    expect(block.flags?.optional).toBe(true);
-    expect(block.flags?.lock_on_decline).toBe(true);
+    expect(block.flags?.optional).toBeUndefined();
+    expect(block.flags?.lock_on_decline).toBeUndefined();
   });
 
   it("dispatch gate: a Bonney already in oncePerTurnUsed is filtered out on the next ATTACK_DECLARED", () => {
     const cardDb = createTestCardDb();
     const { state, bonney } = installBonneyOnDefender(cardDb);
 
-    // Pre-seed the bag as though the player had declined (or accepted) earlier.
+    // Pre-seed the bag as though the mandatory auto had activated earlier.
     const locked: GameState = {
       ...state,
       turn: {
@@ -184,7 +173,7 @@ describe("OPT-244 — [On Opp Attack] per-card lockout on decline", () => {
     expect(ids).toContain(b2.instanceId);
   });
 
-  it("end-to-end: declining Bonney marks oncePerTurnUsed, so a second attack does not re-prompt", () => {
+  it("resolution and dispatch: choosing zero with Bonney consumes once-per-turn", () => {
     const cardDb = createTestCardDb();
     const { state, bonney } = installBonneyOnDefender(cardDb);
 
@@ -192,20 +181,20 @@ describe("OPT-244 — [On Opp Attack] per-card lockout on decline", () => {
       (e) => e.id === "on_opponent_attack_set_don_active",
     ) as EffectBlock;
 
-    // Sanity: the first attack matches Bonney before any decline.
+    // The first attack matches before activation.
     expect(
       matchTriggersForEvent(state, attackEvent(), cardDb)
         .some((m) => m.trigger.sourceCardInstanceId === bonney.instanceId),
     ).toBe(true);
 
-    // Push the optional prompt onto the stack.
+    // Mandatory activation directly asks the up-to quantity.
     const prompted = resolveEffect(state, block, bonney.instanceId, 1, cardDb);
-    expect(prompted.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect(prompted.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
     expect(prompted.state.effectStack.length).toBe(1);
 
-    // Decline via PASS.
+    // Choose zero under rule1-3-5-1.
     const postState = { ...prompted.state, pendingPrompt: null };
-    const declined = resumeFromStack(postState, { type: "PASS" }, cardDb);
+    const declined = resumeFromStack(postState, { type: "PLAYER_CHOICE", choiceId: "choose-value:0" }, cardDb);
 
     // oncePerTurnUsed must now contain this Bonney against her block id.
     const usedSet = declined.state.turn.oncePerTurnUsed.on_opponent_attack_set_don_active;
@@ -223,7 +212,7 @@ describe("OPT-244 — [On Opp Attack] per-card lockout on decline", () => {
     const cardDb = createTestCardDb();
     const { state, bonney } = installBonneyOnDefender(cardDb);
 
-    // Synthetic variant of Bonney's block with the lock flag stripped.
+    // Synthetic optional block exercises the default decline contract.
     const unlockedBlock: EffectBlock = {
       id: "opt244-no-lock-on-decline",
       category: "auto",
@@ -247,7 +236,7 @@ describe("OPT-244 — [On Opp Attack] per-card lockout on decline", () => {
     const cardDb = createTestCardDb();
     const { state, bonney } = installBonneyOnDefender(cardDb);
 
-    // Simulate: Bonney declined this turn, then the turn rolled over.
+    // Simulate: Bonney activated this turn, then the turn rolled over.
     const rolled: GameState = {
       ...state,
       turn: {
