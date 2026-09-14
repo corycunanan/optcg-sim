@@ -12,6 +12,7 @@ import {
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
 import { continueEffectDamageSequence } from "../../effect-damage.js";
+import { lifeToHandDestination } from "../../life-destination.js";
 import { transitionCard } from "../../zone-transition.js";
 import { resolveAmount } from "../action-utils.js";
 
@@ -153,7 +154,10 @@ export function executeSelfTakeDamage(
     if (player.life.length === 0) break;
 
     const lifeCard = player.life[0];
-    const moved = transitionCard(nextState, lifeCard.instanceId, "HAND");
+    const destination = lifeToHandDestination(nextState, controller, lifeCard, cardDb);
+    const moved = transitionCard(nextState, lifeCard.instanceId,
+      destination === "DECK_BOTTOM" ? "DECK" : destination,
+      { position: destination === "TRASH" ? "TOP" : "BOTTOM" });
     if (!moved) break;
     nextState = moved.state;
     dealt++;
