@@ -2093,7 +2093,7 @@ export const OP08_058_CHARLOTTE_PUDDING: EffectSchema = {
       id: "when_attacking_add_don",
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 2 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 2, position: "TOP" }],
       flags: { optional: true },
       actions: [
         {
@@ -2276,7 +2276,7 @@ export const OP08_063_CHARLOTTE_KATAKURI: EffectSchema = {
       id: "on_play_add_don",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1, position: "TOP" }],
       flags: { optional: true },
       actions: [
         {
