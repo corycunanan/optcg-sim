@@ -53,7 +53,7 @@ export function applyCostSelection(
         const preKO_basePower = data && cardDb ? getEffectiveBasePower(source, data, state, cardDb) : undefined;
         return cost.type === "KO_OWN_CHARACTER"
           ? { type: "CARD_KO", playerIndex: fact.owner, payload: { ...provenance, cause: "EFFECT", preKO_donCount: fact.detachedDonInstanceIds.length, ...(preKO_basePower !== undefined ? { preKO_basePower } : {}) } }
-          : { type: "CARD_TRASHED", playerIndex: fact.owner, payload: { ...provenance, reason: "cost" } };
+          : { type: "CARD_TRASHED", playerIndex: fact.owner, payload: { ...provenance, reason: "cost", count: 1, from: "CHARACTER" } };
       });
       return { state: moved.state, events };
     }

@@ -591,6 +591,10 @@ describe("OPT-794 removal watchers through authored pipeline", () => {
     );
     expect(event).toBeDefined();
     expect(hasValidEventPayload(event!.type, event!.payload)).toBe(true);
+    if (type === "TRASH_OWN_CHARACTER")
+      expect(
+        f.state.eventLog.filter((e) => e.type === "CARD_TRASHED")
+      ).toHaveLength(1);
     if (type === "KO_OWN_CHARACTER")
       expect(event?.payload).toMatchObject({
         preKO_basePower: 6000,

@@ -33,7 +33,7 @@ Recursive object walk of generated AUTHORED_SCHEMAS (including nested actions/an
 - Exact Slave Arrow FAQ red before cost-bounce fix, then green (`opt794-slave-red.log`, `opt794-cost-green.log`).
 - Current pipeline: 39 passed (`opt794-cost-matrix.log`); matcher: 25 cases; four focused files previously green, rerunning final combined checks.
 - Mutation experiments removed Character type, source zone, and effect controller guards individually; all red, original file restored (`opt794-mutation-*.log`). These are implementer rung-4 results, reviewers must rerun before treating claims as independently proven.
-- First full verify found two legacy assertions encoding the bug (Stage-as-Character and secret-zone Buggy suppression); corrected. Next verify passed lint/type/schema/bundle/app/pipeline/worker coverage and reached build, which failed Google Fonts DNS in sandbox. Final elevated verify pending after latest cost additions. Database suites skip without TEST_DATABASE_URL; this engine ticket does not require database mutation.
+- First full verify found two legacy assertions encoding the bug (Stage-as-Character and secret-zone Buggy suppression); corrected. Next verify passed lint/type/schema/bundle/app/pipeline/worker coverage and reached build, which failed Google Fonts DNS in sandbox. Final elevated verify found the old aggregate Character-trash event duplicated the new identity event; corrected to one count:1 identity event per Character, and focused 77 tests pass. Final gate rerun pending. Database suites skip without TEST_DATABASE_URL; this engine ticket does not require database mutation.
 
 ## Follow-ups / next ticket
 
