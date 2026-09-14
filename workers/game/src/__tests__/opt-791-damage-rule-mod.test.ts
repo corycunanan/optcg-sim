@@ -154,7 +154,7 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
       );
       r = runPipeline(
         r.state,
-        { type: "REVEAL_TRIGGER", activate: false },
+        { type: "REVEAL_TRIGGER", reveal: false },
         db,
         1
       );
@@ -186,12 +186,7 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
     expect(r.state.turn.pendingTriggerFromEffect?.lifeCard.instanceId).toBe(
       "life-0"
     );
-    r = runPipeline(
-      r.state,
-      { type: "REVEAL_TRIGGER", activate: false },
-      db,
-      1
-    );
+    r = runPipeline(r.state, { type: "REVEAL_TRIGGER", reveal: false }, db, 1);
     expect(r.valid).toBe(true);
     expect(r.state.players[1].hand).toHaveLength(
       state.players[1].hand.length + 1
@@ -215,7 +210,12 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
       expect(r.state.turn.battle?.pendingTriggerLifeCard?.instanceId).toBe(
         "life-0"
       );
-      r = runPipeline(r.state, { type: "REVEAL_TRIGGER", activate }, db, 1);
+      r = runPipeline(
+        r.state,
+        { type: "REVEAL_TRIGGER", reveal: activate },
+        db,
+        1
+      );
       expect(r.valid).toBe(true);
       expect(r.state.players[1].life).toHaveLength(0);
       expect(r.state.players[1].deck.at(-1)?.cardId).toBe(CARDS.TRIGGER.id);
@@ -225,7 +225,16 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
       ).toHaveLength(2);
       expect(
         r.state.eventLog.filter((e) => e.type === "TRIGGER_ACTIVATED")
-      ).toHaveLength(1);
+      ).toHaveLength(activate ? 2 : 1);
+      // The existing log emits on the offer and again on acceptance.
+      expect(
+        r.state.players[1].trash.some(
+          (card) => card.cardId === CARDS.TRIGGER.id
+        )
+      ).toBe(activate);
+      expect(r.state.players[1].deck).toHaveLength(
+        state.players[1].deck.length + (activate ? 0 : 1)
+      );
     }
   );
 
