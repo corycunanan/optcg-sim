@@ -19,6 +19,8 @@ export interface BlockerProhibition {
   appliesTo?: readonly string[];
   target?: BlockerProhibitionTarget;
   scope?: {
+    cause?: string;
+    source_filter?: SharedTargetFilter;
     controller?: string;
     filter?: SharedTargetFilter;
   };
@@ -140,6 +142,13 @@ export function isBlockerProhibited(
     ) {
       continue;
     }
+
+    // Blocker's rest is an activation cost, not an opponent's effect.
+    if (
+      prohibition.prohibitionType === "CANNOT_BE_RESTED" &&
+      ((prohibition.scope?.cause && prohibition.scope.cause !== "ANY") ||
+        prohibition.scope?.source_filter)
+    ) continue;
 
     if (prohibition.prohibitionType === "CANNOT_USE_BLOCKER") {
       if (

@@ -13,6 +13,7 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "LIFE_TO_HAND":
     case "TRASH_FROM_LIFE":
       return cost.position === "TOP_OR_BOTTOM";
+    case "PLAY_NAMED_CARD_FROM_HAND":
     case "TRASH_FROM_HAND":
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
     case "KO_OWN_CHARACTER":
@@ -34,7 +35,6 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "VARIABLE_DON_RETURN":
     case "REST_SELF":
     case "TRASH_SELF":
-    case "PLAY_NAMED_CARD_FROM_HAND":
     case "PLACE_SELF_TO_DECK":
     case "PLACE_STAGE_TO_DECK":
     case "TRASH_OWN_STAGE":
@@ -138,7 +138,7 @@ export function isCostPayable(
       if (cost.target?.type === "YOUR_LEADER") {
         const leader = player.leader;
         if (leader.state !== "ACTIVE") return false;
-        return !isProhibitedForCard(state, leader.instanceId, "CANNOT_BE_RESTED", cardDb);
+        return !isProhibitedForCard(state, leader.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId });
       }
       // OPT-250: a source under CANNOT_BE_RESTED can't pay this cost
       // (qa_op13.md:77-79 — [Activate: Main] rest-self effects are gated).
@@ -148,7 +148,7 @@ export function isCostPayable(
         : player.characters.find((card) => card?.instanceId === sourceCardInstanceId)
           ?? (player.stage?.instanceId === sourceCardInstanceId ? player.stage : null);
       if (!source || source.state !== "ACTIVE") return false;
-      if (isProhibitedForCard(state, sourceCardInstanceId, "CANNOT_BE_RESTED", cardDb)) return false;
+      if (isProhibitedForCard(state, sourceCardInstanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) return false;
       return true;
     }
 
@@ -176,12 +176,14 @@ export function isCostPayable(
 
     case "TURN_LIFE_FACE_UP": {
       const amt = resolveAmount(cost);
-      return player.life.filter((l) => l.face === "DOWN").length >= amt;
+      const candidates = cost.position === "TOP" ? player.life.slice(0, amt) : player.life;
+      return candidates.filter((l) => l.face === "DOWN").length >= amt;
     }
 
     case "TURN_LIFE_FACE_DOWN": {
       const amt = resolveAmount(cost);
-      return player.life.filter((l) => l.face === "UP").length >= amt;
+      const candidates = cost.position === "TOP" ? player.life.slice(0, amt) : player.life;
+      return candidates.filter((l) => l.face === "UP").length >= amt;
     }
 
     case "LEADER_POWER_REDUCTION":
@@ -216,15 +218,6 @@ export function isCostPayable(
       return false;
     }
 
-    case "PLAY_NAMED_CARD_FROM_HAND": {
-      const cardName = cost.card_name;
-      if (!cardName) return false;
-      return player.hand.some((c) => {
-        const data = cardDb.get(c.cardId);
-        return data && data.name === cardName;
-      });
-    }
-
     case "TRASH_FROM_HAND":
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
     case "PLACE_HAND_TO_DECK":
@@ -236,6 +229,7 @@ export function isCostPayable(
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE":
+    case "PLAY_NAMED_CARD_FROM_HAND":
     case "PLACE_FROM_TRASH_TO_DECK":
       return true;
     default:

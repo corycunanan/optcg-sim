@@ -3,6 +3,7 @@ import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
+import { namedPlayCandidates } from "./named-play.js";
 import { isPresent } from "../../type-guards.js";
 
 /** Resolve a simple cost's numeric amount with a deterministic fallback. */
@@ -48,6 +49,8 @@ export function computeCostTargets(
       : ids;
 
   switch (cost.type) {
+    case "PLAY_NAMED_CARD_FROM_HAND":
+      return namedPlayCandidates(state, cost, controller, cardDb);
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": {
       const candidates = [
         ...player.hand,
@@ -114,7 +117,7 @@ export function computeCostTargets(
       const candidates = getRestCostCandidates(player, cost.filter);
       return candidates
         .filter((c) => c.state === "ACTIVE")
-        .filter((c) => !isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb))
+        .filter((c) => !isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId }))
         .filter((c) => !cost.filter || matchesFilter(c, cost.filter, cardDb, state, undefined, undefined, controller))
         .map((c) => c.instanceId);
     }
@@ -125,7 +128,7 @@ export function computeCostTargets(
       // Include matching active characters
       for (const c of player.characters) {
         if (!c || c.state !== "ACTIVE") continue;
-        if (isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb)) continue;
+        if (isProhibitedForCard(state, c.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) continue;
         if (nameFilter) {
           const data = cardDb.get(c.cardId);
           if (!data || data.name !== nameFilter) continue;
@@ -134,7 +137,7 @@ export function computeCostTargets(
       }
       // Include leader if active and matches name filter
       if (player.leader.state === "ACTIVE" &&
-          !isProhibitedForCard(state, player.leader.instanceId, "CANNOT_BE_RESTED", cardDb)) {
+          !isProhibitedForCard(state, player.leader.instanceId, "CANNOT_BE_RESTED", cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) {
         if (nameFilter) {
           const leaderData = cardDb.get(player.leader.cardId);
           if (leaderData && leaderData.name === nameFilter) {
@@ -173,6 +176,7 @@ export function getCostCards(
         ...(player.stage && targetSet.has(player.stage.instanceId) ? [player.stage] : []),
       ];
 
+    case "PLAY_NAMED_CARD_FROM_HAND":
     case "TRASH_FROM_HAND":
     case "PLACE_HAND_TO_DECK":
     case "REVEAL_FROM_HAND":

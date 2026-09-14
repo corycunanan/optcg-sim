@@ -25,6 +25,7 @@ export function terminateForEngineLimit(
     engineOutcome: { type: "INFINITE_LOOP_DRAW", diagnostic },
     pendingPrompt: null,
     effectStack: [],
+    pendingEventActivationEvents: undefined,
     turn: {
       ...state.turn,
       battle: null,
@@ -56,6 +57,7 @@ export function terminateForEngineContract(
     engineOutcome: { type: "ENGINE_ERROR_DRAW", diagnostic },
     pendingPrompt: null,
     effectStack: [],
+    pendingEventActivationEvents: undefined,
     turn: {
       ...state.turn,
       battle: null,

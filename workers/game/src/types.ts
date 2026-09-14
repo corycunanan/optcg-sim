@@ -95,6 +95,8 @@ export interface GameState extends Omit<
   triggerRegistry: RuntimeRegisteredTrigger[];
   pendingPrompt: PendingPromptState | null;
   effectStack: EffectStackFrame[];
+  /** Root Event activation debt, scanned only after its complete effect chain. */
+  pendingEventActivationEvents?: PendingEvent[];
 }
 
 /** Alias for the shared PendingGameEvent — used throughout the engine. */
@@ -307,6 +309,8 @@ export interface EffectStackFrame {
   // Guards against arrange packets arriving during the select stage, where
   // validTargets still holds every candidate.
   costArrangeStage?: boolean;
+  // Hand identity locked while the controller chooses the rule-trash victim.
+  namedPlayCostTargetId?: string;
 }
 
 export interface QueuedTrigger {

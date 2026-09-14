@@ -8,6 +8,7 @@ import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { computeCostTargets } from "./targets.js";
+import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 
 /**
@@ -142,7 +143,7 @@ export function payCosts(
         if (cost.target?.type === "YOUR_LEADER") {
           const leader = nextState.players[controller].leader;
           if (leader.state !== "ACTIVE") return null;
-          if (isProhibitedForCard(nextState, leader.instanceId, "CANNOT_BE_RESTED", _cardDb)) {
+          if (isProhibitedForCard(nextState, leader.instanceId, "CANNOT_BE_RESTED", _cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) {
             return null;
           }
           nextState = setCardState(nextState, leader.instanceId, "RESTED");
@@ -162,7 +163,7 @@ export function payCosts(
         if (!source || source.state !== "ACTIVE") return null;
         // OPT-250: if the source is under CANNOT_BE_RESTED, the cost cannot
         // be paid — the entire effect fails (qa_op13.md:77-79).
-        if (isProhibitedForCard(nextState, sourceCardInstanceId, "CANNOT_BE_RESTED", _cardDb)) {
+        if (isProhibitedForCard(nextState, sourceCardInstanceId, "CANNOT_BE_RESTED", _cardDb, { cause: "COST", causingController: controller, sourceCardInstanceId })) {
           return null;
         }
         nextState = setCardState(nextState, sourceCardInstanceId, "RESTED");
@@ -260,7 +261,7 @@ export function payCosts(
         const p = nextState.players[controller];
         // Find face-down life cards (from top)
         const faceDownIndices: number[] = [];
-        for (let i = 0; i < p.life.length && faceDownIndices.length < amount; i++) {
+        for (let i = 0; i < (cost.position === "TOP" ? Math.min(amount, p.life.length) : p.life.length) && faceDownIndices.length < amount; i++) {
           if (p.life[i].face === "DOWN") faceDownIndices.push(i);
         }
         if (faceDownIndices.length < amount) return null;
@@ -280,7 +281,7 @@ export function payCosts(
         const p = nextState.players[controller];
         // Find face-up life cards
         const faceUpIndices: number[] = [];
-        for (let i = 0; i < p.life.length && faceUpIndices.length < amount; i++) {
+        for (let i = 0; i < (cost.position === "TOP" ? Math.min(amount, p.life.length) : p.life.length) && faceUpIndices.length < amount; i++) {
           if (p.life[i].face === "UP") faceUpIndices.push(i);
         }
         if (faceUpIndices.length < amount) return null;
@@ -499,16 +500,15 @@ export function payCosts(
       }
 
       case "PLAY_NAMED_CARD_FROM_HAND": {
-        // Play a specific named card from hand as part of the cost
-        const p = nextState.players[controller];
-        const cardName = cost.card_name;
-        if (!cardName) return null;
-        const handIdx = p.hand.findIndex((c) => {
-          const data = _cardDb.get(c.cardId);
-          return data && data.name === cardName;
-        });
-        if (handIdx === -1) return null;
-        // Card will be played by the action chain — just verify it exists
+        // Synchronous callers cannot choose a card or rule-trash victim.
+        // Pay only an unambiguous single-card payment; never report presence
+        // alone as successful payment.
+        const candidates = namedPlayCandidates(nextState, cost, controller, _cardDb);
+        if (candidates.length !== 1) return null;
+        const paid = payNamedPlay(nextState, cost, candidates[0], controller, _cardDb);
+        if (!paid) return null;
+        nextState = paid.state;
+        events.push(...paid.events);
         break;
       }
 

@@ -166,7 +166,10 @@ function evaluateSimple(
         state,
         cond.controller,
         ctx.controller
-      ).trash.filter((c) => !stagingIds.has(c.instanceId)).length;
+      ).trash.filter((c) =>
+        !stagingIds.has(c.instanceId) &&
+        (!cond.filter || matchesFilter(c, cond.filter, ctx.cardDb, state, undefined, undefined, ctx.controller, ctx.queries))
+      ).length;
       return compareNum(trashCount, cond.operator, cond.value);
     }
 
@@ -1136,7 +1139,7 @@ export function matchesFilter(
         "controller" in value && typeof value.controller === "string"
           ? value.controller
           : undefined;
-      return resolveGameStateValue(source, state, controller, card.controller);
+      return resolveGameStateValue(source, state, controller, filterController ?? card.controller);
     },
     getReferencedCard,
     getReferencedInstanceIds: (ref) => resultRefs?.get(ref)?.targetInstanceIds,

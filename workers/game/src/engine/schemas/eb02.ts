@@ -111,31 +111,29 @@ export const EB02_005_FAKE_STRAW_HAT_CREW: EffectSchema = {
   effects: [
     {
       id: "your_turn_power_up",
-      category: "auto",
+      category: "permanent",
       source_text: "[Your Turn] This Character gains +2000 power.",
-      trigger: { keyword: "START_OF_TURN" },
-      actions: [
+      modifiers: [
         {
           type: "MODIFY_POWER",
           target: { type: "SELF" },
           params: { amount: 2000 },
-          duration: { type: "THIS_TURN" },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "SELF" } },
     },
     {
       id: "opponent_turn_power_down",
-      category: "auto",
+      category: "permanent",
       source_text: "[Opponent's Turn] Give this Character −2000 power.",
-      trigger: { keyword: "START_OF_TURN", turn_restriction: "OPPONENT_TURN" },
-      actions: [
+      modifiers: [
         {
           type: "MODIFY_POWER",
           target: { type: "SELF" },
           params: { amount: -2000 },
-          duration: { type: "THIS_TURN" },
         },
       ],
+      duration: { type: "WHILE_CONDITION", condition: { type: "IS_MY_TURN", controller: "OPPONENT" } },
     },
   ],
 };

@@ -1085,7 +1085,7 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       const matchEvent: GameEvent = {
         type: "CARD_STATE_CHANGED",
         playerIndex: 0,
-        payload: { cardInstanceId: "char-inst" },
+        payload: { cardInstanceId: "char-inst", newState: "RESTED" },
         timestamp: Date.now(),
       };
       expect(matchTriggersForEvent(state, matchEvent, cardDb).length).toBe(1);

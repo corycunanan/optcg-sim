@@ -23,6 +23,8 @@ import {
 import { getActionParams } from "../../effect-types.js";
 import { findCardInstance } from "../../state.js";
 import type { EffectResolverServices } from "../services.js";
+import { evaluateCondition } from "../../conditions.js";
+import { terminateForEngineContract } from "../../engine-limits.js";
 import { isActionBranchFeasible } from "../feasibility.js";
 
 export function executePlayerChoice(
@@ -44,8 +46,22 @@ export function executePlayerChoice(
   if (!options || options.length === 0)
     return { state, events, succeeded: false };
 
+  const conditions = params.option_conditions;
+  if (conditions !== undefined && (!Array.isArray(conditions) || conditions.length !== options.length || conditions.some((condition) => !condition || typeof condition !== "object" || Array.isArray(condition)))) {
+    return {
+      state: terminateForEngineContract(state, {
+        kind: "ENGINE_CONTRACT", contract: "ACTION_HANDLER", actionType: action.type,
+        sourceCardInstanceId, message: "option_conditions must contain one condition per option",
+      }),
+      events, succeeded: false,
+    };
+  }
+
   const feasibleOptions = options
     .map((branch, originalIndex) => ({ branch, originalIndex }))
+    .filter(({ originalIndex }) => !conditions || evaluateCondition(state, conditions[originalIndex], {
+      sourceCardInstanceId, controller, cardDb, resultRefs,
+    }))
     .filter(({ branch }) =>
       isActionBranchFeasible(
         state,
@@ -80,6 +96,11 @@ export function executePlayerChoice(
       pendingPrompt: result.pendingPrompt,
     };
   }
+
+  // The decision must expose prior committed effects (for example Law's Life
+  // reveal). Publish the ordered caller prefix without draining triggers or
+  // touching staged costs; propagation flags prevent replay after persistence.
+  state = services.publishCommittedEvents(state);
 
   // Build choice labels from action types or explicit labels
   const explicitLabels = params.labels;

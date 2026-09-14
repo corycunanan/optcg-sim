@@ -4171,7 +4171,7 @@ export const OP05_111_HOTORI: EffectSchema = {
       costs: [
         {
           type: "PLAY_NAMED_CARD_FROM_HAND",
-          filter: { name: "Kotori" },
+          card_name: "Kotori",
         },
       ],
       actions: [
@@ -4183,8 +4183,7 @@ export const OP05_111_HOTORI: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 3 },
           },
-          params: { face: "UP" },
-          // _comment: "Player chooses top or bottom of opponent's Life cards"
+          params: { face: "UP", position: "TOP_OR_BOTTOM" },
         },
       ],
       flags: { optional: true },
