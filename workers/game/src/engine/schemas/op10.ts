@@ -785,28 +785,28 @@ export const OP10_022_TRAFALGAR_LAW: EffectSchema = {
       // OPT-444: "If the total cost of your Characters is 5 or more" is a
       // total-cost predicate, not mere character presence.
       conditions: {
-        type: "CHARACTER_TOTAL_COST",
-        controller: "SELF",
-        operator: ">=",
-        value: 5,
+        all_of: [
+          { type: "DON_GIVEN", controller: "SELF", mode: "SPECIFIC_CARD", operator: ">=", value: 1 },
+          { type: "CHARACTER_TOTAL_COST", controller: "SELF", operator: ">=", value: 5 },
+        ],
       },
       actions: [
         {
           type: "REVEAL",
           target: { type: "LIFE_CARD", controller: "SELF" },
           params: { amount: 1, source: "LIFE_TOP" },
+          result_ref: "revealed_life",
         },
         {
-          type: "PLAY_FROM_LIFE",
-          params: { position: "TOP" },
+          type: "PLAYER_CHOICE",
+          params: {
+            labels: ["Play the revealed Character", "Leave it in Life"],
+            options: [[{ type: "PLAY_FROM_LIFE", params: { position: "TOP" } }], []],
+          },
           conditions: {
-            type: "SOURCE_PROPERTY",
-            context: "KO_BY_EFFECT" as never,
-            source_filter: {
-              traits: ["Supernovas"],
-              card_type: "CHARACTER",
-              cost_max: 5,
-            },
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "revealed_life",
+            filter: { traits: ["Supernovas"], card_type: "CHARACTER", cost_max: 5 },
           },
           chain: "THEN",
         },

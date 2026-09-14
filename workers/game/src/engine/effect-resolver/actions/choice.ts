@@ -97,6 +97,11 @@ export function executePlayerChoice(
     };
   }
 
+  // The decision must expose prior committed effects (for example Law's Life
+  // reveal). Publish the ordered caller prefix without draining triggers or
+  // touching staged costs; propagation flags prevent replay after persistence.
+  state = services.publishCommittedEvents(state);
+
   // Build choice labels from action types or explicit labels
   const explicitLabels = params.labels;
   const choices = feasibleOptions.map(({ branch, originalIndex }) => ({
