@@ -1139,7 +1139,7 @@ export function matchesFilter(
         "controller" in value && typeof value.controller === "string"
           ? value.controller
           : undefined;
-      return resolveGameStateValue(source, state, controller, card.controller);
+      return resolveGameStateValue(source, state, controller, filterController ?? card.controller);
     },
     getReferencedCard,
     getReferencedInstanceIds: (ref) => resultRefs?.get(ref)?.targetInstanceIds,

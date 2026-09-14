@@ -7,7 +7,9 @@
  * and finally executes the effect's action chain.
  */
 
-import { retainEventsOnFrame } from "./events.js";
+import { namedPlayCandidates, payNamedPlay } from "../cost/named-play.js";
+import { trashCharacter } from "../card-mutations.js";
+import { retainEventsOnFrame, publishCommittedEvents } from "./events.js";
 import type {
   ChoiceCost,
   Cost,
@@ -547,7 +549,49 @@ export function handleAwaitingCostSelection(
   const events: PendingEvent[] = [...topFrame.accumulatedEvents];
   let nextState = workingState;
 
-  if (
+  if (cost.type === "PLAY_NAMED_CARD_FROM_HAND") {
+    const reject = (): EffectResolverResult => ({ state, events: [], resolved: false, rejected: true });
+    if (action.type !== "SELECT_TARGET" || action.selectedInstanceIds?.length !== 1) return reject();
+    const selected = action.selectedInstanceIds[0];
+    if (!topFrame.validTargets.includes(selected)) return reject();
+    const handId = topFrame.namedPlayCostTargetId ?? selected;
+    // Check both the live and staged states: persistence must not resurrect
+    // a hand identity that disappeared or became prohibited after the offer.
+    if (!namedPlayCandidates(baselineState, cost, controller, cardDb).includes(handId) ||
+        !namedPlayCandidates(nextState, cost, controller, cardDb).includes(handId)) return reject();
+    if (topFrame.namedPlayCostTargetId) {
+      if (!baselineState.players[controller].characters.some(card => card?.instanceId === selected) ||
+          !nextState.players[controller].characters.some(card => card?.instanceId === selected)) return reject();
+      // Rule 3-7-6-1-1: this is rule processing, so no replacement check.
+      const trashed = trashCharacter(nextState, selected, controller, "rule");
+      if (!trashed) return reject();
+      nextState = trashed.state;
+      events.push(...trashed.events);
+    } else if (!nextState.players[controller].characters.includes(null)) {
+      const cards = nextState.players[controller].characters.filter(card => card !== null);
+      const validTargets = cards.map(card => card.instanceId);
+      const handCard = nextState.players[controller].hand.find(card => card.instanceId === handId)!;
+      // The intended card is public before rule-trash selection (3-7-6-1).
+      // Revelation is committed information, while zone payment remains staged.
+      const revealed: PendingEvent[] = [{ type: "CARDS_REVEALED", playerIndex: controller,
+        payload: { cards: [{ instanceId: handId, cardId: handCard.cardId }], source: "HAND", visibility: "BOTH" } }];
+      nextState = publishCommittedEvents(nextState, revealed);
+      events.push(...revealed);
+      nextState = updateTopFrame(nextState, { namedPlayCostTargetId: handId, validTargets });
+      return suspendCurrentFrame(nextState, events, {
+        options: {
+          promptType: "SELECT_TARGET", cards, validTargets, countMin: 1, countMax: 1,
+          effectDescription: "Character area is full. Choose one of your Characters to trash (rule 3-7-6-1).",
+          instruction: "Trash 1 of your Characters.", ctaLabel: "Confirm",
+        },
+        respondingPlayer: controller, resumeContext: topFrame.id,
+      });
+    }
+    const paid = payNamedPlay(nextState, cost, handId, controller, cardDb);
+    if (!paid) return reject();
+    nextState = paid.state;
+    events.push(...paid.events);
+  } else if (
     action.type === "PLAYER_CHOICE" &&
     (cost.type === "REST_DON" || cost.type === "DON_REST") &&
     cost.amount === "ANY_NUMBER"

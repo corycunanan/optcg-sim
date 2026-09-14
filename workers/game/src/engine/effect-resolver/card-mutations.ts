@@ -62,7 +62,7 @@ export function trashCharacter(
   state: GameState,
   instanceId: string,
   causingController: 0 | 1,
-  reason: "effect" | "cost" = "effect",
+  reason: "effect" | "cost" | "rule" = "effect",
 ): CardMutationResult | null {
   void causingController;
   const moved = transitionCard(state, instanceId, "TRASH", {
