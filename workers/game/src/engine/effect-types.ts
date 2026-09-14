@@ -882,11 +882,15 @@ export interface ActionParamsMap {
 
   PLAYER_CHOICE: {
     options: Action[][];
+    /** Eligibility evaluated once before choosing; must match options length. */
+    option_conditions?: Condition[];
     labels?: string[];
     mandatory?: boolean;
   };
   OPPONENT_CHOICE: {
     options: Action[][];
+    /** Eligibility evaluated once before choosing; must match options length. */
+    option_conditions?: Condition[];
     labels?: string[];
     mandatory?: boolean;
   };

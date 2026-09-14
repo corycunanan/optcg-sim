@@ -339,7 +339,7 @@ export const ST05_017_UNION_ARMADA: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_protection",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -356,14 +356,15 @@ export const ST05_017_UNION_ARMADA: EffectSchema = {
         },
         {
           type: "APPLY_PROHIBITION",
+          target: { type: "CHARACTER", controller: "SELF", count: { all: true } },
           target_ref: "boosted_card",
           params: { prohibition_type: "CANNOT_BE_KO" },
           duration: { type: "THIS_TURN" },
           chain: "THEN",
           conditions: {
-            type: "SOURCE_PROPERTY",
-            context: "KO_BY_EFFECT",
-            source_filter: { card_type: "CHARACTER" },
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "boosted_card",
+            filter: { card_type: "CHARACTER" },
           },
         },
       ],
