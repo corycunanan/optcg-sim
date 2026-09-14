@@ -1516,15 +1516,20 @@ export const OP10_042_USOPP: EffectSchema = {
       id: "opponent_turn_character_removed_draw",
       category: "auto",
       trigger: {
-        event: "ANY_CHARACTER_KO",
-        filter: {
-          controller: "SELF",
-          target_filter: { traits: ["Dressrosa"] },
-          cause: "ANY",
-        },
-        turn_restriction: "OPPONENT_TURN",
+        any_of: [
+          {
+            event: "CHARACTER_REMOVED_FROM_FIELD",
+            filter: { controller: "SELF", target_filter: { traits: ["Dressrosa"] }, cause: "BY_OPPONENT_EFFECT" },
+            turn_restriction: "OPPONENT_TURN",
+          },
+          {
+            event: "ANY_CHARACTER_KO",
+            filter: { controller: "SELF", target_filter: { traits: ["Dressrosa"] } },
+            turn_restriction: "OPPONENT_TURN",
+          },
+        ],
       },
-      flags: { once_per_turn: true },
+      flags: { once_per_turn: true, optional: true },
       conditions: {
         type: "HAND_COUNT",
         controller: "SELF",

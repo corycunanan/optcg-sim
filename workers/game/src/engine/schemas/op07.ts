@@ -1286,11 +1286,12 @@ export const OP07_038_BOA_HANCOCK: EffectSchema = {
       id: "OP07-038_effect_1",
       category: "auto",
       trigger: {
-        event: "CHARACTER_RETURNED_TO_HAND",
+        event: "CHARACTER_REMOVED_FROM_FIELD",
         filter: { cause: "BY_YOUR_EFFECT" },
         turn_restriction: "YOUR_TURN",
         once_per_turn: true,
       },
+      flags: { optional: true },
       conditions: {
         type: "HAND_COUNT",
         controller: "SELF",

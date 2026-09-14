@@ -700,8 +700,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       selected,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedTrash.state;
     events.push(...appliedTrash.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -793,7 +792,7 @@ export function handleAwaitingCostSelection(
       nextState = stagedBeforeReplacement;
     }
 
-    const appliedGroup = applyCostSelection(nextState, cost, group, controller);
+    const appliedGroup = applyCostSelection(nextState, cost, group, controller, cardDb);
     nextState = appliedGroup.state;
     events.push(...appliedGroup.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -870,8 +869,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       ordered,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedOrdered.state;
     events.push(...appliedOrdered.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -911,8 +909,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       ordered,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedOrdered.state;
     events.push(...appliedOrdered.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -1026,8 +1023,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       selected,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedSelected.state;
     events.push(...appliedSelected.events);
 

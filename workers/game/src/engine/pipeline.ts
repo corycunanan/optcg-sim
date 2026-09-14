@@ -473,7 +473,8 @@ function deregisterLeftFieldTriggers(
     if (
       event.type === "CARD_KO" ||
       event.type === "CARD_RETURNED_TO_HAND" ||
-      event.type === "CARD_RETURNED_TO_DECK"
+      event.type === "CARD_RETURNED_TO_DECK" ||
+      event.type === "CARD_ADDED_TO_LIFE"
     ) {
       const instanceId = event.payload?.cardInstanceId;
       if (!instanceId) continue;

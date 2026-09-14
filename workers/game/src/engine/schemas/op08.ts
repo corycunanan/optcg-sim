@@ -1629,7 +1629,7 @@ export const OP08_046_SHAKUYAKU: EffectSchema = {
       id: "your_turn_removal_trigger",
       category: "auto",
       trigger: {
-        event: "CHARACTER_RETURNED_TO_HAND",
+        event: "CHARACTER_REMOVED_FROM_FIELD",
         filter: { cause: "BY_YOUR_EFFECT" },
         turn_restriction: "YOUR_TURN",
         once_per_turn: true,
@@ -1989,7 +1989,7 @@ export const OP08_056_MOBY_DICK: EffectSchema = {
       id: "your_turn_removal_draw",
       category: "auto",
       trigger: {
-        event: "CHARACTER_RETURNED_TO_HAND",
+        event: "CHARACTER_REMOVED_FROM_FIELD",
         filter: {
           controller: "SELF",
           cause: "BY_EFFECT",
@@ -2004,8 +2004,14 @@ export const OP08_056_MOBY_DICK: EffectSchema = {
           params: { amount: 1 },
         },
         {
-          type: "PLACE_HAND_TO_DECK",
-          params: { amount: 1, position: "TOP_OR_BOTTOM" },
+          type: "PLAYER_CHOICE",
+          params: {
+            labels: ["Place at top", "Place at bottom"],
+            options: [
+              [{ type: "PLACE_HAND_TO_DECK", params: { amount: 1, position: "TOP" } }],
+              [{ type: "PLACE_HAND_TO_DECK", params: { amount: 1, position: "BOTTOM" } }],
+            ],
+          },
           chain: "THEN",
         },
       ],

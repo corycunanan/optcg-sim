@@ -497,6 +497,19 @@ export function executeAddToLifeFromField(
     if (moved) {
       nextState = moved.state;
       movedIds.push(moved.fact.newInstanceId);
+      events.push({
+        type: "CARD_ADDED_TO_LIFE",
+        playerIndex: moved.fact.owner,
+        payload: {
+          cardInstanceId: moved.fact.oldInstanceId,
+          newCardInstanceId: moved.fact.newInstanceId,
+          cardId: moved.fact.cardId,
+          sourceZone: moved.fact.source,
+          sourceController: moved.fact.controller,
+          causingController: controller,
+          movementCause: "EFFECT",
+        },
+      });
     }
   }
   return {

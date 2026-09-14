@@ -158,7 +158,7 @@ export function executeReturnToHand(
   const finalIds = batch.unprotectedIds;
   const finalizedIds: string[] = [];
   for (const id of finalIds) {
-    const result = returnToHand(nextState, id);
+    const result = returnToHand(nextState, id, controller);
     if (result) {
       nextState = result.state;
       events.push(...result.events);
@@ -322,7 +322,7 @@ export function executeReturnToDeck(
   const finalizedByOldId = new Map<string, ReturnType<typeof returnToDeck>>();
   const executionOrder = position === "TOP" ? [...finalIds].reverse() : finalIds;
   for (const id of executionOrder) {
-    const result = returnToDeck(nextState, id, position);
+    const result = returnToDeck(nextState, id, position, controller);
     if (result) {
       nextState = result.state;
       finalizedByOldId.set(id, result);
