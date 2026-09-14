@@ -39,6 +39,7 @@ import { emitPendingEvent } from "./events.js";
 import { transitionCard, transitionDetachedCard } from "./zone-transition.js";
 import { allocateEngineId, takeEngineTimestamp } from "./execution-context.js";
 import {
+  redirectDamageLifeCard,
   canOfferTrigger as canOfferTriggerQuery,
   continueEffectDamageSequence as continueEffectDamageSequenceQuery,
   moveLifeCardToHand as moveLifeCardToHandQuery,
@@ -915,6 +916,11 @@ function dealOneLeaderDamage(
       },
     });
     return { state: nextState, events, paused: false };
+  }
+
+  const redirected = redirectDamageLifeCard(nextState, lifeCard, inactiveIdx, cardDb);
+  if (redirected) {
+    return { state: redirected.state, events: [...events, ...redirected.events], paused: false };
   }
 
   if (
