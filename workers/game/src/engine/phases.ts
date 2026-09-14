@@ -35,6 +35,7 @@ import {
 } from "./effect-stack.js";
 import { applyRefreshProhibitions } from "./prohibitions.js";
 import { transitionCard } from "./zone-transition.js";
+import { evaluateCondition } from "./conditions.js";
 
 /**
  * Returns true if the current phase should be auto-advanced without player input.
@@ -102,12 +103,49 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
       // decision (OPT-366), not hardcoded to player 0.
       const firstPlayerIndex = state.turn.firstPlayerIndex ?? 0;
       const donCount = (turnNumber === 1 && pi === firstPlayerIndex) ? 1 : 2;
+      const player = state.players[pi];
+      const placedCount = Math.min(donCount, player.donDeck.length);
+      // Roger's prerequisite must see the field before these new DON!! arrive
+      // (official OP13 FAQ). Only newly placed DON!! may be given to the Leader.
+      const rules = cardDb.get(player.leader.cardId)?.effectSchema?.rule_modifications ?? [];
+      let givenCount = 0;
+      for (const rule of rules) {
+        if (rule.rule_type !== "DON_PHASE_BEHAVIOR" || rule.destination !== "GIVEN_TO_LEADER") continue;
+        if (rule.condition && !evaluateCondition(state, rule.condition, {
+          sourceCardInstanceId: player.leader.instanceId,
+          controller: pi,
+          cardDb,
+        })) continue;
+        givenCount = Math.min(placedCount, givenCount + rule.count);
+      }
       nextState = placeDonFromDeck(nextState, pi, donCount);
+      if (givenCount > 0) {
+        const placedPlayer = nextState.players[pi];
+        const newDonStart = player.donCostArea.length;
+        const givenDon = placedPlayer.donCostArea.slice(newDonStart, newDonStart + givenCount);
+        const players: GameState["players"] = [...nextState.players];
+        players[pi] = {
+          ...placedPlayer,
+          donCostArea: [...player.donCostArea, ...placedPlayer.donCostArea.slice(newDonStart + givenCount)],
+          leader: {
+            ...placedPlayer.leader,
+            attachedDon: [...placedPlayer.leader.attachedDon, ...givenDon.map(don => ({ ...don, attachedTo: player.leader.instanceId }))],
+          },
+        };
+        nextState = { ...nextState, players };
+      }
       events.push({
         type: "DON_PLACED_ON_FIELD",
         playerIndex: pi,
-        payload: { count: Math.min(donCount, state.players[pi].donDeck.length) },
+        payload: { count: placedCount },
       });
+      if (givenCount > 0) {
+        events.push({
+          type: "DON_GIVEN_TO_CARD",
+          playerIndex: pi,
+          payload: { targetInstanceId: player.leader.instanceId, count: givenCount },
+        });
+      }
       nextState = { ...nextState, turn: { ...nextState.turn, phase: "MAIN" } };
       events.push({ type: "PHASE_CHANGED", playerIndex: pi, payload: { from: "DON", to: "MAIN" } });
       break;
