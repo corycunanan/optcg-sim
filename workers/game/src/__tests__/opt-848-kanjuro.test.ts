@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
+import { executeTrashFromHand } from "../engine/effect-resolver/actions/removal.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
@@ -200,7 +201,46 @@ describe("OPT-848 authored Kanjuro blind discard", () => {
         expect(
           coordinator.routePromptResponse(f.state, opponent, action).kind
         ).toBe("resume");
-        f.select([other.instanceId], true);
+        const invalidSelections = [
+          [],
+          [hand[0].instanceId, hand[0].instanceId],
+          [other.instanceId],
+          ...(hand.length > 1
+            ? [[hand[0].instanceId, hand[1].instanceId]]
+            : []),
+        ];
+        for (const selectedInstanceIds of invalidSelections) {
+          f.persist();
+          const before = structuredClone(f.state);
+          const malformed: GameAction = { ...action, selectedInstanceIds };
+          // GameSession routes SELECT_TARGET into this lifecycle after authorization.
+          expect(
+            coordinator.executeAction(f.state, [], opponent, malformed, f.db)
+              .kind
+          ).toBe("resume");
+          f.choice(malformed, true);
+          expect(f.state).toEqual(before);
+          f.persist();
+          expect(f.state.pendingPrompt).toEqual(before.pendingPrompt);
+          expect(f.state.pendingPrompt?.respondingPlayer).toBe(opponent);
+          expect(f.targets().blindSelection).toBe(true);
+          expect(
+            filterPromptForPlayer(f.state.pendingPrompt, owner)
+          ).toBeNull();
+          const responder = JSON.stringify(
+            visibleStateForPlayer(f.state, f.db, opponent)
+          );
+          const spectatorPrompt = JSON.stringify(
+            visibleStateForSpectator(f.state, f.db).pendingPrompt
+          );
+          for (const card of hand) {
+            expect(responder).not.toContain(card.cardId);
+            expect(spectatorPrompt).not.toContain(card.cardId);
+          }
+          expect(
+            coordinator.executeAction(f.state, [], owner, action, f.db).kind
+          ).toBe("reject");
+        }
         f.persist();
         f.select([hand[0].instanceId]);
         expect(f.state.pendingPrompt).toBeNull();
@@ -222,4 +262,71 @@ describe("OPT-848 authored Kanjuro blind discard", () => {
       }
     }
   );
+});
+
+describe("blind choice lifecycle shared consumers", () => {
+  it("retains authored Bao Huang's two-card choice after invalid replies", () => {
+    const f = fixture();
+    f.state.players.forEach((p) => {
+      p.hand = [];
+    });
+    f.data("OP01-105", { cost: 2 });
+    const bao = f.put("OP01-105", 0, "HAND");
+    const hand = [0, 1, 2].map((i) => {
+      f.data(`bao-secret-${i}`);
+      return f.put(`bao-secret-${i}`, 1, "HAND");
+    });
+    f.act({ type: "PLAY_CARD", cardInstanceId: bao.instanceId });
+    expect(f.targets()).toMatchObject({
+      blindSelection: true,
+      countMin: 2,
+      countMax: 2,
+    });
+    for (const ids of [
+      [],
+      [hand[0].instanceId],
+      [hand[0].instanceId, hand[0].instanceId],
+      hand.map((c) => c.instanceId),
+    ]) {
+      f.persist();
+      const before = structuredClone(f.state);
+      f.select(ids, true);
+      expect(f.state).toEqual(before);
+    }
+    // Valid choices still reach the existing resolver. REVEAL_HAND currently
+    // re-prompts instead of consuming preselected IDs (also reproduced before
+    // this guard); correcting that separate action is outside OPT-848.
+    f.select([hand[0].instanceId, hand[2].instanceId]);
+    expect(f.state.players[1].hand).toEqual(hand);
+  });
+
+  it("allows zero for an optional blind discard without moving a card", () => {
+    const f = fixture();
+    const hand = structuredClone(f.state.players[1].hand);
+    const result = executeTrashFromHand(
+      f.state,
+      {
+        type: "TRASH_FROM_HAND",
+        target: { controller: "OPPONENT" },
+        params: { amount: 1, chooser: "SELF", optional: true },
+      },
+      f.state.players[0].leader.instanceId,
+      0,
+      f.db,
+      new Map()
+    );
+    expect(result.pendingPrompt?.options).toMatchObject({
+      blindSelection: true,
+      countMin: 0,
+    });
+    const resumed = resumePromptLifecycle(
+      { ...result.state, pendingPrompt: result.pendingPrompt! },
+      { type: "SELECT_TARGET", selectedInstanceIds: [] },
+      f.db,
+      { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }
+    );
+    expect(resumed.responseRejected).toBe(false);
+    expect(resumed.state.pendingPrompt).toBeNull();
+    expect(resumed.state.players[1].hand).toEqual(hand);
+  });
 });
