@@ -688,9 +688,11 @@ Matches a field Character transition to rested, including attack/block declarati
 }
 ```
 
-PRB02-009 Mr.3(Galdino) uses this host-scoped form. Effect-rest events carry `cause: "EFFECT"` and `causingController`, including continuation after a replacement is declined. Declaration/cost rests do not carry effect provenance. Active-state changes and non-Character subjects never match.
+PRB02-009 Mr.3(Galdino) uses this host-scoped form. Effect-rest events carry `cause: "EFFECT"`, `causingController`, and `causingSource` (`instanceId`, `cardId`, printed `cardType`). Activation-cost rests carry `cause: "EFFECT_COST"`: the OP07-031 FAQ explicitly includes resting a Character for an activation cost in “rested by your effect”. Attack/block declarations have no effect provenance. Active-state changes and non-Character subjects never match.
 
-Current supported provenance matching is deliberately limited to explicitly host-scoped rest triggers (`target: "SELF"`): `BY_EFFECT`, `BY_YOUR_EFFECT`, `BY_OPPONENT_EFFECT`, or `ANY`. `BY_CHARACTER_EFFECT` is unsupported. Existing unscoped cause filters retain their prior behavior pending source-kind support; OPT-814 does not activate OP14-070 Buffalo with an incomplete “opponent's Character's effect” check. OP07-031 Bartolomeo and OP10-036 Perona also remain unscoped cause-filter consumers awaiting their own execution correction. Other unscoped rest watchers continue to observe Character rest transitions.
+`BY_EFFECT`, `BY_YOUR_EFFECT`, `BY_OPPONENT_EFFECT`, and `ANY` work independently of host scope. OP07-031 Bartolomeo and OP10-036 Perona intentionally omit `target: "SELF"` to watch any Character rested by their controller's effect. OP14-070 Buffalo combines `target: "SELF"`, `cause: "BY_OPPONENT_EFFECT"`, and `source_card_type: "CHARACTER"`. The causing source identity is derived from the canonical pre-payment source snapshot and survives source departure, ordinary rest, batch replacement prompts, durable save/load, and replacement decline. Missing legacy source identity does not satisfy a Character-source filter.
+
+The recursive disposition and pipeline scenarios for all ten authored consumers are recorded in [OPT-847](../project/handoffs/OPT-847.md).
 
 ---
 

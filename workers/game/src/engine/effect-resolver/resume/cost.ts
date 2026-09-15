@@ -1,4 +1,6 @@
 import { completeHandTrashCostSources, handTrashEvent, isHandTrashByEffect } from "../../hand-trash.js";
+import { effectSourceIdentity } from "../../effect-source.js";
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 /**
  * AWAITING_COST_SELECTION resume — handles the player's response to a cost
  * prompt (CHOOSE_ONE_COST branch pick, CHOICE branch pick, LIFE_TO_HAND
@@ -1037,7 +1039,7 @@ export function handleAwaitingCostSelection(
         events.push({
           type: "CARD_STATE_CHANGED",
           playerIndex: controller,
-          payload: { targetInstanceId: id, newState: "RESTED" },
+          payload: { targetInstanceId: id, newState: "RESTED", cause: "EFFECT_COST", causingController: controller, causingSource: effectSourceIdentity(state, sourceCardInstanceId, cardDb, accumulatedCostRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot) },
         });
       }
     }

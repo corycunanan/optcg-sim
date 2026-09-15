@@ -2130,7 +2130,7 @@ export const EB03_053_NAMI: EffectSchema = {
       id: "on_ko_play",
       category: "auto",
       trigger: { keyword: "ON_KO" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       actions: [
         {
           type: "PLAY_CARD",
@@ -2241,7 +2241,7 @@ export const EB03_056_BELO_BETTY: EffectSchema = {
       id: "on_play_ko",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       actions: [
         {
           type: "KO",

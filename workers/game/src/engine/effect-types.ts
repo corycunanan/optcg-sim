@@ -204,6 +204,7 @@ export interface EventFilter {
   cause?: EventCause;
   /** Causal effect source, distinct from the discarded card. */
   effect_source?: { controller?: Controller; traits?: string[] };
+  source_card_type?: "CHARACTER";
   target_filter?: TargetFilter;
   source_zone?: string;
   includes_trigger_keyword?: boolean;
@@ -1428,6 +1429,7 @@ export type ReplacementEvent =
 
 export interface CauseFilter {
   by: "OPPONENT_EFFECT" | "ANY_EFFECT" | "ANY";
+  source_card_type?: "CHARACTER";
 }
 
 // ─── Rule Modifications (07-RULE-MODIFICATIONS) ─────────────────────────────

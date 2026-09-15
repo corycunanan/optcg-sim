@@ -503,7 +503,8 @@ const EventPayloadSchemas = {
     targetInstanceId: z.string().optional(),
     newState: z.string().optional(),
     error: z.string().optional(),
-    cause: z.literal("EFFECT").optional(),
+    cause: z.enum(["EFFECT", "EFFECT_COST"]).optional(),
+    causingSource: z.strictObject({ instanceId: z.string(), cardId: z.string(), cardType: z.enum(["Leader", "Character", "Event", "Stage"]) }).optional(),
     causingController: PlayerIndex.optional(),
   }),
   POWER_MODIFIED: z.strictObject({

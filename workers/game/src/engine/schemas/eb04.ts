@@ -2708,7 +2708,7 @@ export const EB04_059_BLACK_ROPE_DRAGON_TWISTER: EffectSchema = {
       id: "main_ko_two",
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       // Post-colon "If" gate — evaluated once after costs are paid (Rules 8-3-1/4-10-1).
       post_cost_conditions: {
         type: "COMPARATIVE",

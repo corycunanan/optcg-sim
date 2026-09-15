@@ -678,13 +678,13 @@ function matchesCustomTrigger(
     if (sourceCard.attachedDon.length < trigger.don_requirement) return false;
   }
 
-  // Host-scoped rest effects opt into rest provenance. Unscoped cause filters
-  // retain their existing behavior: notably Buffalo also needs Character-source
-  // provenance, which the generic replacement/rest contracts cannot yet provide.
+  // Rest watchers compare the causing effect controller, independently of the
+  // rested subject. Activation costs count (OP07-031 FAQ); attack/block do not.
   if (trigger.filter) {
     let filter = trigger.filter;
-    if (trigger.event === "CHARACTER_BECOMES_RESTED" && filter.target === "SELF" && event.type === "CARD_STATE_CHANGED") {
-      const isEffect = event.payload.cause === "EFFECT";
+    if (trigger.event === "CHARACTER_BECOMES_RESTED" && event.type === "CARD_STATE_CHANGED") {
+      const isEffect = event.payload.cause === "EFFECT" || event.payload.cause === "EFFECT_COST";
+      if (filter.source_card_type === "CHARACTER" && event.payload.causingSource?.cardType !== "Character") return false;
       const causingController = event.payload.causingController;
       if (filter.cause === "BY_EFFECT" && !isEffect) return false;
       if (filter.cause === "BY_YOUR_EFFECT" && (!isEffect || causingController !== sourceCard.controller)) return false;

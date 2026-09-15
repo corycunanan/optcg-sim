@@ -726,6 +726,7 @@ export const OP14_021_ISSHO: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
+        filter: { target: "SELF" },
         turn_restriction: "YOUR_TURN",
       },
       flags: { optional: true },
@@ -938,6 +939,7 @@ export const OP14_027_SHANKS: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
+        filter: { target: "SELF" },
         turn_restriction: "YOUR_TURN",
       },
       actions: [
@@ -987,6 +989,7 @@ export const OP14_028_JOHNNY: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
+        filter: { target: "SELF" },
         turn_restriction: "YOUR_TURN",
       },
       actions: [
@@ -1119,6 +1122,7 @@ export const OP14_032_HUMANDRILL: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
+        filter: { target: "SELF" },
         turn_restriction: "YOUR_TURN",
       },
       actions: [
@@ -1262,6 +1266,7 @@ export const OP14_035_YOSAKU: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
+        filter: { target: "SELF" },
         turn_restriction: "YOUR_TURN",
       },
       actions: [
@@ -2668,7 +2673,7 @@ export const OP14_070_BUFFALO: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
-        filter: { cause: "BY_OPPONENT_EFFECT" },
+        filter: { target: "SELF", cause: "BY_OPPONENT_EFFECT", source_card_type: "CHARACTER" },
       },
       costs: [{ type: "DON_MINUS", amount: 1 }],
       flags: { optional: true },
@@ -4753,6 +4758,7 @@ export const OP14_119_DRACULE_MIHAWK: EffectSchema = {
       category: "auto",
       trigger: {
         event: "CHARACTER_BECOMES_RESTED",
+        filter: { target: "SELF" },
         turn_restriction: "YOUR_TURN",
       },
       actions: [
