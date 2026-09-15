@@ -1,3 +1,4 @@
+import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { completeHandTrashCostSources, handTrashEvent, isHandTrashByEffect } from "../../hand-trash.js";
 import { updateEffectContinuation } from "../event-activation.js";
 import { effectSourceIdentity } from "../../effect-source.js";
@@ -298,6 +299,20 @@ function resumeAfterBranchPick(
     events,
   );
 
+  if (resumeResult.replaced) {
+    return finishReplacedLifeCost(
+      resumeResult.state,
+      resumeResult.events,
+      topFrame.effectBlock,
+      sourceCardInstanceId,
+      controller,
+      topFrame.pendingTriggers,
+      cardDb,
+      services,
+      topFrame.triggerOrderingGroup,
+    );
+  }
+
   if (resumeResult.cannotPay) {
     return services.processRemainingTriggers(
       resumeResult.state,
@@ -418,6 +433,19 @@ export function handleAwaitingCostSelection(
     }
     nextState = paid.state;
     events.push(...paid.events);
+    if (paid.replaced) {
+      return finishReplacedLifeCost(
+        nextState,
+        events,
+        topFrame.effectBlock,
+        sourceCardInstanceId,
+        controller,
+        topFrame.pendingTriggers,
+        cardDb,
+        services,
+        topFrame.triggerOrderingGroup,
+      );
+    }
     mergeCostRefs(accumulatedCostRefs, paid.costResult);
     const nextCostIndex = topFrame.currentCostIndex + 1;
     if (nextCostIndex < topFrame.costs.length) {
@@ -434,6 +462,20 @@ export function handleAwaitingCostSelection(
         transactionBaseline,
         events,
       );
+      if (remaining.replaced) {
+        return finishReplacedLifeCost(
+          remaining.state,
+          remaining.events,
+          topFrame.effectBlock,
+          sourceCardInstanceId,
+          controller,
+          topFrame.pendingTriggers,
+          cardDb,
+          services,
+          topFrame.triggerOrderingGroup,
+        );
+      }
+
       if (remaining.cannotPay) {
         return services.processRemainingTriggers(
           remaining.state,
@@ -625,80 +667,33 @@ export function handleAwaitingCostSelection(
     action.type === "PLAYER_CHOICE" &&
     (cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE")
   ) {
+    if (action.choiceId !== "0" && action.choiceId !== "1") {
+      return { state, events: [], resolved: false };
+    }
     const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
-    const p = nextState.players[controller];
-    if (p.life.length === 0) {
+    const paid = payCosts(
+      nextState, [{ ...cost, position }], controller, cardDb, sourceCardInstanceId
+    );
+    if (!paid) {
       return services.processRemainingTriggers(
-        popFrame(baselineState),
-        topFrame.pendingTriggers,
-        cardDb,
-        eventsForCostAbandon(topFrame),
+        popFrame(baselineState), topFrame.pendingTriggers, cardDb, eventsForCostAbandon(topFrame)
       );
     }
-
-    const removed = position === "TOP" ? p.life.slice(0, 1) : p.life.slice(-1);
-    if (cost.type === "TRASH_FROM_LIFE") {
-      const moved = transitionCards(
-        nextState,
-        removed.map((card) => card.instanceId),
-        "TRASH",
-        { position: "TOP" }
+    nextState = paid.state;
+    events.push(...paid.events);
+    mergeCostRefs(accumulatedCostRefs, paid.costResult);
+    if (paid.replaced) {
+      return finishReplacedLifeCost(
+        popFrame(nextState),
+        events,
+        topFrame.effectBlock,
+        sourceCardInstanceId,
+        controller,
+        topFrame.pendingTriggers,
+        cardDb,
+        services,
+        topFrame.triggerOrderingGroup,
       );
-      nextState = moved.state;
-      const existing = accumulatedCostRefs.get("__cost_cards_trashed") ?? {
-        targetInstanceIds: [],
-        count: 0,
-      };
-      accumulatedCostRefs.set("__cost_cards_trashed", {
-        targetInstanceIds: [
-          ...existing.targetInstanceIds,
-          ...moved.transitions.map(
-            (transition) => transition.fact.newInstanceId
-          ),
-        ],
-        count: existing.count + moved.transitions.length,
-      });
-      events.push({
-        type: "CARD_TRASHED",
-        playerIndex: controller,
-        payload: { count: 1, reason: "cost", from: "LIFE" },
-      });
-      // OPT-240: any life exit publishes CARD_REMOVED_FROM_LIFE so
-      // Kalgara/Bonney-style watchers fire on cost payments too.
-      for (const transition of moved.transitions) {
-        events.push({
-          type: "CARD_REMOVED_FROM_LIFE",
-          playerIndex: controller,
-          payload: {
-            cardInstanceId: transition.fact.oldInstanceId,
-            newCardInstanceId: transition.fact.newInstanceId,
-          },
-        });
-      }
-    } else {
-      const moved = transitionCards(
-        nextState,
-        removed.map((card) => card.instanceId),
-        "HAND"
-      );
-      nextState = moved.state;
-      events.push({
-        type: "CARD_ADDED_TO_HAND_FROM_LIFE",
-        playerIndex: controller,
-        payload: { count: 1 },
-      });
-      // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
-      // already does; the cost path was missing it).
-      for (const transition of moved.transitions) {
-        events.push({
-          type: "CARD_REMOVED_FROM_LIFE",
-          playerIndex: controller,
-          payload: {
-            cardInstanceId: transition.fact.oldInstanceId,
-            newCardInstanceId: transition.fact.newInstanceId,
-          },
-        });
-      }
     }
   } else if (
     action.type === "SELECT_TARGET" &&
@@ -1166,6 +1161,20 @@ export function handleAwaitingCostSelection(
       transactionBaseline,
       events,
     );
+
+    if (remainingCostResult.replaced) {
+      return finishReplacedLifeCost(
+        remainingCostResult.state,
+        remainingCostResult.events,
+        topFrame.effectBlock,
+        sourceCardInstanceId,
+        controller,
+        topFrame.pendingTriggers,
+        cardDb,
+        services,
+        topFrame.triggerOrderingGroup,
+      );
+    }
 
     if (remainingCostResult.cannotPay) {
       return services.processRemainingTriggers(

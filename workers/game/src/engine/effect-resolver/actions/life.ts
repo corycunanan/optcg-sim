@@ -11,6 +11,7 @@ import type {
   PendingEvent,
   ResumeContext,
 } from "../../../types.js";
+import { moveLifeToHand } from "../life-movement.js";
 import type { ActionResult } from "../types.js";
 import {
   autoSelectTargets,
@@ -223,14 +224,10 @@ export function executeLifeToHand(
   if (count === 0) return { state, events, succeeded: false };
 
   const removed = position === "TOP" ? p.life.slice(0, count) : p.life.slice(-count);
-  const moved = transitionCards(
-    state,
-    removed.map((card) => card.instanceId),
-    "HAND",
-  );
+  const moved = moveLifeToHand(state, removed, targetController, _cardDb);
 
   for (const transition of moved.transitions) {
-    events.push({
+    if (transition.addedToHand) events.push({
       type: "CARD_ADDED_TO_HAND_FROM_LIFE",
       playerIndex: targetController,
       payload: {

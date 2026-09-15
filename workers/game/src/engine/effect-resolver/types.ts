@@ -144,12 +144,16 @@ export type ActionHandlerMap = {
 };
 
 export interface CostPaymentResult {
+  /** Replacement processing committed, but the printed activation cost was not paid. */
+  replaced?: boolean;
   state: GameState;
   events: PendingEvent[];
   costResult: import("../effect-types.js").CostResult;
 }
 
 export interface CostSelectionResult {
+  /** Unlike cannotPay, this state and its events must not be rolled back. */
+  replaced?: boolean;
   state: GameState;
   events: PendingEvent[];
   cannotPay?: boolean;

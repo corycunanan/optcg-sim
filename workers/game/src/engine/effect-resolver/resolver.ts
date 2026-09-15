@@ -1,3 +1,4 @@
+import { finishReplacedLifeCost } from "./cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect, TRIGGERING_HAND_TRASH_REF } from "../hand-trash.js";
 import { retainEventParent } from "./event-activation.js";
 import {
@@ -446,6 +447,19 @@ export function resolveEffect(
       services,
       blockDescription
     );
+
+    if (costPayResult.replaced) {
+      return finishReplacedLifeCost(
+        costPayResult.state,
+        [...events, ...costPayResult.events],
+        block,
+        sourceCardInstanceId,
+        controller,
+        [],
+        cardDb,
+        services,
+      );
+    }
 
     if (costPayResult.cannotPay) {
       state = costPayResult.state;

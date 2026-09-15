@@ -1,3 +1,4 @@
+import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect } from "../../hand-trash.js";
 import { updateEffectContinuation } from "../event-activation.js";
 import { retainEventsOnFrame } from "./events.js";
@@ -465,6 +466,20 @@ export function handleAwaitingOptionalResponse(
       services,
       topFrame.effectDescription,
     );
+
+    if (costResult.replaced) {
+      return finishReplacedLifeCost(
+        popFrame(costResult.state),
+        costResult.events,
+        block,
+        sourceCardInstanceId,
+        controller,
+        topFrame.pendingTriggers,
+        cardDb,
+        services,
+        topFrame.triggerOrderingGroup,
+      );
+    }
 
     if (costResult.cannotPay) {
       nextState = popFrame(costResult.state);
