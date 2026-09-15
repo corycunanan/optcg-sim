@@ -841,7 +841,9 @@ export function handleAwaitingTriggerOrderSelection(
       remaining[0].effectBlock,
       remaining[0].sourceCardInstanceId,
       remaining[0].controller,
-      cardDb
+      cardDb,
+      getEventCardInstanceId(remaining[0].triggeringEvent) ?? null,
+      remaining[0].triggeringEvent,
     );
     nextState = lastResult.state;
     events.push(...lastResult.events);

@@ -145,7 +145,11 @@ export function executeHandWheel(
     { position: "TOP" },
   ).state;
 
-  if (toTrashCount > 0) events.push(handTrashEvent(state, controller, toTrashCount, "EFFECT", _sourceCardInstanceId, controller, resultRefs));
+  if (toTrashCount > 0) {
+    const event = handTrashEvent(state, controller, toTrashCount, "EFFECT", _sourceCardInstanceId, controller, resultRefs);
+    event.payload = { ...event.payload, reason: "hand_wheel" };
+    events.push(event);
+  }
 
   // Draw cards
   const actualDraw = Math.min(drawCount, nextState.players[controller].deck.length);

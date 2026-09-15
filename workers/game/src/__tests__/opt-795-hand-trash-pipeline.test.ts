@@ -612,32 +612,89 @@ it("a multi-step activation cost retains the Navy source after that source leave
   });
 });
 
-it("Kuzan preserves the event count through simultaneous-trigger ordering and reconnect", () => {
+it.each(["Kuzan", "Kuroobi"])(
+  "Kuzan preserves the event count when %s resolves first through ordering and reconnect",
+  (first) => {
+    const f = fixture();
+    f.put("OP12-040", 0, "LEADER", { types: ["Navy"] });
+    const watcher = f.put("OP14-045");
+    const hand = Array.from({ length: 3 }, (_, i) =>
+      f.put(`fodder-${i}`, 0, "HAND")
+    );
+    f.play(f.put("OP12-046", 0, "HAND", { types: ["Navy"] }));
+    f.select(hand.slice(0, 2).map((c) => c.instanceId));
+    expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (f.state.pendingPrompt?.options.promptType !== "PLAYER_CHOICE")
+      throw new Error("Expected trigger order prompt");
+    const choice = f.state.pendingPrompt.options.choices.find((c) =>
+      c.label.startsWith(`${first}:`)
+    )!;
+    f.roundTrip();
+    f.act({ type: "PLAYER_CHOICE", choiceId: choice.id });
+    f.done();
+    expect(f.state.players[0].hand).toHaveLength(3);
+    expect(
+      hasEffectiveKeyword(
+        watcher,
+        f.db.get(watcher.cardId)!,
+        "RUSH",
+        f.state,
+        f.db
+      )
+    ).toBe(true);
+  }
+);
+
+it("two hand-cost steps preserve both actual counts after source departure and reconnect", () => {
   const f = fixture();
   f.put("OP12-040", 0, "LEADER", { types: ["Navy"] });
-  const watcher = f.put("OP14-045");
-  const hand = Array.from({ length: 3 }, (_, i) =>
-    f.put(`fodder-${i}`, 0, "HAND")
+  for (let i = 0; i < 10; i++) f.put(`deck-${i}`, 0, "DECK");
+  const hand = Array.from({ length: 4 }, (_, i) =>
+    f.put(`discard-${i}`, 0, "HAND")
   );
-  f.play(f.put("OP12-046", 0, "HAND", { types: ["Navy"] }));
-  f.select(hand.slice(0, 2).map((c) => c.instanceId));
-  expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
-  if (f.state.pendingPrompt?.options.promptType !== "PLAYER_CHOICE")
-    throw new Error("Expected trigger order prompt");
-  const choice = f.state.pendingPrompt.options.choices.find((c) =>
-    c.label.startsWith("Kuzan:")
-  )!;
+  const source = f.put("navy-sequential-cost", 0, "CHARACTER", {
+    types: ["Navy"],
+    effectSchema: {
+      card_id: "navy-sequential-cost",
+      card_name: "source",
+      card_type: "Character",
+      effects: [
+        {
+          id: "costs",
+          category: "activate",
+          trigger: { keyword: "ACTIVATE_MAIN" },
+          flags: { optional: true },
+          costs: [
+            { type: "TRASH_SELF" },
+            { type: "TRASH_FROM_HAND", amount: 1 },
+            { type: "TRASH_FROM_HAND", amount: 2 },
+          ],
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        },
+      ],
+    },
+  });
+  f.activate(source, "costs");
   f.roundTrip();
-  f.act({ type: "PLAYER_CHOICE", choiceId: choice.id });
+  f.select([hand[0].instanceId]);
+  expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  f.roundTrip();
+  f.select(hand.slice(1, 3).map((c) => c.instanceId));
+  while (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+    const p = f.state.pendingPrompt.options;
+    f.roundTrip();
+    f.act({ type: "PLAYER_CHOICE", choiceId: p.choices[0].id });
+  }
   f.done();
-  expect(f.state.players[0].hand).toHaveLength(3);
+  expect(f.state.players[0].hand).toHaveLength(5);
+  const events = f.state.eventLog.filter(
+    (e) => e.type === "CARD_TRASHED" && e.payload.from === "HAND"
+  );
+  expect(events.map((e) => e.payload.count)).toEqual([1, 2]);
   expect(
-    hasEffectiveKeyword(
-      watcher,
-      f.db.get(watcher.cardId)!,
-      "RUSH",
-      f.state,
-      f.db
-    )
+    events.every((e) => e.payload.effectSourceCardId === source.cardId)
   ).toBe(true);
+  expect(f.state.eventLog.filter((e) => e.type === "CARD_DRAWN")).toHaveLength(
+    4
+  );
 });

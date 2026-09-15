@@ -18,9 +18,13 @@ export function handTrashEvent(
   sourceCardInstanceId: string | undefined,
   causingController: 0 | 1,
   resultRefs?: Map<string, EffectResult>
-): PendingEvent {
+): Extract<PendingEvent, { type: "CARD_TRASHED" }> {
   const source = sourceCardInstanceId
-    ? effectSourceCard(state, sourceCardInstanceId, resultRefs?.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot)
+    ? effectSourceCard(
+        state,
+        sourceCardInstanceId,
+        resultRefs?.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot
+      )
     : undefined;
   return {
     type: "CARD_TRASHED",
