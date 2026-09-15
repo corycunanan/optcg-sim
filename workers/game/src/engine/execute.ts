@@ -1,3 +1,4 @@
+import { getPlayEntryState } from "./play-entry-state.js";
 /**
  * Step 4: Execute
  *
@@ -106,7 +107,9 @@ function executePlayCard(
       }
     }
 
+    const entryState = getPlayEntryState(nextState, pi, cardData, cardDb);
     const moved = transitionCard(nextState, cardInstanceId, "CHARACTER", {
+      entryState,
       slotIndex: position,
       turnPlayed: nextState.turn.number,
     });
@@ -114,7 +117,7 @@ function executePlayCard(
     nextState = moved.state;
     const charNewInstanceId = moved.fact.newInstanceId;
 
-    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER", source: "FROM_HAND", sourceZone: "HAND" } });
+    events.push({ type: "CARD_PLAYED", playerIndex: pi, payload: { cardId: cardData.id, cardInstanceId: charNewInstanceId, zone: "CHARACTER", source: "FROM_HAND", sourceZone: "HAND", playedRested: entryState === "RESTED" } });
 
   } else if (cardData.type === "Event") {
     // Trash the event, then resolve its MAIN_EVENT effect block directly

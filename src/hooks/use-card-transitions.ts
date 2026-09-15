@@ -37,6 +37,8 @@ export interface CardTransition {
   /** Number of destination cards represented by this visual. Count-only
    *  transform events use one fizzle plus an aggregated pile receipt. */
   arrivalCount?: number;
+  /** Character arrival orientation, matching the authoritative CARD_PLAYED event. */
+  playedRested?: boolean;
   /** A transition sourced from the public spotlight waits until that
    *  spotlight yields, preserving its dwell and waiting-player contract. */
   waitForSpotlightId?: string;
@@ -438,6 +440,7 @@ function eventToTransition(
     playerIndex,
     startedAt: Date.now(),
     kind,
+    playedRested: event.type === "CARD_PLAYED" ? event.payload.playedRested : undefined,
     waitForSpotlightId: spotlightCard ? spotlight!.id : undefined,
     spotlightSourceSize: spotlightCard
       ? spotlight!.cards.length === 1

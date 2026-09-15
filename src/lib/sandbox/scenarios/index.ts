@@ -26,6 +26,7 @@ import { attachOneDonScenario } from "./movement/attach-1-don";
 import { attachThreeDonStaggeredScenario } from "./movement/attach-3-don-staggered";
 import { playCharacterSummonScenario } from "./movement/play-character-summon";
 import { redistributeDonScenario } from "./movement/redistribute-don";
+import { playCharacterRestedScenario } from "./playground/play-character-rested";
 import { playCharacterScenario } from "./playground/play-character";
 import { playEventTransformScenario } from "./playground/play-event-transform";
 import { arrangeTopFourScenario } from "./prompts/arrange-top-4";
@@ -36,6 +37,7 @@ import { selectTargetScenario } from "./prompts/select-target";
 
 export const scenarios: Scenario[] = [
   playCharacterScenario,
+  playCharacterRestedScenario,
   playEventTransformScenario,
   drawOneScenario,
   drawTwoScenario,

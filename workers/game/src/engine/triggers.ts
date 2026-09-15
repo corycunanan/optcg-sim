@@ -575,11 +575,8 @@ function matchesKeywordTrigger(
     if (!trigger.source_filter && event.payload.targetInstanceId !== sourceCard.instanceId) return false;
   }
 
-  // On Play does not fire when the Character entered the field rested.
-  // EB04-018 Megalo and similar "play rested" effects skip the On Play window.
-  if (trigger.keyword === "ON_PLAY" && event.type === "CARD_PLAYED") {
-    if (event.payload.playedRested) return false;
-  }
+  // Rested entry still fulfills On Play (rules 10-2-6-1). A REST_SELF
+  // activation cost, such as Megalo's, is checked by cost payability instead.
 
   // ON_OPPONENT_ATTACK: only fires when it is the opponent's turn to attack
   if (trigger.keyword === "ON_OPPONENT_ATTACK") {

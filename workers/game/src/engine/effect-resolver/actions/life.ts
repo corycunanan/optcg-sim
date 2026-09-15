@@ -1,3 +1,4 @@
+import { getPlayEntryState } from "../../play-entry-state.js";
 /**
  * Action handlers: All 14 life actions
  */
@@ -525,7 +526,7 @@ export function executePlayFromLife(
   const data = cardDb.get(lifeCard.cardId);
   if (!data) return { state, events, succeeded: false };
 
-  const entryState = params.entry_state ?? "ACTIVE";
+  const entryState = getPlayEntryState(state, controller, data, cardDb, params.entry_state);
 
   if (data.type.toUpperCase() === "CHARACTER") {
     const moved = transitionCard(state, lifeCard.instanceId, "CHARACTER", {

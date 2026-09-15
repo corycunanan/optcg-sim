@@ -165,12 +165,14 @@ function FlyingCard({
       opacity: 1,
       scale: 1,
     };
+    animateTarget.rotate = transition.playedRested ? 90 : 0;
     transitionConfig = { ...cardTransitions.zoneMove, delay };
   }
 
   return (
     <motion.div
       initial={{
+        rotate: 0,
         x: fromX,
         y: fromY,
         width: fromW,

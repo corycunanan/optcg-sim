@@ -762,10 +762,9 @@ describe("Trigger System", () => {
     expect(matched.length).toBe(1);
   });
 
-  // OPT-230 (A8): EB04-018 Megalo — "If played rested, On Play does not fire."
-  // When a Character enters the field rested via an effect, CARD_PLAYED carries
-  // playedRested: true, which disqualifies every ON_PLAY trigger from matching.
-  it("does NOT match ON_PLAY triggers when CARD_PLAYED has playedRested=true", () => {
+  // Rules 10-2-6-1: entry orientation does not suppress On Play.
+  // Megalo's rested-entry restriction is an unpayable REST_SELF cost.
+  it("matches ON_PLAY triggers when CARD_PLAYED has playedRested=true", () => {
     const state = createInitialGameState();
 
     const luffyInstance: CardInstance = {
@@ -812,7 +811,7 @@ describe("Trigger System", () => {
 
     const cardDb = makeCardDb(LUFFY_CARD);
     const matched = matchTriggersForEvent(state, event, cardDb);
-    expect(matched.length).toBe(0);
+    expect(matched.length).toBe(1);
   });
 
   it("still matches ON_PLAY when CARD_PLAYED has playedRested=false (played active)", () => {
