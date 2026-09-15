@@ -1,0 +1,161 @@
+// Expected-failure probe for the pre-existing Bao Huang REVEAL_HAND continuation.
+// Copy this file to workers/game/src/__tests__/opt-848-bao-repro.test.ts.
+// Run: pnpm --filter optcg-game test src/__tests__/opt-848-bao-repro.test.ts
+// Expected: failure at pendingPrompt null after a legal two-card selection.
+// Remove only that temporary test afterward. Never include this probe in the normal gate.
+// Reproduced before and after OPT-848 malformed-response correction; no guard edits required.
+
+import { describe, expect, it } from "vitest";
+import type { CardData, CardInstance, GameAction } from "../types.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
+import { registerCardEnteredField } from "../engine/triggers.js";
+import { executeTrashFromHand } from "../engine/effect-resolver/actions/removal.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { parseStoredSession } from "../session/persistence.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import {
+  visibleStateForPlayer,
+  visibleStateForSpectator,
+} from "../session/visibility.js";
+import { SessionCoordinator } from "../session/coordinator.js";
+import {
+  filterPromptForRecipient,
+  filterPromptForPlayer,
+} from "../engine/visibility.js";
+import {
+  CARDS,
+  createBattleReadyState,
+  createTestCardDb,
+  padChars,
+} from "./helpers.js";
+
+function fixture() {
+  const db = createTestCardDb();
+  let state = createBattleReadyState(db);
+  state.players.forEach((p) => {
+    p.characters = padChars([]);
+  });
+  let serial = 0;
+  function data(id: string, overrides: Partial<CardData> = {}) {
+    const schema = getEffectSchema(id);
+    const value: CardData = {
+      ...CARDS.VANILLA,
+      id,
+      name: schema?.card_name ?? id,
+      effectSchema: schema ?? null,
+      ...overrides,
+    };
+    db.set(id, value);
+    return value;
+  }
+  function put(
+    id: string,
+    controller: 0 | 1,
+    zone: CardInstance["zone"] = "CHARACTER"
+  ) {
+    const card: CardInstance = {
+      cardId: id,
+      instanceId: `test-instance-${serial++}`,
+      owner: controller,
+      controller,
+      zone,
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 1,
+    };
+    const p = state.players[controller];
+    if (zone === "LEADER") p.leader = card;
+    else if (zone === "STAGE") p.stage = card;
+    else if (zone === "CHARACTER")
+      p.characters[p.characters.findIndex((c) => !c)] = card;
+    else if (zone === "HAND") p.hand.push(card);
+    else if (zone === "TRASH") p.trash.push(card);
+    else if (zone === "DECK") p.deck.push(card);
+    if (["LEADER", "STAGE", "CHARACTER"].includes(zone))
+      state = registerCardEnteredField(state, card, db.get(id)!);
+    return card;
+  }
+  function act(action: GameAction, player = state.turn.activePlayerIndex) {
+    const result = runPipeline(state, action, db, player);
+    expect(result.valid, result.error).toBe(true);
+    state = result.state;
+  }
+  function choice(action: GameAction, rejected = false) {
+    const result = resumePromptLifecycle(state, action, db, {
+      drainPregame: (s) => s,
+      advanceStartOfTurn: (s) => s,
+    });
+    expect(
+      result.responseRejected,
+      JSON.stringify({ action, prompt: state.pendingPrompt })
+    ).toBe(rejected);
+    state = result.state;
+  }
+  function select(ids: string[], rejected = false) {
+    choice({ type: "SELECT_TARGET", selectedInstanceIds: ids }, rejected);
+  }
+  function accept() {
+    choice({ type: "PLAYER_CHOICE", choiceId: "accept" });
+  }
+  function targets() {
+    const options = state.pendingPrompt?.options;
+    expect(options?.promptType).toBe("SELECT_TARGET");
+    if (options?.promptType !== "SELECT_TARGET")
+      throw new Error(JSON.stringify(options));
+    return options;
+  }
+  return {
+    db,
+    data,
+    put,
+    act,
+    choice,
+    select,
+    accept,
+    targets,
+    persist() {
+      state = parseStoredSession(
+        JSON.parse(
+          JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+        )
+      ).state;
+    },
+    get state() {
+      return state;
+    },
+  };
+}
+
+describe("blind choice lifecycle shared consumers", () => {
+  it("retains authored Bao Huang's two-card choice after invalid replies", () => {
+    const f = fixture();
+    f.state.players.forEach((p) => {
+      p.hand = [];
+    });
+    f.data("OP01-105", { cost: 2 });
+    const bao = f.put("OP01-105", 0, "HAND");
+    const hand = [0, 1, 2].map((i) => {
+      f.data(`bao-secret-${i}`);
+      return f.put(`bao-secret-${i}`, 1, "HAND");
+    });
+    f.act({ type: "PLAY_CARD", cardInstanceId: bao.instanceId });
+    expect(f.targets()).toMatchObject({
+      blindSelection: true,
+      countMin: 2,
+      countMax: 2,
+    });
+    f.select([hand[0].instanceId, hand[2].instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[1].hand).toEqual(hand);
+    expect(
+      f.state.eventLog.filter((e) => e.type === "CARDS_REVEALED").at(-1)
+        ?.payload
+    ).toMatchObject({
+      cards: [hand[0], hand[2]].map((c) => ({
+        instanceId: c.instanceId,
+        cardId: c.cardId,
+      })),
+    });
+  });
+
+});
