@@ -303,7 +303,7 @@ export const ST09_015_THUNDER_BAGUA: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_life_add",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -324,7 +324,7 @@ export const ST09_015_THUNDER_BAGUA: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 3 },
           },
-          params: { face: "UP" },
+          params: { face: "UP", position: "TOP_OR_BOTTOM" },
           chain: "THEN",
           conditions: {
             type: "LIFE_COUNT",
