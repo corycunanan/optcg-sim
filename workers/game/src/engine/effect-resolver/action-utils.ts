@@ -1,3 +1,4 @@
+import { effectSourceCard } from "../effect-source.js";
 /**
  * Pure utility functions for action handlers.
  */
@@ -32,10 +33,7 @@ export function effectSourceController(
   fallbackController: 0 | 1,
   resultRefs: Map<string, EffectResult>,
 ): 0 | 1 {
-  const saved = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot;
-  const source = (saved?.instanceId === sourceCardInstanceId ? saved : undefined)
-    ?? findCardInstance(state, sourceCardInstanceId);
-  return source?.controller ?? fallbackController;
+  return effectSourceCard(state, sourceCardInstanceId, resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot)?.controller ?? fallbackController;
 }
 
 export function getSearchAndPlayPickLimit(

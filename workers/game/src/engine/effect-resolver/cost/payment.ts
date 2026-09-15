@@ -1,3 +1,4 @@
+import { handTrashEvent } from "../../hand-trash.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 /** Fixed and automatically selected cost payment mutations. */
 import { moveLifeToHand } from "../life-movement.js";
@@ -212,7 +213,7 @@ export function payCosts(
         nextState = moved.state;
         costResult.cardsTrashedCount += moved.transitions.length;
         costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
-        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "cost", from: "HAND" } });
+        if (moved.transitions.length > 0) events.push(handTrashEvent(state, controller, moved.transitions.length, "COST", sourceCardInstanceId, controller));
         break;
       }
 

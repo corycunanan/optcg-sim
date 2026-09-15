@@ -139,7 +139,8 @@ export function processRemainingTriggers(
         trigger.triggeringEvent?.payload as
           | { cardInstanceId?: string }
           | undefined
-      )?.cardInstanceId ?? null
+      )?.cardInstanceId ?? null,
+      trigger.triggeringEvent,
     );
     nextState = result.state;
     events.push(...result.events);
@@ -204,7 +205,8 @@ export function processRemainingTriggers(
         trigger.triggeringEvent?.payload as
           | { cardInstanceId?: string }
           | undefined
-      )?.cardInstanceId ?? null
+      )?.cardInstanceId ?? null,
+      trigger.triggeringEvent,
     );
     nextState = result.state;
     events.push(...result.events);

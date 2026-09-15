@@ -1428,16 +1428,16 @@ export const OP12_040_KUZAN: EffectSchema = {
       id: "OP12-040_effect_1",
       category: "auto",
       trigger: {
-        event: "CARD_ADDED_TO_HAND_FROM_LIFE",
+        event: "CARD_TRASHED_FROM_HAND",
+        filter: { controller: "SELF", cause: "BY_EFFECT", effect_source: { controller: "SELF", traits: ["Navy"] } },
       },
       actions: [
         {
           type: "DRAW",
           params: {
             amount: {
-              type: "PER_COUNT",
-              source: "CARDS_TRASHED_THIS_WAY",
-              multiplier: 1,
+              type: "ACTION_RESULT",
+              ref: "__triggering_hand_trash",
             },
           },
         },
