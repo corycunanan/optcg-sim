@@ -357,6 +357,7 @@ const StackFrameCore = z.strictObject({
   stateDistributionForPlay: z.unknown().optional(),
   batchResumeMarker: z.unknown().optional(),
   costArrangeStage: z.boolean().optional(),
+  namedPlayCostTargetId: z.string().optional(),
 });
 
 const PersistedGameStateV2 = z.strictObject({

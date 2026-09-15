@@ -1,0 +1,117 @@
+[
+  {
+    "card": "EB01-059",
+    "path": "EB01-059.effects.1.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "COMBINED_LIFE_COUNT"
+  },
+  {
+    "card": "OP04-112",
+    "path": "OP04-112.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "COMBINED_LIFE_COUNT"
+  },
+  {
+    "card": "OP05-102",
+    "path": "OP05-102.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "OP05-103",
+    "path": "OP05-103.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "OP05-114",
+    "path": "OP05-114.effects.1.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "OP05-116",
+    "path": "OP05-116.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "OP06-100",
+    "path": "OP06-100.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "OP08-062",
+    "path": "OP08-062.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_DON_FIELD_COUNT"
+  },
+  {
+    "card": "OP08-098",
+    "path": "OP08-098.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "DON_FIELD_COUNT"
+  },
+  {
+    "card": "OP08-102",
+    "path": "OP08-102.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "LIFE_COUNT"
+  },
+  {
+    "card": "OP10-100",
+    "path": "OP10-100.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "COMBINED_LIFE_COUNT"
+  },
+  {
+    "card": "OP10-110",
+    "path": "OP10-110.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "OP10-115",
+    "path": "OP10-115.effects.1.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "OP11-022",
+    "path": "OP11-022.effects.1.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "DON_FIELD_COUNT"
+  },
+  {
+    "card": "OP13-099",
+    "path": "OP13-099.effects.1.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "DON_FIELD_COUNT",
+    "controller": "SELF"
+  },
+  {
+    "card": "OP15-102",
+    "path": "OP15-102.effects.1.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "P-090",
+    "path": "P-090.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_DON_FIELD_COUNT"
+  },
+  {
+    "card": "ST29-002",
+    "path": "ST29-002.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "OPPONENT_LIFE_COUNT"
+  },
+  {
+    "card": "ST29-013",
+    "path": "ST29-013.effects.0.actions.0.target.filter.cost_max",
+    "type": "GAME_STATE",
+    "source": "COMBINED_LIFE_COUNT"
+  }
+]
