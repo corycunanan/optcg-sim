@@ -463,7 +463,7 @@ it("rule-trash returns attached DON!! and reveals the chosen hand card before th
     f.state.eventLog.find(
       (e) => e.type === "CARD_TRASHED" && e.payload.cardInstanceId === "own-0"
     )?.payload
-  ).toMatchObject({ reason: "rule" });
+  ).toMatchObject({ reason: "rule", movementCause: "RULE" });
   expect(
     f.state.eventLog.filter((e) => e.type === "CARDS_REVEALED")
   ).toHaveLength(1);
@@ -628,3 +628,59 @@ it.each(["moved", "prohibited", "duplicate-victim"])(
     expect(result.state).toEqual(before);
   }
 );
+
+// OP16-041 FAQ: even with DON!! x1, rule overflow cannot activate Buggy.
+// This exercises overflow inside Hotori's activation cost, not a normal play.
+it("registered Buggy ignores rule trash while paying Hotori with Kotori", () => {
+  const f = prepared(1, true);
+  const buggySchema = getEffectSchema("OP16-041")!;
+  const buggyData: CardData = {
+    ...CARDS.LEADER,
+    id: "OP16-041",
+    name: "Buggy",
+    effectSchema: buggySchema,
+  };
+  f.cardDb.set(buggyData.id, buggyData);
+  const buggy: CardInstance = {
+    ...f.state.players[0].leader,
+    cardId: buggyData.id,
+    instanceId: "buggy-leader",
+  };
+  f.state.players[0].leader = buggy;
+  f.state = registerCardEnteredField(f.state, buggy, buggyData);
+  f.act({ type: "ATTACH_DON", targetInstanceId: buggy.instanceId, count: 1 });
+  f.cardDb.set(CARDS.VANILLA.id, { ...CARDS.VANILLA, types: ["Impel Down"] });
+  const prisonerSchema = getEffectSchema("OP16-042")!;
+  f.cardDb.set("OP16-042", {
+    ...CARDS.VANILLA,
+    id: "OP16-042",
+    name: "Prisoner of Impel Down",
+    types: ["Impel Down"],
+    effectSchema: prisonerSchema,
+  });
+  f.state.players[0].hand.push({
+    ...f.source,
+    cardId: "OP16-042",
+    instanceId: "prisoner-in-hand",
+  });
+  activate(f);
+  f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["kotori-0"] });
+  f.state = JSON.parse(JSON.stringify(f.state));
+  f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["own-0"] });
+  f.act({ type: "SELECT_TARGET", selectedInstanceIds: [] });
+  expect(f.state.pendingPrompt).toBeNull();
+  expect(f.state.effectStack).toEqual([]);
+  expect(f.state.players[0].hand.map((card) => card.instanceId)).toEqual([
+    "prisoner-in-hand",
+  ]);
+  expect(
+    f.state.players[0].characters.some((card) => card?.cardId === "OP05-103")
+  ).toBe(true);
+  expect(
+    f.state.eventLog.find(
+      (event) =>
+        event.type === "CARD_TRASHED" &&
+        event.payload.cardInstanceId === "own-0"
+    )?.payload
+  ).toMatchObject({ reason: "rule", movementCause: "RULE" });
+});

@@ -2626,8 +2626,6 @@ export const OP09_079_GUM_GUM_JUMP_ROPE: EffectSchema = {
 // [Opponent's Turn] You may rest this Stage: When your {Straw Hat Crew} type
 // Character is removed from the field by your opponent's effect, add up to 1
 // DON!! card from your DON!! deck and rest it.
-// _comment: No exact "CHARACTER_REMOVED_FROM_FIELD" event — using ANY_CHARACTER_KO
-// as closest match. Covers KO by opponent effect but not bounce/deck removal.
 
 export const OP09_080_THOUSAND_SUNNY: EffectSchema = {
   card_id: "OP09-080",
@@ -2638,7 +2636,7 @@ export const OP09_080_THOUSAND_SUNNY: EffectSchema = {
       id: "opponent_turn_removed_add_don",
       category: "auto",
       trigger: {
-        event: "ANY_CHARACTER_KO",
+        event: "CHARACTER_REMOVED_FROM_FIELD",
         filter: {
           controller: "SELF",
           target_filter: { traits: ["Straw Hat Crew"] },

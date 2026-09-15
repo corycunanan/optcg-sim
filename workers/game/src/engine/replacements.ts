@@ -928,9 +928,9 @@ function finalizeTarget(
     case "KO":
       return koCharacter(state, targetId, causingController, cardDb, snapshotState);
     case "RETURN_TO_HAND":
-      return returnToHand(state, targetId);
+      return returnToHand(state, targetId, causingController);
     case "RETURN_TO_DECK":
-      return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM");
+      return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM", causingController);
     case "SET_REST":
       return restFieldTarget(state, targetId, causingController, causingSource);
   }
