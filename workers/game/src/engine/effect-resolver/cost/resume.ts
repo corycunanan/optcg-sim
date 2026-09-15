@@ -1,7 +1,8 @@
 /** Mutations applied after a player answers a cost-selection prompt. */
 import type { Cost } from "../../effect-types.js";
-import type { CardInstance, GameState, PendingEvent } from "../../../types.js";
+import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
 import { transitionCards } from "../../zone-transition.js";
+import { getEffectiveBasePower } from "../../modifiers.js";
 import { trashStage } from "../card-mutations.js";
 
 export interface AppliedCostSelection {
@@ -15,6 +16,7 @@ export function applyCostSelection(
   cost: Cost,
   selectedIds: string[],
   controller: 0 | 1,
+  cardDb?: Map<string, CardData>,
 ): AppliedCostSelection {
   const p = state.players[controller];
   const selectedSet = new Set(selectedIds);
@@ -43,14 +45,27 @@ export function applyCostSelection(
     case "KO_OWN_CHARACTER":
     case "TRASH_OWN_CHARACTER": {
       const toRemove = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
-      const moved = transitionCards(state, toRemove.map((c) => c.instanceId), "TRASH", { position: "TOP" });
-      return { state: moved.state, events: [] };
+      const moved = transitionCards(state, toRemove.map((c) => c.instanceId), "TRASH", { position: "TOP", preserveSourceTriggers: true });
+      const events: PendingEvent[] = moved.transitions.map(({ fact }) => {
+        const provenance = { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST" as const };
+        const source = toRemove.find(card => card.instanceId === fact.oldInstanceId)!;
+        const data = cardDb?.get(source.cardId);
+        const preKO_basePower = data && cardDb ? getEffectiveBasePower(source, data, state, cardDb) : undefined;
+        return cost.type === "KO_OWN_CHARACTER"
+          ? { type: "CARD_KO", playerIndex: fact.owner, payload: { ...provenance, cause: "EFFECT", preKO_donCount: fact.detachedDonInstanceIds.length, ...(preKO_basePower !== undefined ? { preKO_basePower } : {}) } }
+          : { type: "CARD_TRASHED", playerIndex: fact.owner, payload: { ...provenance, reason: "cost", count: 1, from: "CHARACTER" } };
+      });
+      return { state: moved.state, events };
     }
 
     case "RETURN_OWN_CHARACTER_TO_HAND": {
       const toReturn = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
-      const moved = transitionCards(state, toReturn.map((c) => c.instanceId), "HAND");
-      return { state: moved.state, events: [] };
+      const moved = transitionCards(state, toReturn.map((c) => c.instanceId), "HAND", { preserveSourceTriggers: true });
+      const events: PendingEvent[] = moved.transitions.map(({ fact }) => ({
+        type: "CARD_RETURNED_TO_HAND", playerIndex: fact.owner,
+        payload: { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST" },
+      }));
+      return { state: moved.state, events };
     }
 
     case "PLACE_HAND_TO_DECK":
@@ -67,7 +82,7 @@ export function applyCostSelection(
         const events: PendingEvent[] = moved.transitions.map((transition) => ({
             type: "CARD_RETURNED_TO_DECK",
             playerIndex: controller,
-            payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId, cardId: transition.fact.cardId, position },
+            payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId, cardId: transition.fact.cardId, position, sourceZone: transition.fact.source, sourceController: transition.fact.controller, causingController: controller, movementCause: "COST" },
           }));
         return { state: moved.state, events };
       }
@@ -103,6 +118,10 @@ export function applyCostSelection(
             cardInstanceId: transition.fact.oldInstanceId,
             newCardInstanceId: transition.fact.newInstanceId,
             cardId: transition.fact.cardId,
+            sourceZone: transition.fact.source,
+            sourceController: transition.fact.controller,
+            causingController: controller,
+            movementCause: "COST",
             position: cost.position === "TOP" ? "TOP" : "BOTTOM",
           },
         }));
@@ -119,7 +138,7 @@ export function applyCostSelection(
         events: stageTransition ? [{
           type: "CARD_RETURNED_TO_DECK",
           playerIndex: controller,
-          payload: { cardInstanceId: stage.instanceId, newCardInstanceId: stageTransition.fact.newInstanceId, cardId: stage.cardId, position: "BOTTOM" },
+          payload: { cardInstanceId: stage.instanceId, newCardInstanceId: stageTransition.fact.newInstanceId, cardId: stage.cardId, position: "BOTTOM", sourceZone: "STAGE", sourceController: stage.controller, causingController: controller, movementCause: "COST" },
         }] : [],
       };
     }
@@ -137,7 +156,11 @@ export function applyCostSelection(
         position: position === "BOTTOM" ? "BOTTOM" : "TOP",
         lifeFace: face,
       });
-      return { state: moved.state, events: [] };
+      const events: PendingEvent[] = moved.transitions.map(({ fact }) => ({
+        type: "CARD_ADDED_TO_LIFE", playerIndex: fact.owner,
+        payload: { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST" },
+      }));
+      return { state: moved.state, events };
     }
 
     case "REST_CARDS":

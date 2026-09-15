@@ -5,9 +5,8 @@
  * activated when your {Impel Down} type Character card is removed from the
  * field. Play up to 1 [Prisoner of Impel Down] card from your hand."
  *
- * Rule 8-4-5 limits moved-card auto effects to open destinations, so this
- * custom event matches field→trash exits only: CARD_KO and field-only
- * CARD_TRASHED. Hand, deck, and face-down Life destinations are secret.
+ * A watcher remaining on the field observes exits to secret destinations
+ * (OP16-041 FAQ). Rule 8-4-5 governs the moved card's own auto effects.
  */
 
 import { describe, it, expect } from "vitest";
@@ -100,21 +99,21 @@ describe("OPT-407: CHARACTER_REMOVED_FROM_FIELD matching (OP16-041)", () => {
     expect(matchTriggersForEvent(state, event, cardDb).length).toBe(0);
   });
 
-  it("does NOT match movement to the secret hand area", () => {
+  it("matches a Character field exit to hand, but not trash recovery", () => {
     const { state, cardDb } = buildState();
     // Field bounce: card now in hand.
     state.players[0].hand.push({ ...state.players[0].trash[0], zone: "HAND" });
-    const bounce = makeEvent("CARD_RETURNED_TO_HAND", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id });
-    expect(matchTriggersForEvent(state, bounce, cardDb).length).toBe(0);
+    const bounce = makeEvent("CARD_RETURNED_TO_HAND", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id, sourceZone: "CHARACTER" });
+    expect(matchTriggersForEvent(state, bounce, cardDb).length).toBe(1);
 
     const recovery = makeEvent("CARD_RETURNED_TO_HAND", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id, source: "TRASH" });
     expect(matchTriggersForEvent(state, recovery, cardDb).length).toBe(0);
   });
 
-  it("does NOT match movement to the secret deck area", () => {
+  it("matches a Character field exit to deck", () => {
     const { state, cardDb } = buildState();
-    const event = makeEvent("CARD_RETURNED_TO_DECK", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id, position: "BOTTOM" });
-    expect(matchTriggersForEvent(state, event, cardDb).length).toBe(0);
+    const event = makeEvent("CARD_RETURNED_TO_DECK", 0, { cardInstanceId: "impel-1", cardId: IMPEL_CHAR.id, sourceZone: "CHARACTER", position: "BOTTOM" });
+    expect(matchTriggersForEvent(state, event, cardDb).length).toBe(1);
   });
 
   it("does NOT match the opponent's removals (controller: SELF filter)", () => {
@@ -139,5 +138,46 @@ describe("OPT-407: CHARACTER_REMOVED_FROM_FIELD matching (OP16-041)", () => {
     }, ...state.players[0].trash];
     const event = makeEvent("CARD_KO", 0, { cardInstanceId: "plain-1", cardId: plain.id, cause: "BATTLE", preKO_donCount: 0 });
     expect(matchTriggersForEvent(state, event, cardDb).length).toBe(0);
+  });
+
+  it.each(["HAND", "DECK", "LIFE", "TRASH", "STAGE"])("does not treat %s source as a Character field exit", (sourceZone) => {
+    const { state, cardDb } = buildState();
+    for (const type of ["CARD_RETURNED_TO_HAND", "CARD_RETURNED_TO_DECK", "CARD_ADDED_TO_LIFE"] as const) {
+      const event = makeEvent(type, 0, { cardInstanceId: "old", newCardInstanceId: "new", cardId: IMPEL_CHAR.id, sourceZone, causingController: 0, movementCause: "EFFECT" });
+      expect(matchTriggersForEvent(state, event, cardDb)).toHaveLength(0);
+    }
+  });
+  it.each(["CARD_KO", "CARD_TRASHED", "CARD_RETURNED_TO_HAND", "CARD_RETURNED_TO_DECK", "CARD_ADDED_TO_LIFE"] as const)("never considers a Stage a Character via %s", (type) => {
+    const { state, cardDb } = buildState();
+    cardDb.set("STAGE", { ...IMPEL_CHAR, id: "STAGE", type: "Stage" });
+    const event = makeEvent(type, 0, { cardInstanceId: "old", newCardInstanceId: "new", cardId: "STAGE", sourceZone: "STAGE", reason: "effect", causingController: 0, movementCause: "EFFECT" });
+    expect(matchTriggersForEvent(state, event, cardDb)).toHaveLength(0);
+  });
+  it.each(["EFFECT", "COST", "RULE", "BATTLE"])("preserves %s movement cause for by-your-effect filter", (movementCause) => {
+    const { state, cardDb } = buildState();
+    const block = structuredClone(buggyLeaderBlock);
+    if (block.category !== "auto" || !block.trigger || !("event" in block.trigger)) throw new Error("bad fixture");
+    block.trigger.filter = { cause: "BY_YOUR_EFFECT" };
+    state.triggerRegistry[0].trigger = block.trigger;
+    state.triggerRegistry[0].effectBlock = block;
+    const event = makeEvent("CARD_RETURNED_TO_DECK", 1, { cardInstanceId: "old", cardId: IMPEL_CHAR.id, sourceZone: "CHARACTER", sourceController: 1, causingController: 0, movementCause });
+    expect(matchTriggersForEvent(state, event, cardDb)).toHaveLength(["EFFECT", "COST"].includes(movementCause) ? 1 : 0);
+  });
+  it("filters removed controller independently from destination owner", () => {
+    const { state, cardDb } = buildState();
+    const payload = { cardInstanceId: "old", cardId: IMPEL_CHAR.id, sourceZone: "CHARACTER", sourceController: 0, causingController: 1, movementCause: "EFFECT" };
+    expect(matchTriggersForEvent(state, makeEvent("CARD_RETURNED_TO_DECK", 1, payload), cardDb)).toHaveLength(1);
+    expect(matchTriggersForEvent(state, makeEvent("CARD_RETURNED_TO_DECK", 0, { ...payload, sourceController: 1 }), cardDb)).toHaveLength(0);
+  });
+
+  it.each([0, 1, undefined])("by-your-effect checks causing controller %s, not removed owner", (causingController) => {
+    const { state, cardDb } = buildState();
+    const block = structuredClone(buggyLeaderBlock);
+    if (block.category !== "auto" || !block.trigger || !("event" in block.trigger)) throw new Error("bad fixture");
+    block.trigger.filter = { cause: "BY_YOUR_EFFECT" };
+    state.triggerRegistry[0].trigger = block.trigger;
+    state.triggerRegistry[0].effectBlock = block;
+    const event = makeEvent("CARD_RETURNED_TO_HAND", 1, { cardInstanceId: "old", cardId: IMPEL_CHAR.id, sourceZone: "CHARACTER", causingController, movementCause: "EFFECT" });
+    expect(matchTriggersForEvent(state, event, cardDb)).toHaveLength(causingController === 0 ? 1 : 0);
   });
 });

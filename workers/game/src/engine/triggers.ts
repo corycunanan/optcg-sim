@@ -30,7 +30,9 @@ import type {
   GameEvent,
   GameEventType,
   GameState,
+  PendingEvent,
 } from "../types.js";
+import { expireSourceLeftZone, expireTargetLeftZone } from "./duration-tracker.js";
 import { findCardInstance } from "./state.js";
 import { matchesFilter, hasBaseEffect } from "./conditions.js";
 import { isCardNegated } from "./modifiers.js";
@@ -101,6 +103,23 @@ export function deregisterTriggersForCard(
   );
   if (filtered.length === state.triggerRegistry.length) return state;
   return { ...state, triggerRegistry: filtered };
+}
+
+/** Release pre-transition registrations after the complete event set is matched.
+ * Both pipeline and prompt continuations must retire the OLD identity; looking
+ * up the destination by cardId can accidentally clean a different/new card.
+ */
+export function deregisterDepartedSources(state: GameState, events: PendingEvent[]): GameState {
+  let nextState = state;
+  for (const event of events) {
+    if (!["CARD_KO", "CARD_TRASHED", "CARD_RETURNED_TO_HAND", "CARD_RETURNED_TO_DECK", "CARD_ADDED_TO_LIFE"].includes(event.type)) continue;
+    const id = (event.payload as { cardInstanceId?: string }).cardInstanceId;
+    if (!id) continue;
+    nextState = deregisterTriggersForCard(nextState, id);
+    nextState = expireSourceLeftZone(nextState, id);
+    nextState = expireTargetLeftZone(nextState, id);
+  }
+  return nextState;
 }
 
 // ─── Permanent Effect Registration ───────────────────────────────────────────
@@ -420,7 +439,11 @@ export function matchTriggersForEvent(
       event.payload?.cardInstanceId === reg.sourceCardInstanceId &&
       isOnKOTrigger(reg.trigger);
 
-    if (!isOnKOSelfTrigger && !isCardInValidZone(sourceCard, reg.zone)) continue;
+    // A moved source's removal auto can activate in open Trash (§8-4-5),
+    // while hand/deck/Life destinations remain invalid for that source.
+    const isOpenRemovalSelfTrigger = transitionedSourceId !== undefined &&
+      sourceCard.zone === "TRASH" && containsRemovalTrigger(reg.trigger);
+    if (!isOnKOSelfTrigger && !isOpenRemovalSelfTrigger && !isCardInValidZone(sourceCard, reg.zone)) continue;
 
     // OPT-253: skip triggers whose source Character is currently effect-negated.
     // [Trigger] on Life (ON_TRIGGER_FROM_LIFE) is exempt — field-level negation
@@ -630,7 +653,7 @@ function matchesCustomTrigger(
   sourceCard: CardInstance,
   _cardDb: Map<string, CardData>,
 ): boolean {
-  if (!customEventMatchesGameEvent(trigger.event, event)) return false;
+  if (!customEventMatchesGameEvent(trigger.event, event, _cardDb)) return false;
   if (trigger.event === "CHARACTER_BECOMES_RESTED") {
     if (event.type !== "CARD_STATE_CHANGED" || event.payload.newState !== "RESTED") return false;
     const targetId = event.payload.targetInstanceId ?? event.payload.cardInstanceId;
@@ -667,6 +690,20 @@ function matchesCustomTrigger(
       if (filter.cause === "BY_OPPONENT_EFFECT" && (!isEffect || causingController === undefined || causingController === sourceCard.controller)) return false;
       if (filter.cause && !["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
       filter = { ...filter, cause: undefined };
+    }
+    if (trigger.event === "CHARACTER_REMOVED_FROM_FIELD") {
+      const payload = event.payload as { sourceController?: 0 | 1; causingController?: 0 | 1; movementCause?: string; cause?: string; reason?: string };
+      const removedController = payload.sourceController ?? event.playerIndex;
+      if (filter.controller === "SELF" && removedController !== sourceCard.controller) return false;
+      if (filter.controller === "OPPONENT" && removedController === sourceCard.controller) return false;
+      const isEffect = payload.movementCause === "EFFECT" || payload.movementCause === "COST" ||
+        (event.type === "CARD_KO" && ["EFFECT", "OPPONENT_EFFECT"].includes(payload.cause ?? "")) ||
+        (event.type === "CARD_TRASHED" && payload.reason === "effect");
+      if (filter.cause === "BY_EFFECT" && !isEffect) return false;
+      if (filter.cause === "BY_YOUR_EFFECT" && (!isEffect || payload.causingController !== sourceCard.controller)) return false;
+      if (filter.cause === "BY_OPPONENT_EFFECT" && (!isEffect || payload.causingController === undefined || payload.causingController === sourceCard.controller)) return false;
+      if (filter.cause && !["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
+      filter = { ...filter, controller: undefined, cause: undefined };
     }
     if (!matchesEventFilter(filter, event, sourceCard.controller, state, _cardDb)) return false;
   }
@@ -736,6 +773,11 @@ function getSourceFilteredAttackCardId(
   return null;
 }
 
+function containsRemovalTrigger(trigger: Trigger): boolean {
+  if ("event" in trigger) return trigger.event === "CHARACTER_REMOVED_FROM_FIELD";
+  return "any_of" in trigger && trigger.any_of.some(containsRemovalTrigger);
+}
+
 /** Check if a trigger contains ON_KO (direct keyword or inside compound any_of). */
 function isOnKOTrigger(trigger: Trigger): boolean {
   if ("keyword" in trigger && (trigger as KeywordTrigger).keyword === "ON_KO") return true;
@@ -747,33 +789,24 @@ function isOnKOTrigger(trigger: Trigger): boolean {
   return false;
 }
 
-/**
- * OPT-407: game events that constitute a character being "removed from the
- * field" (OP16-041 Buggy leader). Rule 8-4-5 permits moved-card auto effects
- * only when the destination is open: trash qualifies; hand, deck, and
- * face-down Life are secret areas (3-2-2, 3-4-2, 3-10-2). CARD_TRASHED needs
- * a payload guard because non-field trashes reuse the event type.
+/** Field watchers observe the exit even when its destination is secret.
+ * Rule 8-4-5 concerns the moved card's own effect, not a watcher still on field.
  */
-const REMOVED_FROM_FIELD_EVENTS: GameEventType[] = [
-  "CARD_KO",
-  "CARD_TRASHED",
-];
-
-function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent): boolean {
-  if (
-    event.type === "CARD_KO" &&
-    event.payload.cardType === "STAGE" &&
-    ["CHARACTER_REMOVED_FROM_FIELD", "OPPONENT_CHARACTER_KO", "ANY_CHARACTER_KO"].includes(custom)
-  ) return false;
-
+function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent, cardDb: Map<string, CardData>): boolean {
+  if (event.type === "CARD_KO" && event.payload.cardType === "STAGE" &&
+      ["CHARACTER_REMOVED_FROM_FIELD", "OPPONENT_CHARACTER_KO", "ANY_CHARACTER_KO"].includes(custom)) return false;
   if (custom === "CHARACTER_REMOVED_FROM_FIELD") {
-    if (!REMOVED_FROM_FIELD_EVENTS.includes(event.type)) return false;
+    if (!["CARD_KO", "CARD_TRASHED", "CARD_RETURNED_TO_HAND", "CARD_RETURNED_TO_DECK", "CARD_ADDED_TO_LIFE"].includes(event.type)) return false;
+    const payload = event.payload as { cardId?: string; cardInstanceId?: string; sourceZone?: string; reason?: string; movementCause?: string };
+    if (!payload.cardInstanceId || !payload.cardId || cardDb.get(payload.cardId)?.type !== "Character") return false;
+    // Overflow is rule processing (OP16-041 FAQ); non-field recovery is not removal.
+    if (payload.movementCause === "RULE") return false;
+    if (event.type === "CARD_KO") return true;
     if (event.type === "CARD_TRASHED") {
-      // Field/stage trashes carry the instance id; hand, deck, and search
-      // trashes emit only { count } / { cardId }.
-      return !!(event.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId;
+      return payload.sourceZone === "CHARACTER" ||
+        (payload.sourceZone === undefined && ["effect", "cost"].includes(payload.reason ?? ""));
     }
-    return true;
+    return payload.sourceZone === "CHARACTER";
   }
   const mapped = customEventToGameEvent(custom);
   return mapped !== null && event.type === mapped;
