@@ -1,3 +1,4 @@
+import { cardHasName, cardsShareName } from "./card-names.js";
 /**
  * Runtime-neutral TargetFilter predicate core.
  *
@@ -107,12 +108,13 @@ export const TARGET_FILTER_KEYS = Object.freeze([
   "any_of",
 ] as const satisfies readonly (keyof SharedTargetFilter)[]);
 
-type TargetFilterKeyListIsComplete = Exclude<
-  keyof SharedTargetFilter,
-  (typeof TARGET_FILTER_KEYS)[number]
-> extends never
-  ? true
-  : never;
+type TargetFilterKeyListIsComplete =
+  Exclude<
+    keyof SharedTargetFilter,
+    (typeof TARGET_FILTER_KEYS)[number]
+  > extends never
+    ? true
+    : never;
 const targetFilterKeyListIsComplete: TargetFilterKeyListIsComplete = true;
 void targetFilterKeyListIsComplete;
 
@@ -127,6 +129,7 @@ export interface SharedTargetFilterCard {
   colors: readonly string[];
   traits: readonly string[];
   name: string;
+  nameAliases?: readonly string[];
   attributes: readonly string[];
   cardType: string;
   state?: string;
@@ -375,28 +378,25 @@ export function matchesTargetFilter(
   )
     return false;
 
-  if (filter.name && !card.treatsAsAllNames && card.name !== filter.name)
-    return false;
+  if (filter.name && !cardHasName(card, filter.name)) return false;
   if (
     filter.name_any_of &&
-    !card.treatsAsAllNames &&
-    !filter.name_any_of.includes(card.name)
+    !filter.name_any_of.some((name) => cardHasName(card, name))
   )
     return false;
   if (
     filter.name_includes &&
     !card.treatsAsAllNames &&
-    !card.name.includes(filter.name_includes)
+    ![card.name, ...(card.nameAliases ?? [])].some((name) =>
+      name.includes(filter.name_includes!)
+    )
   )
     return false;
-  if (
-    filter.exclude_name &&
-    (card.treatsAsAllNames || card.name === filter.exclude_name)
-  )
+  if (filter.exclude_name && cardHasName(card, filter.exclude_name))
     return false;
   if (filter.name_matching_ref) {
     const referenced = context.getReferencedCard?.(filter.name_matching_ref);
-    if (referenced && card.name !== referenced.name) return false;
+    if (referenced && !cardsShareName(card, referenced)) return false;
   }
 
   if (filter.keywords) {
