@@ -1,6 +1,6 @@
 # OPT-807 — schema corrections with named-play prerequisite
 
-**Recovered as a stacked draft; final gates remain pending.** Existing PR654 integrates OPT-845 parent `81e571ba5b84e8616369d7c452780e3977e21ea8` by normal merge. OPT-845 supplies OP05-111 Hotori’s real named-character activation cost and Life Top/Bottom choice. The child owns the independent schema rows and SEARCH_AND_PLAY remainder correction below. No ignored `life_controller` parameter is introduced.
+**Recovered as a stacked draft; final gates remain pending.** Existing PR654 integrates OPT-845 parent `96243ce54e09a634726e2a1df0fb2fb3c7c8ecb6` by normal merge. OPT-845 supplies OP05-111 Hotori’s real named-character activation cost and Life Top/Bottom choice. The child owns the independent schema rows and SEARCH_AND_PLAY remainder correction below. No ignored `life_controller` parameter is introduced.
 
 Workspace `/private/tmp/optcg-opt807-final-20260915` (recovered on September 15 from pushed `a15831fbffc3afe48deb061377000430d58a6003`; original workspace preserved); recovered child head `cbc36e3899c65689dc9653c5cf3b9ded4bcc41bf`, initial integration commit `ab4d066`; latest parent also brings main `7491cf09` (OPT-790 DON phase routing) without conflicts. The coordinator has run-scoped merge authorization for OPT-845/OPT-807 after all readiness gates, and stacking is authorized. Implementation agents do not merge PRs or write Linear. This child must target main and renew integration validation after its parent merges.
 
