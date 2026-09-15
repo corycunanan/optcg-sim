@@ -390,7 +390,9 @@ export function executeSearchAndPlay(
 
   const validTargets = matching.map((c) => c.instanceId);
 
-  if (validTargets.length === 0) {
+  if (validTargets.length === 0 && (searchFullDeck || restDest !== "TOP_OR_BOTTOM")) {
+    // A top-or-bottom remainder still needs the normal arrange prompt even
+    // when no revealed card can be played. Fixed destinations resolve directly.
     // No match — shuffle if needed, place rest at bottom
     let nextState = state;
     if (!searchFullDeck) {
