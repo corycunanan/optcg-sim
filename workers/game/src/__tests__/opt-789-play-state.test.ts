@@ -362,24 +362,30 @@ it("plays a revealed Life Trigger rested under its controller's Lim", () => {
   ).toMatchObject({ playedRested: true });
 });
 
-it("resolves Adio's On Play after Lim plays it rested", () => {
+it("resolves real 9-cost Adio's On Play after hand play under Lim", () => {
   const { state, db } = setup();
   db.set("OP09-023", {
     ...CARDS.VANILLA,
     id: "OP09-023",
     name: "Adio",
-    cost: 4,
+    cost: 9,
+    power: 9000,
+    counter: null,
+    color: ["Green"],
+    attribute: ["Special"],
     types: ["ODYSSEY"],
     effectSchema: OP09_023_ADIO,
   });
   state.players[0].hand = [card("adio", "HAND", "OP09-023")];
+  state.players[0].donCostArea.push({
+    instanceId: "ninth-don",
+    state: "ACTIVE",
+    attachedTo: null,
+  });
+  state.players[0].donDeck = state.players[0].donDeck.slice(1);
   const result = runPipeline(
     state,
-    {
-      type: "ACTIVATE_EFFECT",
-      cardInstanceId: state.players[0].leader.instanceId,
-      effectId: "activate_add_don_and_play",
-    },
+    { type: "PLAY_CARD", cardInstanceId: "adio" },
     db,
     0
   );
@@ -391,10 +397,10 @@ it("resolves Adio's On Play after Lim plays it rested", () => {
   });
   expect(
     final.players[0].donCostArea.filter((d) => d.state === "ACTIVE")
-  ).toHaveLength(8);
+  ).toHaveLength(3);
   expect(
     final.players[0].donCostArea.filter((d) => d.state === "RESTED")
-  ).toHaveLength(1);
+  ).toHaveLength(6);
 });
 
 it.each([true, false])(
