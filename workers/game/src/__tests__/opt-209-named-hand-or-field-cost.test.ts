@@ -489,13 +489,17 @@ describe("OPT-510: OP06-033 printed two-branch cost", () => {
     expect(koPrompt.events.filter((event) => event.type === "CARD_TRASHED")).toHaveLength(1);
   });
 
-  it("keeps the hand-side Ark Noah payment event count-only", () => {
+  it("keeps hand-side Ark Noah payment aggregate with causal provenance", () => {
     const { state, cardDb } = op06033State({ arkInHand: true });
     const paymentPrompt = acceptEffect(state, cardDb);
     const koPrompt = select(paymentPrompt.state, ["hand-ark"], cardDb);
     const trashed = koPrompt.events.find((event) => event.type === "CARD_TRASHED");
 
-    expect(trashed?.payload).toEqual({ count: 1, reason: "cost", from: "HAND" });
+    expect(trashed?.payload).toEqual({
+      count: 1, reason: "cost", from: "HAND", sourceZone: "HAND",
+      sourceController: 0, causingController: 0, movementCause: "COST",
+      effectSourceCardId: CARDS.VANILLA.id, effectSourceController: 0,
+    });
   });
 
   it("auto-selects the only payable printed branch and blocks when neither is payable", () => {

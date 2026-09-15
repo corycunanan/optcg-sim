@@ -1,3 +1,4 @@
+import { completeHandTrashCostSources, isHandTrashByEffect, TRIGGERING_HAND_TRASH_REF } from "../hand-trash.js";
 import { retainEventParent } from "./event-activation.js";
 import {
   publishCommittedEvents,
@@ -297,8 +298,8 @@ function createResolverServices(
         targets,
         services
       ),
-    resolveEffect: (state, block, source, controller, db, triggering) =>
-      resolveEffect(state, block, source, controller, db, triggering, services),
+    resolveEffect: (state, block, source, controller, db, triggering, event) =>
+      resolveEffect(state, block, source, controller, db, triggering, services, event),
     continueSimultaneousGroup: (...args) =>
       continueSimultaneousGroup(...args, services),
     processRemainingTriggers: (state, triggers, cardDb, events, group) =>
@@ -328,7 +329,8 @@ export function resolveEffect(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   triggeringCardInstanceId?: string | null,
-  services: EffectResolverServices = resolverExecutionServices
+  services: EffectResolverServices = resolverExecutionServices,
+  triggeringEvent?: PendingEvent,
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -363,6 +365,11 @@ export function resolveEffect(
         sourceCardSnapshot: structuredClone(sourceCard),
       }]]
     : [];
+  if (triggeringEvent && isHandTrashByEffect(triggeringEvent) && triggeringEvent.type === "CARD_TRASHED") {
+    sourceSnapshotRef.push([TRIGGERING_HAND_TRASH_REF, {
+      targetInstanceIds: [], count: triggeringEvent.payload?.count ?? 0,
+    }]);
+  }
   const fullText = sourceTextForBlock(sourceCardData, block);
   const blockDescription = extractEffectDescription(fullText, block);
 
@@ -447,6 +454,7 @@ export function resolveEffect(
     }
 
     state = costPayResult.state;
+    completeHandTrashCostSources(costPayResult.events, state, sourceCardInstanceId, controller, new Map(sourceSnapshotRef));
     events.push(...costPayResult.events);
     costResult = costPayResult.costResult;
 

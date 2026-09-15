@@ -187,6 +187,7 @@ For effects that react to game events (not bracket-tag abilities):
 | "When a battle ends because a combatant left the field" | `{ event: "BATTLE_ABORTED" }` |
 | "When Life reaches 0" | `{ event: "LIFE_COUNT_BECOMES_ZERO" }` |
 | "When card added to hand from Life" | `{ event: "CARD_ADDED_TO_HAND_FROM_LIFE" }` |
+| "When a card is trashed from your hand by an effect" | `{ event: "CARD_TRASHED_FROM_HAND", filter: { controller: "SELF", cause: "BY_EFFECT" } }` |
 | "When you draw outside Draw Phase" | `{ event: "DRAW_OUTSIDE_DRAW_PHASE" }` |
 | "When Character becomes rested" | `{ event: "CHARACTER_BECOMES_RESTED" }` |
 | "When Character returned to hand" | `{ event: "CHARACTER_RETURNED_TO_HAND" }` |
@@ -981,3 +982,11 @@ Card text: `[On Play] Draw 2 cards. Then, trash 1 card from your hand. If you do
   ]
 }
 ```
+
+
+Hand-trash watchers preserve `EFFECT` versus activation `COST` provenance. For
+OP12-040 Kuzan, add `effect_source: { controller: "SELF", traits: ["Navy"] }`
+to the filter and read `{ type: "ACTION_RESULT", ref: "__triggering_hand_trash" }`
+for the actual discarded count. Do not use a discarded-card target filter for
+Navy. The OP14 activation-cost interpretation is explicitly flagged in
+[the rules handoff](../../../../../docs/project/handoffs/opt-795-hand-trash-watchers.md).

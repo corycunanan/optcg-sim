@@ -1718,8 +1718,8 @@ export const OP14_045_KUROOBI: EffectSchema = {
       id: "OP14-045_hand_trash_rush",
       category: "auto",
       trigger: {
-        event: "CARD_ADDED_TO_HAND_FROM_LIFE",
-        // _comment: "Actually triggers on hand-trash by effect — custom event needed"
+        event: "CARD_TRASHED_FROM_HAND",
+        filter: { controller: "SELF", cause: "BY_EFFECT" },
       },
       actions: [
         {
@@ -1873,8 +1873,8 @@ export const OP14_049_JINBE: EffectSchema = {
       id: "OP14-049_hand_trash_rush",
       category: "auto",
       trigger: {
-        event: "CARD_ADDED_TO_HAND_FROM_LIFE",
-        // _comment: "Actually triggers on hand-trash by effect — custom event needed"
+        event: "CARD_TRASHED_FROM_HAND",
+        filter: { controller: "SELF", cause: "BY_EFFECT" },
       },
       actions: [
         {
@@ -2103,8 +2103,8 @@ export const OP14_056_WADATSUMI: EffectSchema = {
       id: "OP14-056_hand_trash_negate",
       category: "auto",
       trigger: {
-        event: "CARD_ADDED_TO_HAND_FROM_LIFE",
-        // _comment: "Actually triggers on hand-trash by effect — custom event needed"
+        event: "CARD_TRASHED_FROM_HAND",
+        filter: { controller: "SELF", cause: "BY_EFFECT" },
       },
       actions: [
         {

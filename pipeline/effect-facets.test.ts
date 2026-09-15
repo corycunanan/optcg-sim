@@ -139,6 +139,18 @@ describe("extractCardFacets", () => {
     });
   });
 
+  it("extracts corrected hand-trash watchers and Kuzan's Navy source reference", () => {
+    for (const id of ["OP12-040", "OP14-045", "OP14-049", "OP14-056"]) {
+      const facets = extractCardFacets(schemaFor(id));
+      expect(facets.tags).toContain("trigger:card_trashed_from_hand");
+      expect(facets.tags).not.toContain("trigger:card_added_to_hand_from_life");
+    }
+    // Trait extraction traverses source restrictions as well as card targets.
+    expect(extractCardFacets(schemaFor("OP12-040")).effectTraits).toContainEqual({
+      trait: "Navy", role: "target", blockId: "OP12-040_effect_1",
+    });
+  });
+
   it("registers and documents every vocabulary tag", () => {
     const taxonomy = readFileSync(
       resolve(process.cwd(), "docs/cards/EFFECT-FACET-TAXONOMY.md"),

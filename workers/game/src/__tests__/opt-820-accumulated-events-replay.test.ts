@@ -173,6 +173,8 @@ describe("OPT-820 accumulated events replay", () => {
       count: 1,
       reason: "cost",
       from: "HAND",
+      sourceZone: "HAND", sourceController: 0, causingController: 0,
+      movementCause: "COST", effectSourceCardId: "OP13-082", effectSourceController: 0,
     });
     expect(state.players[0].hand.some((c) => c.instanceId === costId)).toBe(
       false
