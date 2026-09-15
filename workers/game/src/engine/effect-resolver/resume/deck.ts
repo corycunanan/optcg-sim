@@ -1,3 +1,4 @@
+import { getPlayEntryState } from "../../play-entry-state.js";
 /**
  * ARRANGE_TOP_CARDS resume handlers — response to the player's arrangement
  * after SEARCH_DECK / SEARCH_TRASH_THE_REST / SEARCH_AND_PLAY, plus the life
@@ -361,7 +362,6 @@ export function handleArrangeSearchAndPlay(
   const restDest = sap.rest_destination ?? "BOTTOM";
   const shuffleAfter = sap.shuffle_after ?? false;
   const searchFullDeck = sap.search_full_deck ?? false;
-  const entryState = sap.entry_state ?? "ACTIVE";
   const searchValid = validTargets ?? [];
   const pickLimit = getSearchAndPlayPickLimit(sap, searchValid.length);
 
@@ -385,6 +385,7 @@ export function handleArrangeSearchAndPlay(
   for (const kept of keptCards) {
     const data = cardDb.get(kept.cardId);
     if (data && data.type.toUpperCase() === "CHARACTER") {
+      const entryState = getPlayEntryState(nextState, controller, data, cardDb, sap.entry_state);
       const charSlot = nextState.players[controller].characters.indexOf(null);
       if (charSlot === -1) {
         // Character area full — the card joins the rest pile instead of vanishing.

@@ -1,3 +1,4 @@
+import { getPlayEntryState } from "../../play-entry-state.js";
 import { resolveActivatedEvent } from "../event-activation.js";
 import { isRestTargetActive, restFieldTarget } from "../../field-rest.js";
 import { effectSourceIdentity } from "../../effect-source.js";
@@ -298,7 +299,7 @@ export function executePlayCard(
           frameEntryState = activeLeft ? "ACTIVE" : restedLeft ? "RESTED" : "ACTIVE";
         }
       } else {
-        frameEntryState = (entryStateMode === "RESTED") ? "RESTED" : "ACTIVE";
+        frameEntryState = getPlayEntryState(nextState, controller, data, cardDb, params.entry_state === "PLAYER_CHOICE" ? undefined : params.entry_state);
       }
 
       // Build batch continuation so that if this frame hits full-board (rule
@@ -387,15 +388,16 @@ export function executePlaySelf(
   // Only characters can be played to field via PLAY_SELF
   if (data.type.toUpperCase() !== "CHARACTER") return { state, events, succeeded: false };
 
+  const entryState = getPlayEntryState(state, card.controller, data, cardDb);
   const moved = transitionCard(state, sourceCardInstanceId, "CHARACTER", {
-    entryState: "ACTIVE",
+    entryState,
     turnPlayed: state.turn.number,
   });
   if (!moved) return { state, events, succeeded: false };
   events.push({
     type: "CARD_PLAYED",
     playerIndex: moved.fact.owner,
-    payload: { cardInstanceId: moved.fact.newInstanceId, cardId: card.cardId, zone: "CHARACTER", source: "PLAY_SELF", sourceZone: card.zone },
+    payload: { cardInstanceId: moved.fact.newInstanceId, cardId: card.cardId, zone: "CHARACTER", source: "PLAY_SELF", sourceZone: card.zone, playedRested: entryState === "RESTED" },
   });
   return {
     state: moved.state,

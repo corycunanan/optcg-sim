@@ -6,6 +6,7 @@ import {
   checkProhibitions,
   isCardPlayProhibitedByEffect,
 } from "../../prohibitions.js";
+import { getPlayEntryState } from "../../play-entry-state.js";
 import { transitionCard } from "../../zone-transition.js";
 
 export function namedPlayCandidates(
@@ -57,7 +58,17 @@ export function payNamedPlay(
     return null;
   const slotIndex = state.players[controller].characters.indexOf(null);
   if (slotIndex < 0) return null;
+  const card = state.players[controller].hand.find(
+    (c) => c.instanceId === instanceId
+  )!;
+  const entryState = getPlayEntryState(
+    state,
+    controller,
+    cardDb.get(card.cardId)!,
+    cardDb
+  );
   const moved = transitionCard(state, instanceId, "CHARACTER", {
+    entryState,
     slotIndex,
     turnPlayed: state.turn.number,
   });
@@ -74,7 +85,7 @@ export function payNamedPlay(
           zone: "CHARACTER",
           source: "BY_EFFECT",
           sourceZone: "HAND",
-          playedRested: false,
+          playedRested: entryState === "RESTED",
         },
       },
     ],

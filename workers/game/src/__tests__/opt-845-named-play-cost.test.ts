@@ -684,3 +684,66 @@ it("registered Buggy ignores rule trash while paying Hotori with Kotori", () => 
     )?.payload
   ).toMatchObject({ reason: "rule", movementCause: "RULE" });
 });
+
+it.each([false, true])(
+  "Lim rests Kotori paid as Hotori's cost, then resolves both On Play effects (full=%s)",
+  (full) => {
+    const f = prepared(1, full);
+    f.cardDb.set("OP09-022", {
+      ...CARDS.LEADER,
+      id: "OP09-022",
+      name: "Lim",
+      effectSchema: getEffectSchema("OP09-022"),
+    });
+    f.state.players[0].leader.cardId = "OP09-022";
+    activate(f);
+    const donBefore = structuredClone(f.state.players[0].donCostArea);
+    const hotori = f.state.players[0].characters.find(
+      (c) => c?.cardId === "OP05-111"
+    )!;
+    expect(hotori.state).toBe("RESTED");
+    f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["kotori-0"] });
+    if (full) {
+      expect(targets(f.state)).toHaveLength(5);
+      f.state = JSON.parse(JSON.stringify(f.state));
+      f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["own-0"] });
+    }
+    const kotori = f.state.players[0].characters.find(
+      (c) => c?.cardId === "OP05-103"
+    )!;
+    expect(kotori).toMatchObject({
+      state: "RESTED",
+      controller: 0,
+      zone: "CHARACTER",
+    });
+    expect(kotori.instanceId).not.toBe("kotori-0");
+    expect(f.state.players[0].donCostArea).toEqual(donBefore);
+    expect(f.state.players[0].hand).toHaveLength(0);
+    expect(targets(f.state)).toEqual(["life-target", "ko-target"]);
+    // Kotori waits for Hotori's effect, then uses the increased Life count.
+    f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["life-target"] });
+    const options = f.state.pendingPrompt!.options;
+    if (options.promptType !== "PLAYER_CHOICE")
+      throw new Error("Expected Life placement choice");
+    f.act({ type: "PLAYER_CHOICE", choiceId: options.choices[0].id });
+    expect(f.state.players[1].life).toHaveLength(2);
+    expect(targets(f.state)).toEqual(["ko-target"]);
+    f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["ko-target"] });
+    expect(f.state.players[1].trash.some((c) => c.cardId === "ko-target")).toBe(
+      true
+    );
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.effectStack).toEqual([]);
+    const playedEvents = f.state.eventLog.filter(
+      (e) => e.type === "CARD_PLAYED" && e.payload.cardId === "OP05-103"
+    );
+    expect(playedEvents).toHaveLength(1);
+    expect(playedEvents[0].payload).toMatchObject({
+      playedRested: true,
+      sourceZone: "HAND",
+    });
+    expect(
+      f.state.eventLog.filter((e) => e.type === "CARD_STATE_CHANGED")
+    ).toHaveLength(0);
+  }
+);
