@@ -160,7 +160,7 @@ describe("validateDeck leader deck restrictions", () => {
         type: "Character",
         cost: 4,
         traits: [],
-      }),
+      })
     ).toBe(true);
     expect(
       isCardAllowedByDeckRestrictionRules(rules, {
@@ -168,7 +168,7 @@ describe("validateDeck leader deck restrictions", () => {
         type: "Character",
         cost: 5,
         traits: [],
-      }),
+      })
     ).toBe(false);
   });
 
@@ -348,5 +348,51 @@ describe("validateDeck leader deck restrictions", () => {
         card
       )
     ).toBe(true);
+  });
+});
+
+// Rule 2-1-3 applies to construction; rule 5-1-2-3 still counts card numbers.
+describe("OPT-788 alias deck restrictions", () => {
+  const aliases = {
+    rule_modifications: [
+      { rule_type: "NAME_ALIAS", aliases: ["Kouzuki Oden"] },
+    ],
+  };
+  it("keeps different card numbers separate but combines variants", () => {
+    expect(
+      copyLimitResult([
+        makeCard("OP01-121", "Yamato", 4, aliases),
+        makeCard("OP02-030", "Kouzuki Oden", 4),
+      ])?.passed
+    ).toBe(true);
+    expect(
+      copyLimitResult([
+        makeCard("OP01-121", "Yamato", 4, aliases),
+        makeCard("OP01-121_p1", "Yamato", 1, aliases),
+      ])?.passed
+    ).toBe(false);
+  });
+  it("preserves unlimited-copy overrides across card-number variants", () => {
+    expect(
+      copyLimitResult([
+        makeCard("OP01-075", "Pacifista", 4, topLevelCopyLimitOverride),
+        makeCard("OP01-075_p1", "Pacifista", 4, topLevelCopyLimitOverride),
+      ])?.passed
+    ).toBe(true);
+  });
+  it("applies name restrictions to aliases", () => {
+    const card = makeCard("OP01-121", "Yamato", 1, aliases).card;
+    expect(
+      isCardAllowedByDeckRestrictionRules(
+        [{ restriction: "ONLY_INCLUDE", filter: { name: "Kouzuki Oden" } }],
+        card
+      )
+    ).toBe(true);
+    expect(
+      isCardAllowedByDeckRestrictionRules(
+        [{ restriction: "CANNOT_INCLUDE", filter: { name: "Kouzuki Oden" } }],
+        card
+      )
+    ).toBe(false);
   });
 });

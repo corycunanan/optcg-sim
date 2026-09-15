@@ -565,3 +565,62 @@ it.each([{ action: "UNKNOWN_ACTION" }, { source_zone: "UNKNOWN_ZONE" }])(
     expect(f.state.oneTimeModifiers[0].consumed).toBe(false);
   }
 );
+
+// OPT-788: OP12-061's next-hand-play discount also recognizes EB04-038's
+// intrinsic Trafalgar Law name. Printed EB04-038: cost 6, power 8000.
+describe("OPT-788 alias-aware next-play discounts", () => {
+  function aliasedLawFixture() {
+    const f = fixture();
+    const schema = getEffectSchema("EB04-038")!;
+    f.db.set("EB04-038", {
+      ...CARDS.VANILLA,
+      id: "EB04-038",
+      name: schema.card_name!,
+      cost: 6,
+      power: 8000,
+      counter: null,
+      color: ["Purple"],
+      attribute: ["Special", "Wisdom"],
+      types: ["Navy", "Donquixote Pirates"],
+      effectSchema: schema,
+    });
+    // Keep EB04-038's separate draw/ramp condition false, so DON!! assertions
+    // measure payment without any subsequent DON!! being added.
+    f.state.players[1].donCostArea = [];
+    activateRosinante(f);
+    return f;
+  }
+
+  it("discounts and consumes exactly one aliased play, ignoring unrelated cards", () => {
+    const f = aliasedLawFixture();
+    const first = f.put("EB04-038", 0, "HAND", "first");
+    const second = f.put("EB04-038", 0, "HAND", "second");
+    expect(
+      getEffectiveCost(f.db.get("EB04-038")!, f.state, first.instanceId, f.db)
+    ).toBe(4);
+    const before = readyDon(f);
+    f.play(CARDS.VANILLA.id);
+    expect(readyDon(f)).toBe(before - 3);
+    expect(f.state.oneTimeModifiers[0].consumed).toBe(false);
+    f.act({ type: "PLAY_CARD", cardInstanceId: first.instanceId });
+    expect(readyDon(f)).toBe(before - 3 - 4);
+    expect(field(f, "EB04-038")).toBeDefined();
+    expect(f.state.oneTimeModifiers[0].consumed).toBe(true);
+    expect(
+      getEffectiveCost(f.db.get("EB04-038")!, f.state, second.instanceId, f.db)
+    ).toBe(6);
+  });
+
+  it("allows an aliased play when only its discounted cost is available", () => {
+    const f = aliasedLawFixture();
+    f.state.players[0].donCostArea.forEach((don, i) => {
+      don.state = i < 4 ? "ACTIVE" : "RESTED";
+    });
+    const card = f.put("EB04-038", 0, "HAND", "limited");
+    expect(readyDon(f)).toBe(4);
+    f.act({ type: "PLAY_CARD", cardInstanceId: card.instanceId });
+    expect(readyDon(f)).toBe(0);
+    expect(f.state.oneTimeModifiers[0].consumed).toBe(true);
+    expect(field(f, "EB04-038")).toBeDefined();
+  });
+});

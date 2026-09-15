@@ -1,3 +1,5 @@
+import { stripVariantSuffix } from "../../../shared/card-parsing";
+import { cardNameAliases } from "../../../shared/card-names";
 /**
  * OPTCG Deck Validation Engine
  *
@@ -302,6 +304,7 @@ export function matchesDeckRestrictionFilter(
     colors: card.color ?? [],
     traits: card.traits ?? [],
     name: card.name,
+    nameAliases: cardNameAliases(card.effectSchema),
     attributes: card.attribute ?? [],
     cardType: card.type,
     attachedDonCount: 0,
@@ -388,15 +391,28 @@ export function validateDeck(
   });
 
   // Rule 3: Max 4 copies per card (unless the card's effect lifts the limit)
+  const quantitiesByNumber = new Map<string, number>();
+  const unlimitedNumbers = new Set<string>();
+  for (const dc of cards) {
+    const number = stripVariantSuffix(dc.cardId);
+    if (allowsUnlimitedCopies(dc.card)) unlimitedNumbers.add(number);
+    quantitiesByNumber.set(
+      number,
+      (quantitiesByNumber.get(number) ?? 0) + dc.quantity
+    );
+  }
   const overLimitCards = cards.filter(
-    (dc) => dc.quantity > DEFAULT_COPY_LIMIT && !allowsUnlimitedCopies(dc.card)
+    (dc) =>
+      (quantitiesByNumber.get(stripVariantSuffix(dc.cardId)) ?? 0) >
+        DEFAULT_COPY_LIMIT &&
+      !unlimitedNumbers.has(stripVariantSuffix(dc.cardId))
   );
   results.push({
     id: "copy-limit",
     rule: "Copy Limit",
     message:
       overLimitCards.length > 0
-        ? `${overLimitCards.map((dc) => `${dc.card.name} (${dc.quantity})`).join(", ")} exceed 4-copy limit`
+        ? `${overLimitCards.map((dc) => `${dc.card.name} (${quantitiesByNumber.get(stripVariantSuffix(dc.cardId))})`).join(", ")} exceed 4-copy limit`
         : "All cards within 4-copy limit",
     severity: "error",
     passed: overLimitCards.length === 0,
