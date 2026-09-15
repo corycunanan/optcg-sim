@@ -13,7 +13,7 @@ import type {
   ResumeContext,
 } from "../../../types.js";
 import type { ActionResult } from "../types.js";
-import { promptEffectDescription, resolveAmount } from "../action-utils.js";
+import { effectSourceController, promptEffectDescription, resolveAmount } from "../action-utils.js";
 import { koCharacter, returnToHand, returnToDeck, trashCharacter } from "../card-mutations.js";
 import { computeAllValidTargets, autoSelectTargets, needsPlayerTargetSelection, buildSelectTargetPrompt, matchesFilterForTarget } from "../target-resolver.js";
 import { processBatchReplacements } from "../../replacements.js";
@@ -56,6 +56,7 @@ export function executeKO(
   services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
+  const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
@@ -73,10 +74,10 @@ export function executeKO(
   // replacement discovery so protected targets cannot prompt or pay a
   // substitute cost for an action that was never attemptable (OPT-459).
   const attemptableIds = filterProhibitedTargets(
-    state, targetIds, "KO", "EFFECT", controller, sourceCardInstanceId, cardDb,
+    state, targetIds, "KO", "EFFECT", causingController, sourceCardInstanceId, cardDb,
   );
   const batch = processBatchReplacements(
-    state, attemptableIds, "KO", ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, services,
+    state, attemptableIds, "KO", ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", causingController, cardDb, services,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -88,7 +89,7 @@ export function executeKO(
 
   for (let i = 0; i < unprotectedIds.length; i++) {
     const id = unprotectedIds[i];
-    const result = koCharacter(nextState, id, controller, cardDb, batch.state);
+    const result = koCharacter(nextState, id, causingController, cardDb, batch.state);
     if (result) {
       nextState = result.state;
       events.push(...result.events);
@@ -134,6 +135,7 @@ export function executeReturnToHand(
   services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
+  const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
@@ -142,10 +144,10 @@ export function executeReturnToHand(
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   const attemptableIds = filterProhibitedTargets(
-    state, targetIds, "RETURN_TO_HAND", "EFFECT", controller, sourceCardInstanceId, cardDb,
+    state, targetIds, "RETURN_TO_HAND", "EFFECT", causingController, sourceCardInstanceId, cardDb,
   );
   const batch = processBatchReplacements(
-    state, attemptableIds, "RETURN_TO_HAND", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, services,
+    state, attemptableIds, "RETURN_TO_HAND", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", causingController, cardDb, services,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -158,7 +160,7 @@ export function executeReturnToHand(
   const finalIds = batch.unprotectedIds;
   const finalizedIds: string[] = [];
   for (const id of finalIds) {
-    const result = returnToHand(nextState, id);
+    const result = returnToHand(nextState, id, causingController);
     if (result) {
       nextState = result.state;
       events.push(...result.events);
@@ -186,6 +188,7 @@ export function executeReturnToDeck(
   arrangement?: ReturnToDeckArrangement,
 ): ActionResult {
   const events: PendingEvent[] = [];
+  const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const params = action.params ?? {};
   const position = params.position ?? "BOTTOM";
   const allValidIds =
@@ -306,10 +309,10 @@ export function executeReturnToDeck(
   }
 
   const attemptableIds = filterProhibitedTargets(
-    reordered.state, crossZoneIds, "RETURN_TO_DECK", "EFFECT", controller, sourceCardInstanceId, cardDb,
+    reordered.state, crossZoneIds, "RETURN_TO_DECK", "EFFECT", causingController, sourceCardInstanceId, cardDb,
   );
   const batch = processBatchReplacements(
-    reordered.state, attemptableIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", controller, cardDb, services, position,
+    reordered.state, attemptableIds, "RETURN_TO_DECK", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", causingController, cardDb, services, position,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -322,7 +325,7 @@ export function executeReturnToDeck(
   const finalizedByOldId = new Map<string, ReturnType<typeof returnToDeck>>();
   const executionOrder = position === "TOP" ? [...finalIds].reverse() : finalIds;
   for (const id of executionOrder) {
-    const result = returnToDeck(nextState, id, position);
+    const result = returnToDeck(nextState, id, position, causingController);
     if (result) {
       nextState = result.state;
       finalizedByOldId.set(id, result);
@@ -354,6 +357,7 @@ export function executeTrashCard(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
+  const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
@@ -373,12 +377,12 @@ export function executeTrashCard(
       // / CANNOT_LEAVE_FIELD block it. (CANNOT_BE_KO does NOT — trash is not K.O.)
       if (isRemovalProhibited(
         nextState, id,
-        { action: "TRASH", cause: "EFFECT", causingController: controller, sourceCardInstanceId },
+        { action: "TRASH", cause: "EFFECT", causingController, sourceCardInstanceId },
         cardDb,
       )) {
         continue;
       }
-      const result = trashCharacter(nextState, id, controller);
+      const result = trashCharacter(nextState, id, causingController);
       if (result) {
         nextState = result.state;
         events.push(...result.events);

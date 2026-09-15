@@ -13,6 +13,7 @@ import type {
 import type { QueuedTrigger, EffectStackFrame } from "../types.js";
 import {
   matchTriggersForEvent,
+  deregisterDepartedSources,
   orderMatchedTriggers,
   registerCardEnteredField,
 } from "./triggers.js";
@@ -92,6 +93,7 @@ export function scanEventsForTriggers(
     }
   }
 
+  nextState = deregisterDepartedSources(nextState, events);
   return { triggers, state: nextState, events: scannedEvents };
 }
 

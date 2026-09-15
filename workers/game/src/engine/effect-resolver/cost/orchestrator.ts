@@ -502,7 +502,7 @@ export function payCostsWithSelection(
       }
 
       // Block shuffles afterward — order is moot, pay in default order.
-      const applied = applyCostSelection(nextState, cost, group, controller);
+      const applied = applyCostSelection(nextState, cost, group, controller, cardDb);
       nextState = applied.state;
       events.push(...applied.events);
       costResult.cardsPlacedToDeckCount += group.length;
