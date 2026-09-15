@@ -1,4 +1,5 @@
 import { completeHandTrashCostSources, handTrashEvent, isHandTrashByEffect } from "../../hand-trash.js";
+import { updateEffectContinuation } from "../event-activation.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 /**
@@ -217,10 +218,9 @@ function finishCostsAndRunActions(
 
     if (chainResult.pendingPrompt) {
       state = retainEventsOnFrame(state, stackDepth, events);
-      const newTop = peekFrame(state);
-      if (newTop) {
-        state = updateTopFrame(state, { pendingTriggers });
-      }
+      state = updateEffectContinuation(state, stackDepth, () => ({
+        pendingTriggers, triggerOrderingGroup: topFrame.triggerOrderingGroup,
+      }));
       return {
         state,
         events,

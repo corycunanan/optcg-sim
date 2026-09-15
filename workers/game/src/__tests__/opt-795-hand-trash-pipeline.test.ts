@@ -184,6 +184,38 @@ describe("OPT-795 authored hand-trash watchers", () => {
     expect(trash.some((e) => e.payload.from === "HAND")).toBe(false);
   });
 
+  it("nested Event Main preserves hand-cost source and count through completion and trigger ordering", () => {
+    const f = fixture();
+    const watcher = f.put("OP14-045");
+    f.put("OP12-040", 0, "LEADER", { types: ["Navy"] });
+    const parent = f.put("nested-parent", 0, "CHARACTER", { effectSchema: { effects: [{
+      id: "activate-event", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" },
+      actions: [{ type: "ACTIVATE_EVENT_FROM_HAND", target: { type: "CARD_IN_HAND", controller: "SELF", count: { exact: 1 }, filter: { card_type: "EVENT" } }, params: {} }],
+    }] } });
+    const event = f.put("nested-navy-event", 0, "HAND", { type: "Event", types: ["Navy"], effectSchema: { effects: [{
+      id: "nested-main", category: "auto", trigger: { keyword: "MAIN_EVENT" }, flags: { optional: true },
+      costs: [{ type: "TRASH_FROM_HAND", amount: 2 }], actions: [{ type: "DRAW", params: { amount: 1 } }],
+    }] } });
+    const payments = [f.put("nested-cost-a", 0, "HAND"), f.put("nested-cost-b", 0, "HAND"), f.put("nested-spare", 0, "HAND")];
+    f.activate(parent, "activate-event");
+    f.roundTrip();
+    f.select(payments.slice(0, 2).map((c) => c.instanceId));
+    while (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+      const options = f.state.pendingPrompt.options;
+      const kuroobi = options.choices.find((c) => c.label.includes("Kuroobi"));
+      f.roundTrip();
+      expect(kuroobi).toBeDefined();
+      f.act({ type: "PLAYER_CHOICE", choiceId: kuroobi!.id });
+    }
+    f.done();
+    expect(f.state.players[0].hand).toHaveLength(4);
+    expect(hasEffectiveKeyword(watcher, f.db.get(watcher.cardId)!, "RUSH", f.state, f.db)).toBe(true);
+    const trash = f.state.eventLog.filter((e) => e.type === "CARD_TRASHED").find((e) => e.payload.from === "HAND" && e.payload.count === 2);
+    expect(trash?.payload).toMatchObject({ movementCause: "COST", effectSourceCardId: event.cardId, effectSourceController: 0 });
+    expect(f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")).toHaveLength(1);
+    expect(f.state.eventLog.filter((e) => e.type === "CARD_DRAWN")).toHaveLength(3);
+  });
+
   it("Kuzan draws the actual effect discard count and can trigger again", () => {
     const f = fixture();
     f.put("OP12-040", 0, "LEADER", { types: ["Navy"] });

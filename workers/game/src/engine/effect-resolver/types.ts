@@ -109,6 +109,8 @@ export interface EffectResolverResult {
 }
 
 export interface ActionResult {
+  /** Handler pushed an Event completion boundary and nested Main frames. */
+  nestedEventActivation?: boolean;
   state: GameState;
   events: PendingEvent[];
   succeeded: boolean;
