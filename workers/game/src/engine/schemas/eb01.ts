@@ -1443,7 +1443,7 @@ export const EB01_040_KYROS: EffectSchema = {
       id: "activate_ko",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       actions: [
         {
           type: "KO",

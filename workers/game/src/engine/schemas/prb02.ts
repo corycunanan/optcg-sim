@@ -249,14 +249,11 @@ export const PRB02_006_RORONOA_ZORO: EffectSchema = {
     {
       id: "rest_replacement",
       category: "replacement",
-      // The turn gate is enforced. Character-source restriction remains unsupported:
-      // replacements currently receive only cause/controller, not source-kind
-      // provenance. See OPT-814 handoff and its executable source-kind gap probe.
       flags: { optional: true },
       conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       replaces: {
         event: "WOULD_BE_RESTED",
-        cause_filter: { by: "OPPONENT_EFFECT" },
+        cause_filter: { by: "OPPONENT_EFFECT", source_card_type: "CHARACTER" },
       },
       replacement_actions: [
         {
@@ -265,7 +262,7 @@ export const PRB02_006_RORONOA_ZORO: EffectSchema = {
             type: "CHARACTER",
             controller: "SELF",
             count: { exact: 1 },
-            filter: { exclude_self: true },
+            filter: { exclude_self: true, is_active: true },
           },
         },
       ],
