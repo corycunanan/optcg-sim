@@ -480,8 +480,8 @@ describe("OPT-814 registered authored-card pipeline", () => {
       )
     ).toHaveLength(0);
   });
-  it.each(["OP10-036", "OP14-070"])(
-    "leaves unscoped %s cause filters unchanged pending source support",
+  it.each(["OP14-070"])(
+    "%s ignores a sibling rest",
     (id) => {
       const f = fixture();
       const target = f.put(CARDS.VANILLA.id, 1);

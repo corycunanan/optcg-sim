@@ -587,6 +587,11 @@ function hasValidPrompt(value: unknown): boolean {
       ) &&
       isNonNegativeInteger(resume.currentMatchIndex) &&
       (resume.causingController === 0 || resume.causingController === 1) &&
+      (resume.causingSource === undefined ||
+        (isRecord(resume.causingSource) &&
+          typeof resume.causingSource.instanceId === "string" &&
+          typeof resume.causingSource.cardId === "string" &&
+          ["Leader", "Character", "Event", "Stage"].includes(String(resume.causingSource.cardType)))) &&
       (resume.returnToDeckPosition === undefined ||
         resume.returnToDeckPosition === "TOP" ||
         resume.returnToDeckPosition === "BOTTOM")

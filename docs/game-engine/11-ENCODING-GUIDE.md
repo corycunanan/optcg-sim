@@ -88,8 +88,8 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "When your number of Life cards becomes 0" | `{ "event": "LIFE_COUNT_BECOMES_ZERO", "filter": { "controller": "SELF" } }` |
 | "When a card is added to your hand from your Life" | `{ "event": "CARD_ADDED_TO_HAND_FROM_LIFE" }` |
 | "When you draw a card outside of your Draw Phase" | `{ "event": "DRAW_OUTSIDE_DRAW_PHASE" }` |
-| "When this Character becomes rested" | `{ "event": "CHARACTER_BECOMES_RESTED" }` |
-| "When this Character becomes rested by your opponent's effect" | `{ "event": "CHARACTER_BECOMES_RESTED", "filter": { "cause": "BY_OPPONENT_EFFECT" } }` |
+| "When this Character becomes rested" | `{ "event": "CHARACTER_BECOMES_RESTED", "filter": { "target": "SELF" } }` |
+| "When this Character becomes rested by your opponent's effect" | `{ "event": "CHARACTER_BECOMES_RESTED", "filter": { "target": "SELF", "cause": "BY_OPPONENT_EFFECT" } }` |
 | "When your opponent's Character is returned to the owner's hand by your effect" | `{ "event": "CHARACTER_RETURNED_TO_HAND", "filter": { "controller": "OPPONENT", "cause": "BY_YOUR_EFFECT" } }` |
 | "When you take damage" | `{ "event": "DAMAGE_TAKEN" }` |
 | "When your opponent activates [Blocker]" | `{ "event": "BLOCKER_ACTIVATED", "filter": { "controller": "OPPONENT" } }` |
