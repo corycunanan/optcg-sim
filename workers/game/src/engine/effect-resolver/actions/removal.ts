@@ -1,3 +1,4 @@
+import { handTrashEvent } from "../../hand-trash.js";
 /**
  * Action handlers: KO, RETURN_TO_HAND, RETURN_TO_DECK, TRASH_CARD, TRASH_FROM_HAND
  */
@@ -396,7 +397,7 @@ export function executeTrashCard(
       if (!moved) continue;
       nextState = moved.state;
       trashedIds.push(moved.fact.newInstanceId);
-      events.push({
+      if (moved.fact.source !== "HAND") events.push({
         type: "CARD_TRASHED",
         playerIndex: moved.fact.owner,
         payload: {
@@ -407,6 +408,14 @@ export function executeTrashCard(
         },
       });
     }
+  }
+
+  for (const playerIndex of [0, 1] as const) {
+    const count = targetIds.filter(id => {
+      const card = findCardInstance(state, id);
+      return card?.zone === "HAND" && card.controller === playerIndex && !findCardInstance(nextState, id);
+    }).length;
+    if (count > 0) events.push(handTrashEvent(state, playerIndex, count, "EFFECT", sourceCardInstanceId, controller, resultRefs));
   }
 
   return {
@@ -514,7 +523,7 @@ export function executeTrashFromHand(
     { position: "TOP", preserveSourceTriggers: true },
   );
 
-  events.push({ type: "CARD_TRASHED", playerIndex: targetController, payload: { count: moved.transitions.length, reason: "effect", from: "HAND" } });
+  if (moved.transitions.length > 0) events.push(handTrashEvent(state, targetController, moved.transitions.length, "EFFECT", sourceCardInstanceId, controller, resultRefs));
 
   return {
     state: moved.state,

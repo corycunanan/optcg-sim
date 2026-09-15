@@ -314,6 +314,8 @@ function processTriggerQueuePipeline(
       next.controller,
       cardDb,
       getEventCardInstanceId(next.triggeringEvent) ?? null,
+      undefined,
+      next.triggeringEvent,
     );
     nextState = result.state;
     if (isEngineTerminated(nextState)) return { state: nextState };

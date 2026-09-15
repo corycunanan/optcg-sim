@@ -10,10 +10,7 @@ export function effectSourceIdentity(
   snapshot?: CardInstance
 ): EffectSourceIdentity | undefined {
   if (!sourceInstanceId) return undefined;
-  const source =
-    snapshot?.instanceId === sourceInstanceId
-      ? snapshot
-      : findCardInstance(state, sourceInstanceId);
+  const source = effectSourceCard(state, sourceInstanceId, snapshot);
   const data = source ? cardDb.get(source.cardId) : undefined;
   return source && data
     ? {
@@ -22,4 +19,14 @@ export function effectSourceIdentity(
         cardType: data.type,
       }
     : undefined;
+}
+
+/** Resolve only a snapshot belonging to this executing effect's source. */
+export function effectSourceCard(
+  state: GameState,
+  sourceInstanceId: string,
+  snapshot?: CardInstance,
+): CardInstance | undefined {
+  return (snapshot?.instanceId === sourceInstanceId ? snapshot : undefined)
+    ?? findCardInstance(state, sourceInstanceId) ?? undefined;
 }

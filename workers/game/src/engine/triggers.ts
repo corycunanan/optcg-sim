@@ -1,3 +1,4 @@
+import { isHandTrashByEffect } from "./hand-trash.js";
 /**
  * M4 Trigger System
  *
@@ -792,6 +793,8 @@ function isOnKOTrigger(trigger: Trigger): boolean {
 function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent, cardDb: Map<string, CardData>): boolean {
   if (event.type === "CARD_KO" && event.payload.cardType === "STAGE" &&
       ["CHARACTER_REMOVED_FROM_FIELD", "OPPONENT_CHARACTER_KO", "ANY_CHARACTER_KO"].includes(custom)) return false;
+  if (custom === "CARD_TRASHED_FROM_HAND") return isHandTrashByEffect(event);
+  if (["ANY_CHARACTER_TRASHED", "OPPONENT_CHARACTER_TRASHED"].includes(custom) && event.type === "CARD_TRASHED" && event.payload.from === "HAND") return false;
   if (custom === "CHARACTER_REMOVED_FROM_FIELD") {
     if (!["CARD_KO", "CARD_TRASHED", "CARD_RETURNED_TO_HAND", "CARD_RETURNED_TO_DECK", "CARD_ADDED_TO_LIFE"].includes(event.type)) return false;
     const payload = event.payload as { cardId?: string; cardInstanceId?: string; sourceZone?: string; reason?: string; movementCause?: string };
@@ -840,6 +843,7 @@ function customEventToGameEvent(event: CustomEventType): GameEventType | null {
     BLOCKER_ACTIVATED: "BLOCK_DECLARED",
     LEADER_ATTACK_DEALS_DAMAGE: "DAMAGE_DEALT",
     CARD_ADDED_TO_HAND_FROM_LIFE: "CARD_ADDED_TO_HAND_FROM_LIFE",
+    CARD_TRASHED_FROM_HAND: "CARD_TRASHED",
     CHARACTER_BECOMES_RESTED: "CARD_STATE_CHANGED",
     CHARACTER_RETURNED_TO_HAND: "CARD_RETURNED_TO_HAND",
     COMBAT_VICTORY: "COMBAT_VICTORY",
@@ -865,7 +869,21 @@ function matchesEventFilter(
     if (filter.controller === "OPPONENT" && eventPlayerIndex === sourceController) return false;
   }
 
-  if (filter.cause) {
+  if (filter.effect_source) {
+    if (event.type !== "CARD_TRASHED" || !isHandTrashByEffect(event)) return false;
+    const source = filter.effect_source;
+    if (source.controller === "SELF" && event.payload.effectSourceController !== sourceController) return false;
+    if (source.controller === "OPPONENT" && event.payload.effectSourceController === sourceController) return false;
+    const sourceData = cardDb.get(event.payload.effectSourceCardId!);
+    if (source.traits && (!sourceData || !source.traits.some(trait => sourceData.types.includes(trait)))) return false;
+  }
+
+  if (filter.cause && event.type === "CARD_TRASHED" && event.payload.from === "HAND") {
+    if (!isHandTrashByEffect(event)) return false;
+    if (filter.cause === "BY_YOUR_EFFECT" && event.payload.effectSourceController !== sourceController) return false;
+    if (filter.cause === "BY_OPPONENT_EFFECT" && event.payload.effectSourceController === sourceController) return false;
+    if (!["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
+  } else if (filter.cause) {
     const eventCause = event.type === "CARD_KO" ? event.payload.cause : undefined;
     if (filter.cause !== "ANY" && eventCause !== filter.cause) return false;
   }
