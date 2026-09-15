@@ -70,7 +70,8 @@ export interface EffectResolverServices {
     sourceCardInstanceId: string,
     controller: 0 | 1,
     cardDb: Map<string, CardData>,
-    triggeringCardInstanceId?: string | null
+    triggeringCardInstanceId?: string | null,
+    triggeringEvent?: PendingEvent,
   ): EffectResolverResult;
 
   continueSimultaneousGroup(

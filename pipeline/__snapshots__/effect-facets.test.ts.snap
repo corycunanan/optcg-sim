@@ -306,6 +306,7 @@ exports[`extractCardFacets > snapshots every distinct authored tag and rejects u
   "trigger:blocker_activated",
   "trigger:card_added_to_hand_from_life",
   "trigger:card_removed_from_life",
+  "trigger:card_trashed_from_hand",
   "trigger:character_battles",
   "trigger:character_becomes_rested",
   "trigger:character_played",

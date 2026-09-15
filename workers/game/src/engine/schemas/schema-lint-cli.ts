@@ -18,6 +18,7 @@ import {
 } from "../schema-registry.js";
 import {
   findSchemaCardTypeCategoryViolations,
+  findHandTrashTriggerViolations,
   findSchemasWithMultipleTriggerBlocks,
   type CardTextManifest,
 } from "../trigger-schema-coverage.js";
@@ -52,6 +53,17 @@ function loadBracketedDonCardIds(): Set<string> {
   }
 
   return cardIds;
+}
+
+function findHandTrashIntentViolations(schemas: Record<string, EffectSchema>): string[] {
+  const directory = resolve(repoRoot, "docs/cards");
+  return readdirSync(directory).filter(file => file.endsWith(".md")).flatMap(file =>
+    readFileSync(resolve(directory, file), "utf8").split(/\n---\n/).flatMap(block => {
+      const cardId = block.match(/\*\*([A-Z]+\d*-\d+)\*\*/)?.[1];
+      const schema = cardId ? schemas[cardId] : undefined;
+      return schema ? findHandTrashTriggerViolations(block, schema) : [];
+    }),
+  );
 }
 
 function hasAttachedDonEncoding(value: unknown): boolean {
@@ -243,6 +255,7 @@ async function main(): Promise<void> {
       categoryCheckedSchemas,
     ),
     ...findDonIntentViolations(schemas),
+    ...findHandTrashIntentViolations(schemas),
     ...findStartOfGameEffectRuleCountViolations(modules),
     ...findPickDestinationViolations(modules),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
