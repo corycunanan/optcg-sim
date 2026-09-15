@@ -662,6 +662,9 @@ export function payCostsWithSelection(
     }
     nextState = singleResult.state;
     events.push(...singleResult.events);
+    if (singleResult.replaced) {
+      return { state: nextState, events, costResult, replaced: true };
+    }
     costResult.donRestedCount += singleResult.costResult.donRestedCount;
     costResult.cardsTrashedCount += singleResult.costResult.cardsTrashedCount;
     costResult.cardsReturnedCount += singleResult.costResult.cardsReturnedCount;

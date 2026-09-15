@@ -1,3 +1,4 @@
+import { finishReplacedLifeCost } from "./cost/replaced.js";
 import {
   publishCommittedEvents,
   retainEventsOnFrame,
@@ -438,6 +439,19 @@ export function resolveEffect(
       services,
       blockDescription
     );
+
+    if (costPayResult.replaced) {
+      return finishReplacedLifeCost(
+        costPayResult.state,
+        [...events, ...costPayResult.events],
+        block,
+        sourceCardInstanceId,
+        controller,
+        [],
+        cardDb,
+        services,
+      );
+    }
 
     if (costPayResult.cannotPay) {
       state = costPayResult.state;

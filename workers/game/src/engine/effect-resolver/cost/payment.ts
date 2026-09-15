@@ -1,4 +1,5 @@
 /** Fixed and automatically selected cost payment mutations. */
+import { moveLifeToHand } from "../life-movement.js";
 import type { Cost, CostResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { CostPaymentResult } from "../types.js";
@@ -12,7 +13,8 @@ import { applyCostSelection } from "./resume.js";
 
 /**
  * Pay every fixed cost in order and aggregate the resources paid across steps.
- * Returns null when any step cannot be completed from the evolving game state.
+ * Returns null when a payment cannot start; replaced results retain committed
+ * movement while distinguishing it from successful payment of the printed cost.
  */
 export function payCosts(
   state: GameState,
@@ -219,13 +221,17 @@ export function payCosts(
         if (p.life.length < amount) return null;
 
         const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
-        const moved = transitionCards(nextState, removed.map((card) => card.instanceId), "HAND");
+        const moved = moveLifeToHand(nextState, removed, controller, _cardDb);
         nextState = moved.state;
-        events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: amount } });
+        const addedCount = moved.transitions.filter(t => t.addedToHand).length;
+        if (addedCount > 0) events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: addedCount } });
         // OPT-240: life exits publish CARD_REMOVED_FROM_LIFE (executeLifeToHand
         // already does; the cost path was missing it).
         for (const transition of moved.transitions) {
           events.push({ type: "CARD_REMOVED_FROM_LIFE", playerIndex: controller, payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId } });
+        }
+        if (moved.replaced) {
+          return { state: nextState, events, costResult, replaced: true };
         }
         break;
       }
