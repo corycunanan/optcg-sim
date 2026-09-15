@@ -64,6 +64,7 @@ export const EFFECT_FACET_GROUPS = [
       ["battle_aborted", "Battle Aborted"],
       ["life_count_becomes_zero", "Life Count Becomes Zero"],
       ["card_added_to_hand_from_life", "Card Added to Hand from Life"],
+      ["card_trashed_from_hand", "Card Trashed from Hand"],
       ["draw_outside_draw_phase", "Draw Outside Draw Phase"],
       ["character_becomes_rested", "Character Becomes Rested"],
       ["character_returned_to_hand", "Character Returned to Hand"],
