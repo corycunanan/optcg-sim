@@ -1,3 +1,4 @@
+import { meetsAttachedDonRequirement } from "./attached-don.js";
 import type { EffectAvailability } from "../../../../shared/game-types.js";
 import type { CardData, CardInstance, GameState } from "../types.js";
 import { evaluateCondition } from "./conditions.js";
@@ -226,6 +227,10 @@ function availabilityForBlock(
     state.turn.oncePerTurnUsed[block.id]?.includes(card.instanceId)
   ) {
     return { effectId: block.id, status: "used" };
+  }
+
+  if (!meetsAttachedDonRequirement(card, block.trigger)) {
+    return { effectId: block.id, status: "blocked", reason: "CONDITION" };
   }
 
   if (
