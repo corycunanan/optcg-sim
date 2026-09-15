@@ -3516,7 +3516,7 @@ export const OP10_099_EUSTASS_CAPTAIN_KID: EffectSchema = {
       id: "eot_set_active_and_blocker",
       category: "auto",
       trigger: { keyword: "END_OF_YOUR_TURN" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       flags: { optional: true },
       actions: [
         {
