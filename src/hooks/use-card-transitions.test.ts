@@ -601,3 +601,35 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     expect(out[0].arrivalCount).toBeUndefined();
   });
 });
+
+it.each([0, 1] as const)(
+  "preserves rested arrival for player %s",
+  (playerIndex) => {
+    for (const playedRested of [true, false]) {
+      const event: GameEvent = {
+        type: "CARD_PLAYED",
+        playerIndex,
+        timestamp: 1,
+        payload: {
+          cardId: "OP09-023",
+          cardInstanceId: "adio",
+          zone: "CHARACTER",
+          source: "BY_EFFECT",
+          playedRested,
+        },
+      };
+      const [transition] = eventToTransitions(
+        event,
+        0,
+        mkRegistry({
+          getCardZone: () => (playerIndex === 0 ? "p-char-1" : "o-char-1"),
+        })
+      );
+      expect(transition.playedRested).toBe(playedRested);
+      expect(transition.playerIndex).toBe(playerIndex);
+      expect(transition.toZoneKey).toBe(
+        playerIndex === 0 ? "p-char-1" : "o-char-1"
+      );
+    }
+  }
+);

@@ -9,6 +9,7 @@
 // [Trigger], Stage, high-cost Character). Add a new entry below when a
 // scenario needs a card outside this set.
 
+import { OP09_022_LIM, OP09_025_CROCODILE } from "@engine/engine/schemas/op09";
 import type { CardData } from "@engine/types";
 import type { EffectSchema } from "@engine/engine/effect-types";
 import { extractKeywords } from "@/lib/game/keywords";
@@ -344,6 +345,19 @@ const SANDBOX_CARDS: SandboxCardInput[] = [
     effectText:
       "[On Play] DON!! −3: Choose one:\n• If your Leader has the {Donquixote Pirates} type, K.O. up to 1 of your opponent's Characters with a cost of 8 or less.\n• Up to 3 of your opponent's Characters with a cost of 7 or less cannot be rested until the end of your opponent's next End Phase.",
     triggerText: null,
+  },
+  {
+    id: "OP09-022", name: "Lim", type: "Leader", color: ["Green", "Purple"],
+    cost: null, power: 5000, counter: null, life: 4, attribute: ["Wisdom"], types: ["ODYSSEY"],
+    effectText: "Your Character cards are played rested.\n[Activate: Main] [Once Per Turn] You may rest 3 of your DON!! cards: Add up to 1 DON!! card from your DON!! deck and rest it, and play up to 1 {ODYSSEY} type Character card with a cost of 5 or less from your hand.",
+    triggerText: null, effectSchema: OP09_022_LIM,
+  },
+  {
+    id: "OP09-025", name: "Crocodile", type: "Character", color: ["Green"],
+    cost: 4, power: 5000, counter: 1000, life: null, attribute: ["Special"],
+    types: ["ODYSSEY", "The Seven Warlords of the Sea", "Baroque Works"],
+    effectText: "If your Leader has the {ODYSSEY} type, this Character cannot be K.O.'d in battle by Leaders.",
+    triggerText: null, effectSchema: OP09_025_CROCODILE,
   },
 ];
 
