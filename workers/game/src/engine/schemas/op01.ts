@@ -1037,14 +1037,9 @@ export const OP01_038_KANJURO: EffectSchema = {
       trigger: { keyword: "ON_KO" },
       actions: [
         {
-          type: "OPPONENT_ACTION",
-          params: {
-            action: {
-              type: "TRASH_FROM_HAND",
-              target: { type: "CARD_IN_HAND", controller: "SELF", count: { exact: 1 } },
-              params: { amount: 1 },
-            },
-          },
+          type: "TRASH_FROM_HAND",
+          target: { type: "CARD_IN_HAND", controller: "SELF", count: { exact: 1 } },
+          params: { amount: 1, chooser: "OPPONENT" },
         },
       ],
     },
