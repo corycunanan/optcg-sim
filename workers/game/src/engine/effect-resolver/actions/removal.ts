@@ -434,6 +434,13 @@ export function executeTrashFromHand(
         ? 1
         : 0
       : controller;
+  const chooser =
+    params.chooser === "SELF"
+      ? controller
+      : params.chooser === "OPPONENT"
+        ? controller === 0 ? 1 : 0
+        : targetController;
+  const blindSelection = chooser !== targetController;
   const amount = resolveAmount(
     params.amount ?? 1,
     resultRefs,
@@ -459,9 +466,10 @@ export function executeTrashFromHand(
 
   // If no preselection and player needs to choose, prompt. Optional trashes
   // always prompt (even with exactly `amount` candidates, declining is legal).
+  // A cross-hand chooser must receive the blind choice even for a sole card.
   if (!selectedIds) {
     const validTargets = candidates.map((c) => c.instanceId);
-    if (validTargets.length > amount || optional) {
+    if (validTargets.length > amount || optional || blindSelection) {
       const resumeCtx: import("../../../types.js").ResumeContext = {
         effectSourceInstanceId: sourceCardInstanceId,
         controller,
@@ -479,13 +487,16 @@ export function executeTrashFromHand(
           effectDescription: optional
             ? `You may trash up to ${amount} card(s) from hand`
             : `Choose ${amount} card(s) to trash from hand`,
-          instruction: optional
-            ? `Trash up to ${amount} of your cards in hand.`
-            : `Trash ${amount} of your cards in hand.`,
+          instruction: blindSelection
+            ? `Choose ${amount} face-down card(s) from your opponent's hand to trash.`
+            : optional
+              ? `Trash up to ${amount} of your cards in hand.`
+              : `Trash ${amount} of your cards in hand.`,
           ctaLabel: "Trash",
+          ...(blindSelection ? { blindSelection: true } : {}),
           cards: candidates.filter((c) => validTargets.includes(c.instanceId)),
         },
-        respondingPlayer: targetController,
+        respondingPlayer: chooser,
         resumeContext: resumeCtx,
       };
       return { state, events, succeeded: false, pendingPrompt };
