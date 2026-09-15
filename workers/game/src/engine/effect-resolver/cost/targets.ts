@@ -3,6 +3,7 @@ import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
+import { namedPlayCandidates } from "./named-play.js";
 import { isPresent } from "../../type-guards.js";
 
 /** Resolve a simple cost's numeric amount with a deterministic fallback. */
@@ -48,6 +49,8 @@ export function computeCostTargets(
       : ids;
 
   switch (cost.type) {
+    case "PLAY_NAMED_CARD_FROM_HAND":
+      return namedPlayCandidates(state, cost, controller, cardDb);
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": {
       const candidates = [
         ...player.hand,
@@ -173,6 +176,7 @@ export function getCostCards(
         ...(player.stage && targetSet.has(player.stage.instanceId) ? [player.stage] : []),
       ];
 
+    case "PLAY_NAMED_CARD_FROM_HAND":
     case "TRASH_FROM_HAND":
     case "PLACE_HAND_TO_DECK":
     case "REVEAL_FROM_HAND":

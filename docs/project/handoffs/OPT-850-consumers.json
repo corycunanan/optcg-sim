@@ -1,0 +1,330 @@
+{
+  "producers": [
+    {
+      "id": "EB03-031",
+      "path": "$.effects.0.actions.0",
+      "action": {
+        "type": "ACTIVATE_EVENT_FROM_TRASH",
+        "target": {
+          "type": "EVENT_CARD",
+          "controller": "SELF",
+          "count": {
+            "up_to": 1
+          },
+          "source_zone": "TRASH",
+          "filter": {
+            "cost_max": 7
+          }
+        }
+      }
+    },
+    {
+      "id": "OP12-041",
+      "path": "$.effects.0.actions.0",
+      "action": {
+        "type": "ACTIVATE_EVENT_FROM_HAND",
+        "target": {
+          "type": "EVENT_CARD",
+          "source_zone": "HAND",
+          "count": {
+            "up_to": 1
+          },
+          "filter": {
+            "traits": [
+              "Straw Hat Crew"
+            ],
+            "base_cost_max": 3
+          }
+        }
+      }
+    },
+    {
+      "id": "OP15-014",
+      "path": "$.effects.1.actions.0",
+      "action": {
+        "type": "ACTIVATE_EVENT_FROM_HAND",
+        "target": {
+          "type": "EVENT_CARD",
+          "source_zone": "HAND",
+          "count": {
+            "up_to": 1
+          },
+          "filter": {
+            "traits": [
+              "Dressrosa"
+            ],
+            "base_cost_max": 3
+          }
+        }
+      }
+    },
+    {
+      "id": "OP15-046",
+      "path": "$.effects.1.actions.0",
+      "action": {
+        "type": "ACTIVATE_EVENT_FROM_HAND",
+        "target": {
+          "type": "EVENT_CARD",
+          "source_zone": "HAND",
+          "count": {
+            "up_to": 1
+          },
+          "filter": {
+            "traits": [
+              "Dressrosa"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "watchers": [
+    {
+      "id": "OP01-004",
+      "path": "$.effects.0.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "don_requirement": 1,
+        "turn_restriction": "YOUR_TURN",
+        "once_per_turn": true
+      }
+    },
+    {
+      "id": "OP01-004",
+      "path": "$.effects.0.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "don_requirement": 1,
+        "turn_restriction": "YOUR_TURN",
+        "once_per_turn": true
+      }
+    },
+    {
+      "id": "OP01-062",
+      "path": "$.effects.0.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "SELF"
+        },
+        "don_requirement": 1
+      }
+    },
+    {
+      "id": "OP01-062",
+      "path": "$.effects.0.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "SELF"
+        },
+        "don_requirement": 1
+      }
+    },
+    {
+      "id": "OP04-053",
+      "path": "$.effects.0.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "SELF"
+        },
+        "don_requirement": 1
+      }
+    },
+    {
+      "id": "OP04-053",
+      "path": "$.effects.0.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "SELF"
+        },
+        "don_requirement": 1
+      }
+    },
+    {
+      "id": "OP06-044",
+      "path": "$.effects.0.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN",
+        "once_per_turn": true
+      }
+    },
+    {
+      "id": "OP06-044",
+      "path": "$.effects.0.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN",
+        "once_per_turn": true
+      }
+    },
+    {
+      "id": "OP06-048",
+      "path": "$.effects.0.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN"
+      }
+    },
+    {
+      "id": "OP06-048",
+      "path": "$.effects.0.trigger.any_of.2",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN"
+      }
+    },
+    {
+      "id": "OP10-003",
+      "path": "$.effects.1.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "SELF"
+        },
+        "turn_restriction": "OPPONENT_TURN"
+      }
+    },
+    {
+      "id": "OP10-003",
+      "path": "$.effects.1.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "SELF"
+        },
+        "turn_restriction": "OPPONENT_TURN"
+      }
+    },
+    {
+      "id": "OP11-012",
+      "path": "$.effects.0.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN",
+        "once_per_turn": true
+      }
+    },
+    {
+      "id": "OP11-012",
+      "path": "$.effects.0.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN",
+        "once_per_turn": true
+      }
+    },
+    {
+      "id": "OP11-102",
+      "path": "$.effects.0.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN"
+      }
+    },
+    {
+      "id": "OP11-102",
+      "path": "$.effects.0.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "OPPONENT"
+        },
+        "turn_restriction": "YOUR_TURN"
+      }
+    },
+    {
+      "id": "OP15-119",
+      "path": "$.effects.1.trigger.any_of.0",
+      "trigger": {
+        "event": "EVENT_ACTIVATED_FROM_HAND",
+        "filter": {
+          "controller": "OPPONENT"
+        }
+      }
+    },
+    {
+      "id": "OP15-119",
+      "path": "$.effects.1.trigger.any_of.1",
+      "trigger": {
+        "event": "EVENT_MAIN_RESOLVED_FROM_TRASH",
+        "filter": {
+          "controller": "OPPONENT"
+        }
+      }
+    }
+  ],
+  "mainCount": 273,
+  "mainActionTypes": [
+    "ADD_DON_FROM_DECK",
+    "ADD_TO_LIFE_FROM_DECK",
+    "ADD_TO_LIFE_FROM_FIELD",
+    "ADD_TO_LIFE_FROM_HAND",
+    "APPLY_PROHIBITION",
+    "CHOOSE_VALUE",
+    "DRAIN_LIFE_TO_THRESHOLD",
+    "DRAW",
+    "GIVE_DON",
+    "GRANT_KEYWORD",
+    "KO",
+    "LIFE_SCRY",
+    "LIFE_TO_HAND",
+    "MILL",
+    "MODIFY_COST",
+    "MODIFY_POWER",
+    "NEGATE_EFFECTS",
+    "OPPONENT_ACTION",
+    "OPPONENT_CHOICE",
+    "PLAYER_CHOICE",
+    "PLAY_CARD",
+    "REST_OPPONENT_DON",
+    "RETURN_HAND_TO_DECK",
+    "RETURN_TO_DECK",
+    "RETURN_TO_HAND",
+    "REVEAL",
+    "SCHEDULE_ACTION",
+    "SEARCH_AND_PLAY",
+    "SEARCH_DECK",
+    "SEARCH_TRASH_THE_REST",
+    "SET_ACTIVE",
+    "SET_BASE_POWER",
+    "SET_DON_ACTIVE",
+    "SET_REST",
+    "SHUFFLE_DECK",
+    "SWAP_BASE_POWER",
+    "TRASH_FROM_HAND",
+    "TRASH_FROM_LIFE",
+    "TURN_ALL_LIFE_FACE_DOWN",
+    "TURN_LIFE_FACE_UP"
+  ]
+}

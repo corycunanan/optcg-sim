@@ -352,10 +352,12 @@ const StackFrameCore = z.strictObject({
     })
     .optional(),
   accumulatedEvents: z.array(z.unknown()),
+  eventActivationCompletion: z.unknown().optional(),
   ruleTrashForPlay: z.unknown().optional(),
   stateDistributionForPlay: z.unknown().optional(),
   batchResumeMarker: z.unknown().optional(),
   costArrangeStage: z.boolean().optional(),
+  namedPlayCostTargetId: z.string().optional(),
 });
 
 const PersistedGameStateV2 = z.strictObject({
@@ -404,11 +406,14 @@ const EventPayloadSchemas = {
     sourceZone: z.string().optional(),
   }),
   CARD_KO: z.strictObject({
+    sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
+    sourceController: PlayerIndex.optional(),
+    causingController: PlayerIndex.optional(),
+    movementCause: z.enum(["EFFECT", "COST", "RULE", "BATTLE"]).optional(),
     cardInstanceId: z.string(),
     newCardInstanceId: z.string().optional(),
     cardId: z.string(),
     cause: z.string(),
-    causingController: PlayerIndex.optional(),
     causeCardInstanceId: z.string().optional(),
     preKO_donCount: FiniteNumber,
     preKO_basePower: FiniteNumber.optional(),
@@ -420,6 +425,10 @@ const EventPayloadSchemas = {
     source: z.string().optional(),
   }),
   CARD_TRASHED: z.strictObject({
+    sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
+    sourceController: PlayerIndex.optional(),
+    causingController: PlayerIndex.optional(),
+    movementCause: z.enum(["EFFECT", "COST", "RULE", "BATTLE"]).optional(),
     cardId: z.string().optional(),
     cardInstanceId: z.string().optional(),
     newCardInstanceId: z.string().optional(),
@@ -428,10 +437,23 @@ const EventPayloadSchemas = {
     from: z.string().optional(),
   }),
   CARD_RETURNED_TO_HAND: z.strictObject({
+    sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
+    sourceController: PlayerIndex.optional(),
+    causingController: PlayerIndex.optional(),
+    movementCause: z.enum(["EFFECT", "COST", "RULE", "BATTLE"]).optional(),
     cardInstanceId: z.string(),
     newCardInstanceId: z.string().optional(),
     cardId: z.string(),
     source: z.string().optional(),
+  }),
+  CARD_ADDED_TO_LIFE: z.strictObject({
+    sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
+    sourceController: PlayerIndex.optional(),
+    causingController: PlayerIndex.optional(),
+    movementCause: z.enum(["EFFECT", "COST", "RULE", "BATTLE"]).optional(),
+    cardInstanceId: z.string(),
+    newCardInstanceId: z.string(),
+    cardId: z.string(),
   }),
   CARD_ADDED_TO_HAND_FROM_LIFE: z.strictObject({
     cardId: z.string().optional(),
@@ -496,6 +518,10 @@ const EventPayloadSchemas = {
     diagnostic: z.unknown().optional(),
   }),
   CARD_RETURNED_TO_DECK: z.strictObject({
+    sourceZone: z.enum(["DECK", "HAND", "TRASH", "LIFE", "LEADER", "CHARACTER", "STAGE", "DON_DECK", "COST_AREA"]).optional(),
+    sourceController: PlayerIndex.optional(),
+    causingController: PlayerIndex.optional(),
+    movementCause: z.enum(["EFFECT", "COST", "RULE", "BATTLE"]).optional(),
     cardInstanceId: z.string(),
     newCardInstanceId: z.string().optional(),
     cardId: z.string().optional(),

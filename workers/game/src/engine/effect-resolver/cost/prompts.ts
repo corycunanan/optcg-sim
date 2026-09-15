@@ -59,6 +59,7 @@ export function buildTrashToDeckArrangePrompt(
 export function getCostLabel(cost: Cost): string {
   const amount = cost.type !== "CHOICE" && typeof cost.amount === "number" ? cost.amount : 1;
   switch (cost.type) {
+    case "PLAY_NAMED_CARD_FROM_HAND": return `Play 1 [${cost.card_name}] from your hand`;
     case "TRASH_FROM_HAND": return `Choose ${amount} card(s) from hand to trash as cost`;
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": return `Choose 1 [${cost.card_name ?? "named card"}] from hand or stage to trash as cost`;
     case "KO_OWN_CHARACTER": return `Choose ${amount} character(s) to KO as cost`;

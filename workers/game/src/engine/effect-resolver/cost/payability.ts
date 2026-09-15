@@ -13,6 +13,7 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "LIFE_TO_HAND":
     case "TRASH_FROM_LIFE":
       return cost.position === "TOP_OR_BOTTOM";
+    case "PLAY_NAMED_CARD_FROM_HAND":
     case "TRASH_FROM_HAND":
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
     case "KO_OWN_CHARACTER":
@@ -34,7 +35,6 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "VARIABLE_DON_RETURN":
     case "REST_SELF":
     case "TRASH_SELF":
-    case "PLAY_NAMED_CARD_FROM_HAND":
     case "PLACE_SELF_TO_DECK":
     case "PLACE_STAGE_TO_DECK":
     case "TRASH_OWN_STAGE":
@@ -218,15 +218,6 @@ export function isCostPayable(
       return false;
     }
 
-    case "PLAY_NAMED_CARD_FROM_HAND": {
-      const cardName = cost.card_name;
-      if (!cardName) return false;
-      return player.hand.some((c) => {
-        const data = cardDb.get(c.cardId);
-        return data && data.name === cardName;
-      });
-    }
-
     case "TRASH_FROM_HAND":
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE":
     case "PLACE_HAND_TO_DECK":
@@ -238,6 +229,7 @@ export function isCostPayable(
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE":
+    case "PLAY_NAMED_CARD_FROM_HAND":
     case "PLACE_FROM_TRASH_TO_DECK":
       return true;
     default:

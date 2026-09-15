@@ -48,7 +48,7 @@ describe("OPT-193 exhaustive cost narrowing", () => {
     },
     { cost: { type: "PLACE_HAND_TO_DECK" }, needsSelection: true },
     { cost: { type: "REVEAL_FROM_HAND" }, needsSelection: true },
-    { cost: { type: "PLAY_NAMED_CARD_FROM_HAND" }, needsSelection: false },
+    { cost: { type: "PLAY_NAMED_CARD_FROM_HAND" }, needsSelection: true },
     { cost: { type: "REST_CARDS" }, needsSelection: true },
     { cost: { type: "REST_NAMED_CARD" }, needsSelection: true },
     { cost: { type: "KO_OWN_CHARACTER" }, needsSelection: true },

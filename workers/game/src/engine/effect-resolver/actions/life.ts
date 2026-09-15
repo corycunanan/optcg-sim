@@ -23,7 +23,7 @@ import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
-import { promptEffectDescription, resolveAmount } from "../action-utils.js";
+import { effectSourceController, promptEffectDescription, resolveAmount } from "../action-utils.js";
 
 export function executeAddToLifeFromDeck(
   state: GameState,
@@ -386,6 +386,7 @@ export function executeAddToLifeFromField(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
+  const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const allValidIds =
     preselectedTargets ??
     computeAllValidTargets(
@@ -426,7 +427,7 @@ export function executeAddToLifeFromField(
         {
           action: "TO_LIFE",
           cause: "EFFECT",
-          causingController: controller,
+          causingController,
           sourceCardInstanceId,
         },
         cardDb,
@@ -483,7 +484,7 @@ export function executeAddToLifeFromField(
         {
           action: "TO_LIFE",
           cause: "EFFECT",
-          causingController: controller,
+          causingController,
           sourceCardInstanceId,
         },
         cardDb,
@@ -498,6 +499,19 @@ export function executeAddToLifeFromField(
     if (moved) {
       nextState = moved.state;
       movedIds.push(moved.fact.newInstanceId);
+      events.push({
+        type: "CARD_ADDED_TO_LIFE",
+        playerIndex: moved.fact.owner,
+        payload: {
+          cardInstanceId: moved.fact.oldInstanceId,
+          newCardInstanceId: moved.fact.newInstanceId,
+          cardId: moved.fact.cardId,
+          sourceZone: moved.fact.source,
+          sourceController: moved.fact.controller,
+          causingController,
+          movementCause: "EFFECT",
+        },
+      });
     }
   }
   return {

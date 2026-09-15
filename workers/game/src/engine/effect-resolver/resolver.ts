@@ -1,3 +1,4 @@
+import { retainEventParent } from "./event-activation.js";
 import {
   publishCommittedEvents,
   retainEventsOnFrame,
@@ -941,6 +942,24 @@ export function executeActionChain(
     lastActionSucceeded = result.succeeded;
     if (isEngineTerminated(state)) return { state, events };
 
+    if (result.pendingPrompt && result.nestedEventActivation) {
+      return {
+        state: retainEventParent(
+          state,
+          stackDepthBeforeAction,
+          action,
+          actions.slice(i + 1),
+          sourceCardInstanceId,
+          controller,
+          resultRefs,
+          result,
+          events,
+          effectDescription
+        ),
+        events,
+        pendingPrompt: result.pendingPrompt,
+      };
+    }
     if (result.pendingPrompt) {
       // Pause — push a stack frame with the remaining actions and surface the prompt
       const nestedPromptFrame = result.state.effectStack.at(-1);

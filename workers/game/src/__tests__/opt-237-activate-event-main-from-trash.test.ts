@@ -153,7 +153,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
     expect(result.state.players[0].trash.some((c) => c.instanceId === "evt-trash-1")).toBe(true);
   });
 
-  it("emits EVENT_MAIN_RESOLVED_FROM_TRASH before the nested effect's events", () => {
+  it("emits EVENT_MAIN_RESOLVED_FROM_TRASH after the nested effect's events", () => {
     const cardDb = createTestCardDb();
     const evtCard = makeEventCard("EVT-CLASS2-ORDER", {
       effectText: "[Main] Draw 1 card.",
@@ -178,7 +178,7 @@ describe("OPT-237 — ACTIVATE_EVENT_FROM_TRASH resolves the Event's [Main] bloc
     const classIdx = types.indexOf("EVENT_MAIN_RESOLVED_FROM_TRASH");
     const drawIdx = types.indexOf("CARD_DRAWN");
     expect(classIdx).toBeGreaterThanOrEqual(0);
-    expect(drawIdx).toBeGreaterThan(classIdx);
+    expect(drawIdx).toBeLessThan(classIdx);
   });
 
   it("class 2 payload carries cardId and cardInstanceId of the trashed Event", () => {

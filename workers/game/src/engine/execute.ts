@@ -6,6 +6,7 @@ import { getPlayEntryState } from "./play-entry-state.js";
  * Main Phase actions (play card, attach DON!!) directly.
  */
 
+import { meetsAttachedDonRequirement } from "./attached-don.js";
 import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import type { CardData, GameAction, GameState, PendingEvent, ExecuteResult } from "../types.js";
 import {
@@ -262,6 +263,8 @@ function executeActivateEffect(
       (block.trigger.keyword !== "ACTIVATE_MAIN")) {
     return { state, events };
   }
+
+  if (!meetsAttachedDonRequirement(found.card, block.trigger)) return { state, events };
 
   // Check once-per-turn restriction
   if (isOncePerTurnBlock(block)) {
