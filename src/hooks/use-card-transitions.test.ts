@@ -9,7 +9,9 @@ import {
   type CardTransition,
 } from "./use-card-transitions";
 
-function mkRegistry(overrides: Partial<ZonePositionRegistry> = {}): ZonePositionRegistry {
+function mkRegistry(
+  overrides: Partial<ZonePositionRegistry> = {}
+): ZonePositionRegistry {
   return {
     register: () => {},
     unregister: () => {},
@@ -37,7 +39,7 @@ function mkTransition(partial: Partial<CardTransition> = {}): CardTransition {
 function handCard(
   instanceId: string,
   cardId: string,
-  owner: 0 | 1,
+  owner: 0 | 1
 ): CardInstance {
   return {
     instanceId,
@@ -210,15 +212,17 @@ describe("eventToTransitions — CARD_DRAWN (deck→hand flight)", () => {
         payload: { cardId: "hidden", cardInstanceId: instanceId },
       } as unknown as GameEvent;
       const hands: [CardInstance[], CardInstance[]] = [[], []];
-      hands[playerIndex] = [handCard(instanceId, `OP0${playerIndex + 1}-001`, playerIndex)];
+      hands[playerIndex] = [
+        handCard(instanceId, `OP0${playerIndex + 1}-001`, playerIndex),
+      ];
 
       const [transition] = eventToTransitions(ev, 0, registry, null, hands);
 
       expect(transition.cardId).toBe(`OP0${playerIndex + 1}-001`);
       expect(transition.toZoneKey).toBe(
-        playerIndex === 0 ? "p-hand" : "o-hand",
+        playerIndex === 0 ? "p-hand" : "o-hand"
       );
-    },
+    }
   );
 
   it("keeps a received hidden draw face-down defensively", () => {
@@ -289,12 +293,12 @@ describe("receivedHandsByPlayerIndex", () => {
       const receivedHands = receivedHandsByPlayerIndex(
         bottomHand,
         topHand,
-        bottomPlayerIndex,
+        bottomPlayerIndex
       );
 
       expect(receivedHands[0]).toBe(player0Hand);
       expect(receivedHands[1]).toBe(player1Hand);
-    },
+    }
   );
 });
 
@@ -391,7 +395,11 @@ describe("eventToTransitions — CARD_RETURNED_TO_DECK (OPT-121)", () => {
       type: "CARD_RETURNED_TO_DECK",
       playerIndex: 0,
       timestamp: 1,
-      payload: { cardInstanceId: instanceId, cardId: "OP01-001", position: "TOP" },
+      payload: {
+        cardInstanceId: instanceId,
+        cardId: "OP01-001",
+        position: "TOP",
+      },
     } as unknown as GameEvent;
     const [t] = eventToTransitions(ev, 0, registry);
     expect(t.fromZoneKey).toBe("p-char-1");
@@ -492,7 +500,11 @@ describe("eventToTransitions — life-source CARD_TRASHED (OPT-121)", () => {
   });
 
   it("face_up_life uses the same life→trash route", () => {
-    const out = eventToTransitions(lifeTrashEvent("face_up_life", 1), 0, mkRegistry());
+    const out = eventToTransitions(
+      lifeTrashEvent("face_up_life", 1),
+      0,
+      mkRegistry()
+    );
     expect(out).toHaveLength(1);
     expect(out[0].fromZoneKey).toBe("p-life");
     expect(out[0].toZoneKey).toBe("p-trash");
@@ -512,7 +524,7 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
 
   function trashEvent(
     payload: Record<string, unknown>,
-    playerIndex: 0 | 1 = 0,
+    playerIndex: 0 | 1 = 0
   ): GameEvent {
     return {
       type: "CARD_TRASHED",
@@ -526,7 +538,7 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     const out = eventToTransitions(
       trashEvent({ cardInstanceId: "p0-life-1", from: "LIFE", reason: "x" }),
       0,
-      registry,
+      registry
     );
     expect(out).toHaveLength(1);
     expect(out[0].fromZoneKey).toBe("p-life");
@@ -538,7 +550,7 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     const out = eventToTransitions(
       trashEvent({ cardInstanceId: "p0-life-1", reason: "face_up_life" }),
       0,
-      registry,
+      registry
     );
     expect(out[0].fromZoneKey).toBe("p-life");
   });
@@ -547,7 +559,7 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     const out = eventToTransitions(
       trashEvent({ cardInstanceId: "p0-life-1", reason: "life_trash" }),
       0,
-      registry,
+      registry
     );
     expect(out[0].fromZoneKey).toBe("p-life");
   });
@@ -556,10 +568,10 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     const out = eventToTransitions(
       trashEvent(
         { cardInstanceId: "p1-life-1", from: "LIFE", reason: "face_up_life" },
-        1,
+        1
       ),
       0,
-      registry,
+      registry
     );
     expect(out[0].fromZoneKey).toBe("o-life");
     expect(out[0].toZoneKey).toBe("o-trash");
@@ -569,7 +581,7 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     const out = eventToTransitions(
       trashEvent({ cardInstanceId: "x", reason: "EFFECT" }),
       0,
-      registry,
+      registry
     );
     expect(out[0].fromZoneKey).toBe("p-hand");
   });
@@ -587,7 +599,7 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
       mkRegistry({
         getCardZone: (instanceId) =>
           instanceId === sourceInstanceId ? "p-stage" : null,
-      }),
+      })
     );
 
     expect(out).toHaveLength(1);
@@ -601,3 +613,35 @@ describe("eventToTransitions — CARD_TRASHED life→trash routing (singular pat
     expect(out[0].arrivalCount).toBeUndefined();
   });
 });
+
+it.each([0, 1] as const)(
+  "preserves rested arrival for player %s",
+  (playerIndex) => {
+    for (const playedRested of [true, false]) {
+      const event: GameEvent = {
+        type: "CARD_PLAYED",
+        playerIndex,
+        timestamp: 1,
+        payload: {
+          cardId: "OP09-023",
+          cardInstanceId: "adio",
+          zone: "CHARACTER",
+          source: "BY_EFFECT",
+          playedRested,
+        },
+      };
+      const [transition] = eventToTransitions(
+        event,
+        0,
+        mkRegistry({
+          getCardZone: () => (playerIndex === 0 ? "p-char-1" : "o-char-1"),
+        })
+      );
+      expect(transition.playedRested).toBe(playedRested);
+      expect(transition.playerIndex).toBe(playerIndex);
+      expect(transition.toZoneKey).toBe(
+        playerIndex === 0 ? "p-char-1" : "o-char-1"
+      );
+    }
+  }
+);
