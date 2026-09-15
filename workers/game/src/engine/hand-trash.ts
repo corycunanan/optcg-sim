@@ -1,7 +1,6 @@
-import type { CardInstance, GameState, PendingEvent } from "../types.js";
+import type { GameState, PendingEvent } from "../types.js";
 import type { EffectResult } from "./effect-types.js";
-import { EFFECT_SOURCE_SNAPSHOT_REF } from "./effect-types.js";
-import { findCardInstance } from "./state.js";
+import { effectSourceCard } from "./effect-resolver/action-utils.js";
 
 export const TRIGGERING_HAND_TRASH_REF = "__triggering_hand_trash";
 
@@ -17,30 +16,42 @@ export function handTrashEvent(
   movementCause: "COST" | "EFFECT",
   sourceCardInstanceId: string | undefined,
   causingController: 0 | 1,
-  resultRefs?: Map<string, EffectResult>,
-  sourceSnapshot?: CardInstance,
+  resultRefs?: Map<string, EffectResult>
 ): PendingEvent {
-  const saved = sourceSnapshot ?? resultRefs?.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot;
-  // Replacement/nested effects can inherit references from the replaced effect.
-  // Only use a snapshot belonging to this execution's causal source.
-  const source = (saved?.instanceId === sourceCardInstanceId ? saved : undefined)
-    ?? (sourceCardInstanceId ? findCardInstance(state, sourceCardInstanceId) : undefined);
+  const source = sourceCardInstanceId
+    ? effectSourceCard(state, sourceCardInstanceId, resultRefs ?? new Map())
+    : undefined;
   return {
-    type: "CARD_TRASHED", playerIndex,
+    type: "CARD_TRASHED",
+    playerIndex,
     payload: {
-      count, reason: movementCause === "COST" ? "cost" : "effect", from: "HAND",
-      sourceZone: "HAND", sourceController: playerIndex, movementCause, causingController: source?.controller ?? causingController,
-      ...(source ? { effectSourceCardId: source.cardId, effectSourceController: source.controller } : {}),
+      count,
+      reason: movementCause === "COST" ? "cost" : "effect",
+      from: "HAND",
+      sourceZone: "HAND",
+      sourceController: playerIndex,
+      movementCause,
+      causingController: source?.controller ?? causingController,
+      ...(source
+        ? {
+            effectSourceCardId: source.cardId,
+            effectSourceController: source.controller,
+          }
+        : {}),
     },
   };
 }
 
 export function isHandTrashByEffect(event: PendingEvent): boolean {
-  return event.type === "CARD_TRASHED" && event.payload?.from === "HAND"
-    && (event.payload?.count ?? 0) > 0
-    && (event.payload?.movementCause === "EFFECT" || event.payload?.movementCause === "COST")
-    && event.payload?.effectSourceCardId !== undefined
-    && event.payload?.effectSourceController !== undefined;
+  return (
+    event.type === "CARD_TRASHED" &&
+    event.payload?.from === "HAND" &&
+    (event.payload?.count ?? 0) > 0 &&
+    (event.payload?.movementCause === "EFFECT" ||
+      event.payload?.movementCause === "COST") &&
+    event.payload?.effectSourceCardId !== undefined &&
+    event.payload?.effectSourceController !== undefined
+  );
 }
 
 /** Complete causal snapshots for multi-step costs whose source already left.
@@ -48,15 +59,30 @@ export function isHandTrashByEffect(event: PendingEvent): boolean {
  * a replacement effect's own source or already-attributed hand discard.
  */
 export function completeHandTrashCostSources(
-  events: PendingEvent[], state: GameState, sourceCardInstanceId: string,
-  controller: 0 | 1, resultRefs: Map<string, EffectResult>,
+  events: PendingEvent[],
+  state: GameState,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  resultRefs: Map<string, EffectResult>
 ): void {
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
-    if (event.type !== "CARD_TRASHED" || event.payload?.from !== "HAND"
-      || event.payload.movementCause !== "COST" || event.payload.effectSourceCardId) continue;
-    const attributed = handTrashEvent(state, event.playerIndex ?? controller, event.payload.count ?? 0,
-      "COST", sourceCardInstanceId, controller, resultRefs);
+    if (
+      event.type !== "CARD_TRASHED" ||
+      event.payload?.from !== "HAND" ||
+      event.payload.movementCause !== "COST" ||
+      event.payload.effectSourceCardId
+    )
+      continue;
+    const attributed = handTrashEvent(
+      state,
+      event.playerIndex ?? controller,
+      event.payload.count ?? 0,
+      "COST",
+      sourceCardInstanceId,
+      controller,
+      resultRefs
+    );
     events[i] = { ...event, payload: attributed.payload } as PendingEvent;
   }
 }

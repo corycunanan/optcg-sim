@@ -138,6 +138,7 @@ type CustomEventType =
   | "END_OF_BATTLE"
   | "LIFE_COUNT_BECOMES_ZERO"
   | "CARD_ADDED_TO_HAND_FROM_LIFE"
+  | "CARD_TRASHED_FROM_HAND"
   | "DRAW_OUTSIDE_DRAW_PHASE"
   | "CHARACTER_BECOMES_RESTED"
   | "CHARACTER_RETURNED_TO_HAND"
@@ -150,6 +151,7 @@ type CustomEventType =
 interface EventFilter {
   controller?: Controller;
   cause?: EventCause;
+  effect_source?: { controller?: Controller; traits?: string[] };
   target_filter?: TargetFilter;
   source_zone?: Zone;
   includes_trigger_keyword?: boolean;
@@ -1097,3 +1099,29 @@ This uses the same cost payment pipeline as `[Activate: Main]` effects. See [Cos
 ---
 
 _Last updated: 2026-03-19_
+
+
+### Hand-trash effect watchers (OPT-795)
+
+`CARD_TRASHED_FROM_HAND` matches a positive-count `CARD_TRASHED` event with
+`from: "HAND"`, explicit `movementCause: "EFFECT" | "COST"`, and a causal
+`effectSourceCardId` / `effectSourceController` snapshot. The event's player is
+whose hand lost cards; the causal source is the card whose effect caused the
+movement, even when an opponent chooses the discarded cards or a replacement
+substitutes its own effect. A simultaneous discard emits one aggregate event.
+
+Use `filter: { controller: "SELF", cause: "BY_EFFECT" }` for OP14-045/049/056.
+Kuzan OP12-040 additionally uses
+`effect_source: { controller: "SELF", traits: ["Navy"] }`; these are the
+**effect source's** traits, not the discarded card's traits. Its draw amount is
+`{ type: "ACTION_RESULT", ref: "__triggering_hand_trash" }`, seeded from the
+triggering event count and retained through ordering, cost, and reconnect
+continuations. Kuzan has no once-per-turn clause.
+
+Activation-cost inclusion is supported for Kuzan by the official OP12 Garp FAQ:
+Kuzan draws after Garp's complete effect resolves. That FAQ misnumbers the Leader
+as OP12-043; the matching Leader is OP12-040. Applying this interpretation to the
+three OP14 cards is explicitly a user-authorized inference from that analogue,
+not a direct OP14 activation-cost ruling. COST remains distinct from EFFECT in
+persisted events. Symbol Counter, rule disposal, routine Event disposal, zero-card
+movements, and Life-to-hand movements do not qualify.
