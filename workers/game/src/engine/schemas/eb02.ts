@@ -2265,7 +2265,7 @@ export const EB02_060_MERRY_GO: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       costs: [
         { type: "REST_SELF" },
-        { type: "TURN_LIFE_FACE_UP", amount: 1 },
+        { type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" },
       ],
       flags: { optional: true },
       actions: [
