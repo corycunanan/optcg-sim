@@ -29,7 +29,7 @@ export const ST20_001_CHARLOTTE_KATAKURI: EffectSchema = {
       id: "ST20-001_activate_main",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       actions: [
         {
           type: "GIVE_DON",

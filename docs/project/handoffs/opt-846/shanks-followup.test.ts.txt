@@ -1,0 +1,135 @@
+// OPT-851 exploratory reproduction; copy into workers/game/src/__tests__ to run.
+// Expected to FAIL on OPT-846 base; simplified printed cost metadata.
+import { describe, expect, it } from "vitest";
+import type { CardData, CardInstance, GameAction } from "../types.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { registerCardEnteredField } from "../engine/triggers.js";
+import {
+  CARDS,
+  createBattleReadyState,
+  createTestCardDb,
+  padChars,
+} from "./helpers.js";
+
+// Expectations: canonical text and official FAQs recorded in opt-846-life-costs.md.
+function fixture() {
+  const db = createTestCardDb();
+  let state = createBattleReadyState(db);
+  state.players.forEach((p) => {
+    p.characters = padChars([]);
+    p.hand = [];
+  });
+  function put(
+    id: string,
+    owner: 0 | 1 = 0,
+    zone: CardInstance["zone"] = "CHARACTER",
+    data: Partial<CardData> = {}
+  ) {
+    const schema = getEffectSchema(id);
+    db.set(id, {
+      ...(zone === "LEADER" ? CARDS.LEADER : CARDS.VANILLA),
+      id,
+      name: schema?.card_name ?? id,
+      cost: 3,
+      power: 4000,
+      effectText:
+        data.type === "Event"
+          ? "[Main] Rest up to 1 of your opponent’s Characters."
+          : "",
+      ...data,
+      ...(schema ? { effectSchema: schema } : {}),
+    });
+    const c: CardInstance = {
+      instanceId: `${id}-${owner}-${zone}`,
+      cardId: id,
+      controller: owner,
+      owner,
+      zone,
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 0,
+    };
+    if (zone === "HAND") state.players[owner].hand.push(c);
+    else if (zone === "LEADER") state.players[owner].leader = c;
+    else if (zone === "STAGE") state.players[owner].stage = c;
+    else
+      state.players[owner].characters[
+        state.players[owner].characters.findIndex((c) => !c)
+      ] = c;
+    if (zone !== "HAND")
+      state = registerCardEnteredField(state, c, db.get(id)!);
+    return c;
+  }
+  function act(
+    action: GameAction,
+    player: 0 | 1 = state.turn.activePlayerIndex
+  ) {
+    if (state.pendingPrompt) {
+      const r = resumePromptLifecycle(state, action, db, {
+        drainPregame: (s) => s,
+        advanceStartOfTurn: (s) => s,
+      });
+      expect(r.responseRejected).toBe(false);
+      state = r.state;
+    } else {
+      const r = runPipeline(state, action, db, player);
+      expect(r.valid, r.error).toBe(true);
+      state = r.state;
+    }
+  }
+  function select(ids: string[]) {
+    act({ type: "SELECT_TARGET", selectedInstanceIds: ids });
+  }
+  function accept() {
+    if (state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+      act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+  }
+  function play(c: CardInstance) {
+    act({ type: "PLAY_CARD", cardInstanceId: c.instanceId });
+  }
+  function activate(c: CardInstance, effectId: string) {
+    act({ type: "ACTIVATE_EFFECT", cardInstanceId: c.instanceId, effectId });
+    accept();
+  }
+  function done() {
+    expect(state.pendingPrompt).toBeNull();
+    expect(state.effectStack).toHaveLength(0);
+  }
+  return {
+    db,
+    put,
+    act,
+    select,
+    accept,
+    play,
+    activate,
+    done,
+    roundTrip() {
+      state = JSON.parse(JSON.stringify(state));
+    },
+    get state() {
+      return state;
+    },
+  };
+}
+
+describe("OPT-851 downstream target reproduction", () => {
+  it("Shanks retains unpositioned payment below a face-down top", () => {
+    const f = fixture();
+    f.state.players[0].life.forEach((c) => (c.face = "DOWN"));
+    f.state.players[0].life[1].face = "UP";
+    const before = structuredClone(f.state.players[0].life);
+    for (let i = 0; i < 7; i++) f.put(`opponent-hand-${i}`, 1, "HAND");
+    const opponentBefore = f.state.players[1].life.length;
+    f.play(f.put("ST13-009", 0, "HAND", { cost: 0 }));
+    f.roundTrip();
+    f.accept();
+    f.done();
+    expect(f.state.players[0].life).toEqual(
+      before.map((c, i) => (i === 1 ? { ...c, face: "DOWN" } : c))
+    );
+    expect(f.state.players[1].life).toHaveLength(opponentBefore - 1);
+  });
+});
