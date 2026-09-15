@@ -1,3 +1,5 @@
+import { restFieldTarget } from "./field-rest.js";
+import type { EffectSourceIdentity } from "../../../../shared/game-types.js";
 /**
  * M4 Replacement Effect Interceptor — Pipeline Step 3
  *
@@ -35,7 +37,7 @@ import { updateTopFrame } from "./effect-stack.js";
 import { matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
 import { isProhibitedForCard } from "./prohibitions.js";
-import { koCharacter, returnToHand, returnToDeck, setCardState } from "./effect-resolver/card-mutations.js";
+import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
 import { extractEffectDescription } from "./effect-resolver/action-utils.js";
@@ -246,7 +248,9 @@ function replacementMatchesTarget(
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
+  causingSource?: EffectSourceIdentity,
 ): boolean {
+  if (params.cause_filter?.source_card_type === "CHARACTER" && causingSource?.cardType !== "Character") return false;
   if (params.trigger !== event) return false;
 
   const targetCard = findCardInstance(state, targetInstanceId);
@@ -365,6 +369,7 @@ export function scanReplacementsForBatch(
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
+  causingSource?: EffectSourceIdentity,
 ): ReplacementBatchMatch[] {
   const effects = state.activeEffects;
   const matches: ReplacementBatchMatch[] = [];
@@ -381,7 +386,7 @@ export function scanReplacementsForBatch(
     if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb)) continue;
 
     const matchedIds = targetInstanceIds.filter((id) =>
-      replacementMatchesTarget(state, effect, params, id, event, cause, causingController, cardDb),
+      replacementMatchesTarget(state, effect, params, id, event, cause, causingController, cardDb, causingSource),
     );
     if (matchedIds.length === 0) continue;
 
@@ -797,6 +802,7 @@ export interface ReplacementBatchResumeContext {
   currentMatchIndex: number;
   /** Controller of the action that produced the event. */
   causingController: 0 | 1;
+  causingSource?: EffectSourceIdentity;
   /** Only used when actionKind === "RETURN_TO_DECK". */
   returnToDeckPosition?: "TOP" | "BOTTOM";
 }
@@ -912,6 +918,7 @@ function finalizeTarget(
   returnToDeckPosition: "TOP" | "BOTTOM" | undefined,
   cardDb: Map<string, CardData>,
   snapshotState: GameState,
+  causingSource?: EffectSourceIdentity,
 ): {
   state: GameState;
   events: PendingEvent[];
@@ -924,18 +931,8 @@ function finalizeTarget(
       return returnToHand(state, targetId);
     case "RETURN_TO_DECK":
       return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM");
-    case "SET_REST": {
-      const nextState = setCardState(state, targetId, "RESTED");
-      if (nextState === state) return null;
-      return {
-        state: nextState,
-        events: [{
-          type: "CARD_STATE_CHANGED",
-          playerIndex: causingController,
-          payload: { targetInstanceId: targetId, newState: "RESTED", cause: "EFFECT", causingController },
-        }],
-      };
-    }
+    case "SET_REST":
+      return restFieldTarget(state, targetId, causingController, causingSource);
   }
 }
 
@@ -956,13 +953,14 @@ export function processBatchReplacements(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
   returnToDeckPosition?: "TOP" | "BOTTOM",
+  causingSource?: EffectSourceIdentity,
 ): BatchResumeResult {
   // Multiple events: scan each in order (specific first, e.g. WOULD_BE_KO
   // before WOULD_BE_REMOVED_FROM_FIELD / WOULD_LEAVE_FIELD). A replacement
   // effect registers for exactly one trigger, so no match can duplicate.
   const eventList = Array.isArray(event) ? event : [event];
   const matches = eventList.flatMap((e) =>
-    scanReplacementsForBatch(state, targetIds, e, cause, causingController, cardDb),
+    scanReplacementsForBatch(state, targetIds, e, cause, causingController, cardDb, causingSource),
   );
   const ctx: ReplacementBatchResumeContext = {
     type: "REPLACEMENT_BATCH",
@@ -973,6 +971,7 @@ export function processBatchReplacements(
     pendingMatches: matches,
     currentMatchIndex: 0,
     causingController,
+    causingSource,
     returnToDeckPosition,
   };
   return stepBatch(state, ctx, 0, cardDb, services);
@@ -1093,7 +1092,7 @@ function finishReplacementBatch(
   // All replacements resolved — finalize unprotected targets inline.
   const finalizedIds: string[] = [];
   for (const id of rest.unprotectedIds) {
-    const finalized = finalizeTarget(resumeState, id, ctx.actionKind, ctx.causingController, ctx.returnToDeckPosition, cardDb, rest.state);
+    const finalized = finalizeTarget(resumeState, id, ctx.actionKind, ctx.causingController, ctx.returnToDeckPosition, cardDb, rest.state, ctx.causingSource);
     if (finalized) {
       resumeState = finalized.state;
       resumeEvents.push(...finalized.events);
