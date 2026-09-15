@@ -161,6 +161,29 @@ describe("OPT-795 authored hand-trash watchers", () => {
     expect(trash?.payload).toMatchObject({ count: 1, movementCause: "EFFECT", effectSourceCardId: "OP01-038", effectSourceController: owner, causingController: owner });
   });
 
+  it("Hotori named hand-play cost and rule overflow do not activate hand-trash watchers", () => {
+    const f = fixture();
+    const watcher = f.put("OP14-045");
+    f.put("OP12-040", 0, "LEADER", { types: ["Navy"] });
+    const overflow = f.put("overflow-victim");
+    f.put("field-b");
+    f.put("field-c");
+    const kotori = f.put("OP05-103", 0, "HAND");
+    f.play(f.put("OP05-111", 0, "HAND", { types: ["Navy"] }));
+    f.accept();
+    f.select([kotori.instanceId]);
+    f.roundTrip();
+    f.select([overflow.instanceId]);
+    f.accept();
+    f.done();
+    expect(f.state.players[0].hand).toHaveLength(0);
+    expect(hasEffectiveKeyword(watcher, f.db.get(watcher.cardId)!, "RUSH", f.state, f.db)).toBe(false);
+    const trash = f.state.eventLog.filter((e) => e.type === "CARD_TRASHED");
+    expect(trash).toHaveLength(1);
+    expect(trash[0].payload).toMatchObject({ sourceZone: "CHARACTER", movementCause: "RULE" });
+    expect(trash.some((e) => e.payload.from === "HAND")).toBe(false);
+  });
+
   it("Kuzan draws the actual effect discard count and can trigger again", () => {
     const f = fixture();
     f.put("OP12-040", 0, "LEADER", { types: ["Navy"] });

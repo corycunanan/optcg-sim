@@ -10,6 +10,7 @@ import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { computeCostTargets } from "./targets.js";
+import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 
 /**
@@ -499,16 +500,15 @@ export function payCosts(
       }
 
       case "PLAY_NAMED_CARD_FROM_HAND": {
-        // Play a specific named card from hand as part of the cost
-        const p = nextState.players[controller];
-        const cardName = cost.card_name;
-        if (!cardName) return null;
-        const handIdx = p.hand.findIndex((c) => {
-          const data = _cardDb.get(c.cardId);
-          return data && data.name === cardName;
-        });
-        if (handIdx === -1) return null;
-        // Card will be played by the action chain — just verify it exists
+        // Synchronous callers cannot choose a card or rule-trash victim.
+        // Pay only an unambiguous single-card payment; never report presence
+        // alone as successful payment.
+        const candidates = namedPlayCandidates(nextState, cost, controller, _cardDb);
+        if (candidates.length !== 1) return null;
+        const paid = payNamedPlay(nextState, cost, candidates[0], controller, _cardDb);
+        if (!paid) return null;
+        nextState = paid.state;
+        events.push(...paid.events);
         break;
       }
 

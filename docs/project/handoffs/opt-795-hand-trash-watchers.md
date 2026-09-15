@@ -1,6 +1,6 @@
 # OPT-795 — Hand-trash effect watchers
 
-Implementation includes OPT-794 PR #670 and latest main `fcfc530019100e7338895af929dbea55022e13fc` (OPT-848 Kanjuro). PR #674 targets main. The Kanjuro integration preserves its blind opponent chooser while retaining the departed Kanjuro as causal source; authored regressions cover both owners and Kuroobi Rush after reconnect. The focused OPT-795/848 suite passed 30 tests. Final tested head, renewed full verification, independent review, and coordinator readiness are recorded in [PR #674](https://github.com/corycunanan/optcg-sim/pull/674). Implementer never merges or updates Linear.
+Implementation includes OPT-794 PR #670 and latest main `b818660be4284bdfba5eeb5165826e470ffef102` (OPT-845 Hotori; includes OPT-848 Kanjuro). PR #674 targets main. The Kanjuro integration preserves its blind opponent chooser while retaining the departed Kanjuro as causal source; authored regressions cover both owners and Kuroobi Rush after reconnect. The focused OPT-795/845/848 suite passed 60 tests. The authored Hotori/Kotori overflow regression verifies that playing from hand as a cost produces no hand-trash event, rule overflow retains RULE provenance, and neither Kuroobi nor Kuzan activates (Hotori receives a test Navy trait to make the Kuzan negative decisive). Final tested head, renewed full verification, independent review, and coordinator readiness are recorded in [PR #674](https://github.com/corycunanan/optcg-sim/pull/674). Implementer never merges or updates Linear.
 
 ## Behavior and entry points
 
