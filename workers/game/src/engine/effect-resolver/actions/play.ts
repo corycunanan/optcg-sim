@@ -1,3 +1,5 @@
+import { isRestTargetActive, restFieldTarget } from "../../field-rest.js";
+import { effectSourceIdentity } from "../../effect-source.js";
 /**
  * Action handlers: PLAY_CARD, PLAY_SELF, SET_ACTIVE, SET_REST,
  * ACTIVATE_EVENT_FROM_HAND, ACTIVATE_EVENT_FROM_TRASH
@@ -438,6 +440,7 @@ export function executeSetRest(
   preselectedTargets: string[] | undefined,
   services: EffectResolverServices,
 ): ActionResult {
+  const causingSource = effectSourceIdentity(state, sourceCardInstanceId, cardDb, resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot);
   const events: PendingEvent[] = [];
   const rawValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   // OPT-250: strip targets under CANNOT_BE_RESTED before prompting or
@@ -449,7 +452,9 @@ export function executeSetRest(
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
-  const targetIds = autoSelectTargets(action.target, allValidIds);
+  const targetIds = autoSelectTargets(action.target, allValidIds).filter(
+    (id) => isRestTargetActive(state, id),
+  );
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
   // OPT-222: scan for WOULD_BE_RESTED replacements (e.g. PRB02-006 Zoro)
@@ -465,6 +470,8 @@ export function executeSetRest(
     controller,
     cardDb,
     services,
+    undefined,
+    causingSource,
   );
   events.push(...batch.events);
   if (batch.pendingPrompt) {
@@ -478,14 +485,10 @@ export function executeSetRest(
   for (let i = 0; i < unprotectedIds.length; i++) {
     const id = unprotectedIds[i];
 
-    // OPT-224: resting a Character that is already RESTED is a no-op —
-    // no state change, no CHARACTER_BECOMES_RESTED event, no ON_REST drain.
-    const preRest = findCardInstance(nextState, id);
-    if (preRest && preRest.state !== "ACTIVE") continue;
-
-    nextState = setCardState(nextState, id, "RESTED");
-    const evt: PendingEvent = { type: "CARD_STATE_CHANGED", playerIndex: controller, payload: { targetInstanceId: id, newState: "RESTED", cause: "EFFECT", causingController: controller } };
-    events.push(evt);
+    const rested = restFieldTarget(nextState, id, controller, causingSource);
+    if (!rested) continue;
+    nextState = rested.state;
+    events.push(...rested.events);
     restedIds.push(id);
   }
 
