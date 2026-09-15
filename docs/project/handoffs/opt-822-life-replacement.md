@@ -51,7 +51,8 @@ positions), 3 DOWN controls passed. After recovery on main `d2626419`, final
 focused checks passed 5 files / 65 tests; worker type-check passed. Ticket suite
 has 20 scenarios. Disabling the committed replacement result caused 11 failures /
 9 passes; disabling usage marking caused 8 failures / 12 passes. Both mutations
-were restored and the 65-test focused group passed again. Full required gate
+were restored and the 65-test focused group passed again. The cost-module architecture inventory now includes the committed replacement
+terminal helper; its acyclic-module check remains unchanged. Full required gate
 results are recorded in the PR body; these focused results alone are not readiness.
 
 ## Authored impact and boundaries
