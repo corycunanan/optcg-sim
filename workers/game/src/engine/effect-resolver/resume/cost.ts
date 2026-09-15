@@ -1,4 +1,5 @@
 import { finishReplacedLifeCost } from "../cost/replaced.js";
+import { updateEffectContinuation } from "../event-activation.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 /**
@@ -10,7 +11,9 @@ import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
  * and finally executes the effect's action chain.
  */
 
-import { retainEventsOnFrame } from "./events.js";
+import { namedPlayCandidates, payNamedPlay } from "../cost/named-play.js";
+import { trashCharacter } from "../card-mutations.js";
+import { retainEventsOnFrame, publishCommittedEvents } from "./events.js";
 import type {
   ChoiceCost,
   Cost,
@@ -215,10 +218,9 @@ function finishCostsAndRunActions(
 
     if (chainResult.pendingPrompt) {
       state = retainEventsOnFrame(state, stackDepth, events);
-      const newTop = peekFrame(state);
-      if (newTop) {
-        state = updateTopFrame(state, { pendingTriggers });
-      }
+      state = updateEffectContinuation(state, stackDepth, () => ({
+        pendingTriggers, triggerOrderingGroup: topFrame.triggerOrderingGroup,
+      }));
       return {
         state,
         events,
@@ -591,7 +593,49 @@ export function handleAwaitingCostSelection(
   const events: PendingEvent[] = [...topFrame.accumulatedEvents];
   let nextState = workingState;
 
-  if (
+  if (cost.type === "PLAY_NAMED_CARD_FROM_HAND") {
+    const reject = (): EffectResolverResult => ({ state, events: [], resolved: false, rejected: true });
+    if (action.type !== "SELECT_TARGET" || action.selectedInstanceIds?.length !== 1) return reject();
+    const selected = action.selectedInstanceIds[0];
+    if (!topFrame.validTargets.includes(selected)) return reject();
+    const handId = topFrame.namedPlayCostTargetId ?? selected;
+    // Check both the live and staged states: persistence must not resurrect
+    // a hand identity that disappeared or became prohibited after the offer.
+    if (!namedPlayCandidates(baselineState, cost, controller, cardDb).includes(handId) ||
+        !namedPlayCandidates(nextState, cost, controller, cardDb).includes(handId)) return reject();
+    if (topFrame.namedPlayCostTargetId) {
+      if (!baselineState.players[controller].characters.some(card => card?.instanceId === selected) ||
+          !nextState.players[controller].characters.some(card => card?.instanceId === selected)) return reject();
+      // Rule 3-7-6-1-1: this is rule processing, so no replacement check.
+      const trashed = trashCharacter(nextState, selected, controller, "rule");
+      if (!trashed) return reject();
+      nextState = trashed.state;
+      events.push(...trashed.events);
+    } else if (!nextState.players[controller].characters.includes(null)) {
+      const cards = nextState.players[controller].characters.filter(card => card !== null);
+      const validTargets = cards.map(card => card.instanceId);
+      const handCard = nextState.players[controller].hand.find(card => card.instanceId === handId)!;
+      // The intended card is public before rule-trash selection (3-7-6-1).
+      // Revelation is committed information, while zone payment remains staged.
+      const revealed: PendingEvent[] = [{ type: "CARDS_REVEALED", playerIndex: controller,
+        payload: { cards: [{ instanceId: handId, cardId: handCard.cardId }], source: "HAND", visibility: "BOTH" } }];
+      nextState = publishCommittedEvents(nextState, revealed);
+      events.push(...revealed);
+      nextState = updateTopFrame(nextState, { namedPlayCostTargetId: handId, validTargets });
+      return suspendCurrentFrame(nextState, events, {
+        options: {
+          promptType: "SELECT_TARGET", cards, validTargets, countMin: 1, countMax: 1,
+          effectDescription: "Character area is full. Choose one of your Characters to trash (rule 3-7-6-1).",
+          instruction: "Trash 1 of your Characters.", ctaLabel: "Confirm",
+        },
+        respondingPlayer: controller, resumeContext: topFrame.id,
+      });
+    }
+    const paid = payNamedPlay(nextState, cost, handId, controller, cardDb);
+    if (!paid) return reject();
+    nextState = paid.state;
+    events.push(...paid.events);
+  } else if (
     action.type === "PLAYER_CHOICE" &&
     (cost.type === "REST_DON" || cost.type === "DON_REST") &&
     cost.amount === "ANY_NUMBER"
@@ -697,8 +741,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       selected,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedTrash.state;
     events.push(...appliedTrash.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -790,7 +833,7 @@ export function handleAwaitingCostSelection(
       nextState = stagedBeforeReplacement;
     }
 
-    const appliedGroup = applyCostSelection(nextState, cost, group, controller);
+    const appliedGroup = applyCostSelection(nextState, cost, group, controller, cardDb);
     nextState = appliedGroup.state;
     events.push(...appliedGroup.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -867,8 +910,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       ordered,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedOrdered.state;
     events.push(...appliedOrdered.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -908,8 +950,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       ordered,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedOrdered.state;
     events.push(...appliedOrdered.events);
     const existing = accumulatedCostRefs.get("__cost_cards_placed_to_deck") ?? {
@@ -1023,8 +1064,7 @@ export function handleAwaitingCostSelection(
       nextState,
       cost,
       selected,
-      controller
-    );
+      controller, cardDb);
     nextState = appliedSelected.state;
     events.push(...appliedSelected.events);
 
@@ -1081,14 +1121,14 @@ export function handleAwaitingCostSelection(
 
     // Only trash payments publish CARD_TRASHED. Stage-side named-card payment
     // already emitted the canonical identity-bearing event via trashStage;
-    // hand-side payment retains the count-only bookkeeping event used by every
+    // Character trash also emits one identity-bearing event per moved card.
+    // Hand-side payment retains the count-only bookkeeping event used by every
     // other selectable hand trash. Other selectable costs use this same resume
     // branch (including ST13-001's Character-to-Life cost), so emitting it
     // unconditionally fabricated a trash event for unrelated zone transitions.
     if (
       cost.type === "TRASH_FROM_HAND" ||
-      (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage) ||
-      cost.type === "TRASH_OWN_CHARACTER"
+      (cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" && !selectedStage)
     ) {
       events.push({
         type: "CARD_TRASHED",
@@ -1098,7 +1138,7 @@ export function handleAwaitingCostSelection(
           reason: "cost",
           from: cost.type === "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE"
             ? (selectedStage ? "STAGE" : "HAND")
-            : cost.type === "TRASH_FROM_HAND" ? "HAND" : "CHARACTER",
+            : "HAND",
         },
       });
     }

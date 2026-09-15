@@ -1,3 +1,4 @@
+import { resolveActivatedEvent } from "../event-activation.js";
 import { isRestTargetActive, restFieldTarget } from "../../field-rest.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 /**
@@ -528,13 +529,41 @@ export function executeActivateEventFromHand(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices
 ): ActionResult {
   const events: PendingEvent[] = [];
 
-  const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  const allValidIds = (
+    preselectedTargets ??
+    computeAllValidTargets(
+      state,
+      action.target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs
+    )
+  ).filter((id) => {
+    const card = state.players[controller].hand.find(
+      (card) => card.instanceId === id
+    );
+    const data = card && cardDb.get(card.cardId);
+    return data?.type === "Event" && findMainEventBlock(data) !== undefined;
+  });
+  if (
+    !preselectedTargets &&
+    needsPlayerTargetSelection(action.target, allValidIds)
+  ) {
+    return buildSelectTargetPrompt(
+      state,
+      action,
+      allValidIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs
+    );
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
@@ -545,20 +574,30 @@ export function executeActivateEventFromHand(
   if (cardIdx === -1) return { state, events, succeeded: false };
 
   const eventCard = p.hand[cardIdx];
-  const moved = transitionCard(state, eventInstanceId, "TRASH", { position: "TOP" });
+  const moved = transitionCard(state, eventInstanceId, "TRASH", {
+    position: "TOP",
+  });
   if (!moved) return { state, events, succeeded: false };
 
-  // Effect-driven activation bypasses the normal cost-payment step, so no
-  // printed cost was "reduced" by a modifier — OPT-238 Crocodile should not
-  // fire on this path.
-  events.push({ type: "EVENT_ACTIVATED_FROM_HAND", playerIndex: controller, payload: { cardId: eventCard.cardId, cardInstanceId: moved.fact.newInstanceId, costReducedAmount: 0 } });
-
-  return {
-    state: moved.state,
-    events,
-    succeeded: true,
-    result: { targetInstanceIds: [moved.fact.newInstanceId], count: 1 },
-  };
+  // Printed play cost is skipped; the selected Main still pays its own costs.
+  // Crocodile and other activation watchers observe this path after resolution.
+  return resolveActivatedEvent(
+    moved.state,
+    findMainEventBlock(cardDb.get(eventCard.cardId)!)!,
+    moved.fact.newInstanceId,
+    controller,
+    cardDb,
+    {
+      type: "EVENT_ACTIVATED_FROM_HAND",
+      playerIndex: controller,
+      payload: {
+        cardId: eventCard.cardId,
+        cardInstanceId: moved.fact.newInstanceId,
+        costReducedAmount: 0,
+      },
+    },
+    services
+  );
 }
 
 // ─── ACTIVATE_EVENT_FROM_TRASH ───────────────────────────────────────────────
@@ -571,13 +610,22 @@ export function executeActivateEventFromTrash(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets: string[] | undefined,
-  services: EffectResolverServices,
+  services: EffectResolverServices
 ): ActionResult {
   const events: PendingEvent[] = [];
 
   // OPT-237: restrict candidates to Events that actually have a [Main] block —
   // Counter-only / Trigger-only Events are invalid targets for this action.
-  const rawValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
+  const rawValidIds =
+    preselectedTargets ??
+    computeAllValidTargets(
+      state,
+      action.target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs
+    );
   const allValidIds = rawValidIds.filter((id) => {
     const card = findCardInstance(state, id);
     if (!card) return false;
@@ -585,8 +633,19 @@ export function executeActivateEventFromTrash(
     return data ? findMainEventBlock(data) !== undefined : false;
   });
 
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
-    return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
+  if (
+    !preselectedTargets &&
+    needsPlayerTargetSelection(action.target, allValidIds)
+  ) {
+    return buildSelectTargetPrompt(
+      state,
+      action,
+      allValidIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs
+    );
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
@@ -599,22 +658,18 @@ export function executeActivateEventFromTrash(
   const mainBlock = findMainEventBlock(eventData);
   if (!mainBlock) return { state, events, succeeded: false };
 
-  // Class 2: Character activates Event [Main] from trash. FAQ: the Event's
-  // printed main cost is skipped (the character already paid its inline cost),
-  // and the Event stays in trash after resolution.
-  events.push({
-    type: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-    playerIndex: controller,
-    payload: { cardId: eventCard.cardId, cardInstanceId: eventInstanceId },
-  });
-
-  const resolveResult = services.resolveEffect(state, mainBlock, eventInstanceId, controller, cardDb);
-
-  return {
-    state: resolveResult.state,
-    events: [...events, ...resolveResult.events],
-    succeeded: true,
-    result: { targetInstanceIds: [eventInstanceId], count: 1 },
-    ...(resolveResult.pendingPrompt && { pendingPrompt: resolveResult.pendingPrompt }),
-  };
+  // Trash activation retains identity and also finishes Main before notifying.
+  return resolveActivatedEvent(
+    state,
+    mainBlock,
+    eventInstanceId,
+    controller,
+    cardDb,
+    {
+      type: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+      playerIndex: controller,
+      payload: { cardId: eventCard.cardId, cardInstanceId: eventInstanceId },
+    },
+    services
+  );
 }

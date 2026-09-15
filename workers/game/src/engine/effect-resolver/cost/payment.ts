@@ -10,6 +10,7 @@ import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import { computeCostTargets } from "./targets.js";
+import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 
 /**
@@ -416,7 +417,7 @@ export function payCosts(
         const moved = transitionCard(nextState, stage.instanceId, "DECK", { position: "BOTTOM" });
         if (!moved) return null;
         nextState = moved.state;
-        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: stage.cardId } });
+        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: stage.cardId, sourceZone: "STAGE", sourceController: stage.controller, causingController: controller, movementCause: "COST" } });
         break;
       }
 
@@ -457,8 +458,7 @@ export function payCosts(
           nextState,
           { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: cost.position ?? "BOTTOM" },
           [sourceCardInstanceId],
-          controller,
-        );
+          controller, _cardDb);
         nextState = applied.state;
         events.push(...applied.events);
         costResult.cardsPlacedToDeckCount += 1;
@@ -477,8 +477,7 @@ export function payCosts(
           nextState,
           { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: "BOTTOM" },
           [sourceCardInstanceId],
-          controller,
-        );
+          controller, _cardDb);
         nextState = applied.state;
         events.push(...applied.events);
         break;
@@ -498,8 +497,7 @@ export function payCosts(
           nextState,
           cost,
           [sourceCardInstanceId, ...candidates.slice(0, amt)],
-          controller,
-        );
+          controller, _cardDb);
         nextState = applied.state;
         events.push(...applied.events);
         costResult.cardsPlacedToDeckCount += 1 + amt;
@@ -507,16 +505,15 @@ export function payCosts(
       }
 
       case "PLAY_NAMED_CARD_FROM_HAND": {
-        // Play a specific named card from hand as part of the cost
-        const p = nextState.players[controller];
-        const cardName = cost.card_name;
-        if (!cardName) return null;
-        const handIdx = p.hand.findIndex((c) => {
-          const data = _cardDb.get(c.cardId);
-          return data && data.name === cardName;
-        });
-        if (handIdx === -1) return null;
-        // Card will be played by the action chain — just verify it exists
+        // Synchronous callers cannot choose a card or rule-trash victim.
+        // Pay only an unambiguous single-card payment; never report presence
+        // alone as successful payment.
+        const candidates = namedPlayCandidates(nextState, cost, controller, _cardDb);
+        if (candidates.length !== 1) return null;
+        const paid = payNamedPlay(nextState, cost, candidates[0], controller, _cardDb);
+        if (!paid) return null;
+        nextState = paid.state;
+        events.push(...paid.events);
         break;
       }
 

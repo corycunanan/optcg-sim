@@ -88,6 +88,7 @@ describe("OPT-478 resolver architecture contract", () => {
 
     expect([...graph.keys()].sort()).toEqual([
       "feasibility",
+      "named-play",
       "orchestrator",
       "payability",
       "payment",

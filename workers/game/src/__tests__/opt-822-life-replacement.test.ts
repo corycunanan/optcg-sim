@@ -149,6 +149,130 @@ function fixture(faces: LifeCard["face"][]) {
 }
 
 describe("OPT-822 Life replacement", () => {
+  for (const selected of [false, true]) {
+    it(`nested Event replacement completes once before parent and queued siblings (selected=${selected})`, () => {
+      // Synthetic producer/siblings isolate OPT-850's continuation contract;
+      // the real Reject/Makino regressions below establish the FAQ behavior.
+      const f = fixture(["UP", "DOWN"]);
+      f.db.set("NESTED", {
+        ...CARDS.VANILLA,
+        id: "NESTED",
+        type: "Event",
+        cost: 0,
+        effectText: "[Main] You may add 1 Life card to hand: Draw 5 cards.",
+        effectSchema: {
+          effects: [
+            {
+              id: "nested-main",
+              category: "auto",
+              trigger: { keyword: "MAIN_EVENT" },
+              flags: { optional: true },
+              costs: [
+                { type: "LIFE_TO_HAND", amount: 1, position: "TOP_OR_BOTTOM" },
+              ],
+              actions: [{ type: "DRAW", params: { amount: 5 } }],
+            },
+          ],
+        },
+      });
+      f.state.players[0].hand.push({
+        ...f.state.players[0].hand[0],
+        cardId: "NESTED",
+        instanceId: "nested-event",
+      });
+      const siblings: EffectBlock[] = [2, 3].map((amount) => ({
+        id: `sibling-${amount}`,
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        actions: [{ type: "DRAW", params: { amount } }],
+      }));
+      f.db.set("PARENT", {
+        ...CARDS.VANILLA,
+        id: "PARENT",
+        cost: 1,
+        color: ["Yellow"],
+        effectSchema: {
+          effects: [
+            {
+              id: "parent",
+              category: "auto",
+              trigger: { keyword: "ON_PLAY" },
+              actions: [
+                {
+                  type: "ACTIVATE_EVENT_FROM_HAND",
+                  target: {
+                    type: "EVENT_CARD",
+                    source_zone: "HAND",
+                    count: selected ? { up_to: 1 } : { exact: 1 },
+                  },
+                },
+                { type: "DRAW", params: { amount: 1 }, chain: "THEN" },
+              ],
+            },
+            ...siblings,
+          ],
+        },
+      });
+      const hand = f.state.players[0].hand.length;
+      f.play("PARENT");
+      const orderingId = f.state.effectStack
+        .at(-1)!
+        .simultaneousTriggers.find(
+          (t) => t.effectBlock.id === "parent"
+        )!.orderingId!;
+      f.choice(orderingId);
+      if (selected)
+        f.respond({
+          type: "SELECT_TARGET",
+          selectedInstanceIds: ["nested-event"],
+        });
+      expect(
+        f.state.effectStack.some((frame) => frame.eventActivationCompletion)
+      ).toBe(true);
+      f.choice("accept");
+      expect(
+        f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+      ).toHaveLength(0);
+      f.choice("0");
+      expect(f.state.players[0].life.map((c) => c.instanceId)).toEqual([
+        "life-1",
+      ]);
+      expect(f.state.players[0].hand).toHaveLength(hand);
+      expect(
+        f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+      ).toHaveLength(1);
+      expect(
+        f.state.eventLog
+          .filter((e) =>
+            [
+              "CARD_REMOVED_FROM_LIFE",
+              "EVENT_ACTIVATED_FROM_HAND",
+              "CARD_DRAWN",
+            ].includes(e.type)
+          )
+          .map((e) => e.type)
+      ).toEqual([
+        "CARD_REMOVED_FROM_LIFE",
+        "EVENT_ACTIVATED_FROM_HAND",
+        "CARD_DRAWN",
+      ]);
+      const remaining = f.state.effectStack.at(-1)!;
+      expect(remaining.triggerOrderingGroup?.resolvedTriggerIds).toEqual([
+        orderingId,
+      ]);
+      f.choice(
+        remaining.simultaneousTriggers.find(
+          (t) => t.effectBlock.id === "sibling-3"
+        )!.orderingId!
+      );
+      expect(f.state.players[0].hand).toHaveLength(hand + 5);
+      expect(
+        f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+      ).toHaveLength(1);
+      expect(f.state.effectStack).toHaveLength(0);
+      expect(f.state.pendingPrompt).toBeNull();
+    });
+  }
   for (const optional of [false, true]) {
     for (const position of ["TOP", "BOTTOM"] as const) {
       it(`fixed ${position} cost commits replacement and consumes once-per-turn (optional=${optional})`, () => {

@@ -1,3 +1,4 @@
+import { updateEffectContinuation } from "./effect-resolver/event-activation.js";
 /**
  * 7-Step Action Pipeline
  *
@@ -24,16 +25,13 @@ import {
   matchTriggersForEvent,
   orderMatchedTriggers,
   registerCardEnteredField,
-  deregisterTriggersForCard,
+  deregisterDepartedSources,
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver/index.js";
-import { peekFrame as peekStackFrame, updateTopFrame as updateStackTopFrame } from "./effect-stack.js";
 import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
 import {
-  expireSourceLeftZone,
-  expireTargetLeftZone,
   evaluateWhileConditions,
 } from "./duration-tracker.js";
 import { log } from "../lib/log.js";
@@ -230,7 +228,7 @@ function fireEventsAndTriggers(
   }
 
   // Deregister triggers for cards that left the field AFTER matching
-  state = deregisterLeftFieldTriggers(state, execResult);
+  state = deregisterDepartedSources(state, execResult.events);
 
   // Group triggers by controller — turn player resolves first (§8-6),
   // and within each group the player chooses the order.
@@ -308,6 +306,7 @@ function processTriggerQueuePipeline(
     const next = queue.shift();
     if (!next) break;
 
+    const stackDepth = nextState.effectStack.length;
     const result = resolveEffect(
       nextState,
       next.effectBlock,
@@ -320,13 +319,9 @@ function processTriggerQueuePipeline(
     if (isEngineTerminated(nextState)) return { state: nextState };
 
     if (result.pendingPrompt) {
-      // Store remaining triggers in the top stack frame's pendingTriggers
-      const topFrame = peekStackFrame(nextState);
-      if (topFrame) {
-        nextState = updateStackTopFrame(nextState, {
-          pendingTriggers: [...topFrame.pendingTriggers ?? [], ...queue],
-        });
-      }
+      nextState = updateEffectContinuation(nextState, stackDepth, frame => ({
+        pendingTriggers: [...frame.pendingTriggers, ...queue],
+      }));
       return { state: nextState, pendingPrompt: result.pendingPrompt };
     }
 
@@ -455,48 +450,6 @@ function registerNewCardTriggers(
   return state;
 }
 
-/** Deregister triggers for cards that left the field (KO, bounce, trash, to-deck). */
-function deregisterLeftFieldTriggers(
-  state: GameState,
-  execResult: ExecuteResult,
-): GameState {
-  const cleanupInstance = (s: GameState, id: string): GameState => {
-    s = deregisterTriggersForCard(s, id);
-    s = expireSourceLeftZone(s, id);
-    // OPT-256: also strip the leaving instanceId from every effect/prohibition
-    // target list so fresh-instance invariants hold on re-summon.
-    s = expireTargetLeftZone(s, id);
-    return s;
-  };
-
-  for (const event of execResult.events) {
-    if (
-      event.type === "CARD_KO" ||
-      event.type === "CARD_RETURNED_TO_HAND" ||
-      event.type === "CARD_RETURNED_TO_DECK"
-    ) {
-      const instanceId = event.payload?.cardInstanceId;
-      if (!instanceId) continue;
-      state = cleanupInstance(state, instanceId);
-    }
-
-    if (event.type === "CARD_TRASHED") {
-      const cardId = event.payload?.cardId;
-      if (cardId) {
-        for (const player of state.players) {
-          const trashed = player.trash.find((c) => c.cardId === cardId);
-          if (trashed) {
-            state = cleanupInstance(state, trashed.instanceId);
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  return state;
-}
-
 // ─── Step 6: Recalculate Modifiers ────────────────────────────────────────────
 
 function recalculateModifiers(
@@ -611,13 +564,9 @@ function processPlayerTriggerGroup(
     // Single trigger — auto-resolve, no prompt needed
     const result = processTriggerQueuePipeline(state, [...triggers], cardDb);
     if (result.pendingPrompt) {
-      // Store afterTriggers on the stack frame so they resume later
-      const topFrame = peekStackFrame(result.state);
-      if (topFrame && afterTriggers.length > 0) {
-        result.state = updateStackTopFrame(result.state, {
-          pendingTriggers: [...topFrame.pendingTriggers ?? [], ...afterTriggers],
-        });
-      }
+      result.state = updateEffectContinuation(result.state, state.effectStack.length, frame => ({
+        pendingTriggers: [...frame.pendingTriggers, ...afterTriggers],
+      }));
       return result;
     }
     // Single trigger done — process the other player's group

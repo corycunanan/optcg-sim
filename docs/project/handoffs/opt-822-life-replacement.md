@@ -83,3 +83,20 @@ Follow-ups: none discovered that require expanding this slice. Ordinary unpaid
 cost rollback and unrelated field-exit replacement handling keep their existing
 contracts. OPT-789 owns PLAY_FROM_LIFE entry initialization; OPT-822 changes only
 executeLifeToHand and a separate import in their shared actions/life.ts file.
+
+## Integration with subsequent engine work
+
+Latest main `aed6d6ab` adds removal provenance (OPT-794), named-play cost support
+(OPT-845), activated DON handling (OPT-849), and nested Event completion
+(OPT-850). Integration retains those contracts and both `named-play` and
+`replaced` in the cost-module architecture inventory. Conflicts were import-only;
+no existing rest/removal provenance or Event-parent routing was removed.
+
+Two additional production-pipeline regressions exercise a nested Event whose
+Life cost is replaced, using selected and automatic Event entry. Storage-cloned
+cost prompts complete without the child's post-colon draw, publish exactly one
+Event activation after Life removal, then execute the parent suffix and queued
+siblings in their retained ordering group. These are explicit synthetic contract
+probes; the real Reject/Makino FAQ coverage remains unchanged. Ticket coverage is
+now 22 cases; the immediate OPT-822/850/478 integration group passed 48 tests.
+The complete integrated gate and final head are recorded in the PR body.

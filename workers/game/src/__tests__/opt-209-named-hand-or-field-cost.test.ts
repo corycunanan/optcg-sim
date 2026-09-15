@@ -292,7 +292,7 @@ describe("OPT-510: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE", () => {
     }
   });
 
-  it("fires a field-removal watcher when the named stage pays the cost", () => {
+  it("does not fire a Character-removal watcher when a named Stage pays the cost", () => {
     const cardDb = createTestCardDb();
     const stageData = cardDb.get(CARDS.STAGE.id)!;
     cardDb.set(CARDS.STAGE.id, { ...stageData, name: "The Ark Noah" });
@@ -352,8 +352,8 @@ describe("OPT-510: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE", () => {
       cardDb,
     );
 
-    expect(resumed.events.some((event) => event.type === "CARD_DRAWN")).toBe(true);
-    expect(resumed.state.players[0].hand).toHaveLength(1);
+    expect(resumed.events.some((event) => event.type === "CARD_DRAWN")).toBe(false);
+    expect(resumed.state.players[0].hand).toHaveLength(0);
   });
 
   it("accepts the primitive only with a non-empty card_name", () => {

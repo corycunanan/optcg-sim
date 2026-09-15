@@ -1,4 +1,5 @@
 import { finishReplacedLifeCost } from "../cost/replaced.js";
+import { updateEffectContinuation } from "../event-activation.js";
 import { retainEventsOnFrame } from "./events.js";
 /**
  * PLAYER_CHOICE resume handlers.
@@ -589,13 +590,9 @@ export function handleAwaitingOptionalResponse(
 
     if (chainResult.pendingPrompt) {
       nextState = retainEventsOnFrame(nextState, stackDepth, events);
-      const newTop = peekFrame(nextState);
-      if (newTop) {
-        nextState = updateTopFrame(nextState, {
-          pendingTriggers,
-          triggerOrderingGroup: topFrame.triggerOrderingGroup,
-        });
-      }
+      nextState = updateEffectContinuation(nextState, stackDepth, () => ({
+        pendingTriggers, triggerOrderingGroup: topFrame.triggerOrderingGroup,
+      }));
       return {
         state: nextState,
         events,
@@ -739,6 +736,7 @@ export function handleAwaitingTriggerOrderSelection(
   nextState = popFrame(nextState);
 
   // Resolve the chosen trigger
+  const chosenStackDepth = nextState.effectStack.length;
   const result = services.withCommittedEvents(events).resolveEffect(
     nextState,
     chosenTrigger.effectBlock,
@@ -758,13 +756,10 @@ export function handleAwaitingTriggerOrderSelection(
   // Merge simultaneousTriggers into pendingTriggers so processRemainingTriggers
   // will re-detect the 2+ same-player group and re-prompt for ordering.
   if (result.pendingPrompt) {
-    const newTop = peekFrame(nextState);
-    if (newTop) {
-      nextState = updateTopFrame(nextState, {
-        pendingTriggers: [...remaining, ...savedPendingTriggers],
-        triggerOrderingGroup: nextTriggerOrderingGroup,
-      });
-    }
+    nextState = updateEffectContinuation(nextState, chosenStackDepth, () => ({
+      pendingTriggers: [...remaining, ...savedPendingTriggers],
+      triggerOrderingGroup: nextTriggerOrderingGroup,
+    }));
     return {
       state: nextState,
       events,
@@ -800,6 +795,7 @@ export function handleAwaitingTriggerOrderSelection(
     replacePendingEventReferences(events, result.events, scanResult.events);
     if (scanResult.triggers.length > 0) {
       // Process nested triggers first, then come back to remaining simultaneous
+      const nestedStackDepth = nextState.effectStack.length;
       const nestedResult = services.processRemainingTriggers(
         nextState,
         scanResult.triggers,
@@ -809,13 +805,10 @@ export function handleAwaitingTriggerOrderSelection(
       nextState = nestedResult.state;
       // nestedResult.events already includes our prior events (passed as priorEvents)
       if (nestedResult.pendingPrompt) {
-        const newTop = peekFrame(nextState);
-        if (newTop) {
-          nextState = updateTopFrame(nextState, {
-            pendingTriggers: [...remaining, ...savedPendingTriggers],
-            triggerOrderingGroup: nextTriggerOrderingGroup,
-          });
-        }
+        nextState = updateEffectContinuation(nextState, nestedStackDepth, () => ({
+          pendingTriggers: [...remaining, ...savedPendingTriggers],
+          triggerOrderingGroup: nextTriggerOrderingGroup,
+        }));
         return {
           state: nextState,
           events: nestedResult.events,
@@ -848,6 +841,7 @@ export function handleAwaitingTriggerOrderSelection(
 
   if (remaining.length === 1) {
     // Auto-resolve the last one
+    const lastStackDepth = nextState.effectStack.length;
     const lastResult = services.withCommittedEvents(events).resolveEffect(
       nextState,
       remaining[0].effectBlock,
@@ -859,12 +853,9 @@ export function handleAwaitingTriggerOrderSelection(
     events.push(...lastResult.events);
 
     if (lastResult.pendingPrompt) {
-      const newTop = peekFrame(nextState);
-      if (newTop) {
-        nextState = updateTopFrame(nextState, {
-          pendingTriggers: savedPendingTriggers,
-        });
-      }
+      nextState = updateEffectContinuation(nextState, lastStackDepth, () => ({
+        pendingTriggers: savedPendingTriggers,
+      }));
       return {
         state: nextState,
         events,
@@ -903,6 +894,7 @@ export function handleAwaitingTriggerOrderSelection(
         scanResult2.events
       );
       if (scanResult2.triggers.length > 0) {
+        const nestedStackDepth = nextState.effectStack.length;
         const nestedResult = services.processRemainingTriggers(
           nextState,
           scanResult2.triggers,
@@ -911,12 +903,9 @@ export function handleAwaitingTriggerOrderSelection(
         );
         nextState = nestedResult.state;
         if (nestedResult.pendingPrompt) {
-          const newTop = peekFrame(nextState);
-          if (newTop) {
-            nextState = updateTopFrame(nextState, {
-              pendingTriggers: savedPendingTriggers,
-            });
-          }
+          nextState = updateEffectContinuation(nextState, nestedStackDepth, () => ({
+            pendingTriggers: savedPendingTriggers,
+          }));
           return {
             state: nextState,
             events: nestedResult.events,

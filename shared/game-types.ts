@@ -275,15 +275,24 @@ export interface EngineTerminalOutcome {
  * Per-event-type payload map — single source of truth for all event payloads.
  * GameEvent and PendingEvent are both derived from this map.
  */
+/** Provenance captured before a zone transition resets identity and control. */
+export interface FieldMovementProvenance {
+  sourceZone?: Zone;
+  sourceController?: 0 | 1;
+  causingController?: 0 | 1;
+  movementCause?: "EFFECT" | "COST" | "RULE" | "BATTLE";
+}
+
 export interface GameEventPayloadMap {
   PHASE_CHANGED: { from: string; to: string };
   TURN_STARTED: Record<string, never>;
   TURN_ENDED: Record<string, never>;
   CARD_PLAYED: { cardId: string; cardInstanceId: string; zone: Zone; source: string; playedRested?: boolean; sourceZone?: Zone };
-  CARD_KO: { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; cardType?: "STAGE" };
+  CARD_KO: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; cause: string; causingController?: 0 | 1; causeCardInstanceId?: string; preKO_donCount: number; preKO_basePower?: number; cardType?: "STAGE" };
   CARD_DRAWN: { cardId: string; cardInstanceId?: string; source?: string };
-  CARD_TRASHED: { cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
-  CARD_RETURNED_TO_HAND: { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
+  CARD_TRASHED: FieldMovementProvenance & { cardId?: string; cardInstanceId?: string; newCardInstanceId?: string; count?: number; reason: string; from?: string };
+  CARD_RETURNED_TO_HAND: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId: string; source?: string };
+  CARD_ADDED_TO_LIFE: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId: string; cardId: string };
   CARD_ADDED_TO_HAND_FROM_LIFE: { cardId?: string; cardInstanceId?: string; count?: number };
   LIFE_CARD_FACE_CHANGED: { face: "UP" | "DOWN" };
   ATTACK_DECLARED: { attackerInstanceId: string; targetInstanceId: string; attackerPower: number };
@@ -307,7 +316,7 @@ export interface GameEventPayloadMap {
     reason: string;
     diagnostic?: EngineLimitDiagnostic;
   };
-  CARD_RETURNED_TO_DECK: { cardInstanceId: string; newCardInstanceId?: string; cardId?: string; position?: string };
+  CARD_RETURNED_TO_DECK: FieldMovementProvenance & { cardInstanceId: string; newCardInstanceId?: string; cardId?: string; position?: string };
   DON_SET_ACTIVE: { count: number };
   DON_RESTED: { count: number };
   CARDS_REVEALED: {
@@ -356,6 +365,7 @@ export const ALL_GAME_EVENT_TYPES = [
   "CARD_DRAWN",
   "CARD_TRASHED",
   "CARD_RETURNED_TO_HAND",
+  "CARD_ADDED_TO_LIFE",
   "CARD_ADDED_TO_HAND_FROM_LIFE",
   "LIFE_CARD_FACE_CHANGED",
   "ATTACK_DECLARED",
@@ -451,6 +461,8 @@ export type EffectStackPhase =
   | "AWAITING_BATCH_RESUME";
 
 export interface EffectStackFrame {
+  /** Notify activation watchers only after the nested Event Main finishes. */
+  eventActivationCompletion?: PendingGameEvent;
   id: string;
   sourceCardInstanceId: string;
   controller: 0 | 1;

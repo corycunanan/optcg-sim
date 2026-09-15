@@ -1,0 +1,203 @@
+import { expect, it } from "vitest";
+import type {
+  CardData,
+  CardInstance,
+  GameAction,
+  GameState,
+} from "../types.js";
+import {
+  SessionRepository,
+  parseStoredSession,
+  type SessionStorage,
+} from "../session/persistence.js";
+import { filterStateForPlayer } from "../engine/state.js";
+import { visibleStateForSpectator } from "../session/visibility.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { SessionCoordinator } from "../session/coordinator.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import {
+  getEffectSchema,
+  getAllAuthoredSchemas,
+} from "../engine/schema-registry.js";
+import { registerCardEnteredField } from "../engine/triggers.js";
+import { getEffectivePower } from "../engine/modifiers.js";
+import {
+  CARDS,
+  createBattleReadyState,
+  createTestCardDb,
+  padChars,
+} from "./helpers.js";
+
+class ActivationMemory implements SessionStorage {
+  data = new Map<string, unknown>();
+  async get<T>(key: string) {
+    return this.data.get(key) as T | undefined;
+  }
+  async put(key: string | Record<string, unknown>, value?: unknown) {
+    for (const [k, v] of Object.entries(
+      typeof key === "string" ? { [key]: value } : key
+    ))
+      this.data.set(k, JSON.parse(JSON.stringify(v)));
+  }
+  async setAlarm() {}
+  async deleteAlarm() {}
+}
+async function activationRoundTrip(
+  state: GameState,
+  cardDb: Map<string, CardData>
+) {
+  const storage = new ActivationMemory();
+  const config = { nextJsUrl: "https://example.test", workerSecret: "test" };
+  await new SessionRepository(storage, config).save({
+    state,
+    cardDb,
+    undoHistory: [],
+    mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
+    testPriorityRolls: null,
+  });
+  const loaded = await new SessionRepository(storage, config).load();
+  expect(loaded).not.toBeNull();
+  return loaded!;
+}
+
+// Printed costs/types verified against the official OP12/OP15 card lists.
+const text: Record<string, string> = {};
+function fixture() {
+  const db = createTestCardDb();
+  for (const [id, cost, color, traits] of [
+    ["OP12-041", 0, ["Blue", "Purple"], ["Straw Hat Crew"]],
+    ["OP12-059", 1, ["Blue"], ["Straw Hat Crew"]],
+    ["OP09-077", 1, ["Purple"], ["Straw Hat Crew"]],
+    ["OP04-053", 4, ["Blue"], ["Animal Kingdom Pirates"]],
+    ["EB03-031", 4, ["Purple"], ["Vinsmoke Family"]],
+    ["OP15-014", 4, ["Red"], ["Dressrosa"]],
+    ["OP15-046", 7, ["Blue"], ["Dressrosa"]],
+    ["OP15-055", 3, ["Blue"], ["Dressrosa"]],
+    ["OP15-002", 0, ["Red", "Blue"], ["Dressrosa"]],
+    ["OP15-119", 10, ["Yellow"], ["Straw Hat Crew"]],
+    ["OP09-078", 1, ["Purple"], ["Straw Hat Crew"]],
+    ["EB04-028", 2, ["Blue"], ["Navy"]],
+  ] as const) {
+    const schema = getEffectSchema(id)!;
+    const type = schema.card_type as CardData["type"];
+    db.set(id, {
+      ...CARDS.VANILLA,
+      id,
+      name: schema.card_name!,
+      type,
+      cost: type === "Leader" ? null : cost,
+      power: type === "Leader" ? 5000 : null,
+      color: [...color],
+      types: [...traits],
+      effectText: text[id] ?? "",
+      effectSchema: schema,
+    });
+  }
+  let state = createBattleReadyState(db);
+  state.players[0].characters = padChars([]);
+  state.players[1].characters = padChars([]);
+  function put(
+    id: string,
+    controller: 0 | 1,
+    zone: CardInstance["zone"] = "CHARACTER",
+    suffix = ""
+  ) {
+    const c: CardInstance = {
+      ...state.players[controller].leader,
+      instanceId: `${id}-${controller}-${zone}-${suffix}`,
+      cardId: id,
+      controller,
+      owner: controller,
+      zone,
+      state: "ACTIVE",
+      attachedDon: [],
+      turnPlayed: 0,
+    };
+    if (zone === "LEADER") state.players[controller].leader = c;
+    else if (zone === "CHARACTER")
+      state.players[controller].characters[
+        state.players[controller].characters.indexOf(null)
+      ] = c;
+    else if (zone === "HAND") state.players[controller].hand.push(c);
+    else if (zone === "TRASH") state.players[controller].trash.push(c);
+    if (zone === "LEADER" || zone === "CHARACTER")
+      state = registerCardEnteredField(state, c, db.get(id)!);
+    return c;
+  }
+  function act(
+    action: GameAction,
+    player: 0 | 1 = state.turn.activePlayerIndex
+  ) {
+    if (state.pendingPrompt) {
+      action = {
+        ...action,
+        promptId: state.pendingPrompt.promptId,
+      } as GameAction;
+      expect(
+        new SessionCoordinator().routePromptResponse(
+          state,
+          state.pendingPrompt.respondingPlayer,
+          action
+        ).kind
+      ).toBe("resume");
+      const r = resumePromptLifecycle(state, action, db, {
+        drainPregame: (s) => s,
+        advanceStartOfTurn: (s) => s,
+      });
+      expect(r.responseRejected).toBe(false);
+      state = r.state;
+    } else {
+      const r = runPipeline(state, action, db, player);
+      expect(r.valid, r.error).toBe(true);
+      state = { ...r.state, pendingPrompt: r.pendingPrompt ?? null };
+    }
+  }
+  const choose = (choiceId: string) => {
+    const o = state.pendingPrompt?.options;
+    act({
+      type: "PLAYER_CHOICE",
+      choiceId:
+        o?.promptType === "PLAYER_CHOICE"
+          ? (o.choices.find((c) => c.label === choiceId)?.id ?? choiceId)
+          : choiceId,
+    });
+  };
+  const select = (selectedInstanceIds: string[]) =>
+    act({ type: "SELECT_TARGET", selectedInstanceIds });
+  const play = (id: string) => {
+    const c = put(
+      id,
+      state.turn.activePlayerIndex,
+      "HAND",
+      String(state.turn.actionsPerformedThisTurn.length)
+    );
+    act({ type: "PLAY_CARD", cardInstanceId: c.instanceId });
+    return c;
+  };
+  return {
+    db,
+    put,
+    act,
+    choose,
+    select,
+    play,
+    async reload() {
+      const loaded = await activationRoundTrip(state, db);
+      state = loaded.state;
+      for (const [id, data] of loaded.cardDb) db.set(id, data);
+    },
+    get state() {
+      return state;
+    },
+  };
+}
+it("Reiju Main activation must not trigger Page One per EB03 FAQ", () => {
+ const f=fixture(); f.put("OP12-041",0,"LEADER");
+ const page=f.put("OP04-053",0); page.attachedDon=[{...f.state.players[0].donCostArea.pop()!, attachedTo:page.instanceId}];
+ const event=f.put("OP12-059",0,"TRASH");
+ f.play("EB03-031"); f.select([event.instanceId]);
+ expect.soft(f.state.pendingPrompt, "Page One must not ask to bottom a card after Reiju Main").toBeNull();
+ if(f.state.pendingPrompt?.options.promptType === "SELECT_TARGET") f.select([f.state.pendingPrompt.options.validTargets[0]]);
+ expect(f.state.effectStack).toHaveLength(0);
+});

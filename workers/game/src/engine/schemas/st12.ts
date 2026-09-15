@@ -252,7 +252,7 @@ export const ST12_010_EMPORIO_IVANKOV: EffectSchema = {
           params: {
             look_at: 1,
             filter: { card_type: "CHARACTER", cost_exact: 2 },
-            rest_destination: "BOTTOM",
+            rest_destination: "TOP_OR_BOTTOM",
           },
         },
       ],
@@ -350,7 +350,7 @@ export const ST12_013_ZEFF: EffectSchema = {
           params: {
             look_at: 1,
             filter: { card_type: "CHARACTER", cost_exact: 2 },
-            rest_destination: "BOTTOM",
+            rest_destination: "TOP_OR_BOTTOM",
             entry_state: "RESTED",
           },
         },
