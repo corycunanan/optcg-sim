@@ -451,6 +451,8 @@ export type EffectStackPhase =
   | "AWAITING_BATCH_RESUME";
 
 export interface EffectStackFrame {
+  /** Notify activation watchers only after the nested Event Main finishes. */
+  eventActivationCompletion?: PendingGameEvent;
   id: string;
   sourceCardInstanceId: string;
   controller: 0 | 1;

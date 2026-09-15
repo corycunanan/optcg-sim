@@ -586,6 +586,7 @@ export function resumeFromStack(
     // ── Interrupted by nested triggers (triggers have completed, resume) ─
     case "INTERRUPTED_BY_TRIGGERS": {
       const events = pendingPropagationEvents(topFrame.accumulatedEvents);
+      if (topFrame.eventActivationCompletion) events.push(topFrame.eventActivationCompletion);
       let nextState = popFrame(state);
       const stackDepthAfterPop = nextState.effectStack.length;
 

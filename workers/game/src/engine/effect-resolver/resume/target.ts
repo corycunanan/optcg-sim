@@ -1,3 +1,4 @@
+import { retainEventParent } from "../event-activation.js";
 /**
  * Target-selection resume handlers — REDISTRIBUTE_DON transfers and
  * SELECT_TARGET (including the rule 3-7-6-1 overflow-trash-for-play flow).
@@ -415,6 +416,7 @@ export function handleSelectTarget(
     };
   }
 
+  const childStart = nextState.effectStack.length;
   const actionResult = services.executeEffectAction(
     nextState,
     pausedAction,
@@ -433,6 +435,20 @@ export function handleSelectTarget(
     };
   }
 
+  if (actionResult.pendingPrompt && actionResult.nestedEventActivation) {
+    nextState = retainEventParent(
+      nextState,
+      childStart,
+      pausedAction,
+      remainingActions,
+      effectSourceInstanceId,
+      resumeCtx.remainingActionsController ?? controller,
+      resultRefs,
+      actionResult,
+      events,
+      effectDescription
+    );
+  }
   if (actionResult.pendingPrompt) {
     return {
       kind: "terminal",
