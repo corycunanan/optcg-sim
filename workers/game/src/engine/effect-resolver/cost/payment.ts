@@ -1,3 +1,4 @@
+import { effectSourceIdentity } from "../../effect-source.js";
 /** Fixed and automatically selected cost payment mutations. */
 import type { Cost, CostResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
@@ -21,6 +22,7 @@ export function payCosts(
   _cardDb: Map<string, CardData>,
   sourceCardInstanceId?: string,
 ): CostPaymentResult | null {
+  const causingSource = effectSourceIdentity(state, sourceCardInstanceId, _cardDb);
   const events: PendingEvent[] = [];
   const costResult: CostResult = {
     donRestedCount: 0,
@@ -149,7 +151,7 @@ export function payCosts(
           events.push({
             type: "CARD_STATE_CHANGED",
             playerIndex: controller,
-            payload: { targetInstanceId: leader.instanceId, newState: "RESTED" },
+            payload: { targetInstanceId: leader.instanceId, newState: "RESTED", cause: "EFFECT_COST", causingController: controller, causingSource },
           });
           break;
         }
@@ -169,7 +171,7 @@ export function payCosts(
         events.push({
           type: "CARD_STATE_CHANGED",
           playerIndex: controller,
-          payload: { targetInstanceId: sourceCardInstanceId, newState: "RESTED" },
+          payload: { targetInstanceId: sourceCardInstanceId, newState: "RESTED", cause: "EFFECT_COST", causingController: controller, causingSource },
         });
         break;
       }
