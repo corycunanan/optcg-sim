@@ -24,6 +24,13 @@ vi.mock("@/components/ui", () => {
   };
 });
 
+import { computeEffectAvailability } from "@engine/engine/availability";
+import { injectSchemasIntoCardDb } from "@engine/engine/schema-registry";
+import {
+  CARDS,
+  createBattleReadyState,
+  createTestCardDb,
+} from "@engine/__tests__/helpers";
 import { CardActionMenuContent } from "./card-action-menu";
 
 const card = {
@@ -74,6 +81,57 @@ function actionItems(renderer: ReactTestRenderer) {
 }
 
 describe("CardActionMenuContent", () => {
+  it.each([0, 1, 2])(
+    "renders authored Dalton DON eligibility with %i attached DON",
+    (count) => {
+      const db = createTestCardDb();
+      db.set("OP08-008", { ...CARDS.VANILLA, id: "OP08-008" });
+      injectSchemasIntoCardDb(db);
+      const state = createBattleReadyState(db);
+      const source = state.players[0].characters[0]!;
+      source.cardId = "OP08-008";
+      source.attachedDon = Array.from({ length: count }, (_, i) => ({
+        instanceId: `don-${i}`,
+        state: "ACTIVE",
+        attachedTo: source.instanceId,
+      }));
+      const onAction = vi.fn();
+      let renderer!: ReactTestRenderer;
+      act(() => {
+        renderer = create(
+          <EffectAvailabilityProvider
+            effectAvailability={computeEffectAvailability(state, db)}
+          >
+            <CardActionMenuContent
+              card={source}
+              cardDb={Object.fromEntries(db)}
+              activation={null}
+              canActivateNow={true}
+              onAction={onAction}
+              onClose={vi.fn()}
+            />
+          </EffectAvailabilityProvider>
+        );
+      });
+      const [item] = actionItems(renderer);
+      expect(item.props.disabled).toBe(count === 0);
+      if (count > 0) {
+        act(() => item.props.onClick());
+        expect(onAction).toHaveBeenCalledWith({
+          type: "ACTIVATE_EFFECT",
+          cardInstanceId: source.instanceId,
+          effectId: "activate_rush",
+        });
+      } else {
+        expect(
+          item.findAllByType("span").map((span) => span.children.join(""))
+        ).toContain("condition not met");
+        expect(onAction).not.toHaveBeenCalled();
+      }
+      act(() => renderer.unmount());
+    }
+  );
+
   it("enables and dispatches an available Activate Main effect", () => {
     const onAction = vi.fn();
     const renderer = renderMenu(

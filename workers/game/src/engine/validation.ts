@@ -5,6 +5,7 @@
  * Checks phase compatibility, resource availability, and targeting rules.
  */
 
+import { meetsAttachedDonRequirement } from "./attached-don.js";
 import type { CardData, GameAction, GameState } from "../types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
 import {
@@ -375,6 +376,10 @@ function validateActivateEffect(
   const schema = cardData?.effectSchema;
   const block = schema?.effects.find((b) => b.id === effectId);
   if (!block || block.category !== "activate") return null;
+
+  if (!meetsAttachedDonRequirement(found.card, block.trigger)) {
+    return "Attached DON!! requirement is not met";
+  }
 
   const controller = found.playerIndex;
   if (
