@@ -78,7 +78,7 @@ export function trashCharacter(
     events: [{
       type: "CARD_TRASHED",
       playerIndex: moved.fact.owner,
-      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, reason, sourceZone: moved.fact.source, sourceController: moved.fact.controller, causingController, movementCause: reason === "cost" ? "COST" : "EFFECT" },
+      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, reason, sourceZone: moved.fact.source, sourceController: moved.fact.controller, causingController, movementCause: reason === "rule" ? "RULE" : reason === "cost" ? "COST" : "EFFECT" },
     }],
   };
 }
