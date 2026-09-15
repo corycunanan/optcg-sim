@@ -1,6 +1,6 @@
 # OPT-795 — Hand-trash effect watchers
 
-Implementation includes parent `f1bc0c1abe6e0ebb1fddce9885a9709d2686dcb2` (main `438fd7da1c29227b87d87b65961cf8236fbc054e`), stacked on OPT-794 PR #670. Implementation and parent integration are complete. Final tested head, verification outcomes, independent review, and coordinator readiness are recorded in [PR #674](https://github.com/corycunanan/optcg-sim/pull/674). Implementer never merges or updates Linear.
+Implementation includes OPT-794 PR #670, now landed on main as `e0fc652dafa68791c6fc01268287d72ccdd6e107` (tree identical to reviewed parent `f1bc0c1abe6e0ebb1fddce9885a9709d2686dcb2`). PR #674 now targets main. Full `pnpm verify` passed at `6c13a4d65c3a92f7c1263ac4419f30f89c5e5fab`; reconciliation with the squash merge preserves that tested source tree, with only this handoff updated. Implementation and parent integration are complete. Final tested head, verification outcomes, independent review, and coordinator readiness are recorded in [PR #674](https://github.com/corycunanan/optcg-sim/pull/674). Implementer never merges or updates Linear.
 
 ## Behavior and entry points
 
