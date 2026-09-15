@@ -16,6 +16,7 @@ import {
   type SharedTargetFilter,
   type SharedTargetFilterCard,
 } from "@shared/target-filter";
+import { cardNameAliases } from "@shared/card-names";
 import { useActiveEffects } from "@/contexts/active-effects-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { isCounterEvent } from "@/lib/game/counter-eligibility";
@@ -409,6 +410,7 @@ function matchesBlockerFilter(
     colors: cardData?.color ?? [],
     traits: cardData?.types ?? [],
     name: cardData?.name ?? card.cardId,
+    nameAliases: cardNameAliases(cardData?.effectSchema),
     attributes: cardData?.attribute ?? [],
     cardType: cardData?.type ?? "Character",
     state: card.state,

@@ -47,7 +47,7 @@ Rule modifications live in the `rule` field of an [EffectBlock](./01-SCHEMA-OVER
 
 ## Name Aliasing (10.1)
 
-A card is treated as having one or more additional names for all game purposes: deck construction legality, targeting by name, condition checks, and copy-limit counting.
+A card is treated as having one or more additional names for all game purposes: deck construction legality, targeting by name, and condition checks (rule §2-1-3), including in secret areas. Ordinary copy limits remain keyed by card number (§§2-14-2 and 5-1-2-3).
 
 ```typescript
 interface NameAlias {
@@ -62,9 +62,11 @@ interface NameAlias {
 
 The card retains its original printed name and *also* matches any name in the `aliases` array. This affects:
 
-- Deck construction copy-limit counting (a deck with 4 copies of "Yamato" and 1 copy of "Yamato (OP01-121)" that aliases "Kouzuki Oden" counts Yamato at 4 and Oden at 1)
+- Name-based Leader deck restrictions. Four OP01-121 Yamato and four distinct-number Kouzuki Oden cards do not violate the four-copy limit merely because their names overlap; variants of the same card number share that limit.
 - Name-based targeting (e.g., "up to 1 [Kouzuki Oden]" matches this card)
 - Name-based conditions (e.g., "if you have [Kouzuki Oden]" is satisfied)
+
+Distinct-name counts retain printed card-name identities rather than expanding aliases or merging overlapping alias sets. The OP16-034 FAQ gives +2000 for Luffy plus one or two EB04-038 copies, and +3000 for Luffy plus OP13-031 plus EB04-038.
 
 ### Single Alias
 
