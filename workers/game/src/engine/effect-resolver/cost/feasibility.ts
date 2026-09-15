@@ -62,7 +62,7 @@ function selectionPayments(
         cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
           ? [sourceCardInstanceId, ...selected]
           : selected;
-      return applyCostSelection(state, cost, paymentTargets, controller).state;
+      return applyCostSelection(state, cost, paymentTargets, controller, cardDb).state;
     }),
   );
 }
