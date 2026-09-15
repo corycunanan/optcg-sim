@@ -1,3 +1,4 @@
+import { updateEffectContinuation } from "./effect-resolver/event-activation.js";
 /**
  * 7-Step Action Pipeline
  *
@@ -27,7 +28,6 @@ import {
   deregisterDepartedSources,
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver/index.js";
-import { peekFrame as peekStackFrame, updateTopFrame as updateStackTopFrame } from "./effect-stack.js";
 import { findCardInstance } from "./state.js";
 import type { QueuedTrigger } from "../types.js";
 import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
@@ -306,6 +306,7 @@ function processTriggerQueuePipeline(
     const next = queue.shift();
     if (!next) break;
 
+    const stackDepth = nextState.effectStack.length;
     const result = resolveEffect(
       nextState,
       next.effectBlock,
@@ -318,13 +319,9 @@ function processTriggerQueuePipeline(
     if (isEngineTerminated(nextState)) return { state: nextState };
 
     if (result.pendingPrompt) {
-      // Store remaining triggers in the top stack frame's pendingTriggers
-      const topFrame = peekStackFrame(nextState);
-      if (topFrame) {
-        nextState = updateStackTopFrame(nextState, {
-          pendingTriggers: [...topFrame.pendingTriggers ?? [], ...queue],
-        });
-      }
+      nextState = updateEffectContinuation(nextState, stackDepth, frame => ({
+        pendingTriggers: [...frame.pendingTriggers, ...queue],
+      }));
       return { state: nextState, pendingPrompt: result.pendingPrompt };
     }
 
@@ -567,13 +564,9 @@ function processPlayerTriggerGroup(
     // Single trigger — auto-resolve, no prompt needed
     const result = processTriggerQueuePipeline(state, [...triggers], cardDb);
     if (result.pendingPrompt) {
-      // Store afterTriggers on the stack frame so they resume later
-      const topFrame = peekStackFrame(result.state);
-      if (topFrame && afterTriggers.length > 0) {
-        result.state = updateStackTopFrame(result.state, {
-          pendingTriggers: [...topFrame.pendingTriggers ?? [], ...afterTriggers],
-        });
-      }
+      result.state = updateEffectContinuation(result.state, state.effectStack.length, frame => ({
+        pendingTriggers: [...frame.pendingTriggers, ...afterTriggers],
+      }));
       return result;
     }
     // Single trigger done — process the other player's group

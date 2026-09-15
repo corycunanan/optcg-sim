@@ -1,5 +1,10 @@
 import type { Action, EffectResult, EffectBlock } from "../effect-types.js";
-import type { CardData, GameState, PendingEvent } from "../../types.js";
+import type {
+  CardData,
+  EffectStackFrame,
+  GameState,
+  PendingEvent,
+} from "../../types.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
   generateFrameId,
@@ -123,5 +128,30 @@ export function retainEventParent(
       parent,
       ...state.effectStack.slice(childStart),
     ],
+  };
+}
+
+/** Carry the caller's queued siblings on its continuation, never on the Event's
+ * prompt. Other prompt shapes retain the existing top-frame behavior. */
+export function updateEffectContinuation(
+  state: GameState,
+  firstNewFrame: number,
+  patch: (frame: EffectStackFrame) => Partial<EffectStackFrame>
+): GameState {
+  const candidate = state.effectStack[firstNewFrame];
+  const isEventParent =
+    candidate?.phase === "INTERRUPTED_BY_TRIGGERS" &&
+    (candidate.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
+      candidate.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH") &&
+    state.effectStack[firstNewFrame + 1]?.eventActivationCompletion !==
+      undefined;
+  const index = isEventParent ? firstNewFrame : state.effectStack.length - 1;
+  const frame = state.effectStack[index];
+  if (!frame) return state;
+  return {
+    ...state,
+    effectStack: state.effectStack.map((current, i) =>
+      i === index ? { ...current, ...patch(frame) } : current
+    ),
   };
 }

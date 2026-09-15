@@ -1,3 +1,4 @@
+import { updateEffectContinuation } from "./event-activation.js";
 /**
  * Dependency-injected resume dispatchers — resumeEffectChain (action-type based) and
  * resumeFromStack (phase based). Branch bodies live in ./resume/*.ts:
@@ -529,17 +530,11 @@ export function resumeFromStack(
           };
         } else {
           nextState = retainEventsOnFrame(nextState, stackDepthAfterPop, events);
-          const replacementFrame = peekFrame(nextState);
-          if (replacementFrame) {
-            nextState = updateTopFrame(nextState, {
-              pendingTriggers: [
-                ...replacementFrame.pendingTriggers,
-                ...topFrame.pendingTriggers,
-              ],
-              replacementBatchContinuation:
-                topFrame.replacementBatchContinuation,
-            });
-          }
+          nextState = updateEffectContinuation(nextState, stackDepthAfterPop, frame => ({
+            pendingTriggers: [...frame.pendingTriggers, ...topFrame.pendingTriggers],
+            triggerOrderingGroup: topFrame.triggerOrderingGroup ?? frame.triggerOrderingGroup,
+            replacementBatchContinuation: topFrame.replacementBatchContinuation,
+          }));
         }
         return {
           state: nextState,
@@ -634,7 +629,8 @@ export function resumeFromStack(
             nextState,
             [...scan.triggers, ...topFrame.pendingTriggers],
             cardDb,
-            events
+            events,
+            topFrame.triggerOrderingGroup
           );
         }
       }
@@ -643,7 +639,8 @@ export function resumeFromStack(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
-        events
+        events,
+        topFrame.triggerOrderingGroup
       );
     }
 

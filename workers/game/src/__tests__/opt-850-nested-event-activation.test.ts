@@ -77,6 +77,8 @@ function fixture() {
     ["OP15-002", 0, ["Red", "Blue"], ["Dressrosa"]],
     ["OP15-119", 10, ["Yellow"], ["Straw Hat Crew"]],
     ["OP09-078", 1, ["Purple"], ["Straw Hat Crew"]],
+    ["OP04-024", 3, ["Green"], ["Donquixote Pirates"]],
+    ["OP01-060", 0, ["Blue"], ["Donquixote Pirates"]],
     ["EB04-028", 2, ["Blue"], ["Navy"]],
   ] as const) {
     const schema = getEffectSchema(id)!;
@@ -711,6 +713,134 @@ it.each([true, false])(
     expect(
       f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
     ).toHaveLength(1);
+    expect(f.state.effectStack).toHaveLength(0);
+  }
+);
+
+it.each(["OP15-014", "OP15-046"])(
+  "%s completes nested Main before queued opponent Sugar",
+  async (producer) => {
+    const f = fixture();
+    f.put("OP15-002", 0, "LEADER");
+    f.put("OP01-060", 1, "LEADER");
+    f.put("OP04-024", 1);
+    const event = f.put("OP15-055", 0, "HAND");
+    while (f.state.players[0].donCostArea.length < 10)
+      f.state.players[0].donCostArea.push(f.state.players[0].donDeck.pop()!);
+    const played = f.play(producer);
+    f.select([event.instanceId]);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    await f.reload();
+    f.choose("Draw 2 cards");
+    // Rule8-6-3: Sugar's simultaneous play watcher cannot interleave inside
+    // the still-resolving producer/Event before its completion notification.
+    expect(
+      f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+    ).toHaveLength(1);
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(1);
+    f.select([
+      f.state.players[0].characters.find((c) => c?.cardId === played.cardId)!
+        .instanceId,
+    ]);
+    expect(f.state.effectStack).toHaveLength(0);
+  }
+);
+
+it.each(["SELECTED", "AUTOMATIC"])(
+  "nested Event parent owns same-play ordering group and refs via %s entry",
+  async (entry) => {
+    const f = fixture();
+    f.put("OP15-002", 0, "LEADER");
+    // Current authored producers have one On Play block and an up-to choice.
+    // Extra same-source siblings and exact-one selection are contract probes
+    // for both direct chain and selected-action resumptions.
+    const schema = structuredClone(getEffectSchema("OP15-014")!);
+    const onPlay = schema.effects.find((e) => e.id === "OP15-014_on_play")!;
+    onPlay.actions![0].result_ref = "activatedEvent";
+    onPlay.actions!.push({
+      type: "REVEAL",
+      target_ref: "activatedEvent",
+      params: { visibility: "BOTH" },
+      chain: "THEN",
+    });
+    if (entry === "AUTOMATIC") onPlay.actions![0].target!.count = { exact: 1 };
+    onPlay.actions!.push({
+      type: "MODIFY_POWER",
+      target: { type: "SELF" },
+      params: { amount: 1000 },
+      duration: { type: "THIS_TURN" },
+      chain: "THEN",
+    });
+    for (const id of ["sibling-a", "sibling-b"])
+      schema.effects.push({
+        id,
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        actions: [
+          {
+            type: "MODIFY_POWER",
+            target: { type: "SELF" },
+            params: { amount: 1000 },
+            duration: { type: "THIS_TURN" },
+          },
+        ],
+      });
+    f.db.set("OP15-014", {
+      ...f.db.get("OP15-014")!,
+      power: 6000,
+      effectSchema: schema,
+    });
+    const event = f.put("OP15-055", 0, "HAND");
+    f.play("OP15-014");
+    const group = f.state.effectStack.at(-1)!;
+    const chosen = group.simultaneousTriggers.find(
+      (t) => t.effectBlock.id === "OP15-014_on_play"
+    )!;
+    f.choose(chosen.orderingId!);
+    if (entry === "SELECTED") f.select([event.instanceId]);
+    const parent = f.state.effectStack.find(
+      (frame) =>
+        frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" &&
+        frame.phase === "INTERRUPTED_BY_TRIGGERS"
+    )!;
+    expect(parent.pendingTriggers).toHaveLength(2);
+    expect(parent.triggerOrderingGroup?.resolvedTriggerIds).toEqual([
+      chosen.orderingId,
+    ]);
+    expect(f.state.effectStack.at(-1)?.pendingTriggers).toHaveLength(0);
+    expect(
+      new Map(parent.resultRefs).get("activatedEvent")?.targetInstanceIds
+    ).toEqual([
+      f.state.players[0].trash.find((c) => c.cardId === event.cardId)!
+        .instanceId,
+    ]);
+    await f.reload();
+    f.choose("Draw 2 cards");
+    const barto = f.state.players[0].characters.find(
+      (c) => c?.cardId === "OP15-014"
+    )!;
+    expect(getEffectivePower(barto, f.db.get("OP15-014")!, f.state)).toBe(7000);
+    expect(
+      f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
+    ).toHaveLength(1);
+    const remaining = f.state.effectStack.at(-1)!;
+    expect(remaining.triggerOrderingGroup?.triggers).toHaveLength(3);
+    expect(remaining.triggerOrderingGroup?.resolvedTriggerIds).toEqual([
+      chosen.orderingId,
+    ]);
+    await f.reload();
+    f.choose(
+      remaining.simultaneousTriggers.find(
+        (t) => t.effectBlock.id === "sibling-b"
+      )!.orderingId!
+    );
+    expect(
+      getEffectivePower(
+        f.state.players[0].characters.find((c) => c?.cardId === "OP15-014")!,
+        f.db.get("OP15-014")!,
+        f.state
+      )
+    ).toBe(9000);
     expect(f.state.effectStack).toHaveLength(0);
   }
 );
