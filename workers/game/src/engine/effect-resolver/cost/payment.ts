@@ -411,7 +411,7 @@ export function payCosts(
         const moved = transitionCard(nextState, stage.instanceId, "DECK", { position: "BOTTOM" });
         if (!moved) return null;
         nextState = moved.state;
-        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: stage.cardId } });
+        events.push({ type: "CARD_RETURNED_TO_DECK", playerIndex: controller, payload: { cardInstanceId: stage.instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: stage.cardId, sourceZone: "STAGE", sourceController: stage.controller, causingController: controller, movementCause: "COST" } });
         break;
       }
 
@@ -452,8 +452,7 @@ export function payCosts(
           nextState,
           { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: cost.position ?? "BOTTOM" },
           [sourceCardInstanceId],
-          controller,
-        );
+          controller, _cardDb);
         nextState = applied.state;
         events.push(...applied.events);
         costResult.cardsPlacedToDeckCount += 1;
@@ -472,8 +471,7 @@ export function payCosts(
           nextState,
           { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, position: "BOTTOM" },
           [sourceCardInstanceId],
-          controller,
-        );
+          controller, _cardDb);
         nextState = applied.state;
         events.push(...applied.events);
         break;
@@ -493,8 +491,7 @@ export function payCosts(
           nextState,
           cost,
           [sourceCardInstanceId, ...candidates.slice(0, amt)],
-          controller,
-        );
+          controller, _cardDb);
         nextState = applied.state;
         events.push(...applied.events);
         costResult.cardsPlacedToDeckCount += 1 + amt;

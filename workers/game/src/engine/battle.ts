@@ -1332,6 +1332,7 @@ function executeDamageStep(
                   payload: {
                     ...ev.payload,
                     cause: "BATTLE",
+                    movementCause: "BATTLE",
                     preKO_donCount: preKODonCount,
                   },
                 });

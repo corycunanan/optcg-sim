@@ -46,6 +46,9 @@ export function koCharacter(
         cardId: moved.fact.cardId,
         cause: causingController !== owner ? "OPPONENT_EFFECT" : "EFFECT",
         causingController,
+        sourceZone: moved.fact.source,
+        sourceController: moved.fact.controller,
+        movementCause: "EFFECT",
         preKO_donCount: moved.fact.detachedDonInstanceIds.length,
         ...(preKO_basePower !== undefined ? { preKO_basePower } : {}),
         ...(moved.fact.source === "STAGE" ? { cardType: "STAGE" as const } : {}),
@@ -64,7 +67,6 @@ export function trashCharacter(
   causingController: 0 | 1,
   reason: "effect" | "cost" | "rule" = "effect",
 ): CardMutationResult | null {
-  void causingController;
   const moved = transitionCard(state, instanceId, "TRASH", {
     position: "TOP",
     preserveSourceTriggers: true,
@@ -76,7 +78,7 @@ export function trashCharacter(
     events: [{
       type: "CARD_TRASHED",
       playerIndex: moved.fact.owner,
-      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, reason },
+      payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, reason, sourceZone: moved.fact.source, sourceController: moved.fact.controller, causingController, movementCause: reason === "cost" ? "COST" : "EFFECT" },
     }],
   };
 }
@@ -156,6 +158,7 @@ export function detachDonToCostArea(
 export function returnToHand(
   state: GameState,
   instanceId: string,
+  causingController?: 0 | 1,
 ): CardMutationResult | null {
   const moved = transitionCard(state, instanceId, "HAND", { preserveSourceTriggers: true });
   if (!moved || !["CHARACTER", "STAGE", "TRASH"].includes(moved.fact.source)) return null;
@@ -169,6 +172,10 @@ export function returnToHand(
         cardInstanceId: instanceId,
         newCardInstanceId: moved.fact.newInstanceId,
         cardId: moved.fact.cardId,
+        sourceZone: moved.fact.source,
+        sourceController: moved.fact.controller,
+        causingController,
+        movementCause: "EFFECT",
         ...(moved.fact.source === "TRASH" ? { source: "TRASH" as const } : {}),
       },
     }],
@@ -328,6 +335,7 @@ export function returnToDeck(
   state: GameState,
   instanceId: string,
   position: "TOP" | "BOTTOM" = "BOTTOM",
+  causingController?: 0 | 1,
 ): CardMutationResult | null {
   const moved = transitionCard(state, instanceId, "DECK", {
     position,
@@ -339,7 +347,7 @@ export function returnToDeck(
   const events: PendingEvent[] = [{
     type: "CARD_RETURNED_TO_DECK",
     playerIndex: moved.fact.owner,
-    payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, position },
+    payload: { cardInstanceId: instanceId, newCardInstanceId: moved.fact.newInstanceId, cardId: moved.fact.cardId, position, sourceZone: moved.fact.source, sourceController: moved.fact.controller, causingController, movementCause: "EFFECT" },
   }];
   if (moved.fact.source === "LIFE") {
     events.push({
