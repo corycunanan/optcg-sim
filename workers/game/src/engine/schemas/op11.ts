@@ -792,7 +792,7 @@ export const OP11_022_SHIRAHOSHI: EffectSchema = {
       flags: { once_per_turn: true, optional: true },
       costs: [
         { type: "REST_DON", amount: 1 },
-        { type: "TURN_LIFE_FACE_UP", amount: 1 },
+        { type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" },
       ],
       actions: [
         {
@@ -3212,7 +3212,7 @@ export const OP11_100_OTOHIME: EffectSchema = {
         controller: "SELF",
         property: { name: "Shirahoshi" },
       },
-      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1, position: "TOP" }],
       flags: { optional: true },
       actions: [
         {
@@ -3335,7 +3335,7 @@ export const OP11_103_LONG_JAW_NEPTUNIAN: EffectSchema = {
       flags: { optional: true },
       costs: [
         { type: "REST_SELF" },
-        { type: "TURN_LIFE_FACE_DOWN", amount: 1 },
+        { type: "TURN_LIFE_FACE_DOWN", amount: 1, position: "TOP" },
       ],
       conditions: {
         type: "LEADER_PROPERTY",
@@ -3378,7 +3378,7 @@ export const OP11_104_SHIRLEY: EffectSchema = {
       id: "on_play_search",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1, position: "TOP" }],
       flags: { optional: true },
       actions: [
         {
@@ -3446,7 +3446,7 @@ export const OP11_107_TOPKNOT_NEPTUNIAN: EffectSchema = {
       id: "activate_set_active_at_eot",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1, position: "TOP" }],
       flags: { once_per_turn: true, optional: true },
       conditions: {
         type: "LEADER_PROPERTY",
@@ -3487,7 +3487,7 @@ export const OP11_108_NEPTUNE: EffectSchema = {
         controller: "SELF",
         property: { name: "Shirahoshi" },
       },
-      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_DOWN", amount: 1, position: "TOP" }],
       flags: { optional: true },
       actions: [
         {
@@ -3788,7 +3788,7 @@ export const OP11_117_FISH_MAN_ISLAND: EffectSchema = {
       id: "activate_buff",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
-      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1 }],
+      costs: [{ type: "TURN_LIFE_FACE_UP", amount: 1, position: "TOP" }],
       flags: { once_per_turn: true, optional: true },
       conditions: {
         type: "LEADER_PROPERTY",

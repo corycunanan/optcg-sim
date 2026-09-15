@@ -1,0 +1,121 @@
+[
+  {
+    "path": "EB01-040.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "EB02-060.effects[0].costs[1]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "EB03-053.effects[1].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "EB03-056.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "EB04-059.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP08-058.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 2,
+    "position": "TOP"
+  },
+  {
+    "path": "OP08-063.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP10-099.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP11-022.effects[1].costs[1]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP11-100.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP11-103.effects[0].costs[1]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP11-104.effects[1].costs[0]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP11-107.effects[1].costs[0]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP11-108.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP11-117.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP15-099.effects[1].costs[0]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "OP15-114.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "P-106.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  },
+  {
+    "path": "ST13-009.effects[0].costs[0]",
+    "type": "TURN_LIFE_FACE_DOWN",
+    "amount": 1
+  },
+  {
+    "path": "ST20-001.effects[1].costs[0]",
+    "type": "TURN_LIFE_FACE_UP",
+    "amount": 1,
+    "position": "TOP"
+  }
+]
