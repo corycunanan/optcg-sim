@@ -502,7 +502,7 @@ The broadest removal interception. Fires when a Character would leave the field 
 
 #### WOULD_BE_RESTED
 
-Fires when a Character would be changed from active to rested state by an opponent's effect.
+Fires when a Character would be changed from active to rested state by an opponent's effect. PRB02-006 additionally requires the opponent's turn and `cause_filter: { by: "OPPONENT_EFFECT", source_card_type: "CHARACTER" }`. Rest interception carries the causing source identity from the existing pre-payment snapshot through the persisted replacement batch. Event, Leader, Stage, own-effect, and own-turn rests do not offer Zoro. Its alternate must be another active, legally restable Character (official PRB02-006 FAQ); a no-op rest never enters replacement processing.
 
 | Card Text | Example |
 |-----------|---------|

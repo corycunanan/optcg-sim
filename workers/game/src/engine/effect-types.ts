@@ -201,6 +201,7 @@ export interface EventFilter {
   target?: "SELF";
   controller?: Controller;
   cause?: EventCause;
+  source_card_type?: "CHARACTER";
   target_filter?: TargetFilter;
   source_zone?: string;
   includes_trigger_keyword?: boolean;
@@ -1425,6 +1426,7 @@ export type ReplacementEvent =
 
 export interface CauseFilter {
   by: "OPPONENT_EFFECT" | "ANY_EFFECT" | "ANY";
+  source_card_type?: "CHARACTER";
 }
 
 // ─── Rule Modifications (07-RULE-MODIFICATIONS) ─────────────────────────────
