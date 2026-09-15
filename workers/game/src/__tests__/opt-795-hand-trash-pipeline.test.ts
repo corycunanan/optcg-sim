@@ -687,9 +687,9 @@ it("two hand-cost steps preserve both actual counts after source departure and r
   }
   f.done();
   expect(f.state.players[0].hand).toHaveLength(5);
-  const events = f.state.eventLog.filter(
-    (e) => e.type === "CARD_TRASHED" && e.payload.from === "HAND"
-  );
+  const events = f.state.eventLog
+    .filter((e) => e.type === "CARD_TRASHED")
+    .filter((e) => e.payload.from === "HAND");
   expect(events.map((e) => e.payload.count)).toEqual([1, 2]);
   expect(
     events.every((e) => e.payload.effectSourceCardId === source.cardId)
