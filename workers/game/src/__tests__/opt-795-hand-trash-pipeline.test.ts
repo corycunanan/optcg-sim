@@ -142,6 +142,25 @@ describe("OPT-795 authored hand-trash watchers", () => {
     }
   );
 
+  it.each([0, 1] as const)("Kanjuro blind discard preserves owner %i's causal source", (owner) => {
+    const f = fixture();
+    const opponent = owner === 0 ? 1 : 0;
+    f.state.turn.activePlayerIndex = opponent;
+    const watcher = f.put("OP14-045", owner);
+    const kanjuro = f.put("OP01-038", owner, "CHARACTER", { cost: 2 });
+    const discarded = f.put("kanjuro-secret", owner, "HAND");
+    f.play(f.put("OP04-094", opponent, "HAND", { type: "Event", cost: 4, power: null }));
+    f.select([kanjuro.instanceId]);
+    f.roundTrip();
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(opponent);
+    expect(f.state.pendingPrompt?.options).toMatchObject({ blindSelection: true });
+    f.select([discarded.instanceId]);
+    f.done();
+    expect(hasEffectiveKeyword(watcher, f.db.get(watcher.cardId)!, "RUSH", f.state, f.db)).toBe(true);
+    const trash = f.state.eventLog.filter((e) => e.type === "CARD_TRASHED").find((e) => e.payload.from === "HAND");
+    expect(trash?.payload).toMatchObject({ count: 1, movementCause: "EFFECT", effectSourceCardId: "OP01-038", effectSourceController: owner, causingController: owner });
+  });
+
   it("Kuzan draws the actual effect discard count and can trigger again", () => {
     const f = fixture();
     f.put("OP12-040", 0, "LEADER", { types: ["Navy"] });
