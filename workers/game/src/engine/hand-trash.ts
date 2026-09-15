@@ -1,6 +1,7 @@
 import type { GameState, PendingEvent } from "../types.js";
 import type { EffectResult } from "./effect-types.js";
-import { effectSourceCard } from "./effect-resolver/action-utils.js";
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "./effect-types.js";
+import { effectSourceCard } from "./effect-source.js";
 
 export const TRIGGERING_HAND_TRASH_REF = "__triggering_hand_trash";
 
@@ -19,7 +20,7 @@ export function handTrashEvent(
   resultRefs?: Map<string, EffectResult>
 ): PendingEvent {
   const source = sourceCardInstanceId
-    ? effectSourceCard(state, sourceCardInstanceId, resultRefs ?? new Map())
+    ? effectSourceCard(state, sourceCardInstanceId, resultRefs?.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot)
     : undefined;
   return {
     type: "CARD_TRASHED",

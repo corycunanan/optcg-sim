@@ -1,3 +1,4 @@
+import { effectSourceCard } from "../effect-source.js";
 /**
  * Pure utility functions for action handlers.
  */
@@ -11,7 +12,7 @@ import type {
   EffectBlock,
   StartOfGameEffect,
 } from "../effect-types.js";
-import type { CardData, CardInstance, GameState } from "../../types.js";
+import type { CardData, GameState } from "../../types.js";
 import { matchesFilter } from "../conditions.js";
 import type { ExpiryTiming } from "../effect-types.js";
 import { getEffectiveBasePower } from "../modifiers.js";
@@ -32,18 +33,7 @@ export function effectSourceController(
   fallbackController: 0 | 1,
   resultRefs: Map<string, EffectResult>,
 ): 0 | 1 {
-  return effectSourceCard(state, sourceCardInstanceId, resultRefs)?.controller ?? fallbackController;
-}
-
-/** Snapshot belongs to the actual executing effect, never the replaced effect. */
-export function effectSourceCard(
-  state: GameState,
-  sourceCardInstanceId: string,
-  resultRefs: Map<string, EffectResult>,
-): CardInstance | undefined {
-  const saved = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot;
-  return (saved?.instanceId === sourceCardInstanceId ? saved : undefined)
-    ?? findCardInstance(state, sourceCardInstanceId) ?? undefined;
+  return effectSourceCard(state, sourceCardInstanceId, resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot)?.controller ?? fallbackController;
 }
 
 export function getSearchAndPlayPickLimit(

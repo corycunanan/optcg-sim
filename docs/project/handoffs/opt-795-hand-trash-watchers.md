@@ -1,12 +1,12 @@
 # OPT-795 — Hand-trash effect watchers
 
-Implementation checkpoint: `db4464e2` plus this handoff; stacked on OPT-794 PR #670. Implementation is complete; final parent integration, full verification, independent review, and coordinator readiness are pending. Implementer never merges or updates Linear.
+Implementation includes parent `7e089d0177d23559da53e1108f270fed6feee385` (main `549bfb1d0d24c8fe9a42f207095e9607a4dbbf15`), stacked on OPT-794 PR #670. Implementation and parent integration are complete; full verification, independent review, and coordinator readiness are pending. Implementer never merges or updates Linear.
 
 ## Behavior and entry points
 
 `CARD_TRASHED_FROM_HAND` observes actual positive-count hand discards caused by an effect or its activation cost. `movementCause` retains `EFFECT` versus `COST`; causal card/controller snapshots distinguish the effect source from the discard chooser and discarded card. The three OP14 inverse Life-event placeholders and the pool-audit match OP12-040 Kuzan are corrected. Kuzan filters its own Navy effect source, draws the actual event count after the causing effect resolves, and remains repeatable.
 
-Read `workers/game/src/engine/hand-trash.ts`, `triggers.ts`, `effect-resolver/action-utils.ts`, and `__tests__/opt-795-hand-trash-pipeline.test.ts` first. Event fields also appear in `shared/game-types.ts` and strict persisted-event validation. The shared source lookup only accepts a snapshot whose instance matches the executing source, preventing replacement effects from inheriting the replaced effect's provenance. Cost continuations preserve that snapshot after the source leaves. Trigger-count refs are separate from the watcher's own cost refs and survive ordering/reconnect.
+Read `workers/game/src/engine/hand-trash.ts`, `triggers.ts`, `effect-source.ts`, `effect-resolver/action-utils.ts`, and `__tests__/opt-795-hand-trash-pipeline.test.ts` first. Event fields also appear in `shared/game-types.ts` and strict persisted-event validation. The shared source lookup only accepts a snapshot whose instance matches the executing source, preventing replacement effects from inheriting the replaced effect's provenance. Cost continuations preserve that snapshot after the source leaves. Trigger-count refs are separate from the watcher's own cost refs and survive ordering/reconnect.
 
 ## Rules packet and explicit interpretation
 
@@ -35,6 +35,6 @@ Read `workers/game/src/engine/hand-trash.ts`, `triggers.ts`, `effect-resolver/ac
 
 ## Follow-ups
 
-- Existing OP04-048 Sasaki schema uses unparameterized `HAND_WHEEL`; its handler defaults both counts to zero. Printed text instead returns all hand cards to deck, shuffles, and draws the returned count (`docs/cards/OP-04.md:341`). This unrelated schema defect is unchanged; coordinator should link its deduplicated follow-up ticket in the PR.
+- Existing OP04-048 Sasaki schema uses unparameterized `HAND_WHEEL`; its handler defaults both counts to zero. Printed text instead returns all hand cards to deck, shuffles, and draws the returned count (`docs/cards/OP-04.md:341`). This unrelated schema defect is unchanged; tracked separately as [OPT-853](https://linear.app/optcg-sim/issue/OPT-853/correct-op04-048-sasaki-hand-to-deck-shuffle-and-redraw).
 - A future direct OP14 activation-cost ruling should replace the flagged analogue-based interpretation if it differs.
 - ST33 encoding remains outside this ticket's scope. Once OPT-794 and OPT-795 are merged and verified, dependent schema work may use this event capability; stack-ready alone does not fulfill that prerequisite.
