@@ -531,7 +531,12 @@ function hasValidStackFrame(value: unknown): boolean {
   ) return false;
   return (
     Array.isArray(value.accumulatedEvents) &&
-    value.accumulatedEvents.every(isKnownPendingEvent)
+    value.accumulatedEvents.every(isKnownPendingEvent) &&
+    (value.eventActivationCompletion === undefined ||
+      (value.phase === "INTERRUPTED_BY_TRIGGERS" &&
+       isKnownPendingEvent(value.eventActivationCompletion) &&
+       (value.eventActivationCompletion.type === "EVENT_ACTIVATED_FROM_HAND" ||
+        value.eventActivationCompletion.type === "EVENT_MAIN_RESOLVED_FROM_TRASH")))
   );
 }
 

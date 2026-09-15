@@ -2333,38 +2333,37 @@ Actions that interact with the effect system itself — activating other effects
 
 ### ACTIVATE_EVENT_FROM_HAND
 
-Resolve an Event card's effect directly from the hand via another card's effect. The Event is not "played" in the normal sense — its effect is activated without paying its cost, then the Event goes to trash.
-
-```typescript
-interface ActivateEventFromHandParams {
-  filter: TargetFilter;
-  cost_override: "FREE" | "REDUCED" | "NORMAL";
-  cost_reduction?: number;
-}
-```
-
-| Field | Value |
-|-------|-------|
-| **Target** | An Event card in hand matching `filter` |
-| **Failure mode** | If no matching Event exists in hand, the action is ignored. |
-| **Fired events** | `EVENT_ACTIVATED_FROM_HAND` |
-| **Example cards** | OP12-041 Sanji, OP15-014 Bartolomeo, OP15-046 Sabo |
+Resolve the selected Event's **[Main]** from hand. All three authored producers
+(Sanji OP12-041, Bartolomeo OP15-014 and Sabo OP15-046) skip its printed play cost;
+activation costs within the Main text still apply. Counter-only and Trigger-only
+Events are excluded. Selecting zero leaves the hand unchanged.
 
 ```json
 {
   "type": "ACTIVATE_EVENT_FROM_HAND",
-  "params": {
-    "filter": { "card_type": "EVENT", "cost": { "operator": "<=", "value": 5 } },
-    "cost_override": "FREE"
+  "target": {
+    "type": "EVENT_CARD",
+    "source_zone": "HAND",
+    "count": { "up_to": 1 },
+    "filter": { "traits": ["Straw Hat Crew"], "base_cost_max": 3 }
   }
 }
 ```
+
+The selected Event moves to trash with fresh identity before resolving Main. Its
+optional/cost/target prompts and the parent continuation survive persistence.
+`EVENT_ACTIVATED_FROM_HAND` is emitted once after the nested Main finishes; own
+and opponent activation watchers then become eligible. Skipping the printed cost
+is not a cost-reduction modifier (`costReducedAmount: 0`). Crocodile's unqualified
+activation trigger still matches this path. See OP12 FAQ, Sanji; rules §8-3 and
+§8-6-3. Notification is held separately from committed event accumulators so an
+intermediate prompt cannot publish or scan it early.
 
 ---
 
 ### ACTIVATE_EVENT_FROM_TRASH
 
-Resolve an Event card's **[Main] effect** directly from the trash (e.g. EB03-031 Vinsmoke Reiju). The activating Character's effect pays its own inline DON!! cost; the Event's **printed main cost is skipped**. The Event stays in trash — it does not move zones — and the resolved [Main] block may surface its own prompts (e.g. target selection, PLAYER_CHOICE) which bubble up through the action handler.
+Resolve an Event card's **[Main] effect** directly from the trash (e.g. EB03-031 Vinsmoke Reiju). The activating Character's effect pays its own inline DON!! cost; the Event's **printed main cost is skipped**. Activation costs inside Main still apply. The Event stays in trash — it does not move zones — and the resolved [Main] block may surface its own prompts (e.g. target selection, PLAYER_CHOICE) which bubble up through the action handler.
 
 ```typescript
 interface ActivateEventFromTrashParams {
@@ -2377,7 +2376,7 @@ interface ActivateEventFromTrashParams {
 |-------|-------|
 | **Target** | An Event card in trash matching `filter`. Events without a `MAIN_EVENT` block (Counter-only, Trigger-only) are automatically excluded from valid targets. |
 | **Failure mode** | If no matching [Main]-bearing Event exists in trash, the action is ignored (no event emitted, no resolution). |
-| **Fired events** | `EVENT_MAIN_RESOLVED_FROM_TRASH` (emitted first), followed by whatever events the resolved [Main] block produces (e.g. `CARD_DRAWN`, `CARD_KO`). |
+| **Fired events** | The Main block's events (e.g. `CARD_DRAWN`, `CARD_KO`), then `EVENT_MAIN_RESOLVED_FROM_TRASH` once the nested Main finishes. |
 | **Example cards** | EB03-031 Vinsmoke Reiju |
 
 ```json

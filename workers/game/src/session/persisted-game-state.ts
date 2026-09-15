@@ -352,6 +352,7 @@ const StackFrameCore = z.strictObject({
     })
     .optional(),
   accumulatedEvents: z.array(z.unknown()),
+  eventActivationCompletion: z.unknown().optional(),
   ruleTrashForPlay: z.unknown().optional(),
   stateDistributionForPlay: z.unknown().optional(),
   batchResumeMarker: z.unknown().optional(),

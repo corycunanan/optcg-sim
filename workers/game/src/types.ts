@@ -222,6 +222,8 @@ export type BatchResumeMarker =
 // ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
 
 export interface EffectStackFrame {
+  /** Notify activation watchers only after the nested Event Main finishes. */
+  eventActivationCompletion?: PendingEvent;
   id: string;
   sourceCardInstanceId: string;
   controller: 0 | 1;
