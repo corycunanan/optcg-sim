@@ -1132,6 +1132,7 @@ export const OP05_030_DONQUIXOTE_ROSINANTE: EffectSchema = {
         event: "WOULD_BE_KO",
         target_filter: { is_rested: true },
       },
+      conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       replacement_actions: [
         {
           type: "TRASH_CARD",
@@ -3646,7 +3647,7 @@ export const OP05_096_I_BID_500_MILLION: EffectSchema = {
                     count: { up_to: 1 },
                     filter: { cost_max: 1 },
                   },
-                  params: { face: "UP" },
+                  params: { face: "UP", position: "TOP_OR_BOTTOM" },
                 },
               ],
             ],
@@ -4170,7 +4171,7 @@ export const OP05_111_HOTORI: EffectSchema = {
       costs: [
         {
           type: "PLAY_NAMED_CARD_FROM_HAND",
-          filter: { name: "Kotori" },
+          card_name: "Kotori",
         },
       ],
       actions: [
@@ -4182,8 +4183,7 @@ export const OP05_111_HOTORI: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 3 },
           },
-          params: { face: "UP" },
-          // _comment: "Player chooses top or bottom of opponent's Life cards"
+          params: { face: "UP", position: "TOP_OR_BOTTOM" },
         },
       ],
       flags: { optional: true },

@@ -2730,7 +2730,7 @@ export const OP13_078_ORO_JACKSON: EffectSchema = {
       id: "OP13-078_on_removal",
       category: "auto",
       trigger: {
-        event: "ANY_CHARACTER_KO",
+        event: "CHARACTER_REMOVED_FROM_FIELD",
         filter: {
           controller: "SELF",
           cause: "BY_OPPONENT_EFFECT",

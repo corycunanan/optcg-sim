@@ -18,7 +18,25 @@ import { getEffectiveBasePower } from "../modifiers.js";
 import { resolveDynamicValue } from "../dynamic-values.js";
 import { findCardInstance } from "../state.js";
 
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../effect-types.js";
+
 export { getActionParams } from "../effect-types.js";
+
+/** OPPONENT_ACTION changes the chooser, not the controller of the effect.
+ * The guarded snapshot survives a source paying itself as a cost. A replacement
+ * may inherit refs from another source, so never reuse a mismatched snapshot.
+ */
+export function effectSourceController(
+  state: GameState,
+  sourceCardInstanceId: string,
+  fallbackController: 0 | 1,
+  resultRefs: Map<string, EffectResult>,
+): 0 | 1 {
+  const saved = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot;
+  const source = (saved?.instanceId === sourceCardInstanceId ? saved : undefined)
+    ?? findCardInstance(state, sourceCardInstanceId);
+  return source?.controller ?? fallbackController;
+}
 
 export function getSearchAndPlayPickLimit(
   params: ActionParamsMap["SEARCH_AND_PLAY"],

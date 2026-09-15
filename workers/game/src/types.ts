@@ -222,6 +222,8 @@ export type BatchResumeMarker =
 // ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
 
 export interface EffectStackFrame {
+  /** Notify activation watchers only after the nested Event Main finishes. */
+  eventActivationCompletion?: PendingEvent;
   id: string;
   sourceCardInstanceId: string;
   controller: 0 | 1;
@@ -309,6 +311,8 @@ export interface EffectStackFrame {
   // Guards against arrange packets arriving during the select stage, where
   // validTargets still holds every candidate.
   costArrangeStage?: boolean;
+  // Hand identity locked while the controller chooses the rule-trash victim.
+  namedPlayCostTargetId?: string;
 }
 
 export interface QueuedTrigger {

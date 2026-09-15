@@ -56,6 +56,7 @@ type RedactedGameEventType = {
 /** Every private event remains in spectator history with identities hidden. */
 const SPECTATOR_REDACTED_EVENT_RULES = {
   CARD_DRAWN: "Preserve the draw event with identities hidden.",
+  CARD_ADDED_TO_LIFE: "Preserve the Life-entry event with identities hidden.",
   CARD_RETURNED_TO_HAND: "Preserve the hand-return event with identities hidden.",
   CARD_ADDED_TO_HAND_FROM_LIFE: "Preserve the Life-to-hand event with identities hidden.",
   TRIGGER_ACTIVATED: "Preserve an unaccepted Trigger offer with identity hidden.",

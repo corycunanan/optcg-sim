@@ -367,9 +367,11 @@ describe("OPT-453 — review fixes: resume trigger scan + unresolvable-target fi
       cardDb,
     );
 
-    // Rule 8-4-5: deck is secret, so the moved-card auto effect does not
-    // activate even though resume-path cost events are scanned correctly.
-    expect(done.pendingPrompt).toBeUndefined();
+    // Buggy stays on the field; the secret destination only prevents the
+    // moved card's own auto effect, not this field watcher (OP16-041 FAQ).
+    expect(done.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    const declined = resumeFromStack(done.state, { type: "PLAYER_CHOICE", choiceId: "skip" }, cardDb);
+    expect(declined.pendingPrompt).toBeUndefined();
   });
 
   it("a stage payment does not satisfy OP16-041's Character-only target filter", () => {
@@ -396,7 +398,7 @@ describe("OPT-453 — review fixes: resume trigger scan + unresolvable-target fi
     };
     expect(matchTriggersForEvent(state, stageEvent as any, cardDb)).toHaveLength(0);
 
-    // A Character snapshot still cannot bypass Rule 8-4-5's secret-area gate.
+    // Without a source-zone stamp, a deck move cannot prove a field exit.
     const charEvent = {
       type: "CARD_RETURNED_TO_DECK" as const,
       playerIndex: 0 as const,

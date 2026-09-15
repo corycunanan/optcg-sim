@@ -1,3 +1,4 @@
+import { updateEffectContinuation } from "../event-activation.js";
 /**
  * processRemainingTriggers — drains queued triggers per turn-player priority
  * (§8-6). 2+ same-player triggers prompt for ordering; otherwise resolve in
@@ -127,6 +128,7 @@ export function processRemainingTriggers(
 
   // Resolve turn player's 0–1 triggers first
   for (const trigger of turnPlayerTriggers) {
+    const stackDepth = nextState.effectStack.length;
     const result = services.resolveEffect(
       nextState,
       trigger.effectBlock,
@@ -143,12 +145,9 @@ export function processRemainingTriggers(
     events.push(...result.events);
 
     if (result.pendingPrompt) {
-      const topFrame = peekFrame(nextState);
-      if (topFrame) {
-        nextState = updateTopFrame(nextState, {
-          pendingTriggers: nonTurnPlayerTriggers,
-        });
-      }
+      nextState = updateEffectContinuation(nextState, stackDepth, () => ({
+        pendingTriggers: nonTurnPlayerTriggers,
+      }));
       return {
         state: retainPropagationBeforePrompt(nextState, events),
         events,
@@ -194,6 +193,7 @@ export function processRemainingTriggers(
 
   // Resolve non-turn player's 0–1 triggers
   for (const trigger of nonTurnPlayerTriggers) {
+    const stackDepth = nextState.effectStack.length;
     const result = services.resolveEffect(
       nextState,
       trigger.effectBlock,
@@ -210,12 +210,7 @@ export function processRemainingTriggers(
     events.push(...result.events);
 
     if (result.pendingPrompt) {
-      const topFrame = peekFrame(nextState);
-      if (topFrame) {
-        nextState = updateTopFrame(nextState, {
-          pendingTriggers: [],
-        });
-      }
+      nextState = updateEffectContinuation(nextState, stackDepth, () => ({ pendingTriggers: [] }));
       return {
         state: retainPropagationBeforePrompt(nextState, events),
         events,

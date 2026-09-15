@@ -57,6 +57,28 @@ export function resumePromptLifecycle(
     return { state: stateBeforeResume, responseRejected: true };
   }
 
+  // Blind choices carry a chooser and hidden-face policy that generic target
+  // reconstruction cannot recover from the effect controller. Reject malformed
+  // replies before clearing the original prompt or consuming its continuation.
+  if (
+    prompt.options.promptType === "SELECT_TARGET" &&
+    prompt.options.blindSelection
+  ) {
+    if (action.type !== "SELECT_TARGET") {
+      return { state: stateBeforeResume, responseRejected: true };
+    }
+    const selected = action.selectedInstanceIds;
+    const { countMin, countMax, validTargets } = prompt.options;
+    if (
+      selected.length < countMin ||
+      selected.length > countMax ||
+      new Set(selected).size !== selected.length ||
+      selected.some((id) => !validTargets.includes(id))
+    ) {
+      return { state: stateBeforeResume, responseRejected: true };
+    }
+  }
+
   const resumeContext = prompt.resumeContext;
   const respondingPlayer = prompt.respondingPlayer;
   if (

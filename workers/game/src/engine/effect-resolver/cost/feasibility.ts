@@ -1,6 +1,8 @@
 /** Pure sequential feasibility search for cost suffixes and choice branches. */
 import type { Cost, SimpleCost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
+import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
+import { trashCharacter } from "../card-mutations.js";
 import { payCosts } from "./payment.js";
 import { costNeedsPlayerSelection } from "./payability.js";
 import { applyCostSelection } from "./resume.js";
@@ -30,6 +32,20 @@ function selectionPayments(
   cardDb: Map<string, CardData>,
   sourceCardInstanceId: string,
 ): GameState[] {
+  if (cost.type === "PLAY_NAMED_CARD_FROM_HAND") {
+    const candidates = namedPlayCandidates(state, cost, controller, cardDb);
+    const capacityStates = state.players[controller].characters.includes(null)
+      ? [state]
+      : state.players[controller].characters.flatMap(card => {
+          const trashed = card && trashCharacter(state, card.instanceId, controller, "rule");
+          return trashed ? [trashed.state] : [];
+        });
+    return capacityStates.flatMap(capacityState => candidates.flatMap(id => {
+      const paid = payNamedPlay(capacityState, cost, id, controller, cardDb);
+      return paid ? [paid.state] : [];
+    }));
+  }
+
   if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
       cost.position === "TOP_OR_BOTTOM") {
     return (["TOP", "BOTTOM"] as const).flatMap((position) => {
@@ -62,7 +78,7 @@ function selectionPayments(
         cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
           ? [sourceCardInstanceId, ...selected]
           : selected;
-      return applyCostSelection(state, cost, paymentTargets, controller).state;
+      return applyCostSelection(state, cost, paymentTargets, controller, cardDb).state;
     }),
   );
 }
