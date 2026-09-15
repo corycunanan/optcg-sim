@@ -1132,6 +1132,7 @@ export const OP05_030_DONQUIXOTE_ROSINANTE: EffectSchema = {
         event: "WOULD_BE_KO",
         target_filter: { is_rested: true },
       },
+      conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       replacement_actions: [
         {
           type: "TRASH_CARD",
@@ -3646,7 +3647,7 @@ export const OP05_096_I_BID_500_MILLION: EffectSchema = {
                     count: { up_to: 1 },
                     filter: { cost_max: 1 },
                   },
-                  params: { face: "UP" },
+                  params: { face: "UP", position: "TOP_OR_BOTTOM" },
                 },
               ],
             ],
