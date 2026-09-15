@@ -131,8 +131,9 @@ export function matchesFilterForTarget(
   cardDb: Map<string, CardData>,
   state: GameState,
   resultRefs?: Map<string, EffectResult>,
+  filterController?: 0 | 1,
 ): boolean {
-  return matchesFilterImpl(card, filter, cardDb, state, resultRefs);
+  return matchesFilterImpl(card, filter, cardDb, state, resultRefs, undefined, filterController);
 }
 
 // ─── validateTargetConstraints ───────────────────────────────────────────────
@@ -398,20 +399,20 @@ export function computeAllValidTargets(
     case "SELF": return [sourceCardInstanceId];
     case "YOUR_LEADER": {
       const leader = state.players[controller].leader;
-      if (target.filter && !matchesFilterForTarget(leader, target.filter, cardDb, state, _resultRefs)) return [];
+      if (target.filter && !matchesFilterForTarget(leader, target.filter, cardDb, state, _resultRefs, controller)) return [];
       return [leader.instanceId];
     }
     case "OPPONENT_LEADER": {
       const opp = controller === 0 ? 1 : 0;
       const leader = state.players[opp].leader;
-      if (target.filter && !matchesFilterForTarget(leader, target.filter, cardDb, state, _resultRefs)) return [];
+      if (target.filter && !matchesFilterForTarget(leader, target.filter, cardDb, state, _resultRefs, controller)) return [];
       return [leader.instanceId];
     }
     case "ALL_YOUR_CHARACTERS": {
       let candidates = state.players[controller].characters.filter(isPresent);
       if (target.filter) candidates = candidates.filter((c) => {
         if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
-        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
+        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs, controller);
       });
       return candidates.map((c) => c.instanceId);
     }
@@ -420,7 +421,7 @@ export function computeAllValidTargets(
       let candidates = state.players[opp].characters.filter(isPresent);
       if (target.filter) candidates = candidates.filter((c) => {
         if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
-        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
+        return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs, controller);
       });
       return candidates.map((c) => c.instanceId);
     }
@@ -462,7 +463,7 @@ export function computeAllValidTargets(
       if (target.filter) {
         candidates = candidates.filter((c) => {
           if (target.filter!.exclude_self && c.instanceId === sourceCardInstanceId) return false;
-          return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs);
+          return matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs, controller);
         });
       }
       if (target.self_ref) return candidates.filter((c) => c.instanceId === sourceCardInstanceId).map((c) => c.instanceId);
@@ -494,7 +495,7 @@ export function computeAllValidTargets(
           return data && data.type?.toUpperCase() === "STAGE";
         });
       }
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs, controller));
       return candidates.map((c) => c.instanceId);
     }
     case "CARD_IN_TRASH": {
@@ -503,14 +504,14 @@ export function computeAllValidTargets(
       // OPT-257 (F4): exclude trigger-staging instances from trash queries.
       const stagingIds = new Set(state.turn.triggerStagingInstanceIds ?? []);
       let candidates = state.players[pi].trash.filter((c) => !stagingIds.has(c.instanceId));
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs, controller));
       return candidates.map((c) => c.instanceId);
     }
     case "CARD_IN_DECK": {
       const ctrl = target.controller ?? "SELF";
       const pi = ctrl === "SELF" ? controller : (controller === 0 ? 1 : 0);
       let candidates = state.players[pi].deck;
-      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs));
+      if (target.filter) candidates = candidates.filter((c) => matchesFilterForTarget(c, target.filter!, cardDb, state, _resultRefs, controller));
       return candidates.map((c) => c.instanceId);
     }
     case "DON_IN_COST_AREA": {
@@ -536,7 +537,7 @@ export function computeAllValidTargets(
         .filter(isPresent);
       if (target.filter) {
         candidates = candidates.filter((stage) =>
-          matchesFilterForTarget(stage, target.filter!, cardDb, state, _resultRefs));
+          matchesFilterForTarget(stage, target.filter!, cardDb, state, _resultRefs, controller));
       }
       return candidates.map((stage) => stage.instanceId);
     }
