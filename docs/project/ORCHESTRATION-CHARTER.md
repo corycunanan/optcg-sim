@@ -1,6 +1,6 @@
 # Track-based orchestration charter
 
-Canonical workflow for coordinating 1–N Linear issues in this repository. Applies to Codex and Claude coordinators. Updated 2026-09-09; replaces the earlier Claude-only charter and lifecycle rules. Correctness precedes throughput and cost.
+Canonical workflow for coordinating 1–N Linear issues in this repository. Applies to Codex and Claude coordinators. Updated 2026-09-09; replaces the earlier Claude-only charter and lifecycle rules. Correctness precedes throughput and cost; the risk tier in §3 bounds how much ceremony a ticket pays for that correctness.
 
 ## 1. Scope and authority
 
@@ -10,7 +10,7 @@ Publish the issue list, proposed tracks, unresolved decisions, and effective per
 
 | Role | Responsibility | Authority |
 | --- | --- | --- |
-| Coordinator | Resolve scope, schedule, review every diff, adjudicate findings, maintain ledger and readiness | Linear maintenance and ticket creation with required comments; merge only with explicit run-scoped authorization |
+| Coordinator | Resolve scope, declare tiers, schedule, adjudicate findings, review diffs to the tier's depth, maintain ledger and readiness | Linear maintenance and ticket creation with required comments; merge only with explicit run-scoped authorization |
 | Implementer | One bounded ticket, implementation, validation, commits, push, PR, handoff | Never merges or writes Linear |
 | Independent reviewer | Challenge spec fidelity, correctness, regressions and evidence at a recorded commit | No implementation edits, merges, or Linear writes |
 
@@ -22,7 +22,7 @@ Codex and Claude coordinators have standing user authorization to update Linear 
 
 - Every issue update (status, description/acceptance criteria, labels, priority, assignee, dependencies or PR attachments) requires a comment on that issue stating what changed, meaningful before/after values, why, and relevant evidence/PR links. One comment may cover a coherent batch; an audit comment itself does not require another comment.
 - New tickets discovered while implementing an existing ticket must link back to the original. Also comment on the original ticket with each new ticket's ID/link, the discovery/evidence, why it is separate work, and its dependency or impact on the original. Include rationale and acceptance criteria in the new ticket. PR-body Follow-ups and ledger notes do not replace the original-ticket comment.
-- Read current state and existing comments before mutation; preserve unrelated user edits. Apply the update/create operation, immediately post required audit comments, and verify both the operation and comment links. If a comment fails or work is interrupted, record the successful mutation and pending comment in the ledger, repair that audit trail before further mutations on the issue, and check for existing tickets/comments before retrying. Never report an operation fully documented while its comment is missing.
+- Read current state and existing comments before mutation; preserve unrelated user edits. Apply the update/create operation and post its audit comment in the same step; one comment covers all mutations of one state transition. Verify an issue's audit comments by read-back once at close-out, or immediately when a write reports an error, not after every comment. If a comment fails or work is interrupted, record the successful mutation and pending comment in the ledger, repair that audit trail before further mutations on the issue, and check for existing tickets/comments before retrying. Never report an operation fully documented while its comment is missing.
 - Creating a ticket does not automatically authorize implementing or merging it in the run. Keep follow-ups queued unless within already authorized implementation scope. Preserve original acceptance criteria; material product decisions still require resolution rather than silent scope changes.
 - Keep status aligned with evidence using actual team status names: active implementation is In Progress, PR assessment/merge-ready is In Review, and Done requires verified delivery or an evidence-backed no-change disposition. Comment on every transition, including close-out, and recheck integration-driven status drift.
 
@@ -42,6 +42,16 @@ Use one isolated workspace per active ticket. Prefer standalone clones under a w
 
 Classify each issue: determinate, decision-blocked, externally blocked, already delivered, or recoverable in-flight work. Detect dependency cycles and contradictory acceptance criteria. Record each edge's reason; label inferred dependencies as such. Validate completed prerequisites against actual delivered code/merged PRs, not just a Done label.
 
+**Risk tier.** Declare one tier per issue in the ledger from the surfaces the ticket touches and its labels. The tier sets review depth, validation, and records for the rest of the run. A reviewer or coordinator raises the tier when the diff exceeds the declared surface; a tier is never lowered after dispatch.
+
+| Tier | Surfaces | Review | Validation | Records |
+| --- | --- | --- | --- | --- |
+| Small | Docs; authored schema encodings using established semantics; test-only changes; single-component UI copy or token fixes | One combined spec-fidelity and correctness pass by a fresh reviewer; mutation check only for a changed guard; one delta pass if findings return | Focused checks locally; CI is the full gate | Ledger row plus readiness receipt; no separate review document unless findings |
+| Medium | App features, API routes, deck builder, board components, non-shared engine handlers, single-card semantics | Full independent review plus one delta; coordinator reads the reviewer report and acceptance map, spot-checks one decisive claim | Focused suites locally; CI is the full gate | Standard |
+| Large | Shared engine mechanics (triggers, targets, costs, continuations, zone transitions), `GameSession` protocol, auth, migrations, pipeline data, shared design tokens | Full charter with [OPTCG verification](./ORCHESTRATION-OPTCG.md); coordinator reads every hunk; mutation checks on decisive guards; cross-family review | Local full gate plus CI | Standard, with consumer inventory |
+
+Schedule Small tickets to land first within a wave so the re-integration tail after each merge is short.
+
 A track is a sequence of tickets sharing a dependency or implementation surface. Prefer narrow complete behaviors over separate schema/handler/test tickets. Coordinators may clarify or split issues under the standing Linear authorization, preserving acceptance criteria and documenting updates and originating-ticket follow-ups as required above. Creating a subdivision does not automatically authorize implementing it. Implementation support required by a card ticket must precede parallel card batches. First prove one representative card end to end, then broaden the family.
 
 Dispatch the ready frontier: one active implementation per track, concurrent across independent tracks within available agent/resource capacity. Every dispatch names sibling-owned files, shared contracts, and out-of-scope behavior. Serialize overlapping edits and shared browser/database resources. Reserve coordinator capacity; limit in-flight PRs to what can actually be reviewed. An unrelated blocked track does not stop the others.
@@ -54,19 +64,29 @@ Default dependency mode is **merged**: successors start after verified prerequis
 
 ## 4. Implement complete, bounded behavior
 
-Dispatch full ticket content, source references, acceptance criteria, dependency/base SHAs, ownership fences, validation expectations and deliverables using the run-record reference. Give the implementer a concrete failure-class brief, not merely “be careful.” Use available models suited to the work; do not depend on a historical model name.
+Dispatch full ticket content, source references, acceptance criteria, dependency/base SHAs, ownership fences, validation expectations and deliverables using the run-record reference. Give the implementer a concrete failure-class brief, not merely “be careful.” The brief is the implementer's complete policy: do not send this charter, the records document, or the coordinator's conversation.
+
+**Model roles (defaults as of 2026-09-15; override per run when a provider's budget is exhausted, and verify the configured model before dispatch):**
+
+| Role | Default | Effort |
+| --- | --- | --- |
+| Coordinator | The Claude session running `/orchestrate` (Fable). Codex `$orchestrate` is the fallback coordinator | Session default |
+| Implementer | Codex CLI, `gpt-6-astra`, via `codex exec -C <clone>` | `low` for Small, `medium` for Medium and Large; never `high` for implementation, since a reviewer backstops it |
+| Independent reviewer | Fresh Claude subagent (Fable), cross-family to the implementer; at most two concurrent | Default; `high` only for Large |
+
+Cross-family review is the point of the split: when both roles must fall back to one provider, record that diversity was lost and raise the mutation-check expectation instead.
 
 Measure relevant validation baselines before edits. For bug fixes, reproduce the defect with a failing regression through a meaningful public boundary, then fix it. If no practical automated reproduction exists, record the live reproduction and limitation; do not claim a red test. Work one behavioral slice at a time. Expected values come from the specification or independent worked examples, not recomputation of the implementation.
 
 Use current domain terminology and deepen existing module boundaries where needed. Preserve behavior outside acceptance criteria. Remove tagged temporary debug instrumentation before committing. Scope-expanding findings become PR-body **Follow-ups**, with evidence; a defect that makes this change unsafe cannot be deferred to make the PR pass.
 
-Run focused checks and the repository-required gate from current package scripts/CI (currently `pnpm verify`). Existing baseline failures are not automatically attributable to the PR, but required failed or unrun checks still prevent full readiness. Record commands, outputs, environment and tested SHA. Re-run relevant checks after fixes; do not rerun unchanged checks without cause.
+Run focused checks locally for every tier. The repository-required gate from current package scripts/CI (currently `pnpm verify`) runs locally only for Large tickets; Small and Medium cite the CI run on the exact head instead of rerunning it. Existing baseline failures are not automatically attributable to the PR, but required failed or unrun checks still prevent full readiness. Record commands, outputs, environment and tested SHA. Re-run relevant checks after fixes; do not rerun unchanged checks without cause.
 
 Deliver atomic commits with `(OPT-NNN)` suffix, a pushed PR and a concise handoff in that same PR. Open ready-for-review only when the implementation is ready for review; if genuinely incomplete, use a draft and record the blocker. Neither an open PR nor successful local compilation completes the ticket.
 
 ## 5. Review and evidence
 
-Review the actual PR head and base, including handoff commits. Capture full SHAs before review. An empty or mismatched diff is an incomplete review, never a reason to improvise another range. The coordinator reads every diff. A fresh independent reviewer receives the intent, full diff, relevant context, and targeted hunt brief; implementation self-review cannot replace this pass. Prefer available cross-model/family diversity when useful; consensus is not proof.
+Review the actual PR head and base, including handoff commits. Capture full SHAs before review. An empty or mismatched diff is an incomplete review, never a reason to improvise another range. A fresh independent reviewer receives the intent, full diff, relevant context, and targeted hunt brief, and owns the detailed code read; implementation self-review cannot replace this pass. The coordinator reads the reviewer's structured report and the acceptance-to-evidence map, spot-checks one decisive claim against the diff, and reads every hunk only for Large tickets. Prefer cross-family diversity between implementer and reviewer; consensus is not proof.
 
 Required passes are spec fidelity and correctness/regression review; add domain, ordering, trust-boundary, or visual passes according to changed behavior. Map each acceptance criterion to implementation plus verification, and each changed hunk back to a criterion or necessary support. Account for shared consumers and data/wire contracts beyond direct call sites. Use [OPTCG verification](./ORCHESTRATION-OPTCG.md) for game-related changes.
 
@@ -80,7 +100,7 @@ Use the [evidence ladder](../../.claude/reference/evidence-ladder.md), with thes
 
 Classify each pass as `clean`, `findings`, or `incomplete`. Record concrete scenarios, locations, evidence, commands/results, and dispositions. Treat the existing `.claude/workflows/pr-review.js` as advisory evidence only: its output does not implement this complete gate. In particular, inspect caveats, informational blast-radius results, skipped refuters, and same-line dedup losses. If its aggregation cannot establish completeness, run fresh independent passes directly. Reviewers need scratch/cache write access to execute tests; tracked content must remain unchanged, with any experiments restored and verified.
 
-Send actionable findings back to the same implementer and independently verify the correction. Budget one full review plus one delta review. Persistent material findings, a new major failure family, or irreconcilable reviewer disagreement triggers reassessment and a recorded blocker, not endless patching. Routine CI fixes and conflict repair are still owned by the coordinator/implementer; any new substantive fixes require fresh evidence. Continue other tracks while surfacing a need for scope/approach decisions. Never waive a finding merely to fit the review budget.
+Send actionable findings back to the same implementer and independently verify the correction. Budget one full review plus one delta review (for Small, the combined pass plus one delta). Persistent material findings, a new major failure family, or irreconcilable reviewer disagreement triggers reassessment and a recorded blocker, not endless patching. Routine CI fixes and conflict repair are still owned by the coordinator/implementer; any new substantive fixes require fresh evidence. Continue other tracks while surfacing a need for scope/approach decisions. Never waive a finding merely to fit the review budget.
 
 ## 6. Readiness and optional merge
 
@@ -93,7 +113,7 @@ Write a readiness receipt from [ORCHESTRATION-RECORDS.md](./ORCHESTRATION-RECORD
 5. PR non-draft, mergeable, intended base main, prerequisites merged, and latest main integrated and validated. Repair conflicts by merging main into the branch, not rebasing/force-pushing an open reviewed PR.
 6. Final handoff and PR body present, honest about validation and follow-ups; head and base SHAs match the receipt.
 
-Every head change invalidates readiness, including docs/handoff commits. Assess the new delta and renew affected evidence; safe unchanged test results may be carried forward with justification. A changed base requires integration assessment and required checks again. An administrative refresh with no substantive code change is not another full adversarial review cycle. Serialize final integration/merge gates across tracks so one merge cannot silently invalidate another's assessment.
+Every head change invalidates readiness, including docs/handoff commits. Assess the new delta and renew affected evidence; safe unchanged test results may be carried forward with justification. A changed base requires integration assessment and required checks again. Integration assessment means an overlap check, not a fresh review: intersect the PR's changed files with `git diff --name-only <reviewed-base>..<new-base>`, and for Large tickets add consumers of any changed shared contract. Record the command and result. No overlap plus successful required checks on the integrated head carries the prior review forward; overlap requires a delta review of the intersecting files only. An administrative refresh with no substantive code change is not another full adversarial review cycle. Serialize final integration/merge gates across tracks so one merge cannot silently invalidate another's assessment.
 
 With merging off, deliver the receipt and leave the PR open. With a valid grant, re-fetch head, base, mergeability, required checks, review state and authorization immediately before merging. If anything changed, return to assessment. Use synchronous squash merge pinned to the full reviewed head:
 

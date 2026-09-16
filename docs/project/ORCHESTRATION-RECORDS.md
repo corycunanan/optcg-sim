@@ -16,10 +16,11 @@ Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coo
 - Stacking: off | explicitly allowed
 - Linear writes: coordinator authorized by standing policy | <user-imposed restriction>
 - Runtime/resources: <available agent slots, isolated workspace policy, browser/DB ownership>
+- Model roles: <coordinator / implementer model+effort / reviewer model; note any provider fallback and lost cross-family diversity>
 - Coordinator ledger path: <absolute path>
 
 ## Tracks
-| Track | Issue | Dependencies and reasons | Owned surfaces | State | Workspace/branch | PR/base PR | Head/base SHA | Next action/blocker |
+| Track | Issue | Tier | Dependencies and reasons | Owned surfaces | State | Workspace/branch | PR/base PR | Head/base SHA | Next action/blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## Decisions and evidence
@@ -39,9 +40,9 @@ Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coo
 
 ## Dispatch brief
 
-Embed the full resolved ticket and necessary comments/requirements, rather than expecting a network-restricted worker to retrieve them. Include:
+Embed the full resolved ticket and necessary comments/requirements, rather than expecting a network-restricted worker to retrieve them. The brief is the implementer's whole policy: do not attach the charter, this document, or the coordinator's conversation. Save the resolved ticket as `packets/<issue>-<date>.json` beside the ledger so reviewers and re-dispatches reuse it. Include:
 
-- Ticket ID, acceptance criteria, relevant source evidence and any approved interpretation.
+- Ticket ID, declared tier, acceptance criteria, relevant source evidence and any approved interpretation.
 - Track, workspace/branch, base branch/full SHA, prerequisites and their verified state.
 - Owned surfaces, sibling owners, excluded scope, and existing in-flight work to preserve.
 - Relevant rules/scenario packet or design brief; name the one or two safety assumptions to prove.
@@ -57,17 +58,18 @@ Create one per PR. Every field must contain observed evidence, an explicit appli
 ```markdown
 ### PR <number> — <ticket>
 - Result: stack-ready | merge-ready | blocked | incomplete | merged | verified-no-change
+- Tier: Small | Medium | Large <raised from … if changed>
 - Head / base: <full SHAs; base branch must be main to merge>
 - Assessed at: <timestamp>
 - Scope and acceptance: <criterion → hunk/behavior → evidence>
-- Coordinator review: <head, outcome, evidence location>
+- Coordinator review: <head, depth per tier (report+spot-check or every hunk), spot-checked claim, outcome>
 - Independent review: <reviewer, head, required passes and each outcome>
 - Findings: <scenario/root cause, severity, evidence, resolution or blocker>
-- Baseline/final validation: <commands, exit/results, revisions, logs; carried-forward checks and why>
+- Baseline/final validation: <commands, exit/results, revisions, logs; carried-forward checks and why; for Small/Medium the CI run cited for the full gate>
 - Rules / protocol / VQA: <applicable evidence or justified not applicable>
 - GitHub checks: <required check inventory, runs/SHAs, successful conclusions>
 - Review feedback / approvals: <all feedback dispositioned, unresolved threads, required approvals>
-- Integration: <prerequisites, current main, conflict/mergeability assessment>
+- Integration: <prerequisites, current main, conflict/mergeability assessment, overlap command and result for each base change>
 - Delivery: <handoff, accurate PR body, Follow-ups>
 - Merge permission: <scope-matching user grant or off>
 - Final recheck: <timestamp, unchanged head/base/checks/reviews, freshness enforcement>
