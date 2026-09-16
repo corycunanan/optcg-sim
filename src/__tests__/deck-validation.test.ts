@@ -167,7 +167,7 @@ describe("OPT-852 restricted card numbers", () => {
       expect(restrictedResult([base, variant])).toMatchObject({
         passed: false,
         cardIds: [base.cardId, variant.cardId],
-        message: "Base art (2), Alternate art (2) — restricted cards limited to 1 copy",
+        message: "Base art (2) — restricted cards limited to 1 copy",
       });
     }
   );
@@ -176,8 +176,8 @@ describe("OPT-852 restricted card numbers", () => {
     "restricts the whole number when only one row is restricted (reverse: %s)",
     (reverse) => {
       const rows = [
-        makeCard("OP01-075", "Same name", 1),
-        makeCard("OP01-075_p1", "Same name", 1, null, {
+        makeCard("OP01-075", "Pacifista", 1),
+        makeCard("OP01-075_p1", "Pacifista", 1, null, {
           banStatus: "RESTRICTED",
         }),
       ];
@@ -185,6 +185,7 @@ describe("OPT-852 restricted card numbers", () => {
       expect(restrictedResult(rows)).toMatchObject({
         passed: false,
         cardIds: rows.map((row) => row.cardId),
+        message: "Pacifista (2) — restricted cards limited to 1 copy",
       });
       expect(restrictedResult(rows.map((row) => ({
         ...row,
@@ -222,7 +223,7 @@ describe("OPT-852 restricted card numbers", () => {
     expect(validation.results.find((r) => r.id === "restricted")).toMatchObject({
       passed: false,
       cardIds: ["OP01-075", "OP01-075_p1"],
-      message: "Base art (5), Alternate art (5) — restricted cards limited to 1 copy",
+      message: "Base art (5) — restricted cards limited to 1 copy",
     });
     expect(validation.results.find((r) => r.id === "ban-status")).toMatchObject({
       passed: false,
