@@ -148,6 +148,90 @@ describe("validateDeck copy limit", () => {
   });
 });
 
+describe("OPT-852 restricted card numbers", () => {
+  function restrictedResult(cards: DeckCard[]) {
+    return validateDeck(leader, cards).results.find((r) => r.id === "restricted")!;
+  }
+
+  it.each(["_p1", "_p2", "_r1"])(
+    "limits base and %s art to one total copy and reports every row",
+    (suffix) => {
+      const base = makeCard("OP01-075", "Base art", 1, null, {
+        banStatus: "RESTRICTED",
+      });
+      const variant = makeCard(`OP01-075${suffix}`, "Alternate art", 1, null, {
+        banStatus: "RESTRICTED",
+      });
+      expect(restrictedResult([base]).passed).toBe(true);
+      expect(restrictedResult([variant]).passed).toBe(true);
+      expect(restrictedResult([base, variant])).toMatchObject({
+        passed: false,
+        cardIds: [base.cardId, variant.cardId],
+        message: "Base art (2) — restricted cards limited to 1 copy",
+      });
+    }
+  );
+
+  it.each([false, true])(
+    "restricts the whole number when only one row is restricted (reverse: %s)",
+    (reverse) => {
+      const rows = [
+        makeCard("OP01-075", "Pacifista", 1),
+        makeCard("OP01-075_p1", "Pacifista", 1, null, {
+          banStatus: "RESTRICTED",
+        }),
+      ];
+      if (reverse) rows.reverse();
+      expect(restrictedResult(rows)).toMatchObject({
+        passed: false,
+        cardIds: rows.map((row) => row.cardId),
+        message: "Pacifista (2) — restricted cards limited to 1 copy",
+      });
+      expect(restrictedResult(rows.map((row) => ({
+        ...row,
+        card: { ...row.card, banStatus: "LEGAL" },
+      }))).passed).toBe(true);
+    }
+  );
+
+  it("keeps distinct restricted numbers separate even with the same name", () => {
+    const base = makeCard("OP01-075", "Same name", 1, null, {
+      banStatus: "RESTRICTED",
+    });
+    const distinct = makeCard("OP02-075_p1", "Same name", 1, null, {
+      banStatus: "RESTRICTED",
+    });
+    expect(restrictedResult([base, distinct]).passed).toBe(true);
+    expect(restrictedResult([
+      base,
+      { ...distinct, cardId: "OP01-075_p1" },
+    ]).passed).toBe(false);
+  });
+
+  it("enforces restrictions and bans despite authored unlimited copies", () => {
+    const rows = [
+      makeCard("OP01-075", "Base art", 4, topLevelCopyLimitOverride),
+      makeCard("OP01-075_p1", "Alternate art", 1, null, {
+        banStatus: "RESTRICTED",
+      }),
+      makeCard("OP08-072", "Banned card", 8, effectBlockCopyLimitOverride, {
+        banStatus: "BANNED",
+      }),
+    ];
+    const validation = validateDeck(leader, rows);
+    expect(validation.results.find((r) => r.id === "copy-limit")?.passed).toBe(true);
+    expect(validation.results.find((r) => r.id === "restricted")).toMatchObject({
+      passed: false,
+      cardIds: ["OP01-075", "OP01-075_p1"],
+      message: "Base art (5) — restricted cards limited to 1 copy",
+    });
+    expect(validation.results.find((r) => r.id === "ban-status")).toMatchObject({
+      passed: false,
+      cardIds: ["OP08-072"],
+    });
+  });
+});
+
 describe("validateDeck leader deck restrictions", () => {
   it("evaluates proactive dimming from the slim search-card fields", () => {
     const rules = collectDeckRestrictionRules({
