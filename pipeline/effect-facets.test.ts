@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { EFFECT_FACET_GROUPS } from "@shared/effect-facets";
 import { getAllAuthoredSchemas } from "../workers/game/src/engine/schema-registry";
-import type { EffectSchema } from "../workers/game/src/engine/effect-types";
+import type { DynamicValue, EffectSchema } from "../workers/game/src/engine/effect-types";
 import { extractCardFacets } from "./effect-facets";
 
 const authoredSchemas = getAllAuthoredSchemas();
@@ -39,6 +39,38 @@ describe("extractCardFacets", () => {
     expect(first.tags).not.toBe(second.tags);
     expect(first.effectTraits).not.toBe(second.effectTraits);
     expect(schema).toEqual(before);
+  });
+
+  it.each<{ name: string; amount: DynamicValue; direction?: "up" | "down" }>([
+    { name: "negative PER_COUNT", amount: { type: "PER_COUNT", source: "MATCHING_CARDS_ON_FIELD", multiplier: -1000 }, direction: "down" },
+    { name: "positive PER_COUNT", amount: { type: "PER_COUNT", source: "MATCHING_CARDS_ON_FIELD", multiplier: 1000 }, direction: "up" },
+    { name: "zero PER_COUNT", amount: { type: "PER_COUNT", source: "MATCHING_CARDS_ON_FIELD", multiplier: 0 } },
+    { name: "negative FIXED", amount: { type: "FIXED", value: -1000 }, direction: "down" },
+    { name: "positive FIXED", amount: { type: "FIXED", value: 1000 }, direction: "up" },
+    { name: "zero FIXED", amount: { type: "FIXED", value: 0 } },
+    { name: "GAME_STATE default", amount: { type: "GAME_STATE", source: "HAND_COUNT" }, direction: "up" },
+  ])("classifies $name power changes with and without qualifiers", ({ amount, direction }) => {
+    for (const qualified of [false, true]) {
+      const schema: EffectSchema = {
+        effects: [{
+          id: "dynamic_power",
+          category: "auto",
+          actions: [{
+            type: "MODIFY_POWER",
+            target: qualified
+              ? { type: "CHARACTER", controller: "OPPONENT" }
+              : { type: "ALL_OPPONENT_CHARACTERS" },
+            params: { amount },
+          }],
+        }],
+      };
+      const powerTags = extractCardFacets(schema).tags.filter((tag) =>
+        tag.startsWith("stat:power_")
+      );
+      expect(powerTags).toEqual(direction
+        ? [`stat:power_${direction}${qualified ? ":opponent" : ""}`]
+        : []);
+    }
   });
 
   it("covers every Tier 1 group and required qualifier with authored cards", () => {
