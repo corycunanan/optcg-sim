@@ -471,15 +471,22 @@ export function validateDeck(
     cardIds: bannedCards.map((dc) => dc.cardId),
   });
 
-  // Rule 6: Restricted cards (max 1 copy)
+  // Rule 6: Restricted cards (max 1 copy across all art variants)
+  const restrictedNumbers = new Set(
+    cards
+      .filter((dc) => dc.card.banStatus === "RESTRICTED")
+      .map((dc) => stripVariantSuffix(dc.cardId))
+  );
   const restrictedOver = cards.filter(
-    (dc) => dc.card.banStatus === "RESTRICTED" && dc.quantity > 1
+    (dc) =>
+      restrictedNumbers.has(stripVariantSuffix(dc.cardId)) &&
+      (quantitiesByNumber.get(stripVariantSuffix(dc.cardId)) ?? 0) > 1
   );
   if (restrictedOver.length > 0) {
     results.push({
       id: "restricted",
       rule: "Restricted",
-      message: `${restrictedOver.map((dc) => `${dc.card.name} (${dc.quantity})`).join(", ")} — restricted cards limited to 1 copy`,
+      message: `${restrictedOver.map((dc) => `${dc.card.name} (${quantitiesByNumber.get(stripVariantSuffix(dc.cardId))})`).join(", ")} — restricted cards limited to 1 copy`,
       severity: "error",
       passed: false,
       cardIds: restrictedOver.map((dc) => dc.cardId),

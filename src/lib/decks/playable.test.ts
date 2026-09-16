@@ -243,6 +243,30 @@ describe("requirePlayableDeck", () => {
     await expectInvalidDetail("ban-status");
   });
 
+  it("rejects an otherwise playable deck with restricted alternate-art copies", async () => {
+    const rows = [
+      { cardId: "OP01-075", quantity: 1, selectedArtUrl: null },
+      { cardId: "OP01-075_p1", quantity: 1, selectedArtUrl: null },
+      ...mainDeckRows(48),
+    ];
+    mockDeck(rows);
+    mockCards([
+      leader,
+      ...mainDeckCards(rows).map((card) => ({
+        ...card,
+        banStatus: card.id === "OP01-075_p1" ? "RESTRICTED" : "LEGAL",
+      }) as Card),
+    ]);
+
+    await expect(requirePlayableDeck("deck-1", "user-1")).rejects.toMatchObject({
+      details: [{
+        id: "restricted",
+        passed: false,
+        cardIds: ["OP01-075", "OP01-075_p1"],
+      }],
+    });
+  });
+
   it("rejects a color affinity violation", async () => {
     const rows = mainDeckRows(50);
     mockDeck(rows);
