@@ -461,7 +461,7 @@ Every completed action (step 4) emits one or more typed events. Events are the s
 | `TURN_STARTED` | A new turn begins (triggers "at the start of your turn" effects). |
 | `TURN_ENDED` | A turn completes (after End Phase processing). |
 | `DECK_SHUFFLED` | A deck is shuffled. |
-| `HAND_REVEALED` | A player's hand is revealed to the opponent. |
+| `CARDS_REVEALED` | Cards from a player's hand are revealed (source `HAND`). |
 | `GAME_OVER` | A player wins, loses, or the game draws. |
 
 ---

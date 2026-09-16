@@ -315,6 +315,8 @@ export function executeRevealHand(
       : controller;
   const p = state.players[targetController];
 
+  if (p.hand.length === 0) return { state, events, succeeded: false };
+
   // Omitted amount means the entire hand (Morgans); explicit amounts are
   // blind choices (Bao Huang and Arlong). Validate again against the live hand.
   const count = Math.min(params.amount ?? p.hand.length, p.hand.length);
@@ -355,8 +357,6 @@ export function executeRevealHand(
 
     return { state, events, succeeded: false, pendingPrompt };
   }
-
-  if (p.hand.length === 0) return { state, events, succeeded: false };
 
   const selectedIds = preselectedTargets ?? validTargets;
   const selectedCards = selectedIds.map((id) => p.hand.find((c) => c.instanceId === id)!);

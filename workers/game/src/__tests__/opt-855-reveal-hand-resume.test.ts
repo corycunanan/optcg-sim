@@ -203,6 +203,18 @@ describe("OPT-855 registered Bao Huang", () => {
     });
   }
 
+  it("completes without revealing when the hand empties during a persisted blind prompt", () => {
+    const { f, opponent, source, hand } = setup(0, 3);
+    f.act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
+    expect(f.targets()).toMatchObject({ blindSelection: true, countMin: 2, countMax: 2 });
+    f.persist();
+    f.state.players[opponent].hand = [];
+    f.select([hand[0].instanceId, hand[2].instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(reveals(f)).toEqual([]);
+    expect(f.state.players[opponent].hand).toEqual([]);
+  });
+
   it("defensively rejects malformed direct preselection producers", () => {
     const { f, source, hand } = setup(0, 3);
     for (const ids of [[], [hand[0].instanceId], hand.map((c) => c.instanceId), [hand[0].instanceId, hand[0].instanceId], [hand[0].instanceId, source.instanceId]]) {
