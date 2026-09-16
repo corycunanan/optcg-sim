@@ -498,7 +498,8 @@ type DynamicSource =
   | "CARDS_IN_TRASH"
   | "REVEALED_CARD_COST"
   | "DON_GIVEN_TO_TARGET"
-  | "MATCHING_CHARACTERS_ON_FIELD";
+  | "MATCHING_CHARACTERS_ON_FIELD"
+  | "MATCHING_CARDS_ON_FIELD";
 ```
 
 | Source | Multiplier | Divisor | Example |

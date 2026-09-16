@@ -638,6 +638,15 @@ function evaluateSimple(
         const allCards = [p.leader, ...p.characters.filter(isPresent)];
         return allCards.some((c) => c.attachedDon.length > 0);
       }
+      if (cond.mode === "TOTAL_GIVEN") {
+        const total = [p.leader, ...p.characters.filter(isPresent)].reduce(
+          (sum, card) => sum + card.attachedDon.length,
+          0
+        );
+        return cond.operator !== undefined && cond.value !== undefined
+          ? compareNum(total, cond.operator, cond.value)
+          : false;
+      }
       // SPECIFIC_CARD mode — check if the source card has DON attached
       if (cond.mode === "SPECIFIC_CARD") {
         const sourceCard = findCardInstance(state, ctx.sourceCardInstanceId);

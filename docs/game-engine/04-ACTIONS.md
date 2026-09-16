@@ -2599,6 +2599,10 @@ All action types at a glance with their primary zone interactions and event emis
 | `GRANT_ATTRIBUTE` | -- | -- | `ATTRIBUTE_GRANTED` |
 | `GRANT_COUNTER` | -- | -- | `COUNTER_GRANTED` |
 
+### Field-wide dynamic counts
+
+`PER_COUNT` source `MATCHING_CARDS_ON_FIELD` counts the controller's Leader, present Characters and Stage. It uses the same filter and unique-name semantics as `MATCHING_CHARACTERS_ON_FIELD`, which remains Character-only. A filter requires card data and a filter resolver; missing dependencies retain the unresolved-value contract.
+
 ---
 
 _Last updated: 2026-03-19_
