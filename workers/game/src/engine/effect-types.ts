@@ -507,7 +507,7 @@ export interface RestedCardCountCondition {
 export interface DonGivenCondition {
   type: "DON_GIVEN";
   controller: Controller;
-  mode: "ANY_CARD_HAS_DON" | "SPECIFIC_CARD";
+  mode: "ANY_CARD_HAS_DON" | "SPECIFIC_CARD" | "TOTAL_GIVEN";
   operator?: NumericOperator;
   value?: number;
 }
@@ -577,6 +577,7 @@ export type DynamicSource =
   | "CARDS_IN_TRASH"
   | "REVEALED_CARD_COST"
   | "DON_GIVEN_TO_TARGET"
+  | "MATCHING_CARDS_ON_FIELD"
   | "MATCHING_CHARACTERS_ON_FIELD"
   | "HAND_COUNT"
   | "CHARACTERS_ON_FIELD"

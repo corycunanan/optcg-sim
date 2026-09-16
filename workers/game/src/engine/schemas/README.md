@@ -990,3 +990,9 @@ to the filter and read `{ type: "ACTION_RESULT", ref: "__triggering_hand_trash" 
 for the actual discarded count. Do not use a discarded-card target filter for
 Navy. The OP14 activation-cost interpretation is explicitly flagged in
 [the rules handoff](../../../../../docs/project/handoffs/opt-795-hand-trash-watchers.md).
+
+### Field-wide dynamic counts
+
+`PER_COUNT` source `MATCHING_CARDS_ON_FIELD` counts the controller's Leader, present Characters and Stage. It uses the same filter and unique-name semantics as `MATCHING_CHARACTERS_ON_FIELD`, which remains Character-only. A filter requires card data and a filter resolver; missing dependencies retain the unresolved-value contract.
+
+`DON_GIVEN` mode `TOTAL_GIVEN` compares the total attached DON!! on the controller-selected Leader and Characters using `operator` and `value`; cost-area DON!! are excluded. `ANY_CARD_HAS_DON` and `SPECIFIC_CARD` retain their existing behavior.

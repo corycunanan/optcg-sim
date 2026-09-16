@@ -275,7 +275,18 @@ function numericDirection(value: unknown): "up" | "down" | undefined {
     if (value < 0) return "down";
     return undefined;
   }
-  return value && typeof value === "object" ? "up" : undefined;
+  if (value && typeof value === "object") {
+    const dynamic = value as Record<string, unknown>;
+    if (dynamic.type === "PER_COUNT" && typeof dynamic.multiplier === "number") {
+      return numericDirection(dynamic.multiplier);
+    }
+    if (dynamic.type === "FIXED" && typeof dynamic.value === "number") {
+      return numericDirection(dynamic.value);
+    }
+    // Other dynamic shapes need runtime state; preserve the existing "up" default.
+    return "up";
+  }
+  return undefined;
 }
 
 function visitStatChange(

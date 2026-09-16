@@ -74,6 +74,7 @@ const PER_COUNT_SOURCE_CONTEXT = {
   EVENTS_IN_TRASH: "LIVE_STATE",
   CARDS_IN_TRASH: "LIVE_STATE",
   MATCHING_CHARACTERS_ON_FIELD: "LIVE_STATE",
+  MATCHING_CARDS_ON_FIELD: "LIVE_STATE",
   HAND_COUNT: "LIVE_STATE",
   CHARACTERS_ON_FIELD: "LIVE_STATE",
   OPPONENT_CHARACTERS_ON_FIELD: "LIVE_STATE",
@@ -352,6 +353,36 @@ function resolvePerCountSource(
         );
       }
       return resolved(characters.length);
+    }
+    case "MATCHING_CARDS_ON_FIELD": {
+      let cards = [player.leader, ...player.characters, player.stage].filter(isPresent);
+      if (filter) {
+        if (!context.cardDb) {
+          return unresolved(
+            "MISSING_CARD_DB",
+            `${source} with a filter requires card data`
+          );
+        }
+        if (!context.matchesFilter) {
+          return unresolved(
+            "MISSING_FILTER_RESOLVER",
+            `${source} with a filter requires target-filter resolution`
+          );
+        }
+        cards = cards.filter((card) =>
+          context.matchesFilter!(card, filter, context.cardDb!, state)
+        );
+      }
+      if (filter?.unique_names) {
+        return resolved(
+          new Set(
+            cards.map(
+              (card) => context.cardDb?.get(card.cardId)?.name ?? card.cardId
+            )
+          ).size
+        );
+      }
+      return resolved(cards.length);
     }
     case "DON_FIELD_COUNT":
       return resolved(

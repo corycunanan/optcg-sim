@@ -1193,7 +1193,7 @@ interface RestedCardCountCondition {
 
 ### DON_GIVEN
 
-Checks DON!! attachment state on cards. Operates in two modes depending on whether it checks for global existence or per-card count.
+Checks DON!! attachment state on cards. Operates in three modes: global existence, per-card count, or field-wide total.
 
 > **Findings ref:** 2.30 (DON Given to Target), 2.31 (Opponent Has DON Given)
 
@@ -1201,7 +1201,7 @@ Checks DON!! attachment state on cards. Operates in two modes depending on wheth
 interface DonGivenCondition {
   type: "DON_GIVEN";
   controller: Controller;
-  mode: "ANY_CARD_HAS_DON" | "SPECIFIC_CARD";
+  mode: "ANY_CARD_HAS_DON" | "SPECIFIC_CARD" | "TOTAL_GIVEN";
   operator?: NumericOperator;
   value?: number;
 }
@@ -1220,6 +1220,8 @@ interface DonGivenCondition {
   "mode": "ANY_CARD_HAS_DON"
 }
 ```
+
+**Mode: TOTAL_GIVEN** — Sum attached DON!! on the specified player's Leader and present Characters, then compare using the required `operator` and `value`. Cost-area DON!! are excluded. Missing comparison fields resolve false. Existing modes are unchanged.
 
 **Mode: SPECIFIC_CARD** — Checks a specific card's DON!! given count. Used primarily as a [TargetFilter](./05-TARGETING.md) property but appears here for completeness.
 
