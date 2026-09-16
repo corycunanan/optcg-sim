@@ -1193,7 +1193,7 @@ interface RestedCardCountCondition {
 
 ### DON_GIVEN
 
-Checks DON!! attachment state on cards. Operates in two modes depending on whether it checks for global existence or per-card count.
+Checks DON!! attachment state on cards. Operates in three modes: global existence, per-card count, or field-wide total.
 
 > **Findings ref:** 2.30 (DON Given to Target), 2.31 (Opponent Has DON Given)
 

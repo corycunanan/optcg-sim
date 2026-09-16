@@ -258,3 +258,44 @@ it("inventories every authored DON_GIVEN consumer without migrating existing mod
   expect(inventory.filter(s => !s.startsWith("ST31-004"))).toHaveLength(96);
   expect(inventory.every(s => /: (ANY_CARD_HAS_DON|SPECIFIC_CARD|TOTAL_GIVEN)$/.test(s))).toBe(true);
 });
+
+it("ST31-004 debuffs by 2000 with only itself and a Straw Hat Crew Leader", () => {
+  const f = fixture();
+  f.data("crew-leader", {type: "Leader", types: ["Straw Hat Crew"]});
+  f.data("victim", {power: 9000, types: ["Straw Hat Crew"]});
+  f.put("crew-leader", 0, "LEADER");
+  const victim = f.put("victim", 1);
+  expect(power(f, victim.instanceId, 1)).toBe(9000);
+  f.data("ST31-004", {cost: 7, power: 9000, types: ["The Four Emperors", "Straw Hat Crew"]});
+  const hand = f.put("ST31-004", 0, "HAND");
+  f.act({type: "PLAY_CARD", cardInstanceId: hand.instanceId});
+  f.select([victim.instanceId]);
+  // Printed -1000 per friendly Straw Hat Crew card: Leader + Luffy = 2.
+  expect(power(f, victim.instanceId, 1)).toBe(7000);
+});
+
+it("ST32-002 prevents its protected Character from attacking on the opponent's next turn", () => {
+  const f = fixture();
+  f.data("base-six", {cost: 6});
+  const protectedCard = f.put("base-six", 1);
+  const unprotectedCard = f.put(CARDS.VANILLA.id, 1);
+  f.data("ST32-002", {cost: 5, power: 6000});
+  const oden = f.put("ST32-002", 0, "HAND");
+  f.act({type: "PLAY_CARD", cardInstanceId: oden.instanceId});
+  f.select([protectedCard.instanceId]);
+  nextMain(f);
+  expect(f.state.turn.activePlayerIndex).toBe(1);
+  // Printed cannot-be-rested effect lasts through this turn; §7-1 attacks require resting.
+  const result = runPipeline(f.state, {
+    type: "DECLARE_ATTACK",
+    attackerInstanceId: protectedCard.instanceId,
+    targetInstanceId: f.state.players[0].leader.instanceId,
+  }, f.db, 1);
+  expect(result.valid).toBe(false);
+  expect(result.error).toContain("cannot be rested");
+  f.act({
+    type: "DECLARE_ATTACK",
+    attackerInstanceId: unprotectedCard.instanceId,
+    targetInstanceId: f.state.players[0].leader.instanceId,
+  }, 1);
+});
