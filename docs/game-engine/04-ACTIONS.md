@@ -726,27 +726,36 @@ The `result_ref` captures the count of cards returned, enabling dynamic draw amo
 
 ### REVEAL_HAND
 
-Force the opponent to reveal their entire hand to the controller. No cards are moved.
+Reveal the target player's entire hand when `amount` is omitted (Morgans), or
+choose exactly `min(amount, hand size)` cards when supplied (Bao Huang, Arlong).
+If a choice is needed, the effect controller selects blindly; all selected cards
+are revealed simultaneously to both players. Cards stay in hand with unchanged
+identities and order. The reveal is an event, not a persistent hand-visibility effect.
 
 ```typescript
 interface RevealHandParams {
-  controller: Controller;
+  amount?: number;
 }
 ```
 
 | Field | Value |
 |-------|-------|
-| **Target** | None (operates on a player's hand) |
-| **Failure mode** | If the hand is empty, the action resolves successfully with zero revealed cards. |
-| **Fired events** | `HAND_REVEALED` |
-| **Example cards** | OP07-090 Morgans |
+| **Target** | `target.controller` selects SELF (default) or OPPONENT |
+| **Failure mode** | Empty hand returns `succeeded: false`, with no reveal event. |
+| **Fired events** | `CARDS_REVEALED`, source `HAND`, visibility `BOTH` |
+| **Result** | `targetInstanceIds` and `count`, available to `result_ref` conditions |
+| **Example cards** | OP01-063 Arlong, OP01-105 Bao Huang, OP07-090 Morgans |
 
 ```json
 {
   "type": "REVEAL_HAND",
-  "params": { "controller": "OPPONENT" }
+  "target": { "type": "PLAYER", "controller": "OPPONENT" }
 }
 ```
+
+Resuming a blind choice consumes the selected IDs only after checking exact
+count, uniqueness, and current membership in the target hand. Invalid selections
+return a blind prompt without revealing cards; the session preserves the continuation.
 
 ---
 
@@ -2542,7 +2551,7 @@ All action types at a glance with their primary zone interactions and event emis
 | `SEARCH_AND_PLAY` | DECK | FIELD | `CARD_PLAYED` |
 | `PLACE_HAND_TO_DECK` | HAND | DECK | `CARD_PLACED_TO_DECK` |
 | `HAND_WHEEL` | HAND | DECK/HAND | `CARD_DRAWN` |
-| `REVEAL_HAND` | HAND | -- (stays) | `HAND_REVEALED` |
+| `REVEAL_HAND` | HAND | -- (stays) | `CARDS_REVEALED` |
 | `SHUFFLE_DECK` | DECK | DECK | `DECK_SHUFFLED` |
 | `MODIFY_POWER` | -- | -- | `POWER_MODIFIED` |
 | `SET_BASE_POWER` | -- | -- | `BASE_POWER_SET` |

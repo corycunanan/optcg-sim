@@ -303,10 +303,10 @@ export function executeRevealHand(
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = params.amount ?? 1;
   const targetController: 0 | 1 =
     action.target?.controller === "OPPONENT"
       ? controller === 0
@@ -317,11 +317,19 @@ export function executeRevealHand(
 
   if (p.hand.length === 0) return { state, events, succeeded: false };
 
-  const count = Math.min(amount, p.hand.length);
+  // Omitted amount means the entire hand (Morgans); explicit amounts are
+  // blind choices (Bao Huang and Arlong). Validate again against the live hand.
+  const count = Math.min(params.amount ?? p.hand.length, p.hand.length);
 
   const validTargets = p.hand.map((c) => c.instanceId);
 
-  if (validTargets.length > count) {
+  const invalidSelection = preselectedTargets !== undefined && (
+    preselectedTargets.length !== count ||
+    new Set(preselectedTargets).size !== preselectedTargets.length ||
+    preselectedTargets.some((id) => !validTargets.includes(id))
+  );
+
+  if (invalidSelection || (preselectedTargets === undefined && validTargets.length > count)) {
     const resumeCtx: ResumeContext = {
       effectSourceInstanceId: sourceCardInstanceId,
       controller,
@@ -350,12 +358,15 @@ export function executeRevealHand(
     return { state, events, succeeded: false, pendingPrompt };
   }
 
-  // All cards selected (hand size <= amount)
+  const selectedIds = preselectedTargets ?? validTargets;
+  const selectedCards = selectedIds.map((id) => p.hand.find((c) => c.instanceId === id)!);
+
+  // Reveal simultaneously without changing hand identities, order, or zones.
   events.push({
     type: "CARDS_REVEALED",
     playerIndex: targetController,
     payload: {
-      cards: p.hand.slice(0, count).map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })),
+      cards: selectedCards.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })),
       source: "HAND",
       visibility: "BOTH",
     },
@@ -365,7 +376,7 @@ export function executeRevealHand(
     state,
     events,
     succeeded: true,
-    result: { targetInstanceIds: p.hand.slice(0, count).map((c) => c.instanceId), count },
+    result: { targetInstanceIds: selectedIds, count },
   };
 }
 
