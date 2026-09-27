@@ -1949,11 +1949,8 @@ export const EB04_042_ALPHA: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       flags: { optional: true },
+      costs: [{ type: "MILL", amount: 3 }],
       actions: [
-        {
-          type: "MILL",
-          params: { amount: 3 },
-        },
         {
           type: "MODIFY_COST",
           target: {
@@ -2245,11 +2242,8 @@ export const EB04_049_FINGER_PISTOL_YELLOW_LOTUS: EffectSchema = {
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
       flags: { optional: true },
+      costs: [{ type: "MILL", amount: 2 }],
       actions: [
-        {
-          type: "MILL",
-          params: { amount: 2 },
-        },
         {
           type: "KO",
           target: {

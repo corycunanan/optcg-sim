@@ -2815,11 +2815,8 @@ export const OP07_079_ROB_LUCCI: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       flags: { optional: true },
+      costs: [{ type: "MILL", amount: 2 }],
       actions: [
-        {
-          type: "MILL",
-          params: { amount: 2 },
-        },
         {
           type: "MODIFY_COST",
           target: {
@@ -2829,7 +2826,6 @@ export const OP07_079_ROB_LUCCI: EffectSchema = {
           },
           params: { amount: -1 },
           duration: { type: "THIS_TURN" },
-          chain: "IF_DO",
         },
       ],
     },

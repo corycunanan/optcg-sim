@@ -406,6 +406,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **8-3-1.** Activation cost (before the colon) | **IMPL** | `effect-resolver/cost-handler.ts → payCosts()` | Handles DON_MINUS, DON_REST, TRASH_FROM_HAND, CARD_RETURN |
+| **8-3-1-1 / 8-3-1-3.** Costs paid in printed order; an unpayable cost pays nothing | **IMPL** | `effect-resolver/cost/orchestrator.ts → payCostsWithSelection()`, `cost/feasibility.ts → isCostSequencePayable()` | The whole remaining cost sequence is checked before any selection prompt; a short deck cannot pay a `MILL` cost. [`opt-798-mill-and-either-deck-cost.test.ts`](../../workers/game/src/__tests__/opt-798-mill-and-either-deck-cost.test.ts) |
 | **8-3-1-5.** ① symbol = rest N active DON!! | **IMPL** | `cost-handler.ts` | DON_REST cost type implemented |
 | **8-3-1-6.** "DON!! −X" = return DON!! to DON!! deck | **IMPL** | `state.ts → returnDonToDeck()` | Returns DON!! from cost area to DON!! deck, preferring rested |
 | **8-3-2-3.** [DON!! xX] condition | **IMPL** | `conditions.ts` | DON_FIELD_COUNT condition type evaluates attached DON!! count |

@@ -2,9 +2,17 @@
 import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
-import { isProhibitedForCard } from "../../prohibitions.js";
+import { isProhibitedForCard, isRemovalProhibited } from "../../prohibitions.js";
 import { namedPlayCandidates } from "./named-play.js";
 import { isPresent } from "../../type-guards.js";
+
+/**
+ * OPT-798: true for "place 1 Character ... at the bottom of the owner's deck"
+ * costs that may select either player's Character (OP04-055, OP06-043).
+ */
+export function isEitherPlayerDeckPlacement(cost: Cost): boolean {
+  return cost.type === "PLACE_OWN_CHARACTER_TO_DECK" && cost.controller === "EITHER";
+}
 
 /** Resolve a simple cost's numeric amount with a deterministic fallback. */
 export function resolveAmount(cost: SimpleCost, fallback = 1): number {
@@ -89,11 +97,26 @@ export function computeCostTargets(
     case "RETURN_OWN_CHARACTER_TO_HAND":
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE": {
-      let candidates = player.characters.filter(isPresent);
+      const eitherPlayer = isEitherPlayerDeckPlacement(cost);
+      let candidates = (eitherPlayer
+        ? [...player.characters, ...state.players[controller === 0 ? 1 : 0].characters]
+        : player.characters
+      ).filter(isPresent);
       if (cost.filter) {
         candidates = candidates.filter((c) =>
           matchesFilter(c, cost.filter!, cardDb, state, undefined, undefined, controller),
         );
+      }
+      if (eitherPlayer) {
+        // OPT-798: moving another player's Character is an effect-caused
+        // return to deck — honor its removal protections (e.g. "cannot be
+        // removed from the field by your opponent's effects").
+        candidates = candidates.filter((c) => !isRemovalProhibited(
+          state,
+          c.instanceId,
+          { action: "RETURN_TO_DECK", cause: "EFFECT", causingController: controller, sourceCardInstanceId },
+          cardDb,
+        ));
       }
       return dropSelf(candidates.map((c) => c.instanceId));
     }
@@ -196,7 +219,10 @@ export function getCostCards(
     case "ADD_OWN_CHARACTER_TO_LIFE":
     case "REST_CARDS":
     case "REST_NAMED_CARD": {
-      const cards = player.characters.filter((c): c is CardInstance => c !== null && targetSet.has(c.instanceId));
+      const cards = (isEitherPlayerDeckPlacement(cost)
+        ? state.players.flatMap((fieldPlayer) => fieldPlayer.characters)
+        : player.characters
+      ).filter((c): c is CardInstance => c !== null && targetSet.has(c.instanceId));
       if (targetSet.has(player.leader.instanceId)) {
         cards.push(player.leader);
       }

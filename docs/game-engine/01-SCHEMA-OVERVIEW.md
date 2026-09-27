@@ -200,8 +200,12 @@ type CostType =
   | "KO_OWN_CHARACTER"        // K.O. one of your characters (optional filter)
   | "TRASH_OWN_CHARACTER"     // Trash character from field (not K.O.)
   | "RETURN_OWN_CHARACTER_TO_HAND"  // Bounce your character as cost
-  | "PLACE_OWN_CHARACTER_TO_DECK"   // Place character at bottom of deck
+  | "PLACE_OWN_CHARACTER_TO_DECK"   // Place character at bottom of the owner's deck
+                                    // (controller: "EITHER" = either player's Character)
   | "PLACE_STAGE_TO_DECK"     // Place your Stage at bottom of deck
+
+  // Deck costs
+  | "MILL"                    // Trash N cards from the top of your deck (deck must hold N)
 
   // Trash costs
   | "PLACE_FROM_TRASH_TO_DECK" // Return N cards from trash to deck bottom (optional filter)

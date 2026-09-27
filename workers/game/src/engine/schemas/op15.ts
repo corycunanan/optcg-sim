@@ -3620,9 +3620,8 @@ export const OP15_088_PIRATES_DOCKING_SIX: EffectSchema = {
       id: "OP15-088_on_play",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      costs: [{ type: "TRASH_FROM_HAND", amount: 3 }],
+      costs: [{ type: "MILL", amount: 3 }],
       actions: [
-        { type: "MILL", params: { amount: 3 } },
         {
           type: "PLAY_CARD",
           target: {

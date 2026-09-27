@@ -191,15 +191,28 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
 
   it("cleans up the stack and still drains queued triggers when a later cost is unpayable", () => {
     const cardDb = createTestCardDb();
-    // Empty trash: the second cost (PLACE_FROM_TRASH_TO_DECK) becomes
-    // unpayable once the first selection resolves (rule 8-3-1-3-1 territory —
-    // this test pins the OPT-429 invariants only: no orphaned frame, queued
-    // triggers still processed, effect actions skipped).
-    const state = createBattleReadyState(cardDb);
+    // The trash empties between the first prompt and its response, so the
+    // second cost (PLACE_FROM_TRASH_TO_DECK) becomes unpayable once the first
+    // selection resolves (rule 8-3-1-3-1 territory — this test pins the
+    // OPT-429 invariants only: no orphaned frame, queued triggers still
+    // processed, effect actions skipped). OPT-798: an initially unpayable
+    // suffix no longer prompts at all (rule 8-3-1-3), so the trash starts
+    // with a card and is emptied in both the live and staged cost state.
+    const state = stateWithChoices(cardDb);
     const block = chainedCostBlock();
 
-    const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
-    expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    const paid = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
+    expect(paid.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    const emptyTrash = (players: GameState["players"]): GameState["players"] =>
+      [{ ...players[0], trash: [] }, players[1]];
+    const frame = paid.state.effectStack.at(-1)!;
+    const pay = {
+      ...paid,
+      state: updateTopFrame(
+        { ...paid.state, players: emptyTrash(paid.state.players) },
+        { costTransactionState: { ...frame.costTransactionState!, players: emptyTrash(frame.costTransactionState!.players) } },
+      ),
+    };
 
     const queuedTrigger: QueuedTrigger = {
       sourceCardInstanceId: pay.state.players[0].leader.instanceId,

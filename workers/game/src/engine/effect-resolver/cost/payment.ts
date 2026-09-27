@@ -265,6 +265,25 @@ export function payCosts(
         break;
       }
 
+      case "MILL": {
+        // OPT-798: "trash N cards from the top of your deck:" as an
+        // activation cost. Deterministic (top N, no selection); refuses a
+        // partial payment so the effect after the colon never resolves on
+        // a short deck (rule 8-3-1-3). Publishes the same event shape as the
+        // MILL action (executeMill) so deck→trash consumers see one event.
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const p = nextState.players[controller];
+        if (p.deck.length < amount) return null;
+        if (amount <= 0) break;
+        const milled = p.deck.slice(0, amount);
+        const moved = transitionCards(nextState, milled.map((card) => card.instanceId), "TRASH", { position: "TOP" });
+        nextState = moved.state;
+        costResult.cardsTrashedCount += moved.transitions.length;
+        costResult.cardsTrashedInstanceIds.push(...moved.transitions.map((transition) => transition.fact.newInstanceId));
+        events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: moved.transitions.length, reason: "mill", from: "DECK" } });
+        break;
+      }
+
       case "TURN_LIFE_FACE_UP": {
         const amount = typeof cost.amount === "number" ? cost.amount : 1;
         const p = nextState.players[controller];

@@ -30,6 +30,8 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "PLACE_SELF_AND_HAND_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE":
       return true;
+    // OPT-798: the top N cards of the deck are fixed — no choice to prompt.
+    case "MILL":
     case "DON_MINUS":
     case "DON_REST":
     case "VARIABLE_DON_RETURN":
@@ -172,6 +174,13 @@ export function isCostPayable(
     case "TRASH_FROM_LIFE": {
       const amt = resolveAmount(cost);
       return player.life.length >= amt;
+    }
+
+    case "MILL": {
+      // OPT-798: "trash N cards from the top of your deck:" is payable only
+      // with N or more cards in the deck — never a partial mill
+      // (rule 8-3-1-3; qa_eb01.md EB01-051: ≤1 card in deck cannot use it).
+      return player.deck.length >= resolveAmount(cost);
     }
 
     case "TURN_LIFE_FACE_UP": {

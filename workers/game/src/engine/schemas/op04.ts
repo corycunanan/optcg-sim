@@ -1886,6 +1886,10 @@ export const OP04_055_PLAGUE_ROUNDS: EffectSchema = {
           type: "PLACE_OWN_CHARACTER_TO_DECK",
           amount: 1,
           filter: { cost_max: 4 },
+          // "place 1 Character" (no "your"): either player's Character
+          // (qa_op04.md: your own Character is also allowed).
+          controller: "EITHER",
+          position: "BOTTOM",
         },
       ],
       actions: [

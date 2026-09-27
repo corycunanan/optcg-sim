@@ -76,12 +76,19 @@ export function applyCostSelection(
         const moved = transitionCards(state, toPlace.map((c) => c.instanceId), "DECK", { position });
         return { state: moved.state, events: [] };
       } else {
-        const toPlace = p.characters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
+        // OPT-798: an EITHER cost may select the opponent's Character; the
+        // transition places every card in its OWNER's deck (rule 4-2-1-1).
+        const fieldCharacters = cost.controller === "EITHER"
+          ? state.players.flatMap((fieldPlayer) => fieldPlayer.characters)
+          : p.characters;
+        const toPlace = fieldCharacters.filter((c): c is CardInstance => c !== null && selectedSet.has(c.instanceId));
         const position = cost.position === "TOP" ? "TOP" : "BOTTOM";
         const moved = transitionCards(state, toPlace.map((c) => c.instanceId), "DECK", { position });
         const events: PendingEvent[] = moved.transitions.map((transition) => ({
             type: "CARD_RETURNED_TO_DECK",
-            playerIndex: controller,
+            // The deck that received the card. Identical to `controller` for
+            // own-Character payments (field cards sit in their owner's area).
+            playerIndex: transition.fact.owner,
             payload: { cardInstanceId: transition.fact.oldInstanceId, newCardInstanceId: transition.fact.newInstanceId, cardId: transition.fact.cardId, position, sourceZone: transition.fact.source, sourceController: transition.fact.controller, causingController: controller, movementCause: "COST" },
           }));
         return { state: moved.state, events };
