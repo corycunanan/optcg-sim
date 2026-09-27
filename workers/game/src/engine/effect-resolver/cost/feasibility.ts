@@ -8,30 +8,55 @@ import { costNeedsPlayerSelection } from "./payability.js";
 import { applyCostSelection } from "./resume.js";
 import { computeCostTargets, resolveAmount } from "./targets.js";
 
-function combinations(values: string[], count: number): string[][] {
-  if (count === 0) return [[]];
-  if (values.length < count) return [];
-  const result: string[][] = [];
-  const visit = (start: number, chosen: string[]) => {
+/** Lazily yield every `count`-sized combination of `values` in index order. */
+function* combinations(values: string[], count: number): Generator<string[]> {
+  if (count === 0) {
+    yield [];
+    return;
+  }
+  if (values.length < count) return;
+  const chosen: string[] = [];
+  function* visit(start: number): Generator<string[]> {
     if (chosen.length === count) {
-      result.push(chosen);
+      yield [...chosen];
       return;
     }
     for (let index = start; index <= values.length - (count - chosen.length); index++) {
-      visit(index + 1, [...chosen, values[index]]);
+      chosen.push(values[index]);
+      yield* visit(index + 1);
+      chosen.pop();
     }
-  };
-  visit(0, []);
-  return result;
+  }
+  yield* visit(0);
 }
 
-function selectionPayments(
+/** True for selection costs whose payments are exactly the target combinations. */
+function isCombinationSelection(cost: Cost): boolean {
+  if (cost.type === "PLAY_NAMED_CARD_FROM_HAND") return false;
+  if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
+      cost.position === "TOP_OR_BOTTOM") return false;
+  return true;
+}
+
+function selectionAmounts(cost: Cost, targetCount: number): number[] {
+  return cost.type === "REST_CARDS" && cost.amount === "ANY_NUMBER"
+    ? Array.from({ length: targetCount }, (_, index) => index + 1)
+    : [resolveAmount(cost as SimpleCost)];
+}
+
+/**
+ * Lazily yield the state after each valid payment of a selection cost.
+ * OPT-798 review: callers short-circuit on the first payable path, so a
+ * large candidate pool (e.g. OP05-080's 20-of-N trash cost) is never
+ * materialized in full.
+ */
+function* selectionPayments(
   state: GameState,
   cost: Cost,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   sourceCardInstanceId: string,
-): GameState[] {
+): Generator<GameState> {
   if (cost.type === "PLAY_NAMED_CARD_FROM_HAND") {
     const candidates = namedPlayCandidates(state, cost, controller, cardDb);
     const capacityStates = state.players[controller].characters.includes(null)
@@ -40,15 +65,18 @@ function selectionPayments(
           const trashed = card && trashCharacter(state, card.instanceId, controller, "rule");
           return trashed ? [trashed.state] : [];
         });
-    return capacityStates.flatMap(capacityState => candidates.flatMap(id => {
-      const paid = payNamedPlay(capacityState, cost, id, controller, cardDb);
-      return paid ? [paid.state] : [];
-    }));
+    for (const capacityState of capacityStates) {
+      for (const id of candidates) {
+        const paid = payNamedPlay(capacityState, cost, id, controller, cardDb);
+        if (paid) yield paid.state;
+      }
+    }
+    return;
   }
 
   if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
       cost.position === "TOP_OR_BOTTOM") {
-    return (["TOP", "BOTTOM"] as const).flatMap((position) => {
+    for (const position of ["TOP", "BOTTOM"] as const) {
       const paid = payCosts(
         state,
         [{ ...cost, position }],
@@ -56,8 +84,9 @@ function selectionPayments(
         cardDb,
         sourceCardInstanceId,
       );
-      return paid ? [paid.state] : [];
-    });
+      if (paid) yield paid.state;
+    }
+    return;
   }
 
   const targets = computeCostTargets(
@@ -67,20 +96,23 @@ function selectionPayments(
     cardDb,
     sourceCardInstanceId,
   );
-  const amounts = cost.type === "REST_CARDS" && cost.amount === "ANY_NUMBER"
-    ? Array.from({ length: targets.length }, (_, index) => index + 1)
-    : [resolveAmount(cost as SimpleCost)];
-
-  return amounts.flatMap((amount) =>
-    combinations(targets, amount).map((selected) => {
+  for (const amount of selectionAmounts(cost, targets.length)) {
+    for (const selected of combinations(targets, amount)) {
       const paymentTargets =
         cost.type === "PLACE_SELF_AND_TRASH_TO_DECK" ||
         cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
           ? [sourceCardInstanceId, ...selected]
           : selected;
-      return applyCostSelection(state, cost, paymentTargets, controller, cardDb).state;
-    }),
-  );
+      yield applyCostSelection(state, cost, paymentTargets, controller, cardDb).state;
+    }
+  }
+}
+
+function anyState(states: Iterable<GameState>, predicate: (state: GameState) => boolean): boolean {
+  for (const state of states) {
+    if (predicate(state)) return true;
+  }
+  return false;
 }
 
 /**
@@ -144,7 +176,21 @@ export function isCostSequencePayable(
     });
   }
 
-  const nextStates = costNeedsPlayerSelection(cost)
+  if (costNeedsPlayerSelection(cost) && isCombinationSelection(cost) && suffix.length === 0) {
+    // OPT-798 review: a terminal combination cost needs no search — every
+    // combination of valid targets is a payment (applyCostSelection never
+    // refuses a validated selection), so payability is a count check.
+    const targetCount = computeCostTargets(
+      state,
+      cost,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+    ).length;
+    return selectionAmounts(cost, targetCount).some((amount) => targetCount >= amount);
+  }
+
+  const nextStates: Iterable<GameState> = costNeedsPlayerSelection(cost)
     ? selectionPayments(state, cost, controller, cardDb, sourceCardInstanceId)
     : (() => {
         const paid = payCosts(
@@ -157,7 +203,7 @@ export function isCostSequencePayable(
         return paid ? [paid.state] : [];
       })();
 
-  return nextStates.some((nextState) =>
+  return anyState(nextStates, (nextState) =>
     isCostSequencePayable(
       nextState,
       suffix,
