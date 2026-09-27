@@ -350,6 +350,33 @@ describe("OPT-824 GIVE_DON cost — OP13-007", () => {
   });
 });
 
+describe("OPT-824 GIVE_DON cost — stale staged payment", () => {
+  it("rejects a persisted recipient reply once the staged cost area lacks the active DON!!", () => {
+    const f = fixture();
+    f.data("OP12-001", { type: "Leader", name: "Silvers Rayleigh", cost: 0, power: 5000 });
+    f.data("OP12-016", { type: "Event", cost: 0, power: null, counter: null, effectText: "[Main] You may give 2 active DON!! cards to 1 of your [Silvers Rayleigh]: ..." });
+    const leader = f.put("OP12-001", P0, "LEADER");
+    const event = f.put("OP12-016", P0, "HAND");
+    setDon(f, P0, 2);
+    f.act({ type: "PLAY_CARD", cardInstanceId: event.instanceId });
+    f.accept();
+    expect(selectPrompt(f).validTargets).toEqual([leader.instanceId]);
+    f.persist();
+    // Only 1 of the 2 DON!! the offer assumed is still active in the staged payment.
+    const frame = f.state.effectStack.at(-1)!;
+    const staged = structuredClone(frame.costTransactionState!);
+    staged.players[P0].donCostArea[0] = { ...staged.players[P0].donCostArea[0], state: "RESTED" };
+    f.state = {
+      ...f.state,
+      effectStack: [...f.state.effectStack.slice(0, -1), { ...frame, costTransactionState: staged }],
+    };
+    const before = structuredClone(f.state);
+    f.select([leader.instanceId], true);
+    expect(f.state).toEqual(before);
+    expect(f.state.players[P0].leader.attachedDon).toHaveLength(0);
+  });
+});
+
 // ─── Silvers Rayleigh Events: EB04-009, OP12-016, OP12-017, OP12-019 ────────
 
 const EVENT_TEXT: Record<string, string> = {
