@@ -23,6 +23,7 @@ import {
   type CardTextManifest,
 } from "../trigger-schema-coverage.js";
 import { collectTargetInstructionCoverage } from "../effect-resolver/target-instruction.js";
+import { findMillCostIntentViolations } from "../schema-cost-lint.js";
 
 const repoRoot = resolve(__dirname, "../../../../../");
 
@@ -62,6 +63,16 @@ function findHandTrashIntentViolations(schemas: Record<string, EffectSchema>): s
       const cardId = block.match(/\*\*([A-Z]+\d*-\d+)\*\*/)?.[1];
       const schema = cardId ? schemas[cardId] : undefined;
       return schema ? findHandTrashTriggerViolations(block, schema) : [];
+    }),
+  );
+}
+
+function loadCanonicalCardBlocks(): { cardId: string; text: string }[] {
+  const directory = resolve(repoRoot, "docs/cards");
+  return readdirSync(directory).filter(file => file.endsWith(".md")).sort().flatMap(file =>
+    readFileSync(resolve(directory, file), "utf8").split(/\n---\n/).flatMap(block => {
+      const cardId = block.match(/\*\*([A-Z]+\d*-\d+)\*\*/)?.[1];
+      return cardId ? [{ cardId, text: block }] : [];
     }),
   );
 }
@@ -256,6 +267,7 @@ async function main(): Promise<void> {
     ),
     ...findDonIntentViolations(schemas),
     ...findHandTrashIntentViolations(schemas),
+    ...findMillCostIntentViolations(loadCanonicalCardBlocks(), schemas),
     ...findStartOfGameEffectRuleCountViolations(modules),
     ...findPickDestinationViolations(modules),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
