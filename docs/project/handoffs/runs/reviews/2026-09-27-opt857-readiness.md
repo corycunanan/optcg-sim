@@ -1,0 +1,12 @@
+### PR 685 — OPT-857
+- Result: merged (178b5ee8e1999afbbd6b129dcbebcec1b1d65973)
+- Tier: Large (by surface; small diff)
+- Head / base: 6ba35811323997b683af29ea5f265f621d3a2fd1 / main 3359178092fcfe88b76b33e0814be1de7cdbdf9a
+- Scope: finishReplacedLifeCost completes hand-trash cost sources and admits isHandTrashByEffect (replaced.ts), resultRefs threaded through 7 callers, regression (Character on field / departed, Event source with CARD_REMOVED_FROM_LIFE watcher, direct attribution), schema-life-cost-lint (LIFE_TO_HAND last; only LIFE_TO_HAND can yield replaced:true per reviewer), docs.
+- Coordinator review: replaced.ts hunk read (matches ticket fix exactly); spot-check re-ran both OPT-857 test files at 6ba3581 → 10/10.
+- Independent review: Opus full at 94fa175 findings (F1 MAJOR Event test could not go red / false PR claim — confirmed probe; F2 MINOR refs unobservable M4/M5; F3 NIT); Codex astra lens same F1 (MINOR). Opus delta at 6ba3581 clean (pre-fix 4/4 red incl. Event for ordering reason; claims match).
+- Findings disposition: F1 fixed (6ba3581); F2 accepted with explicit PR-body disclosure (unreachable: TRASH_FROM_HAND always attributes at selection); F3 no action; body NIT (column header SHA) cosmetic.
+- Validation: implementer pnpm verify exit 0 at 94fa175 (worker 3287/5 xfail/5 skip); delta test-only → carried; focused 60/60 + type-check at 6ba3581 (reviewer); CI success at 6ba3581.
+- Inventory: 2474 schemas / 881 cost blocks / 81 Life-zone blocks / 0 non-last Life costs / 0 hand-trash+Life mixes — identical base/head (implementer and reviewer independently).
+- Integration: main 3359178 unchanged; CLEAN/MERGEABLE; no PR comments. Merged pinned; landed identical.
+- Merge permission: user grant 2026-09-26. Post-merge: logs/178b5ee-postmerge.watch.

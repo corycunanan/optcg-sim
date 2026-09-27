@@ -1,0 +1,11 @@
+### PR 684 — OPT-828
+- Result: merged (3359178092fcfe88b76b33e0814be1de7cdbdf9a)
+- Tier: Large
+- Head / base: 4b7c796e67191045bfb1fbb73206876116b623b7 / main 42970881e28bd2f84febbb902c27103d4dadf00d
+- Scope: ADD_OWN_CHARACTER_TO_LIFE cost-level controller OPPONENT (targets opponent Characters, removal-protection filter, owner-Life face-up placement, TOP_OR_BOTTOM bound PLAYER_CHOICE stage, live+staged validation at both stages, replacement replay), validateCost, OP09-101 schema (placement as mandatory cost, hand trash as only action), OPT-775 snapshot, docs. Tests opt-828 24 (22 red on main).
+- Coordinator review: cost/schema hunks read (targets, resume, payment, op09); spot-check mutation opponent-only candidates → 18 red, restored clean.
+- Independent review: Opus full at 4b7c796 clean for the PR (pre-existing F1 MINOR empty SELECT_TARGET bypass → OPT-870; NITs coordinator-blocked __PAY_FIXED_COST__, face-up Life event visibility); mutations M1/M4/M5/M9 reproduced, R1/R4 red, R2/R3 redundant survivors. Codex astra lens: F1 MINOR duplicate-ID dedupe (harmless) → folded into OPT-870.
+- Validation: implementer pnpm verify exit 0 at 4b7c796 (worker 3277/5 xfail/5 skip); reviewer re-ran worker suite/type-check/schema:check; CI success at 4b7c796.
+- Integration: main 4297088 unchanged through merge; CLEAN/MERGEABLE; no PR comments.
+- Merge permission: user grant 2026-09-26. Merged pinned; landed tree identical.
+- Post-merge: logs/3359178-postmerge.watch; user: pnpm pipeline:sync-facets (OP09-101 facets).

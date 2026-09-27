@@ -1,0 +1,13 @@
+### PR 683 — OPT-824
+- Result: merged (42970881e28bd2f84febbb902c27103d4dadf00d)
+- Tier: Large
+- Head / base: a05689834cf2bb25481d6fd53118e75df2c9c10e / main b545c2d8f5af6ffec9e198e4b319cec7bcb1f2e4
+- Scope: GIVE_DON cost (vocabulary, targets, payability, applyCostSelection, resume branch with live+staged validation, refs `__cost_don_given`, validateCost), schemas OP13-007, EB04-009, OP12-016/017/019, cost:give_don facet registration, docs. Tests: opt-824-give-don-cost.test.ts 31 (20/23 red on main originally).
+- Coordinator review: every engine hunk read at 40a1c8c (attachDonToCard active-only verified) and delta at a056898. Out-of-fence files (resolver.ts, resume/cost.ts, types.ts, schema-registry.ts) accepted as necessary support. Spot-check: live-state guard disabled → 2 red, restored clean.
+- Independent review: Opus full at 40a1c8c (spec clean; F1 MINOR untested resume filter; N1 NIT dead branch; I1 info); Codex astra lens at 40a1c8c (F1 MAJOR staged-only resume validation, CONFIRMED; F2 MINOR TRASH_SELF prohibition, pre-existing); Opus delta at a056898 clean (rebuilt Codex divergence scenarios A/B, callers audited, mutations re-run).
+- Automated GitHub review (chatgpt-codex-connector P2 CANNOT_ATTACH_DON): verified latent (no provider, no card text; action has same gap) → OPT-869; disposition added to PR body.
+- Findings: Codex F1 + Opus F1 + N1 fixed (dfc141a, a056898). Codex F2 → OPT-867 (patched). I1 → OPT-826 comment.
+- Validation: implementer pnpm verify exit 0 at a056898 (worker 3253/5 xfail/5 skip, app 2377, pipeline 56, build). Reviewer: focused 31/31, type-check, schema:check at a056898. CI 36292670599 success at a056898.
+- Integration: main b545c2d unchanged through merge. Final recheck CLEAN/MERGEABLE, all checks SUCCESS, 1 bot comment dispositioned.
+- Merge permission: user grant 2026-09-26. Merged `--squash --match-head-commit a056898…`; landed tree identical.
+- Post-merge: watch logs/4297088-postmerge.watch; user: `pnpm pipeline:sync-facets` (cost:give_don).
