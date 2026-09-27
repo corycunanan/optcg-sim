@@ -11,6 +11,7 @@ import { isCostSequencePayable } from "../engine/effect-resolver/cost/feasibilit
 import { applyCostSelection } from "../engine/effect-resolver/cost/resume.js";
 import { isCostPayable } from "../engine/effect-resolver/cost/payability.js";
 import { validateCost } from "../engine/schema-registry.js";
+import { transitionCard } from "../engine/zone-transition.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
@@ -663,5 +664,65 @@ describe("OPT-824 GIVE_DON cost — engine contract", () => {
       expect(give.target.filter?.name, id).toBe(want.name);
       expect(block.actions?.some((a) => a.type === "GIVE_DON"), id).toBe(false);
     }
+  });
+});
+
+// Review round 1: a persisted recipient reply must be checked against the
+// LIVE state as well as the staged payment snapshot, so a divergence between
+// them can never resurrect a departed recipient or spend unavailable DON!!.
+describe("OPT-824 GIVE_DON cost — live/staged divergence", () => {
+  function pendingOp12016() {
+    const setup = setupRayleigh("OP12-016", { active: 2 });
+    setup.f.act({ type: "PLAY_CARD", cardInstanceId: setup.event.instanceId });
+    setup.f.accept();
+    expect(selectPrompt(setup.f).validTargets).toEqual([setup.rayleighChar!.instanceId]);
+    setup.f.persist();
+    return setup;
+  }
+
+  it("rejects the reply when the offered recipient left the field in the live state", () => {
+    const { f, rayleighChar } = pendingOp12016();
+    const moved = transitionCard(f.state, rayleighChar!.instanceId, "TRASH", { position: "TOP" });
+    expect(moved).not.toBeNull();
+    f.state = moved!.state;
+    f.persist();
+    const before = structuredClone(f.state);
+    const trashId = moved!.fact.newInstanceId;
+    f.select([rayleighChar!.instanceId], true);
+    expect(f.state).toEqual(before);
+    expect(f.state.players[P0].characters.some((c) => c?.instanceId === rayleighChar!.instanceId)).toBe(false);
+    expect(f.state.players[P0].trash.some((c) => c.instanceId === trashId)).toBe(true);
+    expect(donGivenEvents(f)).toHaveLength(0);
+  });
+
+  it("rejects the reply when a needed DON!! was rested in the live state", () => {
+    const { f, rayleighChar } = pendingOp12016();
+    const p = f.state.players[P0];
+    p.donCostArea = p.donCostArea.map((d, i) => (i === 0 ? { ...d, state: "RESTED" as const } : d));
+    f.persist();
+    const before = structuredClone(f.state);
+    f.select([rayleighChar!.instanceId], true);
+    expect(f.state).toEqual(before);
+    expect(f.state.players[P0].characters.find((c) => c?.instanceId === rayleighChar!.instanceId)!.attachedDon)
+      .toHaveLength(0);
+    expect(activeCostDon(f)).toBe(1);
+    expect(donGivenEvents(f)).toHaveLength(0);
+  });
+
+  it("rejects an own Character that fails the [Silvers Rayleigh] filter", () => {
+    const { f, ally, event } = setupRayleigh("EB04-009");
+    play(f, event);
+    f.accept();
+    f.persist();
+    const before = structuredClone(f.state);
+    f.select([ally.instanceId], true);
+    expect(f.state).toEqual(before);
+    expect(f.state.players[P0].characters.find((c) => c?.instanceId === ally.instanceId)!.attachedDon)
+      .toHaveLength(0);
+    // Direct callers cannot bypass the recipient filter either.
+    const give = getEffectSchema("EB04-009")!.effects[0].costs![0];
+    const applied = applyCostSelection(f.state, give, [ally.instanceId], P0, f.db);
+    expect(applied.events).toEqual([]);
+    expect(applied.state).toBe(f.state);
   });
 });
