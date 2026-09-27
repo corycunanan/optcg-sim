@@ -4,6 +4,7 @@ import type { EffectResult } from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { parseStoredSession } from "../session/persistence.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { executeMill } from "../engine/effect-resolver/actions/draw-search.js";
 import { evaluateCondition } from "../engine/conditions.js";
@@ -16,12 +17,17 @@ import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./hel
 // cards gains +5000 power during this battle."
 // Rules: 5-1-2-1 (a deck holds only Character, Event and Stage cards) and
 // 2-7-5 (only those card types have costs), so every milled card has a
-// printed cost. 3-1-6 — the milled card is a new card in the trash; the gate
-// reads the card actually moved, never an unrelated trash or field card.
+// printed cost. Identity: per docs/game-engine/ZONE-TRANSITION-CONTRACT.md the
+// deck→trash move gives the milled card a fresh instance id (rule 3-1-6 itself
+// covers only cards leaving the Character or Stage area); the gate reads the
+// card actually moved, never an unrelated trash or field card.
 
 const DEFENDER = 1 as const;
 
-function fixture(deckCosts: number[], opts: { deckType?: CardData["type"] } = {}) {
+function fixture(
+  deckCosts: number[],
+  opts: { deckType?: CardData["type"]; defenderLeaderId?: string } = {},
+) {
   const db = createTestCardDb();
   let state: GameState = createBattleReadyState(db);
   state.players.forEach((p) => {
@@ -29,6 +35,21 @@ function fixture(deckCosts: number[], opts: { deckType?: CardData["type"] } = {}
     p.hand = [];
     p.trash = [];
   });
+
+  if (opts.defenderLeaderId) {
+    const leaderSchema = getEffectSchema(opts.defenderLeaderId);
+    expect(leaderSchema).toBeDefined();
+    db.set(opts.defenderLeaderId, {
+      ...CARDS.LEADER,
+      id: opts.defenderLeaderId,
+      name: leaderSchema!.card_name ?? opts.defenderLeaderId,
+      effectSchema: leaderSchema!,
+    });
+    state.players[DEFENDER].leader = {
+      ...state.players[DEFENDER].leader,
+      cardId: opts.defenderLeaderId,
+    };
+  }
 
   const schema = getEffectSchema("OP08-096");
   expect(schema).toBeDefined();
@@ -121,8 +142,11 @@ function fixture(deckCosts: number[], opts: { deckType?: CardData["type"] } = {}
       const leader = state.players[DEFENDER].leader;
       return getEffectivePower(leader, db.get(leader.cardId)!, state, db);
     },
-    roundTrip() {
-      state = JSON.parse(JSON.stringify(state));
+    /** Persist and reload through the durable stored-session parser. */
+    persist() {
+      state = parseStoredSession(
+        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
+      ).state;
     },
   };
 }
@@ -198,12 +222,27 @@ describe("OPT-827 OP08-096 gates on the card actually milled", () => {
     expect(f.leaderPower()).toBe(base);
   });
 
-  it("empty deck → nothing milled, the gate is false, no buff, no crash", () => {
-    // A defender with 0 deck cards has already lost at rule processing before
-    // it can reach the counter step through the pipeline (the pipeline
-    // rejects with "Game is already over"), so this resolves the registered
-    // OP08-096 [Counter] block directly. Deck-out defeat timing is OPT-862;
-    // this asserts only the gate.
+  it("empty deck (OP15-022 Brook Leader) → through the pipeline nothing is milled, no prompt, no buff", () => {
+    // Brook delays deck-out defeat to end of turn, so a 0-card deck can reach
+    // the [Counter] step through the real pipeline. Deck-out timing is
+    // OPT-862; this asserts only the gate.
+    const f = fixture([], { defenderLeaderId: "OP15-022" });
+    const base = f.leaderPower();
+    const trashBefore = f.state.players[DEFENDER].trash.length;
+    f.attackAndCounter();
+    expect(f.state.status).not.toBe("FINISHED");
+    expectSettled(f.state);
+    expect(f.leaderPower()).toBe(base);
+    // Only the Event itself went to the trash; nothing was milled.
+    expect(f.state.players[DEFENDER].trash.map((c) => c.cardId)).toEqual(["OP08-096"]);
+    expect(trashBefore).toBe(0);
+  });
+
+  it("empty deck, resolver level → the registered block records no ref and grants nothing", () => {
+    // With an ordinary Leader a 0-card deck has already lost before the
+    // counter step (unreachable through the pipeline with an ordinary
+    // Leader), so this resolves the registered [Counter] block directly to
+    // show the no-ref path without any Leader rule in play.
     const f = fixture([]);
     const block = getEffectSchema("OP08-096")!.effects.find((e) => e.id === "counter_effect")!;
     const before = f.state.activeEffects.length;
@@ -213,12 +252,16 @@ describe("OPT-827 OP08-096 gates on the card actually milled", () => {
     expect(r.state.players[DEFENDER].trash).toHaveLength(0);
   });
 
-  it("the gate survives a JSON round-trip of the pending selection and applies exactly once", () => {
+  it("the gated selection prompt survives persisted-session reload and applies exactly once", () => {
+    // The gate is decided before the prompt; this proves the continuation
+    // (and the MILL snapshot inside it) survives parseStoredSession and
+    // resumes once — not that the gate is re-evaluated.
     const f = fixture([6, 1]);
     const base = f.leaderPower();
     f.attackAndCounter();
     expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    f.roundTrip();
+    expect(JSON.stringify(f.state)).toContain('"source":"MILL"');
+    f.persist();
     const leaderId = f.state.players[DEFENDER].leader.instanceId;
     f.act({ type: "SELECT_TARGET", selectedInstanceIds: [leaderId] }, DEFENDER);
     expectSettled(f.state);
