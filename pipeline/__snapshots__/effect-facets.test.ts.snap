@@ -183,6 +183,7 @@ exports[`extractCardFacets > snapshots every distinct authored tag and rejects u
   "cost:ko_own_character",
   "cost:leader_power_reduction",
   "cost:life_to_hand",
+  "cost:mill",
   "cost:none",
   "cost:place_from_trash_to_deck",
   "cost:place_hand_to_deck",
