@@ -23,7 +23,7 @@ import type {
   Target,
   TargetFilter,
 } from "./effect-types.js";
-import { ALL_ACTION_TYPES } from "./effect-types.js";
+import { ALL_ACTION_TYPES, ALL_CAUSE_FILTER_BY } from "./effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -116,13 +116,10 @@ function isReplacementAction(value: unknown): value is Action {
   return true;
 }
 
+const CAUSE_FILTER_BY = new Set<string>(ALL_CAUSE_FILTER_BY);
+
 function isCauseFilter(value: unknown): value is CauseFilter {
-  return (
-    isRecord(value) &&
-    (value.by === "OPPONENT_EFFECT" ||
-      value.by === "ANY_EFFECT" ||
-      value.by === "ANY")
-  );
+  return isRecord(value) && typeof value.by === "string" && CAUSE_FILTER_BY.has(value.by);
 }
 
 function isTargetFilter(value: unknown): value is TargetFilter {
@@ -462,10 +459,18 @@ function matchesCauseFilter(
       return cause === "effect" && causingController !== replacementOwner;
     case "ANY_EFFECT":
       return cause === "effect";
+    case "BATTLE":
+      // Rules §7-1-4-1-2: only the battle-result K.O. is "K.O.'d in battle".
+      return cause === "battle";
     case "ANY":
       return true;
-    default:
-      return true;
+    default: {
+      // Exhaustive: a new `by` value must be handled above. Fail closed at
+      // runtime; `isCauseFilter` already rejects unknown values upstream.
+      const unhandled: never = filter.by;
+      void unhandled;
+      return false;
+    }
   }
 }
 

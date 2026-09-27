@@ -352,6 +352,8 @@ Prohibitions applied by an effect to a target go in an action: `{ "type": "APPLY
 | Card Text | Replacement Encoding |
 |---|---|
 | "If this/your Character would be K.O.'d... instead" | `replaces: { "event": "WOULD_BE_KO" }` |
+| "If this Character would be K.O.'d in battle... instead" | `replaces: { "event": "WOULD_BE_KO", "cause_filter": { "by": "BATTLE" } }` (battle-result K.O. only; an effect K.O. during a battle does not match) |
+| "If this Character would be K.O.'d by an effect... instead" | `replaces: { "event": "WOULD_BE_KO", "cause_filter": { "by": "ANY_EFFECT" } }` |
 | "If your Character with base cost 4+ would be K.O.'d..." | `replaces: { "event": "WOULD_BE_KO", "target_filter": { "controller": "SELF", "base_cost_min": 4 } }` |
 | "would be removed from the field by your opponent's effect... instead" | `replaces: { "event": "WOULD_BE_REMOVED_FROM_FIELD", "cause_filter": { "by": "OPPONENT_EFFECT" } }` |
 | "When your deck is reduced to 0, you win instead" | `replaces: { "event": "WOULD_LOSE_GAME" }` with `replacement_actions: [{ "type": "WIN_GAME" }]` |
