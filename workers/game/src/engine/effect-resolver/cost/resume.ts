@@ -3,7 +3,7 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
 import { transitionCards } from "../../zone-transition.js";
 import { getEffectiveBasePower } from "../../modifiers.js";
-import { trashStage } from "../card-mutations.js";
+import { attachDonToCard, trashStage } from "../card-mutations.js";
 
 export interface AppliedCostSelection {
   state: GameState;
@@ -184,6 +184,35 @@ export function applyCostSelection(
       const newPlayers = [...state.players] as [typeof state.players[0], typeof state.players[1]];
       newPlayers[controller] = { ...p, leader: newLeader, characters: newChars, stage: newStage };
       return { state: { ...state, players: newPlayers }, events: [] };
+    }
+
+    case "GIVE_DON": {
+      // OPT-824: place `amount` of the payer's active, unattached cost-area
+      // DON!! under the one selected recipient — the same attachment the
+      // GIVE_DON action performs (rule 6-5-5-1). All or nothing: a recipient
+      // that is gone or a DON!! shortfall moves nothing (rule 8-3-1-3).
+      const recipient = selectedIds.length === 1 ? selectedIds[0] : undefined;
+      const amount = typeof cost.amount === "number" ? cost.amount : 1;
+      if (!recipient || amount < 1) return { state, events: [] };
+      // attachDonToCard draws DON!! from the target's side; only the payer's
+      // own Leader or Characters may receive the payer's DON!!.
+      const ownRecipient = p.leader.instanceId === recipient ||
+        p.characters.some((c) => c?.instanceId === recipient);
+      if (!ownRecipient) return { state, events: [] };
+      let given = state;
+      for (let i = 0; i < amount; i++) {
+        const attached = attachDonToCard(given, controller, recipient, "ACTIVE");
+        if (!attached) return { state, events: [] };
+        given = attached;
+      }
+      return {
+        state: given,
+        events: [{
+          type: "DON_GIVEN_TO_CARD",
+          playerIndex: controller,
+          payload: { targetInstanceId: recipient, count: amount },
+        }],
+      };
     }
 
     default:

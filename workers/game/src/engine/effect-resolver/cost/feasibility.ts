@@ -6,7 +6,7 @@ import { trashCharacter } from "../card-mutations.js";
 import { payCosts } from "./payment.js";
 import { costNeedsPlayerSelection } from "./payability.js";
 import { applyCostSelection } from "./resume.js";
-import { computeCostTargets, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount } from "./targets.js";
 
 /** Lazily yield every `count`-sized combination of `values` in index order. */
 function* combinations(values: string[], count: number): Generator<string[]> {
@@ -41,7 +41,7 @@ function isCombinationSelection(cost: Cost): boolean {
 function selectionAmounts(cost: Cost, targetCount: number): number[] {
   return cost.type === "REST_CARDS" && cost.amount === "ANY_NUMBER"
     ? Array.from({ length: targetCount }, (_, index) => index + 1)
-    : [resolveAmount(cost as SimpleCost)];
+    : [costSelectionCount(cost as SimpleCost)];
 }
 
 /**

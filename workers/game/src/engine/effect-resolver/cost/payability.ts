@@ -3,7 +3,7 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
-import { computeCostTargets, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, resolveAmount } from "./targets.js";
 
 /** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -29,6 +29,8 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "PLACE_SELF_AND_TRASH_TO_DECK":
     case "PLACE_SELF_AND_HAND_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE":
+    // OPT-824: the player selects the recipient of the given DON!!.
+    case "GIVE_DON":
       return true;
     // OPT-798: the top N cards of the deck are fixed — no choice to prompt.
     case "MILL":
@@ -100,7 +102,7 @@ export function isCostPayable(
     const targets = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
     const amt = cost.type === "REST_CARDS" && cost.amount === "ANY_NUMBER"
       ? 1
-      : resolveAmount(cost);
+      : costSelectionCount(cost);
     return targets.length >= amt;
   }
 
@@ -240,6 +242,7 @@ export function isCostPayable(
     case "ADD_OWN_CHARACTER_TO_LIFE":
     case "PLAY_NAMED_CARD_FROM_HAND":
     case "PLACE_FROM_TRASH_TO_DECK":
+    case "GIVE_DON":
       return true;
     default:
       return assertNever(cost);

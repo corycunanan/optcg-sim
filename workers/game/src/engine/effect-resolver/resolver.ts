@@ -41,6 +41,7 @@ import type {
   ActionHandlerMap,
   EffectResolverServices,
 } from "./types.js";
+import { COST_DON_GIVEN_REF } from "./types.js";
 import {
   markOncePerTurnUsed,
   extractEffectDescription,
@@ -1217,7 +1218,8 @@ function costResultToRefs(
     costResult.cardsTrashedCount > 0 ||
     costResult.cardsReturnedCount > 0 ||
     costResult.cardsPlacedToDeckCount > 0 ||
-    costResult.charactersKoCount > 0;
+    costResult.charactersKoCount > 0 ||
+    costResult.donGivenCount > 0;
   if (!hasValues) return undefined;
   const refs = new Map<string, EffectResult>();
   refs.set("__cost_don_rested", {
@@ -1239,6 +1241,10 @@ function costResultToRefs(
   refs.set("__cost_characters_ko", {
     targetInstanceIds: costResult.charactersKoInstanceIds ?? [],
     count: costResult.charactersKoCount,
+  });
+  refs.set(COST_DON_GIVEN_REF, {
+    targetInstanceIds: costResult.donGivenInstanceIds ?? [],
+    count: costResult.donGivenCount,
   });
   return refs;
 }

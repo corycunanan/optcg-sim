@@ -10,7 +10,7 @@ import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
-import { computeCostTargets } from "./targets.js";
+import { computeCostTargets, resolveAmount } from "./targets.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 
@@ -37,6 +37,8 @@ export function payCosts(
     cardsTrashedInstanceIds: [],
     cardsReturnedInstanceIds: [],
     charactersKoInstanceIds: [],
+    donGivenCount: 0,
+    donGivenInstanceIds: [],
   };
 
   let nextState = state;
@@ -454,6 +456,21 @@ export function payCosts(
         events.push(...result.events);
         costResult.cardsTrashedCount += 1;
         costResult.cardsTrashedInstanceIds.push(stageId);
+        break;
+      }
+
+      case "GIVE_DON": {
+        // OPT-824: synchronous callers cannot ask for the recipient. Pay only
+        // an unambiguous payment (exactly one eligible recipient); the
+        // interactive flow prompts through payCostsWithSelection.
+        const recipients = computeCostTargets(nextState, cost, controller, _cardDb, sourceCardInstanceId);
+        if (recipients.length !== 1) return null;
+        const applied = applyCostSelection(nextState, cost, recipients, controller, _cardDb);
+        if (applied.events.length === 0) return null;
+        nextState = applied.state;
+        events.push(...applied.events);
+        costResult.donGivenCount += resolveAmount(cost);
+        costResult.donGivenInstanceIds.push(...recipients);
         break;
       }
 

@@ -1261,7 +1261,9 @@ export type SimpleCost = {
   [Type in SimpleCostType]: SimpleCostFields & { type: Type } & (
     Type extends "PLACE_OWN_CHARACTER_TO_DECK"
       ? PlaceCharacterToDeckCostFields
-      : unknown
+      : Type extends "GIVE_DON"
+        ? GiveDonCostFields
+        : unknown
   );
 }[SimpleCostType];
 
@@ -1274,6 +1276,19 @@ export type SimpleCost = {
  */
 interface PlaceCharacterToDeckCostFields {
   controller?: "SELF" | "EITHER";
+}
+
+/**
+ * OPT-824: "give N active DON!! cards to 1 of your <recipient>" before the
+ * colon (OP13-007, EB04-009, OP12-016/017/019). `amount` DON!! come from the
+ * paying player's cost area and must be ACTIVE and unattached (rule 6-5-5-1);
+ * `target` is the single recipient — one of the payer's Leader or Characters,
+ * narrowed by its filter (e.g. name "Silvers Rayleigh"). The recipient is the
+ * only choice: active cost-area DON!! are interchangeable. The chosen card is
+ * exposed to post-colon actions as the `__cost_don_given` result ref.
+ */
+interface GiveDonCostFields {
+  target: Target;
 }
 
 export interface ChoiceCost {
@@ -1313,6 +1328,8 @@ export type CostType =
   | "PLACE_FROM_TRASH_TO_DECK"
   | "LEADER_POWER_REDUCTION"
   | "GIVE_OPPONENT_DON"
+  // OPT-824: give N of your active DON!! to 1 of your Leader or Characters.
+  | "GIVE_DON"
   | "RETURN_ATTACHED_DON_TO_COST"
   | "PLACE_SELF_AND_HAND_TO_DECK"
   | "PLACE_SELF_AND_TRASH_TO_DECK"
@@ -1331,7 +1348,7 @@ export const ALL_COST_TYPES = [
   "TRASH_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK",
   "MILL", "PLACE_SELF_TO_DECK", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
   "TRASH_OWN_STAGE", "PLACE_FROM_TRASH_TO_DECK", "LEADER_POWER_REDUCTION",
-  "GIVE_OPPONENT_DON", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
+  "GIVE_OPPONENT_DON", "GIVE_DON", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
   "PLACE_SELF_AND_TRASH_TO_DECK", "LIFE_TO_HAND", "REST_DON", "TURN_LIFE_FACE_UP",
   "TURN_LIFE_FACE_DOWN", "CHOOSE_ONE_COST", "CHOICE",
 ] as const satisfies readonly CostType[];
@@ -1694,4 +1711,7 @@ export interface CostResult {
   cardsTrashedInstanceIds: string[];
   cardsReturnedInstanceIds: string[];
   charactersKoInstanceIds: string[];
+  /** OPT-824: DON!! given by a GIVE_DON cost, and the card(s) that received them. */
+  donGivenCount: number;
+  donGivenInstanceIds: string[];
 }

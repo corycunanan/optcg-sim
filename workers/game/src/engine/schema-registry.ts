@@ -22,6 +22,7 @@ import {
   type Action,
   type Controller,
   type Cost,
+  type Target,
   type TargetFilter,
   type TargetType,
 } from "./effect-types.js";
@@ -130,6 +131,7 @@ const IMPLICIT_COST_RESULT_REFS = new Set([
   "__cost_cards_returned",
   "__cost_cards_placed_to_deck",
   "__cost_characters_ko",
+  "__cost_don_given",
 ]);
 const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
   "type", "params", "target", "duration", "chain", "target_ref",
@@ -490,6 +492,29 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
     (typeof cost.card_name !== "string" || cost.card_name.trim().length === 0)
   ) {
     errors.push(`${prefix}: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE requires a non-empty 'card_name'`);
+  }
+
+  // OPT-824: "give N active DON!! cards to 1 of your <recipient>" — N DON!!,
+  // exactly one of the payer's own Leader or Characters as the recipient.
+  if (cost.type === "GIVE_DON") {
+    const amount = (cost as { amount?: unknown }).amount;
+    if (typeof amount !== "number" || !Number.isInteger(amount) || amount < 1) {
+      errors.push(`${prefix}: GIVE_DON requires a positive integer 'amount' (DON!! given)`);
+    }
+    const target = (cost as { target?: Target }).target;
+    if (!target) {
+      errors.push(`${prefix}: GIVE_DON requires a 'target' naming the recipient`);
+    } else {
+      if (!(["LEADER_OR_CHARACTER", "CHARACTER", "YOUR_LEADER"] as (TargetType | undefined)[]).includes(target.type)) {
+        errors.push(`${prefix}: GIVE_DON recipient must be a Leader or Character target`);
+      }
+      if (target.type !== "YOUR_LEADER" && target.controller !== "SELF") {
+        errors.push(`${prefix}: GIVE_DON recipient must be controller 'SELF'`);
+      }
+      if (target.type !== "YOUR_LEADER" && !(target.count && "exact" in target.count && target.count.exact === 1)) {
+        errors.push(`${prefix}: GIVE_DON recipient count must be { exact: 1 }`);
+      }
+    }
   }
 
   return errors;

@@ -16,7 +16,7 @@ import {
   captureCostTransactionState,
   type CostTransactionState,
 } from "./transaction.js";
-import { computeCostTargets, getCostCards, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, getCostCards, resolveAmount } from "./targets.js";
 import {
   blockShufflesDeck,
   buildTrashToDeckArrangePrompt,
@@ -93,6 +93,8 @@ export function payCostsWithSelection(
     cardsTrashedInstanceIds: [],
     cardsReturnedInstanceIds: [],
     charactersKoInstanceIds: [],
+    donGivenCount: 0,
+    donGivenInstanceIds: [],
   };
 
   // OPT-798: rule 8-3-1-3 — when the remaining activation cost cannot be
@@ -576,7 +578,8 @@ export function payCostsWithSelection(
 
       // Build valid targets for this cost
       const validTargets = computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId);
-      const amount = typeof cost.amount === "number" ? cost.amount : 1;
+      // OPT-824: a GIVE_DON amount counts DON!!; the player picks 1 recipient.
+      const amount = costSelectionCount(cost);
 
       if (validTargets.length < amount) {
         return cannotPay();
@@ -688,6 +691,8 @@ export function payCostsWithSelection(
     costResult.cardsTrashedInstanceIds.push(...singleResult.costResult.cardsTrashedInstanceIds);
     costResult.cardsReturnedInstanceIds.push(...singleResult.costResult.cardsReturnedInstanceIds);
     costResult.charactersKoInstanceIds.push(...singleResult.costResult.charactersKoInstanceIds);
+    costResult.donGivenCount += singleResult.costResult.donGivenCount;
+    costResult.donGivenInstanceIds.push(...singleResult.costResult.donGivenInstanceIds);
   }
 
   return { state: nextState, events, costResult };

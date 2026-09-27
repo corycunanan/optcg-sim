@@ -161,6 +161,12 @@ export interface CostSelectionResult {
   costResult?: import("../effect-types.js").CostResult;
 }
 
+/**
+ * OPT-824: result ref naming the card(s) that received DON!! from a GIVE_DON
+ * cost ("the card given these DON!! cards"); count is the DON!! given.
+ */
+export const COST_DON_GIVEN_REF = "__cost_don_given";
+
 /** Serialize CostResult into entries for EffectStackFrame.costResultRefs */
 export function costResultToEntries(
   costResult: import("../effect-types.js").CostResult
@@ -193,6 +199,13 @@ export function costResultToEntries(
       {
         targetInstanceIds: costResult.charactersKoInstanceIds ?? [],
         count: costResult.charactersKoCount,
+      },
+    ],
+    [
+      COST_DON_GIVEN_REF,
+      {
+        targetInstanceIds: costResult.donGivenInstanceIds ?? [],
+        count: costResult.donGivenCount ?? 0,
       },
     ],
   ];
