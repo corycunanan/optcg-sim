@@ -181,7 +181,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **3-8-5-1.** Stage overflow: trash existing, then play | **IMPL** | `execute.ts:110–114` | |
 | **3-9-1/2/3.** Cost area: DON!! cards, open, enter active | **IMPL** | `PlayerState.donCostArea`, `placeDonFromDeck()` sets active | |
 | **3-10-1/2.** Life area: secret, face-down stack, top removed first | **IMPL** | `PlayerState.life: LifeCard[]`, `removeTopLifeCard()` | Index 0 = top |
-| **3-10-2-1.** Effects can add life face-up | **IMPL** | `LifeCard.face: "UP" \| "DOWN"`, `effect-resolver/actions/life.ts` | Both data model and action handlers support face-up life cards |
+| **3-10-2-1.** Effects can add life face-up | **IMPL** | `LifeCard.face: "UP" \| "DOWN"`, `effect-resolver/actions/life.ts` | Both data model and action handlers support face-up life cards. OPT-828: the opponent `ADD_OWN_CHARACTER_TO_LIFE` cost (OP09-101) places the chosen opponent Character face-up at the payer-chosen end of its owner's Life via `cost/resume.ts → applyCostSelection()`; `resume/cost.ts` re-validates the target and bound end against live and staged state. [`opt-828-kuzan-opponent-life-cost.test.ts`](../../workers/game/src/__tests__/opt-828-kuzan-opponent-life-cost.test.ts) |
 
 ---
 
