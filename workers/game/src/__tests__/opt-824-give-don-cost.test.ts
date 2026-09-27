@@ -619,6 +619,20 @@ describe("OPT-824 GIVE_DON cost — engine contract", () => {
     expect(applied.state.players[P1].characters.find((c) => c?.instanceId === foe.instanceId)!.attachedDon).toEqual([]);
   });
 
+  it("pays all or nothing: a DON!! shortfall moves no DON!! and emits no event", () => {
+    const f = fixture();
+    setDon(f, P0, 1, 2);
+    const leader = f.state.players[P0].leader;
+    const give = {
+      type: "GIVE_DON" as const,
+      amount: 2,
+      target: { type: "LEADER_OR_CHARACTER" as const, controller: "SELF" as const, count: { exact: 1 } },
+    };
+    const applied = applyCostSelection(f.state, give, [leader.instanceId], P0, f.db);
+    expect(applied.events).toEqual([]);
+    expect(applied.state).toBe(f.state);
+  });
+
   it("validates the authored GIVE_DON cost shape", () => {
     const recipient = { type: "LEADER_OR_CHARACTER" as const, controller: "SELF" as const, count: { exact: 1 } };
     expect(validateCost({ type: "GIVE_DON", amount: 2, target: recipient }, "c", false)).toEqual([]);
