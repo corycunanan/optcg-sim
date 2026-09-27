@@ -95,6 +95,21 @@ export function payCostsWithSelection(
     charactersKoInstanceIds: [],
   };
 
+  // OPT-798: rule 8-3-1-3 — when the remaining activation cost cannot be
+  // paid in full (in printed order, rule 8-3-1-1), none of it is paid. Check
+  // the whole suffix before prompting for the first selection so a player is
+  // never asked to pick a payment that must then be rolled back (e.g.
+  // OP04-055: an [Ice Oni] in hand but no cost ≤4 Character on either field).
+  if (!isCostSequencePayable(
+    state,
+    costs.slice(startIndex),
+    controller,
+    cardDb,
+    sourceCardInstanceId,
+  )) {
+    return cannotPay();
+  }
+
   // Use a mutable copy so CHOOSE_ONE_COST auto-select can replace the slot.
   const workingCosts = [...costs];
   for (let i = startIndex; i < workingCosts.length; i++) {

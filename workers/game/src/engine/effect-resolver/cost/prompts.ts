@@ -64,7 +64,10 @@ export function getCostLabel(cost: Cost): string {
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": return `Choose 1 [${cost.card_name ?? "named card"}] from hand or stage to trash as cost`;
     case "KO_OWN_CHARACTER": return `Choose ${amount} character(s) to KO as cost`;
     case "RETURN_OWN_CHARACTER_TO_HAND": return `Choose ${amount} character(s) to return to hand as cost`;
-    case "PLACE_OWN_CHARACTER_TO_DECK": return `Choose ${amount} character(s) to place on deck as cost`;
+    case "PLACE_OWN_CHARACTER_TO_DECK": return cost.controller === "EITHER"
+      ? `Choose ${amount} Character(s) to place at the bottom of the owner's deck as cost`
+      : `Choose ${amount} character(s) to place on deck as cost`;
+    case "MILL": return `Trash ${amount} card(s) from the top of your deck as cost`;
     case "ADD_OWN_CHARACTER_TO_LIFE": return `Choose ${amount} character(s) to add to your Life cards as cost`;
     case "TRASH_FROM_LIFE": return `Choose ${amount} life card(s) to trash as cost`;
     case "PLACE_HAND_TO_DECK": return `Choose ${amount} card(s) to place on deck as cost`;

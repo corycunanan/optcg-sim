@@ -1258,8 +1258,23 @@ type SimpleCostType = Exclude<CostType, "CHOICE">;
  * every branch without assertions and enforce exhaustive dispatch.
  */
 export type SimpleCost = {
-  [Type in SimpleCostType]: SimpleCostFields & { type: Type };
+  [Type in SimpleCostType]: SimpleCostFields & { type: Type } & (
+    Type extends "PLACE_OWN_CHARACTER_TO_DECK"
+      ? PlaceCharacterToDeckCostFields
+      : unknown
+  );
 }[SimpleCostType];
+
+/**
+ * OPT-798: "place 1 Character ... at the bottom of the owner's deck" (no
+ * "your") selects either player's Character (OP04-055, OP06-043). Omitted or
+ * "SELF" keeps the historical own-Characters-only candidate set. The card
+ * always moves to its OWNER's deck (rule 4-2-1-1); the paying player chooses.
+ * Only this cost type accepts the field.
+ */
+interface PlaceCharacterToDeckCostFields {
+  controller?: "SELF" | "EITHER";
+}
 
 export interface ChoiceCost {
   type: "CHOICE";
@@ -1285,6 +1300,9 @@ export type CostType =
   | "TRASH_OWN_CHARACTER"
   | "RETURN_OWN_CHARACTER_TO_HAND"
   | "PLACE_OWN_CHARACTER_TO_DECK"
+  // OPT-798: "trash N cards from the top of your deck" before the colon —
+  // the paying player's deck must hold at least N cards (rule 8-3-1-3).
+  | "MILL"
   // OPT-454: "place this Character at the bottom of the owner's deck" —
   // fixed to the source card, auto-pays like TRASH_SELF (no selection).
   | "PLACE_SELF_TO_DECK"
@@ -1311,7 +1329,7 @@ export const ALL_COST_TYPES = [
   "TRASH_FROM_HAND", "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE", "TRASH_FROM_LIFE", "PLACE_HAND_TO_DECK", "REVEAL_FROM_HAND",
   "PLAY_NAMED_CARD_FROM_HAND", "REST_CARDS", "REST_NAMED_CARD", "KO_OWN_CHARACTER",
   "TRASH_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK",
-  "PLACE_SELF_TO_DECK", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
+  "MILL", "PLACE_SELF_TO_DECK", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
   "TRASH_OWN_STAGE", "PLACE_FROM_TRASH_TO_DECK", "LEADER_POWER_REDUCTION",
   "GIVE_OPPONENT_DON", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
   "PLACE_SELF_AND_TRASH_TO_DECK", "LIFE_TO_HAND", "REST_DON", "TURN_LIFE_FACE_UP",
