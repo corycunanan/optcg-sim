@@ -360,7 +360,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `KO_OWN_CHARACTER` | "K.O. one of your Characters" |
 | `TRASH_OWN_CHARACTER` | "Trash your Character" |
 | `RETURN_OWN_CHARACTER_TO_HAND` | "Return your Character to hand" |
-| `PLACE_OWN_CHARACTER_TO_DECK` | "Place Character at deck bottom" |
+| `PLACE_OWN_CHARACTER_TO_DECK` | "Place Character at deck bottom" — add `controller: "EITHER"` when the text says "place 1 Character … the owner's deck" (either player's; the card goes to its owner's deck) |
 | `ADD_OWN_CHARACTER_TO_LIFE` | "Add your Character to Life" |
 | `TRASH_OWN_STAGE` | "Trash your Stage" |
 
@@ -371,6 +371,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `LEADER_POWER_REDUCTION` | "Your Leader -N power" |
 | `LIFE_TO_HAND` | "Add N Life to hand" (with `position: "TOP"\|"BOTTOM"\|"TOP_OR_BOTTOM"`) |
 | `TRASH_FROM_LIFE` | "Trash N from Life" |
+| `MILL` | "Trash N cards from the top of your deck" before the colon — `{ amount: N }`; unpayable with fewer than N cards in deck |
 | `PLACE_FROM_TRASH_TO_DECK` | "Return N from trash to deck" |
 | `PLACE_STAGE_TO_DECK` | "Place Stage at deck bottom" |
 | `PLACE_HAND_TO_DECK` | "Place N from hand to deck" |
