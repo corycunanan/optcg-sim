@@ -1127,3 +1127,10 @@ three OP14 cards is explicitly a user-authorized inference from that analogue,
 not a direct OP14 activation-cost ruling. COST remains distinct from EFFECT in
 persisted events. Symbol Counter, rule disposal, routine Event disposal, zero-card
 movements, and Life-to-hand movements do not qualify.
+
+Every committed-cost scan admits these canonical events, including the terminal
+path for a Life cost replaced by ST13-003 (`finishReplacedLifeCost`, OPT-857):
+it completes the causal source from the frame's pre-payment snapshot, then scans
+the hand-trash cost so its watchers wait in the same batch as the effect's other
+waiting auto effects. That path pays no later cost, so schema lint requires
+`LIFE_TO_HAND` to be the last cost of every payment order.
