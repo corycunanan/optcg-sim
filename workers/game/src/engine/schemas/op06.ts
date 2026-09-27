@@ -1544,6 +1544,9 @@ export const OP06_043_ARAMAKI: EffectSchema = {
           type: "PLACE_OWN_CHARACTER_TO_DECK",
           amount: 1,
           filter: { cost_max: 2 },
+          // "place 1 Character" (no "your"): either player's Character
+          // (qa_op06.md: needs a cost ≤2 Character on either field).
+          controller: "EITHER",
           position: "BOTTOM",
         },
       ],

@@ -1789,11 +1789,8 @@ export const EB01_051_FINGER_PISTOL: EffectSchema = {
       id: "main_ko",
       category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
+      costs: [{ type: "MILL", amount: 2 }],
       actions: [
-        {
-          type: "MILL",
-          params: { amount: 2 },
-        },
         {
           type: "KO",
           target: {
@@ -1802,7 +1799,6 @@ export const EB01_051_FINGER_PISTOL: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 5 },
           },
-          chain: "THEN",
         },
       ],
       flags: { optional: true },
