@@ -143,6 +143,7 @@ All SimpleCondition types at a glance. Each is detailed in the section indicated
 | `DON_GIVEN` | DON!! attachment state | "If your opponent has any DON!! cards given..." | OP15-005, OP15-001 |
 | `TURN_COUNT` | Game turn number | "If it is your second turn or later..." | OP15-058 |
 | `SOURCE_PROPERTY` | Source of event matches filter | "by effects of Characters with N base power..." | OP14-003, OP11-005 |
+| `REVEALED_CARD_PROPERTY` | A card recorded by an earlier action's `result_ref` (REVEAL, REVEAL_HAND, MILL, …) matches `filter` / printed-`COST` `compare`; false when the ref is absent or empty | "If the revealed card is...", "If the trashed card has a cost of N or more..." | OP01-060, OP08-096 |
 
 ---
 

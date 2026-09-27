@@ -1662,10 +1662,17 @@ export interface EffectResolutionContext {
   costResults: CostResult;
 }
 
+/**
+ * Last-known identity of a card an action exposed. REVEAL snapshots the card
+ * in place; MILL snapshots the card it actually moved, using its new trash
+ * instance id (ZONE-TRANSITION-CONTRACT), so a later REVEALED_CARD_PROPERTY condition reads
+ * the milled card's printed properties even if it has since changed zone and
+ * never matches an unrelated trash or field card.
+ */
 export interface RevealedCardSnapshot {
   instanceId: string;
   cardId: string;
-  source: "DECK" | "DECK_TOP" | "LIFE_TOP";
+  source: "DECK" | "DECK_TOP" | "LIFE_TOP" | "MILL";
   controller: 0 | 1;
 }
 

@@ -3403,6 +3403,7 @@ export const OP08_096_PEOPLES_DREAMS: EffectSchema = {
         {
           type: "MILL",
           params: { amount: 1 },
+          result_ref: "milled",
         },
         {
           type: "MODIFY_POWER",
@@ -3413,10 +3414,12 @@ export const OP08_096_PEOPLES_DREAMS: EffectSchema = {
           },
           params: { amount: 5000 },
           duration: { type: "THIS_BATTLE" },
+          // "If the trashed card has a cost of 6 or more" — the printed cost
+          // of the card MILL actually moved (empty deck → no ref → false).
           conditions: {
-            type: "SOURCE_PROPERTY",
-            context: "KO_BY_EFFECT",
-            source_filter: { cost_min: 6 },
+            type: "REVEALED_CARD_PROPERTY",
+            result_ref: "milled",
+            compare: { property: "COST", operator: ">=", value: 6 },
           },
           chain: "THEN",
         },

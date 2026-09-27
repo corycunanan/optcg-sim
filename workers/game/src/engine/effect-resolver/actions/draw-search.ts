@@ -204,6 +204,9 @@ export function executeMill(
 
   events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: millCount, reason: "mill", from: "DECK" } });
 
+  // Record the cards actually moved: new trash instance ids plus a snapshot
+  // of each printed card, so a later "if the trashed card ..." condition
+  // (REVEALED_CARD_PROPERTY via result_ref) reads exactly these cards.
   return {
     state: moved.state,
     events,
@@ -211,6 +214,12 @@ export function executeMill(
     result: {
       targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
       count: moved.transitions.length,
+      revealedCards: moved.transitions.map((transition) => ({
+        instanceId: transition.fact.newInstanceId,
+        cardId: transition.fact.cardId,
+        source: "MILL" as const,
+        controller: transition.fact.controller,
+      })),
     },
   };
 }
