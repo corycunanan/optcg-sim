@@ -19,6 +19,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 import type { EffectBlock, EffectSchema, TargetFilter } from "../engine/effect-types.js";
+import { findReplacementControllerViolations } from "../engine/schema-replacement-controller-lint.js";
+import { ST29_008_NAMI } from "../engine/schemas/st29.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CARDS_DOCS_DIR = path.resolve(__dirname, "../../../../docs/cards");
@@ -161,5 +163,90 @@ describe("schema lint: replacement self-exclusion", () => {
     const failures = lintSchema(broken, tashigiText);
     expect(failures).toHaveLength(1);
     expect(failures[0].cardId).toBe("OP10-032");
+  });
+});
+
+// ─── OPT-800: replacement target_filter must declare controller ─────────────
+
+describe("schema lint: replacement target_filter controller (OPT-800)", () => {
+  function replacementSchema(targetFilter?: TargetFilter): EffectSchema {
+    return {
+      card_id: "LINT-TEST",
+      card_name: "Lint Test",
+      card_type: "Character",
+      effects: [
+        {
+          id: "replacement",
+          category: "replacement",
+          replaces: {
+            event: "WOULD_BE_KO",
+            ...(targetFilter ? { target_filter: targetFilter } : {}),
+          },
+          replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }],
+          flags: { optional: true },
+        },
+      ],
+    };
+  }
+
+  it("every authored replacement target_filter declares a controller", () => {
+    const failures = Object.values(getAllAuthoredSchemas()).flatMap(findReplacementControllerViolations);
+    expect(failures).toEqual([]);
+  });
+
+  it("fails a target_filter that omits controller", () => {
+    const failures = findReplacementControllerViolations(
+      replacementSchema({ card_type: "CHARACTER", traits: ["Egghead"] }),
+    );
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatch(/^LINT-TEST replacement: /);
+  });
+
+  it("exempts a self-only replacement (no target_filter)", () => {
+    expect(findReplacementControllerViolations(replacementSchema())).toEqual([]);
+  });
+
+  it.each(["SELF", "OPPONENT", "EITHER", "ANY"] as const)("accepts an explicit %s controller", (controller) => {
+    expect(
+      findReplacementControllerViolations(replacementSchema({ controller, card_type: "CHARACTER" })),
+    ).toEqual([]);
+  });
+
+  it("walks nested replacement definitions (granted blocks inside actions)", () => {
+    const nested = replacementSchema().effects[0];
+    const schema: EffectSchema = {
+      card_id: "LINT-NESTED",
+      card_name: "Lint Nested",
+      card_type: "Event",
+      effects: [
+        {
+          id: "grant",
+          category: "auto",
+          trigger: { keyword: "MAIN_EVENT" },
+          actions: [
+            {
+              type: "GRANT_EFFECT",
+              params: {
+                effect: {
+                  ...nested,
+                  id: "granted_replacement",
+                  replaces: { event: "WOULD_BE_KO", target_filter: { card_type: "CHARACTER" } },
+                },
+              },
+            } as never,
+          ],
+        },
+      ],
+    };
+    const failures = findReplacementControllerViolations(schema);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatch(/^LINT-NESTED granted_replacement: /);
+  });
+
+  it("regression: removing ST29-008's controller fails the lint", () => {
+    expect(findReplacementControllerViolations(ST29_008_NAMI)).toEqual([]);
+    const broken = structuredClone(ST29_008_NAMI);
+    delete broken.effects[0].replaces!.target_filter!.controller;
+    expect(findReplacementControllerViolations(broken)).toHaveLength(1);
   });
 });
