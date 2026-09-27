@@ -199,14 +199,36 @@ describe.each(["EB01-051", "EB04-049"])("OPT-798 %s — MILL is an activation co
     expect(f.millEvents()[0]).toMatchObject({ playerIndex: 0, payload: { count: 2, reason: "mill", from: "DECK" } });
   });
 
-  it("an exactly-2-card deck can pay (deck ≥ amount) and the K.O. still resolves", () => {
+  // OPT-798 review: rule 9-1-2 (rule processing is immediate) + 9-2-1-2 (a
+  // player with 0 cards in deck loses). Paying the cost with exactly N cards
+  // empties the deck, so the game must end before the post-colon K.O. prompt.
+  // Pre-existing shared defect (the MILL action behaves the same way): defeat
+  // is only checked at the pipeline boundary. Tracked as a follow-up; this
+  // ratchet fails loudly once immediate deck-out processing lands.
+  it.fails("an exactly-2-card deck pays, then loses immediately before any K.O. prompt (rule 9-1-2)", () => {
     const f = fixture();
+    f.deck(0, 2);
+    f.put("victim", 1, "CHARACTER", { cost: 2 });
+    f.act({ type: "PLAY_CARD", cardInstanceId: putEvent(f, id).instanceId });
+    f.accept();
+    expect(f.state.players[0].deck).toHaveLength(0);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state).toMatchObject({ status: "FINISHED", winner: 1 });
+  });
+
+  it("a delayed deck-out Leader (OP15-022 Brook) keeps playing after the cost empties the deck", () => {
+    const f = fixture();
+    f.put("OP15-022", 0, "LEADER", { type: "Leader", cost: null, power: 5000, life: 4 });
     f.deck(0, 2);
     const victim = f.put("victim", 1, "CHARACTER", { cost: 2 });
     f.act({ type: "PLAY_CARD", cardInstanceId: putEvent(f, id).instanceId });
     f.accept();
     expect(f.state.players[0].deck).toHaveLength(0);
+    expect(f.state.status).toBe("IN_PROGRESS");
     expect(f.validTargets()).toEqual([victim.instanceId]);
+    f.select([victim.instanceId]);
+    expect(onField(f.state, victim.instanceId)).toBe(false);
+    expect(f.state.status).toBe("IN_PROGRESS");
   });
 
   it("declining the optional cost trashes nothing and K.O.s nothing", () => {
@@ -335,15 +357,28 @@ describe("OPT-798 EB04-042 Alpha [On Play] MILL cost", () => {
 
   it("payable: trashes 3, then −1 cost", () => {
     const f = fixture();
-    f.deck(0, 3);
+    f.deck(0, 4);
     const target = f.put("target", 1, "CHARACTER", { cost: 3 });
     f.act({ type: "PLAY_CARD", cardInstanceId: f.put("EB04-042", 0, "HAND", { cost: 2 }).instanceId });
     f.accept();
-    expect(f.state.players[0].deck).toHaveLength(0);
+    expect(f.state.players[0].deck).toHaveLength(1);
     f.select([target.instanceId]);
     expect(getEffectiveCost(f.db.get("target")!, f.state, target.instanceId, f.db)).toBe(2);
     expect(f.millEvents()).toHaveLength(1);
     expect(f.millEvents()[0].payload).toMatchObject({ count: 3 });
+  });
+
+  // Same rule 9-1-2 ratchet as the Event case: emptying the deck with the
+  // cost must end the game before the −1 cost target prompt.
+  it.fails("an exactly-3-card deck pays, then loses immediately before the −1 cost prompt (rule 9-1-2)", () => {
+    const f = fixture();
+    f.deck(0, 3);
+    f.put("target", 1, "CHARACTER", { cost: 3 });
+    f.act({ type: "PLAY_CARD", cardInstanceId: f.put("EB04-042", 0, "HAND", { cost: 2 }).instanceId });
+    f.accept();
+    expect(f.state.players[0].deck).toHaveLength(0);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state).toMatchObject({ status: "FINISHED", winner: 1 });
   });
 });
 
