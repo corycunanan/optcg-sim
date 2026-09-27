@@ -7,7 +7,7 @@
  * Driven from canonical card text (docs/cards), not from schema shape, so a
  * card encoded without any MILL at all is still caught.
  */
-import type { Cost, EffectSchema } from "./effect-types.js";
+import type { Cost, EffectBlock, EffectSchema, KeywordTriggerType, Trigger } from "./effect-types.js";
 
 const WORD_NUMBERS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
 const DECK_TRASH = /\btrash (\d+|a|an|one|two|three|four|five) cards? from the top of your deck\b/gi;
@@ -28,22 +28,61 @@ function toAmount(token: string): number {
   return /^\d+$/.test(token) ? Number(token) : WORD_NUMBERS[token.toLowerCase()] ?? 1;
 }
 
-/** Amounts of every printed "trash N cards from the top of your deck" that sits before a colon. */
-export function preColonMillAmounts(cardText: string): number[] {
-  const amounts: number[] = [];
+/**
+ * Printed timing brackets → authored trigger keywords. A clause is associated
+ * with the blocks whose trigger carries one of these keywords.
+ */
+const TIMING_KEYWORDS: Record<string, readonly KeywordTriggerType[]> = {
+  "main": ["MAIN_EVENT"],
+  "activate: main": ["ACTIVATE_MAIN"],
+  "on play": ["ON_PLAY"],
+  "when attacking": ["WHEN_ATTACKING"],
+  "on k.o.": ["ON_KO"],
+  "on block": ["ON_BLOCK"],
+  "on your opponent's attack": ["ON_OPPONENT_ATTACK"],
+  "end of your turn": ["END_OF_YOUR_TURN"],
+  "end of your opponent's turn": ["END_OF_OPPONENT_TURN"],
+  "counter": ["COUNTER", "COUNTER_EVENT"],
+  "trigger": ["TRIGGER"],
+};
+
+/** One printed pre-colon "trash N cards from the top of your deck". */
+export interface PreColonMillClause {
+  amount: number;
+  /**
+   * Trigger keywords of the printed timing on the clause's line, or null when
+   * the line carries no recognized timing bracket (e.g. an event-driven
+   * "When ..." sentence). Null clauses fall back to card-wide matching.
+   */
+  keywords: readonly KeywordTriggerType[] | null;
+}
+
+/** Every printed pre-colon deck trash, with the timing it belongs to. */
+export function preColonMillClauses(cardText: string): PreColonMillClause[] {
+  const clauses: PreColonMillClause[] = [];
   const lines = cardText.replace(/<br\s*\/?\s*>/gi, "\n").split("\n");
   for (const line of lines) {
+    let keywords: readonly KeywordTriggerType[] | null = null;
+    for (const bracket of line.matchAll(/\[([^\]]*)\]/g)) {
+      const mapped = TIMING_KEYWORDS[bracket[1].trim().toLowerCase()];
+      if (mapped) keywords = mapped;
+    }
     // Keyword brackets such as [Activate: Main] carry their own colon.
     const unbracketed = line.replace(/\[[^\]]*\]/g, " ");
     for (const sentence of unbracketed.split(/(?<=\.)\s+/)) {
       const colon = sentence.indexOf(":");
       if (colon < 0) continue;
       for (const match of sentence.slice(0, colon).matchAll(DECK_TRASH)) {
-        amounts.push(toAmount(match[1]));
+        clauses.push({ amount: toAmount(match[1]), keywords });
       }
     }
   }
-  return amounts;
+  return clauses;
+}
+
+/** Amounts of every printed pre-colon deck trash. */
+export function preColonMillAmounts(cardText: string): number[] {
+  return preColonMillClauses(cardText).map((clause) => clause.amount);
 }
 
 function millCostAmounts(costs: readonly Cost[] | undefined): number[] {
@@ -55,38 +94,70 @@ function millCostAmounts(costs: readonly Cost[] | undefined): number[] {
   });
 }
 
-/** Violations for one card: canonical text block + its authored schema. */
+function triggerKeywords(trigger: Trigger | undefined): KeywordTriggerType[] {
+  if (!trigger) return [];
+  if ("any_of" in trigger) return trigger.any_of.flatMap(triggerKeywords);
+  return "keyword" in trigger ? [trigger.keyword] : [];
+}
+
+function clauseMatchesBlock(clause: PreColonMillClause, block: EffectBlock): boolean {
+  if (clause.keywords === null) return true;
+  const blockKeywords = triggerKeywords(block.trigger);
+  return clause.keywords.some((keyword) => blockKeywords.includes(keyword));
+}
+
+/**
+ * Violations for one card: canonical text block + its authored schema.
+ *
+ * Each printed clause is matched only against blocks with the same timing
+ * (the bracket on its line vs `block.trigger`). A clause whose line has no
+ * recognized timing bracket falls back to matching any block of the card.
+ */
 export function findMillCostViolations(cardText: string, schema: EffectSchema): string[] {
-  const printed = preColonMillAmounts(cardText);
-  const authored = schema.effects.flatMap((block) => millCostAmounts(block.costs));
+  const clauses = preColonMillClauses(cardText);
   const violations: string[] = [];
+  // Unconsumed MILL costs per block, consumed as clauses find a payment.
+  const unmatched = new Map<EffectBlock, number[]>(
+    schema.effects.map((block) => [block, millCostAmounts(block.costs)]),
+  );
 
   for (const block of schema.effects) {
     const first = block.actions?.[0];
     if (first?.type !== "MILL" || millCostAmounts(block.costs).length > 0) continue;
     const amount = (first.params as { amount?: unknown } | undefined)?.amount;
-    if (typeof amount === "number" && printed.includes(amount)) {
+    if (
+      typeof amount === "number" &&
+      clauses.some((clause) => clause.amount === amount && clauseMatchesBlock(clause, block))
+    ) {
       violations.push(
         `${schema.card_id} ${block.id}: printed "trash ${amount} cards from the top of your deck:" is an activation cost but is encoded as the first action — use costs: [{ type: "MILL", amount: ${amount} }]`,
       );
     }
   }
 
-  const unmatched = [...authored];
-  for (const amount of printed) {
-    const index = unmatched.indexOf(amount);
-    if (index >= 0) {
-      unmatched.splice(index, 1);
+  // Timed clauses first so an untimed (card-wide) clause cannot take the
+  // only cost a timed clause could use.
+  const ordered = [...clauses].sort((a, b) => Number(a.keywords === null) - Number(b.keywords === null));
+  for (const clause of ordered) {
+    const payer = schema.effects.find((block) =>
+      clauseMatchesBlock(clause, block) && unmatched.get(block)!.includes(clause.amount),
+    );
+    if (payer) {
+      const amounts = unmatched.get(payer)!;
+      amounts.splice(amounts.indexOf(clause.amount), 1);
       continue;
     }
     violations.push(
-      `${schema.card_id}: printed "trash ${amount} cards from the top of your deck:" requires a MILL cost with amount ${amount}`,
+      `${schema.card_id}: printed "trash ${clause.amount} cards from the top of your deck:" requires a MILL cost with amount ${clause.amount}` +
+        (clause.keywords ? ` on its ${clause.keywords.join("/")} block` : ""),
     );
   }
-  for (const amount of unmatched) {
-    violations.push(
-      `${schema.card_id}: MILL cost (amount ${amount}) has no printed pre-colon "trash N cards from the top of your deck:"`,
-    );
+  for (const [block, amounts] of unmatched) {
+    for (const amount of amounts) {
+      violations.push(
+        `${schema.card_id} ${block.id}: MILL cost (amount ${amount}) has no printed pre-colon "trash N cards from the top of your deck:" with this block's timing`,
+      );
+    }
   }
   return violations;
 }

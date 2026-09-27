@@ -9,6 +9,7 @@ import {
   findMillCostIntentViolations,
   findMillCostViolations,
   preColonMillAmounts,
+  preColonMillClauses,
 } from "../engine/schema-cost-lint.js";
 
 // ─── Schema lint ─────────────────────────────────────────────────────────────
@@ -88,5 +89,56 @@ describe("OPT-798 schema lint — pre-colon deck trash must be a MILL cost", () 
     expect(findMillCostIntentViolations(cards, schemas, new Set(["SYN-001", "SYN-003"]))).toEqual([
       expect.stringContaining("SYN-003: listed in MILL_COST_ENCODING_DEFERRALS but no longer violates"),
     ]);
+  });
+
+  // Codex review (OPT-798 round 1): printed clauses are matched per block
+  // timing, not pooled across the card.
+  const twoTimings = "[Main] You may trash 2 cards from the top of your deck: Draw 1 card.\n[When Attacking] Trash 2 cards from the top of your deck.";
+  const draw = { type: "DRAW", params: { amount: 1 } } as const;
+
+  it("accepts a correct Main MILL cost beside a separate When Attacking mill action", () => {
+    const schema: EffectSchema = {
+      card_id: "SYN-010",
+      card_type: "Character",
+      effects: [
+        { id: "main", category: "activate", trigger: { keyword: "MAIN_EVENT" }, flags: { optional: true }, costs: [{ type: "MILL", amount: 2 }], actions: [draw] },
+        { id: "attack", category: "auto", trigger: { keyword: "WHEN_ATTACKING" }, actions: [{ type: "MILL", params: { amount: 2 } }] },
+      ],
+    };
+    expect(findMillCostViolations(twoTimings, schema)).toEqual([]);
+  });
+
+  it("rejects a MILL cost placed on the wrong block's timing", () => {
+    const schema: EffectSchema = {
+      card_id: "SYN-011",
+      card_type: "Character",
+      effects: [
+        { id: "main", category: "activate", trigger: { keyword: "MAIN_EVENT" }, flags: { optional: true }, actions: [draw] },
+        { id: "attack", category: "auto", trigger: { keyword: "WHEN_ATTACKING" }, costs: [{ type: "MILL", amount: 2 }], actions: [draw] },
+      ],
+    };
+    const violations = findMillCostViolations("[Main] You may trash 2 cards from the top of your deck: Draw 1 card.\n[When Attacking] Draw 1 card.", schema);
+    expect(violations).toEqual(expect.arrayContaining([
+      expect.stringContaining("SYN-011: printed \"trash 2 cards from the top of your deck:\" requires a MILL cost with amount 2 on its MAIN_EVENT block"),
+      expect.stringContaining("SYN-011 attack: MILL cost (amount 2) has no printed"),
+    ]));
+  });
+
+  it("attributes a timed clause through prefix brackets such as [DON!! x1] and [Once Per Turn]", () => {
+    expect(preColonMillClauses("[DON!! x1] [When Attacking] [Once Per Turn] You may trash 1 card from the top of your deck: Draw 1 card.")).toEqual([
+      { amount: 1, keywords: ["WHEN_ATTACKING"] },
+    ]);
+  });
+
+  it("falls back to card-wide matching when the line has no timing bracket", () => {
+    expect(preColonMillClauses("When your Character is K.O.'d, you may trash 1 card from the top of your deck: Draw 1 card.")).toEqual([
+      { amount: 1, keywords: null },
+    ]);
+    const schema: EffectSchema = {
+      card_id: "SYN-012",
+      card_type: "Character",
+      effects: [{ id: "watch", category: "auto", trigger: { event: "ANY_CHARACTER_KO" } as never, flags: { optional: true }, costs: [{ type: "MILL", amount: 1 }], actions: [draw] }],
+    };
+    expect(findMillCostViolations("When your Character is K.O.'d, you may trash 1 card from the top of your deck: Draw 1 card.", schema)).toEqual([]);
   });
 });
