@@ -376,6 +376,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `PLACE_STAGE_TO_DECK` | "Place Stage at deck bottom" |
 | `PLACE_HAND_TO_DECK` | "Place N from hand to deck" |
 | `GIVE_OPPONENT_DON` | "Give DON!! to opponent" |
+| `GIVE_DON` | "Give N active DON!! card(s) to 1 of your [Name]/Leader or Character cards" before the colon — `{ amount: N, target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { exact: 1 }, filter } }`; only active, unattached cost-area DON!! pay; the player picks the recipient, exposed as result ref `__cost_don_given` |
 | `RETURN_ATTACHED_DON_TO_COST` | "Return attached DON!!" |
 | `PLACE_SELF_AND_HAND_TO_DECK` | "Place this card and hand to deck" |
 | `PLACE_SELF_AND_TRASH_TO_DECK` | "Place this card and cards from trash to deck" |

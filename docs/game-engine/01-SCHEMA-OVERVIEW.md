@@ -215,6 +215,8 @@ type CostType =
 
   // DON!! manipulation costs
   | "GIVE_OPPONENT_DON"       // Give opponent's DON!! to opponent's character
+  | "GIVE_DON"                // Give N of your ACTIVE cost-area DON!! to 1 of your Leader/Characters
+                              // (target = the recipient, count exact 1; ref __cost_don_given)
   | "RETURN_ATTACHED_DON_TO_COST" // Return given DON!! to cost area
 
   // Compound costs
