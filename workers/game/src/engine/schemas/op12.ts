@@ -970,6 +970,7 @@ export const OP12_027_KOUSHIROU: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           attribute: "SLASH",
           cost_max: 5,
@@ -1743,6 +1744,7 @@ export const OP12_048_DONQUIXOTE_ROSINANTE: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           color: "BLUE",
           traits: ["Navy"],
@@ -2187,6 +2189,7 @@ export const OP12_061_DONQUIXOTE_ROSINANTE: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           name: "Trafalgar Law",
         },
       },
@@ -3740,6 +3743,7 @@ export const OP12_102_SHIRAHOSHI: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           base_cost_max: 6,
         },

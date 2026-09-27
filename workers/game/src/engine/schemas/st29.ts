@@ -219,6 +219,7 @@ export const ST29_008_NAMI: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Egghead"],
         },

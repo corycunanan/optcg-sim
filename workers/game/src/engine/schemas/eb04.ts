@@ -1973,6 +1973,7 @@ export const EB04_043_KAKU: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           color: "BLACK",
           base_cost_max: 5,
         },

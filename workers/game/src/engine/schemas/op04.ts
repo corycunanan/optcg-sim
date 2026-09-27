@@ -2881,7 +2881,6 @@ export const OP04_082_KYROS: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_KO",
-        target_filter: { exclude_self: false },
       },
       replacement_actions: [
         {

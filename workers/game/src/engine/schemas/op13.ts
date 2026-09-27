@@ -366,6 +366,7 @@ export const OP13_008_EMPORIO_IVANKOV: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Revolutionary Army"],
           exclude_self: true,
@@ -555,6 +556,7 @@ export const OP13_017_MONKEY_D_DRAGON: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Revolutionary Army"],
           exclude_self: true,
@@ -1636,6 +1638,7 @@ export const OP13_047_FOSSA: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits_contains: ["Whitebeard Pirates"],
           exclude_self: true,
@@ -2059,6 +2062,7 @@ export const OP13_060_AMATSUKI_TOKI: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits_contains: ["Roger Pirates"],
           exclude_self: true,

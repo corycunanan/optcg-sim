@@ -29,7 +29,7 @@ export const EB03_001_NEFELTARI_VIVI: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_KO",
-        target_filter: { base_cost_min: 4 },
+        target_filter: { controller: "SELF", base_cost_min: 4 },
       },
       replacement_actions: [
         {

@@ -2794,7 +2794,7 @@ export const P_111_NICO_ROBIN: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { traits: ["Straw Hat Crew"], card_type: "CHARACTER" },
+        target_filter: { controller: "SELF", traits: ["Straw Hat Crew"], card_type: "CHARACTER" },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
