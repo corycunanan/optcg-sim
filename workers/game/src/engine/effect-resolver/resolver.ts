@@ -459,6 +459,7 @@ export function resolveEffect(
         [],
         cardDb,
         services,
+        new Map(sourceSnapshotRef),
       );
     }
 

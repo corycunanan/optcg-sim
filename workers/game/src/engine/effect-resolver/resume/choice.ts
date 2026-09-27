@@ -477,6 +477,7 @@ export function handleAwaitingOptionalResponse(
         topFrame.pendingTriggers,
         cardDb,
         services,
+        new Map(topFrame.resultRefs),
         topFrame.triggerOrderingGroup,
       );
     }

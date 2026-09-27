@@ -337,6 +337,7 @@ function resumeAfterBranchPick(
       topFrame.pendingTriggers,
       cardDb,
       services,
+      new Map(topFrame.resultRefs),
       topFrame.triggerOrderingGroup,
     );
   }
@@ -471,6 +472,7 @@ export function handleAwaitingCostSelection(
         topFrame.pendingTriggers,
         cardDb,
         services,
+        new Map(topFrame.resultRefs),
         topFrame.triggerOrderingGroup,
       );
     }
@@ -500,6 +502,7 @@ export function handleAwaitingCostSelection(
           topFrame.pendingTriggers,
           cardDb,
           services,
+          new Map(topFrame.resultRefs),
           topFrame.triggerOrderingGroup,
         );
       }
@@ -720,6 +723,7 @@ export function handleAwaitingCostSelection(
         topFrame.pendingTriggers,
         cardDb,
         services,
+        new Map(topFrame.resultRefs),
         topFrame.triggerOrderingGroup,
       );
     }
@@ -1336,6 +1340,7 @@ export function handleAwaitingCostSelection(
         topFrame.pendingTriggers,
         cardDb,
         services,
+        new Map(topFrame.resultRefs),
         topFrame.triggerOrderingGroup,
       );
     }

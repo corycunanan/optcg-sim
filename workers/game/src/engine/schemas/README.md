@@ -369,7 +369,7 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | Type | Card Text |
 |------|-----------|
 | `LEADER_POWER_REDUCTION` | "Your Leader -N power" |
-| `LIFE_TO_HAND` | "Add N Life to hand" (with `position: "TOP"\|"BOTTOM"\|"TOP_OR_BOTTOM"`) |
+| `LIFE_TO_HAND` | "Add N Life to hand" (with `position: "TOP"\|"BOTTOM"\|"TOP_OR_BOTTOM"`); must be the last cost in every payment order (schema lint, OPT-857) |
 | `TRASH_FROM_LIFE` | "Trash N from Life" |
 | `MILL` | "Trash N cards from the top of your deck" before the colon — `{ amount: N }`; unpayable with fewer than N cards in deck |
 | `PLACE_FROM_TRASH_TO_DECK` | "Return N from trash to deck" |
