@@ -236,19 +236,20 @@ describe("OPT-857 replaced Life cost admits hand-trash cost watchers", () => {
     });
   }
 
-  it("Event source (in trash): both hand-trash watchers queue in one batch with source attribution", () => {
-    // Event [Main] frames carry no waiting siblings, so this pins the batch
-    // and attribution contract rather than a pre-fix ordering difference.
+  it("Event source (in trash): Kuroobi joins the Life-removal watcher's batch with source attribution", () => {
+    // The replaced cost's own CARD_REMOVED_FROM_LIFE watcher is scanned by the
+    // terminal path; before OPT-857 it resolved alone and Kuroobi's hand-trash
+    // watcher only fired in a later batch.
     const f = fixture();
-    f.put("HANDWATCH", "CHARACTER", {
+    f.put("LIFEWATCH", "CHARACTER", {
       effectSchema: {
         effects: [
           {
-            id: "hand_watch",
+            id: "life_watch",
             category: "auto",
             trigger: {
-              event: "CARD_TRASHED_FROM_HAND",
-              filter: { controller: "SELF", cause: "BY_EFFECT" },
+              event: "CARD_REMOVED_FROM_LIFE",
+              filter: { controller: "SELF" },
             },
             actions: [{ type: "DRAW", params: { amount: 1 } }],
           },
@@ -280,7 +281,7 @@ describe("OPT-857 replaced Life cost admits hand-trash cost watchers", () => {
     const ids = f.choices();
     expect(ids).toHaveLength(2);
     expect(ids.some((c) => c.includes(KUROOBI_TRIGGER))).toBe(true);
-    expect(ids.some((c) => c.includes(":hand_watch:"))).toBe(true);
+    expect(ids.some((c) => c.includes(":life_watch:"))).toBe(true);
     expect(f.rush()).toBe(false);
     expectReplacedOnce(f, "EVENT");
 
@@ -291,7 +292,7 @@ describe("OPT-857 replaced Life cost admits hand-trash cost watchers", () => {
     expect(f.state.players[0].trash.some((c) => c.cardId === "EVENT")).toBe(
       true
     );
-    // Paid 1 hand card; Draw 5 never resolved; the watcher drew exactly once.
+    // Paid 1 hand card; Draw 5 never resolved; the Life watcher drew exactly once.
     expect(f.state.players[0].hand).toHaveLength(hand);
     expectReplacedOnce(f, "EVENT");
   });
