@@ -172,6 +172,7 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "K.O. 1 of your Characters:" | `{ "type": "KO_OWN_CHARACTER", "amount": 1 }` |
 | "You may trash N cards from the top of your deck:" | `{ "type": "MILL", "amount": N }` — never a first `MILL` action (schema lint enforces this from canonical text) |
 | "place 1 Character with a cost of N or less at the bottom of the owner's deck:" (no "your") | `{ "type": "PLACE_OWN_CHARACTER_TO_DECK", "amount": 1, "filter": { "cost_max": N }, "controller": "EITHER", "position": "BOTTOM" }` |
+| "You may give N active DON!! card(s) to 1 of your [Name]:" | `{ "type": "GIVE_DON", "amount": N, "target": { "type": "LEADER_OR_CHARACTER", "controller": "SELF", "count": { "exact": 1 }, "filter": { "name": "Name" } } }` — a Leader or Character with that name; never `GIVE_OPPONENT_DON` or a first `GIVE_DON` action |
 | "return 1 of your Characters to your hand:" | `{ "type": "RETURN_OWN_CHARACTER_TO_HAND" }` |
 | "rest any number of your DON!!" | `{ "type": "DON_REST", "amount": "ANY_NUMBER" }` |
 

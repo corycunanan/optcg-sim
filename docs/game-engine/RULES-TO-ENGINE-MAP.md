@@ -299,7 +299,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **6-5-2-1.** Declare end of Main Phase → End Phase | **IMPL** | `ADVANCE_PHASE` action from MAIN phase | `phases.ts:69–77` |
 | **6-5-3-1.** Play Character/Stage or activate [Main] Event | **IMPL** | `validatePlayCard()` checks card type and `[Main]` keyword | `validation.ts:89–91` |
 | **6-5-4-1.** Activate [Main] or [Activate: Main] effects | **IMPL** | `execute.ts → executeActivateEffect()` | Full effect activation with cost payment and resolution |
-| **6-5-5-1.** Give DON!! = 1 active DON!! → Leader/Character | **IMPL** | `executeAttachDon()` in `execute.ts`, `attachDon()` in `state.ts` | |
+| **6-5-5-1.** Give DON!! = 1 active DON!! → Leader/Character | **IMPL** | `executeAttachDon()` in `execute.ts`, `attachDon()` in `state.ts` | `GIVE_DON` activation cost (OPT-824): `cost/targets.ts → computeCostTargets()` offers recipients only while enough active, unattached cost-area DON!! remain; `cost/resume.ts → applyCostSelection()` attaches via `attachDonToCard()` and emits one `DON_GIVEN_TO_CARD`. [`opt-824-give-don-cost.test.ts`](../../workers/game/src/__tests__/opt-824-give-don-cost.test.ts) |
 | **6-5-5-2.** +1000 power per DON!! during owner's turn | **IMPL** | `modifiers.ts → getEffectivePower()` | `card.attachedDon.length * 1000` when `isOwnersTurn` |
 | **6-5-5-3.** Giving can be performed many times | **IMPL** | `executeAttachDon()` supports `count` parameter | |
 | **6-5-5-4.** Card moves zones → DON!! return rested | **IMPL** | `state.ts → moveCard()` | Strips `attachedDon`, returns them to `donCostArea` rested |

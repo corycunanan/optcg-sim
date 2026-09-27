@@ -78,6 +78,7 @@ export function getCostLabel(cost: Cost): string {
     case "TRASH_OWN_CHARACTER": return `Choose ${amount} character(s) to trash as cost`;
     case "REVEAL_FROM_HAND": return `Choose ${amount} card(s) from hand to reveal as cost`;
     case "CHOOSE_ONE_COST": return "Choose a cost to pay";
+    case "GIVE_DON": return `Choose 1 card to give ${amount} active DON!! card${amount === 1 ? "" : "s"} to as cost`;
     default: return "Select card(s) as cost";
   }
 }
@@ -105,6 +106,7 @@ export function getCostCtaLabel(cost: Cost): string {
     case "REST_CARDS":
     case "REST_NAMED_CARD": return "Rest";
     case "REVEAL_FROM_HAND": return "Reveal";
+    case "GIVE_DON": return "Give DON!!";
     default: return "Confirm";
   }
 }

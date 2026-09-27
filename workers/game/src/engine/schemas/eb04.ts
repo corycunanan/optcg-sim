@@ -329,31 +329,22 @@ export const EB04_009_ITS_MY_STUDENTS_FAREWELL: EffectSchema = {
       id: "main_don_debuff",
       category: "auto",
       trigger: { keyword: "MAIN_EVENT" },
+      // OPT-824: the give is the activation cost, and "1 of your [Silvers
+      // Rayleigh]" is a Leader or Character with that name.
       costs: [
         {
-          type: "REST_CARDS",
+          type: "GIVE_DON",
           amount: 1,
-          filter: { name: "Silvers Rayleigh" },
           target: {
-            type: "DON_IN_COST_AREA",
+            type: "LEADER_OR_CHARACTER",
             controller: "SELF",
             count: { exact: 1 },
-            filter: { is_active: true },
+            filter: { name: "Silvers Rayleigh" },
           },
         },
       ],
       flags: { optional: true },
       actions: [
-        {
-          type: "GIVE_DON",
-          target: {
-            type: "CHARACTER",
-            controller: "SELF",
-            count: { exact: 1 },
-            filter: { name: "Silvers Rayleigh" },
-          },
-          params: { amount: 1 },
-        },
         {
           type: "MODIFY_POWER",
           target: {

@@ -37,6 +37,8 @@ export function payCosts(
     cardsTrashedInstanceIds: [],
     cardsReturnedInstanceIds: [],
     charactersKoInstanceIds: [],
+    donGivenCount: 0,
+    donGivenInstanceIds: [],
   };
 
   let nextState = state;
@@ -456,6 +458,13 @@ export function payCosts(
         costResult.cardsTrashedInstanceIds.push(stageId);
         break;
       }
+
+      case "GIVE_DON":
+        // OPT-824: the recipient is always the player's choice, paid through
+        // payCostsWithSelection's prompt and the AWAITING_COST_SELECTION
+        // resume. No synchronous caller reaches a GIVE_DON cost, so fail
+        // closed rather than pick a recipient on the player's behalf.
+        return null;
 
       case "RETURN_ATTACHED_DON_TO_COST": {
         const amount = typeof cost.amount === "number" ? cost.amount : 1;

@@ -40,7 +40,8 @@ import {
   blockShufflesDeck,
   buildTrashToDeckArrangePrompt,
 } from "../cost-handler.js";
-import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
+import { COST_DON_GIVEN_REF, costResultToEntries, costResultRefsFromEntries } from "../types.js";
+import { computeCostTargets } from "../cost/targets.js";
 import { postCostConditionsMet } from "../post-cost.js";
 import type { EffectResolverResult, EffectResolverServices } from "../types.js";
 import {
@@ -962,6 +963,39 @@ export function handleAwaitingCostSelection(
     accumulatedCostRefs.set("__cost_cards_placed_to_deck", {
       targetInstanceIds: existing.targetInstanceIds,
       count: existing.count + ordered.length,
+    });
+  } else if (action.type === "SELECT_TARGET" && cost.type === "GIVE_DON") {
+    // OPT-824: the player chose the single recipient of the given DON!!.
+    // Accept exactly one offered card that is still an eligible recipient
+    // (which also requires `amount` active DON!!) in BOTH the live state and
+    // the staged payment state — mirroring the named-play branch above — so
+    // a stale, replayed or diverged response can never resurrect a departed
+    // recipient, spend unavailable DON!!, or pay partially or twice.
+    const selected = [...new Set(action.selectedInstanceIds ?? [])];
+    const recipient = selected.length === 1 ? selected[0] : undefined;
+    const eligibleIn = (candidateState: GameState): boolean =>
+      computeCostTargets(candidateState, cost, controller, cardDb, sourceCardInstanceId).includes(recipient!);
+    if (
+      !recipient ||
+      !topFrame.validTargets.includes(recipient) ||
+      !eligibleIn(baselineState) ||
+      !eligibleIn(nextState)
+    ) {
+      return { state, events: [], resolved: false };
+    }
+    const appliedGive = applyCostSelection(nextState, cost, [recipient], controller, cardDb, sourceCardInstanceId);
+    if (appliedGive.events.length === 0) {
+      return { state, events: [], resolved: false };
+    }
+    nextState = appliedGive.state;
+    events.push(...appliedGive.events);
+    const existing = accumulatedCostRefs.get(COST_DON_GIVEN_REF) ?? {
+      targetInstanceIds: [],
+      count: 0,
+    };
+    accumulatedCostRefs.set(COST_DON_GIVEN_REF, {
+      targetInstanceIds: [...existing.targetInstanceIds, recipient],
+      count: existing.count + (typeof cost.amount === "number" ? cost.amount : 1),
     });
   } else if (action.type === "SELECT_TARGET") {
     // OPT-455 review: this generic branch used to trust the client's

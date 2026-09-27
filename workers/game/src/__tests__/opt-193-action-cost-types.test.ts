@@ -63,6 +63,14 @@ describe("OPT-193 exhaustive cost narrowing", () => {
     { cost: { type: "PLACE_FROM_TRASH_TO_DECK" }, needsSelection: true },
     { cost: { type: "LEADER_POWER_REDUCTION" }, needsSelection: false },
     { cost: { type: "GIVE_OPPONENT_DON" }, needsSelection: false },
+    {
+      cost: {
+        type: "GIVE_DON",
+        amount: 1,
+        target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { exact: 1 } },
+      },
+      needsSelection: true,
+    },
     { cost: { type: "RETURN_ATTACHED_DON_TO_COST" }, needsSelection: false },
     { cost: { type: "PLACE_SELF_AND_HAND_TO_DECK" }, needsSelection: true },
     { cost: { type: "PLACE_SELF_AND_TRASH_TO_DECK" }, needsSelection: true },

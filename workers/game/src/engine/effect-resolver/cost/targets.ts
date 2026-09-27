@@ -5,6 +5,7 @@ import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard, isRemovalProhibited } from "../../prohibitions.js";
 import { namedPlayCandidates } from "./named-play.js";
 import { isPresent } from "../../type-guards.js";
+import { computeAllValidTargets } from "../target-resolver.js";
 
 /**
  * OPT-798: true for "place 1 Character ... at the bottom of the owner's deck"
@@ -17,6 +18,49 @@ export function isEitherPlayerDeckPlacement(cost: Cost): boolean {
 /** Resolve a simple cost's numeric amount with a deterministic fallback. */
 export function resolveAmount(cost: SimpleCost, fallback = 1): number {
   return typeof cost.amount === "number" ? cost.amount : fallback;
+}
+
+/**
+ * Number of cards the player selects to pay a selection cost. For most costs
+ * this is the printed amount; a GIVE_DON cost's amount counts DON!!, while the
+ * player selects exactly one recipient (OPT-824).
+ */
+export function costSelectionCount(cost: SimpleCost): number {
+  return cost.type === "GIVE_DON" ? 1 : resolveAmount(cost);
+}
+
+/** OPT-824: unattached ACTIVE DON!! in the cost area — the only DON!! a give can use (rule 6-5-5-1). */
+export function activeCostAreaDonCount(player: PlayerState): number {
+  return player.donCostArea.filter((don) => don.state === "ACTIVE" && !don.attachedTo).length;
+}
+
+/**
+ * OPT-824: recipients a GIVE_DON cost may select — the payer's Leader or
+ * Characters matching the cost's target, resolved exactly as the GIVE_DON
+ * action resolves its target. Empty when fewer than `amount` active DON!!
+ * remain, so every returned recipient is a complete payment (rule 8-3-1-3).
+ */
+function giveDonRecipients(
+  state: GameState,
+  cost: Extract<SimpleCost, { type: "GIVE_DON" }>,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): string[] {
+  const player = state.players[controller];
+  if (activeCostAreaDonCount(player) < resolveAmount(cost)) return [];
+  const ownField = new Set([
+    player.leader.instanceId,
+    ...player.characters.filter(isPresent).map((card) => card.instanceId),
+  ]);
+  return computeAllValidTargets(
+    state,
+    cost.target,
+    controller,
+    cardDb,
+    sourceCardInstanceId ?? "",
+    new Map(),
+  ).filter((id) => ownField.has(id));
 }
 
 /** Return active field cards that can be offered for a rest cost. */
@@ -173,6 +217,9 @@ export function computeCostTargets(
       return candidates;
     }
 
+    case "GIVE_DON":
+      return giveDonRecipients(state, cost, controller, cardDb, sourceCardInstanceId);
+
     case "CHOOSE_ONE_COST":
       // Targets are computed per-option after selection; no aggregate list.
       return [];
@@ -218,7 +265,8 @@ export function getCostCards(
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE":
     case "REST_CARDS":
-    case "REST_NAMED_CARD": {
+    case "REST_NAMED_CARD":
+    case "GIVE_DON": {
       const cards = (isEitherPlayerDeckPlacement(cost)
         ? state.players.flatMap((fieldPlayer) => fieldPlayer.characters)
         : player.characters
