@@ -41,7 +41,34 @@ import {
   buildTrashToDeckArrangePrompt,
 } from "../cost-handler.js";
 import { COST_DON_GIVEN_REF, costResultToEntries, costResultRefsFromEntries } from "../types.js";
-import { computeCostTargets } from "../cost/targets.js";
+import { computeCostTargets, costSelectionCount, isOpponentLifePlacement } from "../cost/targets.js";
+
+const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
+
+/** OPT-828: a Life-end choice id bound to the Characters chosen to pay the cost. */
+function lifeDestinationChoiceId(ids: string[], end: "TOP" | "BOTTOM"): string {
+  return `${LIFE_DESTINATION_CHOICE_PREFIX}${JSON.stringify(ids)}:${end}`;
+}
+
+function isLifeDestinationChoiceId(id: string): boolean {
+  return id.startsWith(LIFE_DESTINATION_CHOICE_PREFIX);
+}
+
+function parseLifeDestinationChoiceId(
+  id: string,
+): { ids: string[]; position: "TOP" | "BOTTOM" } | null {
+  if (!isLifeDestinationChoiceId(id)) return null;
+  const split = id.lastIndexOf(":");
+  const end = id.slice(split + 1);
+  if (end !== "TOP" && end !== "BOTTOM") return null;
+  try {
+    const ids: unknown = JSON.parse(id.slice(LIFE_DESTINATION_CHOICE_PREFIX.length, split));
+    if (!Array.isArray(ids) || !ids.every((value) => typeof value === "string")) return null;
+    return { ids, position: end };
+  } catch {
+    return null;
+  }
+}
 import { postCostConditionsMet } from "../post-cost.js";
 import type { EffectResolverResult, EffectResolverServices } from "../types.js";
 import {
@@ -964,6 +991,109 @@ export function handleAwaitingCostSelection(
       targetInstanceIds: existing.targetInstanceIds,
       count: existing.count + ordered.length,
     });
+  } else if (cost.type === "ADD_OWN_CHARACTER_TO_LIFE" && isOpponentLifePlacement(cost)) {
+    // OPT-828: OP09-101 — the payer chooses 1 of the opponent's Characters,
+    // then (for TOP_OR_BOTTOM) the end of the opponent's Life it goes to.
+    // Both replies are validated against the frame's offer AND against the
+    // LIVE and staged payment states (as the named-play / GIVE_DON branches
+    // do), so a stale, replayed or diverged reply can never move a Character
+    // that left the field, stopped matching, or became protected.
+    const reject = (): EffectResolverResult => ({ state, events: [], resolved: false });
+    const eligibleIn = (candidateState: GameState, ids: string[]): boolean => {
+      const candidates = computeCostTargets(candidateState, cost, controller, cardDb, sourceCardInstanceId);
+      return ids.every((id) => candidates.includes(id));
+    };
+    const amount = costSelectionCount(cost);
+    const destinationStage = topFrame.validTargets.some(isLifeDestinationChoiceId);
+    let placedIds: string[];
+    let position: "TOP" | "BOTTOM";
+    if (action.type === "SELECT_TARGET") {
+      if (destinationStage) return reject();
+      const selected = [...new Set(action.selectedInstanceIds ?? [])];
+      if (
+        selected.length !== amount ||
+        !selected.every((id) => topFrame.validTargets.includes(id)) ||
+        !eligibleIn(baselineState, selected) ||
+        !eligibleIn(nextState, selected)
+      ) {
+        return reject();
+      }
+      if (cost.position === "TOP_OR_BOTTOM") {
+        // Bind the destination choices to the chosen identities (the
+        // OPT-821 field-to-Life pattern). Nothing moves until the end is
+        // chosen; the staged frame survives session restore.
+        const choices = (["TOP", "BOTTOM"] as const).map((end) => ({
+          id: lifeDestinationChoiceId(selected, end),
+          label: end === "TOP" ? "Top" : "Bottom",
+        }));
+        nextState = updateTopFrame(nextState, { validTargets: choices.map((choice) => choice.id) });
+        return suspendCurrentFrame(nextState, events, {
+          options: {
+            promptType: "PLAYER_CHOICE",
+            effectDescription: "Choose the top or bottom of your opponent's Life cards to place the Character",
+            choices,
+          },
+          respondingPlayer: controller,
+          resumeContext: topFrame.id,
+        });
+      }
+      placedIds = selected;
+      position = cost.position === "BOTTOM" ? "BOTTOM" : "TOP";
+    } else if (action.type === "PLAYER_CHOICE") {
+      const parsed = destinationStage && topFrame.validTargets.includes(action.choiceId)
+        ? parseLifeDestinationChoiceId(action.choiceId)
+        : null;
+      if (
+        !parsed ||
+        parsed.ids.length !== amount ||
+        !eligibleIn(baselineState, parsed.ids) ||
+        !eligibleIn(nextState, parsed.ids)
+      ) {
+        return reject();
+      }
+      placedIds = parsed.ids;
+      position = parsed.position;
+    } else {
+      return reject();
+    }
+
+    if (!topFrame.costReplacementChecked) {
+      // Placing the Character is an effect-caused removal; a replacement means
+      // the printed cost was not paid (rules 8-3-1-3-1 / 8-3-1-7).
+      const stagedBeforeReplacement = nextState;
+      const replacement = checkReplacementForRemoval(
+        applyCostTransactionState(nextState, transactionBaseline),
+        placedIds[0],
+        controller,
+        cardDb,
+        services
+      );
+      events.push(...replacement.events);
+      nextState = replacement.state;
+      if (replacement.pendingPrompt) {
+        nextState = updateTopFrame(nextState, {
+          costReplacementAction: action,
+          costReplacementChecked: true,
+        });
+        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement);
+      }
+      if (replacement.replaced) {
+        return abortReplacedCost(nextState, topFrame, replacement.events, cardDb, services);
+      }
+      nextState = stagedBeforeReplacement;
+    }
+
+    const placed = applyCostSelection(
+      nextState,
+      { ...cost, position },
+      placedIds,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+    );
+    if (placed.events.length !== amount) return reject();
+    nextState = placed.state;
+    events.push(...placed.events);
   } else if (action.type === "SELECT_TARGET" && cost.type === "GIVE_DON") {
     // OPT-824: the player chose the single recipient of the given DON!!.
     // Accept exactly one offered card that is still an eligible recipient

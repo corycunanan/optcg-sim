@@ -15,6 +15,15 @@ export function isEitherPlayerDeckPlacement(cost: Cost): boolean {
   return cost.type === "PLACE_OWN_CHARACTER_TO_DECK" && cost.controller === "EITHER";
 }
 
+/**
+ * OPT-828: true for "place 1 of your opponent's Characters ... at the top or
+ * bottom of your opponent's Life cards" costs (OP09-101). Only the opponent's
+ * Characters are offered, and each moves to its owner's (the opponent's) Life.
+ */
+export function isOpponentLifePlacement(cost: Cost): boolean {
+  return cost.type === "ADD_OWN_CHARACTER_TO_LIFE" && cost.controller === "OPPONENT";
+}
+
 /** Resolve a simple cost's numeric amount with a deterministic fallback. */
 export function resolveAmount(cost: SimpleCost, fallback = 1): number {
   return typeof cost.amount === "number" ? cost.amount : fallback;
@@ -142,9 +151,13 @@ export function computeCostTargets(
     case "PLACE_OWN_CHARACTER_TO_DECK":
     case "ADD_OWN_CHARACTER_TO_LIFE": {
       const eitherPlayer = isEitherPlayerDeckPlacement(cost);
+      const opponentLife = isOpponentLifePlacement(cost);
+      const opponentCharacters = state.players[controller === 0 ? 1 : 0].characters;
       let candidates = (eitherPlayer
-        ? [...player.characters, ...state.players[controller === 0 ? 1 : 0].characters]
-        : player.characters
+        ? [...player.characters, ...opponentCharacters]
+        : opponentLife
+          ? opponentCharacters
+          : player.characters
       ).filter(isPresent);
       if (cost.filter) {
         candidates = candidates.filter((c) =>
@@ -159,6 +172,17 @@ export function computeCostTargets(
           state,
           c.instanceId,
           { action: "RETURN_TO_DECK", cause: "EFFECT", causingController: controller, sourceCardInstanceId },
+          cardDb,
+        ));
+      }
+      if (opponentLife) {
+        // OPT-828: placing the opponent's Character in their Life is an
+        // effect-caused removal from the field — honor "cannot be removed"
+        // protections exactly as executeAddToLifeFromField does.
+        candidates = candidates.filter((c) => !isRemovalProhibited(
+          state,
+          c.instanceId,
+          { action: "TO_LIFE", cause: "EFFECT", causingController: controller, sourceCardInstanceId },
           cardDb,
         ));
       }
@@ -269,7 +293,9 @@ export function getCostCards(
     case "GIVE_DON": {
       const cards = (isEitherPlayerDeckPlacement(cost)
         ? state.players.flatMap((fieldPlayer) => fieldPlayer.characters)
-        : player.characters
+        : isOpponentLifePlacement(cost)
+          ? state.players[controller === 0 ? 1 : 0].characters
+          : player.characters
       ).filter((c): c is CardInstance => c !== null && targetSet.has(c.instanceId));
       if (targetSet.has(player.leader.instanceId)) {
         cards.push(player.leader);

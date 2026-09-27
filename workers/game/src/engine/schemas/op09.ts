@@ -3398,17 +3398,21 @@ export const OP09_101_KUZAN: EffectSchema = {
       id: "on_play_place_to_life_then_discard",
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
-      actions: [
+      // OPT-828: the placement is the activation cost (before the colon), with
+      // no "You may" — mandatory when payable (rule 8-1-2), and the effect does
+      // not activate when no opponent Character can be placed (rule 8-3-1-3;
+      // qa_op09.md OP09-101).
+      costs: [
         {
-          type: "ADD_TO_LIFE_FROM_FIELD",
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { exact: 1 },
-            filter: { cost_max: 3 },
-          },
-          params: { face: "UP" },
+          type: "ADD_OWN_CHARACTER_TO_LIFE",
+          controller: "OPPONENT",
+          amount: 1,
+          filter: { cost_max: 3 },
+          position: "TOP_OR_BOTTOM",
+          face: "UP",
         },
+      ],
+      actions: [
         {
           type: "OPPONENT_ACTION",
           params: {
@@ -3418,7 +3422,6 @@ export const OP09_101_KUZAN: EffectSchema = {
               params: { amount: 1 },
             },
           },
-          chain: "THEN",
         },
       ],
     },

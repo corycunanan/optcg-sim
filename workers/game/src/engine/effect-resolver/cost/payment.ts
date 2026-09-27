@@ -10,7 +10,7 @@ import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
-import { computeCostTargets } from "./targets.js";
+import { computeCostTargets, isOpponentLifePlacement } from "./targets.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 
@@ -458,6 +458,14 @@ export function payCosts(
         costResult.cardsTrashedInstanceIds.push(stageId);
         break;
       }
+
+      case "ADD_OWN_CHARACTER_TO_LIFE":
+        // OPT-828: the opponent's Character and the Life end are always the
+        // paying player's choice (payCostsWithSelection prompt + resume); no
+        // synchronous caller may pick them, so fail closed. The own-Character
+        // form keeps its historical no-op fallthrough.
+        if (isOpponentLifePlacement(cost)) return null;
+        break;
 
       case "GIVE_DON":
         // OPT-824: the recipient is always the player's choice, paid through

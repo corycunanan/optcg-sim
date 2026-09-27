@@ -1263,7 +1263,9 @@ export type SimpleCost = {
       ? PlaceCharacterToDeckCostFields
       : Type extends "GIVE_DON"
         ? GiveDonCostFields
-        : unknown
+        : Type extends "ADD_OWN_CHARACTER_TO_LIFE"
+          ? AddCharacterToLifeCostFields
+          : unknown
   );
 }[SimpleCostType];
 
@@ -1276,6 +1278,19 @@ export type SimpleCost = {
  */
 interface PlaceCharacterToDeckCostFields {
   controller?: "SELF" | "EITHER";
+}
+
+/**
+ * OPT-828: "place 1 of your opponent's Characters ... at the top or bottom of
+ * your opponent's Life cards face-up" before the colon (OP09-101). "OPPONENT"
+ * offers only the opponent's Characters (removal protections honored) and the
+ * card always moves to its OWNER's Life — the opponent's (rule 3-10-2-1 for
+ * face-up Life). `position: "TOP_OR_BOTTOM"` lets the paying player choose the
+ * end after choosing the Character. Omitted or "SELF" keeps the historical
+ * own-Characters-only ST13-001 cost. Only this cost type accepts the field.
+ */
+interface AddCharacterToLifeCostFields {
+  controller?: "SELF" | "OPPONENT";
 }
 
 /**
@@ -1323,6 +1338,8 @@ export type CostType =
   | "PLACE_SELF_TO_DECK"
   | "PLACE_STAGE_TO_DECK"
   // OPT-455: "add 1 of your Characters ... to the top of your Life cards"
+  // OPT-828: controller "OPPONENT" — "place 1 of your opponent's Characters
+  // ... at the top or bottom of your opponent's Life cards".
   | "ADD_OWN_CHARACTER_TO_LIFE"
   | "TRASH_OWN_STAGE"
   | "PLACE_FROM_TRASH_TO_DECK"
