@@ -68,7 +68,9 @@ export function getCostLabel(cost: Cost): string {
       ? `Choose ${amount} Character(s) to place at the bottom of the owner's deck as cost`
       : `Choose ${amount} character(s) to place on deck as cost`;
     case "MILL": return `Trash ${amount} card(s) from the top of your deck as cost`;
-    case "ADD_OWN_CHARACTER_TO_LIFE": return `Choose ${amount} character(s) to add to your Life cards as cost`;
+    case "ADD_OWN_CHARACTER_TO_LIFE": return cost.controller === "OPPONENT"
+      ? `Choose ${amount} of your opponent's Character(s) to place in their Life cards face-up as cost`
+      : `Choose ${amount} character(s) to add to your Life cards as cost`;
     case "TRASH_FROM_LIFE": return `Choose ${amount} life card(s) to trash as cost`;
     case "PLACE_HAND_TO_DECK": return `Choose ${amount} card(s) to place on deck as cost`;
     case "PLACE_FROM_TRASH_TO_DECK": return `Choose ${amount} card(s) from your trash to place in your deck as cost`;
@@ -102,7 +104,7 @@ export function getCostCtaLabel(cost: Cost): string {
     case "PLACE_FROM_TRASH_TO_DECK":
     case "PLACE_SELF_AND_TRASH_TO_DECK": return "Place on Deck";
     case "PLACE_SELF_AND_HAND_TO_DECK": return "Place on Deck";
-    case "ADD_OWN_CHARACTER_TO_LIFE": return "Add to Life";
+    case "ADD_OWN_CHARACTER_TO_LIFE": return cost.controller === "OPPONENT" ? "Place in Life" : "Add to Life";
     case "REST_CARDS":
     case "REST_NAMED_CARD": return "Rest";
     case "REVEAL_FROM_HAND": return "Reveal";

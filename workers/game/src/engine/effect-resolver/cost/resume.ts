@@ -4,7 +4,7 @@ import type { CardData, CardInstance, GameState, PendingEvent } from "../../../t
 import { transitionCards } from "../../zone-transition.js";
 import { getEffectiveBasePower } from "../../modifiers.js";
 import { attachDonToCard, trashStage } from "../card-mutations.js";
-import { computeCostTargets } from "./targets.js";
+import { computeCostTargets, isOpponentLifePlacement } from "./targets.js";
 
 export interface AppliedCostSelection {
   state: GameState;
@@ -153,6 +153,33 @@ export function applyCostSelection(
     }
 
     case "ADD_OWN_CHARACTER_TO_LIFE": {
+      if (isOpponentLifePlacement(cost)) {
+        // OPT-828: "place 1 of your opponent's Characters ... at the top or
+        // bottom of your opponent's Life cards face-up" (OP09-101). All or
+        // nothing: every selected card must still be a current candidate (an
+        // opponent Character matching the filter and not protected from
+        // removal), so direct callers cannot bypass the candidate rules. The
+        // card goes to its OWNER's Life as a new instance (rule 3-1-6), with
+        // attached DON!! returned per the zone-transition contract.
+        const amount = typeof cost.amount === "number" ? cost.amount : 1;
+        const unique = [...selectedSet];
+        if (!cardDb || unique.length !== amount) return { state, events: [] };
+        const candidates = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId);
+        if (!unique.every((id) => candidates.includes(id))) return { state, events: [] };
+        const moved = transitionCards(state, unique, "LIFE", {
+          // An unresolved TOP_OR_BOTTOM only reaches here from the pure
+          // feasibility search, where the end chosen cannot change payability.
+          position: cost.position === "BOTTOM" ? "BOTTOM" : "TOP",
+          lifeFace: cost.face ?? "UP",
+          preserveSourceTriggers: true,
+        });
+        if (moved.transitions.length !== amount) return { state, events: [] };
+        const events: PendingEvent[] = moved.transitions.map(({ fact }) => ({
+          type: "CARD_ADDED_TO_LIFE", playerIndex: fact.owner,
+          payload: { cardInstanceId: fact.oldInstanceId, newCardInstanceId: fact.newInstanceId, cardId: fact.cardId, sourceZone: fact.source, sourceController: fact.controller, causingController: controller, movementCause: "COST" },
+        }));
+        return { state: moved.state, events };
+      }
       // OPT-455: "add 1 of your Characters ... to the top of your Life cards
       // face-up" (ST13-001). Canonical field exit: the Life card is a NEW
       // instance (rules 3-1-6, matching executeAddToLifeFromField), attached

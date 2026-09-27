@@ -494,6 +494,35 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
     errors.push(`${prefix}: TRASH_NAMED_CARD_FROM_HAND_OR_STAGE requires a non-empty 'card_name'`);
   }
 
+  // OPT-798 / OPT-828: a cost-level `controller` widens a Character-selection
+  // cost beyond the payer's own field. It is meaningful on exactly two types.
+  const costController = (cost as { controller?: unknown }).controller;
+  if (costController !== undefined) {
+    const allowed: Partial<Record<Cost["type"], readonly unknown[]>> = {
+      PLACE_OWN_CHARACTER_TO_DECK: ["SELF", "EITHER"],
+      ADD_OWN_CHARACTER_TO_LIFE: ["SELF", "OPPONENT"],
+    };
+    const accepted = allowed[cost.type];
+    if (!accepted) {
+      errors.push(`${prefix}: cost type '${cost.type}' does not accept a 'controller'`);
+    } else if (!accepted.includes(costController)) {
+      errors.push(`${prefix}: ${cost.type} controller must be one of ${accepted.join(", ")}`);
+    }
+  }
+
+  // OPT-828: "place 1 of your opponent's Characters ... at the top or bottom
+  // of your opponent's Life cards" — exactly one Character (the resume path
+  // checks one removal replacement) and a concrete or chosen end.
+  if (cost.type === "ADD_OWN_CHARACTER_TO_LIFE" && costController === "OPPONENT") {
+    const amount = (cost as { amount?: unknown }).amount;
+    if (amount !== undefined && amount !== 1) {
+      errors.push(`${prefix}: opponent ADD_OWN_CHARACTER_TO_LIFE places exactly 1 Character ('amount' must be 1)`);
+    }
+    if (!["TOP", "BOTTOM", "TOP_OR_BOTTOM"].includes((cost as { position?: string }).position ?? "")) {
+      errors.push(`${prefix}: opponent ADD_OWN_CHARACTER_TO_LIFE requires 'position' TOP, BOTTOM or TOP_OR_BOTTOM`);
+    }
+  }
+
   // OPT-824: "give N active DON!! cards to 1 of your <recipient>" — N DON!!,
   // exactly one of the payer's own Leader or Characters as the recipient.
   if (cost.type === "GIVE_DON") {
