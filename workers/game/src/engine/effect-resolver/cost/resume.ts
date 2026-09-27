@@ -4,6 +4,7 @@ import type { CardData, CardInstance, GameState, PendingEvent } from "../../../t
 import { transitionCards } from "../../zone-transition.js";
 import { getEffectiveBasePower } from "../../modifiers.js";
 import { attachDonToCard, trashStage } from "../card-mutations.js";
+import { computeCostTargets } from "./targets.js";
 
 export interface AppliedCostSelection {
   state: GameState;
@@ -17,6 +18,7 @@ export function applyCostSelection(
   selectedIds: string[],
   controller: 0 | 1,
   cardDb?: Map<string, CardData>,
+  sourceCardInstanceId?: string,
 ): AppliedCostSelection {
   const p = state.players[controller];
   const selectedSet = new Set(selectedIds);
@@ -194,11 +196,13 @@ export function applyCostSelection(
       const recipient = selectedIds.length === 1 ? selectedIds[0] : undefined;
       const amount = typeof cost.amount === "number" ? cost.amount : 1;
       if (!recipient || amount < 1) return { state, events: [] };
-      // attachDonToCard draws DON!! from the target's side; only the payer's
-      // own Leader or Characters may receive the payer's DON!!.
-      const ownRecipient = p.leader.instanceId === recipient ||
-        p.characters.some((c) => c?.instanceId === recipient);
-      if (!ownRecipient) return { state, events: [] };
+      // The recipient must be a current candidate: one of the payer's own
+      // Leader or Characters (attachDonToCard draws DON!! from the target's
+      // side), matching the printed filter, with `amount` active DON!! left.
+      // Direct callers cannot bypass any of these.
+      if (!cardDb || !computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).includes(recipient)) {
+        return { state, events: [] };
+      }
       let given = state;
       for (let i = 0; i < amount; i++) {
         const attached = attachDonToCard(given, controller, recipient, "ACTIVE");

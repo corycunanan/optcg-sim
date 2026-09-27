@@ -966,19 +966,24 @@ export function handleAwaitingCostSelection(
     });
   } else if (action.type === "SELECT_TARGET" && cost.type === "GIVE_DON") {
     // OPT-824: the player chose the single recipient of the given DON!!.
-    // Accept exactly one offered card that is still an eligible recipient in
-    // the staged payment state (which also requires `amount` active DON!!),
-    // so a stale or replayed response can never pay partially or twice.
+    // Accept exactly one offered card that is still an eligible recipient
+    // (which also requires `amount` active DON!!) in BOTH the live state and
+    // the staged payment state — mirroring the named-play branch above — so
+    // a stale, replayed or diverged response can never resurrect a departed
+    // recipient, spend unavailable DON!!, or pay partially or twice.
     const selected = [...new Set(action.selectedInstanceIds ?? [])];
     const recipient = selected.length === 1 ? selected[0] : undefined;
+    const eligibleIn = (candidateState: GameState): boolean =>
+      computeCostTargets(candidateState, cost, controller, cardDb, sourceCardInstanceId).includes(recipient!);
     if (
       !recipient ||
       !topFrame.validTargets.includes(recipient) ||
-      !computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId).includes(recipient)
+      !eligibleIn(baselineState) ||
+      !eligibleIn(nextState)
     ) {
       return { state, events: [], resolved: false };
     }
-    const appliedGive = applyCostSelection(nextState, cost, [recipient], controller, cardDb);
+    const appliedGive = applyCostSelection(nextState, cost, [recipient], controller, cardDb, sourceCardInstanceId);
     if (appliedGive.events.length === 0) {
       return { state, events: [], resolved: false };
     }

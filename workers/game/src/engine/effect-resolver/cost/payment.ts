@@ -10,7 +10,7 @@ import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
-import { computeCostTargets, resolveAmount } from "./targets.js";
+import { computeCostTargets } from "./targets.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 
@@ -459,20 +459,12 @@ export function payCosts(
         break;
       }
 
-      case "GIVE_DON": {
-        // OPT-824: synchronous callers cannot ask for the recipient. Pay only
-        // an unambiguous payment (exactly one eligible recipient); the
-        // interactive flow prompts through payCostsWithSelection.
-        const recipients = computeCostTargets(nextState, cost, controller, _cardDb, sourceCardInstanceId);
-        if (recipients.length !== 1) return null;
-        const applied = applyCostSelection(nextState, cost, recipients, controller, _cardDb);
-        if (applied.events.length === 0) return null;
-        nextState = applied.state;
-        events.push(...applied.events);
-        costResult.donGivenCount += resolveAmount(cost);
-        costResult.donGivenInstanceIds.push(...recipients);
-        break;
-      }
+      case "GIVE_DON":
+        // OPT-824: the recipient is always the player's choice, paid through
+        // payCostsWithSelection's prompt and the AWAITING_COST_SELECTION
+        // resume. No synchronous caller reaches a GIVE_DON cost, so fail
+        // closed rather than pick a recipient on the player's behalf.
+        return null;
 
       case "RETURN_ATTACHED_DON_TO_COST": {
         const amount = typeof cost.amount === "number" ? cost.amount : 1;
