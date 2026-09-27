@@ -17,6 +17,36 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 - Environment for Codex validation: `CI=true` + `XDG_CACHE_HOME` + `COREPACK_HOME` (seed from `~/.cache/node/corepack`; an empty dir yields pnpm 11). Put both cache dirs OUTSIDE the clone (`/private/tmp/optcg-cache-<NNN>/{xdg,corepack}`): in-clone `.cache`/`.corepack` dirs are traversed by root ESLint and fail `pnpm lint` with "could not find plugin react-hooks" (2026-09-09). Postgres cannot start in-sandbox; host it outside.
 - Sandboxed Codex has no network and no Linear: embed the full ticket text in the prompt and state that missing external access is not grounds to stop. A review task that tries its own Linear MCP and fails will refuse to issue a verdict (2026-08-04).
 - Background Codex tasks cannot escalate permissions; never instruct them to (the classifier blocks the prompt too).
+- Codex fallback implementer dispatch (use it when Claude quota is exhausted, or for wide Small batches):
+
+  ```sh
+  codex exec -m gpt-6-astra -c model_reasoning_effort="<low|medium>" -C <clone> --sandbox workspace-write -o <out.md> - < <brief.txt>
+  ```
+
+  In Codex follow-up sessions, `.git/index.lock` writes were denied 4 of 6 times (2026-09-15). The coordinator read the diff and committed on the implementer's behalf.
+
+## Claude subagent implementers and review worktrees (2026-09-27, PRs #681–#685)
+
+- Create one implementation worktree per ticket (`git worktree add -b <branch> <dir> origin/main`), then install deps in it before dispatch.
+- Review worktrees are detached at the PR head and symlink deps from the implementation worktree:
+  - root: `node_modules -> ../<impl>/node_modules`
+  - worker: `workers/game/node_modules -> ../../../<impl>/workers/game/node_modules`
+
+  With `../../` for the worker link, tests still pass but worker type-check fails with TS2688, and both reviewers reported type-check as `incomplete`.
+- Agents must put scratch copies in a temp dir outside git, never in a new worktree. The guardrails hook blocks forced worktree removal, so a scratch worktree holding one untracked file cannot be cleaned up without the user.
+- `rm -f $R/...` is blocked by the root-expansion safety check. Use literal paths or `"${R:?}"`.
+- The guardrail regexes scan the whole command line, including heredoc bodies. A ` -- <path>` on a line that also contains `checkout` reads as a checkout-discard. Split such commands, and write any prose that mentions guarded commands with the Edit tool.
+- In the main checkout (on a stale branch), `git diff A B <path>` needs the `--` when the path is absent from the working tree.
+- Opus implementers stop at the fence edge and ask. Two stalls came from facet registration. A new cost or action type becomes a `cost:<type>` or `action:<type>` facet tag, which must be added to three files:
+  - `shared/effect-facets.ts`
+  - `pipeline/__snapshots__/effect-facets.test.ts.snap`
+  - `docs/cards/EFFECT-FACET-TAXONOMY.md`
+
+  Pre-approve those three files in the brief, and list `pnpm pipeline:sync-facets` as a post-merge user action.
+- The Codex review lens needs the two Codex environment entries under "Dispatch and sandbox" pasted into its brief: the cache env vars and the no-network sentence. With `--sandbox workspace-write` it ran vitest probes, then restored tracked files and deleted its scratch copies on all five PRs.
+- The GitHub integration moves the Linear issue to Done when its PR merges. Read the issue state before writing a status after a merge. A blind "In Review" write regressed OPT-827 and needed an audit note.
+- The automated Codex GitHub reviewer (`chatgpt-codex-connector`) posts inline PR comments within minutes. Read `gh api repos/<o>/<r>/pulls/<n>/comments` in the final recheck and disposition each comment before merging. On #683 it raised a real (latent) P2.
+- Hot-path feasibility code needs a scale test. OPT-798's upfront cost check eagerly enumerated C(28,20) states and ran out of heap, and its own mutation table could not see it. Whenever a brief touches enumeration, ask for a timing test with large zones (for example, 30 trash cards).
 
 ## Clones and base branches
 

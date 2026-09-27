@@ -1,0 +1,14 @@
+### PR 682 — OPT-827
+- Result: merged (b545c2d8f5af6ffec9e198e4b319cec7bcb1f2e4)
+- Tier: Large
+- Head / base: dcb68c60e25e385620ab445e711204fbce871401 / main 793401b4eefc9475519afffbe7350d9a4f4945e3
+- Scope and acceptance: milled-card ref → executeMill revealedCards snapshot (new trash id) + REVEALED_CARD_PROPERTY source MILL; OP08-096 gate re-authored (cost <6 / =6 / >6, unrelated card, empty deck via Brook pipeline + resolver path, persisted parseStoredSession reload) → opt-827-mill-result-ref.test.ts 11/11; 5 red on main.
+- Coordinator review: every hunk read at bfdc2f5 (draw-search executeMill, condition-queries zone map, effect-types snapshot source, op08 schema); delta test-only (diff --stat). Spot-check: re-ran focused file at dcb68c6 → 11 passed.
+- Independent review: fresh Claude Opus — full at bfdc2f5: findings (MINOR-1 test overclaim, NIT ×3), M1/M3 reproduced, own M6/M9 killed, M8 `?? 0` survives (unreachable for legal decks — accepted); delta at dcb68c6 clean (R1/R2 red checks re-run). Codex astra lens at bfdc2f5: findings (MINOR Brook empty-deck reachable, NIT citation), no runtime defect.
+- Findings disposition: all MINOR/NIT fixed in dcb68c6 except NIT-2 (accepted: rules 5-1-2-1/2-7-5 make a cost-less milled card impossible) and NIT-3 (TRASH zone unobservable, disclosed).
+- Validation: implementer pnpm verify exit 0 at bfdc2f5 (worker 3221/5 xfail/5 skip); delta test-only → carried forward; focused 11/11 + type-check + schema:check at dcb68c6; CI run 36290604151 success at dcb68c6 (full gate).
+- Rules: 5-1-2-1, 2-7-5; ZONE-TRANSITION-CONTRACT for identity; no OP08-096 FAQ entry. No protocol change (revealedCards stripped from client prompts, visibility.ts:325; parseStoredSession accepts source MILL).
+- GitHub checks: ci SUCCESS, Vercel SUCCESS, CodeRabbit skipped. 0 review comments.
+- Integration: main unchanged 793401b through merge.
+- Merge permission: user grant 2026-09-26. Final recheck: head dcb68c6, main 793401b, CLEAN/MERGEABLE. Merged `--squash --match-head-commit dcb68c6…`; landed tree identical.
+- Post-merge: pending watch (logs/b545c2d-postmerge.watch).

@@ -1,0 +1,23 @@
+### PR 681 — OPT-798
+- Result: merge-ready pending required `ci` at d415b3a (run 36289257157)
+- Tier: Large
+- Head / base: d415b3acbf46f52f84044f984bb8dcf4e006c8e7 / main a100c3dc3b4a878b90895c1ede51b88f6ef9d7d4
+- Assessed at: 2026-09-27 ~02:48Z
+- Scope and acceptance:
+  - EB01-051 unavailable with a 1-card deck → payability.ts MILL `deck.length >= amount` + payment refusal → opt-798 tests (M1/M2 killed; reviewer re-ran M1).
+  - OP15-088 no hand discard → op15.ts cost replaced by MILL 3 → opt-798 OP15-088 tests.
+  - OP06-043 bottom-decks an opponent cost ≤2 Character → targets.ts EITHER set + resume.ts owner transition → 6 Aramaki/OP04-055 tests (coordinator mutation: 6 red).
+  - Worker tests + schema:check green → implementer verify exit 0 at d415b3a; reviewer re-ran the worker suite (3211 passed / 5 expected fail) and schema:check at d415b3a.
+  - Lint rule → schema-cost-lint.ts per-block (D1 MINOR residual → OPT-865).
+- Coordinator review: every hunk read (engine/schemas at 84a910a; delta feasibility.ts at d415b3a; lint read at 3e4f0e9, delta summarized by reviewer plus own read of the fast-path equivalence). Spot-check: EITHER candidate mutation → 6 red, restored, porcelain clean.
+- Independent review: fresh Claude Opus reviewer — full at 3e4f0e9 (spec clean; correctness F1 BLOCKER + F2 MINOR out of scope; mutation M1/M3/M6/M7 clean); delta at d415b3a clean (F1 fixed and re-probed to 60 trash; eager mutant OOM; `>`-mutant 68 red; D1 MINOR, 2 NITs). Cross-family: Codex gpt-6-astra medium lens at 3e4f0e9 — findings 1 (=F1), 2 (deck-out test fidelity), 3 (optional prompt, pre-existing), 4 (lint pooling), 5 (reuse prompt, pre-existing).
+- Findings: F1 BLOCKER perf/OOM → fixed e595ef2 (verified at d415b3a). Codex-2 MAJOR → it.fails ratchets 286bec6 + OPT-862. Codex-4 MINOR → fixed 6b23cfb. D1 MINOR (lint post-colon bracket, fails closed, no current card) → OPT-865. F2 → OPT-866. Codex-3 → OPT-864. Codex-5 → OPT-863. Implementer follow-up 5 → OPT-867.
+- Baseline/final validation: baseline at a100c3d (type-check 0; schema:check 2474; worker 3166/5 skip). Final pnpm verify exit 0 at d415b3a (implementer): app 2377/7 skip, pipeline 56, worker 3211/5 xfail/5 skip, build 36/36. Reviewer re-ran worker suite, type-check, schema:check at d415b3a.
+- Rules / protocol / VQA: rules 8-3-1-1/8-3-1-3/8-3-1-4, 4-2-1-1, 3-1-6, 6-5-5-4, 9-1-2/9-2-1-2; FAQ qa_eb01, faq_op15-eb04, qa_op04, qa_op06 — verified by the reviewer. No protocol or UI change (CARD_RETURNED_TO_DECK.playerIndex=owner consumers inventoried by the reviewer). VQA not applicable.
+- GitHub checks: ci (required) pending; Vercel pass; CodeRabbit skipped (advisory).
+- Review feedback / approvals: no GitHub review threads; no required approvals (mergeStateStatus BLOCKED only on pending ci).
+- Integration: main unchanged at a100c3d since dispatch; no base change.
+- Delivery: PR body has rules table, acceptance map, inventory, validation, mutations, Review round 1, 7 Follow-ups, post-merge sync-facets.
+- Merge permission: granted by the user 2026-09-26 for OPT-798/827/824/828/857.
+- Final recheck: pending CI.
+- Post-merge: user action `pnpm pipeline:sync-facets` against both Neon DBs (new cost:mill facet).
