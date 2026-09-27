@@ -10,7 +10,7 @@
  * is now a count check, and non-terminal enumeration is lazy.
  */
 import { describe, expect, it } from "vitest";
-import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
+import type { CardInstance, GameAction, GameState } from "../types.js";
 import type { Cost } from "../engine/effect-types.js";
 import { getAllAuthoredSchemas, getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
