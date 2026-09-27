@@ -497,13 +497,34 @@ interface MillParams {
 | **Target** | None (operates on a player's deck) |
 | **Failure mode** | If the deck has fewer cards than `amount`, mill as many as possible. |
 | **Fired events** | `CARD_MILLED` per card |
-| **Example cards** | OP03-040 Nami, various "trash from the top of your deck" effects |
+| **Example cards** | OP03-040 Nami, OP08-096 People's Dreams Don't Ever End!!, various "trash from the top of your deck" effects |
+| **Result (`result_ref`)** | The cards actually moved: `targetInstanceIds` are their new trash instance ids, and `revealedCards` holds a `source: "MILL"` last-known snapshot of each. An empty deck mills nothing and records no ref. |
 
 ```json
 {
   "type": "MILL",
   "params": { "amount": 1 }
 }
+```
+
+"If the trashed card …" gates read the milled card through `REVEALED_CARD_PROPERTY` on the MILL `result_ref` — never `SOURCE_PROPERTY`, which describes the source of a K.O./removal/rest event. `compare: { property: "COST" }` reads the printed cost of the card that was milled (a deck holds only Character, Event and Stage cards, all of which have a cost — rules 5-1-2-1 and 2-7-5). An unrelated card already in the trash or on the field cannot satisfy the gate. This MILL *action* is distinct from the `MILL` activation *cost* (`costs: [{ type: "MILL", amount }]`).
+
+```json
+[
+  { "type": "MILL", "params": { "amount": 1 }, "result_ref": "milled" },
+  {
+    "type": "MODIFY_POWER",
+    "target": { "type": "LEADER_OR_CHARACTER", "controller": "SELF", "count": { "up_to": 1 } },
+    "params": { "amount": 5000 },
+    "duration": { "type": "THIS_BATTLE" },
+    "conditions": {
+      "type": "REVEALED_CARD_PROPERTY",
+      "result_ref": "milled",
+      "compare": { "property": "COST", "operator": ">=", "value": 6 }
+    },
+    "chain": "THEN"
+  }
+]
 ```
 
 ---

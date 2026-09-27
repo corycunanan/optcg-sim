@@ -746,7 +746,12 @@ function evaluateSimple(
         ? result.revealedCards.map((snapshot) => ({
             instanceId: snapshot.instanceId,
             cardId: snapshot.cardId,
-            zone: snapshot.source === "LIFE_TOP" ? "LIFE" : "DECK",
+            zone:
+              snapshot.source === "LIFE_TOP"
+                ? "LIFE"
+                : snapshot.source === "MILL"
+                  ? "TRASH"
+                  : "DECK",
             state: "ACTIVE",
             attachedDon: [],
             turnPlayed: null,
