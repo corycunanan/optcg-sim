@@ -641,6 +641,12 @@ Proxy replacements use the `target_filter` field on `ReplacementTrigger` to spec
 
 When the engine processes a KO action at step 3, it checks all active replacement effects. For proxy replacements, it matches the *card being KO'd* against the `target_filter`. The source card (Kaku, Vivi, etc.) must be on the field and in an eligible state.
 
+**Explicit controller is required (OPT-800).** `registerReplacementsForCard` registers a replacement that has a `target_filter` as a wildcard (`appliesTo = []`), and `replacementMatchesTarget` applies the filter relative to the replacement's controller. A filter **without** `controller` matches both players' cards; the engine does not default it to SELF. Printed text decides the scope ("your Character" → `"SELF"`; a card protecting the opponent's or either player's cards → `"OPPONENT"` / `"EITHER"`), since rules §1-3-1 allows printed exceptions. A `cause_filter` does not substitute for it: `by: "OPPONENT_EFFECT"` still passes when the opponent's effect removes the opponent's *own* matching Character.
+
+The schema lint (`workers/game/src/engine/schema-replacement-controller-lint.ts`, run by `lint-schemas.sh`) fails any replacement definition — including ones nested in granted blocks — whose `replaces.target_filter` omits `controller`.
+
+**Self-only replacements omit `target_filter`.** With no `target_filter`, registration sets `appliesTo = [source instance]`, so the replacement can only protect its own source ("If this Character would be..."). This is the lint's only exemption. Do not encode "this Character" as a wildcard filter such as `{ card_type: "CHARACTER" }` or `{ exclude_self: false }`; that protects every matching card on both sides.
+
 ---
 
 ### Replacement Priority Rules

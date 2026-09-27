@@ -486,6 +486,7 @@ export const OP14_016_X_DRAKE: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Supernovas"],
         },
@@ -1025,7 +1026,6 @@ export const OP14_029_TASHIGI: EffectSchema = {
       flags: { optional: true },
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { card_type: "CHARACTER" },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
@@ -1231,6 +1231,7 @@ export const OP14_034_MONKEY_D_LUFFY: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Straw Hat Crew"],
         },
@@ -2338,6 +2339,7 @@ export const OP14_061_VERGO: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Donquixote Pirates"],
         },

@@ -363,7 +363,7 @@ export const OP09_012_MONSTER: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_KO",
-        target_filter: { name: "Bonk Punch" },
+        target_filter: { controller: "SELF", name: "Bonk Punch" },
         cause_filter: { by: "ANY_EFFECT" },
       },
       replacement_actions: [

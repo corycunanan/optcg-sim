@@ -1127,6 +1127,7 @@ export const OP10_032_TASHIGI: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           color: "GREEN",
           exclude_name: "Tashigi",
           card_type: "CHARACTER",
@@ -1753,6 +1754,7 @@ export const OP10_049_SABO: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           base_cost_max: 7,
           exclude_name: "Sabo",
           card_type: "CHARACTER",

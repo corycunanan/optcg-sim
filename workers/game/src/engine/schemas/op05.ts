@@ -30,6 +30,7 @@ export const OP05_001_SABO: EffectSchema = {
       replaces: {
         event: "WOULD_BE_KO",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           power_min: 5000,
         },
@@ -1130,7 +1131,7 @@ export const OP05_030_DONQUIXOTE_ROSINANTE: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_KO",
-        target_filter: { is_rested: true },
+        target_filter: { controller: "SELF", is_rested: true },
       },
       conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       replacement_actions: [

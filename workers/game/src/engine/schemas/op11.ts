@@ -50,6 +50,7 @@ export const OP11_001_KOBY: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Navy"],
           base_power_max: 7000,
@@ -3247,6 +3248,7 @@ export const OP11_101_CAPONE_GANG_BEGE: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Supernovas"],
           exclude_name: 'Capone"Gang"Bege',

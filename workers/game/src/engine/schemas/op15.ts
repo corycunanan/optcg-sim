@@ -405,7 +405,7 @@ export const OP15_009_KOBY: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { card_type: "CHARACTER", base_power_max: 7000 },
+        target_filter: { controller: "SELF", card_type: "CHARACTER", base_power_max: 7000 },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
@@ -1423,7 +1423,7 @@ export const OP15_035_LABOON: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { card_type: "CHARACTER", base_power_max: 7000 },
+        target_filter: { controller: "SELF", card_type: "CHARACTER", base_power_max: 7000 },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
@@ -2001,7 +2001,7 @@ export const OP15_052_LEO: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { card_type: "CHARACTER", base_power_max: 7000 },
+        target_filter: { controller: "SELF", card_type: "CHARACTER", base_power_max: 7000 },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
@@ -2722,7 +2722,7 @@ export const OP15_069_NOLA: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { card_type: "CHARACTER", base_power_max: 7000 },
+        target_filter: { controller: "SELF", card_type: "CHARACTER", base_power_max: 7000 },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
@@ -3652,7 +3652,7 @@ export const OP15_090_PERONA: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { card_type: "CHARACTER", base_power_max: 7000 },
+        target_filter: { controller: "SELF", card_type: "CHARACTER", base_power_max: 7000 },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [
@@ -3844,6 +3844,7 @@ export const OP15_094_RORONOA_ZORO: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Straw Hat Crew"],
           exclude_self: true,
@@ -4047,6 +4048,7 @@ export const OP15_098_MONKEY_D_LUFFY: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Sky Island"],
           base_power_min: 6000,
@@ -4304,7 +4306,7 @@ export const OP15_105_JEWELRY_BONNEY: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
-        target_filter: { card_type: "CHARACTER", base_power_max: 7000 },
+        target_filter: { controller: "SELF", card_type: "CHARACTER", base_power_max: 7000 },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
       replacement_actions: [

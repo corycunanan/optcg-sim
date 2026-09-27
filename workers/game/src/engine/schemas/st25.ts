@@ -144,6 +144,7 @@ export const ST25_003_CROCODILE_AND_MIHAWK: EffectSchema = {
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
+          controller: "SELF",
           card_type: "CHARACTER",
           traits: ["Cross Guild"],
         },
