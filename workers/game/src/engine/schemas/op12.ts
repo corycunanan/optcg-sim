@@ -497,7 +497,7 @@ export const OP12_016_TO_NEVER_DOUBT: EffectSchema = {
       flags: { optional: true },
       costs: [
         {
-          type: "GIVE_OPPONENT_DON",
+          type: "GIVE_DON",
           amount: 2,
           target: {
             type: "LEADER_OR_CHARACTER",
@@ -509,6 +509,10 @@ export const OP12_016_TO_NEVER_DOUBT: EffectSchema = {
       ],
       actions: [
         {
+          // "the card given these DON!! cards" is the GIVE_DON cost's
+          // recipient (result ref __cost_don_given, OPT-824). Binding the
+          // attack scope to that exact card is OPT-826; until then the scope
+          // names the [Silvers Rayleigh] recipient class.
           type: "APPLY_PROHIBITION",
           target: { type: "OPPONENT_LEADER" },
           params: {
@@ -569,7 +573,7 @@ export const OP12_017_COLOR_OF_OBSERVATION_HAKI: EffectSchema = {
       flags: { optional: true },
       costs: [
         {
-          type: "GIVE_OPPONENT_DON",
+          type: "GIVE_DON",
           amount: 1,
           target: {
             type: "LEADER_OR_CHARACTER",
@@ -676,7 +680,7 @@ export const OP12_019_COLOR_OF_ARMS_HAKI: EffectSchema = {
       flags: { optional: true },
       costs: [
         {
-          type: "GIVE_OPPONENT_DON",
+          type: "GIVE_DON",
           amount: 1,
           target: {
             type: "LEADER_OR_CHARACTER",

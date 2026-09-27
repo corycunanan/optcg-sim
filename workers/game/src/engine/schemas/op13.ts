@@ -320,9 +320,11 @@ export const OP13_007_ACE_SABO_LUFFY: EffectSchema = {
       id: "OP13-007_activate_main",
       category: "activate",
       trigger: { keyword: "ACTIVATE_MAIN" },
+      // OPT-824: printed order — give 1 active DON!! to 1 of your Leader or
+      // Character cards (this Character included), then trash this Character.
       costs: [
         {
-          type: "RETURN_ATTACHED_DON_TO_COST",
+          type: "GIVE_DON",
           amount: 1,
           target: {
             type: "LEADER_OR_CHARACTER",
