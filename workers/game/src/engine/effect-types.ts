@@ -1482,8 +1482,24 @@ export type ReplacementEvent =
   | "WOULD_LOSE_GAME"
   | "LIFE_ADDED_TO_HAND";
 
+/**
+ * What caused the replaced event (rules §8-1-3-4). `BATTLE` is the battle-result
+ * K.O. of rules §7-1-4-1-2 ("K.O.'d in battle"); an effect that K.O.s a card
+ * while a battle is in progress is still an effect K.O. (OPT-825).
+ */
+export type CauseFilterBy = "OPPONENT_EFFECT" | "ANY_EFFECT" | "BATTLE" | "ANY";
+
+/** Runtime mirror used by replacement-parameter validation. */
+export const ALL_CAUSE_FILTER_BY = [
+  "OPPONENT_EFFECT", "ANY_EFFECT", "BATTLE", "ANY",
+] as const satisfies readonly CauseFilterBy[];
+
+type _AllCauseFilterByCoverUnion = Exclude<CauseFilterBy, typeof ALL_CAUSE_FILTER_BY[number]> extends never ? true : never;
+const _allCauseFilterByCoverUnion: _AllCauseFilterByCoverUnion = true;
+void _allCauseFilterByCoverUnion;
+
 export interface CauseFilter {
-  by: "OPPONENT_EFFECT" | "ANY_EFFECT" | "ANY";
+  by: CauseFilterBy;
   source_card_type?: "CHARACTER";
 }
 

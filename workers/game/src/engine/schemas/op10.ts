@@ -1196,7 +1196,7 @@ export const OP10_034_FRANKY: EffectSchema = {
       category: "replacement",
       replaces: {
         event: "WOULD_BE_KO",
-        cause_filter: { by: "ANY" },
+        cause_filter: { by: "BATTLE" },
       },
       replacement_actions: [
         {

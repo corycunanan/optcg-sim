@@ -456,11 +456,22 @@ type ReplacementEvent =
   | "WOULD_LOSE_GAME"
   | "LIFE_ADDED_TO_HAND";
 
-type CauseFilter =
-  | { by: "OPPONENT_EFFECT" }
-  | { by: "ANY_EFFECT" }
-  | { by: "ANY" };
+interface CauseFilter {
+  by: "OPPONENT_EFFECT" | "ANY_EFFECT" | "BATTLE" | "ANY";
+  source_card_type?: "CHARACTER";
+}
 ```
+
+| `by` | Matches | Card text | Example |
+|------|---------|-----------|---------|
+| `OPPONENT_EFFECT` | An effect controlled by the replacement's opponent | "...by your opponent's effect..." | ST29-008 Nami |
+| `ANY_EFFECT` | Any effect, either player's | "...K.O.'d by an effect..." | ST20-002 Charlotte Cracker |
+| `BATTLE` | Only the battle-result K.O. of rules §7-1-4-1-2 | "...K.O.'d in battle..." | OP10-034 Franky |
+| `ANY` | Battle and effect | no cause printed; prefer omitting `cause_filter` | OP11-110 Fukaboshi |
+
+`BATTLE` does not match an effect that K.O.s a card while a battle is in progress, such as a [Counter] Event or a [When Attacking] effect. The official FAQ treats "K.O.'d by an effect" and "K.O.'d in battle" as separate categories (P-040 Kaido; ST05-017 Union Armada). Callers pass `"battle"` only from the damage step (`battle.ts` `checkReplacementForKO`); every effect K.O. passes `"effect"` (OPT-825).
+
+`ALL_CAUSE_FILTER_BY` in `effect-types.ts` is the runtime mirror of `by`. Replacement-parameter validation (`isCauseFilter`) rejects any other value, so a replacement with an unknown `by` never registers a match. `matchesCauseFilter` is exhaustive at the type level and fails closed.
 
 ---
 
@@ -470,7 +481,7 @@ Each trigger defines the event being intercepted. The `target_filter` scopes whi
 
 #### WOULD_BE_KO
 
-Fires when a Character would be K.O.'d by any cause (battle or effect).
+Fires when a Character would be K.O.'d by any cause (battle or effect). Narrow it with `cause_filter`: `{ by: "BATTLE" }` for "K.O.'d in battle" (OP10-034 Franky), `{ by: "ANY_EFFECT" }` for "K.O.'d by an effect", `{ by: "OPPONENT_EFFECT" }` for "K.O.'d by your opponent's effect".
 
 | Card Text | Example |
 |-----------|---------|
