@@ -4,7 +4,9 @@ import {
   updateEffectContinuation,
   withdrawUnactivatedTrashMain,
 } from "../event-activation.js";
-import { retainEventsOnFrame } from "./events.js";
+import { pendingPropagationEvents, retainEventsOnFrame } from "./events.js";
+import { isEngineTerminated } from "../../engine-limits.js";
+import { log } from "../../../lib/log.js";
 /**
  * PLAYER_CHOICE resume handlers.
  *
@@ -647,6 +649,121 @@ export function handleAwaitingOptionalResponse(
   return services.processRemainingTriggers(
     nextState,
     pendingTriggers,
+    cardDb,
+    events,
+    topFrame.triggerOrderingGroup
+  );
+}
+
+/**
+ * OPT-799: AWAITING_OPTIONAL_RESPONSE for an action-level "you may" clause.
+ * The clauses before it already resolved (their events ride on the frame);
+ * only the paused action and the rest of the chain run here.
+ *
+ * - Accept: the paused action runs once (its inline condition already held
+ *   when the prompt opened, so it is not re-evaluated), then the rest.
+ * - Decline: the paused action is skipped and counts as not performed, so an
+ *   IF_DO dependent is skipped while THEN clauses still resolve (Rules
+ *   4-10-1 / 4-10-2). Its `result_ref` stays unset, exactly as for an action
+ *   that could not be performed.
+ * - Anything else is rejected with the frame and prompt intact.
+ */
+export function handleAwaitingOptionalActionResponse(
+  state: GameState,
+  action: GameAction,
+  topFrame: EffectStackFrame,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices
+): EffectResolverResult {
+  const declined =
+    action.type === "PASS" ||
+    (action.type === "PLAYER_CHOICE" && action.choiceId === "skip");
+  const accepted =
+    action.type === "PLAYER_CHOICE" &&
+    (action.choiceId === "accept" || action.choiceId === "activate");
+  const pausedAction = topFrame.pausedAction;
+  if ((!declined && !accepted) || !pausedAction) {
+    return { state, events: [], resolved: false, rejected: true };
+  }
+
+  const { sourceCardInstanceId, controller } = topFrame;
+  log("effect.optional_action", {
+    sourceInstanceId: sourceCardInstanceId,
+    controller,
+    actionType: pausedAction.type,
+    decision: accepted ? "accepted" : "declined",
+  });
+  const events = pendingPropagationEvents(topFrame.accumulatedEvents);
+  let nextState = popFrame(state);
+  const stackDepthAfterPop = nextState.effectStack.length;
+
+  let chainActions = topFrame.remainingActions;
+  if (accepted) {
+    const {
+      optional: _optional,
+      conditions: _conditions,
+      ...decided
+    } = pausedAction;
+    chainActions = [decided as typeof pausedAction, ...chainActions];
+  }
+
+  if (chainActions.length > 0) {
+    const chainResult = services.withCommittedEvents(events).executeActionChain(
+      nextState,
+      chainActions,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      new Map<string, EffectResult>(topFrame.resultRefs),
+      topFrame.effectDescription,
+      accepted ? (topFrame.priorActionSucceeded ?? true) : false
+    );
+    nextState = chainResult.state;
+    events.push(...chainResult.events);
+    if (isEngineTerminated(nextState)) {
+      return { state: nextState, events, resolved: false };
+    }
+
+    if (chainResult.pendingPrompt) {
+      nextState = retainEventsOnFrame(nextState, stackDepthAfterPop, events);
+      nextState = updateEffectContinuation(nextState, stackDepthAfterPop, (frame) => ({
+        pendingTriggers: [...frame.pendingTriggers, ...topFrame.pendingTriggers],
+        triggerOrderingGroup:
+          topFrame.triggerOrderingGroup ?? frame.triggerOrderingGroup,
+        ...(topFrame.replacementBatchContinuation
+          ? { replacementBatchContinuation: topFrame.replacementBatchContinuation }
+          : {}),
+      }));
+      return {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: chainResult.pendingPrompt,
+      };
+    }
+  }
+
+  // Same publication/trigger obligations as an interrupted continuation: the
+  // saved prefix and the new chain events are scanned once (already-scanned
+  // events are skipped), then queued triggers drain.
+  if (events.length > 0) {
+    const scan = scanEventsForTriggers(nextState, events, controller, cardDb);
+    nextState = scan.state;
+    events.splice(0, events.length, ...scan.events);
+    if (scan.triggers.length > 0) {
+      return services.processRemainingTriggers(
+        nextState,
+        [...scan.triggers, ...topFrame.pendingTriggers],
+        cardDb,
+        events,
+        topFrame.triggerOrderingGroup
+      );
+    }
+  }
+
+  return services.processRemainingTriggers(
+    nextState,
+    topFrame.pendingTriggers,
     cardDb,
     events,
     topFrame.triggerOrderingGroup
