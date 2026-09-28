@@ -78,6 +78,30 @@ function resolveRestDestination(
   return normalized === "TOP" ? "top" : "bottom";
 }
 
+/**
+ * Announce the searched picks. A printed search reveals its picks to both
+ * players (rule 11-2-1); `reveal: false` (e.g. OP16-119, per its FAQ) keeps
+ * the identities controller-only so the owner still learns what they took,
+ * while the event visibility policy redacts them for the opponent and
+ * spectators.
+ */
+function pushSearchPickReveal(
+  events: PendingEvent[],
+  keptCards: CardInstance[],
+  controller: 0 | 1,
+  reveal: boolean | undefined,
+): void {
+  if (keptCards.length === 0) return;
+  const cards = keptCards.map((card) => ({ instanceId: card.instanceId, cardId: card.cardId }));
+  events.push({
+    type: "CARDS_REVEALED",
+    playerIndex: controller,
+    payload: reveal === false
+      ? { cards, source: "search", visibility: "CONTROLLER_ONLY", visibleTo: controller }
+      : { cards, source: "search", visibility: "BOTH" },
+  });
+}
+
 export const SEARCH_PICK_DESTINATIONS = [
   "HAND",
   "TRASH",
@@ -233,17 +257,7 @@ export function handleArrangeSearchDeck(
   const { restOfDeck, arrangedCards, keptCards } = computeArrangeContext(p.deck, keptIds, ordered);
 
   let nextState = state;
-  if (keptCards.length > 0) {
-    events.push({
-      type: "CARDS_REVEALED",
-      playerIndex: controller,
-      payload: {
-        cards: keptCards.map((card) => ({ instanceId: card.instanceId, cardId: card.cardId })),
-        source: "search",
-        visibility: "BOTH",
-      },
-    });
-  }
+  pushSearchPickReveal(events, keptCards, controller, sp.reveal);
   nextState = moveSearchPicksToDestination(
     nextState,
     keptCards,
@@ -295,17 +309,7 @@ export function handleArrangeSearchTrashTheRest(
   );
 
   let nextState = state;
-  if (keptCards.length > 0) {
-    events.push({
-      type: "CARDS_REVEALED",
-      playerIndex: controller,
-      payload: {
-        cards: keptCards.map((card) => ({ instanceId: card.instanceId, cardId: card.cardId })),
-        source: "search",
-        visibility: "BOTH",
-      },
-    });
-  }
+  pushSearchPickReveal(events, keptCards, controller, sp.reveal);
   nextState = moveSearchPicksToDestination(
     nextState,
     keptCards,
