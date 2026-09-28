@@ -792,7 +792,7 @@ interface HandWheelParams {
 | **Target** | None (operates on the controller's hand and deck) |
 | **Failure mode** | If the hand is empty, the action is ignored. If the deck has fewer cards than were returned, draw as many as possible. |
 | **Fired events** | `CARD_PLACED_TO_DECK` per returned card, `CARD_DRAWN` per drawn card |
-| **Example cards** | OP04-048 Sasaki, P-002 |
+| **Example cards** | None authored (OP04-048 Sasaki and P-002 use `RETURN_HAND_TO_DECK` → `SHUFFLE_DECK` → `DRAW`) |
 
 The `result_ref` captures the count of cards returned, enabling dynamic draw amounts:
 

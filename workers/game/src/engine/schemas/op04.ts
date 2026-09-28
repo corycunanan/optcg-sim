@@ -1675,9 +1675,11 @@ export const OP04_047_ICE_ONI: EffectSchema = {
   ],
 };
 
-// ─── OP04-048 Sasaki — ON_PLAY hand wheel (return all + draw same) ──────────
+// ─── OP04-048 Sasaki — ON_PLAY return hand to deck, shuffle, draw equal ────
 // [On Play] Return all cards in your hand to your deck and shuffle your deck.
 // Then, draw cards equal to the number you returned to your deck.
+// Same printed text and encoding as P-002. The count is captured before the
+// shuffle; the draw uses the shuffled deck.
 
 export const OP04_048_SASAKI: EffectSchema = {
   card_id: "OP04-048",
@@ -1690,8 +1692,13 @@ export const OP04_048_SASAKI: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         {
-          type: "HAND_WHEEL",
+          type: "RETURN_HAND_TO_DECK",
+          params: { position: "BOTTOM" },
           result_ref: "returned_count",
+        },
+        {
+          type: "SHUFFLE_DECK",
+          chain: "THEN",
         },
         {
           type: "DRAW",
