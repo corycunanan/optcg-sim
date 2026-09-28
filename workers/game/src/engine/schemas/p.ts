@@ -2979,7 +2979,8 @@ export const P_117_NAMI: EffectSchema = {
       id: "leader_damage_mill",
       category: "auto",
       trigger: {
-        event: "LEADER_ATTACK_DEALS_DAMAGE",
+        event: "ATTACK_DEALS_DAMAGE",
+        filter: { attacker: "SELF" },
         don_requirement: 1,
       },
       actions: [

@@ -336,7 +336,15 @@ export interface GameEventPayloadMap {
   BLOCK_DECLARED: { blockerInstanceId: string };
   COUNTER_USED: { cardId: string; counterValue?: number; counterTargetInstanceId?: string; cardInstanceId?: string; type?: string };
   BATTLE_RESOLVED: Record<string, never>;
-  DAMAGE_DEALT: { amount: number; attackerInstanceId: string; attackerType: string; target?: string; lethal?: boolean };
+  DAMAGE_DEALT: {
+    amount: number;
+    attackerInstanceId: string;
+    attackerType: string;
+    target?: string;
+    lethal?: boolean;
+    /** OPT-796: true only for the first Life damage an attack deals ([Double Attack] deals two). */
+    firstDamageOfAttack?: boolean;
+  };
   TRIGGER_ACTIVATED: { cardId: string; activated?: boolean };
   DON_GIVEN_TO_CARD: { targetInstanceId?: string; count: number };
   DON_DETACHED: { count?: number };

@@ -93,7 +93,8 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "When your opponent's Character is returned to the owner's hand by your effect" | `{ "event": "CHARACTER_RETURNED_TO_HAND", "filter": { "controller": "OPPONENT", "cause": "BY_YOUR_EFFECT" } }` |
 | "When you take damage" | `{ "event": "DAMAGE_TAKEN" }` |
 | "When your opponent activates [Blocker]" | `{ "event": "BLOCKER_ACTIVATED", "filter": { "controller": "OPPONENT" } }` |
-| "When this Leader's attack deals damage to your opponent's Life" | `{ "event": "LEADER_ATTACK_DEALS_DAMAGE" }` |
+| "When this Leader's/Character's attack deals damage to your opponent's Life" | `{ "event": "ATTACK_DEALS_DAMAGE", "filter": { "attacker": "SELF" } }` |
+| "When you deal damage to your opponent's Life" | `{ "event": "ATTACK_DEALS_DAMAGE" }` |
 
 ### Compound Triggers
 

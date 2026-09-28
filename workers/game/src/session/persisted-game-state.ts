@@ -502,6 +502,7 @@ const EventPayloadSchemas = {
     attackerType: z.string(),
     target: z.string().optional(),
     lethal: z.boolean().optional(),
+    firstDamageOfAttack: z.boolean().optional(),
   }),
   TRIGGER_ACTIVATED: z.strictObject({
     cardId: z.string(),
