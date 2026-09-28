@@ -26,6 +26,7 @@ import { collectTargetInstructionCoverage } from "../effect-resolver/target-inst
 import { findMillCostIntentViolations } from "../schema-cost-lint.js";
 import { findLifeCostOrderIntentViolations } from "../schema-life-cost-lint.js";
 import { findReplacementControllerIntentViolations } from "../schema-replacement-controller-lint.js";
+import { findTriggerEventIntentViolations } from "../schema-trigger-event-lint.js";
 
 const repoRoot = resolve(__dirname, "../../../../../");
 
@@ -272,6 +273,7 @@ async function main(): Promise<void> {
     ...findMillCostIntentViolations(loadCanonicalCardBlocks(), schemas),
     ...findLifeCostOrderIntentViolations(schemas),
     ...findReplacementControllerIntentViolations(schemas),
+    ...findTriggerEventIntentViolations(schemas),
     ...findStartOfGameEffectRuleCountViolations(modules),
     ...findPickDestinationViolations(modules),
     ...(source ? [] : validateSchemaSourceParity(modules, registry)),
