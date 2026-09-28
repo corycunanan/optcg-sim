@@ -1495,11 +1495,13 @@ export const OP11_041_NAMI: EffectSchema = {
       id: "life_removed_draw",
       category: "auto",
       trigger: {
-        event: "LIFE_CARD_REMOVED",
+        event: "CARD_REMOVED_FROM_LIFE",
         filter: { controller: "ANY" },
         turn_restriction: "YOUR_TURN",
         once_per_turn: true,
       },
+      // "This effect can be activated when…" — optional, as OP07-038.
+      flags: { optional: true },
       conditions: {
         type: "HAND_COUNT",
         controller: "SELF",
