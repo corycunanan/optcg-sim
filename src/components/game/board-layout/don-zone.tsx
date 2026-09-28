@@ -12,6 +12,7 @@ import { cardEntry } from "@/lib/motion";
 import { Card } from "../card";
 import { getBoardZoneLabel } from "./accessibility";
 import { type ActiveDonDrag } from "./constants";
+import { stgDonWidth } from "./board-geometry";
 
 const DON_CARD_W = 50;
 const DON_CARD_H = 70;
@@ -19,6 +20,89 @@ const DON_ACTIVE_OVERLAP = 35;
 const DON_RESTED_OVERLAP = 60;
 const DEFAULT_DON_IMG = "/images/DON/zoro.jpg";
 export const DON_ENTRY_STAGGER_SECONDS = 0.05;
+
+// ─── Prompt-time fan-out (OPT-792) ───────────────────────────────────────────
+// At rest, DON!! overlap heavily: each covered token shows 15 board px
+// (active) or 10 (rested) — a few screen px once the board scales down. While
+// an in-place SELECT_TARGET offers DON!! from this zone, the offered group
+// fans out to use the zone width (the other group compresses), clamped so a
+// full 10 DON!! still fit. Steps never drop below the resting ones.
+const DON_ZONE_BORDER = 2;
+const DON_GROUP_GAP = 8;
+const DON_FAN_CARD_GAP = 4;
+const DON_MIN_STEP = 4;
+const DON_ACTIVE_STEP = DON_CARD_W - DON_ACTIVE_OVERLAP;
+const DON_RESTED_STEP = DON_CARD_H - DON_RESTED_OVERLAP;
+
+export interface DonFanSteps {
+  /** Horizontal distance between consecutive active DON!! (board px). */
+  active: number;
+  /** Horizontal distance between consecutive rested DON!! (board px). */
+  rested: number;
+}
+
+export function donFanSteps({
+  activeCount,
+  restedCount,
+  activeOffered,
+  restedOffered,
+  zoneWidth,
+}: {
+  activeCount: number;
+  restedCount: number;
+  activeOffered: boolean;
+  restedOffered: boolean;
+  zoneWidth: number;
+}): DonFanSteps {
+  const resting = { active: DON_ACTIVE_STEP, rested: DON_RESTED_STEP };
+  if (!activeOffered && !restedOffered) return resting;
+
+  const groups = [
+    { key: "active" as const, n: activeCount, card: DON_CARD_W, offered: activeOffered },
+    { key: "rested" as const, n: restedCount, card: DON_CARD_H, offered: restedOffered },
+  ].filter((group) => group.n > 0);
+  const gap = groups.length > 1 ? DON_GROUP_GAP : 0;
+  let available = zoneWidth - DON_ZONE_BORDER - gap;
+  const steps: DonFanSteps = { ...resting };
+
+  // Other group: compressed so the offered group gets the room.
+  for (const group of groups.filter((g) => !g.offered)) {
+    steps[group.key] = DON_MIN_STEP;
+    available -= group.card + (group.n - 1) * DON_MIN_STEP;
+  }
+  // Offered groups share the remaining room; fitting always wins.
+  const offered = groups.filter((g) => g.offered);
+  available -= offered.reduce((sum, g) => sum + g.card, 0);
+  const cap = (g: (typeof groups)[number], step: number) =>
+    Math.min(g.card + DON_FAN_CARD_GAP, step);
+  const spans = offered.reduce((sum, g) => sum + (g.n - 1), 0);
+  if (spans === 0) {
+    for (const g of offered) steps[g.key] = cap(g, Infinity);
+    return steps;
+  }
+  const share = Math.floor(available / spans);
+  const [first, second] = offered;
+  if (second && first.n > 1 && second.n > 1) {
+    // Both groups offered: if one falls below its resting step, pin it there
+    // when the other can still keep its own resting step.
+    for (const [low, high] of [
+      [first, second],
+      [second, first],
+    ] as const) {
+      if (share >= resting[low.key]) continue;
+      const rest = Math.floor(
+        (available - (low.n - 1) * resting[low.key]) / (high.n - 1),
+      );
+      if (rest >= resting[high.key]) {
+        steps[low.key] = resting[low.key];
+        steps[high.key] = cap(high, rest);
+        return steps;
+      }
+    }
+  }
+  for (const g of offered) steps[g.key] = cap(g, share);
+  return steps;
+}
 
 // DON entry pop on turn-start (OPT-121). New tokens scale + fade in; existing
 // tokens skip the pop via `initial={false}`. Same shape as field-card entry
@@ -49,6 +133,7 @@ export const DonCard = React.memo(function DonCard({
 function DraggableDonCard({
   don,
   index,
+  step,
   disabled,
   donArtUrl,
   motionDelay,
@@ -57,6 +142,7 @@ function DraggableDonCard({
 }: {
   don: DonInstance;
   index: number;
+  step: number;
   disabled?: boolean;
   donArtUrl?: string | null;
   motionDelay?: number;
@@ -84,7 +170,7 @@ function DraggableDonCard({
       animate={{ ...ENTRY_ANIMATE, opacity: isDragging ? 0.3 : 1 }}
       transition={entering ? entryTransition(entryIndex) : undefined}
       style={{
-        marginLeft: index > 0 ? -DON_ACTIVE_OVERLAP : 0,
+        marginLeft: index > 0 ? step - DON_CARD_W : 0,
         zIndex: index,
         cursor: disabled ? "default" : "grab",
       }}
@@ -115,6 +201,7 @@ function SelectableDonCard({
   onToggle,
   rested,
   index,
+  step,
   donArtUrl,
   motionDelay,
   entering,
@@ -125,6 +212,7 @@ function SelectableDonCard({
   onToggle?: (instanceId: string) => void;
   rested: boolean;
   index: number;
+  step: number;
   donArtUrl?: string | null;
   motionDelay?: number;
   entering?: boolean;
@@ -180,8 +268,7 @@ function SelectableDonCard({
       )}
       style={{
         ...(rested ? { width: DON_CARD_H, height: DON_CARD_W } : {}),
-        marginLeft:
-          index > 0 ? -(rested ? DON_RESTED_OVERLAP : DON_ACTIVE_OVERLAP) : 0,
+        marginLeft: index > 0 ? step - (rested ? DON_CARD_H : DON_CARD_W) : 0,
         zIndex: index,
       }}
     >
@@ -250,6 +337,19 @@ export const DonZone = React.memo(function DonZone({
 
   const activeDon = allDon.filter((d) => d.state === "ACTIVE");
   const restedDon = allDon.filter((d) => d.state === "RESTED");
+  // A group is "offered" while the prompt lets the player pick from it.
+  const offered = (group: DonInstance[]) =>
+    group.some((d) => {
+      const selection = targetSelectionById?.get(d.instanceId);
+      return !!selection && (selection.eligible || selection.selected);
+    });
+  const steps = donFanSteps({
+    activeCount: activeDon.length,
+    restedCount: restedDon.length,
+    activeOffered: offered(activeDon),
+    restedOffered: offered(restedDon),
+    zoneWidth: typeof style.width === "number" ? style.width : stgDonWidth,
+  });
   const entryIndexById = new Map(
     allDon.map((don, index) => [don.instanceId, index]),
   );
@@ -293,6 +393,7 @@ export const DonZone = React.memo(function DonZone({
                     onToggle={onTargetToggle}
                     rested={false}
                     index={i}
+                    step={steps.active}
                     donArtUrl={donArtUrl}
                     motionDelay={delay}
                     entering={entering}
@@ -306,6 +407,7 @@ export const DonZone = React.memo(function DonZone({
                     key={don.instanceId}
                     don={don}
                     index={i}
+                    step={steps.active}
                     donArtUrl={donArtUrl}
                     motionDelay={delay}
                     entering={entering}
@@ -326,7 +428,7 @@ export const DonZone = React.memo(function DonZone({
                       : undefined
                   }
                   style={{
-                    marginLeft: i > 0 ? -DON_ACTIVE_OVERLAP : 0,
+                    marginLeft: i > 0 ? steps.active - DON_CARD_W : 0,
                     zIndex: i,
                   }}
                 >
@@ -356,6 +458,7 @@ export const DonZone = React.memo(function DonZone({
                       onToggle={onTargetToggle}
                       rested
                       index={i}
+                      step={steps.rested}
                       donArtUrl={donArtUrl}
                       motionDelay={
                         animationDelay ? animationDelay + i * 0.02 : undefined
@@ -381,7 +484,7 @@ export const DonZone = React.memo(function DonZone({
                     style={{
                       width: DON_CARD_H,
                       height: DON_CARD_W,
-                      marginLeft: i > 0 ? -DON_RESTED_OVERLAP : 0,
+                      marginLeft: i > 0 ? steps.rested - DON_CARD_H : 0,
                       zIndex: i,
                     }}
                   >
