@@ -37,6 +37,8 @@ import {
 } from "../engine/effect-resolver/target-resolver.js";
 import { executeEffectAction } from "../engine/effect-resolver/resolver.js";
 import { payCosts } from "../engine/effect-resolver/cost/payment.js";
+import { applyCostSelection } from "../engine/effect-resolver/cost/resume.js";
+import { handleRedistributeDon } from "../engine/effect-resolver/resume/target.js";
 import {
   SessionRepository,
   type SessionStorage,
@@ -704,6 +706,126 @@ describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
     expect(f.state.players[1].donCostArea.find((d) => d.instanceId === held)?.state).toBe(
       "ACTIVE"
     );
+  });
+
+  it("Magellan: the opponent chooses to return the held DON!! (choice resume path)", () => {
+    const f = fixture();
+    const held = holdRestedOpponentDon(f);
+    // One held rested + one active DON!!: a real choice, so the DON!! owner
+    // is prompted (OP16-074 FAQ) and the return resolves on resume.
+    const active = f.state.players[1].donCostArea.find((d) => d.state === "ACTIVE")!;
+    f.state.players[1].donCostArea = f.state.players[1].donCostArea.filter(
+      (d) => d.instanceId === held || d.instanceId === active.instanceId
+    );
+    f.play("OP02-085");
+    for (let guard = 0; guard < 4; guard++) {
+      const options = f.state.pendingPrompt?.options;
+      if (options?.promptType === "OPTIONAL_EFFECT") {
+        f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      } else break;
+    }
+    const options = f.state.pendingPrompt?.options;
+    expect(options?.promptType).toBe("PLAYER_CHOICE");
+    const rested =
+      options?.promptType === "PLAYER_CHOICE"
+        ? options.choices.find((c) => c.label === "Return 1 rested DON!!")
+        : undefined;
+    expect(rested).toBeDefined();
+    f.act({ type: "PLAYER_CHOICE", choiceId: rested!.id }, 1);
+    expect(f.state.players[1].donDeck.map((d) => d.instanceId)).toContain(held);
+    expect(f.state.prohibitions.some((p) => p.appliesTo.includes(held))).toBe(false);
+  });
+
+  it("releases at the cost-selection step (GIVE_DON cost) — defensive, seeded effect", () => {
+    const f = fixture();
+    const don = f.state.players[0].donCostArea.find((d) => d.state === "ACTIVE")!;
+    f.state = {
+      ...f.state,
+      prohibitions: [
+        {
+          id: "seeded-don-hold",
+          sourceCardInstanceId: "seed",
+          sourceEffectBlockId: "",
+          prohibitionType: "CANNOT_REFRESH",
+          scope: {},
+          duration: { type: "SKIP_NEXT_REFRESH" },
+          controller: 1,
+          appliesTo: [don.instanceId],
+          usesRemaining: null,
+        } as GameState["prohibitions"][number],
+      ],
+    };
+    const leader = f.state.players[0].leader.instanceId;
+    const applied = applyCostSelection(
+      f.state,
+      {
+        type: "GIVE_DON",
+        amount: 1,
+        target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { exact: 1 } },
+      },
+      [leader],
+      0,
+      f.db,
+      "source"
+    );
+    expect(applied.state.players[0].leader.attachedDon.map((d) => d.instanceId)).toContain(
+      don.instanceId
+    );
+    expect(applied.state.prohibitions.some((p) => p.appliesTo.includes(don.instanceId))).toBe(
+      false
+    );
+  });
+
+  it("releases on a REDISTRIBUTE_DON resume transfer — defensive, seeded effect", () => {
+    const f = fixture();
+    const c = f.put("COST-3", 0);
+    const moving = { instanceId: "moving-don", state: "ACTIVE" as const, attachedTo: f.state.players[0].leader.instanceId };
+    f.state.players[0].leader.attachedDon = [moving];
+    f.state = {
+      ...f.state,
+      prohibitions: [
+        {
+          id: "seeded-don-hold",
+          sourceCardInstanceId: "seed",
+          sourceEffectBlockId: "",
+          prohibitionType: "CANNOT_REFRESH",
+          scope: {},
+          duration: { type: "SKIP_NEXT_REFRESH" },
+          controller: 1,
+          appliesTo: [moving.instanceId],
+          usesRemaining: null,
+        } as GameState["prohibitions"][number],
+      ],
+    };
+    const result = handleRedistributeDon(
+      f.state,
+      {
+        type: "REDISTRIBUTE_DON",
+        transfers: [
+          {
+            fromCardInstanceId: f.state.players[0].leader.instanceId,
+            donInstanceId: moving.instanceId,
+            toCardInstanceId: c.instanceId,
+          },
+        ],
+      },
+      {
+        effectSourceInstanceId: "source",
+        controller: 0,
+        pausedAction: { type: "REDISTRIBUTE_DON", params: { amount: 1 } },
+        remainingActions: [],
+        resultRefs: [],
+        validTargets: [c.instanceId],
+      },
+      new Map(),
+      []
+    );
+    expect(result?.kind).toBe("fallthrough");
+    const next = result?.kind === "fallthrough" ? result.state : f.state;
+    expect(char({ ...f, state: next } as Fixture, c)?.attachedDon.map((d) => d.instanceId)).toContain(
+      moving.instanceId
+    );
+    expect(next.prohibitions.some((p) => p.appliesTo.includes(moving.instanceId))).toBe(false);
   });
 
   it("releases at the effect-action step (return to deck) without the pipeline backstop", () => {
