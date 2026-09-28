@@ -434,8 +434,14 @@ export function executeTrashCard(
  * amount = max(0, hand − N). OP14 FAQ: with N or fewer cards nothing is
  * trashed. Otherwise `amount` (default 1) is resolved as before.
  *
- * `min`/`max` bound a legal selection: a mandatory trash takes exactly
- * min(amount, candidates); an optional one takes 0..that.
+ * Some authored cards carry the printed count on `target.count` instead of
+ * `params`: `up_to: N` ("trash up to 3 cards", OP02-059 / OP02-070) allows
+ * 0..N, and `any_number` ("trash any number of …", OP15-002) allows
+ * 0..candidates. `exact` and `all` keep the `amount` semantics.
+ *
+ * `min`/`max` bound a legal selection and feed both the prompt's
+ * countMin/countMax and the resume guard: a mandatory trash takes exactly
+ * min(amount, candidates); an optional or variable one takes 0..that.
  */
 export function trashFromHandSelection(
   state: GameState,
@@ -459,10 +465,9 @@ export function trashFromHandSelection(
         : targetController;
   const p = state.players[targetController];
   const untilCount = params.until_count;
-  const amount =
-    untilCount !== undefined
-      ? Math.max(0, p.hand.length - untilCount)
-      : resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
+  const count = untilCount === undefined ? action.target?.count : undefined;
+  const upTo = count && "up_to" in count ? count.up_to : undefined;
+  const anyNumber = !!count && "any_number" in count;
 
   let candidates = [...p.hand];
   if (action.target?.filter) {
@@ -471,7 +476,16 @@ export function trashFromHandSelection(
 
   // "You may trash…" — the player can decline by selecting 0 cards, and an
   // IF_DO chain after this action only fires when at least 1 was trashed.
-  const optional = params.optional === true;
+  const amount =
+    untilCount !== undefined
+      ? Math.max(0, p.hand.length - untilCount)
+      : anyNumber
+        ? candidates.length
+        : upTo !== undefined
+          ? upTo
+          : resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
+  // "Up to N" / "any number" permit 0 (Comprehensive Rules 1-3-5-1).
+  const optional = params.optional === true || upTo !== undefined || anyNumber;
   const max = Math.min(amount, candidates.length);
   return {
     targetController,
@@ -496,7 +510,7 @@ export function executeTrashFromHand(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const { targetController, chooser, blindSelection, amount, untilCount, candidates, optional } =
+  const { targetController, chooser, blindSelection, amount, untilCount, candidates, optional, min, max } =
     trashFromHandSelection(state, action, controller, cardDb, resultRefs);
 
   if (candidates.length === 0) return { state, events, succeeded: false };
@@ -524,8 +538,8 @@ export function executeTrashFromHand(
         options: {
           promptType: "SELECT_TARGET",
           validTargets,
-          countMin: optional ? 0 : amount,
-          countMax: amount,
+          countMin: min,
+          countMax: max,
           effectDescription: optional
             ? `You may trash up to ${amount} card(s) from hand`
             : `Choose ${amount} card(s) to trash from hand`,

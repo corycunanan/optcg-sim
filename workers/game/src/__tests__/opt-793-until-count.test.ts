@@ -96,11 +96,12 @@ function fixture() {
     };
     if (zone === "HAND") state.players[owner].hand.push(c);
     else if (zone === "LEADER") state.players[owner].leader = c;
+    else if (zone === "STAGE") state.players[owner].stage = c;
     else
       state.players[owner].characters[
         state.players[owner].characters.findIndex((slot) => !slot)
       ] = c;
-    if (zone === "LEADER" || zone === "CHARACTER")
+    if (zone === "LEADER" || zone === "CHARACTER" || zone === "STAGE")
       state = registerCardEnteredField(state, c, db.get(id)!);
     return c;
   }
@@ -265,6 +266,103 @@ describe("OPT-793 TRASH_FROM_HAND until_count primitive", () => {
     if (options?.promptType !== "SELECT_TARGET") throw new Error("expected SELECT_TARGET");
     expect([options.countMin, options.countMax]).toEqual([2, 2]);
     expect(options.validTargets).toEqual(f.state.players[1].hand.map((c) => c.instanceId));
+  });
+});
+
+// ─── Review fix: printed counts carried on target.count ──────────────────────
+
+describe("OPT-793 hand trash with target.count up_to / any_number", () => {
+  function acceptOptional(f: ReturnType<typeof fixture>) {
+    if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT") {
+      expect(f.respond({ type: "PLAYER_CHOICE", choiceId: "accept" })).toBe(false);
+    }
+  }
+
+  /** Reaches the "Then, trash up to 3 cards from your hand" prompt with 5 cards in hand. */
+  function upToThree(cardId: "OP02-059" | "OP02-070", handSize = 5) {
+    const f = fixture();
+    f.fillHand(0, handSize);
+    if (cardId === "OP02-059") {
+      const hancock = f.put("OP02-059", 0);
+      f.run({
+        type: "DECLARE_ATTACK",
+        attackerInstanceId: hancock.instanceId,
+        targetInstanceId: f.state.players[1].leader.instanceId,
+      });
+    } else {
+      f.db.set(CARDS.LEADER.id, { ...CARDS.LEADER, name: "Emporio.Ivankov" });
+      const stage = f.put("OP02-070", 0, "STAGE", { type: "Stage" });
+      f.run({ type: "ACTIVATE_EFFECT", cardInstanceId: stage.instanceId, effectId: "activate_cycle" });
+      acceptOptional(f);
+    }
+    // Draw 1 (6 in hand), then the exact "trash 1".
+    const exact = trashPrompt(f.state);
+    expect([exact.options.countMin, exact.options.countMax]).toEqual([1, 1]);
+    expect(f.selectHand(0, 1)).toBe(false);
+    expect(f.state.players[0].hand).toHaveLength(handSize);
+    return f;
+  }
+
+  for (const cardId of ["OP02-059", "OP02-070"] as const) {
+    it.each([0, 2, 3])(`${cardId} accepts %i cards for "trash up to 3"`, (count) => {
+      const f = upToThree(cardId);
+      const { options, respondingPlayer } = trashPrompt(f.state);
+      expect(respondingPlayer).toBe(0);
+      expect([options.countMin, options.countMax]).toEqual([0, 3]);
+      expect(f.selectHand(0, count)).toBe(false);
+      expect(f.state.players[0].hand).toHaveLength(5 - count);
+    });
+
+    it(`${cardId} rejects 4 cards for "trash up to 3"`, () => {
+      const f = upToThree(cardId);
+      trashPrompt(f.state);
+      expect(f.selectHand(0, 4)).toBe(true);
+      expect(f.state.players[0].hand).toHaveLength(5);
+      expect(f.selectHand(0, 3)).toBe(false);
+      expect(f.state.players[0].hand).toHaveLength(2);
+    });
+  }
+
+  it("OP02-059 advertises the clamped bound 0..2 when only 2 cards remain", () => {
+    const f = upToThree("OP02-059", 2);
+    const { options } = trashPrompt(f.state);
+    expect([options.countMin, options.countMax]).toEqual([0, 2]);
+    expect(f.selectHand(0, 2)).toBe(false);
+    expect(f.state.players[0].hand).toHaveLength(0);
+  });
+
+  function lucy() {
+    const f = fixture();
+    const leader = f.put("OP15-002", 0, "LEADER", { type: "Leader", power: 5000 });
+    const events = Array.from({ length: 4 }, () => f.put("OPT793-EVENT", 0, "HAND", { type: "Event" }));
+    const other = f.put("OPT793-FILLER", 0, "HAND");
+    f.run({
+      type: "DECLARE_ATTACK",
+      attackerInstanceId: leader.instanceId,
+      targetInstanceId: f.state.players[1].leader.instanceId,
+    });
+    acceptOptional(f);
+    return { f, events, other };
+  }
+
+  it.each([0, 2, 3])('OP15-002 accepts %i Events for "trash any number"', (count) => {
+    const { f, events } = lucy();
+    const { options } = trashPrompt(f.state);
+    expect([options.countMin, options.countMax]).toEqual([0, 4]);
+    expect(options.validTargets).toEqual(events.map((c) => c.instanceId));
+    expect(
+      f.respond({ type: "SELECT_TARGET", selectedInstanceIds: events.slice(0, count).map((c) => c.instanceId) })
+    ).toBe(false);
+    expect(f.state.players[0].hand).toHaveLength(5 - count);
+  });
+
+  it("OP15-002 rejects a non-Event/Stage card", () => {
+    const { f, events, other } = lucy();
+    trashPrompt(f.state);
+    expect(
+      f.respond({ type: "SELECT_TARGET", selectedInstanceIds: [events[0].instanceId, other.instanceId] })
+    ).toBe(true);
+    expect(f.state.players[0].hand).toHaveLength(5);
   });
 });
 
