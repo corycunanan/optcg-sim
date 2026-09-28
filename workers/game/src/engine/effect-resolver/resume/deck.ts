@@ -1,8 +1,8 @@
 import { getPlayEntryState } from "../../play-entry-state.js";
 /**
  * ARRANGE_TOP_CARDS resume handlers — response to the player's arrangement
- * after SEARCH_DECK / SEARCH_TRASH_THE_REST / SEARCH_AND_PLAY, plus the life
- * reorder response for REORDER_ALL_LIFE.
+ * after SEARCH_DECK / SEARCH_TRASH_THE_REST / SEARCH_AND_PLAY / DECK_SCRY,
+ * plus the life reorder response for REORDER_ALL_LIFE.
  *
  * Each handler mutates the caller's `events` accumulator and returns the
  * updated state, or null to fall through to the next branch.
@@ -24,6 +24,7 @@ import type { EffectResolverServices } from "../services.js";
 import type { ActionResult } from "../types.js";
 import { isPresent } from "../../type-guards.js";
 import { getSearchAndPlayPickLimit } from "../action-utils.js";
+import { getDeckScryDestination, getDeckScryGroupSize } from "../actions/draw-search.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -568,4 +569,81 @@ export function handleArrangeLifeScry(
     payload: { orderedInstanceIds: [selectedId] },
   });
   return { ...state, players };
+}
+
+export type DeckScryResumeResult =
+  | { rejected: true }
+  | { rejected: false; state: GameState };
+
+/**
+ * DECK_SCRY resume: place the looked-at group, whole and in the chosen order,
+ * at the chosen end of the deck (OP17-050 FAQ: the group is never split).
+ *
+ * The response must be exactly the looked-at group — same cards, each once,
+ * nothing kept — and those cards must still be the top of the deck. Anything
+ * else is rejected without mutating state, following the established resume
+ * rejection contract (handleFieldToLifePosition in ./choice.ts): the stack
+ * dispatcher restores the paused frame and resumePromptLifecycle restores the
+ * pre-response state and reports responseRejected, so the prompt stays
+ * pending. The wire action carries one destination for the whole group, so a
+ * per-card split is not representable.
+ *
+ * `validTargets` holds the looked-at instance ids (executeDeckScry). Frames
+ * persisted before OPT-839 recorded none; the deck cannot change while the
+ * prompt is pending, so their group is re-derived from the schema's count.
+ *
+ * Reordering cards inside the deck is not a zone transition
+ * (ZONE-TRANSITION-CONTRACT): instances keep their identities.
+ */
+export function handleArrangeDeckScry(
+  state: GameState,
+  action: GameAction,
+  pausedAction: Action | null,
+  controller: 0 | 1,
+  validTargets: string[] | undefined,
+): DeckScryResumeResult | null {
+  if (!pausedAction || pausedAction.type !== "DECK_SCRY") return null;
+  if (action.type !== "ARRANGE_TOP_CARDS") return { rejected: true };
+
+  const params = getActionParams(pausedAction, "DECK_SCRY");
+  const deck = state.players[controller].deck;
+  const group = validTargets && validTargets.length > 0
+    ? validTargets
+    : deck.slice(0, getDeckScryGroupSize(params, deck.length)).map((card) => card.instanceId);
+  const groupSet = new Set(group);
+
+  const kept = [
+    ...(action.keptCardInstanceIds ?? []),
+    ...(action.keptCardInstanceId ? [action.keptCardInstanceId] : []),
+  ];
+  const ordered = action.orderedInstanceIds ?? [];
+  if (
+    kept.length > 0 ||
+    ordered.length !== group.length ||
+    new Set(ordered).size !== ordered.length ||
+    ordered.some((id) => !groupSet.has(id))
+  ) {
+    return { rejected: true };
+  }
+
+  const top = deck.slice(0, group.length);
+  if (top.length !== group.length || top.some((card) => !groupSet.has(card.instanceId))) {
+    return { rejected: true };
+  }
+
+  const allowed = getDeckScryDestination(params);
+  if (
+    (allowed === "TOP" && action.destination !== "top") ||
+    (allowed === "BOTTOM" && action.destination !== "bottom")
+  ) {
+    return { rejected: true };
+  }
+
+  const byId = new Map(top.map((card) => [card.instanceId, card]));
+  const arranged = ordered.map((id) => byId.get(id)).filter(isPresent);
+  const newDeck = placeArrangedInDeck(deck.slice(group.length), arranged, action.destination);
+
+  const players = [...state.players] as [typeof state.players[0], typeof state.players[1]];
+  players[controller] = { ...state.players[controller], deck: newDeck };
+  return { rejected: false, state: { ...state, players } };
 }

@@ -812,7 +812,17 @@ export interface ActionParamsMap {
     pick?: CountMode;
     shuffle_after?: boolean;
   };
-  DECK_SCRY: { look_at?: number; count?: number };
+  DECK_SCRY: {
+    look_at?: number;
+    /** Legacy alias for look_at (OP02-056); look_at wins when both are set. */
+    count?: number;
+    /**
+     * Where the whole looked-at group goes. The group is never split
+     * (OP17-050 FAQ). Defaults to TOP_OR_BOTTOM, the printed wording of every
+     * consumer except ST17-003 ("place them at the top of your deck").
+     */
+    destination?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
+  };
   SEARCH_TRASH_THE_REST: {
     look_at?: number;
     pick?: CountMode;

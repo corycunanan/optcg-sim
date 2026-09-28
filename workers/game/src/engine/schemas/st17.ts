@@ -108,7 +108,7 @@ export const ST17_003_BUGGY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "ON_PLAY" },
       actions: [
-        { type: "DECK_SCRY", params: { look_at: 3 } },
+        { type: "DECK_SCRY", params: { look_at: 3, destination: "TOP" } },
       ],
     },
   ],

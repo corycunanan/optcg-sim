@@ -4,7 +4,8 @@ import { updateEffectContinuation } from "./event-activation.js";
  * resumeFromStack (phase based). Branch bodies live in ./resume/*.ts:
  *
  *   deck.ts     — ARRANGE_TOP_CARDS branches (SEARCH_DECK, SEARCH_TRASH_THE_REST,
- *                 SEARCH_AND_PLAY, REORDER_ALL_LIFE) + shared arrange helpers
+ *                 SEARCH_AND_PLAY, DECK_SCRY, REORDER_ALL_LIFE) + shared arrange
+ *                 helpers
  *   target.ts   — REDISTRIBUTE_DON, SELECT_TARGET (including rule 3-7-6-1
  *                 overflow-trash-for-play)
  *   choice.ts   — PLAYER_CHOICE branches + AWAITING_OPTIONAL_RESPONSE +
@@ -44,6 +45,7 @@ import {
   handleArrangeLifeScry,
   handleArrangeReorderLife,
   handleArrangeReturnToDeck,
+  handleArrangeDeckScry,
 } from "./resume/deck.js";
 import {
   handleRedistributeDon,
@@ -159,6 +161,23 @@ export function resumeEffectChain(
     events
   );
   if (lifeScry) nextState = lifeScry;
+
+  // DECK_SCRY validates the whole group before placing it; an invalid
+  // response is rejected with no state change and the prompt stays pending.
+  const deckScry = handleArrangeDeckScry(
+    nextState,
+    action,
+    pausedAction,
+    controller,
+    validTargets
+  );
+  if (deckScry?.rejected) {
+    return { state, events: [], resolved: false, rejected: true };
+  }
+  if (deckScry) {
+    nextState = deckScry.state;
+    pausedActionSucceeded = true;
+  }
 
   const returnToDeck = handleArrangeReturnToDeck(
     nextState,

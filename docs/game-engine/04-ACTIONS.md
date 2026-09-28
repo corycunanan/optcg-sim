@@ -609,29 +609,31 @@ interface FullDeckSearchParams {
 
 ### DECK_SCRY
 
-Look at the top N cards of the deck and rearrange each individually to the top or bottom. No cards are added to hand — this is pure deck manipulation.
+Look at the top N cards of the deck, reorder them, and place the whole group at the top or bottom of the deck. The group is never split between top and bottom (OP17-050 FAQ). No cards are added to hand — this is pure deck manipulation.
 
 ```typescript
 interface DeckScryParams {
-  count: number;
+  look_at?: number;   // default 5
+  count?: number;     // legacy alias for look_at (OP02-056)
+  destination?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM"; // default TOP_OR_BOTTOM
 }
 ```
 
 | Field | Value |
 |-------|-------|
 | **Target** | None (always the controller's deck) |
-| **Failure mode** | If the deck has fewer than `count` cards, scry all remaining. |
+| **Failure mode** | If the deck has fewer than `look_at` cards, scry all remaining; an empty deck resolves without a prompt. |
 | **Fired events** | None (private information rearrangement) |
-| **Example cards** | OP01-073, ST03-010, OP07-039 |
+| **Example cards** | OP01-073, ST03-010, OP07-039, OP17-050, ST17-003 (`destination: "TOP"`) |
 
 ```json
 {
   "type": "DECK_SCRY",
-  "params": { "count": 5 }
+  "params": { "look_at": 5 }
 }
 ```
 
-The controller looks at the top N cards, then places each card at either the top or bottom of the deck in any order.
+The controller answers an `ARRANGE_TOP_CARDS` prompt with every looked-at card exactly once and one destination for the whole group. The engine rejects partial, duplicate, foreign or kept-card responses, and a destination the schema forbids, without changing state. Reordering inside the deck is not a zone transition; instances keep their identities. Chained actions (e.g. OP17-050's "Then, draw 1 card") see the new deck order.
 
 ---
 

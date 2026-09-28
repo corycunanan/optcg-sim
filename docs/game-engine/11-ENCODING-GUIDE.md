@@ -199,7 +199,7 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "Play...from your trash rested" | above with `"source_zone": "TRASH"` and `"play_state": "RESTED"` |
 | "Trash N cards from the top of your deck" | `{ "type": "MILL", "params": { "amount": N } }` |
 | "Place N card(s) from your hand at the bottom of your deck" | `{ "type": "PLACE_HAND_TO_DECK", "params": { "amount": N, "position": "BOTTOM" } }` |
-| "Look at N cards from the top of your deck; place them at the top or bottom" | `{ "type": "DECK_SCRY", "params": { "count": N } }` |
+| "Look at N cards from the top of your deck; place them at the top or bottom" | `{ "type": "DECK_SCRY", "params": { "look_at": N } }` (top only: add `"destination": "TOP"`) |
 
 ### Power and Stats
 
