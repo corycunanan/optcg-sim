@@ -16,6 +16,10 @@ export interface TargetCardSelectionState {
   selected: boolean;
   eligible: boolean;
   disabledReason: string | null;
+  /** The server offered this id (prompt `validTargets`). Unlike `eligible`,
+   *  it does not change as the shared count fills. Always set by
+   *  `buildTargetSelectionModel`; optional only for hand-built fixtures. */
+  offered?: boolean;
 }
 
 export interface TargetSelectionModel {
@@ -261,6 +265,7 @@ export function buildTargetSelectionModel(
       selected,
       eligible: !selected && reason === null,
       disabledReason: reason,
+      offered: validSet.has(card.instanceId),
     });
   }
   for (const don of selectableDon) {
@@ -272,6 +277,7 @@ export function buildTargetSelectionModel(
       selected,
       eligible: !selected && reason === null,
       disabledReason: reason,
+      offered: validSet.has(don.instanceId),
     });
   }
 

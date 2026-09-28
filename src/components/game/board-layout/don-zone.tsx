@@ -337,11 +337,16 @@ export const DonZone = React.memo(function DonZone({
 
   const activeDon = allDon.filter((d) => d.state === "ACTIVE");
   const restedDon = allDon.filter((d) => d.state === "RESTED");
-  // A group is "offered" while the prompt lets the player pick from it.
+  // A group is "offered" while the server's prompt includes one of its DON!!.
+  // Server membership, not transient eligibility: filling the shared count
+  // with Characters must not collapse the fan (OPT-792 review).
   const offered = (group: DonInstance[]) =>
     group.some((d) => {
       const selection = targetSelectionById?.get(d.instanceId);
-      return !!selection && (selection.eligible || selection.selected);
+      if (!selection) return false;
+      // `offered` is always set by the selection model; hand-built maps
+      // without it fall back to the momentary state.
+      return selection.offered ?? (selection.eligible || selection.selected);
     });
   const steps = donFanSteps({
     activeCount: activeDon.length,

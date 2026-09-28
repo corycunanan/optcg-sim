@@ -1,8 +1,14 @@
 import React, { useState } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DonInstance, PlayerState } from "@shared/game-types";
+import type {
+  CardInstance,
+  DonInstance,
+  PlayerState,
+  SelectTargetPrompt,
+} from "@shared/game-types";
 import { DON_ENTRY_STAGGER_SECONDS, DonZone, donFanSteps } from "./don-zone";
+import { buildTargetSelectionModel } from "@/lib/game/target-selection";
 
 const motionState = vi.hoisted(() => ({ reduced: false }));
 
@@ -261,7 +267,7 @@ describe("DonZone prompt-time fan-out (OPT-792)", () => {
     const selection = new Map(
       dons.map((d) => [
         d.instanceId,
-        { selected: false, eligible: true, disabledReason: null },
+        { selected: false, eligible: true, disabledReason: null, offered: true },
       ]),
     );
     const render = (withPrompt: boolean) => {
@@ -284,5 +290,44 @@ describe("DonZone prompt-time fan-out (OPT-792)", () => {
     // Prompt: (232 - 50) / 5 = 36px exposed → -14 margin.
     expect(findDonWrapper(render(true), "a-1").props.style.marginLeft).toBe(-14);
     expect(findDonWrapper(render(true), "a-0").props.style.marginLeft).toBe(0);
+  });
+});
+
+describe("DonZone fan stays put at the shared limit (OPT-792 review A)", () => {
+  it("keeps offered DON!! fanned when Characters fill the shared count", () => {
+    const dons = Array.from({ length: 6 }, (_, i) => don(`a-${i}`, "ACTIVE"));
+    const cards = [
+      { instanceId: "c1", cardId: "C", zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: null, controller: 1, owner: 1 },
+      { instanceId: "c2", cardId: "C", zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: null, controller: 1, owner: 1 },
+    ] as CardInstance[];
+    const prompt: SelectTargetPrompt = {
+      promptType: "SELECT_TARGET",
+      cards,
+      validTargets: ["c1", "c2", ...dons.map((d) => d.instanceId)],
+      effectDescription: "Rest up to a total of 2 of your opponent's Characters or DON!! cards.",
+      countMin: 0,
+      countMax: 2,
+      ctaLabel: "Confirm",
+    };
+    const margin = (selected: string[]) => {
+      const byId = buildTargetSelectionModel(prompt, new Set(selected), {}, cards, dons).byId;
+      act(() => {
+        const element = (
+          <DonZone
+            player={player(...dons)}
+            zoneKey="opp-don"
+            style={{ position: "absolute", left: 0, top: 0, width: 234 }}
+            targetSelectionById={byId}
+          />
+        );
+        if (renderer) renderer.update(element);
+        else renderer = create(element);
+      });
+      return findDonWrapper(renderer!.root, "a-1").props.style.marginLeft;
+    };
+    expect(margin([])).toBe(-14);
+    // Limit reached by Characters: every DON!! is ineligible and unselected.
+    expect(margin(["c1", "c2"])).toBe(-14);
+    expect(margin(["c1"])).toBe(-14);
   });
 });

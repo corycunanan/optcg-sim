@@ -133,11 +133,15 @@ describe("buildTargetSelectionModel", () => {
       selected: true,
       eligible: false,
       disabledReason: null,
+      offered: true,
     });
     expect(model.byId.get("beta")?.disabledReason).toBe(
       "Selection limit reached"
     );
+    // Still server-offered at the limit; gamma never was.
+    expect(model.byId.get("beta")?.offered).toBe(true);
     expect(model.byId.get("gamma")?.disabledReason).toBe("Not a valid target");
+    expect(model.byId.get("gamma")?.offered).toBe(false);
     expect(model.canConfirm).toBe(true);
   });
 
