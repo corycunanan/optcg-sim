@@ -347,8 +347,7 @@ describe("OPT-792 resolver union", () => {
 
   it("total_count is enforced even when the parent count is absent", () => {
     const f = fixture();
-    const base = targetOf("OP06-035");
-    const { count: _count, ...noParentCount } = base;
+    const noParentCount: Target = { ...targetOf("OP06-035"), count: undefined };
     const [a, b, c] = oppDonIds(f);
     const check = (ids: string[]) =>
       validateTargetConstraints(ids, noParentCount, f.state, f.db, new Map());
