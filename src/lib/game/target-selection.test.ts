@@ -195,3 +195,68 @@ describe("buildTargetSelectionModel", () => {
     expect(complete.canConfirm).toBe(true);
   });
 });
+
+describe("mixed Character + DON!! pools (OPT-792)", () => {
+  const donA = { instanceId: "don-a", state: "ACTIVE" as const, attachedTo: null };
+  const donB = { instanceId: "don-b", state: "ACTIVE" as const, attachedTo: null };
+  const donRested = { instanceId: "don-r", state: "RESTED" as const, attachedTo: null };
+  const displayDon = [donA, donB, donRested];
+  const mixed = prompt([alpha, beta], {
+    validTargets: [alpha.instanceId, beta.instanceId, donA.instanceId, donB.instanceId],
+    countMin: 0,
+    countMax: 2,
+  });
+
+  it("treats DON!!-only and mixed prompts as battlefield prompts", () => {
+    expect(isBattlefieldTargetPrompt(mixed, [alpha, beta], displayDon)).toBe(true);
+    expect(
+      isBattlefieldTargetPrompt(
+        prompt([], { validTargets: [donA.instanceId] }),
+        [alpha],
+        displayDon
+      )
+    ).toBe(true);
+    // DON!! ids the board does not render keep the old empty-cards rule.
+    expect(
+      isBattlefieldTargetPrompt(prompt([], { validTargets: ["elsewhere"] }), [alpha], displayDon)
+    ).toBe(false);
+  });
+
+  it("counts Characters and DON!! against one shared maximum", () => {
+    const model = buildTargetSelectionModel(
+      mixed,
+      new Set([alpha.instanceId, donA.instanceId]),
+      cardDb,
+      [alpha, beta],
+      displayDon
+    );
+    expect(model.selectedCount).toBe(2);
+    expect(model.selectedIds).toEqual([alpha.instanceId, donA.instanceId]);
+    expect(model.byId.get(donA.instanceId)?.selected).toBe(true);
+    expect(model.byId.get(donB.instanceId)?.disabledReason).toBe("Selection limit reached");
+    expect(model.byId.get(beta.instanceId)?.disabledReason).toBe("Selection limit reached");
+    expect(model.byId.get(donRested.instanceId)?.disabledReason).toBe("Not a valid target");
+    expect(model.canConfirm).toBe(true);
+  });
+
+  it("rejects a DON!! selection beyond the count and ignores DON!! for Character-only prompts", () => {
+    const over = buildTargetSelectionModel(
+      mixed,
+      new Set([alpha.instanceId, donA.instanceId, donB.instanceId]),
+      cardDb,
+      [alpha, beta],
+      displayDon
+    );
+    expect(over.canConfirm).toBe(false);
+
+    const charactersOnly = buildTargetSelectionModel(
+      prompt([alpha, beta], { countMin: 0, countMax: 2 }),
+      new Set([donA.instanceId]),
+      cardDb,
+      [alpha, beta],
+      displayDon
+    );
+    expect(charactersOnly.byId.has(donA.instanceId)).toBe(false);
+    expect(charactersOnly.selectedIds).toEqual([]);
+  });
+});

@@ -10,6 +10,7 @@ import type {
 import {
   buildTargetSelectionModel,
   collectBattlefieldCards,
+  collectBattlefieldDon,
   isBattlefieldTargetPrompt,
   selectTargetPromptKey,
 } from "@/lib/game/target-selection";
@@ -33,8 +34,13 @@ export function useInPlaceTargetSelection({
     () => collectBattlefieldCards(me, opp),
     [me, opp]
   );
+  // OPT-792: mixed pools also offer cost-area DON!! by id.
+  const battlefieldDon = useMemo(
+    () => collectBattlefieldDon(me, opp),
+    [me, opp]
+  );
   const inPlacePrompt =
-    prompt && isBattlefieldTargetPrompt(prompt, battlefieldCards)
+    prompt && isBattlefieldTargetPrompt(prompt, battlefieldCards, battlefieldDon)
       ? prompt
       : null;
   const promptKey = inPlacePrompt ? selectTargetPromptKey(inPlacePrompt) : null;
@@ -54,10 +60,11 @@ export function useInPlaceTargetSelection({
             inPlacePrompt,
             selectedIds,
             cardDb,
-            battlefieldCards
+            battlefieldCards,
+            battlefieldDon
           )
         : null,
-    [battlefieldCards, cardDb, inPlacePrompt, selectedIds]
+    [battlefieldCards, battlefieldDon, cardDb, inPlacePrompt, selectedIds]
   );
 
   const clear = useCallback(() => {
@@ -110,7 +117,7 @@ export function useInPlaceTargetSelection({
     if (!model?.canConfirm) return;
     onAction({
       type: "SELECT_TARGET",
-      selectedInstanceIds: model.selectedCards.map((card) => card.instanceId),
+      selectedInstanceIds: model.selectedIds,
     });
   }, [model, onAction]);
 

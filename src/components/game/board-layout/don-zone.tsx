@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useId } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { motion, useReducedMotion } from "motion/react";
 import type { DonInstance, PlayerState } from "@shared/game-types";
 import { cn } from "@/lib/utils";
+import type { TargetCardSelectionState } from "@/lib/game/target-selection";
 import { useZonePosition } from "@/contexts/zone-position-context";
 import { useFieldArrivals } from "@/hooks/use-field-arrivals";
 import { cardEntry } from "@/lib/motion";
@@ -101,6 +102,106 @@ function DraggableDonCard({
   );
 }
 
+/**
+ * OPT-792: a cost-area DON!! offered by an in-place SELECT_TARGET prompt
+ * (mixed "Characters or DON!!" pools). Mirrors the field-card selection
+ * affordance: eligible/selected highlight ring, click and Enter/Space toggle,
+ * dimmed and inert when ineligible, and the same accessible name/state.
+ * Eligibility is the server's valid ids, resolved into `selection` upstream.
+ */
+function SelectableDonCard({
+  don,
+  selection,
+  onToggle,
+  rested,
+  index,
+  donArtUrl,
+  motionDelay,
+  entering,
+  entryIndex,
+}: {
+  don: DonInstance;
+  selection: TargetCardSelectionState;
+  onToggle?: (instanceId: string) => void;
+  rested: boolean;
+  index: number;
+  donArtUrl?: string | null;
+  motionDelay?: number;
+  entering?: boolean;
+  entryIndex: number;
+}) {
+  const descriptionId = useId();
+  const disabledReason = selection.disabledReason;
+  const toggle = disabledReason ? undefined : () => onToggle?.(don.instanceId);
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if ((event.key === "Enter" || event.key === " ") && toggle) {
+      event.preventDefault();
+      toggle();
+    }
+  };
+  const highlightRing = selection.selected
+    ? ("selected" as const)
+    : selection.eligible
+      ? ("eligible" as const)
+      : undefined;
+
+  return (
+    <motion.div
+      data-don-instance-id={don.instanceId}
+      data-target-selection=""
+      data-target-instance-id={don.instanceId}
+      layout
+      initial={entering ? ENTRY_INITIAL : false}
+      animate={{ ...ENTRY_ANIMATE, opacity: disabledReason ? 0.35 : 1 }}
+      transition={entering ? entryTransition(entryIndex) : undefined}
+      onClick={toggle}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={[
+        "DON!!",
+        rested ? "rested" : "active",
+        selection.selected
+          ? "selected"
+          : selection.eligible
+            ? "eligible for selection"
+            : null,
+        disabledReason,
+      ]
+        .filter(Boolean)
+        .join(". ")}
+      aria-pressed={selection.selected}
+      aria-disabled={disabledReason ? true : undefined}
+      aria-describedby={disabledReason ? descriptionId : undefined}
+      className={cn(
+        "relative rounded-card focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gb-signal-eligible",
+        rested && "flex items-center justify-center shrink-0",
+        toggle ? "cursor-pointer" : "cursor-default",
+      )}
+      style={{
+        ...(rested ? { width: DON_CARD_H, height: DON_CARD_W } : {}),
+        marginLeft:
+          index > 0 ? -(rested ? DON_RESTED_OVERLAP : DON_ACTIVE_OVERLAP) : 0,
+        zIndex: index,
+      }}
+    >
+      <Card
+        variant="don"
+        state={rested ? "rest" : "active"}
+        artUrl={donArtUrl || DEFAULT_DON_IMG}
+        motionDelay={motionDelay}
+        overlays={{ highlightRing }}
+        interaction={{ tooltipNotice: disabledReason ?? undefined }}
+      />
+      {disabledReason && (
+        <span id={descriptionId} className="sr-only">
+          {disabledReason}
+        </span>
+      )}
+    </motion.div>
+  );
+}
+
 export const DonZone = React.memo(function DonZone({
   player,
   style,
@@ -109,6 +210,8 @@ export const DonZone = React.memo(function DonZone({
   zoneKey,
   animationDelay,
   donArtUrl,
+  targetSelectionById,
+  onTargetToggle,
 }: {
   player: PlayerState | null;
   style: React.CSSProperties;
@@ -117,6 +220,10 @@ export const DonZone = React.memo(function DonZone({
   zoneKey?: string;
   animationDelay?: number;
   donArtUrl?: string | null;
+  /** In-place SELECT_TARGET state keyed by instance id (OPT-792). A DON!!
+   *  with an entry renders as a selectable target. */
+  targetSelectionById?: ReadonlyMap<string, TargetCardSelectionState>;
+  onTargetToggle?: (instanceId: string) => void;
 }) {
   const zonePos = useZonePosition();
   const reducedMotion = useReducedMotion();
@@ -176,6 +283,23 @@ export const DonZone = React.memo(function DonZone({
             {activeDon.map((don, i) => {
               const delay = animationDelay ? animationDelay + i * 0.02 : undefined;
               const entering = arrivals.has(don.instanceId) && !reducedMotion;
+              const selection = targetSelectionById?.get(don.instanceId);
+              if (selection) {
+                return (
+                  <SelectableDonCard
+                    key={don.instanceId}
+                    don={don}
+                    selection={selection}
+                    onToggle={onTargetToggle}
+                    rested={false}
+                    index={i}
+                    donArtUrl={donArtUrl}
+                    motionDelay={delay}
+                    entering={entering}
+                    entryIndex={entryIndexById.get(don.instanceId) ?? i}
+                  />
+                );
+              }
               if (enableDrag) {
                 return (
                   <DraggableDonCard
@@ -222,6 +346,25 @@ export const DonZone = React.memo(function DonZone({
             <div className="flex items-center ml-auto">
               {restedDon.map((don, i) => {
                 const entering = arrivals.has(don.instanceId) && !reducedMotion;
+                const selection = targetSelectionById?.get(don.instanceId);
+                if (selection) {
+                  return (
+                    <SelectableDonCard
+                      key={don.instanceId}
+                      don={don}
+                      selection={selection}
+                      onToggle={onTargetToggle}
+                      rested
+                      index={i}
+                      donArtUrl={donArtUrl}
+                      motionDelay={
+                        animationDelay ? animationDelay + i * 0.02 : undefined
+                      }
+                      entering={entering}
+                      entryIndex={entryIndexById.get(don.instanceId) ?? i}
+                    />
+                  );
+                }
                 return (
                   <motion.div
                     key={don.instanceId}
