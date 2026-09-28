@@ -2148,17 +2148,11 @@ export const OP05_058_WASTE_OF_HUMAN_LIFE: EffectSchema = {
           params: { position: "BOTTOM" },
         },
         {
-          // Both players trash down to 5 cards in hand
+          // OP05 FAQ: the turn player (activator) chooses and trashes first,
+          // then the opponent chooses from their own hand. Each count is read
+          // independently at resolution: max(0, hand - 5).
           type: "TRASH_FROM_HAND",
-          params: {
-            amount: {
-              type: "GAME_STATE",
-              source: "HAND_COUNT",
-              controller: "SELF",
-            },
-            _comment:
-              "Dynamic: trash (hand_count - 5) cards. Both self and opponent trim to 5.",
-          },
+          params: { until_count: 5 },
           chain: "THEN",
         },
         {
@@ -2166,14 +2160,7 @@ export const OP05_058_WASTE_OF_HUMAN_LIFE: EffectSchema = {
           params: {
             action: {
               type: "TRASH_FROM_HAND",
-              params: {
-                amount: {
-                  type: "GAME_STATE",
-                  source: "HAND_COUNT",
-                  controller: "OPPONENT",
-                },
-                _comment: "Dynamic: opponent trashes down to 5 cards in hand.",
-              },
+              params: { until_count: 5 },
             },
           },
           chain: "THEN",

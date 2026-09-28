@@ -119,6 +119,30 @@ export function resolveAmount(
   return 0;
 }
 
+/**
+ * Like `resolveAmount`, but returns null when a DynamicValue cannot be
+ * resolved instead of collapsing to 0. Use where 0 is not a safe default —
+ * e.g. an "until you have N" target, where N = 0 would return everything.
+ */
+export function tryResolveAmount(
+  amount: number | DynamicValue,
+  resultRefs: Map<string, EffectResult>,
+  state: GameState,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): number | null {
+  if (typeof amount === "number") return amount;
+  const resolution = resolveDynamicValue(amount, {
+    resultRefs,
+    state,
+    controller,
+    cardDb,
+    matchesFilter,
+    getEffectiveBasePower,
+  });
+  return resolution.resolved ? resolution.value : null;
+}
+
 // ─── computeExpiry ────────────────────────────────────────────────────────────
 
 /**

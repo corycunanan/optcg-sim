@@ -875,7 +875,16 @@ export interface ActionParamsMap {
   NEGATE_EFFECTS: Record<string, never>;
 
   GIVE_DON: { amount?: number; don_state?: CardState };
-  RETURN_DON_TO_DECK: { amount?: number | DynamicValue };
+  RETURN_DON_TO_DECK: {
+    amount?: number | DynamicValue;
+    /**
+     * "Return DON!! … until you have N DON!! on your field" (OP08-074): return
+     * max(0, field DON!! − N), resolved when the action resolves. The whole
+     * field (cost area + attached) is eligible; the controller chooses.
+     * Replaces `amount`.
+     */
+    until_count?: number | DynamicValue;
+  };
   ADD_DON_FROM_DECK: { amount?: number | DynamicValue; target_state?: CardState; up_to?: boolean };
   SET_DON_ACTIVE: { amount?: number | DynamicValue; up_to?: boolean };
   REST_DON: { amount?: number };
@@ -985,6 +994,11 @@ export interface ActionParamsMap {
     chooser?: "SELF" | "OPPONENT";
     amount?: number | DynamicValue;
     optional?: boolean;
+    /**
+     * "Trash cards from your hand until you have N": trash exactly
+     * max(0, hand − N) from the hand owner's hand, counted at resolution.
+     * Replaces `amount`; the hand owner chooses (OP14-054, OP05-058).
+     */
     until_count?: number;
     filter?: TargetFilter;
     _comment?: string;
