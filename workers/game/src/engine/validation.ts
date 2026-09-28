@@ -230,7 +230,12 @@ function validateDeclareBlocker(
   const found = findCardInState(state, blockerInstanceId);
   if (!found) return `Blocker ${blockerInstanceId} not found`;
   if (found.playerIndex !== inactiveIdx) return "Can only declare your own card as Blocker";
-  if (found.card.zone !== "CHARACTER") return "Blocker must be a Character";
+  // §10-1-4-1: [Blocker] is a property of "this card", not of Characters
+  // only. A Leader can hold an effective [Blocker] when an effect grants it
+  // (OP16-048 on an all-names Leader — qa_op16.md / qa_op17.md p.9).
+  if (found.card.zone !== "CHARACTER" && found.card.zone !== "LEADER") {
+    return "Blocker must be a Leader or Character";
+  }
   if (found.card.state !== "ACTIVE") return "Blocker must be active";
 
   const cardData = cardDb.get(found.card.cardId);
