@@ -17,6 +17,7 @@ import type {
 } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
 import {
   resolveEffect,
   resumeFromStack,
@@ -119,12 +120,15 @@ function selectFirst(result: PromptResult, cardDb: Map<string, CardData>) {
   if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
     throw new Error("Expected SELECT_TARGET prompt");
   }
+  // OPT-838: blind hand prompts offer slot tokens; the session lifecycle
+  // translates them before resume, so direct resumes must do the same.
+  const translated = translateBlindHandSelection(result.pendingPrompt, [
+    result.pendingPrompt.options.validTargets[0],
+  ]);
+  if (!translated) throw new Error("Selection is not a slot of this prompt");
   return resumeFromStack(
     result.state,
-    {
-      type: "SELECT_TARGET",
-      selectedInstanceIds: [result.pendingPrompt.options.validTargets[0]],
-    },
+    { type: "SELECT_TARGET", selectedInstanceIds: translated },
     cardDb
   );
 }
@@ -391,7 +395,9 @@ describe("OPT-727 OP17 Leaders", () => {
     ).toBe(2000);
   });
 
-  it("OP17-099 makes the opponent trash from their own hand", () => {
+  // OPT-838 / qa_op17 OP17-099: the effect's controller chooses blindly from
+  // the opponent's hand; the opponent only picks the branch.
+  it("OP17-099 lets its controller blindly trash from the opponent's hand", () => {
     const { state, cardDb, leader } = installLeader(OP17_099_CHARLOTTE_LINLIN);
     const ownerHandBefore = state.players[0].hand.length;
     const opponentHandBefore = state.players[1].hand.length;
@@ -400,7 +406,8 @@ describe("OPT-727 OP17 Leaders", () => {
     let result = acceptOptional(attack, cardDb);
     result = selectFirst(result, cardDb);
     result = choose(result, "1", cardDb);
-    expect(result.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(result.pendingPrompt?.options).toMatchObject({ blindSelection: true });
     result = selectFirst(result, cardDb);
 
     expect(result.pendingPrompt).toBeUndefined();

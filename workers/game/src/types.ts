@@ -5,6 +5,7 @@ export type {
   Zone, CardInstance, LifeCard, DonInstance,
   BattleContext, BattleSubPhase,
   Phase, PerformedAction, TurnState,
+  LeaderDamageContinuation, BattleKOReplacementContinuation,
   PlayerState,
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
   EngineLimitDiagnostic, EngineTerminalOutcome,
@@ -59,6 +60,19 @@ export interface PendingPromptState extends Omit<
   "resumeContext"
 > {
   resumeContext: PromptResumeContext;
+  /**
+   * Server-only mapping for a blind choice from a hand (OPT-838). The
+   * responder sees only the opaque tokens, in this shuffled order; replies are
+   * validated against the tokens and translated to instance ids before resume.
+   * Never projected to any client.
+   */
+  blindSlots?: BlindHandSlot[];
+}
+
+/** One opaque face-down slot of a blind hand choice and the card it names. */
+export interface BlindHandSlot {
+  token: string;
+  instanceId: string;
 }
 
 export type PregamePromptResumeContext = {

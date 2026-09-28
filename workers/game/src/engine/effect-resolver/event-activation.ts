@@ -56,6 +56,11 @@ export function resolveActivatedEvent(
     cardDb
   );
   const result = { targetInstanceIds: [eventInstanceId], count: 1 };
+  // Hand activation is card activation (rule 8-5-2) and completes regardless.
+  // A Main resolved from trash that was never activated publishes nothing.
+  const completes =
+    !resolved.effectNotActivated ||
+    notification.type !== "EVENT_MAIN_RESOLVED_FROM_TRASH";
   if (resolved.pendingPrompt)
     return {
       state: resolved.state,
@@ -69,9 +74,40 @@ export function resolveActivatedEvent(
     return { state: resolved.state, events: resolved.events, succeeded: false };
   return {
     state: popFrame(resolved.state),
-    events: [...resolved.events, notification],
+    events: completes ? [...resolved.events, notification] : resolved.events,
     succeeded: true,
     result,
+  };
+}
+
+/**
+ * Rules 8-1-2, 8-3-1-3 and 8-3-1-4: a declined optional Main, or one whose
+ * activation cost is abandoned or unpayable, was never activated. Callers pass
+ * the state after popping the abandoned frame. When that frame was the [Main]
+ * of an Event resolved from trash, its completion boundary stays on the stack
+ * (it still returns control to the parent) but no longer publishes
+ * EVENT_MAIN_RESOLVED_FROM_TRASH. Hand activation is card activation (8-5-2),
+ * so its completion is kept.
+ */
+export function withdrawUnactivatedTrashMain(
+  state: GameState,
+  abandoned: EffectStackFrame
+): GameState {
+  const top = state.effectStack.at(-1);
+  const trigger = abandoned.effectBlock.trigger;
+  if (
+    top?.eventActivationCompletion?.type !== "EVENT_MAIN_RESOLVED_FROM_TRASH" ||
+    top.sourceCardInstanceId !== abandoned.sourceCardInstanceId ||
+    !trigger ||
+    !("keyword" in trigger) ||
+    trigger.keyword !== "MAIN_EVENT"
+  )
+    return state;
+  const boundary: EffectStackFrame = { ...top };
+  delete boundary.eventActivationCompletion;
+  return {
+    ...state,
+    effectStack: [...state.effectStack.slice(0, -1), boundary],
   };
 }
 

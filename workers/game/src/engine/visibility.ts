@@ -319,8 +319,10 @@ export function filterPromptForRecipient(
     return null;
   }
 
+  // The blind-slot mapping (OPT-838) is server-only, like the continuation.
+  const { blindSlots: _blindSlots, ...projectable } = prompt;
   return {
-    ...prompt,
+    ...projectable,
     options: filterPromptOptionsForRecipient(prompt.options, recipient, policy),
     resumeContext: null,
   };

@@ -4817,8 +4817,8 @@ export const OP15_119_MONKEY_D_LUFFY: EffectSchema = {
       category: "auto",
       trigger: {
         any_of: [
+          // Event card activation only (rule 8-5-4; EB03-031 FAQ).
           { event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "OPPONENT" } },
-          { event: "EVENT_MAIN_RESOLVED_FROM_TRASH", filter: { controller: "OPPONENT" } },
           { event: "BLOCKER_ACTIVATED", filter: { controller: "OPPONENT" } },
         ],
       },

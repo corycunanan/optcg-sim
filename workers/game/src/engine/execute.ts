@@ -212,6 +212,8 @@ function executeConcede(state: GameState, concedingPlayer: 0 | 1): ExecuteResult
     winReason: `Player ${concedingPlayer + 1} conceded`,
     pendingPrompt: null,
     pendingEventActivationEvents: undefined,
+    // OPT-872: a paused battle never resumes after a concession.
+    turn: { ...state.turn, pendingBattleDamageContinuation: null },
   };
   return {
     state: nextState,

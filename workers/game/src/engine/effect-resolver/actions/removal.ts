@@ -24,6 +24,7 @@ import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { reorderDeckCards, transitionCard, transitionCards } from "../../zone-transition.js";
 import type { EffectResolverServices } from "../services.js";
+import { createBlindHandSlots } from "../blind-hand-slots.js";
 
 // OPT-251: filter targets that are protected by a "cannot be …" prohibition.
 // Runs AFTER replacement effects — replacements (e.g., Tashigi rest-instead)
@@ -487,10 +488,15 @@ export function executeTrashFromHand(
         resultRefs: [...resultRefs.entries()],
         validTargets,
       };
+      const promptCards = candidates.filter((c) => validTargets.includes(c.instanceId));
+      // A cross-hand chooser sees only shuffled opaque slots (OPT-838).
+      const blind = blindSelection
+        ? createBlindHandSlots(state, promptCards, targetController)
+        : null;
       const pendingPrompt: import("../../../types.js").PendingPromptState = {
         options: {
           promptType: "SELECT_TARGET",
-          validTargets,
+          validTargets: blind ? blind.validTargets : validTargets,
           countMin: optional ? 0 : amount,
           countMax: amount,
           effectDescription: optional
@@ -503,12 +509,13 @@ export function executeTrashFromHand(
               : `Trash ${amount} of your cards in hand.`,
           ctaLabel: "Trash",
           ...(blindSelection ? { blindSelection: true } : {}),
-          cards: candidates.filter((c) => validTargets.includes(c.instanceId)),
+          cards: blind ? blind.cards : promptCards,
         },
         respondingPlayer: chooser,
         resumeContext: resumeCtx,
+        ...(blind ? { blindSlots: blind.blindSlots } : {}),
       };
-      return { state, events, succeeded: false, pendingPrompt };
+      return { state: blind ? blind.state : state, events, succeeded: false, pendingPrompt };
     }
   }
 

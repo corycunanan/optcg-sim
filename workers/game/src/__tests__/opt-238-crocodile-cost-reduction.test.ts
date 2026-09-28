@@ -149,7 +149,9 @@ describe("OPT-238 — Crocodile own Event activations", () => {
     expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(false);
   });
 
-  it("fires on class-2 activations (EVENT_MAIN_RESOLVED_FROM_TRASH)", () => {
+  // OPT-854: resolving an Event [Main] from trash is not card activation
+  // (rule 8-5-4; EB03-031 FAQ), so Crocodile must not observe it.
+  it("does NOT fire on Main-from-trash resolution (EVENT_MAIN_RESOLVED_FROM_TRASH)", () => {
     const cardDb = createTestCardDb();
     const { state, crocLeader } = installCrocodile(cardDb);
 
@@ -161,7 +163,7 @@ describe("OPT-238 — Crocodile own Event activations", () => {
     };
 
     const matched = matchTriggersForEvent(state, event, cardDb);
-    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(true);
+    expect(matched.some((m) => m.trigger.sourceCardInstanceId === crocLeader.instanceId)).toBe(false);
   });
 
   it("does NOT fire when DON!!×1 is not attached to the Leader", () => {

@@ -385,8 +385,8 @@ describe("OPT-470 hidden-information visibility contract", () => {
     const opponentView = filterStateForPlayer(withPendingTrigger, 0);
 
     expect(ownerView.turn.pendingTriggerFromEffect?.lifeCard).toEqual(lifeCard);
-    expect(ownerView.turn.pendingBattleDamageContinuation?.lifeCardInstanceId)
-      .toBe(lifeCard.instanceId);
+    expect(ownerView.turn.pendingBattleDamageContinuation)
+      .toMatchObject({ lifeCardInstanceId: lifeCard.instanceId });
     expect(opponentView.turn.pendingTriggerFromEffect).toBeNull();
     expect(opponentView.turn.pendingBattleDamageContinuation).toBeNull();
     expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.cardId);

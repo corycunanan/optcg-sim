@@ -138,23 +138,14 @@ export const OP01_004_USOPP: EffectSchema = {
     {
       id: "draw_on_event",
       category: "auto",
+      // Card activation only (rule 8-5-4; EB03-031 FAQ): an Event [Main]
+      // resolved from trash is not "activates an Event".
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "OPPONENT" },
-            don_requirement: 1,
-            turn_restriction: "YOUR_TURN",
-            once_per_turn: true,
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "OPPONENT" },
-            don_requirement: 1,
-            turn_restriction: "YOUR_TURN",
-            once_per_turn: true,
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "OPPONENT" },
+        don_requirement: 1,
+        turn_restriction: "YOUR_TURN",
+        once_per_turn: true,
       },
       actions: [{ type: "DRAW", params: { amount: 1 } }],
       flags: { once_per_turn: true },
@@ -1737,7 +1728,9 @@ export const OP01_061_KAIDO_LEADER: EffectSchema = {
 // [DON!! x1] When you activate an Event, you may draw 1 card if you have 4 or
 // less cards in your hand and haven't drawn a card using this Leader's effect
 // during this turn.
-// Event activation includes hand activation and resolving an Event Main from trash.
+// "Activate an Event" is card activation (rule 8-5-4): hand play or Counter use.
+// Resolving an Event [Main] from trash (EB03-031 Reiju) is not card activation
+// (EB03-031 FAQ), so it does not satisfy this trigger.
 // No cost-reduction condition is printed; the hand-count gate is checked after
 // the Event resolves (OP01-062 FAQ), and declining does not spend the draw slot.
 
@@ -1749,12 +1742,7 @@ export const OP01_062_CROCODILE: EffectSchema = {
     {
       id: "OP01-062_event_draw",
       category: "auto",
-      trigger: {
-        any_of: [
-          { event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "SELF" }, don_requirement: 1 },
-          { event: "EVENT_MAIN_RESOLVED_FROM_TRASH", filter: { controller: "SELF" }, don_requirement: 1 },
-        ],
-      },
+      trigger: { event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "SELF" }, don_requirement: 1 },
       conditions: {
         type: "HAND_COUNT",
         controller: "SELF",
