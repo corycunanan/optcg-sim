@@ -26,6 +26,7 @@ import type {
 } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { SessionRepository, type SessionStorage } from "../session/persistence.js";
@@ -239,6 +240,31 @@ describe("OPT-793 OP14-054 Fisher Tiger — [End of Your Turn] trash until 5", (
     expect(f.selectHand(0, 3)).toBe(false);
     expect(f.state.players[0].hand).toHaveLength(5);
     expect(f.state.turn.activePlayerIndex).toBe(1);
+  });
+});
+
+describe("OPT-793 TRASH_FROM_HAND until_count primitive", () => {
+  it("counts the targeted hand, not the controller's, and prompts its owner", () => {
+    const f = fixture();
+    f.fillHand(0, 2);
+    f.fillHand(1, 7);
+    const block = {
+      id: "synthetic_until",
+      category: "auto" as const,
+      actions: [
+        {
+          type: "TRASH_FROM_HAND" as const,
+          target: { type: "CARD_IN_HAND" as const, controller: "OPPONENT" as const },
+          params: { until_count: 5 },
+        },
+      ],
+    };
+    const result = resolveEffect(f.state, block, f.state.players[0].leader.instanceId, 0, f.db);
+    expect(result.pendingPrompt?.respondingPlayer).toBe(1);
+    const options = result.pendingPrompt?.options;
+    if (options?.promptType !== "SELECT_TARGET") throw new Error("expected SELECT_TARGET");
+    expect([options.countMin, options.countMax]).toEqual([2, 2]);
+    expect(options.validTargets).toEqual(f.state.players[1].hand.map((c) => c.instanceId));
   });
 });
 
