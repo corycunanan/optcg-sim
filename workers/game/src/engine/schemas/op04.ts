@@ -1831,19 +1831,12 @@ export const OP04_053_PAGE_ONE: EffectSchema = {
     {
       id: "event_activated_draw_cycle",
       category: "auto",
+      // Card activation only (rule 8-5-4). The EB03-031 FAQ names this card:
+      // Reiju resolving an Event [Main] from trash does not activate it.
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "SELF" },
-            don_requirement: 1,
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "SELF" },
-            don_requirement: 1,
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "SELF" },
+        don_requirement: 1,
       },
       flags: { once_per_turn: true },
       actions: [
