@@ -3994,7 +3994,7 @@ export const OP13_112_VEGAPUNK: EffectSchema = {
       conditions: {
         type: "DON_GIVEN",
         controller: "SELF",
-        mode: "ANY_CARD_HAS_DON",
+        mode: "TOTAL_GIVEN",
         operator: ">=",
         value: 2,
       },
