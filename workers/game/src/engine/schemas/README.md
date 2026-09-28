@@ -174,10 +174,9 @@ For effects that react to game events (not bracket-tag abilities):
 | "When a Character is removed from the field" | `{ event: "CHARACTER_REMOVED_FROM_FIELD" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
-| "When an Event is activated (from hand)" | `{ event: "EVENT_ACTIVATED_FROM_HAND" }` |
-| "When a Character activates an Event's [Main] from trash" | `{ event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }` |
+| "When [you/your opponent] activate(s) an Event" (card activation, rule 8-5-4) | `{ event: "EVENT_ACTIVATED_FROM_HAND" }` |
+| A Character resolved an Event's [Main] from trash (EB03-031); not "activates an Event" per the EB03-031 FAQ, so no printed watcher uses it | `{ event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }` |
 | "When an Event's [Trigger] resolves from Life" | `{ event: "EVENT_TRIGGER_RESOLVED" }` |
-| "When an Event is activated (any path, excluding [Trigger] from Life)" | `{ any_of: [{ event: "EVENT_ACTIVATED_FROM_HAND" }, { event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }] }` |
 | "When you play a Character" | `{ event: "CHARACTER_PLAYED" }` |
 | "When a card is removed from Life" | `{ event: "CARD_REMOVED_FROM_LIFE" }` |
 | "When [Trigger] is activated" | `{ event: "TRIGGER_ACTIVATED" }` |

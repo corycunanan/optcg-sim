@@ -433,8 +433,8 @@ Every completed action (step 4) emits one or more typed events. Events are the s
 
 | Event | Emitted When |
 |-------|-------------|
-| `EVENT_ACTIVATED_FROM_HAND` | An Event card is played and its [Main] resolves from hand. |
-| `EVENT_MAIN_RESOLVED_FROM_TRASH` | A Character activates an Event's [Main] effect from trash. |
+| `EVENT_ACTIVATED_FROM_HAND` | Card activation of an Event from hand ([Main] play, [Counter] use, or effect-driven hand activation). |
+| `EVENT_MAIN_RESOLVED_FROM_TRASH` | A Character activated an Event's [Main] effect from trash (effect activation, not card activation; no authored subscribers). |
 | `EVENT_TRIGGER_RESOLVED` | An Event card's [Trigger] effect resolves from Life. |
 | `TRIGGER_ACTIVATED` | A [Trigger] effect is activated from a revealed Life card. |
 | `BLOCKER_ACTIVATED` | A [Blocker] keyword is activated. |
