@@ -206,15 +206,15 @@ describe("OPT-801 — OP11-041 Nami draws when a Life card is removed", () => {
     f.accept();
     f.act({ type: "PLAYER_CHOICE", choiceId: "0" });
     expect(lifeRemovals(f.state, 0)).toBe(1);
-    // "Add up to 1 card from your hand to the top of your Life cards."
-    if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET") {
-      f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["hand-0-0"] });
-    }
+    // Hiyori's "Add up to 1 card from your hand to the top of your Life
+    // cards" auto-resolves; Nami is offered only after both Life→hand (4→3
+    // Life, 3→4 hand) and hand→Life (back to 4 Life, 3 hand) complete.
+    expect(f.state.players[0].life).toHaveLength(4);
+    expect(f.state.players[0].hand).toHaveLength(3);
     expect(f.namiOffered()).toBe(true);
-    const handBefore = f.state.players[0].hand.length;
     f.accept();
     f.done();
-    expect(f.state.players[0].hand).toHaveLength(handBefore + 1);
+    expect(f.state.players[0].hand).toHaveLength(4);
   });
 
   it("removal during the opponent's turn does not fire", () => {
