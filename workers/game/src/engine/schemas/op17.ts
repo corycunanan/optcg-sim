@@ -1772,23 +1772,16 @@ export const OP17_049_CHARLOTTE_LINLIN: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         {
-          // GAP: OPPONENT_CHOICE has no branch-feasibility contract, so the
-          // exact-2 trash branch cannot be hidden when the opponent has fewer
-          // than 2 cards without changing engine vocabulary.
+          // FAQ (qa_op17 OP17-049): the opponent only picks the branch. "Draw 2"
+          // draws for the effect user, so it is an unwrapped DRAW. The trash
+          // branch stays selectable at any hand size (1 card: trash it; 0: no
+          // effect); exact-2 with <=2 candidates auto-trashes them all.
           type: "OPPONENT_CHOICE",
           params: {
             mandatory: true,
             labels: ["Draw 2 cards", "Trash 2 cards from hand"],
             options: [
-              [
-                {
-                  type: "OPPONENT_ACTION",
-                  params: {
-                    mandatory: true,
-                    action: { type: "DRAW", params: { amount: 2 } },
-                  },
-                },
-              ],
+              [{ type: "DRAW", params: { amount: 2 } }],
               [
                 {
                   type: "OPPONENT_ACTION",
