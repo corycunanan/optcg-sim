@@ -1,3 +1,4 @@
+import { releaseMovedDonEffects } from "../don-area-effects.js";
 import { finishReplacedLifeCost } from "./cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect, TRIGGERING_HAND_TRASH_REF } from "../hand-trash.js";
 import { retainEventParent } from "./event-activation.js";
@@ -1268,7 +1269,7 @@ export function executeEffectAction<K extends ActionType>(
   }
   const handler = getActionHandler(action);
   if (handler) {
-    return handler(
+    const result = handler(
       state,
       action,
       sourceCardInstanceId,
@@ -1278,6 +1279,9 @@ export function executeEffectAction<K extends ActionType>(
       preselectedTargets,
       services
     );
+    // Rule 3-1-6-1: a DON!! this action moved sheds its effects.
+    const released = releaseMovedDonEffects(state, result.state);
+    return released === result.state ? result : { ...result, state: released };
   }
   // Boot validation makes this unreachable for authored schemas. Treat any
   // untrusted/runtime drift as a rules-visible terminal engine contract fault.

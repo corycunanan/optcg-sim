@@ -35,6 +35,8 @@ import {
   computeAllValidTargets,
   validateTargetConstraints,
 } from "../engine/effect-resolver/target-resolver.js";
+import { executeEffectAction } from "../engine/effect-resolver/resolver.js";
+import { payCosts } from "../engine/effect-resolver/cost/payment.js";
 import {
   SessionRepository,
   type SessionStorage,
@@ -61,6 +63,8 @@ const SCOPE_CARDS = [
   // Characters with a cost of 2 or less") can K.O. it through the pipeline.
   ["OP14-024", 2],
   ["EB01-049", 2],
+  ["OP15-026", 2],
+  ["OP02-085", 3],
 ] as const;
 
 function fixture() {
@@ -622,6 +626,154 @@ describe("OPT-792 pipeline", () => {
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.state.players[0].stage?.state).toBe("RESTED");
     expect(char(f, ownChar)?.state).toBe("ACTIVE");
+  });
+});
+
+// ─── Rule 3-1-6-1: DON!! area moves shed id-keyed effects ────────────────────
+// "When a DON!! card moves from one area to another, all effects that were
+// previously applied to that DON!! card are removed." (rule_comprehensive.md:289)
+
+describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
+  function holdRestedOpponentDon(f: Fixture) {
+    f.donOf(1, "RESTED", 1);
+    const held = oppDonIds(f)[0];
+    f.play("OP07-026");
+    f.select([held]);
+    expect(f.state.prohibitions.some((p) => p.appliesTo.includes(held))).toBe(true);
+    return held;
+  }
+  function answerPrompts(f: Fixture) {
+    for (let guard = 0; guard < 6 && f.state.pendingPrompt; guard++) {
+      const options = f.state.pendingPrompt.options;
+      if (options.promptType === "OPTIONAL_EFFECT") f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      else if (options.promptType === "PLAYER_CHOICE")
+        f.act({ type: "PLAYER_CHOICE", choiceId: options.choices[0].id });
+      else if (options.promptType === "SELECT_TARGET")
+        f.select(options.validTargets.slice(0, Math.max(1, options.countMin)));
+      else throw new Error(`unexpected prompt ${options.promptType}`);
+    }
+    expect(f.state.pendingPrompt).toBeNull();
+  }
+
+  it("Jango giving the held DON!! to a Character ends the hold; it refreshes active", () => {
+    const f = fixture();
+    const jango = f.put("OP15-026", 0);
+    const c = f.put("COST-3", 1);
+    const held = holdRestedOpponentDon(f);
+    f.act({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: jango.instanceId,
+      effectId: "OP15-026_activate_trash",
+    });
+    answerPrompts(f);
+    expect(char(f, c)?.attachedDon.map((d) => d.instanceId)).toContain(held);
+    expect(f.state.prohibitions.some((p) => p.appliesTo.includes(held))).toBe(false);
+
+    f.state = advanceThroughRefreshOf(f, 1);
+    expect(f.state.players[1].donCostArea.find((d) => d.instanceId === held)?.state).toBe(
+      "ACTIVE"
+    );
+  });
+
+  it("Magellan returning the held DON!! to the deck ends the hold even after it is re-added", () => {
+    const f = fixture();
+    // Only the held DON!! is on the opponent's field and their DON!! deck is
+    // empty, so the DON!! phase re-adds that same instance.
+    const held = holdRestedOpponentDon(f);
+    f.state.players[1].donCostArea = f.state.players[1].donCostArea.filter(
+      (d) => d.instanceId === held
+    );
+    f.state.players[1].donDeck = [];
+    f.play("OP02-085");
+    answerPrompts(f);
+    expect(f.state.players[1].donDeck.map((d) => d.instanceId)).toEqual([held]);
+    expect(f.state.prohibitions.some((p) => p.appliesTo.includes(held))).toBe(false);
+
+    f.state = advanceThroughRefreshOf(f, 1); // refresh, draw
+    for (let i = 0; i < 2 && f.state.turn.phase !== "MAIN"; i++) {
+      const r = runPipeline(f.state, { type: "ADVANCE_PHASE" }, f.db, 1);
+      expect(r.valid, r.error).toBe(true);
+      f.state = r.state;
+    }
+    const back = f.state.players[1].donCostArea.find((d) => d.instanceId === held);
+    expect(back).toBeDefined();
+    back!.state = "RESTED"; // spent on B's turn
+
+    f.state = advanceThroughRefreshOf(f, 0);
+    f.state = advanceThroughRefreshOf(f, 1);
+    expect(f.state.players[1].donCostArea.find((d) => d.instanceId === held)?.state).toBe(
+      "ACTIVE"
+    );
+  });
+
+  it("releases at the effect-action step (return to deck) without the pipeline backstop", () => {
+    const f = fixture();
+    const held = holdRestedOpponentDon(f);
+    f.state.players[1].donCostArea = f.state.players[1].donCostArea.filter(
+      (d) => d.instanceId === held
+    );
+    const result = executeEffectAction(
+      f.state,
+      { type: "RETURN_DON_TO_DECK", params: { amount: 1 } },
+      f.state.players[1].leader.instanceId,
+      1,
+      f.db,
+      new Map()
+    );
+    expect(result.state.players[1].donDeck.map((d) => d.instanceId)).toContain(held);
+    expect(result.state.prohibitions.some((p) => p.appliesTo.includes(held))).toBe(false);
+  });
+
+  it("releases at the cost-payment step (DON!! −1) without the pipeline backstop", () => {
+    const f = fixture();
+    const held = holdRestedOpponentDon(f);
+    f.state.players[1].donCostArea = f.state.players[1].donCostArea.filter(
+      (d) => d.instanceId === held
+    );
+    const paid = payCosts(f.state, [{ type: "DON_MINUS", amount: 1 }], 1, f.db);
+    expect(paid?.state.players[1].donDeck.map((d) => d.instanceId)).toContain(held);
+    expect(paid?.state.prohibitions.some((p) => p.appliesTo.includes(held))).toBe(false);
+  });
+
+  it("releases at the pipeline execute step (player attaches the DON!!)", () => {
+    // Defensive backstop: no printed hold targets a DON!! its controller can
+    // attach, so seed an id-keyed effect on player 0's next attachable DON!!.
+    const f = fixture();
+    const don = f.state.players[0].donCostArea.find((d) => d.state === "ACTIVE")!;
+    f.state = {
+      ...f.state,
+      prohibitions: [
+        {
+          id: "seeded-don-hold",
+          sourceCardInstanceId: "seed",
+          sourceEffectBlockId: "",
+          prohibitionType: "CANNOT_REFRESH",
+          scope: {},
+          duration: { type: "SKIP_NEXT_REFRESH" },
+          controller: 1,
+          appliesTo: [don.instanceId],
+          usesRemaining: null,
+        } as GameState["prohibitions"][number],
+      ],
+    };
+    f.act({
+      type: "ATTACH_DON",
+      targetInstanceId: f.state.players[0].leader.instanceId,
+      count: 1,
+    });
+    expect(f.state.players[0].leader.attachedDon.map((d) => d.instanceId)).toContain(
+      don.instanceId
+    );
+    expect(f.state.prohibitions.some((p) => p.appliesTo.includes(don.instanceId))).toBe(false);
+  });
+
+  it("keeps the hold while the DON!! stays in the cost area (rest/active changes are not moves)", () => {
+    const f = fixture();
+    const held = holdRestedOpponentDon(f);
+    f.state = advanceThroughRefreshOf(f, 1);
+    expect(f.state.players[1].donCostArea.find((d) => d.instanceId === held)?.state).toBe(
+      "RESTED"
+    );
   });
 });
 

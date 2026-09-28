@@ -5,6 +5,7 @@ import { moveLifeToHand } from "../life-movement.js";
 import type { Cost, CostResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { CostPaymentResult } from "../types.js";
+import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import { detachDonToCostArea, setCardState, trashCharacter, trashStage } from "../card-mutations.js";
 import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
@@ -19,7 +20,23 @@ import { applyCostSelection } from "./resume.js";
  * Returns null when a payment cannot start; replaced results retain committed
  * movement while distinguishing it from successful payment of the printed cost.
  */
+/**
+ * Pay costs, then release rule-3-1-6-1 effects from any DON!! the payment
+ * moved (DON!! −X to the deck, giving DON!! as a cost, …).
+ */
 export function payCosts(
+  state: GameState,
+  costs: Cost[],
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): CostPaymentResult | null {
+  const paid = payCostsUnreleased(state, costs, controller, cardDb, sourceCardInstanceId);
+  if (!paid) return paid;
+  return { ...paid, state: releaseMovedDonEffects(state, paid.state) };
+}
+
+function payCostsUnreleased(
   state: GameState,
   costs: Cost[],
   controller: 0 | 1,
