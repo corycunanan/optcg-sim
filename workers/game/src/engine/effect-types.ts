@@ -782,6 +782,13 @@ export interface ActionParamsMap {
     rest_destination?: string;
     pick_destination?: string;
     face?: "UP" | "DOWN";
+    /**
+     * Whether the picked cards are revealed to both players. Defaults to true:
+     * rule 11-2-1 requires a secret-to-secret move to be revealed, and printed
+     * searches say "reveal". Set false only when the card or its FAQ says the
+     * pick is not revealed (OP16-119); the owner still sees it privately.
+     */
+    reveal?: boolean;
   };
   TRASH_CARD: Record<string, never>;
   KO: Record<string, never>;
@@ -812,6 +819,8 @@ export interface ActionParamsMap {
     filter?: TargetFilter;
     rest_destination?: string;
     pick_destination?: string;
+    /** Same contract as SEARCH_DECK.reveal (default true). */
+    reveal?: boolean;
   };
   SEARCH_AND_PLAY: {
     look_at?: number;
