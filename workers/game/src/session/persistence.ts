@@ -26,6 +26,10 @@ import {
   hasValidEventPayload,
   validatePersistedGameStateCore,
 } from "./persisted-game-state.js";
+import {
+  migrateLegacyCardData,
+  migrateLegacyTriggerRegistry,
+} from "./legacy-trigger-migration.js";
 
 export const SESSION_STORAGE_KEY = "session";
 export const SESSION_CARD_DB_STORAGE_KEY = "session:card-db";
@@ -725,7 +729,8 @@ export function parseStoredSession(
       throw new Error(
         `Stored cardDb key '${key}' does not match CardData.id '${card.id}'`
       );
-    cardDb[key] = card;
+    // OPT-796: rewrite pre-change LEADER_ATTACK_DEALS_DAMAGE schemas.
+    cardDb[key] = migrateLegacyCardData(card);
   }
   const mode = raw.mode ?? "PVP";
   if (mode !== "PVP" && mode !== "SOLITAIRE" && mode !== "PVCOMPUTER") {
@@ -752,12 +757,14 @@ export function parseStoredSession(
     throw new Error("Stored session undoHistory is invalid");
   return {
     formatVersion,
-    state: parseStoredGameState(raw.state),
+    state: migrateLegacyTriggerRegistry(parseStoredGameState(raw.state)),
     cardDb,
     mode,
     pregameMode,
     testPriorityRolls,
-    undoHistory: undoHistoryRaw.map(parseStoredGameState),
+    undoHistory: undoHistoryRaw.map((snapshot) =>
+      migrateLegacyTriggerRegistry(parseStoredGameState(snapshot))
+    ),
     historySummary: parseEventHistorySummary(raw.historySummary),
   };
 }

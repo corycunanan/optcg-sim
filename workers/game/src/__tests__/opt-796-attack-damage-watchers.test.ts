@@ -10,7 +10,9 @@
  * Expected values come from the printed text (docs/cards/OP-03.md,
  * docs/cards/UNKNOWN.md P-117) and docs/FAQs/qa_op03.md:88-140:
  * - Gaimon fires on any attack by its controller (Leader or Character), once
- *   for [Double Attack], never on effect-driven Life removal.
+ *   for [Double Attack], never when Life is moved or trashed by an effect.
+ *   DEAL_DAMAGE effect damage emits no DAMAGE_DEALT today, so it fires no
+ *   watcher; whether Gaimon should see it is an open rules question (OPT-892).
  * - Every watcher activates after the Life check and before the resulting
  *   [Trigger] choice.
  */
@@ -21,7 +23,8 @@ import { runPipeline } from "../engine/pipeline.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
-import { parseStoredSession } from "../session/persistence.js";
+import { parseStoredSession, SessionRepository, type SessionStorage } from "../session/persistence.js";
+import { readFileSync } from "node:fs";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 const printedText: Record<string, string> = {
@@ -332,7 +335,7 @@ describe("OPT-796 OP03-043 Gaimon — any attack by its controller", () => {
     expect(state.players[1].life).toHaveLength(1);
   });
 
-  it("does not fire on effect-driven damage to the opponent's Life", () => {
+  it("does not fire on DEAL_DAMAGE effect damage (no DAMAGE_DEALT today; rules question OPT-892)", () => {
     const f = fixture();
     f.put("OP03-043", 0);
     const source: CardInstance = { ...f.state.players[0].leader, instanceId: "effect-damage-hand", cardId: EFFECT_DAMAGE.id, zone: "HAND", attachedDon: [], turnPlayed: null };
@@ -344,7 +347,7 @@ describe("OPT-796 OP03-043 Gaimon — any attack by its controller", () => {
     expect(played.pendingPrompt).toBeUndefined();
   });
 
-  it("does not fire on lethal damage (no Life to check; the game ends)", () => {
+  it("a lethal DAMAGE_DEALT fires no watcher (no Life to check; the game ends)", () => {
     const f = fixture({ lifeTop: [] });
     f.put("OP03-043", 0);
     const { steps, state } = attack(f, f.state.players[0].leader.instanceId);
@@ -430,5 +433,131 @@ describe("OPT-796 persisted sessions and the #692 damage continuation", () => {
     expect(finished.state.pendingPrompt).toBeFalsy();
     expect(finished.state.players[1].life).toHaveLength(1);
     expect(finished.state.eventLog.filter((e) => e.type === "DAMAGE_DEALT").map((e) => e.payload.firstDamageOfAttack)).toEqual([true, false]);
+  });
+});
+
+describe("OPT-796 [Double Attack] against 1 Life (qa_rules.md:156-158)", () => {
+  it("Gaimon fires exactly once and the game does not end", () => {
+    const f = fixture({ lifeTop: [CARDS.VANILLA.id] });
+    const gaimon = f.put("OP03-043", 0);
+    const da = f.put(CARDS.DOUBLE_ATK.id, 0);
+    const { state, sources } = attack(f, da.instanceId, "skip");
+    expect(sources).toEqual([gaimon.instanceId]);
+    expect(state.players[1].life).toHaveLength(0);
+    expect(state.status).toBe("IN_PROGRESS");
+  });
+
+  // OPT-886: with no watcher prompting, the engine currently ends the game on
+  // the second damage. The official FAQ says [Double Attack] against 1 Life
+  // cannot win. Flip to `it` when OPT-886 lands.
+  it.fails("no-watcher control: the game continues (fails today — OPT-886)", () => {
+    const f = fixture({ lifeTop: [CARDS.VANILLA.id] });
+    const da = f.put(CARDS.DOUBLE_ATK.id, 0);
+    const { state, steps } = attack(f, da.instanceId);
+    expect(steps).toEqual([]);
+    expect(state.players[1].life).toHaveLength(0);
+    expect(state.status).toBe("IN_PROGRESS");
+  });
+});
+
+/**
+ * `fixtures/opt-796-legacy-sessions.json` was written by
+ * `SessionRepository.save` on e0aace7 (before OPT-796), so its cardDb schemas
+ * and registered triggers still use the removed LEADER_ATTACK_DEALS_DAMAGE.
+ * - namiUsopp: OP03-040 Nami Leader (1 DON!!), OP03-041 Usopp (1 DON!!), a
+ *   vanilla Character (1 DON!!).
+ * - gaimon: OP03-043 Gaimon, a vanilla Character (1 DON!!).
+ */
+describe("OPT-796 legacy persisted sessions (pre-change schemas and registry)", () => {
+  class MemoryStorage implements SessionStorage {
+    readonly data = new Map<string, unknown>();
+    async get<T>(key: string): Promise<T | undefined> { return this.data.get(key) as T | undefined; }
+    async put(k: string | Record<string, unknown>, v?: unknown): Promise<void> {
+      const entries = typeof k === "string" ? { [k]: v } : k;
+      for (const [key, value] of Object.entries(entries)) this.data.set(key, structuredClone(value));
+    }
+    async setAlarm(): Promise<void> {}
+    async deleteAlarm(): Promise<void> {}
+  }
+
+  const legacy = JSON.parse(
+    readFileSync(new URL("./fixtures/opt-796-legacy-sessions.json", import.meta.url), "utf8"),
+  ) as Record<"namiUsopp" | "gaimon", Record<string, unknown>>;
+
+  async function load(name: "namiUsopp" | "gaimon") {
+    const raw = JSON.stringify(legacy[name]);
+    expect(raw).toContain("LEADER_ATTACK_DEALS_DAMAGE");
+    const storage = new MemoryStorage();
+    for (const [key, value] of Object.entries(JSON.parse(raw))) storage.data.set(key, value);
+    const restored = await new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" }).load();
+    if (!restored) throw new Error("legacy session did not load");
+    let state = restored.state;
+    const cardDb = restored.cardDb;
+    const f = {
+      cardDb,
+      get state() { return state; },
+      set state(s: GameState) { state = s; },
+      put: (id: string, don: number, tag: string) => {
+        const instanceId = `${id}-reentered${tag}`;
+        const card: CardInstance = {
+          instanceId, cardId: id, zone: "CHARACTER", state: "ACTIVE", turnPlayed: 0, controller: 0, owner: 0,
+          attachedDon: Array.from({ length: don }, (_, i) => ({ instanceId: `${instanceId}-don-${i}`, state: "ACTIVE" as const, attachedTo: instanceId })),
+        };
+        state.players[0].characters[state.players[0].characters.findIndex((c) => !c)] = card;
+        state = registerCardEnteredField(state, card, cardDb.get(id)!);
+        return card;
+      },
+    };
+    return { f, restored };
+  }
+
+  it("migrates every stored schema and registration to ATTACK_DEALS_DAMAGE", async () => {
+    const { restored } = await load("namiUsopp");
+    const stored = JSON.stringify([restored.state.triggerRegistry, restored.undoHistory, [...restored.cardDb.values()]]);
+    expect(stored).not.toContain("LEADER_ATTACK_DEALS_DAMAGE");
+    const triggers = (s: GameState) => Object.fromEntries(s.triggerRegistry.map((r) => [r.sourceCardInstanceId, r.trigger]));
+    const expected = {
+      "legacy-OP03-040": { event: "ATTACK_DEALS_DAMAGE", filter: { attacker: "SELF" }, don_requirement: 1 },
+      "legacy-OP03-041": { event: "ATTACK_DEALS_DAMAGE", filter: { attacker: "SELF" }, don_requirement: 1 },
+    };
+    expect(triggers(restored.state)).toMatchObject(expected);
+    expect(triggers(restored.undoHistory[0])).toMatchObject(expected);
+    expect(restored.cardDb.get("OP03-043")?.effectSchema?.effects[0]?.trigger).toEqual({ event: "ATTACK_DEALS_DAMAGE" });
+  });
+
+  it("Nami fires on her own attack only, Usopp on his own attack only", async () => {
+    const { f } = await load("namiUsopp");
+    const deckBefore = deckSize(f.state, 0);
+    const nami = attack(f, "legacy-OP03-040");
+    expect(nami.sources).toEqual(["legacy-OP03-040"]);
+    expect(deckSize(nami.state, 0)).toBe(deckBefore - 1);
+
+    f.state = nami.state;
+    const usopp = attack(f, "legacy-OP03-041");
+    expect(usopp.sources).toEqual(["legacy-OP03-041"]);
+    expect(deckSize(usopp.state, 0)).toBe(deckBefore - 8);
+
+    f.state = usopp.state;
+    const vanilla = f.state.players[0].characters.find((c) => c?.cardId === CARDS.VANILLA.id)!;
+    const other = attack(f, vanilla.instanceId);
+    expect(other.state.players[1].life).toHaveLength(1);
+    expect(other.sources).toEqual([]);
+  });
+
+  it("an Usopp entering the field after load binds to its own attack (migrated cardDb)", async () => {
+    const { f } = await load("namiUsopp");
+    const fresh = f.put("OP03-041", 1, "-a");
+    const result = attack(f, fresh.instanceId);
+    expect(result.sources).toEqual([fresh.instanceId]);
+  });
+
+  it("Gaimon fires on another Character's attack after load, once", async () => {
+    const { f } = await load("gaimon");
+    const vanilla = f.state.players[0].characters.find((c) => c?.cardId === CARDS.VANILLA.id)!;
+    const deckBefore = deckSize(f.state, 0);
+    const result = attack(f, vanilla.instanceId);
+    expect(result.sources).toEqual(["legacy-OP03-043"]);
+    expect(deckSize(result.state, 0)).toBe(deckBefore - 3);
+    expect(onField(result.state, "legacy-OP03-043")).toBe(false);
   });
 });
