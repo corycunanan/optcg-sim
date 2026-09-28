@@ -1177,6 +1177,8 @@ Return DON!! card(s) from the field to the DON!! deck.
 ```typescript
 interface ReturnDonToDeckParams {
   amount: number | DynamicValue;
+  /** "…until you have N DON!! cards on your field"; replaces amount. */
+  until_count?: number | DynamicValue;
   source_state?: "ACTIVE" | "RESTED" | "ANY";
   source: "COST_AREA" | "ATTACHED" | "ANY";
 }
@@ -1185,14 +1187,25 @@ interface ReturnDonToDeckParams {
 | Field | Value |
 |-------|-------|
 | **Target** | None (operates on the controller's DON!! on field) or a specific card's attached DON!! |
-| **Failure mode** | If insufficient DON!! exist on the field, return as many as possible. |
+| **Failure mode** | If insufficient DON!! exist on the field, return as many as possible. With `until_count`, return max(0, field DON!! − N); at or below N nothing is returned, and an unresolvable N returns nothing. |
 | **Fired events** | `DON_RETURNED_TO_DON_DECK` (triggers `DON_RETURNED_TO_DON_DECK` custom event) |
-| **Example cards** | Various DON!! -N cost effects |
+| **Example cards** | Various DON!! -N cost effects; OP08-074 Black Maria (`until_count`) |
+
+`until_count` is resolved when the action resolves — for a `SCHEDULE_ACTION` at end of turn, that is the end of turn. The whole field is eligible (cost-area active/rested DON!! and DON!! attached to the Leader/Characters, Rules 3-1-2 / 8-3-1-6); when more than one distribution exists, the controller answers the same `PLAYER_CHOICE` (`donReturn`) prompt as `FORCE_OPPONENT_DON_RETURN`. Returned DON!! go to the DON!! deck active and unattached.
 
 ```json
 {
   "type": "RETURN_DON_TO_DECK",
   "params": { "amount": 2, "source": "ANY" }
+}
+```
+
+```json
+{
+  "type": "RETURN_DON_TO_DECK",
+  "params": {
+    "until_count": { "type": "GAME_STATE", "source": "DON_FIELD_COUNT", "controller": "OPPONENT" }
+  }
 }
 ```
 
