@@ -2534,7 +2534,8 @@ export const OP16_119_MARSHALL_D_TEACH: EffectSchema = {
       actions: [
         {
           type: "SEARCH_DECK",
-          params: { look_at: 3, pick: { up_to: 1 }, rest_destination: "BOTTOM", pick_destination: "LIFE_TOP", face: "DOWN" },
+          // FAQ (qa_op16): the card is added to Life without revealing it.
+          params: { look_at: 3, pick: { up_to: 1 }, rest_destination: "BOTTOM", pick_destination: "LIFE_TOP", face: "DOWN", reveal: false },
         },
       ],
     },
