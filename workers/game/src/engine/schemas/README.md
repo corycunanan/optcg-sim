@@ -193,7 +193,8 @@ For effects that react to game events (not bracket-tag abilities):
 | "When Character returned to hand" | `{ event: "CHARACTER_RETURNED_TO_HAND" }` |
 | "When you take damage" | `{ event: "DAMAGE_TAKEN" }` |
 | "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED" }` |
-| "When Leader attack deals damage" | `{ event: "LEADER_ATTACK_DEALS_DAMAGE" }` |
+| "When this Leader's/Character's attack deals damage" | `{ event: "ATTACK_DEALS_DAMAGE", filter: { attacker: "SELF" } }` |
+| "When you deal damage to your opponent's Life" | `{ event: "ATTACK_DEALS_DAMAGE" }` |
 | "At end of your turn" (event) | `{ event: "END_OF_YOUR_TURN" }` |
 
 **Custom triggers support filters:**

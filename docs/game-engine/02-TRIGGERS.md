@@ -144,7 +144,7 @@ type CustomEventType =
   | "CHARACTER_RETURNED_TO_HAND"
   | "DAMAGE_TAKEN"
   | "BLOCKER_ACTIVATED"
-  | "LEADER_ATTACK_DEALS_DAMAGE";
+  | "ATTACK_DEALS_DAMAGE";
 ```
 
 ```typescript
@@ -790,24 +790,41 @@ Example:
 
 ---
 
-### LEADER_ATTACK_DEALS_DAMAGE
+### ATTACK_DEALS_DAMAGE
 
-Fires when this Leader's attack successfully deals damage to the opponent's Life.
+Fires when an attack by this card's controller deals damage to the opponent's Life (OPT-796). It matches battle `DAMAGE_DEALT` events only, so effect damage never fires it (qa_op03.md OP03-043), and it:
+
+- matches only the controller's own attacks — never the opponent's;
+- matches once per attack: only the damage the Damage Step deals first (`firstDamageOfAttack`), so a [Double Attack] attack dealing 2 damage fires it once (qa_op03.md OP03-043);
+- ignores lethal damage (0 Life: no Life card is checked; the attacker wins);
+- still matches [Banish] damage and damage whose Life card is redirected by a replacement.
+
+The watcher activates after the Life check and before the resulting [Trigger] choice (qa_op03.md:88-140): the revealed Life card waits in `battle.pendingTriggerLifeCard` while the watcher resolves.
 
 ```typescript
-{ event: "LEADER_ATTACK_DEALS_DAMAGE" }
+{
+  event: "ATTACK_DEALS_DAMAGE",
+  filter?: { attacker?: "SELF" },
+  don_requirement?: number
+}
 ```
 
-| Text Pattern | Example Cards |
-|-------------|---------------|
-| "When this Leader's attack deals damage to your opponent's Life" | OP03-040 Nami |
+`filter.attacker: "SELF"` binds the watcher to attacks by the card hosting it. Omit it only for "When you deal damage".
+
+| Text Pattern | Encoding | Example Cards |
+|-------------|----------|---------------|
+| "When this Leader's attack deals damage to your opponent's Life" | `filter: { attacker: "SELF" }` | OP03-040 Nami, P-117 Nami |
+| "When this Character's attack deals damage to your opponent's Life" | `filter: { attacker: "SELF" }` | OP03-041 Usopp, OP03-047 Zeff, OP03-051 Bell-mère |
+| "When you deal damage to your opponent's Life" | no filter | OP03-043 Gaimon |
 
 Example:
 
 ```json
 {
   "trigger": {
-    "event": "LEADER_ATTACK_DEALS_DAMAGE"
+    "event": "ATTACK_DEALS_DAMAGE",
+    "filter": { "attacker": "SELF" },
+    "don_requirement": 1
   }
 }
 ```
@@ -838,7 +855,7 @@ Example:
 | `CHARACTER_RETURNED_TO_HAND` | "When...Character is returned to the owner's hand" | EB02-023 |
 | `DAMAGE_TAKEN` | "When you take damage" | OP13-002 |
 | `BLOCKER_ACTIVATED` | "When your opponent activates [Blocker]" | OP09-118 |
-| `LEADER_ATTACK_DEALS_DAMAGE` | "When this Leader's attack deals damage" | OP03-040 |
+| `ATTACK_DEALS_DAMAGE` | "When this Leader's/Character's attack deals damage" (`filter.attacker: "SELF"`); "When you deal damage" | OP03-040, OP03-041, OP03-043, OP03-047, OP03-051, P-117 |
 
 ---
 
