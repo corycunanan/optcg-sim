@@ -154,7 +154,8 @@ describe("OPT-795 authored hand-trash watchers", () => {
     f.roundTrip();
     expect(f.state.pendingPrompt?.respondingPlayer).toBe(opponent);
     expect(f.state.pendingPrompt?.options).toMatchObject({ blindSelection: true });
-    f.select([discarded.instanceId]);
+    // OPT-838: the blind chooser answers with the card's opaque slot token.
+    f.select([f.state.pendingPrompt!.blindSlots!.find((s) => s.instanceId === discarded.instanceId)!.token]);
     f.done();
     expect(hasEffectiveKeyword(watcher, f.db.get(watcher.cardId)!, "RUSH", f.state, f.db)).toBe(true);
     const trash = f.state.eventLog.filter((e) => e.type === "CARD_TRASHED").find((e) => e.payload.from === "HAND");

@@ -261,6 +261,47 @@ The KO vs TRASH distinction is critical: `KO` fires `CARD_KO` and triggers all `
 
 ---
 
+### TRASH_FROM_HAND
+
+Trash `amount` cards from a hand. `target.controller` names the hand owner
+(SELF by default); `params.chooser` names who picks, relative to the effect
+controller (`"SELF"` or `"OPPONENT"`; default: the hand owner).
+
+```typescript
+interface TrashFromHandParams {
+  amount?: number | DynamicValue;
+  optional?: boolean;              // "you may trash" — 0 is a legal answer
+  chooser?: "SELF" | "OPPONENT";   // default: the hand owner chooses
+}
+```
+
+| Field | Value |
+|-------|-------|
+| **Target** | `target.controller` selects the hand owner; optional `target.filter` |
+| **Failure mode** | No eligible cards returns `succeeded: false` with no prompt. |
+| **Fired events** | `CARD_TRASHED` (`from: "HAND"`) attributed to the effect source |
+| **Example cards** | OP01-038 Kanjuro (`chooser: "OPPONENT"`), OP17-075 X.Drake and OP17-099 Charlotte Linlin (opponent's hand, `chooser: "SELF"`) |
+
+When the chooser is not the hand owner the choice is blind: it always prompts
+(even for a sole card) and goes to the chooser. The chooser sees only opaque
+face-down slots — fresh per-prompt tokens in an order shuffled by the persisted
+engine RNG — never instance ids, card ids, or hand order. The token-to-card
+mapping is stored server-side on the pending prompt (`blindSlots`) and is never
+projected; the session validates replies against the tokens (exact count,
+uniqueness, membership) and translates them to instance ids before resume. A
+uniformly shuffled face-down choice also satisfies "randomly chooses without
+looking" rulings (qa_op17, OP17-099).
+
+```json
+{
+  "type": "TRASH_FROM_HAND",
+  "target": { "type": "CARD_IN_HAND", "controller": "OPPONENT", "count": { "exact": 1 } },
+  "params": { "amount": 1, "chooser": "SELF" }
+}
+```
+
+---
+
 ### KO
 
 K.O. a Character or Stage, moving it from the field to the trash. Fires the `CARD_KO` event which triggers `[On K.O.]` effects.
@@ -792,9 +833,13 @@ interface RevealHandParams {
 }
 ```
 
-Resuming a blind choice consumes the selected IDs only after checking exact
-count, uniqueness, and current membership in the target hand. Invalid selections
-return a blind prompt without revealing cards; the session preserves the continuation.
+A blind choice offers the chooser opaque, shuffled face-down slot tokens, the
+same mechanism as a blind `TRASH_FROM_HAND`; the token-to-card mapping stays
+server-side. The session rejects replies that are not exactly `count` distinct
+tokens of the pending prompt, then resumes with the instance ids they name.
+Resuming consumes those IDs only after checking exact count, uniqueness, and
+current membership in the target hand. Invalid selections return a fresh blind
+prompt without revealing cards; the session preserves the continuation.
 
 ---
 
@@ -2577,6 +2622,7 @@ All action types at a glance with their primary zone interactions and event emis
 | `DRAW` | DECK | HAND | `CARD_DRAWN` |
 | `SEARCH_DECK` | DECK | HAND | `CARD_SEARCHED` |
 | `TRASH_CARD` | ANY | TRASH | `CARD_TRASHED` |
+| `TRASH_FROM_HAND` | HAND | TRASH | `CARD_TRASHED` |
 | `KO` | FIELD | TRASH | `CARD_KO` |
 | `RETURN_TO_HAND` | FIELD | HAND | `CARD_RETURNED_TO_HAND` |
 | `RETURN_TO_DECK` | FIELD | DECK | `CARD_RETURNED_TO_DECK` |
