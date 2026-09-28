@@ -225,3 +225,94 @@ describe("OPT-793 OP14-054 Fisher Tiger — [End of Your Turn] trash until 5", (
     expect(f.state.turn.activePlayerIndex).toBe(1);
   });
 });
+
+// ─── Slice 2: symmetric OP05-058 ─────────────────────────────────────────────
+
+describe("OPT-793 OP05-058 It's a Waste of Human Life!! — both players trim to 5", () => {
+  /** Hand sizes are counted after the Event has left the hand. */
+  function cast(selfHand: number, oppHand: number) {
+    const f = fixture();
+    const event = f.put("OP05-058", 0, "HAND", {
+      type: "Event",
+      cost: 1,
+      effectText:
+        "[Main] Place all Characters with a cost of 3 or less at the bottom of the owner's deck. Then, you and your opponent trash cards from your hands until you each have 5 cards in your hands.",
+    });
+    f.fillHand(0, selfHand);
+    f.fillHand(1, oppHand);
+    f.run({ type: "PLAY_CARD", cardInstanceId: event.instanceId });
+    return f;
+  }
+
+  it("you 7 / opponent 8: you choose 2 first, then the opponent chooses 3", () => {
+    const f = cast(7, 8);
+    const first = trashPrompt(f.state);
+    expect(first.respondingPlayer).toBe(0);
+    expect(first.options.countMin).toBe(2);
+    expect(first.options.countMax).toBe(2);
+    expect(first.options.validTargets).toEqual(f.state.players[0].hand.map((c) => c.instanceId));
+    expect(f.selectHand(0, 2)).toBe(false);
+    expect(f.state.players[0].hand).toHaveLength(5);
+    expect(f.state.players[1].hand).toHaveLength(8);
+
+    const second = trashPrompt(f.state);
+    expect(second.respondingPlayer).toBe(1);
+    expect(second.options.countMin).toBe(3);
+    expect(second.options.countMax).toBe(3);
+    expect(second.options.blindSelection).toBeUndefined();
+    expect(second.options.validTargets).toEqual(f.state.players[1].hand.map((c) => c.instanceId));
+    expect(f.selectHand(1, 3)).toBe(false);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players.map((p) => p.hand.length)).toEqual([5, 5]);
+    // Event order: the turn player's discard is published before the opponent's.
+    const order = f.state.eventLog
+      .filter((e) => e.type === "CARD_TRASHED" && (e.payload as { from?: string }).from === "HAND")
+      .map((e) => [e.playerIndex, (e.payload as { count: number }).count]);
+    expect(order).toEqual([
+      [0, 2],
+      [1, 3],
+    ]);
+  });
+
+  it("you 3 / opponent 9: you trash nothing, the opponent trashes 4", () => {
+    const f = cast(3, 9);
+    const prompt = trashPrompt(f.state);
+    expect(prompt.respondingPlayer).toBe(1);
+    expect(prompt.options.countMin).toBe(4);
+    expect(f.selectHand(1, 4)).toBe(false);
+    expect(f.state.players.map((p) => p.hand.length)).toEqual([3, 5]);
+    expect(f.handTrashEvents(0)).toHaveLength(0);
+  });
+
+  it("you 9 / opponent 3: you trash 4, the opponent trashes nothing", () => {
+    const f = cast(9, 3);
+    const prompt = trashPrompt(f.state);
+    expect(prompt.respondingPlayer).toBe(0);
+    expect(prompt.options.countMin).toBe(4);
+    expect(f.selectHand(0, 4)).toBe(false);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players.map((p) => p.hand.length)).toEqual([5, 3]);
+    expect(f.handTrashEvents(1)).toHaveLength(0);
+  });
+
+  it.each([
+    [5, 5],
+    [4, 2],
+  ])("you %i / opponent %i: nobody trashes", (a, b) => {
+    const f = cast(a, b);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players.map((p) => p.hand.length)).toEqual([a, b]);
+    expect(f.handTrashEvents(0)).toHaveLength(0);
+    expect(f.handTrashEvents(1)).toHaveLength(0);
+  });
+
+  it("you 6 / opponent 6: each trashes exactly 1 and a wrong-count opponent reply is rejected", () => {
+    const f = cast(6, 6);
+    expect(f.selectHand(0, 1)).toBe(false);
+    expect(trashPrompt(f.state).respondingPlayer).toBe(1);
+    expect(f.selectHand(1, 2)).toBe(true);
+    expect(f.state.players[1].hand).toHaveLength(6);
+    expect(f.selectHand(1, 1)).toBe(false);
+    expect(f.state.players.map((p) => p.hand.length)).toEqual([5, 5]);
+  });
+});
