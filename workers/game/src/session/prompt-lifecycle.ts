@@ -169,8 +169,9 @@ export function resumePromptLifecycle(
       // battle continuation; the loop below ends the battle once it unwinds.
       state = { ...state, pendingPrompt: replacement.pendingPrompt };
     } else if (pausedBattleKO) {
-      // Publish the substitute's events in the same batch as the rest of the
-      // Damage Step, as the synchronous path does.
+      // A substitute that resolved without a prompt: publish its events in
+      // the same batch as the rest of the Damage Step, as the synchronous path
+      // does.
       const continuation = resumeBattleDamageContinuation(
         state,
         cardDb,

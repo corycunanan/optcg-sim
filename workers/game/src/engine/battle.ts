@@ -1308,9 +1308,11 @@ function executeDamageStep(
           // offered an optional replacement (resolution recorded when they
           // answer), or a mandatory replacement's substitute awaits input
           // (already REPLACED). The pipeline drops a prompting execution's
-          // events, so the resumed step rebuilds CHARACTER_BATTLES /
-          // COMBAT_VICTORY and publishes them with the K.O. and END_OF_BATTLE,
-          // as the synchronous path does.
+          // events, so the resumed step rebuilds PHASE_CHANGED /
+          // CHARACTER_BATTLES / COMBAT_VICTORY and publishes them with the
+          // K.O. and END_OF_BATTLE. When the substitute itself prompts, its
+          // events are published first (when its frame resolves), so that
+          // order differs from the synchronous path.
           const resumeContext = replacement.pendingPrompt.resumeContext;
           const optionalEffectId =
             !replacement.replaced &&
@@ -1441,11 +1443,14 @@ function koBattleLoser(
 }
 
 /**
- * OPT-872: finish a Damage Step that paused on an optional battle-K.O.
- * replacement. The batch matches the synchronous Damage Step: CHARACTER_BATTLES
- * (Character attacker only), COMBAT_VICTORY, the replacement's own events, the
- * K.O. when the replacement was not applied (§8-1-3-4-1), then End of the
- * Battle (§7-1-5). The caller clears the continuation and checks its battleId.
+ * OPT-872: finish a Damage Step that paused on a battle-K.O. replacement
+ * prompt. The batch is PHASE_CHANGED (COUNTER_STEP → DAMAGE_STEP),
+ * CHARACTER_BATTLES (Character attacker only), COMBAT_VICTORY, the
+ * `replacementEvents` passed in, the K.O. when the replacement was not applied
+ * (§8-1-3-4-1), then End of the Battle (§7-1-5). That matches the synchronous
+ * order only when the substitute resolved without a prompt; a prompted
+ * substitute's events were already published by its own frame. The caller
+ * clears the continuation and checks its battleId.
  */
 function finishCharacterBattleResult(
   state: GameState,
