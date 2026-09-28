@@ -589,6 +589,35 @@ describe("OPT-799 schema validation of action-level optional", () => {
       "target.count already allows choosing 0",
     ],
     [
+      "an OP04-044-shaped dual_targets slot that allows zero",
+      auto([
+        {
+          type: "RETURN_TO_HAND",
+          target: {
+            type: "CHARACTER",
+            controller: "EITHER",
+            dual_targets: [
+              { filter: { cost_max: 8 }, count: { up_to: 1 } },
+              { filter: { cost_max: 3 }, count: { up_to: 1 } },
+            ],
+          },
+          optional: true,
+        },
+      ]),
+      "target.dual_targets[0].count already allows choosing 0",
+    ],
+    [
+      "an any_number target",
+      auto([
+        {
+          type: "KO",
+          target: { type: "CHARACTER", controller: "OPPONENT", count: { any_number: true } },
+          optional: true,
+        },
+      ]),
+      "target.count already allows choosing 0",
+    ],
+    [
       "params.optional",
       auto([
         {
@@ -636,6 +665,16 @@ describe("OPT-799 schema validation of action-level optional", () => {
     ],
   ])("rejects %s", (_label, block, message) => {
     expect(errorsFor([block]).join("\n")).toContain(message);
+  });
+
+  it("rejects optional on the authored OP04-044 dual-target bounce", () => {
+    const schema = structuredClone(getEffectSchema("OP04-044")!);
+    const bounce = schema.effects[0].actions![0];
+    expect(bounce.target?.dual_targets).toHaveLength(2);
+    bounce.optional = true;
+    expect(validateEffectSchema(schema, "OP04-044").join("\n")).toContain(
+      "target.dual_targets[0].count already allows choosing 0"
+    );
   });
 
   it("only the re-authored cards carry action-level optional in the registry", () => {

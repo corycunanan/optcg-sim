@@ -912,10 +912,9 @@ function validateOptionalAction(
     ];
   }
   const errors: string[] = [];
-  const count = action.target?.count;
-  if (count && ("up_to" in count || "any_number" in count)) {
+  for (const path of zeroAllowingTargetCounts(action.target)) {
     errors.push(
-      `${prefix}.optional: target.count already allows choosing 0; drop 'optional' (the selection prompt is the decline)`,
+      `${prefix}.optional: ${path} already allows choosing 0; drop 'optional' (the selection prompt is the decline)`,
     );
   }
   const params = action.params as Record<string, unknown> | undefined;
@@ -925,6 +924,30 @@ function validateOptionalAction(
     );
   }
   return errors;
+}
+
+function countAllowsZero(count: unknown): boolean {
+  return (
+    !!count &&
+    typeof count === "object" &&
+    ("up_to" in count || "any_number" in count)
+  );
+}
+
+/** Every count on a target shape whose selection may pick zero cards. */
+function zeroAllowingTargetCounts(target: Target | undefined): string[] {
+  if (!target) return [];
+  const paths: string[] = [];
+  if (countAllowsZero(target.count)) paths.push("target.count");
+  target.dual_targets?.forEach((slot, index) => {
+    if (countAllowsZero(slot?.count))
+      paths.push(`target.dual_targets[${index}].count`);
+  });
+  if (countAllowsZero(target.per_type_selection?.count_per_type))
+    paths.push("target.per_type_selection.count_per_type");
+  if (countAllowsZero(target.mixed_pool?.total_count))
+    paths.push("target.mixed_pool.total_count");
+  return paths;
 }
 
 function validateOptionalActionPlacement(block: EffectBlock, prefix: string): string[] {

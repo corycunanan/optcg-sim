@@ -51,7 +51,7 @@ Constraints enforced by schema validation:
 
 - Allowed only on a block's top-level `actions`. It is not allowed in `replacement_actions`, choice branches, `OPPONENT_ACTION`, or `SCHEDULE_ACTION`.
 - Not inside an `AND` transaction.
-- Not with a selection that already allows choosing zero: `target.count` `up_to` / `any_number`, `params.optional` (TRASH_FROM_HAND and similar), or `params.up_to`. That selection prompt is already the decline (Rules 4-8-1).
+- Not with a selection that already allows choosing zero: an `up_to` / `any_number` count on `target.count`, any `target.dual_targets[*].count`, `target.per_type_selection.count_per_type` or `target.mixed_pool.total_count`, `params.optional` (TRASH_FROM_HAND and similar), or `params.up_to`. That selection prompt is already the decline (Rules 4-8-1).
 - Not on the first action of a block with `flags.optional` and no costs. The block prompt already asks for that clause.
 
 For "up to 1 of your Leader" (P-036), the single deterministic Leader target has no selection prompt, so choosing 0 or 1 is encoded as `optional: true` on the Leader action.

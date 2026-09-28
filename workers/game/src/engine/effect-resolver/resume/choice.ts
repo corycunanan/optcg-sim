@@ -699,12 +699,10 @@ export function handleAwaitingOptionalActionResponse(
 
   let chainActions = topFrame.remainingActions;
   if (accepted) {
-    const {
-      optional: _optional,
-      conditions: _conditions,
-      ...decided
-    } = pausedAction;
-    chainActions = [decided as typeof pausedAction, ...chainActions];
+    const decided = { ...pausedAction };
+    delete decided.optional;
+    delete decided.conditions;
+    chainActions = [decided, ...chainActions];
   }
 
   if (chainActions.length > 0) {
