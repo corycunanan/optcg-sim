@@ -425,7 +425,7 @@ export const OP12_015_MONKEY_D_LUFFY: EffectSchema = {
       conditions: {
         type: "DON_GIVEN",
         controller: "SELF",
-        mode: "ANY_CARD_HAS_DON",
+        mode: "TOTAL_GIVEN",
         operator: ">=",
         value: 2,
       },
@@ -889,7 +889,7 @@ export const OP12_024_GYUKIMARU: EffectSchema = {
       conditions: {
         type: "DON_GIVEN",
         controller: "SELF",
-        mode: "ANY_CARD_HAS_DON",
+        mode: "TOTAL_GIVEN",
         operator: ">=",
         value: 3,
       },
