@@ -888,11 +888,14 @@ export const P_036_MONKEY_D_LUFFY: EffectSchema = {
           duration: { type: "THIS_TURN" },
         },
         {
+          // "…and up to 1 of your Leader gain +1000": choosing 0 or 1 of the
+          // single Leader (Rules 4-8-1) is a yes/no choice (OPT-799).
           type: "MODIFY_POWER",
           target: { type: "YOUR_LEADER" },
           params: { amount: 1000 },
           duration: { type: "THIS_TURN" },
           chain: "THEN",
+          optional: true,
         },
       ],
     },

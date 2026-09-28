@@ -3036,9 +3036,12 @@ export const OP14_079_CROCODILE: EffectSchema = {
           duration: { type: "THIS_TURN" },
         },
         {
+          // "Then, you may trash 2 cards from the top of your deck." — a
+          // clause-level choice after the mandatory −10 cost (OPT-799).
           type: "MILL",
           params: { amount: 2 },
           chain: "THEN",
+          optional: true,
         },
       ],
     },
