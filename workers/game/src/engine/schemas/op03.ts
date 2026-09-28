@@ -1434,7 +1434,8 @@ export const OP03_040_NAMI: EffectSchema = {
       id: "leader_damage_mill",
       category: "auto",
       trigger: {
-        event: "LEADER_ATTACK_DEALS_DAMAGE",
+        event: "ATTACK_DEALS_DAMAGE",
+        filter: { attacker: "SELF" },
         don_requirement: 1,
       },
       actions: [
@@ -1467,7 +1468,8 @@ export const OP03_041_USOPP: EffectSchema = {
       id: "damage_mill_7",
       category: "auto",
       trigger: {
-        event: "LEADER_ATTACK_DEALS_DAMAGE",
+        event: "ATTACK_DEALS_DAMAGE",
+        filter: { attacker: "SELF" },
         don_requirement: 1,
       },
       actions: [
@@ -1521,7 +1523,7 @@ export const OP03_043_GAIMON: EffectSchema = {
       id: "damage_mill_3_self_trash",
       category: "auto",
       trigger: {
-        event: "LEADER_ATTACK_DEALS_DAMAGE",
+        event: "ATTACK_DEALS_DAMAGE",
       },
       actions: [
         {
@@ -1629,7 +1631,8 @@ export const OP03_047_ZEFF: EffectSchema = {
       id: "damage_mill_7",
       category: "auto",
       trigger: {
-        event: "LEADER_ATTACK_DEALS_DAMAGE",
+        event: "ATTACK_DEALS_DAMAGE",
+        filter: { attacker: "SELF" },
         don_requirement: 1,
       },
       actions: [
@@ -1776,7 +1779,8 @@ export const OP03_051_BELLMERE: EffectSchema = {
       id: "damage_mill_7",
       category: "auto",
       trigger: {
-        event: "LEADER_ATTACK_DEALS_DAMAGE",
+        event: "ATTACK_DEALS_DAMAGE",
+        filter: { attacker: "SELF" },
         don_requirement: 1,
       },
       actions: [

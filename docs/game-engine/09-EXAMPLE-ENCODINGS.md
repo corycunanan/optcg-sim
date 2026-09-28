@@ -413,7 +413,7 @@ Your Leader and all of your Characters that do not have a type including "Roger 
 ---
 
 ### 7. Nami (OP03-040)
-**Categories demonstrated:** rule_modification (LOSS_CONDITION_MOD), auto with custom trigger (LEADER_ATTACK_DEALS_DAMAGE), MILL action, optional flag
+**Categories demonstrated:** rule_modification (LOSS_CONDITION_MOD), auto with custom trigger (ATTACK_DEALS_DAMAGE), MILL action, optional flag
 
 #### Raw Effect Text
 When your deck is reduced to 0, you win the game instead of losing, according to the rules.
@@ -436,7 +436,9 @@ When your deck is reduced to 0, you win the game instead of losing, according to
       "id": "damage_mill",
       "category": "auto",
       "trigger": {
-        "event": "LEADER_ATTACK_DEALS_DAMAGE"
+        "event": "ATTACK_DEALS_DAMAGE",
+        "filter": { "attacker": "SELF" },
+        "don_requirement": 1
       },
       "actions": [
         {
@@ -454,7 +456,7 @@ When your deck is reduced to 0, you win the game instead of losing, according to
 - **rule_modification vs replacement:** "according to the rules" in the card text signals this is a rule modification, not a replacement effect. The `LOSS_CONDITION_MOD` with `modification: "WIN_INSTEAD"` overrides the standard deck-out loss rule at the engine level. This could alternatively be encoded as a `replacement` block with `replaces.event: "WOULD_LOSE_GAME"` (see [06](./06-PROHIBITIONS-AND-REPLACEMENTS.md) for that pattern). The rule_modification approach is preferred here because the card explicitly says "according to the rules."
 - **Synergy between effects:** The rule modification (deck-out = win) and the auto effect (mill your own deck) form a combo. The player mills their own deck to reach 0 cards and win instead of losing.
 - **DON!! x1 on CustomTrigger:** The `[DON!! x1]` prefix requires 1 DON!! attached to this Leader. The `don_requirement` field is defined on both `KeywordTrigger` and `CustomTrigger` (see [02-TRIGGERS.md](./02-TRIGGERS.md)).
-- **LEADER_ATTACK_DEALS_DAMAGE:** A custom trigger that fires when this Leader's attack successfully deals damage to the opponent's Life (i.e., the attack resolves, is not blocked, and removes a Life card).
+- **ATTACK_DEALS_DAMAGE:** A custom trigger that fires when an attack by this card's controller deals damage to the opponent's Life — once per attack, even with [Double Attack]; never for a lethal `DAMAGE_DEALT`; and not for `DEAL_DAMAGE` effects, which emit no `DAMAGE_DEALT` today (OPT-892). `filter.attacker: "SELF"` binds it to this Leader's own attack, so a Character's attack does not mill (OPT-796).
 - **MILL vs TRASH_CARD:** "trash 1 card from the top of your deck" is a mill operation (deck to trash, top card). MILL is the correct primitive — TRASH_CARD requires a target selection, while MILL always takes from the top.
 
 ---
