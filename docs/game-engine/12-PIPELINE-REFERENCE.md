@@ -89,7 +89,8 @@ Every trigger requires an event to be emitted. If the event isn't emitted, the t
 | `CARD_RETURNED_TO_HAND` | CHARACTER_RETURNED_TO_HAND | card-mutations.ts:returnToHand |
 | `DON_DETACHED` | DON_RETURNED_TO_DON_DECK | don.ts, phases.ts |
 | `DON_GIVEN_TO_CARD` | DON_GIVEN_TO_CARD | don.ts, execute.ts |
-| `CARD_ADDED_TO_HAND_FROM_LIFE` | CARD_REMOVED_FROM_LIFE, CARD_ADDED_TO_HAND_FROM_LIFE, LIFE_CARD_REMOVED | life.ts, battle.ts |
+| `CARD_ADDED_TO_HAND_FROM_LIFE` | CARD_ADDED_TO_HAND_FROM_LIFE | life.ts, battle.ts |
+| `CARD_REMOVED_FROM_LIFE` | CARD_REMOVED_FROM_LIFE | battle.ts, effect-damage.ts, actions/life.ts, actions/battle-actions.ts, cost/payment.ts, card-mutations.ts:returnToDeck |
 | `DAMAGE_DEALT` | DAMAGE_TAKEN, LEADER_ATTACK_DEALS_DAMAGE | battle.ts:executeDamageStep (includes attackerInstanceId, attackerType) |
 | `BATTLE_RESOLVED` | END_OF_BATTLE | battle.ts:endBattle |
 | `COMBAT_VICTORY` | COMBAT_VICTORY | battle.ts:executeDamageStep (attacker wins vs CHARACTER) |
@@ -123,7 +124,7 @@ matchesTrigger(trigger, event, state, sourceCard, cardDb)
 
 ## Custom Event Type Mappings
 
-`customEventToGameEvent()` in triggers.ts maps schema-level custom triggers to engine-level event types:
+`customEventToGameEvent()` in triggers.ts maps schema-level custom triggers to engine-level event types. `CHARACTER_REMOVED_FROM_FIELD` is matched by a bespoke branch instead. `schema-trigger-event-lint.ts` (run by `pnpm schema:check`) rejects any authored `trigger.event` that is neither mapped nor bespoke, so adding a custom event means adding its map entry:
 
 | CustomEventType | Maps To |
 |----------------|---------|
@@ -135,8 +136,7 @@ matchesTrigger(trigger, event, state, sourceCard, cardDb)
 | EVENT_MAIN_RESOLVED_FROM_TRASH | EVENT_MAIN_RESOLVED_FROM_TRASH |
 | EVENT_TRIGGER_RESOLVED | EVENT_TRIGGER_RESOLVED |
 | CHARACTER_PLAYED | CARD_PLAYED |
-| CARD_REMOVED_FROM_LIFE | CARD_ADDED_TO_HAND_FROM_LIFE |
-| LIFE_CARD_REMOVED | CARD_ADDED_TO_HAND_FROM_LIFE |
+| CARD_REMOVED_FROM_LIFE | CARD_REMOVED_FROM_LIFE |
 | TRIGGER_ACTIVATED | TRIGGER_ACTIVATED |
 | DAMAGE_TAKEN | DAMAGE_DEALT |
 | BLOCKER_ACTIVATED | BLOCK_DECLARED |
