@@ -426,7 +426,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `PLAY_CARD` | "Play from hand/trash/life" | Target, source zone |
 | `ADD_TO_LIFE` | "Add card from trash to Life" | `CARD_IN_TRASH` target, `{ face, position }` |
 | `MILL` | "Trash N from top of deck" | `{ amount: N }` |
-| `DECK_SCRY` | "Look at N, arrange" | `{ amount: N, position: "TOP" }` |
+| `DECK_SCRY` | "Look at N, place them at the top or bottom in any order" | `{ look_at: N, destination?: "TOP" \| "BOTTOM" \| "TOP_OR_BOTTOM" }` |
 
 ### Power & Stats
 
