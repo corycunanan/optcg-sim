@@ -469,15 +469,18 @@ export const EB03_012_OTAMA: EffectSchema = {
       actions: [
         {
           type: "SET_REST",
+          // OPT-792: trait and cost qualifiers bind Characters only.
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
-            filter: {
-              any_of: [
-                { card_type: "DON" },
-                { traits_any_of: ["Animal", "SMILE"], cost_max: 3 },
-              ],
+            mixed_pool: {
+              types: ["DON_IN_COST_AREA", "CHARACTER"],
+              total_count: { up_to: 1 },
+              filters: {
+                CHARACTER: { traits_any_of: ["Animal", "SMILE"], cost_max: 3 },
+                DON_IN_COST_AREA: { is_active: true },
+              },
             },
           },
         },
@@ -829,12 +832,18 @@ export const EB03_061_UTA: EffectSchema = {
         },
         {
           type: "SET_REST",
+          // OPT-792: the cost cap binds Characters only.
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
-            filter: {
-              any_of: [{ card_type: "DON" }, { cost_max: 4 }],
+            mixed_pool: {
+              types: ["DON_IN_COST_AREA", "CHARACTER"],
+              total_count: { up_to: 1 },
+              filters: {
+                CHARACTER: { cost_max: 4 },
+                DON_IN_COST_AREA: { is_active: true },
+              },
             },
           },
           chain: "THEN",

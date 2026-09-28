@@ -854,11 +854,21 @@ export const OP07_026_JEWELRY_BONNEY: EffectSchema = {
       actions: [
         {
           type: "APPLY_PROHIBITION",
+          // OPT-792: "rested Character or DON!! cards" — no Leader, and
+          // "rested" applies to both types (qa_op07.md: active or given
+          // DON!! cannot be chosen).
           target: {
-            type: "LEADER_OR_CHARACTER",
+            type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
-            filter: { is_rested: true },
+            mixed_pool: {
+              types: ["CHARACTER", "DON_IN_COST_AREA"],
+              total_count: { up_to: 1 },
+              filters: {
+                CHARACTER: { is_rested: true },
+                DON_IN_COST_AREA: { is_rested: true },
+              },
+            },
           },
           params: { prohibition_type: "CANNOT_REFRESH" },
           duration: { type: "SKIP_NEXT_REFRESH" },

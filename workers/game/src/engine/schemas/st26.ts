@@ -82,24 +82,20 @@ export const ST26_002_TONY_TONY_CHOPPER: EffectSchema = {
       costs: [{ type: "DON_MINUS", amount: 2 }],
       actions: [
         {
-          type: "PLAYER_CHOICE",
-          params: {
-            options: [
-              [
-                { type: "REST_OPPONENT_DON", params: { amount: 1 } },
-              ],
-              [
-                {
-                  type: "SET_REST",
-                  target: {
-                    type: "CHARACTER",
-                    controller: "OPPONENT",
-                    count: { up_to: 1 },
-                    filter: { cost_max: 1 },
-                  },
-                },
-              ],
-            ],
+          // OPT-792: one "up to 1" pool; the cost cap binds Characters only.
+          type: "SET_REST",
+          target: {
+            type: "CHARACTER",
+            controller: "OPPONENT",
+            count: { up_to: 1 },
+            mixed_pool: {
+              types: ["DON_IN_COST_AREA", "CHARACTER"],
+              total_count: { up_to: 1 },
+              filters: {
+                CHARACTER: { cost_max: 1 },
+                DON_IN_COST_AREA: { is_active: true },
+              },
+            },
           },
         },
       ],
