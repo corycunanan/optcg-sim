@@ -347,7 +347,7 @@ export function resolveEffect(
     const usedSet = state.turn.oncePerTurnUsed[block.id];
     if (usedSet?.includes(sourceCardInstanceId)) {
       log("effect.skipped", { ...logCtx, reason: "once_per_turn_used" });
-      return { state, events, resolved: false };
+      return { state, events, resolved: false, effectNotActivated: true };
     }
   }
 
@@ -466,7 +466,7 @@ export function resolveEffect(
     if (costPayResult.cannotPay) {
       state = costPayResult.state;
       log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
-      return { state, events, resolved: false };
+      return { state, events, resolved: false, effectNotActivated: true };
     }
 
     state = costPayResult.state;
@@ -574,13 +574,15 @@ export interface ChainResult {
 type UpToResourceAction =
   | ActionOf<"ADD_DON_FROM_DECK">
   | ActionOf<"ADD_TO_LIFE_FROM_DECK">
-  | ActionOf<"SET_DON_ACTIVE">;
+  | ActionOf<"SET_DON_ACTIVE">
+  | ActionOf<"TRASH_FROM_LIFE">;
 
 function isUpToResourceAction(action: Action): action is UpToResourceAction {
   return (
     (action.type === "ADD_DON_FROM_DECK" ||
       action.type === "ADD_TO_LIFE_FROM_DECK" ||
-      action.type === "SET_DON_ACTIVE") &&
+      action.type === "SET_DON_ACTIVE" ||
+      action.type === "TRASH_FROM_LIFE") &&
     action.params?.up_to === true
   );
 }
@@ -608,7 +610,9 @@ function availableUpToAmount(
       ? player.donDeck.length
       : action.type === "ADD_TO_LIFE_FROM_DECK"
         ? player.deck.length
-        : player.donCostArea.filter((don) => don.state === "RESTED").length;
+        : action.type === "TRASH_FROM_LIFE"
+          ? state.players[life.trashFromLifeOwner(action, controller)].life.length
+          : player.donCostArea.filter((don) => don.state === "RESTED").length;
   return Math.min(requested, available);
 }
 

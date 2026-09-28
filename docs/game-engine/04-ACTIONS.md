@@ -200,8 +200,13 @@ interface SearchDeckParams {
   pick: { up_to: number };
   filter: TargetFilter;
   rest_destination: "TOP" | "BOTTOM" | "SHUFFLE";
+  pick_destination?: "HAND" | "TRASH" | "LIFE" | "LIFE_TOP"; // default HAND
+  face?: "UP" | "DOWN";   // Life picks only; default DOWN
+  reveal?: boolean;       // default true — see below
 }
 ```
+
+**`reveal`** — picks are revealed to both players by default (rule 11-2-1: a card moved from one secret area to another is always revealed, and printed searches say "reveal"). Set `reveal: false` only when the card or its official FAQ says the pick is not revealed, e.g. OP16-119 ("you add it to your Life cards without revealing it") and OP12-079 ("No, you do not reveal it"). The engine then emits `CARDS_REVEALED` as `CONTROLLER_ONLY` so the owner still sees the pick while the opponent and spectators receive a redacted event. `opt-835-search-reveal-secrecy.test.ts` ratchets the authored `reveal: false` set.
 
 | Field | Value |
 |-------|-------|
@@ -253,6 +258,47 @@ interface TrashCardParams {
 ```
 
 The KO vs TRASH distinction is critical: `KO` fires `CARD_KO` and triggers all `[On K.O.]` effects. `TRASH_CARD` fires `CARD_TRASHED` and does not trigger `[On K.O.]` effects. Cards like OP03-012 use "trash" as a cost specifically to avoid triggering opponent's On K.O. effects.
+
+---
+
+### TRASH_FROM_HAND
+
+Trash `amount` cards from a hand. `target.controller` names the hand owner
+(SELF by default); `params.chooser` names who picks, relative to the effect
+controller (`"SELF"` or `"OPPONENT"`; default: the hand owner).
+
+```typescript
+interface TrashFromHandParams {
+  amount?: number | DynamicValue;
+  optional?: boolean;              // "you may trash" — 0 is a legal answer
+  chooser?: "SELF" | "OPPONENT";   // default: the hand owner chooses
+}
+```
+
+| Field | Value |
+|-------|-------|
+| **Target** | `target.controller` selects the hand owner; optional `target.filter` |
+| **Failure mode** | No eligible cards returns `succeeded: false` with no prompt. |
+| **Fired events** | `CARD_TRASHED` (`from: "HAND"`) attributed to the effect source |
+| **Example cards** | OP01-038 Kanjuro (`chooser: "OPPONENT"`), OP17-075 X.Drake and OP17-099 Charlotte Linlin (opponent's hand, `chooser: "SELF"`) |
+
+When the chooser is not the hand owner the choice is blind: it always prompts
+(even for a sole card) and goes to the chooser. The chooser sees only opaque
+face-down slots — fresh per-prompt tokens in an order shuffled by the persisted
+engine RNG — never instance ids, card ids, or hand order. The token-to-card
+mapping is stored server-side on the pending prompt (`blindSlots`) and is never
+projected; the session validates replies against the tokens (exact count,
+uniqueness, membership) and translates them to instance ids before resume. A
+uniformly shuffled face-down choice also satisfies "randomly chooses without
+looking" rulings (qa_op17, OP17-099).
+
+```json
+{
+  "type": "TRASH_FROM_HAND",
+  "target": { "type": "CARD_IN_HAND", "controller": "OPPONENT", "count": { "exact": 1 } },
+  "params": { "amount": 1, "chooser": "SELF" }
+}
+```
 
 ---
 
@@ -604,29 +650,31 @@ interface FullDeckSearchParams {
 
 ### DECK_SCRY
 
-Look at the top N cards of the deck and rearrange each individually to the top or bottom. No cards are added to hand — this is pure deck manipulation.
+Look at the top N cards of the deck, reorder them, and place the whole group at the top or bottom of the deck. The group is never split between top and bottom (OP17-050 FAQ). No cards are added to hand — this is pure deck manipulation.
 
 ```typescript
 interface DeckScryParams {
-  count: number;
+  look_at?: number;   // default 5
+  count?: number;     // legacy alias for look_at (OP02-056)
+  destination?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM"; // default TOP_OR_BOTTOM
 }
 ```
 
 | Field | Value |
 |-------|-------|
 | **Target** | None (always the controller's deck) |
-| **Failure mode** | If the deck has fewer than `count` cards, scry all remaining. |
+| **Failure mode** | If the deck has fewer than `look_at` cards, scry all remaining; an empty deck resolves without a prompt. |
 | **Fired events** | None (private information rearrangement) |
-| **Example cards** | OP01-073, ST03-010, OP07-039 |
+| **Example cards** | OP01-073, ST03-010, OP07-039, OP17-050, ST17-003 (`destination: "TOP"`) |
 
 ```json
 {
   "type": "DECK_SCRY",
-  "params": { "count": 5 }
+  "params": { "look_at": 5 }
 }
 ```
 
-The controller looks at the top N cards, then places each card at either the top or bottom of the deck in any order.
+The controller answers an `ARRANGE_TOP_CARDS` prompt with every looked-at card exactly once and one destination for the whole group. The engine rejects partial, duplicate, foreign or kept-card responses, and a destination the schema forbids, without changing state. Reordering inside the deck is not a zone transition; instances keep their identities. Chained actions (e.g. OP17-050's "Then, draw 1 card") see the new deck order.
 
 ---
 
@@ -639,6 +687,8 @@ interface SearchTrashTheRestParams {
   look_at: number;
   pick: { up_to: number };
   filter: TargetFilter;
+  pick_destination?: "HAND" | "TRASH" | "LIFE" | "LIFE_TOP"; // default HAND
+  reveal?: boolean; // default true — same contract as SEARCH_DECK.reveal
 }
 ```
 
@@ -742,7 +792,7 @@ interface HandWheelParams {
 | **Target** | None (operates on the controller's hand and deck) |
 | **Failure mode** | If the hand is empty, the action is ignored. If the deck has fewer cards than were returned, draw as many as possible. |
 | **Fired events** | `CARD_PLACED_TO_DECK` per returned card, `CARD_DRAWN` per drawn card |
-| **Example cards** | OP04-048 Sasaki, P-002 |
+| **Example cards** | None authored (OP04-048 Sasaki and P-002 use `RETURN_HAND_TO_DECK` → `SHUFFLE_DECK` → `DRAW`) |
 
 The `result_ref` captures the count of cards returned, enabling dynamic draw amounts:
 
@@ -785,9 +835,13 @@ interface RevealHandParams {
 }
 ```
 
-Resuming a blind choice consumes the selected IDs only after checking exact
-count, uniqueness, and current membership in the target hand. Invalid selections
-return a blind prompt without revealing cards; the session preserves the continuation.
+A blind choice offers the chooser opaque, shuffled face-down slot tokens, the
+same mechanism as a blind `TRASH_FROM_HAND`; the token-to-card mapping stays
+server-side. The session rejects replies that are not exactly `count` distinct
+tokens of the pending prompt, then resumes with the instance ids they name.
+Resuming consumes those IDs only after checking exact count, uniqueness, and
+current membership in the target hand. Invalid selections return a fresh blind
+prompt without revealing cards; the session preserves the continuation.
 
 ---
 
@@ -2430,7 +2484,7 @@ interface ActivateEventFromTrashParams {
 |-------|-------|
 | **Target** | An Event card in trash matching `filter`. Events without a `MAIN_EVENT` block (Counter-only, Trigger-only) are automatically excluded from valid targets. |
 | **Failure mode** | If no matching [Main]-bearing Event exists in trash, the action is ignored (no event emitted, no resolution). |
-| **Fired events** | The Main block's events (e.g. `CARD_DRAWN`, `CARD_KO`), then `EVENT_MAIN_RESOLVED_FROM_TRASH` once the nested Main finishes. |
+| **Fired events** | The Main block's events (e.g. `CARD_DRAWN`, `CARD_KO`), then `EVENT_MAIN_RESOLVED_FROM_TRASH` once the nested Main finishes. Nothing is published when the Main is never activated (declined optional, declined or unpayable activation cost). This is effect activation, not card activation: "activates an Event" watchers do not observe it (rule 8-5; EB03-031 FAQ). |
 | **Example cards** | EB03-031 Vinsmoke Reiju |
 
 ```json
@@ -2583,6 +2637,7 @@ All action types at a glance with their primary zone interactions and event emis
 | `DRAW` | DECK | HAND | `CARD_DRAWN` |
 | `SEARCH_DECK` | DECK | HAND | `CARD_SEARCHED` |
 | `TRASH_CARD` | ANY | TRASH | `CARD_TRASHED` |
+| `TRASH_FROM_HAND` | HAND | TRASH | `CARD_TRASHED` |
 | `KO` | FIELD | TRASH | `CARD_KO` |
 | `RETURN_TO_HAND` | FIELD | HAND | `CARD_RETURNED_TO_HAND` |
 | `RETURN_TO_DECK` | FIELD | DECK | `CARD_RETURNED_TO_DECK` |

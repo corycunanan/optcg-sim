@@ -1772,23 +1772,16 @@ export const OP17_049_CHARLOTTE_LINLIN: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         {
-          // GAP: OPPONENT_CHOICE has no branch-feasibility contract, so the
-          // exact-2 trash branch cannot be hidden when the opponent has fewer
-          // than 2 cards without changing engine vocabulary.
+          // FAQ (qa_op17 OP17-049): the opponent only picks the branch. "Draw 2"
+          // draws for the effect user, so it is an unwrapped DRAW. The trash
+          // branch stays selectable at any hand size (1 card: trash it; 0: no
+          // effect); exact-2 with <=2 candidates auto-trashes them all.
           type: "OPPONENT_CHOICE",
           params: {
             mandatory: true,
             labels: ["Draw 2 cards", "Trash 2 cards from hand"],
             options: [
-              [
-                {
-                  type: "OPPONENT_ACTION",
-                  params: {
-                    mandatory: true,
-                    action: { type: "DRAW", params: { amount: 2 } },
-                  },
-                },
-              ],
+              [{ type: "DRAW", params: { amount: 2 } }],
               [
                 {
                   type: "OPPONENT_ACTION",
@@ -2444,11 +2437,11 @@ export const OP17_075_X_DRAKE: EffectSchema = {
       costs: [{ type: "DON_MINUS", amount: 2 }],
       actions: [
         {
-          type: "OPPONENT_ACTION",
-          params: {
-            mandatory: true,
-            action: { type: "TRASH_FROM_HAND", params: { amount: 1 } },
-          },
+          // FAQ: the effect's controller chooses 1 face-down card from the
+          // opponent's hand; the opponent does not choose.
+          type: "TRASH_FROM_HAND",
+          target: { type: "CARD_IN_HAND", controller: "OPPONENT", count: { exact: 1 } },
+          params: { amount: 1, chooser: "SELF" },
         },
       ],
     },
@@ -3477,18 +3470,11 @@ export const OP17_099_CHARLOTTE_LINLIN: EffectSchema = {
               ],
               [
                 {
-                  type: "OPPONENT_ACTION",
-                  params: {
-                    mandatory: true,
-                    action: {
-                      type: "TRASH_CARD",
-                      target: {
-                        type: "CARD_IN_HAND",
-                        controller: "SELF",
-                        count: { exact: 1 },
-                      },
-                    },
-                  },
+                  // FAQ: the effect's controller randomly chooses 1 card from
+                  // the opponent's hand without looking; the opponent trashes it.
+                  type: "TRASH_FROM_HAND",
+                  target: { type: "CARD_IN_HAND", controller: "OPPONENT", count: { exact: 1 } },
+                  params: { amount: 1, chooser: "SELF" },
                 },
               ],
             ],
@@ -4181,12 +4167,23 @@ export const OP17_118_ROCKS_D_XEBEC: EffectSchema = {
       source_text:
         "If you only have Characters without a Counter, this card in your hand has a +2000 Counter.",
       zone: "HAND",
+      // OP17 FAQ: with 0 Characters this card does not have Counter +2000,
+      // so require at least one friendly Character and none with a Counter.
       conditions: {
-        not: {
-          type: "CARD_ON_FIELD",
-          controller: "SELF",
-          filter: { card_type: "CHARACTER", has_counter: true },
-        },
+        all_of: [
+          {
+            type: "CARD_ON_FIELD",
+            controller: "SELF",
+            filter: { card_type: "CHARACTER" },
+          },
+          {
+            not: {
+              type: "CARD_ON_FIELD",
+              controller: "SELF",
+              filter: { card_type: "CHARACTER", has_counter: true },
+            },
+          },
+        ],
       },
       rule: {
         rule_type: "COUNTER_GRANT",

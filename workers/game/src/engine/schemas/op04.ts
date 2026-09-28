@@ -1675,9 +1675,11 @@ export const OP04_047_ICE_ONI: EffectSchema = {
   ],
 };
 
-// ─── OP04-048 Sasaki — ON_PLAY hand wheel (return all + draw same) ──────────
+// ─── OP04-048 Sasaki — ON_PLAY return hand to deck, shuffle, draw equal ────
 // [On Play] Return all cards in your hand to your deck and shuffle your deck.
 // Then, draw cards equal to the number you returned to your deck.
+// Same printed text and encoding as P-002. The count is captured before the
+// shuffle; the draw uses the shuffled deck.
 
 export const OP04_048_SASAKI: EffectSchema = {
   card_id: "OP04-048",
@@ -1690,8 +1692,13 @@ export const OP04_048_SASAKI: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         {
-          type: "HAND_WHEEL",
+          type: "RETURN_HAND_TO_DECK",
+          params: { position: "BOTTOM" },
           result_ref: "returned_count",
+        },
+        {
+          type: "SHUFFLE_DECK",
+          chain: "THEN",
         },
         {
           type: "DRAW",
@@ -1831,19 +1838,12 @@ export const OP04_053_PAGE_ONE: EffectSchema = {
     {
       id: "event_activated_draw_cycle",
       category: "auto",
+      // Card activation only (rule 8-5-4). The EB03-031 FAQ names this card:
+      // Reiju resolving an Event [Main] from trash does not activate it.
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "SELF" },
-            don_requirement: 1,
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "SELF" },
-            don_requirement: 1,
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "SELF" },
+        don_requirement: 1,
       },
       flags: { once_per_turn: true },
       actions: [

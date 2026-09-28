@@ -2,7 +2,7 @@
  * Action handlers: DRAW, SEARCH_DECK, SEARCH_TRASH_THE_REST, FULL_DECK_SEARCH, DECK_SCRY, MILL
  */
 
-import type { ActionOf, EffectResult } from "../../effect-types.js";
+import type { ActionOf, ActionParamsMap, EffectResult } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
@@ -304,12 +304,12 @@ export function executeDeckScry(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "DECK_SCRY");
-  const lookAt = p.look_at ?? 5;
   const player = state.players[controller];
-  const count = Math.min(lookAt, player.deck.length);
+  const count = getDeckScryGroupSize(p, player.deck.length);
   if (count === 0) return { state, events, succeeded: false };
 
   const topCards = player.deck.slice(0, count);
+  const destination = getDeckScryDestination(p);
 
   const effectDescription = promptEffectDescription(
     state,
@@ -317,25 +317,45 @@ export function executeDeckScry(
     sourceCardInstanceId,
   ) || "Look at the top cards of your deck and rearrange them.";
 
+  // The resume handler (handleArrangeDeckScry) requires the response to be
+  // exactly this group, so the looked-at ids ride on the engine-only resume
+  // context. The client prompt keeps validTargets empty: nothing is picked.
   const resumeCtx: ResumeContext = {
     effectSourceInstanceId: sourceCardInstanceId,
     controller,
     pausedAction: action,
     remainingActions: [],
     resultRefs: [...resultRefs.entries()],
-    validTargets: [],
+    validTargets: topCards.map((card) => card.instanceId),
   };
   const pendingPrompt: PendingPromptState = {
     options: {
       promptType: "ARRANGE_TOP_CARDS",
       cards: topCards,
       effectDescription,
-      canSendToBottom: true,
+      canSendToBottom: destination !== "TOP",
+      restDestination: destination,
       validTargets: [], // no picks, just rearranging
+      maxKeep: 0,
     },
     respondingPlayer: controller,
     resumeContext: resumeCtx,
   };
 
   return { state, events, succeeded: false, pendingPrompt };
+}
+
+/** Number of cards a DECK_SCRY looks at, capped by the deck size. */
+export function getDeckScryGroupSize(
+  params: ActionParamsMap["DECK_SCRY"],
+  deckSize: number,
+): number {
+  return Math.max(0, Math.min(params.look_at ?? params.count ?? 5, deckSize));
+}
+
+export function getDeckScryDestination(
+  params: ActionParamsMap["DECK_SCRY"],
+): "TOP" | "BOTTOM" | "TOP_OR_BOTTOM" {
+  const normalized = params.destination?.toUpperCase();
+  return normalized === "TOP" || normalized === "BOTTOM" ? normalized : "TOP_OR_BOTTOM";
 }

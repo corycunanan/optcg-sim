@@ -421,11 +421,14 @@ it.each([true, false])(
     expect(
       f.state.players[0].trash.filter((c) => c.cardId === payment.cardId).length
     ).toBe(Number(accept));
+    // OPT-854: a declined optional Main was never activated (rule 8-1-2 /
+    // 8-3-1-4), so no completion claims it resolved. A paid Main whose
+    // post-colon "if" fails was activated (8-3-3) and still completes.
     expect(
       f.state.eventLog.filter(
         (e) => e.type === "EVENT_MAIN_RESOLVED_FROM_TRASH"
       )
-    ).toHaveLength(1);
+    ).toHaveLength(Number(accept));
     expect(f.state.effectStack).toHaveLength(0);
     expect(f.state.pendingPrompt).toBeNull();
   }

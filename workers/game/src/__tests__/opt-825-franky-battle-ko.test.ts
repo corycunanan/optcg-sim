@@ -267,11 +267,8 @@ describe("OP10-034 Franky — battle K.O. offers the replacement", () => {
     f.accept();
     expect(f.onField(franky)).toBe(true);
     const lifeAfterFirst = f.state.players[0].life.length;
-    // Pre-existing defect (see the ratchets below): the battle does not end
-    // after a battle-K.O. replacement prompt resolves. Close it by hand so the
-    // second attack can be declared; the once-per-turn gate is what is tested.
-    f.state.turn.battle = null;
-    f.state.turn.battleSubPhase = null;
+    // OPT-872: the first battle ends on its own once the replacement resolves.
+    expect(f.state.turn.battle).toBeNull();
 
     f.battle(1, franky, second);
 
@@ -280,13 +277,10 @@ describe("OP10-034 Franky — battle K.O. offers the replacement", () => {
     expect(f.state.players[0].life).toHaveLength(lifeAfterFirst);
   });
 
-  // ── Ratchets for pre-existing defects outside OPT-825 (follow-ups) ──────────
-  // A battle-result K.O. replacement prompt (battle.ts executeDamageStep →
-  // checkReplacementForKO) is resumed by resumeReplacement, but nothing
-  // re-enters the damage step: the battle stays in DAMAGE_STEP, and on
-  // decline the Character is never K.O.'d. These fail loudly once fixed.
+  // OPT-872: the damage step resumes after the battle-K.O. replacement prompt
+  // resolves (formerly it.fails ratchets).
 
-  it.fails("decline: Franky is K.O.'d and Life is unchanged (rules §8-1-3-4-1)", () => {
+  it("decline: Franky is K.O.'d and Life is unchanged (rules §8-1-3-4-1)", () => {
     const f = fixture();
     const franky = f.franky();
     const life = f.state.players[0].life.map((c) => c.instanceId);
@@ -299,9 +293,10 @@ describe("OP10-034 Franky — battle K.O. offers the replacement", () => {
     expect(f.state.players[0].life.map((c) => c.instanceId)).toEqual(life);
     expect(f.state.players[0].hand).toHaveLength(0);
     expect(f.inTrash(franky)).toBe(true);
+    expect(f.state.turn.battle).toBeNull();
   });
 
-  it.fails("accept: the battle ends after the replacement resolves (rules §7-1-4-1-2 → §7-1-5)", () => {
+  it("accept: the battle ends after the replacement resolves (rules §7-1-4-1-2 → §7-1-5)", () => {
     const f = fixture();
     const franky = f.franky();
 

@@ -78,7 +78,7 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "When 2 or more DON!! cards...returned" | above + `"quantity_threshold": 2` |
 | "When...returned to your DON!! deck by your effect" | above + `"filter": { "controller": "SELF", "cause": "BY_YOUR_EFFECT" }` |
 | "When...given a DON!! card" | `{ "event": "DON_GIVEN_TO_CARD" }` |
-| "When your opponent activates an Event" (classes 1+2, excludes [Trigger] from Life) | `{ "any_of": [{ "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } }, { "event": "EVENT_MAIN_RESOLVED_FROM_TRASH", "filter": { "controller": "OPPONENT" } }] }` |
+| "When your opponent activates an Event" (card activation only, rule 8-5-4; excludes Main-from-trash per EB03-031 FAQ and [Trigger] from Life) | `{ "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } }` |
 | "When you play a Character" | `{ "event": "CHARACTER_PLAYED", "filter": { "controller": "SELF" } }` |
 | "When your opponent plays a Character with base cost 8+" | `{ "event": "CHARACTER_PLAYED", "filter": { "controller": "OPPONENT", "target_filter": { "base_cost_min": 8 } } }` |
 | "When a card is removed from your or your opponent's Life cards" | `{ "event": "CARD_REMOVED_FROM_LIFE", "filter": { "controller": "EITHER" } }` |
@@ -201,7 +201,7 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "Trash cards from your hand until you have N cards in your hand" | `{ "type": "TRASH_FROM_HAND", "params": { "until_count": N } }` — trashes max(0, hand − N) counted at resolution; the hand owner chooses. "You and your opponent … until you each have N" adds `{ "type": "OPPONENT_ACTION", "params": { "action": { "type": "TRASH_FROM_HAND", "params": { "until_count": N } } }, "chain": "THEN" }` after your own clause (turn player first, OP05-058 FAQ) |
 | "Trash all cards from your hand" | `{ "type": "TRASH_FROM_HAND", "params": { "amount": { "type": "GAME_STATE", "source": "HAND_COUNT", "controller": "SELF" } } }` — schema lint requires a reviewed `WHOLE_HAND_TRASH_DISPOSITIONS` entry (`schema-hand-trash-amount-lint.ts`) naming the card, clause path and printed words; never use it for "until you have N" |
 | "Place N card(s) from your hand at the bottom of your deck" | `{ "type": "PLACE_HAND_TO_DECK", "params": { "amount": N, "position": "BOTTOM" } }` |
-| "Look at N cards from the top of your deck; place them at the top or bottom" | `{ "type": "DECK_SCRY", "params": { "count": N } }` |
+| "Look at N cards from the top of your deck; place them at the top or bottom" | `{ "type": "DECK_SCRY", "params": { "look_at": N } }` (top only: add `"destination": "TOP"`) |
 
 ### Power and Stats
 

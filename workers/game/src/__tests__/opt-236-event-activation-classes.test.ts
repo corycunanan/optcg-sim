@@ -11,9 +11,10 @@ import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js
  *   3. `EVENT_TRIGGER_RESOLVED`         — Event card's [Trigger] block resolves
  *                                        when revealed from Life.
  *
- * Usopp-style watchers ("when an opponent activates an Event") subscribe to
- * classes 1+2 via a compound `any_of` trigger but MUST NOT fire on class 3,
- * which is a different rules context (trigger reveal, not activation).
+ * OPT-854: "activates an Event" is card activation (rule 8-5-4). Class 2 is
+ * effect activation, not card activation (EB03-031 FAQ), so Usopp-style
+ * watchers subscribe to class 1 only. They MUST NOT fire on class 2 or class 3
+ * (trigger reveal, not activation). Counter Events publish class 1 from battle.
  */
 
 import { describe, it, expect } from "vitest";
@@ -89,23 +90,15 @@ function fieldInstance(cardId: string, owner: 0 | 1, suffix: string): CardInstan
   };
 }
 
-/** Usopp-style schema: draw 1 when opponent activates an Event from hand or trash. */
+/** Usopp-style schema: draw 1 when opponent activates an Event (card activation). */
 const USOPP_STYLE_SCHEMA: EffectSchema = {
   effects: [
     {
       id: "draw_on_opp_event_activation",
       category: "auto",
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "OPPONENT" },
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "OPPONENT" },
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "OPPONENT" },
       },
       actions: [{ type: "DRAW", params: { amount: 1 } }],
     },
@@ -319,7 +312,7 @@ describe("OPT-236 — event class emission", () => {
 
 // ─── 2. Trigger-matching isolation tests ────────────────────────────────────
 
-describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3", () => {
+describe("OPT-236 / OPT-854 — Usopp-style watcher fires on class 1 only", () => {
   function installUsoppWatcher(cardDb: Map<string, CardData>) {
     const watcherCard = makeCharCard("USOPP-STYLE", { effectSchema: USOPP_STYLE_SCHEMA });
     cardDb.set(watcherCard.id, watcherCard);
@@ -347,7 +340,7 @@ describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3",
     expect(matched.some((m) => m.trigger.sourceCardInstanceId === watcherInst.instanceId)).toBe(true);
   });
 
-  it("fires on class 2 (EVENT_MAIN_RESOLVED_FROM_TRASH) from opponent", () => {
+  it("does NOT fire on class 2 (EVENT_MAIN_RESOLVED_FROM_TRASH) from opponent", () => {
     const cardDb = createTestCardDb();
     const { state, watcherInst } = installUsoppWatcher(cardDb);
 
@@ -358,7 +351,7 @@ describe("OPT-236 — Usopp-style watcher fires on classes 1+2 but NOT class 3",
       payload: { cardId: "evt", cardInstanceId: "evt-trash" },
     };
     const matched = matchTriggersForEvent(state, event, cardDb);
-    expect(matched.some((m) => m.trigger.sourceCardInstanceId === watcherInst.instanceId)).toBe(true);
+    expect(matched.some((m) => m.trigger.sourceCardInstanceId === watcherInst.instanceId)).toBe(false);
   });
 
   it("does NOT fire on class 3 (EVENT_TRIGGER_RESOLVED) from opponent", () => {

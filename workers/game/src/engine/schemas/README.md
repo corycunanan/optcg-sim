@@ -174,10 +174,9 @@ For effects that react to game events (not bracket-tag abilities):
 | "When a Character is removed from the field" | `{ event: "CHARACTER_REMOVED_FROM_FIELD" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
-| "When an Event is activated (from hand)" | `{ event: "EVENT_ACTIVATED_FROM_HAND" }` |
-| "When a Character activates an Event's [Main] from trash" | `{ event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }` |
+| "When [you/your opponent] activate(s) an Event" (card activation, rule 8-5-4) | `{ event: "EVENT_ACTIVATED_FROM_HAND" }` |
+| A Character resolved an Event's [Main] from trash (EB03-031); not "activates an Event" per the EB03-031 FAQ, so no printed watcher uses it | `{ event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }` |
 | "When an Event's [Trigger] resolves from Life" | `{ event: "EVENT_TRIGGER_RESOLVED" }` |
-| "When an Event is activated (any path, excluding [Trigger] from Life)" | `{ any_of: [{ event: "EVENT_ACTIVATED_FROM_HAND" }, { event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }] }` |
 | "When you play a Character" | `{ event: "CHARACTER_PLAYED" }` |
 | "When a card is removed from Life" | `{ event: "CARD_REMOVED_FROM_LIFE" }` |
 | "When [Trigger] is activated" | `{ event: "TRIGGER_ACTIVATED" }` |
@@ -194,7 +193,6 @@ For effects that react to game events (not bracket-tag abilities):
 | "When you take damage" | `{ event: "DAMAGE_TAKEN" }` |
 | "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED" }` |
 | "When Leader attack deals damage" | `{ event: "LEADER_ATTACK_DEALS_DAMAGE" }` |
-| "When card removed from Life" (alt) | `{ event: "LIFE_CARD_REMOVED" }` |
 | "At end of your turn" (event) | `{ event: "END_OF_YOUR_TURN" }` |
 
 **Custom triggers support filters:**
@@ -428,7 +426,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `PLAY_CARD` | "Play from hand/trash/life" | Target, source zone |
 | `ADD_TO_LIFE` | "Add card from trash to Life" | `CARD_IN_TRASH` target, `{ face, position }` |
 | `MILL` | "Trash N from top of deck" | `{ amount: N }` |
-| `DECK_SCRY` | "Look at N, arrange" | `{ amount: N, position: "TOP" }` |
+| `DECK_SCRY` | "Look at N, place them at the top or bottom in any order" | `{ look_at: N, destination?: "TOP" \| "BOTTOM" \| "TOP_OR_BOTTOM" }` |
 
 ### Power & Stats
 

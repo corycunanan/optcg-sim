@@ -122,6 +122,39 @@ export interface PerformedAction {
   targetController?: 0 | 1;
 }
 
+
+/** OPT-441: Leader damage paused by a battle-damage Life [Trigger] prompt. */
+export interface LeaderDamageContinuation {
+  battleId: string;
+  lifeCardInstanceId: string;
+  damagedPlayerIndex: 0 | 1;
+  stage: "LIFE_REMOVAL" | "DAMAGE";
+}
+
+/**
+ * OPT-872: the Damage Step paused on an optional replacement for the losing
+ * Character's K.O. (rules §7-1-4-1-2, §8-1-3-4-1). Everything here is public:
+ * the target Character and the replacement source are both on the field.
+ */
+export interface BattleKOReplacementContinuation {
+  battleId: string;
+  stage: "CHARACTER_KO_REPLACEMENT";
+  /** The Character that lost the battle. */
+  targetInstanceId: string;
+  /**
+   * The optional replacement whose OPTIONAL_EFFECT prompt paused the Damage
+   * Step. Absent when a mandatory replacement's substitute paused it instead
+   * (resolution is then already REPLACED).
+   */
+  replacementEffectId?: string;
+  /** Controller of the attacking card (the player causing the battle K.O.). */
+  causingPlayerIndex: 0 | 1;
+  /** Whether CHARACTER_BATTLES belongs in the resumed Damage Step batch. */
+  attackerIsCharacter: boolean;
+  /** Set when the prompt is answered; absent while it is pending. */
+  resolution?: "REPLACED" | "NOT_REPLACED";
+}
+
 export interface TurnState {
   number: number;
   activePlayerIndex: 0 | 1;
@@ -155,12 +188,12 @@ export interface TurnState {
   // Keep the completed Life damage's battle identity until that stack (and any
   // CARD_REMOVED_FROM_LIFE auto effects queued behind it) fully unwinds, then
   // resume the remaining Double Attack damage through the normal pipeline.
-  pendingBattleDamageContinuation?: {
-    battleId: string;
-    lifeCardInstanceId: string;
-    damagedPlayerIndex: 0 | 1;
-    stage: "LIFE_REMOVAL" | "DAMAGE";
-  } | null;
+  // OPT-872: an optional replacement for the losing Character's battle K.O.
+  // pauses the Damage Step the same way; see BattleKOReplacementContinuation.
+  pendingBattleDamageContinuation?:
+    | LeaderDamageContinuation
+    | BattleKOReplacementContinuation
+    | null;
   // Per-turn sticky flag: set to true the first time a player's deck transitions
   // to 0 cards during the current turn. Consumed by the end-of-turn defeat check
   // for Leaders with LOSS_CONDITION_MOD/DELAYED_LOSS (e.g., OP15-022 Brook).

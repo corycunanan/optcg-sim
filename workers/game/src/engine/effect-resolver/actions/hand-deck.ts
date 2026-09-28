@@ -16,6 +16,7 @@ import {
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { shuffleWithEngineContext } from "../../execution-context.js";
+import { createBlindHandSlots } from "../blind-hand-slots.js";
 
 export function executePlaceHandToDeck(
   state: GameState,
@@ -339,23 +340,26 @@ export function executeRevealHand(
       validTargets,
     };
 
+    // The chooser sees only shuffled opaque slots (OPT-838).
+    const blind = createBlindHandSlots(state, p.hand, targetController);
     const pendingPrompt: PendingPromptState = {
       options: {
         promptType: "SELECT_TARGET",
-        validTargets,
+        validTargets: blind.validTargets,
         countMin: count,
         countMax: count,
         effectDescription: `Choose ${count} card(s) from opponent's hand to reveal`,
         instruction: `Choose ${count} of your opponent's cards in hand.`,
         ctaLabel: "Reveal",
-        cards: p.hand,
+        cards: blind.cards,
         blindSelection: true,
       },
       respondingPlayer: controller,
       resumeContext: resumeCtx,
+      blindSlots: blind.blindSlots,
     };
 
-    return { state, events, succeeded: false, pendingPrompt };
+    return { state: blind.state, events, succeeded: false, pendingPrompt };
   }
 
   const selectedIds = preselectedTargets ?? validTargets;

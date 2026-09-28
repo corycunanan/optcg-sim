@@ -1574,21 +1574,12 @@ export const OP06_044_GION: EffectSchema = {
     {
       id: "OP06-044_effect_1",
       category: "auto",
+      // Card activation only (rule 8-5-4; EB03-031 FAQ).
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "OPPONENT" },
-            turn_restriction: "YOUR_TURN",
-            once_per_turn: true,
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "OPPONENT" },
-            turn_restriction: "YOUR_TURN",
-            once_per_turn: true,
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "OPPONENT" },
+        turn_restriction: "YOUR_TURN",
+        once_per_turn: true,
       },
       actions: [
         {
@@ -1722,13 +1713,9 @@ export const OP06_048_ZEFF: EffectSchema = {
             filter: { controller: "OPPONENT" },
             turn_restriction: "YOUR_TURN",
           },
+          // Event card activation only (rule 8-5-4; EB03-031 FAQ).
           {
             event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "OPPONENT" },
-            turn_restriction: "YOUR_TURN",
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
             filter: { controller: "OPPONENT" },
             turn_restriction: "YOUR_TURN",
           },
