@@ -19,6 +19,7 @@ import type { EffectSchema } from "../engine/effect-types.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
 import {
   OP17_053_BARBELL,
   OP17_054_MISS_BUCKINGHAM_STUSSY,
@@ -143,9 +144,13 @@ function selectTargets(
   cardDb: Map<string, CardData>,
 ): PromptResult {
   expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  // OPT-838: blind hand prompts offer slot tokens; the session lifecycle
+  // translates them before resume, so direct resumes must do the same.
+  const translated = translateBlindHandSelection(result.pendingPrompt!, selectedInstanceIds);
+  if (!translated) throw new Error("Selection is not a slot of this prompt");
   return resumeFromStack(
     result.state,
-    { type: "SELECT_TARGET", selectedInstanceIds },
+    { type: "SELECT_TARGET", selectedInstanceIds: translated },
     cardDb,
   );
 }

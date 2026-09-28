@@ -17,6 +17,7 @@ import type {
 } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
 import {
   resolveEffect,
   resumeFromStack,
@@ -119,12 +120,15 @@ function selectFirst(result: PromptResult, cardDb: Map<string, CardData>) {
   if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
     throw new Error("Expected SELECT_TARGET prompt");
   }
+  // OPT-838: blind hand prompts offer slot tokens; the session lifecycle
+  // translates them before resume, so direct resumes must do the same.
+  const translated = translateBlindHandSelection(result.pendingPrompt, [
+    result.pendingPrompt.options.validTargets[0],
+  ]);
+  if (!translated) throw new Error("Selection is not a slot of this prompt");
   return resumeFromStack(
     result.state,
-    {
-      type: "SELECT_TARGET",
-      selectedInstanceIds: [result.pendingPrompt.options.validTargets[0]],
-    },
+    { type: "SELECT_TARGET", selectedInstanceIds: translated },
     cardDb
   );
 }
