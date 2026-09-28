@@ -5,6 +5,7 @@ export type {
   Zone, CardInstance, LifeCard, DonInstance,
   BattleContext, BattleSubPhase,
   Phase, PerformedAction, TurnState,
+  LeaderDamageContinuation, BattleKOReplacementContinuation,
   PlayerState,
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
   EngineLimitDiagnostic, EngineTerminalOutcome,
