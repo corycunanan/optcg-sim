@@ -284,12 +284,16 @@ function mergeSpectatorTurn(
           lifeCard: redactLifeCardIdentity(pendingTriggerFromEffect.lifeCard),
         }
       : pendingTriggerFromEffect,
-    pendingBattleDamageContinuation: pendingBattleDamageContinuation
-      ? {
-          ...pendingBattleDamageContinuation,
-          lifeCardInstanceId: HIDDEN_IDENTITY,
-        }
-      : pendingBattleDamageContinuation,
+    // A battle-K.O. replacement continuation (OPT-872) is public and has no
+    // Life card identity to hide.
+    pendingBattleDamageContinuation:
+      pendingBattleDamageContinuation &&
+      pendingBattleDamageContinuation.stage !== "CHARACTER_KO_REPLACEMENT"
+        ? {
+            ...pendingBattleDamageContinuation,
+            lifeCardInstanceId: HIDDEN_IDENTITY,
+          }
+        : pendingBattleDamageContinuation,
   };
 }
 

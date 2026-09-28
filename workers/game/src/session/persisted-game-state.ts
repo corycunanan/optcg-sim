@@ -122,12 +122,23 @@ const TurnState = z.strictObject({
     .nullable()
     .optional(),
   pendingBattleDamageContinuation: z
-    .strictObject({
-      battleId: z.string(),
-      lifeCardInstanceId: z.string(),
-      damagedPlayerIndex: PlayerIndex,
-      stage: z.enum(["LIFE_REMOVAL", "DAMAGE"]),
-    })
+    .union([
+      z.strictObject({
+        battleId: z.string(),
+        lifeCardInstanceId: z.string(),
+        damagedPlayerIndex: PlayerIndex,
+        stage: z.enum(["LIFE_REMOVAL", "DAMAGE"]),
+      }),
+      z.strictObject({
+        battleId: z.string(),
+        stage: z.literal("CHARACTER_KO_REPLACEMENT"),
+        targetInstanceId: z.string(),
+        replacementEffectId: z.string().optional(),
+        causingPlayerIndex: PlayerIndex,
+        attackerIsCharacter: z.boolean(),
+        resolution: z.enum(["REPLACED", "NOT_REPLACED"]).optional(),
+      }),
+    ])
     .nullable()
     .optional(),
   deckHitZeroThisTurn: z.tuple([z.boolean(), z.boolean()]),
