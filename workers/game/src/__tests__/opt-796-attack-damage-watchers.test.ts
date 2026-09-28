@@ -111,7 +111,7 @@ interface Step { kind: "OPTIONAL" | "REVEAL"; source?: string; triggerPending?: 
  * answering every attacker-side optional prompt with `answer` and declining
  * every defender Life [Trigger]. Records each step in order.
  */
-function attack(f: Fixture, attackerId: string, answer: "accept" | "skip" = "accept") {
+function attack(f: Pick<Fixture, "state" | "cardDb">, attackerId: string, answer: "accept" | "skip" = "accept") {
   const attacking = f.state.turn.activePlayerIndex;
   const defending = (1 - attacking) as 0 | 1;
   let result = runPipeline(
@@ -497,7 +497,7 @@ describe("OPT-796 legacy persisted sessions (pre-change schemas and registry)", 
       cardDb,
       get state() { return state; },
       set state(s: GameState) { state = s; },
-      put: (id: string, don: number, tag: string) => {
+      enter: (id: string, don: number, tag: string) => {
         const instanceId = `${id}-reentered${tag}`;
         const card: CardInstance = {
           instanceId, cardId: id, zone: "CHARACTER", state: "ACTIVE", turnPlayed: 0, controller: 0, owner: 0,
@@ -546,7 +546,7 @@ describe("OPT-796 legacy persisted sessions (pre-change schemas and registry)", 
 
   it("an Usopp entering the field after load binds to its own attack (migrated cardDb)", async () => {
     const { f } = await load("namiUsopp");
-    const fresh = f.put("OP03-041", 1, "-a");
+    const fresh = f.enter("OP03-041", 1, "-a");
     const result = attack(f, fresh.instanceId);
     expect(result.sources).toEqual([fresh.instanceId]);
   });
