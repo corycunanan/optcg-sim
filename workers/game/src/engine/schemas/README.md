@@ -194,7 +194,6 @@ For effects that react to game events (not bracket-tag abilities):
 | "When you take damage" | `{ event: "DAMAGE_TAKEN" }` |
 | "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED" }` |
 | "When Leader attack deals damage" | `{ event: "LEADER_ATTACK_DEALS_DAMAGE" }` |
-| "When card removed from Life" (alt) | `{ event: "LIFE_CARD_REMOVED" }` |
 | "At end of your turn" (event) | `{ event: "END_OF_YOUR_TURN" }` |
 
 **Custom triggers support filters:**
