@@ -106,6 +106,17 @@ export function resumePromptLifecycle(
     "type" in resumeContext &&
     resumeContext.type === "REPLACEMENT"
   ) {
+    // OPT-872: this prompt may have paused a battle's Damage Step on the
+    // losing Character's K.O. (rules §7-1-4-1-2). Only the unanswered
+    // continuation for this exact effect and target is resumed.
+    const battleContinuation = state.turn.pendingBattleDamageContinuation;
+    const pausedBattleKO =
+      battleContinuation?.stage === "CHARACTER_KO_REPLACEMENT" &&
+      battleContinuation.resolution === undefined &&
+      battleContinuation.replacementEffectId === resumeContext.effectId &&
+      battleContinuation.targetInstanceId === resumeContext.targetInstanceId
+        ? battleContinuation
+        : null;
     const replacement = resumeReplacement(
       state,
       resumeContext,
@@ -114,6 +125,18 @@ export function resumePromptLifecycle(
       resolverExecutionServices
     );
     state = replacement.state;
+    if (pausedBattleKO) {
+      state = {
+        ...state,
+        turn: {
+          ...state.turn,
+          pendingBattleDamageContinuation: {
+            ...pausedBattleKO,
+            resolution: replacement.replaced ? "REPLACED" : "NOT_REPLACED",
+          },
+        },
+      };
+    }
     const costFrame = state.effectStack.at(-1);
     if (costFrame?.costReplacementAction) {
       if (replacement.replaced) {
@@ -142,7 +165,26 @@ export function resumePromptLifecycle(
     }
 
     if (replacement.pendingPrompt) {
+      // A substitute awaiting input (e.g. EB03-001's hand trash) keeps the
+      // battle continuation; the loop below ends the battle once it unwinds.
       state = { ...state, pendingPrompt: replacement.pendingPrompt };
+    } else if (pausedBattleKO) {
+      // A substitute that resolved without a prompt: publish its events in
+      // the same batch as the rest of the Damage Step, as the synchronous path
+      // does.
+      const continuation = resumeBattleDamageContinuation(
+        state,
+        cardDb,
+        replacement.events
+      );
+      const pipeline = continuePipelineFromExecution(
+        continuation.state,
+        continuation,
+        cardDb,
+        respondingPlayer
+      );
+      state = pipeline.state;
+      gameOver = pipeline.gameOver;
     } else {
       const interrupted = resumeInterruptedEffectContinuations(
         state,
@@ -281,6 +323,8 @@ export function resumePromptLifecycle(
   }
 
   while (
+    !gameOver &&
+    state.status === "IN_PROGRESS" &&
     !state.pendingPrompt &&
     state.effectStack.length === 0 &&
     state.turn.pendingBattleDamageContinuation
@@ -295,6 +339,11 @@ export function resumePromptLifecycle(
     state = pipeline.state;
     gameOver = pipeline.gameOver;
     if (gameOver) break;
+  }
+
+  // OPT-872: a battle never resumes once the game is over.
+  if (state.status !== "IN_PROGRESS" && state.turn.pendingBattleDamageContinuation) {
+    state = { ...state, turn: { ...state.turn, pendingBattleDamageContinuation: null } };
   }
 
   if (state.status === "IN_PROGRESS") {

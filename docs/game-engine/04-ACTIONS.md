@@ -200,8 +200,13 @@ interface SearchDeckParams {
   pick: { up_to: number };
   filter: TargetFilter;
   rest_destination: "TOP" | "BOTTOM" | "SHUFFLE";
+  pick_destination?: "HAND" | "TRASH" | "LIFE" | "LIFE_TOP"; // default HAND
+  face?: "UP" | "DOWN";   // Life picks only; default DOWN
+  reveal?: boolean;       // default true — see below
 }
 ```
+
+**`reveal`** — picks are revealed to both players by default (rule 11-2-1: a card moved from one secret area to another is always revealed, and printed searches say "reveal"). Set `reveal: false` only when the card or its official FAQ says the pick is not revealed, e.g. OP16-119 ("you add it to your Life cards without revealing it") and OP12-079 ("No, you do not reveal it"). The engine then emits `CARDS_REVEALED` as `CONTROLLER_ONLY` so the owner still sees the pick while the opponent and spectators receive a redacted event. `opt-835-search-reveal-secrecy.test.ts` ratchets the authored `reveal: false` set.
 
 | Field | Value |
 |-------|-------|
@@ -639,6 +644,8 @@ interface SearchTrashTheRestParams {
   look_at: number;
   pick: { up_to: number };
   filter: TargetFilter;
+  pick_destination?: "HAND" | "TRASH" | "LIFE" | "LIFE_TOP"; // default HAND
+  reveal?: boolean; // default true — same contract as SEARCH_DECK.reveal
 }
 ```
 

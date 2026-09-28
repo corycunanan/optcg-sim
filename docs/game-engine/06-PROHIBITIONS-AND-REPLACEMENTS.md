@@ -671,6 +671,20 @@ When multiple replacement effects could intercept the same event, the comprehens
 
 **Engine implementation:** At step 3, the engine collects all matching replacement effects, groups them by controller, and prompts the controller to select one (or decline all optional ones). The selected replacement's `replacement_actions` execute, and the original action is discarded.
 
+#### Battle K.O. replacements pause the Damage Step (OPT-872)
+
+A battle K.O. (rules 7-1-4-1-2) checks replacements with `checkReplacementForKO(..., "battle", ...)` inside `executeDamageStep`. When that check returns a prompt, the Damage Step pauses:
+
+1. `battle.ts` records `turn.pendingBattleDamageContinuation` with `stage: "CHARACTER_KO_REPLACEMENT"`, the `battleId`, the target Character, the causing player, and whether the attacker is a Character. An optional offer also records `replacementEffectId`. A mandatory replacement whose substitute asks for input records `resolution: "REPLACED"` at once.
+2. When the `REPLACEMENT` prompt is answered, `session/prompt-lifecycle.ts` records `REPLACED` or `NOT_REPLACED` on the continuation, but only if that continuation is unanswered and its effect id and target match the prompt. If the substitute resolved without a prompt, the lifecycle then calls `resumeBattleDamageContinuation` with the substitute's events.
+3. `finishCharacterBattleResult` publishes one batch: `PHASE_CHANGED` (`COUNTER_STEP` → `DAMAGE_STEP`, rebuilt because the pipeline drops a prompting action's events), `CHARACTER_BATTLES` (only when the attacker is a Character), `COMBAT_VICTORY`, the substitute's events, the K.O. via `koBattleLoser` when the replacement was not applied (8-1-3-4-1), then `endBattle` (7-1-5). For a substitute that resolved without a prompt, this is the synchronous path's order (plus the rebuilt `PHASE_CHANGED`).
+4. If the substitute itself prompts (for example EB03-001's hand trash), the continuation stays in place. The substitute's frame publishes its own events when it resolves, including events from actions before its prompt. The continuation loop at the end of `resumePromptLifecycle` then finishes the battle. The order is therefore different from the synchronous path: for EB03-001 it is `CARD_TRASHED`, `PHASE_CHANGED`, `CHARACTER_BATTLES`, `COMBAT_VICTORY`, `END_OF_BATTLE`.
+5. Only an answered continuation finishes the battle. An unanswered one that reaches the continuation loop has lost its prompt, so it is discarded without a K.O. or battle end. A continuation is never resumed once the game is over: the loop stops on a terminal state, the lifecycle clears the field, and `CONCEDE` clears it.
+
+`koBattleLoser` is the single K.O. path for both the synchronous and resumed Damage Step. It checks `CANNOT_BE_KO` with cause `BATTLE`, calls `koCharacter`, and tags `CARD_KO` with `cause`/`movementCause: "BATTLE"` and `preKO_donCount`. A continuation whose `battleId` does not match the current battle is discarded. The continuation names only public field cards, so both players and spectators see it unredacted.
+
+Known limitation: the battle path offers only the first matching replacement. After a decline it K.O.s the Character without offering any other replacement that also matches (8-1-3-4-1/2). This is ratcheted in `opt-872-battle-ko-replacement-continuation.test.ts`.
+
 ---
 
 ### Replacement Effect Category Structure

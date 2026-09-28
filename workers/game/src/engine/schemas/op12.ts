@@ -2808,10 +2808,12 @@ export const OP12_079_LUFFY_IS_THE_MAN_KING: EffectSchema = {
       actions: [
         {
           type: "SEARCH_DECK",
+          // FAQ (qa_op12): the card added to hand is not revealed.
           params: {
             look_at: 3,
             pick: { up_to: 1 },
             rest_destination: "BOTTOM",
+            reveal: false,
           },
         },
       ],

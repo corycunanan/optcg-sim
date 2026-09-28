@@ -578,8 +578,11 @@ export function filterStateForPlayer(
       receivingPlayer !== state.turn.pendingTriggerFromEffect.damagedPlayerIndex
         ? null
         : state.turn.pendingTriggerFromEffect,
+    // The Life card is secret until revealed. A battle-K.O. replacement
+    // continuation (OPT-872) names only public field cards, so both see it.
     pendingBattleDamageContinuation:
       state.turn.pendingBattleDamageContinuation &&
+      state.turn.pendingBattleDamageContinuation.stage !== "CHARACTER_KO_REPLACEMENT" &&
       receivingPlayer !== state.turn.pendingBattleDamageContinuation.damagedPlayerIndex
         ? null
         : state.turn.pendingBattleDamageContinuation,
