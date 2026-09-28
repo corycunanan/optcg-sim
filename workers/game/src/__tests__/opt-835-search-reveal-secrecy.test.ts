@@ -69,7 +69,18 @@ function deckCard(cardId: string, instanceId: string): CardInstance {
   };
 }
 
-function setup(searcherId: string, deckIds: [string, string, string], deckTypes: string[] = []) {
+interface SetupOptions {
+  deckTypes?: string[];
+  searcherData?: Partial<CardData>;
+  /** Replace player 0's Leader with a card of this name (e.g. "Sanji"). */
+  leaderName?: string;
+}
+
+function setup(
+  searcherId: string,
+  deckIds: [string, string, string],
+  { deckTypes = [], searcherData = {}, leaderName }: SetupOptions = {},
+) {
   const db = createTestCardDb();
   const schema = getEffectSchema(searcherId);
   if (!schema) throw new Error(`${searcherId} schema not registered`);
@@ -78,8 +89,11 @@ function setup(searcherId: string, deckIds: [string, string, string], deckTypes:
     id: searcherId,
     name: schema.card_name ?? searcherId,
     cost: 1,
+    ...searcherData,
     effectSchema: schema,
   });
+  const LEADER_ID = "OPT835-LEADER";
+  if (leaderName) db.set(LEADER_ID, { ...CARDS.LEADER, id: LEADER_ID, name: leaderName });
   for (const id of [...deckIds, DECK_TAIL]) {
     db.set(id, { ...CARDS.VANILLA, id, name: id, types: deckTypes });
   }
@@ -94,6 +108,7 @@ function setup(searcherId: string, deckIds: [string, string, string], deckTypes:
     zone: "HAND",
   };
   state.players[0].hand = [searcher];
+  if (leaderName) state.players[0].leader = { ...state.players[0].leader, cardId: LEADER_ID };
   state.players[0].deck = [
     deckCard(deckIds[0], "opt835-deck-0"),
     deckCard(deckIds[1], "opt835-deck-1"),
@@ -206,10 +221,72 @@ describe("OPT-835: OP16-119 searched Life pick stays secret", () => {
   });
 });
 
+describe("OPT-835: OP12-079 searched hand pick stays secret", () => {
+  // Card (docs/cards/OP-12.md): "[Main] If your Leader is [Sanji], look at 3
+  // cards from the top of your deck and add up to 1 card to your hand. ..."
+  // FAQ (docs/FAQs/qa_op12.md, OP12-079): "Do I reveal the card I add to my
+  // hand using this [Main] effect to my opponent? — No, you do not reveal it."
+  const PICK = "OPT835-SECRET-HAND-PICK";
+
+  function resolveLuffyEvent() {
+    const { db, state, searcher } = setup("OP12-079", [PICK, REST_A, REST_B], {
+      searcherData: {
+        type: "Event",
+        cost: 1,
+        power: null,
+        counter: null,
+        color: ["Purple"],
+        effectText:
+          "[Main] If your Leader is [Sanji], look at 3 cards from the top of your deck and add up to 1 card to your hand. Then, place the rest at the bottom of your deck in any order.",
+      },
+      leaderName: "Sanji",
+    });
+    const afterPlay = play(state, db, searcher);
+    const resolved = pickFirst(afterPlay, db);
+    return { db, resolved };
+  }
+
+  it("adds the pick to hand, trashes the Event and bottoms the rest", () => {
+    const { resolved } = resolveLuffyEvent();
+    expect(resolved.pendingPrompt).toBeNull();
+    const p0 = resolved.players[0];
+    expect(p0.hand.map((c) => c.cardId)).toEqual([PICK]);
+    expect(p0.trash.map((c) => c.cardId)).toContain("OP12-079");
+    expect(p0.deck.map((c) => c.cardId)).toEqual([DECK_TAIL, REST_B, REST_A]);
+  });
+
+  it("never exposes the picked identity to the opponent, spectators, or persisted history", () => {
+    const { db, resolved } = resolveLuffyEvent();
+    const pickedInstanceIds = ["opt835-deck-0", resolved.players[0].hand[0].instanceId];
+    for (const [label, view] of Object.entries(nonOwnerProjections(resolved, db))) {
+      const serialized = JSON.stringify(view);
+      expect(serialized, label).not.toContain(PICK);
+      for (const id of pickedInstanceIds) expect(serialized, `${label}: ${id}`).not.toContain(id);
+      for (const event of revealEvents(view)) {
+        expect(event.payload.visibility, label).not.toBe("BOTH");
+      }
+    }
+  });
+
+  it("still tells the owner which card they added", () => {
+    const { db, resolved } = resolveLuffyEvent();
+    const ownerView = visibleStateForPlayer(resolved, db, 0);
+    const reveals = revealEvents(ownerView);
+    expect(reveals).toHaveLength(1);
+    expect(reveals[0].payload).toMatchObject({
+      visibility: "CONTROLLER_ONLY",
+      visibleTo: 0,
+      source: "search",
+      cards: [{ instanceId: "opt835-deck-0", cardId: PICK }],
+    });
+    expect(ownerView.players[0].hand.map((c) => c.cardId)).toEqual([PICK]);
+  });
+});
+
 describe("OPT-835: ordinary reveal-to-hand searches stay public", () => {
   it("OP01-016 Nami reveals the {Straw Hat Crew} pick to the opponent and spectators", () => {
     const PICK = "OPT835-STRAW-HAT";
-    const { db, state, searcher } = setup("OP01-016", [PICK, REST_A, REST_B], ["Straw Hat Crew"]);
+    const { db, state, searcher } = setup("OP01-016", [PICK, REST_A, REST_B], { deckTypes: ["Straw Hat Crew"] });
     const resolved = pickFirst(play(state, db, searcher), db);
     expect(resolved.players[0].hand.map((c) => c.cardId)).toEqual([PICK]);
     for (const [label, view] of Object.entries(nonOwnerProjections(resolved, db))) {
@@ -367,9 +444,18 @@ describe("OPT-835: authored search reveal inventory", () => {
 
   it("marks only FAQ-backed secret searches as unrevealed, and their text never says reveal", () => {
     const secret = uses.filter((use) => use.reveal === false);
-    // OP16-119: qa_op16 "you add it to your Life cards without revealing it".
-    // Adding a card here requires a card/FAQ citation overriding rule 11-2-1.
-    expect(secret.map((use) => use.cardId)).toEqual(["OP16-119"]);
+    // FAQ-derived: `grep -rniE "do not reveal|not revealed|without revealing"
+    // docs/FAQs/*.md` finds exactly these search rulings. Adding a card here
+    // requires a card/FAQ citation overriding rule 11-2-1.
+    const FAQ_UNREVEALED_SEARCHES: Record<string, string> = {
+      // docs/FAQs/qa_op12.md: "Do I reveal the card I add to my hand using
+      // this [Main] effect to my opponent? — No, you do not reveal it."
+      "OP12-079": "qa_op12",
+      // docs/FAQs/qa_op16.md: "No, you add it to your Life cards without
+      // revealing it to your opponent."
+      "OP16-119": "qa_op16",
+    };
+    expect(secret.map((use) => use.cardId).sort()).toEqual(Object.keys(FAQ_UNREVEALED_SEARCHES).sort());
     for (const use of secret) {
       expect(printedText(use.cardId), use.cardId).not.toMatch(/reveal/i);
     }
