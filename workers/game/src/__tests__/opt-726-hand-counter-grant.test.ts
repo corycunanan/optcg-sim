@@ -145,11 +145,20 @@ function xebecHandCounter(
 describe("OPT-726: OP17-118 hand-zone self Counter", () => {
   describe.each([0, 1] as const)("held by defending player %i", (defender) => {
     it("grants +2000 at counter time when every friendly Character lacks a printed Counter", () => {
+      const attacker: PlayerIndex = defender === 0 ? 1 : 0;
+      // The opponent's printed-Counter Character must not block the grant:
+      // the no-Counter predicate is scoped to the holder's own field.
       const { state, cardDb } = counterStepState(
         [friendlyCharacter(CARDS.RUSH.id, "counterless-character", defender)],
-        { defender }
+        {
+          defender,
+          opponentCharacters: [
+            friendlyCharacter(CARDS.VANILLA.id, "opponent-printed", attacker),
+          ],
+        }
       );
 
+      expect(xebecHandCounter(state, cardDb, defender)).toBe(2000);
       const result = useXebecCounter(state, cardDb, defender);
 
       expect(result.valid).toBe(true);
