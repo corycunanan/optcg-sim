@@ -90,6 +90,8 @@ describe("extractCardFacets", () => {
       "condition:leader_property",
       "flag:optional",
     ]);
+    // OPT-799: a clause-level "Then, you may…" is optional without flags.optional.
+    expectTags("EB04-001", ["flag:optional"]);
     const untapTags = extractCardFacets(schemaFor("OP12-030")).tags;
     expect(untapTags).toContain("don:untap:self");
     expect(untapTags.some((tag) => tag.startsWith("don:ramp"))).toBe(false);

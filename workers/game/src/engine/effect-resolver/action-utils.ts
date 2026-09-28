@@ -313,6 +313,37 @@ export function extractEffectDescription(
   return effectText;
 }
 
+/**
+ * OPT-799: the clause an action-level `optional` prompt names, taken from the
+ * block's extracted description (extractEffectDescription). Sentences are
+ * read after their last colon so a pre-colon cost ("You may K.O. …:") is never
+ * mistaken for the clause. The unique "you may" sentence wins; otherwise the
+ * unique "up to" sentence ("…and up to 1 of your Leader gain…"); otherwise the
+ * whole block description, so an ambiguous block never names the wrong clause.
+ */
+export function optionalClauseDescription(
+  blockDescription: string | undefined,
+): string {
+  const fallback = blockDescription?.trim() || "You may resolve this effect.";
+  if (!blockDescription) return fallback;
+  // "K.O." is not a sentence end; shield its periods while splitting.
+  const shielded = blockDescription.replace(/K\.O\./g, "K․O․");
+  const sentences = shielded
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/․/g, ".").trim())
+    .filter(Boolean);
+  const effectPart = (sentence: string): string =>
+    sentence.slice(sentence.lastIndexOf(":") + 1);
+  for (const pattern of [/\byou may\b/i, /\bup to\b/i]) {
+    const matches = sentences.filter((sentence) =>
+      pattern.test(effectPart(sentence)),
+    );
+    if (matches.length === 1) return effectPart(matches[0]).trim();
+    if (matches.length > 1) return fallback;
+  }
+  return fallback;
+}
+
 /** Select the printed text field that owns an effect block. */
 export function sourceTextForBlock(
   cardData: CardData | undefined,

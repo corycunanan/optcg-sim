@@ -93,7 +93,8 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "When your opponent's Character is returned to the owner's hand by your effect" | `{ "event": "CHARACTER_RETURNED_TO_HAND", "filter": { "controller": "OPPONENT", "cause": "BY_YOUR_EFFECT" } }` |
 | "When you take damage" | `{ "event": "DAMAGE_TAKEN" }` |
 | "When your opponent activates [Blocker]" | `{ "event": "BLOCKER_ACTIVATED", "filter": { "controller": "OPPONENT" } }` |
-| "When this Leader's attack deals damage to your opponent's Life" | `{ "event": "LEADER_ATTACK_DEALS_DAMAGE" }` |
+| "When this Leader's/Character's attack deals damage to your opponent's Life" | `{ "event": "ATTACK_DEALS_DAMAGE", "filter": { "attacker": "SELF" } }` |
+| "When you deal damage to your opponent's Life" | `{ "event": "ATTACK_DEALS_DAMAGE" }` |
 
 ### Compound Triggers
 
@@ -429,6 +430,7 @@ Encode as separate `permanent` EffectBlocks, each with its own condition. All qu
 |---|---|
 | `[Once Per Turn]` | `flags.once_per_turn: true` |
 | "You may..." (optional activation) | `flags.optional: true` |
+| "Then, you may..." (one optional clause after a mandatory one) | `optional: true` on that action ([04-ACTIONS](./04-ACTIONS.md#action-level-optional)) |
 | `[Blocker]` / `[Rush]` / etc. (printed keywords) | `flags.keywords: ["BLOCKER"]` etc. |
 
 ---
@@ -443,7 +445,7 @@ Encode as separate `permanent` EffectBlocks, each with its own condition. All qu
 - [ ] Duration matches card text exactly
 - [ ] Chain connectors: `THEN` for "Then,", `IF_DO` for "If you do,"
 - [ ] `[Once Per Turn]` mapped to `flags.once_per_turn: true`
-- [ ] "You may" mapped to `flags.optional: true`
+- [ ] "You may" mapped to `flags.optional: true` for the whole effect or its cost, or to action-level `optional: true` for a single later clause
 - [ ] Intrinsic keywords in `flags.keywords`, not as actions
 - [ ] Costs are before the colon, actions are after
 - [ ] Back-references (`result_ref` / `target_ref`) used when a later action refers to "that card"

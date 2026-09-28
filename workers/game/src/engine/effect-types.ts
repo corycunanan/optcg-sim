@@ -191,7 +191,7 @@ export type CustomEventType =
   | "CHARACTER_RETURNED_TO_HAND"
   | "DAMAGE_TAKEN"
   | "BLOCKER_ACTIVATED"
-  | "LEADER_ATTACK_DEALS_DAMAGE"
+  | "ATTACK_DEALS_DAMAGE"
   | "END_OF_YOUR_TURN";
 
 export type KOCause = "ANY" | "BATTLE" | "EFFECT" | "OPPONENT_EFFECT";
@@ -199,6 +199,13 @@ export type KOCause = "ANY" | "BATTLE" | "EFFECT" | "OPPONENT_EFFECT";
 export interface EventFilter {
   /** Scope the event subject to the Character hosting this trigger. */
   target?: "SELF";
+  /**
+   * OPT-796: ATTACK_DEALS_DAMAGE only — bind to attacks by the card hosting
+   * this trigger ("When this Leader's/Character's attack deals damage").
+   * Omitted, any attack by the host's controller matches ("When you deal
+   * damage", OP03-043).
+   */
+  attacker?: "SELF";
   controller?: Controller;
   cause?: EventCause;
   /** Causal effect source, distinct from the discarded card. */
@@ -606,6 +613,18 @@ export interface ActionBase {
   result_ref?: string;
   conditions?: Condition;
   requires?: ActionFeasibilityRequirement;
+  /**
+   * OPT-799: clause-level "you may" ("Then, you may trash 2 cards…"). After
+   * the chain connector and inline `conditions` pass, the resolver asks the
+   * chain's controller an OPTIONAL_EFFECT prompt scoped to this clause.
+   * Declining skips only this action: later THEN clauses still resolve and an
+   * IF_DO dependent is skipped (Rules 4-10-1 / 4-10-2). Top-level block
+   * actions only; never combined with a selection that already allows zero
+   * (`target.count` up_to / any_number, `params.optional`, `params.up_to`).
+   * Block-level "you may" (before a cost, or covering the whole effect) stays
+   * `flags.optional`.
+   */
+  optional?: true;
 }
 
 export interface ActionFeasibilityRequirement {

@@ -144,7 +144,7 @@ type CustomEventType =
   | "CHARACTER_RETURNED_TO_HAND"
   | "DAMAGE_TAKEN"
   | "BLOCKER_ACTIVATED"
-  | "LEADER_ATTACK_DEALS_DAMAGE";
+  | "ATTACK_DEALS_DAMAGE";
 ```
 
 ```typescript
@@ -775,24 +775,45 @@ Example:
 
 ---
 
-### LEADER_ATTACK_DEALS_DAMAGE
+### ATTACK_DEALS_DAMAGE
 
-Fires when this Leader's attack successfully deals damage to the opponent's Life.
+Fires when an attack by this card's controller deals damage to the opponent's Life (OPT-796). It matches battle `DAMAGE_DEALT` events, and it:
+
+- matches only the controller's own attacks — never the opponent's;
+- matches once per attack: only the damage the Damage Step deals first (`firstDamageOfAttack`), so a [Double Attack] attack dealing 2 damage fires it once (qa_op03.md OP03-043);
+- never matches a lethal `DAMAGE_DEALT` (damage determined at 0 Life, §7-1-4-1-1-1: no Life card is checked). This is per event; what a [Double Attack] against 1 Life should do is OPT-886;
+- still matches [Banish] damage and damage whose Life card is redirected by a replacement.
+
+The watcher activates after the Life check and before the resulting [Trigger] choice (qa_op03.md:88-140): the revealed Life card waits in `battle.pendingTriggerLifeCard` while the watcher resolves.
+
+Effect damage: the engine currently emits no `DAMAGE_DEALT` for `DEAL_DAMAGE` effects, so these watchers do not fire on it. Whether that is correct for OP03-043 Gaimon's "When you deal damage" is an open rules question (OPT-892). The Gaimon FAQ only rules out Life moved to hand or trashed by another card's effect.
+
+Sessions saved before OPT-796 still carry `LEADER_ATTACK_DEALS_DAMAGE` in their stored card schemas and trigger registry. `session/legacy-trigger-migration.ts` rewrites them at load to this encoding.
 
 ```typescript
-{ event: "LEADER_ATTACK_DEALS_DAMAGE" }
+{
+  event: "ATTACK_DEALS_DAMAGE",
+  filter?: { attacker?: "SELF" },
+  don_requirement?: number
+}
 ```
 
-| Text Pattern | Example Cards |
-|-------------|---------------|
-| "When this Leader's attack deals damage to your opponent's Life" | OP03-040 Nami |
+`filter.attacker: "SELF"` binds the watcher to attacks by the card hosting it. Omit it only for "When you deal damage".
+
+| Text Pattern | Encoding | Example Cards |
+|-------------|----------|---------------|
+| "When this Leader's attack deals damage to your opponent's Life" | `filter: { attacker: "SELF" }` | OP03-040 Nami, P-117 Nami |
+| "When this Character's attack deals damage to your opponent's Life" | `filter: { attacker: "SELF" }` | OP03-041 Usopp, OP03-047 Zeff, OP03-051 Bell-mère |
+| "When you deal damage to your opponent's Life" | no filter | OP03-043 Gaimon |
 
 Example:
 
 ```json
 {
   "trigger": {
-    "event": "LEADER_ATTACK_DEALS_DAMAGE"
+    "event": "ATTACK_DEALS_DAMAGE",
+    "filter": { "attacker": "SELF" },
+    "don_requirement": 1
   }
 }
 ```
@@ -823,7 +844,7 @@ Example:
 | `CHARACTER_RETURNED_TO_HAND` | "When...Character is returned to the owner's hand" | EB02-023 |
 | `DAMAGE_TAKEN` | "When you take damage" | OP13-002 |
 | `BLOCKER_ACTIVATED` | "When your opponent activates [Blocker]" | OP09-118 |
-| `LEADER_ATTACK_DEALS_DAMAGE` | "When this Leader's attack deals damage" | OP03-040 |
+| `ATTACK_DEALS_DAMAGE` | "When this Leader's/Character's attack deals damage" (`filter.attacker: "SELF"`); "When you deal damage" | OP03-040, OP03-041, OP03-043, OP03-047, OP03-051, P-117 |
 
 ---
 
