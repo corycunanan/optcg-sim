@@ -389,6 +389,32 @@ describe("OP10-034 Franky — the Damage Step resumes after the replacement prom
   });
 });
 
+describe("an answered continuation is never re-answered", () => {
+  // Defensive: no authored flow raises a second prompt for the same
+  // replacement and target while the first answer is still being carried out.
+  // The state is constructed to pin that a recorded resolution is kept.
+  it("a matching REPLACEMENT prompt does not overwrite a recorded REPLACED resolution", () => {
+    const f = fixture();
+    const target = franky(f);
+    f.battle(target, f.attacker());
+    pendingBattleId(f);
+    const lifeBefore = f.state.players[0].life.length;
+    f.state = {
+      ...f.state,
+      turn: {
+        ...f.state.turn,
+        pendingBattleDamageContinuation: { ...f.continuation()!, resolution: "REPLACED" },
+      },
+    };
+    f.decline();
+
+    expect(f.onField(target)).toBe(true);
+    expect(f.events("CARD_KO")).toHaveLength(0);
+    expect(f.state.players[0].life).toHaveLength(lifeBefore);
+    expectBattleClosedOnce(f);
+  });
+});
+
 // ─── Other optional battle-reachable replacements ────────────────────────────
 
 describe("EB03-001 Vivi (Leader proxy) — the Damage Step resumes", () => {
@@ -613,6 +639,13 @@ describe("persisted prompt — SessionRepository.load resumes the battle exactly
 
       expect(f.send(0, response).kind).toBe("reject");
       expect(f.state).toEqual(afterFirst);
+      // The lifecycle itself also refuses a response with no pending prompt.
+      const direct = resumePromptLifecycle(f.state, response, f.db, {
+        drainPregame: (s) => s,
+        advanceStartOfTurn: (s) => s,
+      });
+      expect(direct.responseRejected).toBe(true);
+      expect(direct.state).toEqual(afterFirst);
       expectBattleClosedOnce(f);
     });
   }
