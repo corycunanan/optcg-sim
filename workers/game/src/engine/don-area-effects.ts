@@ -9,14 +9,16 @@
  * surviving OP15-026 Jango giving that DON!! to a Character (OPT-792).
  *
  * `releaseMovedDonEffects` compares a before/after pair and strips every
- * DON!! whose area changed from runtime effect targets. It runs at the
+ * DON!! whose area changed from runtime effect targets. Areas: each player's
+ * cost area, DON!! deck, and — for given DON!! — the host's Leader,
+ * Character or Stage area on that player's field. It runs at the
  * engine's step boundaries — each effect action, each cost payment, and each
  * pipeline execute step — so a DON!! that leaves and later re-enters the cost
  * area within one pipeline action (DON!! −X then "add DON!! from the deck")
  * is still released at the step where it left.
  */
 
-import type { GameState } from "../types.js";
+import type { CardInstance, GameState } from "../types.js";
 
 type DonArea = string;
 
@@ -25,11 +27,19 @@ function donAreas(state: GameState): Map<string, DonArea> {
   state.players.forEach((player, pi) => {
     for (const don of player.donCostArea) areas.set(don.instanceId, `cost:${pi}`);
     for (const don of player.donDeck) areas.set(don.instanceId, `deck:${pi}`);
-    const cards = [player.leader, ...player.characters, player.stage];
-    for (const card of cards) {
+    // Attached DON!! are keyed by the rules area of their host — each player
+    // has one Leader area and one Character area (rules 3-1-1 / 3-1-3) — not
+    // by the host card, so a DON!! moved between two of a player's Characters
+    // stays in the same area and keeps its effects.
+    const hosts: Array<[CardInstance | null, string]> = [
+      [player.leader, "LEADER"],
+      ...player.characters.map((c): [CardInstance | null, string] => [c, "CHARACTER"]),
+      [player.stage, "STAGE"],
+    ];
+    for (const [card, area] of hosts) {
       if (!card) continue;
       for (const don of card.attachedDon) {
-        areas.set(don.instanceId, `attached:${card.instanceId}`);
+        areas.set(don.instanceId, `attached:${pi}:${area}`);
       }
     }
   });

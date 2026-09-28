@@ -39,6 +39,8 @@ import { executeEffectAction } from "../engine/effect-resolver/resolver.js";
 import { payCosts } from "../engine/effect-resolver/cost/payment.js";
 import { applyCostSelection } from "../engine/effect-resolver/cost/resume.js";
 import { handleRedistributeDon } from "../engine/effect-resolver/resume/target.js";
+import { movedDonIds } from "../engine/don-area-effects.js";
+import { resolveEffect } from "../engine/effect-resolver/index.js";
 import {
   SessionRepository,
   type SessionStorage,
@@ -896,6 +898,188 @@ describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
     expect(f.state.players[1].donCostArea.find((d) => d.instanceId === held)?.state).toBe(
       "RESTED"
     );
+  });
+});
+
+// ─── Review round 2: area keys, refresh ordering, resume catch-all ──────────
+
+function seedDonHold(state: GameState, donId: string): GameState {
+  return {
+    ...state,
+    prohibitions: [
+      ...state.prohibitions,
+      {
+        id: `seeded-hold-${donId}`,
+        sourceCardInstanceId: "seed",
+        sourceEffectBlockId: "",
+        prohibitionType: "CANNOT_REFRESH",
+        scope: {},
+        duration: { type: "SKIP_NEXT_REFRESH" },
+        controller: 0,
+        appliesTo: [donId],
+        usesRemaining: null,
+      } as GameState["prohibitions"][number],
+    ],
+  };
+}
+const holds = (state: GameState, donId: string) =>
+  state.prohibitions.some((p) => p.appliesTo.includes(donId));
+
+describe("OPT-792 DON!! areas follow the rules areas (review C)", () => {
+  function moved(mutate: (next: GameState) => void) {
+    const f = fixture();
+    const a = f.put("COST-3", 0);
+    f.put("COST-3", 0);
+    a.attachedDon = [{ instanceId: "moving", state: "ACTIVE", attachedTo: a.instanceId }];
+    const next = structuredClone(f.state);
+    mutate(next);
+    return movedDonIds(f.state, next).has("moving");
+  }
+  const chars = (s: GameState, pi: 0 | 1) => s.players[pi].characters.filter(isChar);
+  const isChar = (c: CardInstance | null): c is CardInstance => c !== null;
+
+  it("Character → Character on one field is the same area (not a move)", () => {
+    expect(
+      moved((next) => {
+        const [a, b] = chars(next, 0);
+        b.attachedDon = a.attachedDon.map((d) => ({ ...d, attachedTo: b.instanceId }));
+        a.attachedDon = [];
+      })
+    ).toBe(false);
+  });
+
+  it("Character → Leader, attached → cost area, and cross-player are moves", () => {
+    expect(
+      moved((next) => {
+        const [a] = chars(next, 0);
+        next.players[0].leader.attachedDon = a.attachedDon;
+        a.attachedDon = [];
+      })
+    ).toBe(true);
+    expect(
+      moved((next) => {
+        const [a] = chars(next, 0);
+        next.players[0].donCostArea.push({ ...a.attachedDon[0], attachedTo: null });
+        a.attachedDon = [];
+      })
+    ).toBe(true);
+    expect(
+      moved((next) => {
+        const [a] = chars(next, 0);
+        next.players[1].leader.attachedDon = a.attachedDon;
+        a.attachedDon = [];
+      })
+    ).toBe(true);
+  });
+
+  it("a Character on the other player's field is a different Character area", () => {
+    expect(
+      moved((next) => {
+        const [a] = chars(next, 0);
+        const theirs: CardInstance = {
+          ...a,
+          instanceId: "their-char",
+          controller: 1,
+          owner: 1,
+          attachedDon: a.attachedDon.map((d) => ({ ...d, attachedTo: "their-char" })),
+        };
+        next.players[1].characters[0] = theirs;
+        a.attachedDon = [];
+      })
+    ).toBe(true);
+  });
+
+  it("REDISTRIBUTE_DON between two of a player's Characters keeps the DON!!'s effects", () => {
+    const f = fixture();
+    const a = f.put("COST-3", 0);
+    const b = f.put("COST-3", 0);
+    a.attachedDon = [{ instanceId: "moving-don", state: "ACTIVE", attachedTo: a.instanceId }];
+    f.state = seedDonHold(f.state, "moving-don");
+    const result = handleRedistributeDon(
+      f.state,
+      {
+        type: "REDISTRIBUTE_DON",
+        transfers: [
+          { fromCardInstanceId: a.instanceId, donInstanceId: "moving-don", toCardInstanceId: b.instanceId },
+        ],
+      },
+      {
+        effectSourceInstanceId: "source",
+        controller: 0,
+        pausedAction: { type: "REDISTRIBUTE_DON", params: { amount: 1 } },
+        remainingActions: [],
+        resultRefs: [],
+        validTargets: [b.instanceId],
+      },
+      new Map(),
+      []
+    );
+    const next = result?.kind === "fallthrough" ? result.state : f.state;
+    expect(char({ ...f, state: next } as Fixture, b)?.attachedDon.map((d) => d.instanceId)).toEqual([
+      "moving-don",
+    ]);
+    expect(holds(next, "moving-don")).toBe(true);
+  });
+});
+
+describe("OPT-792 Refresh returns attached DON!! before step 4 (review B)", () => {
+  it("a hold on a DON!! attached when Refresh begins ends before refresh activation", () => {
+    const f = fixture();
+    f.donOf(1, "RESTED", 1);
+    const held = oppDonIds(f)[0];
+    f.play("OP07-026");
+    f.select([held]);
+    expect(holds(f.state, held)).toBe(true);
+    // Seeded: the held DON!! is given to the opponent's Leader before their
+    // Refresh Phase without passing any step-level release.
+    const don = f.state.players[1].donCostArea.find((d) => d.instanceId === held)!;
+    f.state.players[1].donCostArea = f.state.players[1].donCostArea.filter(
+      (d) => d.instanceId !== held
+    );
+    f.state.players[1].leader.attachedDon = [
+      { ...don, attachedTo: f.state.players[1].leader.instanceId },
+    ];
+    f.state = advanceThroughRefreshOf(f, 1);
+    expect(f.state.players[1].donCostArea.find((d) => d.instanceId === held)?.state).toBe(
+      "ACTIVE"
+    );
+  });
+});
+
+describe("OPT-792 prompt-resume catch-all (review D)", () => {
+  it("rule-trash for play (rule 3-7-6-1) releases the victim's attached DON!! through the real resume path", () => {
+    const f = fixture();
+    const board = Array.from({ length: 5 }, () => f.put("COST-3", 0));
+    const victim = board[0];
+    victim.attachedDon = [{ instanceId: "victim-don", state: "ACTIVE", attachedTo: victim.instanceId }];
+    f.state.players[0].trash = [
+      { ...board[1], instanceId: "trash-candidate", cardId: CARDS.RUSH.id, zone: "TRASH", attachedDon: [] },
+    ];
+    f.state = seedDonHold(f.state, "victim-don");
+    const paused = resolveEffect(
+      f.state,
+      {
+        id: "opt792-rule-trash",
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        actions: [
+          {
+            type: "PLAY_CARD",
+            target: { type: "CHARACTER_CARD", source_zone: "TRASH", count: { exact: 1 } },
+            params: { source_zone: "TRASH", cost_override: "FREE" },
+          },
+        ],
+      },
+      board[1].instanceId,
+      0,
+      f.db
+    );
+    expect(paused.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    f.state = { ...paused.state, pendingPrompt: paused.pendingPrompt! };
+
+    f.select([victim.instanceId]);
+    expect(f.state.players[0].donCostArea.map((d) => d.instanceId)).toContain("victim-don");
+    expect(holds(f.state, "victim-don")).toBe(false);
   });
 });
 
