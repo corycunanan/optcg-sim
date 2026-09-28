@@ -58,7 +58,7 @@ function fixture(handSize: number, deckSize?: number) {
   const watchers = WATCHERS.map((id, i) => {
     const watcherSchema = getEffectSchema(id);
     expect(watcherSchema).toBeTruthy();
-    db.set(id, { ...CARDS.VANILLA, id, name: watcherSchema!.card_name, effectSchema: watcherSchema! });
+    db.set(id, { ...CARDS.VANILLA, id, name: watcherSchema!.card_name ?? id, effectSchema: watcherSchema! });
     const w = card(`watcher-${id}`, id, 0, "CHARACTER");
     state.players[0].characters[i] = w;
     state = registerCardEnteredField(state, w, db.get(id)!);
