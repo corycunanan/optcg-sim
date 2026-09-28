@@ -252,14 +252,16 @@ describe("OPT-729 opponent-relative wrapper completion", () => {
     expect(result.state.players[1].deck).toHaveLength(opponentDeck + 2);
   });
 
-  it("OP17-075 returns the owner's DON and trashes only the opponent's hand", () => {
+  // OPT-838 / qa_op17 OP17-075: the effect's controller chooses face-down.
+  it("OP17-075 returns the owner's DON and blindly trashes only the opponent's hand", () => {
     const { state, cardDb, source } = installCharacter(OP17_075_X_DRAKE);
     const ownerHand = state.players[0].hand.length;
     const ownerDon = state.players[0].donCostArea.length;
     const opponentHand = state.players[1].hand.length;
     const opponentTrash = state.players[1].trash.length;
     let result = resolveBlock(state, cardDb, source, OP17_075_X_DRAKE, "on_play_opponent_trash");
-    expect(result.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(result.pendingPrompt?.options).toMatchObject({ blindSelection: true });
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") throw new Error("hand prompt");
     result = selectTargets(result, [result.pendingPrompt.options.validTargets[0]], cardDb);
     expect(result.pendingPrompt).toBeUndefined();
