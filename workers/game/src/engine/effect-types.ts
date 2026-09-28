@@ -966,6 +966,11 @@ export interface ActionParamsMap {
     chooser?: "SELF" | "OPPONENT";
     amount?: number | DynamicValue;
     optional?: boolean;
+    /**
+     * "Trash cards from your hand until you have N": trash exactly
+     * max(0, hand − N) from the hand owner's hand, counted at resolution.
+     * Replaces `amount`; the hand owner chooses (OP14-054, OP05-058).
+     */
     until_count?: number;
     filter?: TargetFilter;
     _comment?: string;

@@ -426,6 +426,66 @@ export function executeTrashCard(
   };
 }
 
+/**
+ * The hand a TRASH_FROM_HAND resolves against and how many cards it must take.
+ *
+ * `until_count` ("trash cards from your hand until you have N", OP14-054 /
+ * OP05-058) is read from the hand owner's live hand at resolution time:
+ * amount = max(0, hand − N). OP14 FAQ: with N or fewer cards nothing is
+ * trashed. Otherwise `amount` (default 1) is resolved as before.
+ *
+ * `min`/`max` bound a legal selection: a mandatory trash takes exactly
+ * min(amount, candidates); an optional one takes 0..that.
+ */
+export function trashFromHandSelection(
+  state: GameState,
+  action: ActionOf<"TRASH_FROM_HAND">,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+) {
+  const params = action.params ?? {};
+  const targetController: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
+  const chooser: 0 | 1 =
+    params.chooser === "SELF"
+      ? controller
+      : params.chooser === "OPPONENT"
+        ? controller === 0 ? 1 : 0
+        : targetController;
+  const p = state.players[targetController];
+  const untilCount = params.until_count;
+  const amount =
+    untilCount !== undefined
+      ? Math.max(0, p.hand.length - untilCount)
+      : resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
+
+  let candidates = [...p.hand];
+  if (action.target?.filter) {
+    candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state, resultRefs));
+  }
+
+  // "You may trash…" — the player can decline by selecting 0 cards, and an
+  // IF_DO chain after this action only fires when at least 1 was trashed.
+  const optional = params.optional === true;
+  const max = Math.min(amount, candidates.length);
+  return {
+    targetController,
+    chooser,
+    blindSelection: chooser !== targetController,
+    amount,
+    untilCount,
+    candidates,
+    optional,
+    min: optional ? 0 : max,
+    max,
+  };
+}
+
 export function executeTrashFromHand(
   state: GameState,
   action: ActionOf<"TRASH_FROM_HAND">,
@@ -436,39 +496,12 @@ export function executeTrashFromHand(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const targetController: 0 | 1 =
-    action.target?.controller === "OPPONENT"
-      ? controller === 0
-        ? 1
-        : 0
-      : controller;
-  const chooser =
-    params.chooser === "SELF"
-      ? controller
-      : params.chooser === "OPPONENT"
-        ? controller === 0 ? 1 : 0
-        : targetController;
-  const blindSelection = chooser !== targetController;
-  const amount = resolveAmount(
-    params.amount ?? 1,
-    resultRefs,
-    state,
-    controller,
-    cardDb,
-  );
-  const p = state.players[targetController];
-
-  let candidates = [...p.hand];
-  if (action.target?.filter) {
-    candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state, resultRefs));
-  }
+  const { targetController, chooser, blindSelection, amount, untilCount, candidates, optional } =
+    trashFromHandSelection(state, action, controller, cardDb, resultRefs);
 
   if (candidates.length === 0) return { state, events, succeeded: false };
-
-  // "You may trash…" — the player can decline by selecting 0 cards, and an
-  // IF_DO chain after this action only fires when at least 1 was trashed.
-  const optional = params.optional === true;
+  // "Until you have N": already at or below N → nothing to trash, no prompt.
+  if (untilCount !== undefined && amount === 0) return { state, events, succeeded: false };
 
   // Use preselected targets from resume flow (player already chose)
   const selectedIds = preselectedTargets;

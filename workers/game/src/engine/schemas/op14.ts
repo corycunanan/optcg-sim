@@ -2073,7 +2073,7 @@ export const OP14_054_FISHER_TIGER: EffectSchema = {
             type: "CARD_IN_HAND",
             controller: "SELF",
           },
-          params: { until_count: 5, _comment: "Trash from hand until 5 cards remain — needs custom engine handling" },
+          params: { until_count: 5 },
         },
       ],
     },
