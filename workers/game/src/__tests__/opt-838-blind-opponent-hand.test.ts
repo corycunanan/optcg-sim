@@ -315,3 +315,234 @@ describe("OPT-838 blind hand-slot leak regressions", () => {
     expect([...permutations].some((p) => p !== "0,1,2,3")).toBe(true);
   });
 });
+
+/** Answers "up to" value choices with their maximum and accepts optionals. */
+function answerUpToPrompts(f: Fixture, player: 0 | 1) {
+  for (let i = 0; i < 4 && f.state.pendingPrompt?.respondingPlayer === player; i++) {
+    const options = f.state.pendingPrompt.options;
+    if (options.promptType === "PLAYER_CHOICE" && options.choices.every((c) => c.id.startsWith("choose-value:"))) {
+      f.choice({ type: "PLAYER_CHOICE", choiceId: options.choices.at(-1)!.id });
+    } else if (options.promptType === "OPTIONAL_EFFECT") {
+      f.choice({ type: "PLAYER_CHOICE", choiceId: "accept" });
+    } else {
+      return;
+    }
+  }
+}
+
+function handTrashEvents(f: Fixture, owner: 0 | 1) {
+  return f.state.eventLog.filter(
+    (e) =>
+      e.type === "CARD_TRASHED" &&
+      e.playerIndex === owner &&
+      (e.payload as { from?: string }).from === "HAND"
+  );
+}
+
+describe("OPT-838 X.Drake removal, empty and sole-card hands", () => {
+  it.each([0, 1] as const)("controller %i: trash is attributed to X.Drake's controller", (owner) => {
+    const { f, opponent, hand } = playDrake(owner, 2);
+    const slot = f.state.pendingPrompt!.blindSlots![0];
+    f.select([slot.token]);
+    const chosen = hand.find((c) => c.instanceId === slot.instanceId)!;
+    expect(f.state.players[opponent].hand).toEqual(hand.filter((c) => c !== chosen));
+    const events = handTrashEvents(f, opponent);
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).toMatchObject({
+      count: 1,
+      movementCause: "EFFECT",
+      effectSourceCardId: "OP17-075",
+      effectSourceController: owner,
+      causingController: owner,
+    });
+  });
+
+  it.each([0, 1] as const)("controller %i: an empty opponent hand resolves with no prompt", (owner) => {
+    const { f, opponent, own } = playDrake(owner, 0);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.effectStack).toEqual([]);
+    expect(f.state.players[opponent].hand).toEqual([]);
+    expect(f.state.players[owner].hand).toEqual([own]);
+  });
+
+  it.each([0, 1] as const)("controller %i: a sole card is still a blind prompt", (owner) => {
+    const { f, opponent, hand } = playDrake(owner, 1);
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(owner);
+    expect(f.targets()).toMatchObject({ blindSelection: true, countMin: 1, countMax: 1 });
+    expectNoLeak(f, owner, opponent, hand);
+    f.select(f.targets().validTargets);
+    expect(f.state.players[opponent].hand).toEqual([]);
+    expect(f.state.players[opponent].trash.map((c) => c.cardId)).toEqual([hand[0].cardId]);
+  });
+});
+
+describe("OPT-838 blind reply authorization and persistence", () => {
+  it.each([0, 1] as const)("controller %i: only valid slot tokens from the chooser resume", (owner) => {
+    const { f, opponent, hand } = playDrake(owner, 3);
+    f.persist();
+    const tokens = f.targets().validTargets;
+    const coordinator = new SessionCoordinator();
+    const reply = (ids: string[]): GameAction =>
+      ({
+        type: "SELECT_TARGET",
+        selectedInstanceIds: ids,
+        ...(f.state.pendingPrompt?.promptId
+          ? { promptId: f.state.pendingPrompt.promptId }
+          : {}),
+      }) as GameAction;
+    // The hand owner cannot answer the chooser's prompt.
+    expect(coordinator.routePromptResponse(f.state, opponent, reply([tokens[0]]))).toMatchObject({
+      kind: "reject",
+      state: f.state,
+    });
+    expect(coordinator.routePromptResponse(f.state, owner, reply([tokens[0]])).kind).toBe("resume");
+    const stale = tokens[0].replace(/^blind_[^-]+-/, "blind_zzzzzzzz-");
+    const malformed = [
+      [hand[0].instanceId], // a real instance id
+      [f.state.pendingPrompt!.blindSlots![0].instanceId],
+      [tokens[0], tokens[0]], // duplicate
+      [tokens[0], tokens[1]], // wrong count
+      [], // wrong count
+      [stale], // token from another prompt
+    ];
+    for (const ids of malformed) {
+      f.persist();
+      const before = structuredClone(f.state);
+      f.select(ids, true);
+      expect(f.state).toEqual(before);
+      expect(f.state.pendingPrompt?.respondingPlayer).toBe(owner);
+    }
+    // The same token resolves to the same card after a persistence round trip.
+    const slotsBefore = structuredClone(f.state.pendingPrompt!.blindSlots!);
+    f.persist();
+    expect(f.state.pendingPrompt!.blindSlots).toEqual(slotsBefore);
+    expect(f.targets().validTargets).toEqual(tokens);
+    f.select([tokens[2]]);
+    const chosen = hand.find((c) => c.instanceId === slotsBefore[2].instanceId)!;
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[opponent].hand).toEqual(hand.filter((c) => c !== chosen));
+    expect(f.state.players[opponent].trash.map((c) => c.cardId)).toEqual([chosen.cardId]);
+  });
+
+  it("stored prompts keep the mapping server-side only", () => {
+    const { f, opponent, hand } = playDrake(0, 3);
+    const stored = JSON.parse(
+      JSON.stringify({ state: f.state, cardDb: Object.fromEntries(f.db), mode: "PVP" })
+    );
+    const restored = parseStoredSession(stored).state;
+    expect(restored.pendingPrompt?.blindSlots).toEqual(f.state.pendingPrompt?.blindSlots);
+    f.state = restored;
+    expectNoLeak(f, 0, opponent, hand);
+    expect(filterPromptForRecipient(f.state.pendingPrompt, { kind: "OBSERVER" })).toMatchObject({
+      options: { validTargets: [] },
+    });
+    expect(filterPromptForRecipient(f.state.pendingPrompt, { kind: "OBSERVER" })).not.toHaveProperty("blindSlots");
+    expect(filterPromptForPlayer(f.state.pendingPrompt, 0)).not.toHaveProperty("blindSlots");
+  });
+
+  it("builds slots for a 30-card hand in one pass without identity leaks", () => {
+    const { f, opponent, hand } = playDrake(0, 30);
+    const slots = f.state.pendingPrompt!.blindSlots!;
+    expect(slots).toHaveLength(30);
+    expect(new Set(slots.map((s) => s.instanceId))).toEqual(new Set(realIds(hand)));
+    expect(new Set(slots.map((s) => s.token)).size).toBe(30);
+    expectNoLeak(f, 0, opponent, hand);
+    f.select([slots[29].token]);
+    expect(f.state.players[opponent].hand).toHaveLength(29);
+    expect(f.state.players[opponent].hand.map((c) => c.instanceId)).not.toContain(slots[29].instanceId);
+  });
+});
+
+describe("OPT-838 OP17-099 Charlotte Linlin", () => {
+  it.each([0, 1] as const)("controller %i: trash-opponent branch is a blind choice by the controller", (owner) => {
+    const { f, opponent, hand, own } = attackWithLinlin(owner, 3, "1");
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(owner);
+    expect(f.targets()).toMatchObject({ blindSelection: true, countMin: 1, countMax: 1 });
+    expectNoLeak(f, owner, opponent, hand);
+    f.persist();
+    const slot = f.state.pendingPrompt!.blindSlots![1];
+    f.select([slot.token]);
+    const chosen = hand.find((c) => c.instanceId === slot.instanceId)!;
+    expect(f.state.pendingPrompt?.options.promptType).not.toBe("SELECT_TARGET");
+    expect(f.state.players[opponent].hand).toEqual(hand.filter((c) => c !== chosen));
+    expect(f.state.players[opponent].trash.map((c) => c.cardId)).toEqual([chosen.cardId]);
+    expect(f.state.players[owner].hand).toEqual(own);
+    const events = handTrashEvents(f, opponent);
+    expect(events.at(-1)?.payload).toMatchObject({
+      count: 1,
+      movementCause: "EFFECT",
+      effectSourceCardId: "OP17-099",
+      causingController: owner,
+    });
+  });
+
+  it.each([0, 1] as const)("controller %i: trash-opponent branch with an empty opponent hand does not stall", (owner) => {
+    const { f, opponent } = attackWithLinlin(owner, 0, "1");
+    expect(f.state.pendingPrompt?.options.promptType).not.toBe("SELECT_TARGET");
+    expect(f.state.players[opponent].trash).toEqual([]);
+  });
+
+  it.each([0, 1] as const)("controller %i: first branch trashes from the controller's own hand normally", (owner) => {
+    const { f, opponent, own, hand } = attackWithLinlin(owner, 2, "0", 2);
+    const life = f.state.players[owner].life.length;
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(owner);
+    expect(f.targets().blindSelection).toBeUndefined();
+    expect(f.targets().validTargets).toEqual(realIds(own));
+    f.select([own[0].instanceId]);
+    answerUpToPrompts(f, owner);
+    expect(f.state.pendingPrompt?.respondingPlayer).not.toBe(owner);
+    expect(f.state.players[owner].hand).toEqual([own[1]]);
+    expect(f.state.players[opponent].hand).toEqual(hand);
+    expect(f.state.players[owner].life).toHaveLength(life + 1);
+  });
+
+  it.each([0, 1] as const)("controller %i: first branch with 0 cards in hand still adds Life (FAQ)", (owner) => {
+    const { f, opponent, hand } = attackWithLinlin(owner, 2, "0", 0);
+    const life = f.state.players[owner].life.length;
+    const deckTop = f.state.players[owner].deck[0];
+    answerUpToPrompts(f, owner);
+    expect(f.state.pendingPrompt?.respondingPlayer).not.toBe(owner);
+    expect(f.state.players[owner].hand).toEqual([]);
+    expect(f.state.players[opponent].hand).toEqual(hand);
+    expect(f.state.players[owner].life).toHaveLength(life + 1);
+    expect(f.state.players[owner].life[0].cardId).toBe(deckTop.cardId);
+  });
+});
+
+describe("OPT-838 owner-choice discards stay owner choices", () => {
+  it.each([0, 1] as const)("OP17-091 controller %i: the opponent picks from their own visible hand", (owner) => {
+    const f = fixture();
+    const opponent: 0 | 1 = owner === 0 ? 1 : 0;
+    f.state.turn.activePlayerIndex = owner;
+    f.data("big", { cost: 12 });
+    f.put("big", owner, "CHARACTER");
+    f.data("OP17-091", { cost: 2 });
+    const brook = f.put("OP17-091", owner, "HAND");
+    const hand = [0, 1].map(() => f.put(CARDS.VANILLA.id, opponent, "HAND"));
+    f.act({ type: "PLAY_CARD", cardInstanceId: brook.instanceId });
+    acceptOptionalIfPrompted(f);
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(opponent);
+    expect(f.targets().blindSelection).toBeUndefined();
+    expect(f.state.pendingPrompt?.blindSlots).toBeUndefined();
+    expect(f.targets().validTargets).toEqual(realIds(hand));
+    f.select([hand[1].instanceId]);
+    expect(f.state.players[opponent].hand).toEqual([hand[0]]);
+  });
+
+  it.each([0, 1] as const)("OP17-106 controller %i: the opponent picks from their own visible hand", (owner) => {
+    const f = fixture();
+    const opponent: 0 | 1 = owner === 0 ? 1 : 0;
+    f.state.turn.activePlayerIndex = owner;
+    f.data("OP17-106", { cost: 1 });
+    const smoothie = f.put("OP17-106", owner, "HAND");
+    const hand = [0, 1].map(() => f.put(CARDS.VANILLA.id, opponent, "HAND"));
+    f.act({ type: "PLAY_CARD", cardInstanceId: smoothie.instanceId });
+    answerUpToPrompts(f, owner);
+    expect(f.state.pendingPrompt?.respondingPlayer).toBe(opponent);
+    expect(f.targets().blindSelection).toBeUndefined();
+    expect(f.state.pendingPrompt?.blindSlots).toBeUndefined();
+    expect(f.targets().validTargets).toEqual(realIds(hand));
+    f.select([hand[0].instanceId]);
+    expect(f.state.players[opponent].hand).toEqual([hand[1]]);
+  });
+});
