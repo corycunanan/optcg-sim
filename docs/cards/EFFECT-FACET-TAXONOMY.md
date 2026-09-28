@@ -154,7 +154,7 @@
 
 **Once per turn.** `flag:once_per_turn` comes from `flags.once_per_turn` or `trigger.once_per_turn`, including compound-trigger members.
 
-**Optional.** `flag:optional` comes from `flags.optional`.
+**Optional.** `flag:optional` comes from `flags.optional` or from a top-level action's clause-level `optional: true` ("Then, you may…").
 
 **Decline lock.** `flag:lock_on_decline` comes from `flags.lock_on_decline`.
 

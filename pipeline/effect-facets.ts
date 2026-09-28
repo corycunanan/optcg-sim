@@ -505,7 +505,9 @@ function visitBlock(
     addTag(tags, `keyword:${lower(keyword)}`);
   }
   if (block.flags?.once_per_turn) addTag(tags, "flag:once_per_turn");
-  if (block.flags?.optional) addTag(tags, "flag:optional");
+  // OPT-799: a clause-level "you may" (Action.optional) is optional too.
+  if (block.flags?.optional || block.actions?.some((a) => a.optional === true))
+    addTag(tags, "flag:optional");
   if (block.flags?.lock_on_decline) addTag(tags, "flag:lock_on_decline");
 
   if (
