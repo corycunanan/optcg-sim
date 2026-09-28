@@ -61,6 +61,7 @@ Create one per PR. Every field must contain observed evidence, an explicit appli
 - Assessed at: <timestamp>
 - Scope and acceptance: <criterion → hunk/behavior → evidence>
 - Coordinator review: <head, outcome, evidence location>
+- Models: <implementer model; Claude reviewer model; Codex lens model or not run>
 - Independent review: <reviewer, head, required passes and each outcome>
 - Findings: <scenario/root cause, severity, evidence, resolution or blocker>
 - Baseline/final validation: <commands, exit/results, revisions, logs; carried-forward checks and why>
