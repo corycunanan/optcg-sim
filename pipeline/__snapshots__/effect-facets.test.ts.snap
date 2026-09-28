@@ -325,7 +325,6 @@ exports[`extractCardFacets > snapshots every distinct authored tag and rejects u
   "trigger:event_activated_from_hand",
   "trigger:event_main_resolved_from_trash",
   "trigger:leader_attack_deals_damage",
-  "trigger:life_card_removed",
   "trigger:life_count_becomes_zero",
   "trigger:main_event",
   "trigger:on_block",
