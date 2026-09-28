@@ -613,6 +613,18 @@ export interface ActionBase {
   result_ref?: string;
   conditions?: Condition;
   requires?: ActionFeasibilityRequirement;
+  /**
+   * OPT-799: clause-level "you may" ("Then, you may trash 2 cards…"). After
+   * the chain connector and inline `conditions` pass, the resolver asks the
+   * chain's controller an OPTIONAL_EFFECT prompt scoped to this clause.
+   * Declining skips only this action: later THEN clauses still resolve and an
+   * IF_DO dependent is skipped (Rules 4-10-1 / 4-10-2). Top-level block
+   * actions only; never combined with a selection that already allows zero
+   * (`target.count` up_to / any_number, `params.optional`, `params.up_to`).
+   * Block-level "you may" (before a cost, or covering the whole effect) stays
+   * `flags.optional`.
+   */
+  optional?: true;
 }
 
 export interface ActionFeasibilityRequirement {

@@ -62,6 +62,8 @@ export const EB04_001_JEWELRY_BONNEY: EffectSchema = {
           duration: { type: "THIS_TURN" },
         },
         {
+          // "Then, if you have 2 or more Life cards, you may add…": the Life
+          // count is checked first; only then is the player asked (OPT-799).
           type: "LIFE_TO_HAND",
           params: { amount: 1, position: "TOP" },
           conditions: {
@@ -71,6 +73,7 @@ export const EB04_001_JEWELRY_BONNEY: EffectSchema = {
             value: 2,
           },
           chain: "THEN",
+          optional: true,
         },
       ],
     },

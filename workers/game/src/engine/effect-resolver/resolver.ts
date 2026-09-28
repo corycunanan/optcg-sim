@@ -45,6 +45,7 @@ import { COST_DON_GIVEN_REF } from "./types.js";
 import {
   markOncePerTurnUsed,
   extractEffectDescription,
+  optionalClauseDescription,
   resolveAmount,
   sourceTextForBlock,
 } from "./action-utils.js";
@@ -723,7 +724,8 @@ export function continueSimultaneousGroup(
   services: EffectResolverServices = resolverExecutionServices
 ): ChainResult {
   const unsupportedAction = plan.actions.find(
-    (action) => !SIMULTANEOUS_ACTION_TYPES.has(action.type)
+    (action) =>
+      !SIMULTANEOUS_ACTION_TYPES.has(action.type) || action.optional === true
   );
   if (unsupportedAction) {
     const terminated = terminateForEngineContract(state, {
@@ -731,7 +733,9 @@ export function continueSimultaneousGroup(
       contract: "ACTION_HANDLER",
       actionType: unsupportedAction.type,
       sourceCardInstanceId,
-      message: `Action type '${unsupportedAction.type}' cannot commit inside an AND transaction`,
+      message: unsupportedAction.optional
+        ? `An optional '${unsupportedAction.type}' cannot be decided inside an AND transaction`
+        : `Action type '${unsupportedAction.type}' cannot commit inside an AND transaction`,
     });
     return { state: terminated, events: [] };
   }
@@ -905,6 +909,23 @@ export function executeActionChain(
         lastActionSucceeded = false;
         continue;
       }
+    }
+
+    // OPT-799: clause-level "you may". The connector and the inline condition
+    // were checked first ("Then, if you have 2 or more Life cards, you may…"
+    // asks only when the condition holds); now the controller chooses.
+    if (action.optional === true) {
+      return pauseForOptionalAction(
+        state,
+        action,
+        actions.slice(i + 1),
+        resultRefs,
+        lastActionSucceeded,
+        sourceCardInstanceId,
+        controller,
+        effectDescription,
+        events
+      );
     }
 
     if (isUpToResourceAction(action)) {
@@ -1201,6 +1222,70 @@ export function executeActionChain(
   }
 
   return { state, events };
+}
+
+/**
+ * OPT-799: park the chain on an action-level `optional` clause. The frame
+ * keeps the undecided action as `pausedAction` (still carrying
+ * `optional: true`, which is how resumeFromStack tells it apart from a
+ * block-level optional frame, whose pausedAction is null) and the rest of the
+ * chain, so earlier clauses are never re-applied on resume.
+ */
+function pauseForOptionalAction(
+  state: GameState,
+  action: Action,
+  remainingActions: Action[],
+  resultRefs: Map<string, EffectResult>,
+  priorActionSucceeded: boolean,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  effectDescription: string | undefined,
+  events: PendingEvent[]
+): ChainResult {
+  const frameId = generateFrameId(state);
+  const frame: EffectStackFrame = {
+    id: frameId.id,
+    sourceCardInstanceId,
+    controller,
+    effectDescription,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_OPTIONAL_RESPONSE",
+    pausedAction: action,
+    remainingActions,
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [],
+    priorActionSucceeded,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: events,
+  };
+  const nextState = pushFrame(frameId.state, frame);
+  if (isEngineTerminated(nextState)) return { state: nextState, events };
+  const sourceCard = findCardInstance(nextState, sourceCardInstanceId);
+  log("effect.prompt", {
+    sourceInstanceId: sourceCardInstanceId,
+    controller,
+    actionType: action.type,
+    phase: "optional_action_prompt",
+  });
+  return {
+    state: nextState,
+    events,
+    pendingPrompt: {
+      options: {
+        promptType: "OPTIONAL_EFFECT",
+        effectDescription: optionalClauseDescription(effectDescription),
+        cards: sourceCard ? [sourceCard] : [],
+      },
+      respondingPlayer: controller,
+      resumeContext: frame.id,
+    },
+  };
 }
 
 export function withChainDescription(
