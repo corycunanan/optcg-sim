@@ -390,12 +390,13 @@ describe("OPT-838 blind reply authorization and persistence", () => {
           ? { promptId: f.state.pendingPrompt.promptId }
           : {}),
       }) as GameAction;
-    // The hand owner cannot answer the chooser's prompt.
-    expect(coordinator.routePromptResponse(f.state, opponent, reply([tokens[0]]))).toMatchObject({
+    // GameSession.handleAction routes through coordinator.executeAction, then
+    // hands "resume" to resumePromptLifecycle. The hand owner cannot answer.
+    expect(coordinator.executeAction(f.state, [], opponent, reply([tokens[0]]), f.db)).toMatchObject({
       kind: "reject",
       state: f.state,
     });
-    expect(coordinator.routePromptResponse(f.state, owner, reply([tokens[0]])).kind).toBe("resume");
+    expect(coordinator.executeAction(f.state, [], owner, reply([tokens[0]]), f.db).kind).toBe("resume");
     const stale = tokens[0].replace(/^blind_[^-]+-/, "blind_zzzzzzzz-");
     const malformed = [
       [hand[0].instanceId], // a real instance id
