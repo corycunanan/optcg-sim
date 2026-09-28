@@ -39,7 +39,7 @@ import { executeEffectAction } from "../engine/effect-resolver/resolver.js";
 import { payCosts } from "../engine/effect-resolver/cost/payment.js";
 import { applyCostSelection } from "../engine/effect-resolver/cost/resume.js";
 import { handleRedistributeDon } from "../engine/effect-resolver/resume/target.js";
-import { movedDonIds } from "../engine/don-area-effects.js";
+import { movedDonIds, releaseDonEffects } from "../engine/don-area-effects.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import {
   SessionRepository,
@@ -69,6 +69,7 @@ const SCOPE_CARDS = [
   ["EB01-049", 2],
   ["OP15-026", 2],
   ["OP02-085", 3],
+  ["OP15-023", 2],
 ] as const;
 
 function fixture() {
@@ -1080,6 +1081,214 @@ describe("OPT-792 prompt-resume catch-all (review D)", () => {
     f.select([victim.instanceId]);
     expect(f.state.players[0].donCostArea.map((d) => d.instanceId)).toContain("victim-don");
     expect(holds(f.state, "victim-don")).toBe(false);
+  });
+});
+
+// ─── Review round 3: only previously applied effects; no empty leftovers ────
+
+describe("OPT-792 release scope and cleanup (review round 3)", () => {
+  // "ADD_DON_FROM_DECK (rested), then hold all your rested DON!!": the hold is
+  // applied AFTER the DON!! arrives, so it is not "previously applied".
+  const addThenHold: Action[] = [
+    { type: "ADD_DON_FROM_DECK", params: { amount: 1, target_state: "RESTED" } },
+    {
+      type: "APPLY_PROHIBITION",
+      target: {
+        type: "DON_IN_COST_AREA",
+        controller: "SELF",
+        count: { all: true },
+        filter: { is_rested: true },
+      },
+      params: { prohibition_type: "CANNOT_REFRESH" },
+      duration: { type: "SKIP_NEXT_REFRESH" },
+    },
+  ] as Action[];
+  function freshDonFixture() {
+    const f = fixture();
+    f.state.players[0].donCostArea = [];
+    f.state.players[0].donDeck = [{ instanceId: "new-don", state: "ACTIVE", attachedTo: null }];
+    // An unrelated pre-existing hold, so the release's scoping (not its
+    // "nothing held before" fast path) decides the outcome.
+    f.state = seedDonHold(f.state, "unrelated-don");
+    return f;
+  }
+  const holdsNewDon = (state: GameState) =>
+    state.prohibitions.some(
+      (p) => p.prohibitionType === "CANNOT_REFRESH" && p.appliesTo.includes("new-don")
+    );
+
+  it("keeps a hold applied after the move — effect steps", () => {
+    const f = freshDonFixture();
+    const r = resolveEffect(
+      f.state,
+      { id: "temporal", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: addThenHold },
+      f.state.players[0].leader.instanceId,
+      0,
+      f.db
+    );
+    expect(holdsNewDon(r.state)).toBe(true);
+  });
+
+  it("keeps a hold applied after the move — prompt resume", () => {
+    const f = freshDonFixture();
+    const r = resolveEffect(
+      f.state,
+      {
+        id: "temporal",
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        flags: { optional: true },
+        actions: addThenHold,
+      },
+      f.state.players[0].leader.instanceId,
+      0,
+      f.db
+    );
+    expect(r.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.state = { ...r.state, pendingPrompt: r.pendingPrompt! };
+    f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+    expect(f.state.players[0].donCostArea.map((d) => d.instanceId)).toEqual(["new-don"]);
+    expect(holdsNewDon(f.state)).toBe(true);
+  });
+
+  it("keeps a hold applied after the move — pipeline execute", () => {
+    const f = freshDonFixture();
+    const leader = f.state.players[0].leader;
+    f.db.set(leader.cardId, {
+      ...f.db.get(leader.cardId)!,
+      effectSchema: {
+        card_id: leader.cardId,
+        card_type: "Leader",
+        effects: [
+          {
+            id: "temporal",
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            actions: addThenHold,
+          },
+        ],
+      },
+    });
+    f.act({ type: "ACTIVATE_EFFECT", cardInstanceId: leader.instanceId, effectId: "temporal" });
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(holdsNewDon(f.state)).toBe(true);
+  });
+
+  it("drops emptied entries except population prohibitions and dynamic effects; skips out-of-scope ids", () => {
+    const f = fixture();
+    const base = {
+      sourceCardInstanceId: "seed",
+      sourceEffectBlockId: "",
+      scope: {},
+      duration: { type: "SKIP_NEXT_REFRESH" },
+      controller: 0,
+      usesRemaining: null,
+      prohibitionType: "CANNOT_REFRESH",
+    };
+    const effect = (id: string, targetType?: string) =>
+      ({
+        id,
+        sourceCardInstanceId: "seed",
+        sourceEffectBlockId: "",
+        category: "auto",
+        modifiers: [{ type: "MODIFY_POWER", ...(targetType ? { target: { type: targetType } } : {}), params: { amount: 1000 } }],
+        duration: { type: "THIS_TURN" },
+        expiresAt: { wave: "END_OF_TURN" },
+        controller: 0,
+        appliesTo: ["d"],
+        timestamp: 0,
+      }) as unknown as GameState["activeEffects"][number];
+    const state: GameState = {
+      ...f.state,
+      prohibitions: [
+        { ...base, id: "plain", appliesTo: ["d"] },
+        { ...base, id: "population", appliesTo: ["d"], target: { type: "CHARACTER" } },
+        { ...base, id: "partial", appliesTo: ["d", "other"] },
+        { ...base, id: "created-later", appliesTo: ["d"] },
+      ] as GameState["prohibitions"],
+      activeEffects: [effect("e-plain"), effect("e-dynamic", "CHARACTER"), effect("e-self", "SELF")],
+    };
+    const next = releaseDonEffects(state, new Set(["d"]), {
+      prohibitionIds: new Set(["plain", "population", "partial"]),
+      effectIds: new Set(["e-plain", "e-dynamic", "e-self"]),
+    });
+    expect(next.prohibitions.map((p) => [p.id, p.appliesTo])).toEqual([
+      ["population", []],
+      ["partial", ["other"]],
+      ["created-later", ["d"]],
+    ]);
+    expect(next.activeEffects.map((e) => [e.id, e.appliesTo])).toEqual([["e-dynamic", []]]);
+  });
+
+  it("a held DON!! that moves leaves no empty-appliesTo prohibition behind", () => {
+    const f = fixture();
+    const jango = f.put("OP15-026", 0);
+    f.put("COST-3", 1);
+    f.donOf(1, "RESTED", 1);
+    const held = oppDonIds(f)[0];
+    f.play("OP07-026");
+    f.select([held]);
+    const hold = f.state.prohibitions.find((p) => p.appliesTo.includes(held))!;
+    f.act({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: jango.instanceId,
+      effectId: "OP15-026_activate_trash",
+    });
+    if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
+      f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+    expect(f.state.prohibitions.find((p) => p.id === hold.id)).toBeUndefined();
+    expect(
+      f.state.prohibitions.some(
+        (p) => p.prohibitionType === "CANNOT_REFRESH" && p.appliesTo.length === 0 && !p.target
+      )
+    ).toBe(false);
+  });
+
+  it("OP15-023: a held DON!! that leaves via DON!! −1 and returns from the deck is not held later", () => {
+    const f = fixture();
+    const arlong = f.put("OP15-023", 1);
+    f.state.players[0].donCostArea = [
+      { instanceId: "held-don", state: "RESTED", attachedTo: null },
+      ...f.state.players[0].donCostArea.slice(0, 7),
+    ];
+    f.state.players[0].donDeck = [];
+    f.play("EB01-049"); // K.O. Arlong → its On K.O. holds up to 2 rested cards
+    f.select([arlong.instanceId]);
+    expect(promptValidTargets(f)).toContain("held-don");
+    f.select(["held-don"]);
+    expect(holds(f.state, "held-don")).toBe(true);
+
+    // Player 0 pays DON!! −1: rested DON!! return first, so the held one goes.
+    f.play("OP02-085");
+    for (let i = 0; i < 4 && f.state.pendingPrompt; i++) {
+      const o = f.state.pendingPrompt.options;
+      if (o.promptType === "OPTIONAL_EFFECT") f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      else if (o.promptType === "PLAYER_CHOICE") f.act({ type: "PLAYER_CHOICE", choiceId: o.choices[0].id }, 1);
+      else break;
+    }
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[0].donDeck.map((d) => d.instanceId)).toContain("held-don");
+    expect(holds(f.state, "held-don")).toBe(false);
+    expect(
+      f.state.prohibitions.some((p) => p.appliesTo.length === 0 && !p.target && p.prohibitionType === "CANNOT_REFRESH")
+    ).toBe(false);
+
+    // Through player 0's next Refresh + DON!! phase: the same instance returns.
+    f.state = advanceThroughRefreshOf(f, 1);
+    f.state = advanceThroughRefreshOf(f, 0);
+    for (let i = 0; i < 2 && f.state.turn.phase !== "MAIN"; i++) {
+      const r = runPipeline(f.state, { type: "ADVANCE_PHASE" }, f.db, 0);
+      expect(r.valid, r.error).toBe(true);
+      f.state = r.state;
+    }
+    const back = f.state.players[0].donCostArea.find((d) => d.instanceId === "held-don");
+    expect(back).toBeDefined();
+    back!.state = "RESTED";
+    f.state = advanceThroughRefreshOf(f, 1);
+    f.state = advanceThroughRefreshOf(f, 0);
+    expect(f.state.players[0].donCostArea.find((d) => d.instanceId === "held-don")?.state).toBe(
+      "ACTIVE"
+    );
   });
 });
 
