@@ -195,7 +195,7 @@ interface SearchDeckParams {
 }
 ```
 
-**`reveal`** — picks are revealed to both players by default (rule 11-2-1: a card moved from one secret area to another is always revealed, and printed searches say "reveal"). Set `reveal: false` only when the card or its official FAQ says the pick is not revealed, e.g. OP16-119 ("you add it to your Life cards without revealing it"). The engine then emits `CARDS_REVEALED` as `CONTROLLER_ONLY` so the owner still sees the pick while the opponent and spectators receive a redacted event. `opt-835-search-reveal-secrecy.test.ts` ratchets the authored `reveal: false` set.
+**`reveal`** — picks are revealed to both players by default (rule 11-2-1: a card moved from one secret area to another is always revealed, and printed searches say "reveal"). Set `reveal: false` only when the card or its official FAQ says the pick is not revealed, e.g. OP16-119 ("you add it to your Life cards without revealing it") and OP12-079 ("No, you do not reveal it"). The engine then emits `CARDS_REVEALED` as `CONTROLLER_ONLY` so the owner still sees the pick while the opponent and spectators receive a redacted event. `opt-835-search-reveal-secrecy.test.ts` ratchets the authored `reveal: false` set.
 
 | Field | Value |
 |-------|-------|

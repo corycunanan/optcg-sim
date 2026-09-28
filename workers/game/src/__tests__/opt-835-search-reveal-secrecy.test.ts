@@ -255,11 +255,14 @@ describe("OPT-835: OP12-079 searched hand pick stays secret", () => {
     expect(p0.deck.map((c) => c.cardId)).toEqual([DECK_TAIL, REST_B, REST_A]);
   });
 
-  it("never exposes the picked identity to the opponent, spectators, or persisted history", () => {
+  it("never exposes the picked identity to the opponent or in spectator/persisted history", () => {
     const { db, resolved } = resolveLuffyEvent();
     const pickedInstanceIds = ["opt835-deck-0", resolved.players[0].hand[0].instanceId];
     for (const [label, view] of Object.entries(nonOwnerProjections(resolved, db))) {
-      const serialized = JSON.stringify(view);
+      // Spectators see both hands by policy (session/visibility.ts union of
+      // player views), so for them only the history must stay anonymous. The
+      // opponent must not learn the pick from any field.
+      const serialized = JSON.stringify(label.startsWith("spectator") ? view.eventLog : view);
       expect(serialized, label).not.toContain(PICK);
       for (const id of pickedInstanceIds) expect(serialized, `${label}: ${id}`).not.toContain(id);
       for (const event of revealEvents(view)) {
