@@ -239,7 +239,9 @@ describe("registered REVEAL_HAND consumers", () => {
     expect(reveals(f)).toHaveLength(1);
     expect(reveals(f)[0]).toMatchObject({ playerIndex: opponent, payload: { cards: remaining.map((c) => ({ instanceId: c.instanceId, cardId: c.cardId })), source: "HAND", visibility: "BOTH" } });
     expect(f.state.players[opponent].hand.slice(0, 3)).toEqual(remaining);
-    // DRAW recipient fidelity is a documented out-of-scope follow-up.
+    // "Then, your opponent draws 1 card" (OPT-859): the opponent, not the controller.
+    expect(f.state.players[opponent].hand).toHaveLength(4);
+    expect(f.state.players[owner].hand).toEqual([]);
   });
 
   for (const owner of [0, 1] as const) {
