@@ -959,9 +959,10 @@ export interface ActionParamsMap {
     position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
   };
   TRASH_FROM_LIFE: {
-    amount?: number;
+    amount?: number | DynamicValue;
     position?: "TOP" | "BOTTOM";
     controller?: Controller;
+    up_to?: boolean;
   };
   DRAIN_LIFE_TO_THRESHOLD: { threshold?: number };
   LIFE_CARD_TO_DECK: { amount?: number; position?: "TOP" | "BOTTOM" };
