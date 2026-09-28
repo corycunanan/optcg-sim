@@ -671,6 +671,19 @@ When multiple replacement effects could intercept the same event, the comprehens
 
 **Engine implementation:** At step 3, the engine collects all matching replacement effects, groups them by controller, and prompts the controller to select one (or decline all optional ones). The selected replacement's `replacement_actions` execute, and the original action is discarded.
 
+#### Battle K.O. replacements pause the Damage Step (OPT-872)
+
+A battle K.O. (rules 7-1-4-1-2) checks replacements with `checkReplacementForKO(..., "battle", ...)` inside `executeDamageStep`. When that check returns a prompt, the Damage Step pauses:
+
+1. `battle.ts` records `turn.pendingBattleDamageContinuation` with `stage: "CHARACTER_KO_REPLACEMENT"`, the `battleId`, the target Character, the causing player, and whether the attacker is a Character. An optional offer also records `replacementEffectId`. A mandatory replacement whose substitute asks for input records `resolution: "REPLACED"` at once.
+2. When the `REPLACEMENT` prompt is answered, `session/prompt-lifecycle.ts` records `REPLACED` or `NOT_REPLACED` on the matching unanswered continuation. It then calls `resumeBattleDamageContinuation` with the substitute's events.
+3. `finishCharacterBattleResult` publishes one batch, in the same order as the synchronous path: `CHARACTER_BATTLES` (only when the attacker is a Character), `COMBAT_VICTORY`, the substitute's events, the K.O. via `koBattleLoser` when the replacement was not applied (8-1-3-4-1), then `endBattle` (7-1-5).
+4. If the substitute itself prompts (for example EB03-001's hand trash), the continuation stays in place. The continuation loop at the end of `resumePromptLifecycle` finishes the battle once the effect stack unwinds.
+
+`koBattleLoser` is the single K.O. path for both the synchronous and resumed Damage Step. It checks `CANNOT_BE_KO` with cause `BATTLE`, calls `koCharacter`, and tags `CARD_KO` with `cause`/`movementCause: "BATTLE"` and `preKO_donCount`. A continuation whose `battleId` does not match the current battle is discarded. The continuation names only public field cards, so both players and spectators see it unredacted.
+
+Known limitation: the battle path offers only the first matching replacement. After a decline it K.O.s the Character without offering any other replacement that also matches (8-1-3-4-1/2). This is ratcheted in `opt-872-battle-ko-replacement-continuation.test.ts`.
+
 ---
 
 ### Replacement Effect Category Structure
