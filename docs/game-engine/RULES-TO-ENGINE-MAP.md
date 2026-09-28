@@ -425,7 +425,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **8-5-1 to 8-5-4.** Distinct concepts | **PARTIAL** | — | Engine distinguishes "play Event card" from "activate effect on card" but doesn't track which distinction matters for triggers like "when you activate an Event" |
+| **8-5-1 to 8-5-4.** Distinct concepts | **IMPL** | `effect-resolver/actions/play.ts`, `effect-resolver/event-activation.ts`, [`opt-854-event-activation-watchers.test.ts`](../../workers/game/src/__tests__/opt-854-event-activation-watchers.test.ts) | Card activation (hand [Main] play, [Counter] use, effect-driven hand activation) publishes `EVENT_ACTIVATED_FROM_HAND`, the only class "when you activate an Event" watchers observe. Resolving an Event [Main] from trash (EB03-031) is effect activation and publishes `EVENT_MAIN_RESOLVED_FROM_TRASH`, which no watcher observes (EB03-031 FAQ) |
 
 ### 8-6. Order of Effect Resolution
 

@@ -1,6 +1,9 @@
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect } from "../../hand-trash.js";
-import { updateEffectContinuation } from "../event-activation.js";
+import {
+  updateEffectContinuation,
+  withdrawUnactivatedTrashMain,
+} from "../event-activation.js";
 import { retainEventsOnFrame } from "./events.js";
 /**
  * PLAYER_CHOICE resume handlers.
@@ -435,7 +438,7 @@ export function handleAwaitingOptionalResponse(
     (action.type === "PLAYER_CHOICE" && action.choiceId === "skip")
   ) {
     const declinedBlock = topFrame.effectBlock;
-    nextState = popFrame(nextState);
+    nextState = withdrawUnactivatedTrashMain(popFrame(nextState), topFrame);
     if (declinedBlock.flags?.lock_on_decline) {
       nextState = markOncePerTurnUsed(
         nextState,
@@ -483,7 +486,10 @@ export function handleAwaitingOptionalResponse(
     }
 
     if (costResult.cannotPay) {
-      nextState = popFrame(costResult.state);
+      nextState = withdrawUnactivatedTrashMain(
+        popFrame(costResult.state),
+        topFrame
+      );
       return services.processRemainingTriggers(
         nextState,
         topFrame.pendingTriggers,

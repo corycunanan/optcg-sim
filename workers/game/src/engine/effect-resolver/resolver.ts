@@ -347,7 +347,7 @@ export function resolveEffect(
     const usedSet = state.turn.oncePerTurnUsed[block.id];
     if (usedSet?.includes(sourceCardInstanceId)) {
       log("effect.skipped", { ...logCtx, reason: "once_per_turn_used" });
-      return { state, events, resolved: false };
+      return { state, events, resolved: false, effectNotActivated: true };
     }
   }
 
@@ -466,7 +466,7 @@ export function resolveEffect(
     if (costPayResult.cannotPay) {
       state = costPayResult.state;
       log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
-      return { state, events, resolved: false };
+      return { state, events, resolved: false, effectNotActivated: true };
     }
 
     state = costPayResult.state;

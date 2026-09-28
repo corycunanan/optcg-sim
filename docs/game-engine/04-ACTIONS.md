@@ -2469,7 +2469,7 @@ interface ActivateEventFromTrashParams {
 |-------|-------|
 | **Target** | An Event card in trash matching `filter`. Events without a `MAIN_EVENT` block (Counter-only, Trigger-only) are automatically excluded from valid targets. |
 | **Failure mode** | If no matching [Main]-bearing Event exists in trash, the action is ignored (no event emitted, no resolution). |
-| **Fired events** | The Main block's events (e.g. `CARD_DRAWN`, `CARD_KO`), then `EVENT_MAIN_RESOLVED_FROM_TRASH` once the nested Main finishes. |
+| **Fired events** | The Main block's events (e.g. `CARD_DRAWN`, `CARD_KO`), then `EVENT_MAIN_RESOLVED_FROM_TRASH` once the nested Main finishes. Nothing is published when the Main is never activated (declined optional, declined or unpayable activation cost). This is effect activation, not card activation: "activates an Event" watchers do not observe it (rule 8-5; EB03-031 FAQ). |
 | **Example cards** | EB03-031 Vinsmoke Reiju |
 
 ```json

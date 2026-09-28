@@ -1,6 +1,9 @@
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { completeHandTrashCostSources, handTrashEvent, isHandTrashByEffect } from "../../hand-trash.js";
-import { updateEffectContinuation } from "../event-activation.js";
+import {
+  updateEffectContinuation,
+  withdrawUnactivatedTrashMain,
+} from "../event-activation.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 /**
@@ -114,7 +117,10 @@ export function abortReplacedCost(
   services: EffectResolverServices,
   frameOnStack = true
 ): EffectResolverResult {
-  const nextState = frameOnStack ? popFrame(state) : state;
+  const nextState = withdrawUnactivatedTrashMain(
+    frameOnStack ? popFrame(state) : state,
+    frame
+  );
   return services.processRemainingTriggers(
     nextState,
     frame.pendingTriggers,
@@ -344,7 +350,7 @@ function resumeAfterBranchPick(
 
   if (resumeResult.cannotPay) {
     return services.processRemainingTriggers(
-      resumeResult.state,
+      withdrawUnactivatedTrashMain(resumeResult.state, topFrame),
       topFrame.pendingTriggers,
       cardDb,
       eventsForCostAbandon(topFrame, resumeResult.events),
@@ -432,7 +438,7 @@ export function handleAwaitingCostSelection(
     cost.amount === "ANY_NUMBER"
   ) {
     return services.processRemainingTriggers(
-      popFrame(baselineState),
+      withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
       topFrame.pendingTriggers,
       cardDb,
       eventsForCostAbandon(topFrame),
@@ -454,7 +460,7 @@ export function handleAwaitingCostSelection(
     );
     if (!paid) {
       return services.processRemainingTriggers(
-        popFrame(baselineState),
+        withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
         topFrame.pendingTriggers,
         cardDb,
         eventsForCostAbandon(topFrame),
@@ -509,7 +515,7 @@ export function handleAwaitingCostSelection(
 
       if (remaining.cannotPay) {
         return services.processRemainingTriggers(
-          remaining.state,
+          withdrawUnactivatedTrashMain(remaining.state, topFrame),
           topFrame.pendingTriggers,
           cardDb,
           eventsForCostAbandon(topFrame),
@@ -707,7 +713,10 @@ export function handleAwaitingCostSelection(
     );
     if (!paid) {
       return services.processRemainingTriggers(
-        popFrame(baselineState), topFrame.pendingTriggers, cardDb, eventsForCostAbandon(topFrame)
+        withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
+        topFrame.pendingTriggers,
+        cardDb,
+        eventsForCostAbandon(topFrame)
       );
     }
     nextState = paid.state;
@@ -1347,7 +1356,7 @@ export function handleAwaitingCostSelection(
 
     if (remainingCostResult.cannotPay) {
       return services.processRemainingTriggers(
-        remainingCostResult.state,
+        withdrawUnactivatedTrashMain(remainingCostResult.state, topFrame),
         topFrame.pendingTriggers,
         cardDb,
         eventsForCostAbandon(topFrame),
