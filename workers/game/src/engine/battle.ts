@@ -12,6 +12,7 @@ import type {
   LifeCard,
   PendingEvent,
   ExecuteResult,
+  BattleKOReplacementContinuation,
 } from "../types.js";
 import {
   getActivePlayerIndex,
@@ -1052,7 +1053,8 @@ function continueLeaderDamageSequence(
  */
 export function resumeBattleDamageContinuation(
   state: GameState,
-  cardDb: Map<string, CardData>
+  cardDb: Map<string, CardData>,
+  replacementEvents: PendingEvent[] = []
 ): ExecuteResult {
   const pending = state.turn.pendingBattleDamageContinuation;
   if (!pending || state.pendingPrompt || state.effectStack.length > 0) {
@@ -1066,6 +1068,15 @@ export function resumeBattleDamageContinuation(
   };
   if (!battle || battle.battleId !== pending.battleId) {
     return { state: clearedState, events: [] };
+  }
+
+  if (pending.stage === "CHARACTER_KO_REPLACEMENT") {
+    return finishCharacterBattleResult(
+      clearedState,
+      pending,
+      replacementEvents,
+      cardDb
+    );
   }
 
   if (pending.stage === "LIFE_REMOVAL") {
@@ -1267,14 +1278,7 @@ function executeDamageStep(
         };
       } else if (targetFound.card.zone === "CHARACTER") {
         // Emit COMBAT_VICTORY — attacker won against a character
-        events.push({
-          type: "COMBAT_VICTORY",
-          playerIndex: pi,
-          payload: {
-            cardInstanceId: battle.attackerInstanceId,
-            targetInstanceId,
-          },
-        });
+        events.push(combatVictoryEvent(pi as 0 | 1, battle));
 
         // Check for replacement effects before KO
         const replacement = checkReplacementForKO(
@@ -1286,10 +1290,42 @@ function executeDamageStep(
           resolverExecutionServices
         );
         if (replacement.pendingPrompt) {
-          events.push(...replacement.events);
+          // OPT-872: the prompt pauses the Damage Step. Either the player is
+          // offered an optional replacement (resolution recorded when they
+          // answer), or a mandatory replacement's substitute awaits input
+          // (already REPLACED). The pipeline drops a prompting execution's
+          // events, so the resumed step rebuilds CHARACTER_BATTLES /
+          // COMBAT_VICTORY and publishes them with the K.O. and END_OF_BATTLE,
+          // as the synchronous path does.
+          const resumeContext = replacement.pendingPrompt.resumeContext;
+          const optionalEffectId =
+            !replacement.replaced &&
+            typeof resumeContext === "object" &&
+            resumeContext !== null &&
+            "type" in resumeContext &&
+            resumeContext.type === "REPLACEMENT"
+              ? resumeContext.effectId
+              : undefined;
           return {
-            state: replacement.state,
-            events,
+            state: {
+              ...replacement.state,
+              turn: {
+                ...replacement.state.turn,
+                pendingBattleDamageContinuation: {
+                  battleId: battle.battleId,
+                  stage: "CHARACTER_KO_REPLACEMENT",
+                  targetInstanceId,
+                  causingPlayerIndex: pi as 0 | 1,
+                  attackerIsCharacter:
+                    attackerCheck.found!.card.zone === "CHARACTER",
+                  ...(replacement.replaced && { resolution: "REPLACED" as const }),
+                  ...(optionalEffectId !== undefined && {
+                    replacementEffectId: optionalEffectId,
+                  }),
+                },
+              },
+            },
+            events: [],
             damagedPlayerIndex,
             pendingPrompt: replacement.pendingPrompt,
           };
@@ -1297,50 +1333,15 @@ function executeDamageStep(
         if (replacement.replaced) {
           nextState = replacement.state;
           events.push(...replacement.events);
-        } else if (
-          isRemovalProhibited(
-          nextState,
-          targetInstanceId,
-          {
-            action: "KO",
-            cause: "BATTLE",
-            causingController: pi as 0 | 1,
-            sourceCardInstanceId: battle.attackerInstanceId,
-          },
-            cardDb
-          )
-        ) {
-          // OPT-251: CANNOT_BE_KO (with cause BATTLE or ANY) prevents battle
-          // K.O.'s like Luffy's "cannot be K.O.'d in battle by Strike Characters".
-          // Combat Victory still fired; the character just doesn't leave the field.
         } else {
-          // KO the character — use koCharacter() to preserve instanceId for ON_KO triggers
-          const preKODonCount = targetFound.card.attachedDon.length;
-          const koResult = koCharacter(
+          nextState = koBattleLoser(
             nextState,
+            battle,
             targetInstanceId,
             pi as 0 | 1,
-            cardDb
+            cardDb,
+            events
           );
-          if (koResult) {
-            nextState = koResult.state;
-            for (const ev of koResult.events) {
-              if (ev.type === "CARD_KO" && ev.payload) {
-                events.push({
-                  type: "CARD_KO",
-                  playerIndex: ev.playerIndex,
-                  payload: {
-                    ...ev.payload,
-                    cause: "BATTLE",
-                    movementCause: "BATTLE",
-                    preKO_donCount: preKODonCount,
-                  },
-                });
-              } else {
-                events.push(ev);
-              }
-            }
-          }
         }
       }
     }
@@ -1351,6 +1352,121 @@ function executeDamageStep(
   nextState = endBattle(nextState, events);
 
   return { state: nextState, events, damagedPlayerIndex };
+}
+
+/** COMBAT_VICTORY for an attacker that beat a Character in battle. */
+function combatVictoryEvent(
+  causingPlayerIndex: 0 | 1,
+  battle: { attackerInstanceId: string; targetInstanceId: string }
+): PendingEvent {
+  return {
+    type: "COMBAT_VICTORY",
+    playerIndex: causingPlayerIndex,
+    payload: {
+      cardInstanceId: battle.attackerInstanceId,
+      targetInstanceId: battle.targetInstanceId,
+    },
+  };
+}
+
+/**
+ * Rules §7-1-4-1-2: K.O. the Character that lost the battle once no
+ * replacement applied. Shared by the synchronous Damage Step and its OPT-872
+ * resumption after a declined optional replacement (§8-1-3-4-1).
+ */
+function koBattleLoser(
+  state: GameState,
+  battle: { attackerInstanceId: string },
+  targetInstanceId: string,
+  causingPlayerIndex: 0 | 1,
+  cardDb: Map<string, CardData>,
+  events: PendingEvent[]
+): GameState {
+  const targetFound = findCardInState(state, targetInstanceId);
+  if (!targetFound || targetFound.card.zone !== "CHARACTER") return state;
+  if (
+    isRemovalProhibited(
+      state,
+      targetInstanceId,
+      {
+        action: "KO",
+        cause: "BATTLE",
+        causingController: causingPlayerIndex,
+        sourceCardInstanceId: battle.attackerInstanceId,
+      },
+      cardDb
+    )
+  ) {
+    // OPT-251: CANNOT_BE_KO (with cause BATTLE or ANY) prevents battle
+    // K.O.'s like Luffy's "cannot be K.O.'d in battle by Strike Characters".
+    // Combat Victory still fired; the character just doesn't leave the field.
+    return state;
+  }
+
+  // KO the character — use koCharacter() to preserve instanceId for ON_KO triggers
+  const preKODonCount = targetFound.card.attachedDon.length;
+  const koResult = koCharacter(state, targetInstanceId, causingPlayerIndex, cardDb);
+  if (!koResult) return state;
+  for (const ev of koResult.events) {
+    if (ev.type === "CARD_KO" && ev.payload) {
+      events.push({
+        type: "CARD_KO",
+        playerIndex: ev.playerIndex,
+        payload: {
+          ...ev.payload,
+          cause: "BATTLE",
+          movementCause: "BATTLE",
+          preKO_donCount: preKODonCount,
+        },
+      });
+    } else {
+      events.push(ev);
+    }
+  }
+  return koResult.state;
+}
+
+/**
+ * OPT-872: finish a Damage Step that paused on an optional battle-K.O.
+ * replacement. The batch matches the synchronous Damage Step: CHARACTER_BATTLES
+ * (Character attacker only), COMBAT_VICTORY, the replacement's own events, the
+ * K.O. when the replacement was not applied (§8-1-3-4-1), then End of the
+ * Battle (§7-1-5). The caller clears the continuation and checks its battleId.
+ */
+function finishCharacterBattleResult(
+  state: GameState,
+  pending: BattleKOReplacementContinuation,
+  replacementEvents: PendingEvent[],
+  cardDb: Map<string, CardData>
+): ExecuteResult {
+  const battle = state.turn.battle!;
+  const events: PendingEvent[] = [];
+  if (pending.attackerIsCharacter) {
+    events.push({
+      type: "CHARACTER_BATTLES",
+      playerIndex: pending.causingPlayerIndex,
+      payload: {
+        cardInstanceId: battle.attackerInstanceId,
+        targetInstanceId: pending.targetInstanceId,
+      },
+    });
+  }
+  events.push(combatVictoryEvent(pending.causingPlayerIndex, battle));
+  events.push(...replacementEvents);
+
+  let nextState = state;
+  if (pending.resolution !== "REPLACED") {
+    nextState = koBattleLoser(
+      nextState,
+      battle,
+      pending.targetInstanceId,
+      pending.causingPlayerIndex,
+      cardDb,
+      events
+    );
+  }
+  nextState = endBattle(nextState, events);
+  return { state: nextState, events };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
