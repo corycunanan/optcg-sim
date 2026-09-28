@@ -24,7 +24,7 @@ import type { EffectResolverServices } from "../services.js";
 import type { ActionResult } from "../types.js";
 import { isPresent } from "../../type-guards.js";
 import { getSearchAndPlayPickLimit } from "../action-utils.js";
-import { getDeckScryDestination, getDeckScryGroupSize } from "../actions/draw-search.js";
+import { getDeckScryDestination } from "../actions/draw-search.js";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -590,7 +590,11 @@ export type DeckScryResumeResult =
  *
  * `validTargets` holds the looked-at instance ids (executeDeckScry). Frames
  * persisted before OPT-839 recorded none; the deck cannot change while the
- * prompt is pending, so their group is re-derived from the schema's count.
+ * prompt is pending, so their group is re-derived with the size the base
+ * engine actually showed: `look_at ?? 5`, deliberately ignoring the `count`
+ * alias. Base ignored `count` (OP02-056 showed 5 cards), and the session gate
+ * (validateArrangeResponse) demands every card the saved prompt showed, so
+ * any other size would leave such a prompt unanswerable.
  *
  * Reordering cards inside the deck is not a zone transition
  * (ZONE-TRANSITION-CONTRACT): instances keep their identities.
@@ -609,7 +613,7 @@ export function handleArrangeDeckScry(
   const deck = state.players[controller].deck;
   const group = validTargets && validTargets.length > 0
     ? validTargets
-    : deck.slice(0, getDeckScryGroupSize(params, deck.length)).map((card) => card.instanceId);
+    : deck.slice(0, legacyDeckScryGroupSize(params, deck.length)).map((card) => card.instanceId);
   const groupSet = new Set(group);
 
   const kept = [
@@ -646,4 +650,12 @@ export function handleArrangeDeckScry(
   const players = [...state.players] as [typeof state.players[0], typeof state.players[1]];
   players[controller] = { ...state.players[controller], deck: newDeck };
   return { rejected: false, state: { ...state, players } };
+}
+
+/** Pre-OPT-839 group size (executeDeckScry on base): `count` was ignored. */
+function legacyDeckScryGroupSize(
+  params: { look_at?: number },
+  deckSize: number,
+): number {
+  return Math.max(0, Math.min(params.look_at ?? 5, deckSize));
 }
