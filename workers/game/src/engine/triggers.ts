@@ -774,10 +774,11 @@ function getSourceFilteredAttackCardId(
 
 /**
  * OPT-796: an attack by the host's controller dealt damage to the opponent's
- * Life. DAMAGE_DEALT is emitted only by battle damage (effect damage emits
- * none), once per Life card; the watcher binds to the attack's first damage so
- * [Double Attack] fires it once (qa_op03.md OP03-043). Lethal damage checks
- * no Life card, so it is not damage "to your opponent's Life".
+ * Life. DAMAGE_DEALT is emitted only by battle damage (DEAL_DAMAGE effects
+ * emit none today; whether Gaimon should see them is OPT-892), once per Life
+ * card; the watcher binds to the attack's first damage so [Double Attack]
+ * fires it once (qa_op03.md OP03-043). A lethal DAMAGE_DEALT checks no Life
+ * card, so it matches no watcher ([Double Attack] vs 1 Life: OPT-886).
  */
 function matchesAttackDamage(
   trigger: CustomTrigger,

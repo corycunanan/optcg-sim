@@ -777,14 +777,18 @@ Example:
 
 ### ATTACK_DEALS_DAMAGE
 
-Fires when an attack by this card's controller deals damage to the opponent's Life (OPT-796). It matches battle `DAMAGE_DEALT` events only, so effect damage never fires it (qa_op03.md OP03-043), and it:
+Fires when an attack by this card's controller deals damage to the opponent's Life (OPT-796). It matches battle `DAMAGE_DEALT` events, and it:
 
 - matches only the controller's own attacks — never the opponent's;
 - matches once per attack: only the damage the Damage Step deals first (`firstDamageOfAttack`), so a [Double Attack] attack dealing 2 damage fires it once (qa_op03.md OP03-043);
-- ignores lethal damage (0 Life: no Life card is checked; the attacker wins);
+- never matches a lethal `DAMAGE_DEALT` (damage determined at 0 Life, §7-1-4-1-1-1: no Life card is checked). This is per event; what a [Double Attack] against 1 Life should do is OPT-886;
 - still matches [Banish] damage and damage whose Life card is redirected by a replacement.
 
 The watcher activates after the Life check and before the resulting [Trigger] choice (qa_op03.md:88-140): the revealed Life card waits in `battle.pendingTriggerLifeCard` while the watcher resolves.
+
+Effect damage: the engine currently emits no `DAMAGE_DEALT` for `DEAL_DAMAGE` effects, so these watchers do not fire on it. Whether that is correct for OP03-043 Gaimon's "When you deal damage" is an open rules question (OPT-892). The Gaimon FAQ only rules out Life moved to hand or trashed by another card's effect.
+
+Sessions saved before OPT-796 still carry `LEADER_ATTACK_DEALS_DAMAGE` in their stored card schemas and trigger registry. `session/legacy-trigger-migration.ts` rewrites them at load to this encoding.
 
 ```typescript
 {
