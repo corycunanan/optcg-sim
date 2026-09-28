@@ -328,6 +328,8 @@ interface Action {
   chain?: ChainConnector;
   target_ref?: string;
   result_ref?: string;
+  conditions?: Condition;
+  optional?: true; // clause-level "you may" — see 04-ACTIONS.md
 }
 ```
 
