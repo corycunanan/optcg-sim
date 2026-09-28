@@ -39,6 +39,7 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { resumeBattleDamageContinuation } from "../engine/battle.js";
 import {
   SessionRepository,
   parseStoredSession,
@@ -904,6 +905,31 @@ describe("a finished game never resumes the battle", () => {
     expect(f.events("COMBAT_VICTORY")).toHaveLength(0);
     expect(f.events("END_OF_BATTLE")).toHaveLength(0);
     expect(f.continuation() ?? null).toBeNull();
+  });
+
+  it("resumeBattleDamageContinuation drops even an answered continuation on a finished game", () => {
+    // Unit-level: the lifecycle loop already stops on a terminal state; this
+    // pins the function's own guard for its direct caller in the REPLACEMENT
+    // branch.
+    const f = fixture();
+    const target = franky(f);
+    f.battle(target, f.attacker());
+    pendingBattleId(f);
+    const finished: GameState = {
+      ...f.state,
+      status: "FINISHED",
+      winner: 1,
+      pendingPrompt: null,
+      turn: {
+        ...f.state.turn,
+        pendingBattleDamageContinuation: { ...f.continuation()!, resolution: "NOT_REPLACED" },
+      },
+    };
+    const result = resumeBattleDamageContinuation(finished, f.db);
+    expect(result.events).toEqual([]);
+    expect(result.state.turn.pendingBattleDamageContinuation).toBeNull();
+    expect(result.state.turn.battle).toEqual(finished.turn.battle);
+    expect(result.state.players).toEqual(finished.players);
   });
 
   it("concede while the replacement prompt is pending clears the continuation", () => {
