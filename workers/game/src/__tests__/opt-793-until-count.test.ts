@@ -28,12 +28,28 @@ import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
+import { SessionRepository, type SessionStorage } from "../session/persistence.js";
 import {
   CARDS,
   createBattleReadyState,
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+
+class MemoryStorage implements SessionStorage {
+  readonly data = new Map<string, unknown>();
+  async get<T>(key: string): Promise<T | undefined> {
+    return this.data.get(key) as T | undefined;
+  }
+  async put(key: string, value: unknown): Promise<void>;
+  async put(entries: Record<string, unknown>): Promise<void>;
+  async put(keyOrEntries: string | Record<string, unknown>, value?: unknown): Promise<void> {
+    const entries = typeof keyOrEntries === "string" ? { [keyOrEntries]: value } : keyOrEntries;
+    for (const [key, entry] of Object.entries(entries)) this.data.set(key, structuredClone(entry));
+  }
+  async setAlarm(): Promise<void> {}
+  async deleteAlarm(): Promise<void> {}
+}
 
 function dons(owner: 0 | 1, count: number, state: "ACTIVE" | "RESTED", tag: string): DonInstance[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -314,5 +330,194 @@ describe("OPT-793 OP05-058 It's a Waste of Human Life!! — both players trim to
     expect(f.state.players[1].hand).toHaveLength(6);
     expect(f.selectHand(1, 1)).toBe(false);
     expect(f.state.players.map((p) => p.hand.length)).toEqual([5, 5]);
+  });
+});
+
+// ─── Slice 3: scheduled DON!! return OP08-074 ────────────────────────────────
+
+describe("OPT-793 OP08-074 Black Maria — end-of-turn return until DON!! equal", () => {
+  /**
+   * Own field starts at `ownField - added` DON!! (all rested) with a 10-card
+   * DON!! deck; activation adds `added` rested DON!!. Opponent has `oppField`
+   * DON!! in the cost area.
+   */
+  function activate(ownBefore: number, added: number, oppField: number) {
+    const f = fixture();
+    const maria = f.put("OP08-074", 0);
+    const s = f.state;
+    s.players[0].donCostArea = dons(0, ownBefore, "ACTIVE", "own");
+    s.players[0].donDeck = dons(0, 10 - ownBefore, "ACTIVE", "deck");
+    s.players[1].donCostArea = dons(1, oppField, "ACTIVE", "opp");
+    f.run({ type: "ACTIVATE_EFFECT", cardInstanceId: maria.instanceId, effectId: "activate_add_don" });
+    const prompt = f.state.pendingPrompt;
+    if (prompt?.options.promptType === "PLAYER_CHOICE") {
+      expect(f.respond({ type: "PLAYER_CHOICE", choiceId: `choose-value:${added}` })).toBe(false);
+    }
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.scheduledActions).toHaveLength(1);
+    return { f, maria };
+  }
+
+  function donChoicePrompt(state: GameState) {
+    const prompt = state.pendingPrompt;
+    expect(prompt?.options.promptType).toBe("PLAYER_CHOICE");
+    if (prompt?.options.promptType !== "PLAYER_CHOICE") throw new Error("expected PLAYER_CHOICE");
+    return { options: prompt.options, respondingPlayer: prompt.respondingPlayer };
+  }
+
+  it("8 DON!! vs opponent's 5 returns exactly 3 at end of turn, owner chooses", () => {
+    const { f } = activate(3, 5, 5);
+    expect(f.fieldDon(0)).toBe(8);
+    const deckBefore = f.state.players[0].donDeck.length;
+    f.run({ type: "ADVANCE_PHASE" });
+    const { options, respondingPlayer } = donChoicePrompt(f.state);
+    expect(respondingPlayer).toBe(0);
+    expect(options.donReturn?.count).toBe(3);
+    // 3 active + 5 rested in the cost area → 4 distinct plans (0..3 active).
+    expect(options.choices.map((c) => c.id).sort()).toEqual([
+      "don-return:0:3",
+      "don-return:1:3",
+      "don-return:2:3",
+      "don-return:3:3",
+    ]);
+    expect(f.state.turn.activePlayerIndex).toBe(0);
+    expect(f.respond({ type: "PLAYER_CHOICE", choiceId: "don-return:3:3" })).toBe(false);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.fieldDon(0)).toBe(5);
+    expect(f.state.players[0].donCostArea.every((d) => d.state === "RESTED")).toBe(true);
+    expect(f.state.players[0].donDeck).toHaveLength(deckBefore + 3);
+    expect(f.state.turn.activePlayerIndex).toBe(1);
+    expect(f.state.scheduledActions).toHaveLength(0);
+  });
+
+  it("rejects a choice id the prompt did not offer", () => {
+    const { f } = activate(3, 5, 5);
+    f.run({ type: "ADVANCE_PHASE" });
+    donChoicePrompt(f.state);
+    expect(f.respond({ type: "PLAYER_CHOICE", choiceId: "don-return:3:8" })).toBe(true);
+    expect(f.fieldDon(0)).toBe(8);
+    expect(f.respond({ type: "PLAYER_CHOICE", choiceId: "don-return:0:3" })).toBe(false);
+    expect(f.fieldDon(0)).toBe(5);
+  });
+
+  it.each([
+    ["equal", 3, 5, 8],
+    ["fewer", 0, 5, 8],
+  ])("%s DON!! than the opponent returns nothing", (_label, ownBefore, added, opp) => {
+    const { f } = activate(ownBefore, added, opp);
+    const own = f.fieldDon(0);
+    expect(own).toBeLessThanOrEqual(opp);
+    f.run({ type: "ADVANCE_PHASE" });
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.fieldDon(0)).toBe(own);
+    expect(f.state.eventLog.some((e) => e.type === "DON_DETACHED" && e.playerIndex === 0)).toBe(false);
+    expect(f.state.turn.activePlayerIndex).toBe(1);
+  });
+
+  it("reads the opponent's DON!! count at end of turn, not at activation", () => {
+    const { f } = activate(3, 5, 5);
+    // Opponent's field DON!! drops to 2 after activation (e.g. an effect returned them).
+    f.state.players[1].donCostArea = f.state.players[1].donCostArea.slice(0, 2);
+    // All own DON!! rested → a single plan, applied without a prompt.
+    f.state.players[0].donCostArea = f.state.players[0].donCostArea.map((d) => ({ ...d, state: "RESTED" as const }));
+    f.run({ type: "ADVANCE_PHASE" });
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.fieldDon(0)).toBe(2);
+    const detached = f.state.eventLog.filter((e) => e.type === "DON_DETACHED" && e.playerIndex === 0);
+    expect(detached).toHaveLength(1);
+    expect((detached[0].payload as { count: number }).count).toBe(6);
+  });
+
+  it("offers attached DON!! as returnable field DON!! and detaches the chosen ones", () => {
+    const { f, maria } = activate(3, 5, 5);
+    const s = f.state;
+    // Move 2 of the 8 onto the Leader and 1 onto Black Maria (field total stays 8).
+    const [a, b, c, ...rest] = s.players[0].donCostArea;
+    s.players[0].donCostArea = rest.map((d) => ({ ...d, state: "RESTED" as const }));
+    s.players[0].leader = {
+      ...s.players[0].leader,
+      attachedDon: [a, b].map((d) => ({ ...d, state: "ACTIVE" as const, attachedTo: s.players[0].leader.instanceId })),
+    };
+    const slot = s.players[0].characters.findIndex((ch) => ch?.instanceId === maria.instanceId);
+    s.players[0].characters[slot] = {
+      ...s.players[0].characters[slot]!,
+      attachedDon: [{ ...c, state: "ACTIVE" as const, attachedTo: maria.instanceId }],
+    };
+    expect(f.fieldDon(0)).toBe(8);
+    f.run({ type: "ADVANCE_PHASE" });
+    const { options } = donChoicePrompt(f.state);
+    const leaderId = f.state.players[0].leader.instanceId;
+    const choice = `don-return:0:3:${leaderId}=2,${maria.instanceId}=1`;
+    expect(options.choices.map((ch) => ch.id)).toContain(choice);
+    expect(f.respond({ type: "PLAYER_CHOICE", choiceId: choice })).toBe(false);
+    expect(f.fieldDon(0)).toBe(5);
+    expect(f.state.players[0].leader.attachedDon).toHaveLength(0);
+    expect(f.state.players[0].donDeck.every((d) => d.attachedTo === null && d.state === "ACTIVE")).toBe(true);
+  });
+
+  it("still returns after Black Maria left the field (OP08 FAQ)", () => {
+    const { f, maria } = activate(3, 5, 5);
+    const slot = f.state.players[0].characters.findIndex((ch) => ch?.instanceId === maria.instanceId);
+    f.state.players[0].characters[slot] = null;
+    f.state.players[0].donCostArea = f.state.players[0].donCostArea.map((d) => ({ ...d, state: "RESTED" as const }));
+    f.run({ type: "ADVANCE_PHASE" });
+    expect(f.fieldDon(0)).toBe(5);
+  });
+
+  it("persists across a saved prompt, fires once, and keeps end-phase event order", async () => {
+    const { f } = activate(3, 5, 5);
+    const scheduled = f.state.scheduledActions[0];
+    const setActive = (id: string) => ({
+      ...scheduled,
+      id,
+      action: { type: "SET_DON_ACTIVE" as const, params: { amount: 1, up_to: false } },
+    });
+    // Another end-of-turn effect on either side of Black Maria's return.
+    f.state = { ...f.state, scheduledActions: [setActive("before"), scheduled, setActive("after")] };
+    const logStart = f.state.eventLog.length;
+    f.run({ type: "ADVANCE_PHASE" });
+    expect(donChoicePrompt(f.state).options.donReturn?.count).toBe(3);
+    expect(f.state.eventLog.slice(logStart).map((e) => e.type)).toEqual(["PHASE_CHANGED", "DON_SET_ACTIVE"]);
+
+    const repository = new SessionRepository(new MemoryStorage(), {
+      nextJsUrl: "https://app.example.test",
+      workerSecret: "secret",
+    });
+    await repository.save({
+      state: f.state,
+      cardDb: f.db,
+      mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
+      testPriorityRolls: null,
+      undoHistory: [],
+    });
+    const restored = await repository.load();
+    expect(restored).not.toBeNull();
+    f.state = restored!.state;
+    expect(f.state.effectStack[0]?.phaseBoundaryContinuation?.remainingScheduledActions).toHaveLength(1);
+
+    expect(f.respond({ type: "PLAYER_CHOICE", choiceId: "don-return:1:3" })).toBe(false);
+    expect(f.fieldDon(0)).toBe(5);
+    expect(f.state.eventLog.slice(logStart).map((e) => e.type)).toEqual([
+      "PHASE_CHANGED",
+      "DON_SET_ACTIVE",
+      "DON_DETACHED",
+      "DON_SET_ACTIVE",
+      "TURN_ENDED",
+      "TURN_STARTED",
+      "PHASE_CHANGED",
+    ]);
+    expect(f.state.scheduledActions).toHaveLength(0);
+    expect(f.state.effectStack).toEqual([]);
+
+    // Through player 1's turn and back: nothing further is returned.
+    for (let i = 0; i < 10 && f.state.turn.activePlayerIndex === 1 && !f.state.pendingPrompt; i++) {
+      f.run({ type: "ADVANCE_PHASE" }, 1);
+    }
+    expect(f.state.turn.activePlayerIndex).toBe(0);
+    const detachedAfter = f.state.eventLog
+      .slice(logStart)
+      .filter((e) => e.type === "DON_DETACHED" && e.playerIndex === 0);
+    expect(detachedAfter).toHaveLength(1);
   });
 });
