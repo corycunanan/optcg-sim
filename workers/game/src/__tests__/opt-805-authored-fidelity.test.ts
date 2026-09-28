@@ -453,12 +453,22 @@ describe("OPT805 Crocodile authored Event pipeline", () => {
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.state.players[0].hand).toHaveLength(3);
   });
-  it("Crocodile trash-event matching is SELF and requires attached DON (supplemental unreachable Reiju combo)", () => {
+  // OPT-854: Main-from-trash (EB03-031 Reiju) is not card activation (rule
+  // 8-5-4; EB03-031 FAQ), so Crocodile ignores it. Hand activation stays SELF
+  // and DON-gated.
+  it("Crocodile ignores Main-from-trash; hand activation is SELF and requires attached DON", () => {
     const f = fixture();
     const croc = f.put("OP01-062", 0, "LEADER");
     attach(f, croc);
-    const event = {
+    const trash = {
       type: "EVENT_MAIN_RESOLVED_FROM_TRASH" as const,
+      playerIndex: 0 as const,
+      timestamp: 1,
+      payload: { cardInstanceId: "event-in-trash", cardId: "OP01-116" },
+    };
+    expect(matchTriggersForEvent(f.state, trash, f.db)).toHaveLength(0);
+    const event = {
+      type: "EVENT_ACTIVATED_FROM_HAND" as const,
       playerIndex: 0 as const,
       timestamp: 1,
       payload: { cardInstanceId: "event-in-trash", cardId: "OP01-116" },
