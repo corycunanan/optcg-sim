@@ -1060,6 +1060,13 @@ export function resumeBattleDamageContinuation(
   if (!pending || state.pendingPrompt || state.effectStack.length > 0) {
     return { state, events: [] };
   }
+  // A finished game never resumes a battle; drop the continuation.
+  if (state.status !== "IN_PROGRESS") {
+    return {
+      state: { ...state, turn: { ...state.turn, pendingBattleDamageContinuation: null } },
+      events: [],
+    };
+  }
 
   const battle = state.turn.battle;
   const clearedState: GameState = {
@@ -1071,6 +1078,13 @@ export function resumeBattleDamageContinuation(
   }
 
   if (pending.stage === "CHARACTER_KO_REPLACEMENT") {
+    // Only an answered continuation finishes the battle. An unanswered one
+    // reaching here has lost its prompt (no prompt is pending and the stack is
+    // empty), so nothing can answer it any more; discard it rather than
+    // guess a decline and K.O. the Character (OPT-872 review).
+    if (pending.resolution === undefined) {
+      return { state: clearedState, events: [] };
+    }
     return finishCharacterBattleResult(
       clearedState,
       pending,
@@ -1440,7 +1454,15 @@ function finishCharacterBattleResult(
   cardDb: Map<string, CardData>
 ): ExecuteResult {
   const battle = state.turn.battle!;
-  const events: PendingEvent[] = [];
+  // The prompting PASS's events (including this PHASE_CHANGED) were dropped by
+  // the pipeline, so rebuild it with the rest of the Damage Step batch.
+  const events: PendingEvent[] = [
+    {
+      type: "PHASE_CHANGED",
+      playerIndex: state.turn.activePlayerIndex,
+      payload: { from: "COUNTER_STEP", to: "DAMAGE_STEP" },
+    },
+  ];
   if (pending.attackerIsCharacter) {
     events.push({
       type: "CHARACTER_BATTLES",

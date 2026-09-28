@@ -322,6 +322,8 @@ export function resumePromptLifecycle(
   }
 
   while (
+    !gameOver &&
+    state.status === "IN_PROGRESS" &&
     !state.pendingPrompt &&
     state.effectStack.length === 0 &&
     state.turn.pendingBattleDamageContinuation
@@ -336,6 +338,11 @@ export function resumePromptLifecycle(
     state = pipeline.state;
     gameOver = pipeline.gameOver;
     if (gameOver) break;
+  }
+
+  // OPT-872: a battle never resumes once the game is over.
+  if (state.status !== "IN_PROGRESS" && state.turn.pendingBattleDamageContinuation) {
+    state = { ...state, turn: { ...state.turn, pendingBattleDamageContinuation: null } };
   }
 
   if (state.status === "IN_PROGRESS") {
