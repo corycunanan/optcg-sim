@@ -139,7 +139,7 @@ Actions that move cards between zones. The largest and most diverse action famil
 
 ### DRAW
 
-Draw cards from the top of the controller's deck into their hand.
+Draw cards from the top of a player's deck into their hand. The drawing player is the controller unless `target: { type: "PLAYER", controller: "OPPONENT" }` names the opponent.
 
 ```typescript
 interface DrawParams {
@@ -149,15 +149,26 @@ interface DrawParams {
 
 | Field | Value |
 |-------|-------|
-| **Target** | None (always the controller's deck/hand) |
-| **Failure mode** | If the deck has fewer cards than `amount`, draw as many as possible. If the deck is empty, the action is ignored. Deck-out loss is checked separately. |
-| **Fired events** | `CARD_DRAWN` per card (triggers `DRAW_OUTSIDE_DRAW_PHASE` if not during Draw Phase) |
-| **Example cards** | OP01-004 Usopp, EB04-044 Koby |
+| **Target** | Optional `PLAYER`; omitted or `controller: "SELF"` draws for the resolving controller, `controller: "OPPONENT"` draws for the opponent (inside `OPPONENT_ACTION` the resolving controller is already the opponent). A dynamic `amount` is still resolved from the resolving controller's perspective. |
+| **Failure mode** | If the drawing player's deck has fewer cards than `amount`, draw as many as possible. If it is empty, the action is ignored. Deck-out loss is checked separately. |
+| **Fired events** | `CARD_DRAWN` per card and `DRAW_OUTSIDE_DRAW_PHASE`, both attributed to the drawing player |
+| **Example cards** | OP01-004 Usopp, EB04-044 Koby, OP07-090 Morgans (opponent draws) |
 
 ```json
 {
   "type": "DRAW",
   "params": { "amount": 2 }
+}
+```
+
+Opponent draws — OP07-090: "Then, your opponent draws 1 card."
+
+```json
+{
+  "type": "DRAW",
+  "target": { "type": "PLAYER", "controller": "OPPONENT" },
+  "params": { "amount": 1 },
+  "chain": "THEN"
 }
 ```
 

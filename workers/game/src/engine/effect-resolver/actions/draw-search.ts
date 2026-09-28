@@ -31,10 +31,18 @@ export function executeDraw(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "DRAW");
+  // Dynamic amounts stay in the effect controller's frame; only the drawing
+  // player follows the PLAYER target (OP07-090 Morgans: "your opponent draws").
   const amount = resolveAmount(p.amount, resultRefs, state, controller, cardDb);
   if (amount <= 0) return { state, events, succeeded: false };
 
-  const player = state.players[controller];
+  const drawer: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
+  const player = state.players[drawer];
   const drawCount = Math.min(amount, player.deck.length);
   if (drawCount === 0) return { state, events, succeeded: false };
 
@@ -42,11 +50,11 @@ export function executeDraw(
   const moved = transitionCards(state, drawn.map((card) => card.instanceId), "HAND");
 
   for (const card of drawn) {
-    events.push({ type: "CARD_DRAWN", playerIndex: controller, payload: { cardId: card.cardId } });
+    events.push({ type: "CARD_DRAWN", playerIndex: drawer, payload: { cardId: card.cardId } });
   }
 
   if (drawCount > 0) {
-    events.push({ type: "DRAW_OUTSIDE_DRAW_PHASE", playerIndex: controller, payload: { count: drawCount } });
+    events.push({ type: "DRAW_OUTSIDE_DRAW_PHASE", playerIndex: drawer, payload: { count: drawCount } });
   }
 
   return {
