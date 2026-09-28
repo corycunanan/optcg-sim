@@ -178,7 +178,6 @@ export type CustomEventType =
   | "EVENT_TRIGGER_RESOLVED"
   | "CHARACTER_PLAYED"
   | "CARD_REMOVED_FROM_LIFE"
-  | "LIFE_CARD_REMOVED"
   | "TRIGGER_ACTIVATED"
   | "COMBAT_VICTORY"
   | "CHARACTER_BATTLES"
@@ -783,6 +782,13 @@ export interface ActionParamsMap {
     rest_destination?: string;
     pick_destination?: string;
     face?: "UP" | "DOWN";
+    /**
+     * Whether the picked cards are revealed to both players. Defaults to true:
+     * rule 11-2-1 requires a secret-to-secret move to be revealed, and printed
+     * searches say "reveal". Set false only when the card or its FAQ says the
+     * pick is not revealed (OP16-119); the owner still sees it privately.
+     */
+    reveal?: boolean;
   };
   TRASH_CARD: Record<string, never>;
   KO: Record<string, never>;
@@ -806,13 +812,25 @@ export interface ActionParamsMap {
     pick?: CountMode;
     shuffle_after?: boolean;
   };
-  DECK_SCRY: { look_at?: number; count?: number };
+  DECK_SCRY: {
+    look_at?: number;
+    /** Legacy alias for look_at (OP02-056); look_at wins when both are set. */
+    count?: number;
+    /**
+     * Where the whole looked-at group goes. The group is never split
+     * (OP17-050 FAQ). Defaults to TOP_OR_BOTTOM, the printed wording of every
+     * consumer except ST17-003 ("place them at the top of your deck").
+     */
+    destination?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
+  };
   SEARCH_TRASH_THE_REST: {
     look_at?: number;
     pick?: CountMode;
     filter?: TargetFilter;
     rest_destination?: string;
     pick_destination?: string;
+    /** Same contract as SEARCH_DECK.reveal (default true). */
+    reveal?: boolean;
   };
   SEARCH_AND_PLAY: {
     look_at?: number;
@@ -857,7 +875,16 @@ export interface ActionParamsMap {
   NEGATE_EFFECTS: Record<string, never>;
 
   GIVE_DON: { amount?: number; don_state?: CardState };
-  RETURN_DON_TO_DECK: { amount?: number | DynamicValue };
+  RETURN_DON_TO_DECK: {
+    amount?: number | DynamicValue;
+    /**
+     * "Return DON!! … until you have N DON!! on your field" (OP08-074): return
+     * max(0, field DON!! − N), resolved when the action resolves. The whole
+     * field (cost area + attached) is eligible; the controller chooses.
+     * Replaces `amount`.
+     */
+    until_count?: number | DynamicValue;
+  };
   ADD_DON_FROM_DECK: { amount?: number | DynamicValue; target_state?: CardState; up_to?: boolean };
   SET_DON_ACTIVE: { amount?: number | DynamicValue; up_to?: boolean };
   REST_DON: { amount?: number };
@@ -941,9 +968,10 @@ export interface ActionParamsMap {
     position?: "TOP" | "BOTTOM" | "TOP_OR_BOTTOM";
   };
   TRASH_FROM_LIFE: {
-    amount?: number;
+    amount?: number | DynamicValue;
     position?: "TOP" | "BOTTOM";
     controller?: Controller;
+    up_to?: boolean;
   };
   DRAIN_LIFE_TO_THRESHOLD: { threshold?: number };
   LIFE_CARD_TO_DECK: { amount?: number; position?: "TOP" | "BOTTOM" };
@@ -966,6 +994,11 @@ export interface ActionParamsMap {
     chooser?: "SELF" | "OPPONENT";
     amount?: number | DynamicValue;
     optional?: boolean;
+    /**
+     * "Trash cards from your hand until you have N": trash exactly
+     * max(0, hand − N) from the hand owner's hand, counted at resolution.
+     * Replaces `amount`; the hand owner chooses (OP14-054, OP05-058).
+     */
     until_count?: number;
     filter?: TargetFilter;
     _comment?: string;

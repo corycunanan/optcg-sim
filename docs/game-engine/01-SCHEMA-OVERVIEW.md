@@ -561,8 +561,13 @@ Example — OP04-048 Sasaki: "draw cards equal to the number you returned to you
 {
   "actions": [
     {
-      "type": "HAND_WHEEL",
+      "type": "RETURN_HAND_TO_DECK",
+      "params": { "position": "BOTTOM" },
       "result_ref": "returned_count"
+    },
+    {
+      "type": "SHUFFLE_DECK",
+      "chain": "THEN"
     },
     {
       "type": "DRAW",

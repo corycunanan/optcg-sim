@@ -440,7 +440,8 @@ export const ST13_009_SHANKS: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           target: { type: "OPPONENT_LIFE", controller: "OPPONENT" },
-          params: { amount: 1, position: "TOP" },
+          // "trash up to 1": the controller may choose 0 (OPT-731 choose-fewer).
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
       flags: { optional: true },

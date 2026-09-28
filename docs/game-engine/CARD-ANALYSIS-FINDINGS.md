@@ -457,7 +457,7 @@ The initial plan had ~25 action primitives. The full card pool requires approxim
 | `SEARCH_TRASH_THE_REST` | Look at top N, pick M, trash remainder (not deck bottom) | OP03-086, OP09-096, EB04-029 |
 | `SEARCH_AND_PLAY` | Look at top N, play matching card directly to field | OP01-116, OP03-094, OP04-084 |
 | `PLACE_HAND_TO_DECK` | Place card(s) from hand to top/bottom of deck | OP01-011, OP04-053, OP05-046 |
-| `HAND_WHEEL` | Return all hand to deck (shuffle or bottom), draw same count | OP04-048 Sasaki, P-002 |
+| `HAND_WHEEL` | Return all hand to deck (shuffle or bottom), draw same count | None authored; OP04-048 Sasaki and P-002 use `RETURN_HAND_TO_DECK` → `SHUFFLE_DECK` → `DRAW` (OPT-853) |
 | `REVEAL_HAND` | Force opponent to reveal entire hand | OP07-090 Morgans |
 | `SHUFFLE_DECK` | Explicit deck shuffle (not implied by search) | OP06-047, OP08-071 |
 | `EXTRA_TURN` | Take an additional turn after this one | OP05-119 Monkey.D.Luffy |

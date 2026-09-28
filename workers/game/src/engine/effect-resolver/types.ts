@@ -106,6 +106,9 @@ export interface EffectResolverResult {
   pendingPrompt?: PendingPromptState;
   /** The supplied prompt response was invalid and must not consume its frame. */
   rejected?: boolean;
+  /** The block was skipped before activation (once-per-turn spent or its
+   * activation cost unpayable, rules 8-3-1-3). An unmet "if" still activates. */
+  effectNotActivated?: boolean;
 }
 
 export interface ActionResult {

@@ -57,6 +57,22 @@ export function executeAddToLifeFromDeck(
   };
 }
 
+/**
+ * OPT-851: the Life owner of TRASH_FROM_LIFE, relative to the effect
+ * controller. Authored consumers name the opponent's Life either through
+ * `params.controller` or through the target (`OPPONENT_LIFE`, or a target
+ * `controller: "OPPONENT"`); an explicit `params.controller` wins, and with no
+ * signal the controller's own Life is trashed.
+ */
+export function trashFromLifeOwner(
+  action: ActionOf<"TRASH_FROM_LIFE">,
+  controller: 0 | 1,
+): 0 | 1 {
+  const side = action.params?.controller
+    ?? (action.target?.type === "OPPONENT_LIFE" ? "OPPONENT" : action.target?.controller);
+  return side === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
+}
+
 // OPT-259 (F6): trashing a Life card is not damage — never fire [Trigger].
 export function executeTrashFromLife(
   state: GameState,
@@ -68,11 +84,10 @@ export function executeTrashFromLife(
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = params.amount ?? 1;
+  const amount = resolveAmount(params.amount ?? 1, _resultRefs, state, controller, _cardDb);
   const position = params.position ?? "TOP";
 
-  const pi: 0 | 1 =
-    params.controller === "OPPONENT" ? (controller === 0 ? 1 : 0) : controller;
+  const pi = trashFromLifeOwner(action, controller);
   const p = state.players[pi];
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };

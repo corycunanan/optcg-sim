@@ -363,7 +363,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **7-1-4-1-1-1.** 0 life + damage = defeat | **IMPL** | `battle.ts` damage loop + `defeat.ts:31–34` | Life-0 check runs at the start of each damage instance |
 | **7-1-4-1-1-2.** Life → hand; trigger option | **IMPL** | `battle.ts:339–372` | Normal: add to hand. Trigger: pause for REVEAL_TRIGGER |
 | **7-1-4-1-1-3.** Double Attack: 2 damage | **IMPL** | `battle.ts:301` | `damageCount = hasDoubleAttack ? 2 : 1` |
-| **7-1-4-1-2.** Character attacked: K.O. | **IMPL** | `battle.ts:377–380` | `moveCard(state, targetId, "TRASH")` + `CARD_KO` event |
+| **7-1-4-1-2.** Character attacked: K.O. | **IMPL** | `battle.ts → koBattleLoser()`; [`opt-872-battle-ko-replacement-continuation.test.ts`](../../workers/game/src/__tests__/opt-872-battle-ko-replacement-continuation.test.ts) | `koCharacter()` + `CARD_KO` (cause `BATTLE`). An optional replacement prompt pauses the Damage Step through a `CHARACTER_KO_REPLACEMENT` continuation; the answer resumes it exactly once (see 06 §Battle K.O. replacements) |
 | **7-1-4-2.** Attacker loses: nothing happens | **IMPL** | `battle.ts:384` comment | Falls through to `endBattle()` |
 
 ### 7-1-5. End of Battle
@@ -425,7 +425,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **8-5-1 to 8-5-4.** Distinct concepts | **PARTIAL** | — | Engine distinguishes "play Event card" from "activate effect on card" but doesn't track which distinction matters for triggers like "when you activate an Event" |
+| **8-5-1 to 8-5-4.** Distinct concepts | **IMPL** | `effect-resolver/actions/play.ts`, `effect-resolver/event-activation.ts`, [`opt-854-event-activation-watchers.test.ts`](../../workers/game/src/__tests__/opt-854-event-activation-watchers.test.ts) | Card activation (hand [Main] play, [Counter] use, effect-driven hand activation) publishes `EVENT_ACTIVATED_FROM_HAND`, the only class "when you activate an Event" watchers observe. Resolving an Event [Main] from trash (EB03-031) is effect activation and publishes `EVENT_MAIN_RESOLVED_FROM_TRASH`, which no watcher observes (EB03-031 FAQ) |
 
 ### 8-6. Order of Effect Resolution
 

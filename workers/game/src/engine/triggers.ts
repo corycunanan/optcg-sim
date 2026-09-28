@@ -812,48 +812,63 @@ function customEventMatchesGameEvent(custom: CustomEventType, event: GameEvent, 
   return mapped !== null && event.type === mapped;
 }
 
+/**
+ * Authored `trigger.event` → the GameEventType it listens for. Adding a new
+ * custom event is one entry here; `schema-trigger-event-lint.ts` (OPT-801)
+ * rejects any authored event that neither maps here nor is listed in
+ * `BESPOKE_CUSTOM_EVENTS`.
+ */
+const CUSTOM_EVENT_TO_GAME_EVENT: Partial<Record<CustomEventType, GameEventType>> = {
+  OPPONENT_CHARACTER_KO: "CARD_KO",
+  ANY_CHARACTER_KO: "CARD_KO",
+  // OPT-235: "when a Character is trashed" watchers (Basil-style) match the
+  // CARD_TRASHED event emitted by trashCharacter — distinct from CARD_KO per
+  // rule 10-2-1-3. ON_KO keyword triggers intentionally do NOT listen for
+  // CARD_TRASHED, so a KO replaced by trash suppresses Rob Lucci-style
+  // ON_KO watchers while still firing these CHARACTER_TRASHED watchers.
+  ANY_CHARACTER_TRASHED: "CARD_TRASHED",
+  OPPONENT_CHARACTER_TRASHED: "CARD_TRASHED",
+  DON_RETURNED_TO_DON_DECK: "DON_DETACHED",
+  DON_GIVEN_TO_CARD: "DON_GIVEN_TO_CARD",
+  // OPT-236: three distinct Event-activation event classes. Each maps to its
+  // own GameEventType rather than all collapsing to CARD_PLAYED, so Usopp-style
+  // watchers on FROM_HAND don't spuriously fire on Character plays (which emit
+  // CARD_PLAYED) or on Event [Trigger] resolutions from life.
+  EVENT_ACTIVATED_FROM_HAND: "EVENT_ACTIVATED_FROM_HAND",
+  EVENT_MAIN_RESOLVED_FROM_TRASH: "EVENT_MAIN_RESOLVED_FROM_TRASH",
+  EVENT_TRIGGER_RESOLVED: "EVENT_TRIGGER_RESOLVED",
+  CHARACTER_PLAYED: "CARD_PLAYED",
+  // OPT-240: CARD_REMOVED_FROM_LIFE is its own GameEventType emitted after
+  // any life exit (banish, add-to-hand, trigger resolution). Previously
+  // aliased to CARD_ADDED_TO_HAND_FROM_LIFE, which missed banish + trigger
+  // paths and collapsed the FAQ's "after-trigger" ordering.
+  CARD_REMOVED_FROM_LIFE: "CARD_REMOVED_FROM_LIFE",
+  TRIGGER_ACTIVATED: "TRIGGER_ACTIVATED",
+  DAMAGE_TAKEN: "DAMAGE_DEALT",
+  BLOCKER_ACTIVATED: "BLOCK_DECLARED",
+  LEADER_ATTACK_DEALS_DAMAGE: "DAMAGE_DEALT",
+  CARD_ADDED_TO_HAND_FROM_LIFE: "CARD_ADDED_TO_HAND_FROM_LIFE",
+  CARD_TRASHED_FROM_HAND: "CARD_TRASHED",
+  CHARACTER_BECOMES_RESTED: "CARD_STATE_CHANGED",
+  CHARACTER_RETURNED_TO_HAND: "CARD_RETURNED_TO_HAND",
+  COMBAT_VICTORY: "COMBAT_VICTORY",
+  CHARACTER_BATTLES: "CHARACTER_BATTLES",
+  END_OF_BATTLE: "END_OF_BATTLE",
+  BATTLE_ABORTED: "BATTLE_ABORTED",
+  LIFE_COUNT_BECOMES_ZERO: "LIFE_COUNT_BECOMES_ZERO",
+  DRAW_OUTSIDE_DRAW_PHASE: "DRAW_OUTSIDE_DRAW_PHASE",
+};
+
+/** Custom events matched by bespoke logic in `customEventMatchesGameEvent` instead of the map. */
+const BESPOKE_CUSTOM_EVENTS: ReadonlySet<string> = new Set<CustomEventType>(["CHARACTER_REMOVED_FROM_FIELD"]);
+
+/** True when an authored `trigger.event` can ever match a GameEvent (OPT-801). */
+export function isMatchableCustomEvent(event: string): boolean {
+  return BESPOKE_CUSTOM_EVENTS.has(event) || Object.hasOwn(CUSTOM_EVENT_TO_GAME_EVENT, event);
+}
+
 function customEventToGameEvent(event: CustomEventType): GameEventType | null {
-  const map: Partial<Record<CustomEventType, GameEventType>> = {
-    OPPONENT_CHARACTER_KO: "CARD_KO",
-    ANY_CHARACTER_KO: "CARD_KO",
-    // OPT-235: "when a Character is trashed" watchers (Basil-style) match the
-    // CARD_TRASHED event emitted by trashCharacter — distinct from CARD_KO per
-    // rule 10-2-1-3. ON_KO keyword triggers intentionally do NOT listen for
-    // CARD_TRASHED, so a KO replaced by trash suppresses Rob Lucci-style
-    // ON_KO watchers while still firing these CHARACTER_TRASHED watchers.
-    ANY_CHARACTER_TRASHED: "CARD_TRASHED",
-    OPPONENT_CHARACTER_TRASHED: "CARD_TRASHED",
-    DON_RETURNED_TO_DON_DECK: "DON_DETACHED",
-    DON_GIVEN_TO_CARD: "DON_GIVEN_TO_CARD",
-    // OPT-236: three distinct Event-activation event classes. Each maps to its
-    // own GameEventType rather than all collapsing to CARD_PLAYED, so Usopp-style
-    // watchers on FROM_HAND don't spuriously fire on Character plays (which emit
-    // CARD_PLAYED) or on Event [Trigger] resolutions from life.
-    EVENT_ACTIVATED_FROM_HAND: "EVENT_ACTIVATED_FROM_HAND",
-    EVENT_MAIN_RESOLVED_FROM_TRASH: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-    EVENT_TRIGGER_RESOLVED: "EVENT_TRIGGER_RESOLVED",
-    CHARACTER_PLAYED: "CARD_PLAYED",
-    // OPT-240: CARD_REMOVED_FROM_LIFE is its own GameEventType emitted after
-    // any life exit (banish, add-to-hand, trigger resolution). Previously
-    // aliased to CARD_ADDED_TO_HAND_FROM_LIFE, which missed banish + trigger
-    // paths and collapsed the FAQ's "after-trigger" ordering.
-    CARD_REMOVED_FROM_LIFE: "CARD_REMOVED_FROM_LIFE",
-    TRIGGER_ACTIVATED: "TRIGGER_ACTIVATED",
-    DAMAGE_TAKEN: "DAMAGE_DEALT",
-    BLOCKER_ACTIVATED: "BLOCK_DECLARED",
-    LEADER_ATTACK_DEALS_DAMAGE: "DAMAGE_DEALT",
-    CARD_ADDED_TO_HAND_FROM_LIFE: "CARD_ADDED_TO_HAND_FROM_LIFE",
-    CARD_TRASHED_FROM_HAND: "CARD_TRASHED",
-    CHARACTER_BECOMES_RESTED: "CARD_STATE_CHANGED",
-    CHARACTER_RETURNED_TO_HAND: "CARD_RETURNED_TO_HAND",
-    COMBAT_VICTORY: "COMBAT_VICTORY",
-    CHARACTER_BATTLES: "CHARACTER_BATTLES",
-    END_OF_BATTLE: "END_OF_BATTLE",
-    BATTLE_ABORTED: "BATTLE_ABORTED",
-    LIFE_COUNT_BECOMES_ZERO: "LIFE_COUNT_BECOMES_ZERO",
-    DRAW_OUTSIDE_DRAW_PHASE: "DRAW_OUTSIDE_DRAW_PHASE",
-  };
-  return map[event] ?? null;
+  return CUSTOM_EVENT_TO_GAME_EVENT[event] ?? null;
 }
 
 function matchesEventFilter(
