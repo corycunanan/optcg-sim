@@ -4,7 +4,7 @@
  * REST_DON, DISTRIBUTE_DON, REDISTRIBUTE_DON, GIVE_OPPONENT_DON_TO_OPPONENT
  */
 
-import type { ActionOf, EffectResult } from "../../effect-types.js";
+import type { ActionOf, DynamicValue, EffectResult } from "../../effect-types.js";
 import type {
   CardData,
   GameState,
@@ -24,7 +24,7 @@ import {
   needsPlayerTargetSelection,
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
-import { promptEffectDescription, resolveAmount } from "../action-utils.js";
+import { promptEffectDescription, resolveAmount, tryResolveAmount } from "../action-utils.js";
 
 export function executeGiveDon(
   state: GameState,
@@ -326,6 +326,36 @@ export function executeForceOpponentDonReturn(
     return { state: applied.state, events: [...events, ...applied.events], succeeded: true };
   }
 
+  return {
+    state,
+    events,
+    succeeded: false,
+    pendingPrompt: buildFieldDonReturnPrompt(
+      p, opp, count, plans, activeAvail, restedAvail, attachedSources,
+      action, sourceCardInstanceId, controller, cardDb, resultRefs,
+    ),
+  };
+}
+
+/**
+ * PLAYER_CHOICE prompt for a field DON!! return with a genuine choice: one
+ * option per distinct plan, answered by the DON!! owner (`owner`). Resumed by
+ * `handlePlayerChoiceDonReturn` (resume/choice.ts).
+ */
+function buildFieldDonReturnPrompt(
+  p: GameState["players"][0],
+  owner: 0 | 1,
+  count: number,
+  plans: FieldDonReturnPlan[],
+  activeAvail: number,
+  restedAvail: number,
+  attachedSources: { cardInstanceId: string; cap: number }[],
+  action: ActionOf<"FORCE_OPPONENT_DON_RETURN"> | ActionOf<"RETURN_DON_TO_DECK">,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): PendingPromptState {
   const cardLabel = (instanceId: string): string => {
     if (p.leader.instanceId === instanceId) {
       const name = cardDb.get(p.leader.cardId)?.name || "Leader";
@@ -370,17 +400,16 @@ export function executeForceOpponentDonReturn(
     resultRefs: [...resultRefs.entries()],
     validTargets: choices.map((c) => c.id),
   };
-  const pendingPrompt: PendingPromptState = {
+  return {
     options: {
       promptType: "PLAYER_CHOICE",
       effectDescription: `Choose which DON!! to return to your DON!! deck (${count})`,
       choices,
       donReturn: { count, sources: donReturnSources },
     },
-    respondingPlayer: opp,
+    respondingPlayer: owner,
     resumeContext: resumeCtx,
   };
-  return { state, events, succeeded: false, pendingPrompt };
 }
 
 export function executeSetDonActive(
@@ -459,16 +488,72 @@ export function executeRestOpponentDon(
   };
 }
 
+/**
+ * "Return DON!! cards from your field to your DON!! deck until you have N"
+ * (OP08-074 Black Maria). N is resolved when the action resolves — for a
+ * scheduled end-of-turn return that is the end of turn, not activation. The
+ * returnable pool is the controller's whole field (cost area + DON!! attached
+ * to the Leader/Characters, Rules 3-1-2 / 8-3-1-6), and the controller picks
+ * which DON!! go back when more than one distribution exists. At or below N,
+ * nothing is returned. An unresolvable N returns nothing (fails closed).
+ */
+function returnDonUntilCount(
+  state: GameState,
+  action: ActionOf<"RETURN_DON_TO_DECK">,
+  untilCount: number | DynamicValue,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const target = tryResolveAmount(untilCount, resultRefs, state, controller, cardDb);
+  if (target === null) return { state, events, succeeded: false };
+
+  const p = state.players[controller];
+  const activeAvail = p.donCostArea.filter((d) => d.state === "ACTIVE").length;
+  const restedAvail = p.donCostArea.length - activeAvail;
+  const attachedSources = attachedDonSources(p);
+  const fieldTotal = p.donCostArea.length + attachedSources.reduce((s, a) => s + a.cap, 0);
+
+  const count = Math.max(0, fieldTotal - target);
+  if (count === 0) return { state, events, succeeded: false };
+
+  const plans = enumerateDonReturnPlans(activeAvail, restedAvail, attachedSources, count);
+  if (plans.length <= 1) {
+    const applied = applyFieldDonReturn(state, controller, plans[0]);
+    return {
+      state: applied.state,
+      events: applied.events,
+      succeeded: true,
+      result: { targetInstanceIds: [], count: applied.returned },
+    };
+  }
+
+  return {
+    state,
+    events,
+    succeeded: false,
+    pendingPrompt: buildFieldDonReturnPrompt(
+      p, controller, count, plans, activeAvail, restedAvail, attachedSources,
+      action, sourceCardInstanceId, controller, cardDb, resultRefs,
+    ),
+  };
+}
+
 export function executeReturnDonToDeck(
   state: GameState,
   action: ActionOf<"RETURN_DON_TO_DECK">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
+  if (params.until_count !== undefined) {
+    return returnDonUntilCount(state, action, params.until_count, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
   const amount = resolveAmount(
     params.amount ?? 1,
     resultRefs,

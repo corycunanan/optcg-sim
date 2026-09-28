@@ -2605,9 +2605,12 @@ export const OP08_074_BLACK_MARIA: EffectSchema = {
       flags: { once_per_turn: true },
       conditions: {
         not: {
+          // "no other [Black Maria]": CARD_ON_FIELD honors the condition-level
+          // exclude_self; a filter-level exclude_self is ignored there.
           type: "CARD_ON_FIELD",
           controller: "SELF",
-          filter: { name: "Black Maria", exclude_self: true },
+          filter: { name: "Black Maria" },
+          exclude_self: true,
         },
       },
       actions: [
@@ -2622,9 +2625,13 @@ export const OP08_074_BLACK_MARIA: EffectSchema = {
             action: {
               type: "RETURN_DON_TO_DECK",
               params: {
-                amount: {
+                // Read at end of turn: return until own field DON!! equals
+                // the opponent's field DON!! (OP08 FAQ: even if this
+                // Character has left the field).
+                until_count: {
                   type: "GAME_STATE",
                   source: "DON_FIELD_COUNT",
+                  controller: "OPPONENT",
                 },
               },
             },

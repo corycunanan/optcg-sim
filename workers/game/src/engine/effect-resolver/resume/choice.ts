@@ -199,7 +199,8 @@ export function handlePlayerChoiceStateDistribution(
 }
 
 /**
- * OPT-413 / OPT-426: FORCE_OPPONENT_DON_RETURN choice — the DON!! owner picked
+ * OPT-413 / OPT-426: FORCE_OPPONENT_DON_RETURN choice (and OPT-793
+ * RETURN_DON_TO_DECK until_count) — the DON!! owner picked
  * which field DON!! return (OP16-074 Magellan FAQ). The plan covers cost-area
  * active/rested DON!! plus DON!! detached from named Leader/Characters; see
  * `decodeFieldDonReturnChoice` for the id grammar. Rejects choices the prompt
@@ -218,7 +219,8 @@ export function handlePlayerChoiceDonReturn(
   if (
     action.type !== "PLAYER_CHOICE" ||
     !pausedAction ||
-    pausedAction.type !== "FORCE_OPPONENT_DON_RETURN"
+    (pausedAction.type !== "FORCE_OPPONENT_DON_RETURN" &&
+      pausedAction.type !== "RETURN_DON_TO_DECK")
   ) {
     return null;
   }
@@ -239,8 +241,13 @@ export function handlePlayerChoiceDonReturn(
     };
   }
 
-  const opp: 0 | 1 = controller === 0 ? 1 : 0;
-  const applied = applyFieldDonReturn(state, opp, decoded.plan);
+  // FORCE_OPPONENT_DON_RETURN returns the opponent's DON!!; OPT-793
+  // RETURN_DON_TO_DECK until_count (OP08-074) returns the controller's own.
+  const owner: 0 | 1 =
+    pausedAction.type === "RETURN_DON_TO_DECK"
+      ? controller
+      : controller === 0 ? 1 : 0;
+  const applied = applyFieldDonReturn(state, owner, decoded.plan);
   events.push(...applied.events);
   return { kind: "fallthrough", state: applied.state };
 }

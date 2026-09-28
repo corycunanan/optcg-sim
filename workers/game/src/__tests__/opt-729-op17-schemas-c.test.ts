@@ -19,6 +19,7 @@ import type { EffectSchema } from "../engine/effect-types.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
 import {
   OP17_053_BARBELL,
   OP17_054_MISS_BUCKINGHAM_STUSSY,
@@ -143,9 +144,13 @@ function selectTargets(
   cardDb: Map<string, CardData>,
 ): PromptResult {
   expect(result.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  // OPT-838: blind hand prompts offer slot tokens; the session lifecycle
+  // translates them before resume, so direct resumes must do the same.
+  const translated = translateBlindHandSelection(result.pendingPrompt!, selectedInstanceIds);
+  if (!translated) throw new Error("Selection is not a slot of this prompt");
   return resumeFromStack(
     result.state,
-    { type: "SELECT_TARGET", selectedInstanceIds },
+    { type: "SELECT_TARGET", selectedInstanceIds: translated },
     cardDb,
   );
 }
@@ -252,14 +257,16 @@ describe("OPT-729 opponent-relative wrapper completion", () => {
     expect(result.state.players[1].deck).toHaveLength(opponentDeck + 2);
   });
 
-  it("OP17-075 returns the owner's DON and trashes only the opponent's hand", () => {
+  // OPT-838 / qa_op17 OP17-075: the effect's controller chooses face-down.
+  it("OP17-075 returns the owner's DON and blindly trashes only the opponent's hand", () => {
     const { state, cardDb, source } = installCharacter(OP17_075_X_DRAKE);
     const ownerHand = state.players[0].hand.length;
     const ownerDon = state.players[0].donCostArea.length;
     const opponentHand = state.players[1].hand.length;
     const opponentTrash = state.players[1].trash.length;
     let result = resolveBlock(state, cardDb, source, OP17_075_X_DRAKE, "on_play_opponent_trash");
-    expect(result.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(result.pendingPrompt?.options).toMatchObject({ blindSelection: true });
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") throw new Error("hand prompt");
     result = selectTargets(result, [result.pendingPrompt.options.validTargets[0]], cardDb);
     expect(result.pendingPrompt).toBeUndefined();

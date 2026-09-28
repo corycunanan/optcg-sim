@@ -82,8 +82,21 @@ function fixture() {
     ).toBe(rejected);
     state = result.state;
   }
+  // OPT-838: blind hand prompts offer opaque slot tokens. Tests name cards by
+  // instance id; map each named card to its slot token (unknown ids pass
+  // through unchanged, so non-member replies stay non-members).
+  function asSlots(ids: string[]) {
+    const slots = state.pendingPrompt?.blindSlots;
+    if (!slots) return ids;
+    return ids.map(
+      (id) => slots.find((slot) => slot.instanceId === id)?.token ?? id
+    );
+  }
   function select(ids: string[], rejected = false) {
-    choice({ type: "SELECT_TARGET", selectedInstanceIds: ids }, rejected);
+    choice(
+      { type: "SELECT_TARGET", selectedInstanceIds: asSlots(ids) },
+      rejected
+    );
   }
   function accept() {
     choice({ type: "PLAYER_CHOICE", choiceId: "accept" });
@@ -102,6 +115,7 @@ function fixture() {
     act,
     choice,
     select,
+    asSlots,
     accept,
     targets,
     persist() {
@@ -150,7 +164,11 @@ describe("OPT-855 registered Bao Huang", () => {
         expect(f.targets()).toMatchObject({ blindSelection: true, countMin: 2, countMax: 2 });
         const wire = filterPromptForPlayer(f.state.pendingPrompt, owner)!;
         expect(wire.resumeContext).toBeNull();
-        expect(wire.options).toMatchObject({ cards: hand.map((c) => ({ instanceId: c.instanceId, cardId: "hidden" })) });
+        // OPT-838: the responder sees opaque shuffled slot tokens only.
+        const slots = f.state.pendingPrompt!.blindSlots!;
+        expect(wire.options).toMatchObject({ cards: slots.map((s) => ({ instanceId: s.token, cardId: "hidden" })) });
+        expect(slots.map((s) => s.instanceId).sort()).toEqual(hand.map((c) => c.instanceId).sort());
+        for (const c of hand) expect(JSON.stringify(wire)).not.toContain(c.instanceId);
         expect(filterPromptForPlayer(f.state.pendingPrompt, opponent)).toBeNull();
         for (const c of hand) {
           expect(JSON.stringify(visibleStateForPlayer(f.state, f.db, owner))).not.toContain(c.cardId);
@@ -194,7 +212,10 @@ describe("OPT-855 registered Bao Huang", () => {
       f.select([hand[0].instanceId, hand[2].instanceId]);
       expect(reveals(f)).toEqual([]);
       expect(f.state.pendingPrompt?.respondingPlayer).toBe(owner);
-      expect(f.targets()).toMatchObject({ blindSelection: true, countMin: 2, countMax: 2, validTargets: hand.slice(1).map((c) => c.instanceId) });
+      expect(f.targets()).toMatchObject({ blindSelection: true, countMin: 2, countMax: 2 });
+      // OPT-838: the re-prompt offers fresh slot tokens for the live hand.
+      expect(f.state.pendingPrompt!.blindSlots!.map((s) => s.instanceId).sort()).toEqual(hand.slice(1).map((c) => c.instanceId).sort());
+      expect(f.targets().validTargets).toEqual(f.state.pendingPrompt!.blindSlots!.map((s) => s.token));
       f.persist();
       f.select(hand.slice(1).map((c) => c.instanceId));
       expect(f.state.pendingPrompt).toBeNull();
@@ -222,7 +243,9 @@ describe("OPT-855 registered Bao Huang", () => {
       expect(result.succeeded).toBe(false);
       expect(result.events).toEqual([]);
       expect(result.pendingPrompt?.options).toMatchObject({ blindSelection: true, countMin: 2, countMax: 2 });
-      expect(result.state).toBe(f.state);
+      // OPT-838: re-prompting draws slot order from the engine RNG, so only
+      // the execution context may change.
+      expect({ ...result.state, executionContext: f.state.executionContext }).toEqual(f.state);
     }
   });
 });

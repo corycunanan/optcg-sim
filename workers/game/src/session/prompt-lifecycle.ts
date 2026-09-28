@@ -29,6 +29,7 @@ import {
   type ReplacementBatchResumeContext,
 } from "../engine/replacements.js";
 import { isDeclineResponse } from "./coordinator.js";
+import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
 
 export interface PromptLifecycleServices {
   drainPregame(state: GameState): GameState;
@@ -48,7 +49,7 @@ export interface PromptLifecycleResult {
  */
 export function resumePromptLifecycle(
   stateBeforeResume: GameState,
-  action: GameAction,
+  reply: GameAction,
   cardDb: Map<string, CardData>,
   services: PromptLifecycleServices
 ): PromptLifecycleResult {
@@ -60,14 +61,15 @@ export function resumePromptLifecycle(
   // Blind choices carry a chooser and hidden-face policy that generic target
   // reconstruction cannot recover from the effect controller. Reject malformed
   // replies before clearing the original prompt or consuming its continuation.
+  let action = reply;
   if (
     prompt.options.promptType === "SELECT_TARGET" &&
     prompt.options.blindSelection
   ) {
-    if (action.type !== "SELECT_TARGET") {
+    if (reply.type !== "SELECT_TARGET") {
       return { state: stateBeforeResume, responseRejected: true };
     }
-    const selected = action.selectedInstanceIds;
+    const selected = reply.selectedInstanceIds;
     const { countMin, countMax, validTargets } = prompt.options;
     if (
       selected.length < countMin ||
@@ -77,6 +79,13 @@ export function resumePromptLifecycle(
     ) {
       return { state: stateBeforeResume, responseRejected: true };
     }
+    // Hand-sourced blind prompts offer opaque slot tokens (OPT-838). Resume
+    // with the instance ids they name; anything else is rejected intact.
+    const translated = translateBlindHandSelection(prompt, selected);
+    if (!translated) {
+      return { state: stateBeforeResume, responseRejected: true };
+    }
+    action = { ...reply, selectedInstanceIds: translated };
   }
 
   const resumeContext = prompt.resumeContext;

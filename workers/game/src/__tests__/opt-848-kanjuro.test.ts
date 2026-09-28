@@ -84,8 +84,21 @@ function fixture() {
     ).toBe(rejected);
     state = result.state;
   }
+  // OPT-838: blind hand prompts offer opaque slot tokens. Tests name cards by
+  // instance id; map each named card to its slot token (unknown ids pass
+  // through unchanged, so non-member replies stay non-members).
+  function asSlots(ids: string[]) {
+    const slots = state.pendingPrompt?.blindSlots;
+    if (!slots) return ids;
+    return ids.map(
+      (id) => slots.find((slot) => slot.instanceId === id)?.token ?? id
+    );
+  }
   function select(ids: string[], rejected = false) {
-    choice({ type: "SELECT_TARGET", selectedInstanceIds: ids }, rejected);
+    choice(
+      { type: "SELECT_TARGET", selectedInstanceIds: asSlots(ids) },
+      rejected
+    );
   }
   function accept() {
     choice({ type: "PLAYER_CHOICE", choiceId: "accept" });
@@ -104,6 +117,7 @@ function fixture() {
     act,
     choice,
     select,
+    asSlots,
     accept,
     targets,
     persist() {
@@ -157,7 +171,12 @@ describe("OPT-848 authored Kanjuro blind discard", () => {
         }
         f.persist();
         expect(f.state.pendingPrompt?.respondingPlayer).toBe(opponent);
-        expect(f.targets().validTargets).toEqual(hand.map((c) => c.instanceId));
+        // OPT-838: opaque shuffled slot tokens replace real instance ids.
+        const slots = f.state.pendingPrompt!.blindSlots!;
+        expect(f.targets().validTargets).toEqual(slots.map((s) => s.token));
+        expect(slots.map((s) => s.instanceId).sort()).toEqual(
+          hand.map((c) => c.instanceId).sort()
+        );
         expect(f.targets()).toMatchObject({
           countMin: 1,
           countMax: 1,
@@ -166,11 +185,15 @@ describe("OPT-848 authored Kanjuro blind discard", () => {
         const wire = filterPromptForPlayer(f.state.pendingPrompt, opponent)!;
         expect(wire.resumeContext).toBeNull();
         expect(wire.options).toMatchObject({
-          cards: hand.map((c) => ({
-            instanceId: c.instanceId,
+          cards: slots.map((s) => ({
+            instanceId: s.token,
             cardId: "hidden",
           })),
         });
+        expect(JSON.stringify(wire)).not.toContain("blindSlots");
+        for (const card of hand) {
+          expect(JSON.stringify(wire)).not.toContain(card.instanceId);
+        }
         expect(filterPromptForPlayer(f.state.pendingPrompt, owner)).toBeNull();
         const responderState = JSON.stringify(
           visibleStateForPlayer(f.state, f.db, opponent)
@@ -191,7 +214,7 @@ describe("OPT-848 authored Kanjuro blind discard", () => {
         });
         const action: GameAction = {
           type: "SELECT_TARGET",
-          selectedInstanceIds: [hand[0].instanceId],
+          selectedInstanceIds: f.asSlots([hand[0].instanceId]),
           promptId: f.state.pendingPrompt?.promptId,
         };
         const coordinator = new SessionCoordinator();
@@ -212,7 +235,10 @@ describe("OPT-848 authored Kanjuro blind discard", () => {
         for (const selectedInstanceIds of invalidSelections) {
           f.persist();
           const before = structuredClone(f.state);
-          const malformed: GameAction = { ...action, selectedInstanceIds };
+          const malformed: GameAction = {
+            ...action,
+            selectedInstanceIds: f.asSlots(selectedInstanceIds),
+          };
           // GameSession routes SELECT_TARGET into this lifecycle after authorization.
           expect(
             coordinator.executeAction(f.state, [], opponent, malformed, f.db)

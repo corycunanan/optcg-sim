@@ -423,11 +423,11 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `RETURN_TO_HAND` | "Return to hand" | Target |
 | `RETURN_TO_DECK` | "Place at top/bottom of deck" | Target, `{ position: "TOP" \| "BOTTOM" }` |
 | `TRASH_CARD` | "Trash" (not K.O.) | Target |
-| `TRASH_FROM_HAND` | "Trash N from hand" | `{ amount: N }` |
+| `TRASH_FROM_HAND` | "Trash N from hand" | `{ amount: N }`; "until you have N" → `{ until_count: N }` |
 | `PLAY_CARD` | "Play from hand/trash/life" | Target, source zone |
 | `ADD_TO_LIFE` | "Add card from trash to Life" | `CARD_IN_TRASH` target, `{ face, position }` |
 | `MILL` | "Trash N from top of deck" | `{ amount: N }` |
-| `DECK_SCRY` | "Look at N, arrange" | `{ amount: N, position: "TOP" }` |
+| `DECK_SCRY` | "Look at N, place them at the top or bottom in any order" | `{ look_at: N, destination?: "TOP" \| "BOTTOM" \| "TOP_OR_BOTTOM" }` |
 
 ### Power & Stats
 
@@ -450,7 +450,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | Type | Card Text |
 |------|-----------|
 | `GIVE_DON` | "Give up to N DON!! to card" |
-| `RETURN_DON_TO_DECK` | "Return N DON!! to deck" |
+| `RETURN_DON_TO_DECK` | "Return N DON!! to deck" (`amount`), or "until you have N" (`until_count`) |
 | `ADD_DON_FROM_DECK` | "Add N from DON!! deck" |
 | `SET_DON_ACTIVE` | "Set up to N DON!! active" |
 | `REST_DON` | "Rest N DON!!" |

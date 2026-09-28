@@ -258,6 +258,9 @@ const PendingPrompt = z.strictObject({
   options: PromptOptions,
   respondingPlayer: PlayerIndex,
   resumeContext: z.unknown(),
+  blindSlots: z
+    .array(z.strictObject({ token: z.string(), instanceId: z.string() }))
+    .optional(),
 });
 
 const ExecutionContext = z.strictObject({

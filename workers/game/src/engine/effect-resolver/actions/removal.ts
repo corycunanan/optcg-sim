@@ -24,6 +24,7 @@ import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { reorderDeckCards, transitionCard, transitionCards } from "../../zone-transition.js";
 import type { EffectResolverServices } from "../services.js";
+import { createBlindHandSlots } from "../blind-hand-slots.js";
 
 // OPT-251: filter targets that are protected by a "cannot be …" prohibition.
 // Runs AFTER replacement effects — replacements (e.g., Tashigi rest-instead)
@@ -426,6 +427,80 @@ export function executeTrashCard(
   };
 }
 
+/**
+ * The hand a TRASH_FROM_HAND resolves against and how many cards it must take.
+ *
+ * `until_count` ("trash cards from your hand until you have N", OP14-054 /
+ * OP05-058) is read from the hand owner's live hand at resolution time:
+ * amount = max(0, hand − N). OP14 FAQ: with N or fewer cards nothing is
+ * trashed. Otherwise `amount` (default 1) is resolved as before.
+ *
+ * Some authored cards carry the printed count on `target.count` instead of
+ * `params`: `up_to: N` ("trash up to 3 cards", OP02-059 / OP02-070) allows
+ * 0..N, and `any_number` ("trash any number of …", OP15-002) allows
+ * 0..candidates. `exact` and `all` keep the `amount` semantics.
+ *
+ * `min`/`max` bound a legal selection and feed both the prompt's
+ * countMin/countMax and the resume guard: a mandatory trash takes exactly
+ * min(amount, candidates); an optional or variable one takes 0..that.
+ */
+export function trashFromHandSelection(
+  state: GameState,
+  action: ActionOf<"TRASH_FROM_HAND">,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+) {
+  const params = action.params ?? {};
+  const targetController: 0 | 1 =
+    action.target?.controller === "OPPONENT"
+      ? controller === 0
+        ? 1
+        : 0
+      : controller;
+  const chooser: 0 | 1 =
+    params.chooser === "SELF"
+      ? controller
+      : params.chooser === "OPPONENT"
+        ? controller === 0 ? 1 : 0
+        : targetController;
+  const p = state.players[targetController];
+  const untilCount = params.until_count;
+  const count = untilCount === undefined ? action.target?.count : undefined;
+  const upTo = count && "up_to" in count ? count.up_to : undefined;
+  const anyNumber = !!count && "any_number" in count;
+
+  let candidates = [...p.hand];
+  if (action.target?.filter) {
+    candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state, resultRefs));
+  }
+
+  // "You may trash…" — the player can decline by selecting 0 cards, and an
+  // IF_DO chain after this action only fires when at least 1 was trashed.
+  const amount =
+    untilCount !== undefined
+      ? Math.max(0, p.hand.length - untilCount)
+      : anyNumber
+        ? candidates.length
+        : upTo !== undefined
+          ? upTo
+          : resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
+  // "Up to N" / "any number" permit 0 (Comprehensive Rules 1-3-5-1).
+  const optional = params.optional === true || upTo !== undefined || anyNumber;
+  const max = Math.min(amount, candidates.length);
+  return {
+    targetController,
+    chooser,
+    blindSelection: chooser !== targetController,
+    amount,
+    untilCount,
+    candidates,
+    optional,
+    min: optional ? 0 : max,
+    max,
+  };
+}
+
 export function executeTrashFromHand(
   state: GameState,
   action: ActionOf<"TRASH_FROM_HAND">,
@@ -436,39 +511,12 @@ export function executeTrashFromHand(
   preselectedTargets?: string[],
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const params = action.params ?? {};
-  const targetController: 0 | 1 =
-    action.target?.controller === "OPPONENT"
-      ? controller === 0
-        ? 1
-        : 0
-      : controller;
-  const chooser =
-    params.chooser === "SELF"
-      ? controller
-      : params.chooser === "OPPONENT"
-        ? controller === 0 ? 1 : 0
-        : targetController;
-  const blindSelection = chooser !== targetController;
-  const amount = resolveAmount(
-    params.amount ?? 1,
-    resultRefs,
-    state,
-    controller,
-    cardDb,
-  );
-  const p = state.players[targetController];
-
-  let candidates = [...p.hand];
-  if (action.target?.filter) {
-    candidates = candidates.filter((c) => matchesFilterForTarget(c, action.target!.filter!, cardDb, state, resultRefs));
-  }
+  const { targetController, chooser, blindSelection, amount, untilCount, candidates, optional, min, max } =
+    trashFromHandSelection(state, action, controller, cardDb, resultRefs);
 
   if (candidates.length === 0) return { state, events, succeeded: false };
-
-  // "You may trash…" — the player can decline by selecting 0 cards, and an
-  // IF_DO chain after this action only fires when at least 1 was trashed.
-  const optional = params.optional === true;
+  // "Until you have N": already at or below N → nothing to trash, no prompt.
+  if (untilCount !== undefined && amount === 0) return { state, events, succeeded: false };
 
   // Use preselected targets from resume flow (player already chose)
   const selectedIds = preselectedTargets;
@@ -487,12 +535,17 @@ export function executeTrashFromHand(
         resultRefs: [...resultRefs.entries()],
         validTargets,
       };
+      const promptCards = candidates.filter((c) => validTargets.includes(c.instanceId));
+      // A cross-hand chooser sees only shuffled opaque slots (OPT-838).
+      const blind = blindSelection
+        ? createBlindHandSlots(state, promptCards, targetController)
+        : null;
       const pendingPrompt: import("../../../types.js").PendingPromptState = {
         options: {
           promptType: "SELECT_TARGET",
-          validTargets,
-          countMin: optional ? 0 : amount,
-          countMax: amount,
+          validTargets: blind ? blind.validTargets : validTargets,
+          countMin: min,
+          countMax: max,
           effectDescription: optional
             ? `You may trash up to ${amount} card(s) from hand`
             : `Choose ${amount} card(s) to trash from hand`,
@@ -503,12 +556,13 @@ export function executeTrashFromHand(
               : `Trash ${amount} of your cards in hand.`,
           ctaLabel: "Trash",
           ...(blindSelection ? { blindSelection: true } : {}),
-          cards: candidates.filter((c) => validTargets.includes(c.instanceId)),
+          cards: blind ? blind.cards : promptCards,
         },
         respondingPlayer: chooser,
         resumeContext: resumeCtx,
+        ...(blind ? { blindSlots: blind.blindSlots } : {}),
       };
-      return { state, events, succeeded: false, pendingPrompt };
+      return { state: blind ? blind.state : state, events, succeeded: false, pendingPrompt };
     }
   }
 

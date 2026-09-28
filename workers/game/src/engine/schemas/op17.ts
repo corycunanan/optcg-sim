@@ -2437,11 +2437,11 @@ export const OP17_075_X_DRAKE: EffectSchema = {
       costs: [{ type: "DON_MINUS", amount: 2 }],
       actions: [
         {
-          type: "OPPONENT_ACTION",
-          params: {
-            mandatory: true,
-            action: { type: "TRASH_FROM_HAND", params: { amount: 1 } },
-          },
+          // FAQ: the effect's controller chooses 1 face-down card from the
+          // opponent's hand; the opponent does not choose.
+          type: "TRASH_FROM_HAND",
+          target: { type: "CARD_IN_HAND", controller: "OPPONENT", count: { exact: 1 } },
+          params: { amount: 1, chooser: "SELF" },
         },
       ],
     },
@@ -3470,18 +3470,11 @@ export const OP17_099_CHARLOTTE_LINLIN: EffectSchema = {
               ],
               [
                 {
-                  type: "OPPONENT_ACTION",
-                  params: {
-                    mandatory: true,
-                    action: {
-                      type: "TRASH_CARD",
-                      target: {
-                        type: "CARD_IN_HAND",
-                        controller: "SELF",
-                        count: { exact: 1 },
-                      },
-                    },
-                  },
+                  // FAQ: the effect's controller randomly chooses 1 card from
+                  // the opponent's hand without looking; the opponent trashes it.
+                  type: "TRASH_FROM_HAND",
+                  target: { type: "CARD_IN_HAND", controller: "OPPONENT", count: { exact: 1 } },
+                  params: { amount: 1, chooser: "SELF" },
                 },
               ],
             ],
