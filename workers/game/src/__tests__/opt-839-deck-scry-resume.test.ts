@@ -29,6 +29,7 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { handleArrangeDeckScry } from "../engine/effect-resolver/resume/deck.js";
 import { validatePersistedGameStateCore } from "../session/persisted-game-state.js";
+import { SessionCoordinator } from "../session/coordinator.js";
 import { GameActionSchema } from "../../../../shared/validators/client-message.js";
 import {
   CARDS,
@@ -344,5 +345,65 @@ describe("OPT-839: other DECK_SCRY consumers", () => {
     expect(
       handleArrangeDeckScry(s.state, arrange([deckId(0)], "top"), other, 0, [deckId(0)]),
     ).toBeNull();
+  });
+
+  it("the DECK_SCRY handler rejects a top placement under a BOTTOM-only schema and applies a bottom one", () => {
+    const s = setup("OP17-050", 4);
+    const bottomOnly: Action = { type: "DECK_SCRY", params: { look_at: 2, destination: "BOTTOM" } };
+    const group = [deckId(0), deckId(1)];
+    expect(
+      handleArrangeDeckScry(s.state, arrange([deckId(1), deckId(0)], "top"), bottomOnly, 0, group),
+    ).toEqual({ rejected: true });
+    const placed = handleArrangeDeckScry(s.state, arrange([deckId(1), deckId(0)], "bottom"), bottomOnly, 0, group);
+    if (!placed || placed.rejected) throw new Error("expected a placement");
+    expect(placed.state.players[0].deck.map((c) => c.instanceId)).toEqual([
+      deckId(2), deckId(3), deckId(1), deckId(0),
+    ]);
+  });
+});
+
+describe("OPT-839: stale and legacy frames", () => {
+  it("rejects a response when the recorded group is no longer the top of the deck", () => {
+    const s = setup("OP17-050", 5);
+    const afterPlay = play(s);
+    // A different card now sits where deck-0 was; the frame still records deck-0/deck-1.
+    const drifted = JSON.parse(JSON.stringify(afterPlay)) as GameState;
+    const deck = drifted.players[0].deck;
+    [deck[0], deck[2]] = [deck[2], deck[0]];
+    const before = inventory(drifted);
+    const r = respond(drifted, s.db, arrange([deckId(1), deckId(0)], "bottom"));
+    expect(r.responseRejected).toBe(true);
+    expect(r.state).toEqual(drifted);
+    expect(inventory(r.state)).toEqual(before);
+  });
+
+  it("resolves an OP02-056 prompt persisted before OPT-839 (5 shown cards, no recorded group) through the session gate", () => {
+    const s = setup("OP02-056", 6);
+    const afterPlay = play(s);
+    // Rebuild the base-shaped prompt: base ignored `count: 3`, so it showed
+    // the top 5 cards, sent the old option shape and recorded no group.
+    const legacy = JSON.parse(JSON.stringify(afterPlay)) as GameState;
+    const shown = legacy.players[0].deck.slice(0, 5);
+    legacy.pendingPrompt = {
+      ...legacy.pendingPrompt!,
+      options: {
+        promptType: "ARRANGE_TOP_CARDS",
+        cards: shown,
+        effectDescription: arrangePrompt(legacy).effectDescription,
+        canSendToBottom: true,
+        validTargets: [],
+      },
+    };
+    legacy.effectStack.at(-1)!.validTargets = [];
+    const persisted = JSON.parse(JSON.stringify(legacy)) as GameState;
+    expect(validatePersistedGameStateCore(persisted)).toBeNull();
+
+    const ordered = shown.map((c) => c.instanceId).reverse();
+    const response = arrange(ordered, "bottom");
+    const route = new SessionCoordinator().routePromptResponse(persisted, 0, response);
+    expect(route.kind).toBe("resume");
+    const resolved = accept(route.state, s.db, response);
+    expect(resolved.pendingPrompt).toBeNull();
+    expect(resolved.players[0].deck.map((c) => c.instanceId)).toEqual([deckId(5), ...ordered]);
   });
 });
