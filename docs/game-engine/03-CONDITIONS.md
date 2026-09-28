@@ -1224,6 +1224,22 @@ interface DonGivenCondition {
 
 **Mode: TOTAL_GIVEN** — Sum attached DON!! on the specified player's Leader and present Characters, then compare using the required `operator` and `value`. Cost-area DON!! are excluded. Missing comparison fields resolve false. Existing modes are unchanged.
 
+| Text Pattern | Example Cards |
+|-------------|---------------|
+| "If you have a total of N or more given DON!! cards..." | ST31-004, OP12-015, OP12-024, OP13-112 |
+
+```json
+{
+  "type": "DON_GIVEN",
+  "controller": "SELF",
+  "mode": "TOTAL_GIVEN",
+  "operator": ">=",
+  "value": 2
+}
+```
+
+Schema lint (`schema-don-given-lint.ts`) rejects `ANY_CARD_HAS_DON` carrying `operator`/`value`, `TOTAL_GIVEN` missing either field, and canonical "a total of N or more given DON!! cards" text without a matching `TOTAL_GIVEN >= N` condition.
+
 **Mode: SPECIFIC_CARD** — Checks a specific card's DON!! given count. Used primarily as a [TargetFilter](./05-TARGETING.md) property but appears here for completeness.
 
 | Text Pattern | Example Cards |
