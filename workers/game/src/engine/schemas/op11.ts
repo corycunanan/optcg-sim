@@ -409,21 +409,12 @@ export const OP11_012_FRANKY: EffectSchema = {
     {
       id: "opponent_event_buff",
       category: "auto",
+      // Card activation only (rule 8-5-4; EB03-031 FAQ).
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "OPPONENT" },
-            turn_restriction: "YOUR_TURN",
-            once_per_turn: true,
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "OPPONENT" },
-            turn_restriction: "YOUR_TURN",
-            once_per_turn: true,
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "OPPONENT" },
+        turn_restriction: "YOUR_TURN",
+        once_per_turn: true,
       },
       actions: [
         {
@@ -3283,13 +3274,9 @@ export const OP11_102_CAMIE: EffectSchema = {
       category: "auto",
       trigger: {
         any_of: [
+          // Event card activation only (rule 8-5-4; EB03-031 FAQ).
           {
             event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "OPPONENT" },
-            turn_restriction: "YOUR_TURN",
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
             filter: { controller: "OPPONENT" },
             turn_restriction: "YOUR_TURN",
           },

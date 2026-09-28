@@ -306,42 +306,28 @@ Example:
 
 ### EVENT_ACTIVATED_FROM_HAND / EVENT_MAIN_RESOLVED_FROM_TRASH / EVENT_TRIGGER_RESOLVED
 
-Bandai FAQs distinguish three activation paths that share the surface wording "an Event is activated":
+The engine publishes three distinct Event classes. Only class 1 is *card activation*:
 
-1. **`EVENT_ACTIVATED_FROM_HAND`** — activation of an Event card from hand (pay its printed cost, resolve [Main] or [Counter]). Character counters do not emit this class.
-2. **`EVENT_MAIN_RESOLVED_FROM_TRASH`** — a Character activates the [Main] of an Event card from trash (EB03-031 Reiju). The Character's inline cost is paid; the Event's printed cost is skipped; the Event remains in trash.
+1. **`EVENT_ACTIVATED_FROM_HAND`** — card activation (rules 2-7-3, 8-5-2): an Event card is used from hand — ordinary [Main] play, [Counter] use in battle, or effect-driven hand activation (OP12-041 Sanji, OP15 Dressrosa producers) that skips the printed cost. Character counters do not emit this class.
+2. **`EVENT_MAIN_RESOLVED_FROM_TRASH`** — effect activation only (rule 8-5-3): a Character activates the [Main] of an Event card in trash (EB03-031 Reiju). The Character's inline cost is paid; the Event's printed cost is skipped; the Event remains in trash. Published only when that [Main] was actually activated: a declined optional [Main] (8-1-2), or one whose activation cost is declined or unpayable (8-3-1-3, 8-3-1-4), publishes nothing. An unmet "if" clause still activates the effect (8-3-3), so it publishes. No authored card subscribes to this class (OPT-854); it remains the public trash-Main presentation event.
 3. **`EVENT_TRIGGER_RESOLVED`** — an Event card's [Trigger] effect resolves from Life.
 
 For root Main/Counter plays, committed activation events are published before the Event effect emits its own events, but activation watchers are scanned only after the complete Event effect resolves. A prompted Event retains private `pendingEventActivationEvents` trigger-scan debt in durable state; resume clears it before scanning, so a watcher prompt cannot replay it. Counter effects resolve directly before watcher ordering, just like Main effects (OPT-805).
 
-For "when your opponent activates an Event" rulings (Usopp, Page One, Lucy, Luffy, Crocodile Leader), Bandai clarifies that classes 1 and 2 count but class 3 does NOT. Cards subscribe to the exact set of classes they care about via a `CompoundTrigger`:
-
-```typescript
-{
-  any_of: [
-    { event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "OPPONENT" } },
-    { event: "EVENT_MAIN_RESOLVED_FROM_TRASH", filter: { controller: "OPPONENT" } },
-  ]
-}
-```
+"When [you/your opponent] activate(s) an Event" refers to card activation (rule 8-5-4), so these watchers subscribe to class 1 only. The EB03 FAQ (EB03-031) rules that resolving an Event's [Main] with Reiju "differs from activating the Event card itself" and does not activate OP04-053 Page One's "When you activate an Event" effect. Class 3 is not card activation either. Extra printed clauses add their own classes:
 
 | Text Pattern | Subscribe to | Example Cards |
 |-------------|--------------|---------------|
-| "When your opponent activates an Event" | classes 1 + 2 | OP01-004 Usopp, OP06-044 Gion, OP04-053 Page One |
-| "When you activate an Event" | classes 1 + 2 | OP01-062 Crocodile, OP10-062 |
-| "When your opponent activates an Event or [Trigger]" | classes 1 + 2 + `TRIGGER_ACTIVATED` | OP11-102 Camie |
-| "When your opponent activates an Event or [Blocker]" | classes 1 + 2 + `BLOCKER_ACTIVATED` | OP15-119 Monkey.D.Luffy |
+| "When your opponent activates an Event" | class 1 | OP01-004 Usopp, OP06-044 Gion, OP11-012 Franky |
+| "When you activate an Event" | class 1 | OP01-062 Crocodile, OP04-053 Page One, OP10-003 Sugar |
+| "When your opponent activates an Event or [Trigger]" | class 1 + `TRIGGER_ACTIVATED` | OP11-102 Camie |
+| "When your opponent activates [Blocker] or an Event" | class 1 + `BLOCKER_ACTIVATED` | OP06-048 Zeff, OP15-119 Monkey.D.Luffy |
 
-Example — OP01-004 Usopp (opponent activates Event, excluding [Trigger] from Life):
+Example — OP01-004 Usopp (opponent activates an Event):
 
 ```json
 {
-  "trigger": {
-    "any_of": [
-      { "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } },
-      { "event": "EVENT_MAIN_RESOLVED_FROM_TRASH", "filter": { "controller": "OPPONENT" } }
-    ]
-  }
+  "trigger": { "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } }
 }
 ```
 
@@ -352,7 +338,6 @@ Example — OP11-102 Camie (Event or any [Trigger]):
   "trigger": {
     "any_of": [
       { "event": "EVENT_ACTIVATED_FROM_HAND", "filter": { "controller": "OPPONENT" } },
-      { "event": "EVENT_MAIN_RESOLVED_FROM_TRASH", "filter": { "controller": "OPPONENT" } },
       { "event": "TRIGGER_ACTIVATED", "filter": { "controller": "OPPONENT" } }
     ]
   }
@@ -839,8 +824,8 @@ Example:
 | `ANY_CHARACTER_KO` | "When a Character is K.O.'d" | ST08-001, EB01-047 |
 | `DON_RETURNED_TO_DON_DECK` | "When a DON!! card...is returned to your DON!! deck" | OP02-071, OP05-074, OP09-061, EB03-033, ST10-007, ST10-011, ST10-014 |
 | `DON_GIVEN_TO_CARD` | "When...given a DON!! card" | OP02-002 |
-| `EVENT_ACTIVATED_FROM_HAND` | "When [you/opponent] plays an Event from hand" | OP01-004, OP04-053, OP06-044 |
-| `EVENT_MAIN_RESOLVED_FROM_TRASH` | "When a Character activates an Event's [Main] from trash" | OP01-004, OP04-053 (firing path for OP12-041, EB03-031) |
+| `EVENT_ACTIVATED_FROM_HAND` | "When [you/your opponent] activate(s) an Event" (card activation, rule 8-5-4) | OP01-004, OP04-053, OP06-044 |
+| `EVENT_MAIN_RESOLVED_FROM_TRASH` | No printed wording observes it; "activates an Event" excludes it (EB03-031 FAQ) | — (published by EB03-031's trash-Main path) |
 | `EVENT_TRIGGER_RESOLVED` | "When an Event card's [Trigger] resolves from Life" | — (typically excluded from 'Event activated' listeners) |
 | `CHARACTER_PLAYED` | "When [you/opponent] plays a Character" | OP02-026, OP04-024, OP12-081, OP13-100 |
 | `CARD_REMOVED_FROM_LIFE` | "When a card is removed from...Life cards" | OP08-105, OP11-041, OP12-099 |

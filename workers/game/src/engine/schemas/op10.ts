@@ -131,19 +131,11 @@ export const OP10_003_SUGAR: EffectSchema = {
     {
       id: "opponent_turn_event_add_don",
       category: "auto",
+      // Card activation only (rule 8-5-4; EB03-031 FAQ).
       trigger: {
-        any_of: [
-          {
-            event: "EVENT_ACTIVATED_FROM_HAND",
-            filter: { controller: "SELF" },
-            turn_restriction: "OPPONENT_TURN",
-          },
-          {
-            event: "EVENT_MAIN_RESOLVED_FROM_TRASH",
-            filter: { controller: "SELF" },
-            turn_restriction: "OPPONENT_TURN",
-          },
-        ],
+        event: "EVENT_ACTIVATED_FROM_HAND",
+        filter: { controller: "SELF" },
+        turn_restriction: "OPPONENT_TURN",
       },
       flags: { once_per_turn: true },
       actions: [
