@@ -113,6 +113,29 @@ describe("EffectPromptDialog", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it("titles the dialog with the action label while the timing stays in the text", () => {
+    act(() => {
+      renderer = create(
+        <EffectPromptDialog
+          effectDescription="[On Play] KO 1 Character."
+          actionLabel="KO Characters"
+          cardDb={cardDb}
+          isHidden={false}
+          onHide={vi.fn()}
+          onConfirm={vi.fn()}
+        />
+      );
+    });
+    const dialog = renderer!.root.findByProps({ role: "dialog" });
+    expect(
+      renderer!.root.findByProps({ id: dialog.props["aria-labelledby"] })
+        .children
+    ).toEqual(["Card Effect: KO Characters"]);
+    expect(
+      renderer!.root.findByProps({ "data-effect-notation": "timing" }).children
+    ).toEqual(["On Play"]);
+  });
+
   it("keeps Skip visible but disabled when the prompt cannot be declined", () => {
     act(() => {
       renderer = create(
