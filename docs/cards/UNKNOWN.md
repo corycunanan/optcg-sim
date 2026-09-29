@@ -236,6 +236,13 @@ Also treat this card's name as [Franky] according to the rules.
 
 ---
 
+## Roronoa Zoro
+**P-042** · Character · Yellow
+
+**Trigger:** [Trigger] K.O. up to 1 of your opponent's Characters with a cost of 4 or less.
+
+---
+
 ## Monkey.D.Luffy
 **P-043** · Character · Blue
 
@@ -508,6 +515,13 @@ If your Leader is [Buggy], all Characters with a cost of 3 or 4 cannot attack.
 **P-085** · Character · Yellow
 
 [On Play] If your Leader has the {Supernovas} type and the number of your Life cards is equal to or less than the number of your opponent's Life cards, add up to 1 of your opponent's Characters with a cost of 4 or less to the top or bottom of the owner's Life cards face-up.
+
+---
+
+## Trafalgar Law
+**P-088** · Character · Yellow
+
+**Trigger:** [Trigger] If your Leader has the {Supernovas} type and you and your opponent have a total of 5 or less Life cards, play this card.
 
 ---
 
