@@ -272,11 +272,7 @@ describe.each(["EB01-051", "EB04-049"])("OPT-798 %s — MILL is an activation co
     }
   });
 
-  // Pre-existing, out of OPT-798 scope: executeReuseEffect drops the reused
-  // block's pendingPrompt (it returns only `succeeded`), so a Life [Trigger]
-  // that reuses any prompting [Main] leaves an orphan frame and never asks.
-  // Reported as a follow-up; this ratchet fails loudly once that is fixed.
-  it.fails("[Trigger] via Life damage offers the reused [Main]'s optional prompt", () => {
+  it("[Trigger] via Life damage offers the reused [Main]'s optional prompt", () => {
     const f = fixture();
     f.deck(1, 4);
     f.put("victim", 0, "CHARACTER", { cost: 2 });

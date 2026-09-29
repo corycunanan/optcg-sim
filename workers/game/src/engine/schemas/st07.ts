@@ -396,7 +396,7 @@ export const ST07_016_POWER_MOCHI: EffectSchema = {
   effects: [
     {
       id: "counter_scry_and_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

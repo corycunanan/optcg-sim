@@ -486,7 +486,7 @@ export const OP16_020_KISS_YOUR_LIVES_GOODBYE: EffectSchema = {
     },
     {
       id: "counter_trash_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [
@@ -872,7 +872,7 @@ export const OP16_038_LETS_GO_TO_NAVY_HEADQUARTERS: EffectSchema = {
     },
     {
       id: "counter_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [{ type: "MODIFY_POWER", target: { type: "YOUR_LEADER" }, params: { amount: 3000 }, duration: { type: "THIS_BATTLE" } }],
     },
@@ -933,7 +933,7 @@ export const OP16_040_GUM_GUM_HAMMER_RIFLE: EffectSchema = {
     },
     {
       id: "counter_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [{ type: "MODIFY_POWER", target: { type: "YOUR_LEADER" }, params: { amount: 3000 }, duration: { type: "THIS_BATTLE" } }],
     },
@@ -1239,7 +1239,7 @@ export const OP16_057_CAPTAIN_BUGGYS_OUR_SAVIOR: EffectSchema = {
   effects: [
     {
       id: "counter_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: "Prisoner of Impel Down" }, count: { operator: ">=", value: 2 } },
       actions: [
@@ -1325,7 +1325,7 @@ export const OP16_059_SNEAKY_TO_FLASHY: EffectSchema = {
     },
     {
       id: "counter_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [{ type: "MODIFY_POWER", target: { type: "YOUR_LEADER" }, params: { amount: 3000 }, duration: { type: "THIS_BATTLE" } }],
     },
@@ -1633,7 +1633,7 @@ export const OP16_076_THE_THREE_ADMIRALS: EffectSchema = {
     },
     {
       id: "counter_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: { type: "CARD_ON_FIELD", controller: "SELF", filter: { card_type: "CHARACTER", traits: ["Admiral"] } },
       actions: [
@@ -2116,7 +2116,7 @@ export const OP16_099_CUT_THOSE_CHAINS: EffectSchema = {
       ],
       flags: { optional: true },
     },
-    { id: "counter_power", category: "activate", trigger: { keyword: "COUNTER_EVENT" }, actions: [{ type: "MODIFY_POWER", target: { type: "YOUR_LEADER" }, params: { amount: 3000 }, duration: { type: "THIS_BATTLE" } }] },
+    { id: "counter_power", category: "auto", trigger: { keyword: "COUNTER_EVENT" }, actions: [{ type: "MODIFY_POWER", target: { type: "YOUR_LEADER" }, params: { amount: 3000 }, duration: { type: "THIS_BATTLE" } }] },
   ],
 };
 
@@ -2146,7 +2146,7 @@ export const OP16_100_HALLOWED_GLACIER_SLASH: EffectSchema = {
       ],
       flags: { optional: true },
     },
-    { id: "counter_power", category: "activate", trigger: { keyword: "COUNTER_EVENT" }, actions: [{ type: "MODIFY_POWER", target: { type: "YOUR_LEADER" }, params: { amount: 3000 }, duration: { type: "THIS_BATTLE" } }] },
+    { id: "counter_power", category: "auto", trigger: { keyword: "COUNTER_EVENT" }, actions: [{ type: "MODIFY_POWER", target: { type: "YOUR_LEADER" }, params: { amount: 3000 }, duration: { type: "THIS_BATTLE" } }] },
   ],
 };
 
