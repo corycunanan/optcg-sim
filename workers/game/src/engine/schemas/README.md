@@ -187,7 +187,7 @@ For effects that react to game events (not bracket-tag abilities):
 | "When Life reaches 0" | `{ event: "LIFE_COUNT_BECOMES_ZERO" }` |
 | "When card added to hand from Life" | `{ event: "CARD_ADDED_TO_HAND_FROM_LIFE" }` |
 | "When a card is trashed from your hand by an effect" | `{ event: "CARD_TRASHED_FROM_HAND", filter: { controller: "SELF", cause: "BY_EFFECT" } }` |
-| "When you draw outside Draw Phase" | `{ event: "DRAW_OUTSIDE_DRAW_PHASE" }` |
+| "When you draw outside Draw Phase" | `{ event: "DRAW_OUTSIDE_DRAW_PHASE", filter: { controller: "SELF" } }` |
 | "When Character becomes rested" | `{ event: "CHARACTER_BECOMES_RESTED" }` |
 | "When Character returned to hand" | `{ event: "CHARACTER_RETURNED_TO_HAND" }` |
 | "When you take damage" | `{ event: "DAMAGE_TAKEN" }` |

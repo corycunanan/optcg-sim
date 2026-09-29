@@ -1947,6 +1947,7 @@ export const OP05_053_MOZAMBIA: EffectSchema = {
       category: "auto",
       trigger: {
         event: "DRAW_OUTSIDE_DRAW_PHASE",
+        filter: { controller: "SELF" },
         turn_restriction: "YOUR_TURN",
         once_per_turn: true,
       },
