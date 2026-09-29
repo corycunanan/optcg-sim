@@ -1587,8 +1587,10 @@ export interface ProhibitionScope {
    * CANNOT_ATTACK: the attack target the prohibition applies to.
    * CANNOT_ACTIVATE_BLOCKER (OPT-826): `{ type: "SELECTED_CARDS", ref? }`
    * binds the prohibition to the exact attacker(s) — the cards in result ref
-   * `ref`, or, without `ref`, this action's own `target` selection. Any other
-   * Target shape on a Blocker prohibition is not enforced by the engine.
+   * `ref`, or, without `ref`, this action's own `target` selection.
+   * OPT-899: `{ type: "YOUR_LEADER" }` binds it to the applying player's
+   * Leader, resolved at apply time. Any other Target shape on a Blocker
+   * prohibition is not enforced by the engine.
    */
   when_attacking?: Target;
   // OPT-260: keyword trigger type negated by NEGATE_TRIGGER_TYPE (OP09-081).

@@ -444,6 +444,7 @@ describe("OPT-826 attacker-binding schema contract", () => {
   it("only ST01-016, ST21-003, OP12-016 and OP12-077 carry an attacker binding among authored Blocker prohibitions", () => {
     const uses: string[] = [];
     const bound: string[] = [];
+    const leaderBound: string[] = [];
     for (const [cardId, schema] of Object.entries(getAllAuthoredSchemas())) {
       for (const block of schema.effects) {
         walk(block.actions, (action) => {
@@ -452,6 +453,7 @@ describe("OPT-826 attacker-binding schema contract", () => {
           if (!params || !BLOCKER_TYPES.has(params.prohibition_type)) return;
           uses.push(cardId);
           if (params.scope?.when_attacking?.type === "SELECTED_CARDS") bound.push(cardId);
+          if (params.scope?.when_attacking?.type === "YOUR_LEADER") leaderBound.push(cardId);
         });
         for (const p of block.prohibitions ?? []) {
           if (BLOCKER_TYPES.has(p.type)) uses.push(`${cardId}(permanent)`);
@@ -459,6 +461,8 @@ describe("OPT-826 attacker-binding schema contract", () => {
       }
     }
     expect(bound.sort()).toEqual(["OP12-016", "OP12-077", "ST01-016", "ST21-003"]);
+    // OPT-899: OP13-057's Leader binding is enumerated separately.
+    expect(leaderBound).toEqual(["OP13-057"]);
     // Inventory size at this change; a new Blocker prohibition should be
     // classified (bound vs blanket) deliberately.
     expect(uses).toHaveLength(20);

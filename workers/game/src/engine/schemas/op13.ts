@@ -1933,7 +1933,7 @@ export const OP13_057_IF_I_BOWED_DOWN: EffectSchema = {
           type: "APPLY_PROHIBITION",
           params: {
             prohibition_type: "CANNOT_ACTIVATE_BLOCKER",
-            scope: { when_attacking: { type: "YOUR_LEADER" } },
+            scope: { controller: "OPPONENT", when_attacking: { type: "YOUR_LEADER" } },
           },
           duration: { type: "THIS_TURN" },
         },

@@ -977,12 +977,43 @@ function validateAction(
  * engine freezes those ids at execution and ignores the binding elsewhere,
  * so reject any shape it would silently drop or misread.
  */
+function validateLeaderAttackerBinding(
+  action: ActionOf<"APPLY_PROHIBITION">,
+  prefix: string,
+): string[] {
+  const scope = action.params?.scope;
+  const binding = scope?.when_attacking as Record<string, unknown>;
+  const at = `${prefix}.params.scope.when_attacking`;
+  const errors: string[] = [];
+  if (action.params?.prohibition_type !== "CANNOT_ACTIVATE_BLOCKER") {
+    errors.push(
+      `${at}: a YOUR_LEADER attacker binding is only supported on CANNOT_ACTIVATE_BLOCKER`,
+    );
+  }
+  const extraKeys = Object.keys(binding).filter((key) => key !== "type");
+  if (extraKeys.length > 0) {
+    errors.push(`${at}: YOUR_LEADER attacker binding accepts only 'type' (found ${extraKeys.join(", ")})`);
+  }
+  if (action.target || action.target_ref) {
+    errors.push(`${at}: a YOUR_LEADER attacker binding names the attacker; the action must not also carry a target`);
+  }
+  if (scope?.controller !== "OPPONENT") {
+    errors.push(
+      `${prefix}.params.scope.controller: an attacker-bound Blocker prohibition restricts the opponent; set controller 'OPPONENT'`,
+    );
+  }
+  return errors;
+}
+
 function validateAttackerBoundProhibition(
   action: ActionOf<"APPLY_PROHIBITION">,
   prefix: string,
 ): string[] {
   const scope = action.params?.scope;
   const binding = scope?.when_attacking;
+  if (binding?.type === "YOUR_LEADER") {
+    return validateLeaderAttackerBinding(action, prefix);
+  }
   if (binding?.type !== "SELECTED_CARDS") return [];
   const at = `${prefix}.params.scope.when_attacking`;
   const errors: string[] = [];
