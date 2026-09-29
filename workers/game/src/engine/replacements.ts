@@ -650,9 +650,15 @@ function canTrashFromLifeSucceed(
 }
 
 /**
- * Mirrors executeReturnDonToDeck's `amount` path: it returns only unattached
- * cost-area DON!!. (`until_count` substitutes are not authored; they fall
- * through to the handler.)
+ * "Return N DON!! from your field to your DON!! deck" (EB04-030/031, OP12-070,
+ * OP14-061, OP15-069): the printed cost counts every DON!! on the field — the
+ * cost area plus DON!! attached to the Leader and Characters — matching the
+ * field total that executeReturnDonToDeck's `until_count` path uses. The gate
+ * must never be stricter than the printed text.
+ *
+ * Known gap (OPT-921): the handler's `amount` path returns only unattached
+ * cost-area DON!!, so when every DON!! is attached the replacement is offered
+ * (correctly) but the handler underpays. Fix that in the handler, not here.
  */
 function canReturnDonToDeckSucceed(
   state: GameState,
@@ -663,11 +669,12 @@ function canReturnDonToDeckSucceed(
 ): boolean {
   if (action.params?.until_count !== undefined) return true;
   const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
-  let available = 0;
-  for (const don of state.players[controller].donCostArea) {
-    if (!don.attachedTo) available++;
+  const p = state.players[controller];
+  let onField = p.donCostArea.length + p.leader.attachedDon.length;
+  for (const c of p.characters) {
+    if (c) onField += c.attachedDon.length;
   }
-  return amount > 0 && available >= amount;
+  return amount > 0 && onField >= amount;
 }
 
 /** Mirrors executePlaceHandToDeck: the controller's hand, `amount` cards. */
