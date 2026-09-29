@@ -63,7 +63,7 @@ The OPTCG Simulator channels the spirit of One Piece — joyful, energetic, and 
 |---|---|
 | Cold, monochrome dark backgrounds (#293a4c, #013951) | Our dark foundation stays in the deep navy family and preserves warmth through warm-white text, gold, and red                |
 | Orange accent (#EF7D00) as primary                   | Our palette uses gold for primary interaction and navy for structure — orange has the wrong emotional register for One Piece |
-| "TT Norms Pro Compact" as body font | We already use Geist Sans, which is more contemporary and better optimized for UI |
+| "TT Norms Pro Compact" as body font | We already use Public Sans (self-hosted variable body font; replaced Geist Sans in 2026-08, see `docs/design/TYPOGRAPHY.md` §1), which is more contemporary and better optimized for UI |
 | Styled-components architecture | We use Tailwind CSS v4 with CSS tokens — no runtime CSS-in-JS |
 | `z-index: 200000` for modals | We use a sane z-index scale (see Section 8) |
 | Ultra-wide `max-width: 1920px` | Our content max-width is 1280px for readability; full-bleed reserved for heroes |
@@ -530,7 +530,7 @@ Dark surface, consistent across all pages:
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- Canonical nav-link treatment: Erode 16px/700, uppercase, `0.04em` letter spacing. The family application ships with OPT-534; the current navbar remains an interim Geist Sans rendering.
+- Canonical nav-link treatment: Erode 16px/700, uppercase, `0.04em` letter spacing. Applied by `.font-nav` (`src/app/globals.css`) in `src/components/nav/navbar.tsx`; shipped with OPT-534 (#399).
 - Resting: `--text-inverse` at 70% alpha; hover/focus: `--text-inverse` on a 10% white-alpha surface
 - Active: `--text-inverse` on a 10% white-alpha surface; hover raises the surface to 15%
 

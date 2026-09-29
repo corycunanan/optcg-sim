@@ -45,7 +45,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 - [Engine Architecture](./game-engine/08-ENGINE-ARCHITECTURE.md) — action pipeline, modifier layers, trigger system, event bus
 - [Encoding Guide](./game-engine/11-ENCODING-GUIDE.md) — condensed pattern-matching reference for card encoding
 - [Game Engine Requirements](./game-engine/GAME-ENGINE-REQUIREMENTS.md) — rules-to-engine mapping from Comprehensive Rules v1.2.0
-- [Card Analysis Findings](./game-engine/CARD-ANALYSIS-FINDINGS.md) — ~200 distinct card effect patterns across all 51 sets
+- [Card Analysis Findings](./game-engine/CARD-ANALYSIS-FINDINGS.md) — ~200 distinct card effect patterns across the original 51-set analysis corpus
 - [Effect Facet Taxonomy](./cards/EFFECT-FACET-TAXONOMY.md) — Tier 1 tags, schema derivations, trait-reference roles, and product decisions
 
 ## Design
@@ -76,7 +76,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 - [PRD](./project/PRD.md) — product requirements document (source of truth)
 - [Comprehensive Rules](./rules/rule_comprehensive.md) — official OPTCG rules v1.2.0
 - [Rule Index](./rules/RULE-INDEX.md) — concept-to-rule lookup table (start here, then read specific rules)
-- [Card Set Data](./cards/) — effect text for all 51 card sets (OP-01 through ST-29)
+- [Card Set Data](./cards/) — effect text for 55 card sets (OP-01–OP-17, ST-01–ST-32, EB-01–EB-04, PRB-01–PRB-02) plus `UNKNOWN.md` (alongside `EFFECT-FACET-TAXONOMY.md`); ST-31 and ST-32 contain preview cards only ("the rest of this set is not yet imported"; full import is OPT-831)
 
 ## Research
 
