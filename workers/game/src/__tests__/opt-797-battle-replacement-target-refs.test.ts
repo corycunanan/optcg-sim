@@ -513,6 +513,29 @@ function removeWith(f: Fixture, player: 0 | 1, type: "KO" | "RETURN_TO_HAND", ta
   f.act(player, { type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] });
 }
 
+/** Test-only "[Activate: Main] K.O. all of your opponent's Characters other than [name]" for player 1. */
+function koAllOpponentCharactersExcept(f: Fixture, name: string) {
+  const id = "OPT797-WIPE";
+  if (!f.db.has(id)) {
+    f.def(id, {}, {
+      card_id: id,
+      card_name: id,
+      card_type: "Character",
+      effects: [
+        {
+          id: "wipe",
+          category: "activate",
+          trigger: { keyword: "ACTIVATE_MAIN" },
+          actions: [{ type: "KO", target: { type: "ALL_OPPONENT_CHARACTERS", filter: { exclude_name: name } } }],
+        },
+      ],
+    });
+  }
+  f.state.turn.activePlayerIndex = 1;
+  const source = f.put(id, 1);
+  f.act(1, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "wipe" });
+}
+
 function bege(f: Fixture) {
   f.def("OP11-101", { cost: 4, power: 5000, types: ["Supernovas", "Fire Tank Pirates"] });
   f.def("OPT797-SUPERNOVA", { types: ["Supernovas"] });
@@ -793,6 +816,23 @@ describe("REPLACED_CARD substitute feasibility is checked against the replaced c
 
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.onField(protectedCard)).toBe(false);
+  });
+
+  it("batch: protects only the members it can rest; the already-rested member is K.O.'d (§8-1-3-4-5)", () => {
+    const f = fixture();
+    f.def("OPT797-REST-IT", {}, schema);
+    const host = f.put("OPT797-REST-IT", 0);
+    const active = f.put(CARDS.VANILLA.id, 0);
+    const rested = f.put(CARDS.VANILLA.id, 0, { state: "RESTED" });
+
+    koAllOpponentCharactersExcept(f, "Rest it");
+    expect(f.prompt()).toBe("OPTIONAL_EFFECT");
+    f.accept();
+
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[0].characters.find((c) => c?.instanceId === active.instanceId)?.state).toBe("RESTED");
+    expect(f.onField(rested)).toBe(false);
+    expect(f.onField(host)).toBe(true);
   });
 
   it("single-target check (battle / cost paths): offered only while the replaced card is active", () => {

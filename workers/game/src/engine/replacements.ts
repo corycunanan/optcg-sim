@@ -386,12 +386,17 @@ export function scanReplacementsForBatch(
     );
     if (matchedIds.length === 0) continue;
     // OPT-232: skip replacements whose substitute action cannot execute.
-    // OPT-797: evaluated with the matched cards as the REPLACED_CARD reference.
-    if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, matchedIds)) continue;
+    // OPT-797: feasibility is per replaced card (REPLACED_CARD = that card):
+    // a member whose substitute cannot resolve is not covered, so its event
+    // proceeds (§8-1-3-4-5), while the feasible members stay protected.
+    const feasibleIds = matchedIds.filter((id) =>
+      canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, [id]),
+    );
+    if (feasibleIds.length === 0) continue;
 
     matches.push({
       effectId: effect.id,
-      matchedTargetIds: matchedIds,
+      matchedTargetIds: feasibleIds,
       optional: params.optional,
     });
   }
