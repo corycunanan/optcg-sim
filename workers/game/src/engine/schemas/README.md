@@ -679,7 +679,7 @@ Used in `permanent` effect blocks via the `prohibitions` array:
 |------|-----------|-------|
 | `CANNOT_BE_KO` | "Cannot be K.O.'d" | `cause: "IN_BATTLE" \| "BY_EFFECT" \| "ANY"` |
 | `CANNOT_ATTACK` | "Cannot attack" | Optional conditional_override |
-| `CANNOT_BLOCK` / `CANNOT_ACTIVATE_BLOCKER` | "Cannot block" | On `APPLY_PROHIBITION`, "if the selected card attacks, your opponent cannot activate [Blocker]" binds the attacker with `scope: { controller: "OPPONENT", when_attacking: { type: "SELECTED_CARDS", ref? } }` — `ref` names a result ref (e.g. `__cost_don_given`); without it the action's own `target` is the attacker (OPT-826, see 06 §7.9) |
+| `CANNOT_BLOCK` / `CANNOT_ACTIVATE_BLOCKER` | "Cannot block" | On `APPLY_PROHIBITION`, "if the selected card attacks, your opponent cannot activate [Blocker]" binds the attacker with `scope: { controller: "OPPONENT", when_attacking: { type: "SELECTED_CARDS", ref? } }` — `ref` names a result ref (e.g. `__cost_don_given`); without it the action's own `target` is the attacker (OPT-826, see 06 §7.9). `when_attacking: { type: "YOUR_LEADER" }` (with `controller: "OPPONENT"`, no target) binds the applier's Leader — OP13-057 (OPT-899) |
 | `CANNOT_PLAY_FROM_HAND` | "Unable to play cards from hand" | `controller: "SELF" \| "OPPONENT"` |
 | `CANNOT_BE_REMOVED_FROM_FIELD` | "Cannot be removed" | |
 | `CANNOT_BE_RESTED` | "Cannot be rested" | |
