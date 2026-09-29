@@ -37,14 +37,20 @@ export const OP03_001_PORTGAS_D_ACE: EffectSchema = {
           { keyword: "WHEN_ATTACKED" },
         ],
       },
-      costs: [
+      // OPT-885: no colon in the card text — the trash is an action whose
+      // result the bonus counts, not a cost (the ANY_NUMBER cost path takes
+      // exactly 1 card).
+      actions: [
         {
           type: "TRASH_FROM_HAND",
-          amount: "ANY_NUMBER",
-          filter: { card_type: ["EVENT", "STAGE"] },
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { any_number: true },
+            filter: { card_type: ["EVENT", "STAGE"] },
+          },
+          result_ref: "cards_trashed",
         },
-      ],
-      actions: [
         {
           type: "MODIFY_POWER",
           target: { type: "SELF" },
@@ -52,10 +58,12 @@ export const OP03_001_PORTGAS_D_ACE: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CARDS_TRASHED_THIS_WAY",
+              ref: "cards_trashed",
               multiplier: 1000,
             },
           },
           duration: { type: "THIS_BATTLE" },
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
