@@ -41,7 +41,9 @@ import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
-import { extractEffectDescription } from "./effect-resolver/action-utils.js";
+import { extractEffectDescription, resolveAmount } from "./effect-resolver/action-utils.js";
+import { computeAllValidTargets } from "./effect-resolver/target-resolver.js";
+import { trashFromLifeOwner } from "./effect-resolver/actions/life.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -572,12 +574,139 @@ function canExecuteReplacementSubstitute(
         (branch) => branch.length > 0 && canExecuteReplacementSubstitute(state, effect, branch, cardDb, replacedInstanceIds),
       );
       if (!anyFeasible) return false;
+    } else if (action.type === "LIFE_TO_HAND") {
+      // OPT-873: OP10-034 Franky et al. "add 1 card from the top of your Life
+      // cards to your hand instead" — infeasible with fewer Life than printed.
+      if (!canLifeToHandSucceed(state, action, effect.controller, cardDb, refs)) return false;
+    } else if (action.type === "TRASH_FROM_LIFE") {
+      // OPT-873: ST09-010 / ST20-002 FAQ — with no Life cards the replacement
+      // cannot be used.
+      if (!canTrashFromLifeSucceed(state, action, effect.controller, cardDb, refs)) return false;
+    } else if (action.type === "RETURN_DON_TO_DECK") {
+      if (!canReturnDonToDeckSucceed(state, action, effect.controller, cardDb, refs)) return false;
+    } else if (action.type === "RETURN_TO_DECK") {
+      // OPT-873: OP11-001 Koby FAQ (2 or fewer trash cards) and OP07-042
+      // Gecko Moria FAQ (no other Character) — the printed number of cards
+      // must be available to place.
+      if (!hasRequiredSubstituteTargets(state, action.target, effect, cardDb, refs)) return false;
+    } else if (action.type === "PLACE_HAND_TO_DECK") {
+      if (!canPlaceHandToDeckSucceed(state, action, effect.controller, cardDb, refs)) return false;
     }
-    // Other substitute types (TRASH_CARD, RETURN_TO_HAND, MODIFY_POWER, …):
-    // default to feasible. Add explicit checks here as card interactions
-    // surface (e.g. RETURN_TO_HAND with zero valid targets).
+    // Remaining authored substitute types need no zone/resource check — see
+    // the OPT-873 PR inventory: TRASH_CARD / KO / RETURN_TO_HAND on SELF (the
+    // source is on the field while its replacement is registered), DRAW
+    // (bonus after a SELF trash), MODIFY_POWER (no payment), and
+    // ADD_TO_LIFE_FROM_FIELD on REPLACED_CARD (the replaced card is on the
+    // field when the event is checked). TRASH_FROM_HAND is gated by
+    // canPayReplacementCost.
   }
   return true;
+}
+
+// ─── Zone/resource substitutes (OPT-873) ─────────────────────────────────────
+//
+// Each check mirrors its resolver handler's payer and amount so that a
+// feasible substitute is exactly one the handler will carry out in full. The
+// handlers clamp to what is available (Math.min), so a short zone would
+// otherwise let the replacement save the card for a partial or empty payment
+// (rules §8-1-3-4-5).
+
+function substituteAmount(
+  amount: Parameters<typeof resolveAmount>[0],
+  state: GameState,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>,
+): number {
+  return resolveAmount(amount ?? 1, refs, state, controller, cardDb);
+}
+
+/** Payer mirrors executeLifeToHand: OPPONENT_LIFE / controller OPPONENT → opponent. */
+function canLifeToHandSucceed(
+  state: GameState,
+  action: import("./effect-types.js").ActionOf<"LIFE_TO_HAND">,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>,
+): boolean {
+  const opponent: 0 | 1 = controller === 0 ? 1 : 0;
+  const owner = action.target?.type === "OPPONENT_LIFE" || action.target?.controller === "OPPONENT"
+    ? opponent
+    : controller;
+  const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
+  return amount > 0 && state.players[owner].life.length >= amount;
+}
+
+function canTrashFromLifeSucceed(
+  state: GameState,
+  action: import("./effect-types.js").ActionOf<"TRASH_FROM_LIFE">,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>,
+): boolean {
+  const owner = trashFromLifeOwner(action, controller);
+  const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
+  return amount > 0 && state.players[owner].life.length >= amount;
+}
+
+/**
+ * Mirrors executeReturnDonToDeck's `amount` path: it returns only unattached
+ * cost-area DON!!. (`until_count` substitutes are not authored; they fall
+ * through to the handler.)
+ */
+function canReturnDonToDeckSucceed(
+  state: GameState,
+  action: import("./effect-types.js").ActionOf<"RETURN_DON_TO_DECK">,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>,
+): boolean {
+  if (action.params?.until_count !== undefined) return true;
+  const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
+  let available = 0;
+  for (const don of state.players[controller].donCostArea) {
+    if (!don.attachedTo) available++;
+  }
+  return amount > 0 && available >= amount;
+}
+
+/** Mirrors executePlaceHandToDeck: the controller's hand, `amount` cards. */
+function canPlaceHandToDeckSucceed(
+  state: GameState,
+  action: import("./effect-types.js").ActionOf<"PLACE_HAND_TO_DECK">,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>,
+): boolean {
+  const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
+  return amount > 0 && state.players[controller].hand.length >= amount;
+}
+
+/**
+ * A targeted substitute needs its printed number of valid targets, resolved
+ * exactly as the handler resolves them (same controller, source and
+ * REPLACED_CARD refs). "Up to" / "any number" / "all" allow fewer.
+ */
+function hasRequiredSubstituteTargets(
+  state: GameState,
+  target: Target | undefined,
+  effect: RuntimeActiveEffect,
+  cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>,
+): boolean {
+  if (!target) return true; // malformed schemas flow through to the dispatcher.
+  const count = target.count;
+  const needed = !count ? 1 : "exact" in count ? count.exact : 0;
+  if (needed <= 0) return true;
+  const valid = computeAllValidTargets(
+    state,
+    target,
+    effect.controller,
+    cardDb,
+    effect.sourceCardInstanceId,
+    refs,
+  );
+  return valid.length >= needed;
 }
 
 function canSetRestSucceed(
