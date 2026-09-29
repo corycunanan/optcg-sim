@@ -56,6 +56,28 @@ export function executeApplyProhibition(
     targetIds = autoSelectTargets(action.target, allValidIds);
   }
 
+  // OPT-826: "if the selected card attacks, your opponent cannot activate
+  // [Blocker]". The selection (a result ref, or this action's own target) is
+  // the attacker, not the prohibited blocker: freeze it now — refs are
+  // frame-local and gone by the Block Step — and leave appliesTo empty so the
+  // prohibition covers the opponent's blockers while a bound card attacks.
+  let attackerInstanceIds: string[] | undefined;
+  const attackerBinding = params.scope?.when_attacking;
+  if (
+    params.prohibition_type === "CANNOT_ACTIVATE_BLOCKER" &&
+    attackerBinding?.type === "SELECTED_CARDS"
+  ) {
+    attackerInstanceIds = attackerBinding.ref
+      ? [...(resultRefs.get(attackerBinding.ref)?.targetInstanceIds ?? [])]
+      : targetIds;
+    targetIds = [];
+    // "Up to 1" with nothing selected (or a declined/unpaid cost): nothing
+    // is bound, so nothing is prohibited.
+    if (attackerInstanceIds.length === 0) {
+      return { state, events, succeeded: false };
+    }
+  }
+
   const allocated = allocateEngineId(state, "prohibition");
   const prohibition: RuntimeProhibition = {
     id: allocated.id,
@@ -67,6 +89,7 @@ export function executeApplyProhibition(
     expiresAt: computeProhibitionExpiry(duration, state, controller),
     controller,
     appliesTo: targetIds,
+    ...(attackerInstanceIds ? { attackerInstanceIds } : {}),
     usesRemaining: null,
     conditionalOverride: params.conditional_override,
   };

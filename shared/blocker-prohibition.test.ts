@@ -31,12 +31,12 @@ describe("isBlockerProhibited", () => {
     });
 
     expect(
-      isBlockerProhibited([entry], blocker, 0, {
+      isBlockerProhibited([entry], blocker, 0, null, {
         matchesFilter: (filter) => filter.power_min === 5000,
       }),
     ).toBe(true);
     expect(
-      isBlockerProhibited([entry], blocker, 0, {
+      isBlockerProhibited([entry], blocker, 0, null, {
         matchesFilter: () => false,
       }),
     ).toBe(false);
@@ -49,6 +49,7 @@ describe("isBlockerProhibited", () => {
           [prohibition(prohibitionType, { appliesTo: [blocker.instanceId] })],
           blocker,
           0,
+          null,
           { matchesFilter: () => false },
         ),
       ).toBe(true);
@@ -57,6 +58,7 @@ describe("isBlockerProhibited", () => {
           [prohibition(prohibitionType, { appliesTo: ["other-blocker"] })],
           blocker,
           0,
+          null,
           { matchesFilter: () => false },
         ),
       ).toBe(false);
@@ -69,12 +71,12 @@ describe("isBlockerProhibited", () => {
     });
 
     expect(
-      isBlockerProhibited([entry], blocker, 0, {
+      isBlockerProhibited([entry], blocker, 0, null, {
         matchesFilter: () => false,
       }),
     ).toBe(true);
     expect(
-      isBlockerProhibited([entry], blocker, 1, {
+      isBlockerProhibited([entry], blocker, 1, null, {
         matchesFilter: () => false,
       }),
     ).toBe(false);
@@ -86,7 +88,7 @@ describe("isBlockerProhibited", () => {
     });
 
     expect(
-      isBlockerProhibited([entry], blocker, 0, {
+      isBlockerProhibited([entry], blocker, 0, null, {
         matchesFilter: () => false,
       }),
     ).toBe(true);
@@ -104,8 +106,32 @@ describe("isBlockerProhibited", () => {
         ],
         blocker,
         0,
+        null,
         { matchesFilter: () => true },
       ),
     ).toBe(false);
+  });
+  it("gates an attacker-bound prohibition on the current attacker, never the blocker", () => {
+    const entry = prohibition("CANNOT_ACTIVATE_BLOCKER", {
+      scope: { controller: "OPPONENT" },
+      attackerInstanceIds: ["attacker-1"],
+    });
+    const services = { matchesFilter: () => true };
+    expect(isBlockerProhibited([entry], blocker, 0, "attacker-1", services)).toBe(true);
+    expect(isBlockerProhibited([entry], blocker, 0, "attacker-2", services)).toBe(false);
+    // No battle in progress: nothing to bind to.
+    expect(isBlockerProhibited([entry], blocker, 0, null, services)).toBe(false);
+    // Binding the blocker's own id never matters.
+    const selfBound = { ...entry, attackerInstanceIds: [blocker.instanceId] };
+    expect(isBlockerProhibited([selfBound], blocker, 0, "attacker-1", services)).toBe(false);
+    // Still restricted to the opposing player.
+    expect(isBlockerProhibited([entry], { ...blocker, controller: 1 }, 1, "attacker-1", services)).toBe(false);
+  });
+
+  it("leaves unbound prohibitions independent of the attacker", () => {
+    const entry = prohibition("CANNOT_ACTIVATE_BLOCKER", { scope: { controller: "OPPONENT" } });
+    const services = { matchesFilter: () => true };
+    expect(isBlockerProhibited([entry], blocker, 0, null, services)).toBe(true);
+    expect(isBlockerProhibited([entry], blocker, 0, "anyone", services)).toBe(true);
   });
 });

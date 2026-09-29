@@ -214,6 +214,7 @@ function PlayerFieldComponent({
             cardType: charData?.type ?? "Character",
           },
           playerIndex,
+          attackerInstanceId ?? null,
           {
             matchesFilter: (filter) =>
               matchesBlockerFilter(

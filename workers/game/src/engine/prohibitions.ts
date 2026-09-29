@@ -465,6 +465,9 @@ function matchesProhibition(
       cardType: blockerData.type,
     },
     actingPlayerIndex,
+    // OPT-826: attacker-bound prohibitions compare the current battle's
+    // attacker — never the blocker candidate — against their frozen binding.
+    state.turn.battle?.attackerInstanceId ?? null,
     {
       matchesFilter: (filter) =>
         matchesFilter(blocker.card, filter as TargetFilter, cardDb, state),
