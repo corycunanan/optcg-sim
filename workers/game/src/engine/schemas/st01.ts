@@ -355,6 +355,9 @@ export const ST01_016_DIABLE_JAMBE: EffectSchema = {
       trigger: { keyword: "MAIN_EVENT" },
       actions: [
         {
+          // The selected Leader/Character is the attacker the prohibition
+          // binds to (OPT-898, same mechanism as OPT-826): the opponent
+          // cannot activate [Blocker] only in battles that exact card attacks.
           type: "APPLY_PROHIBITION",
           target: {
             type: "LEADER_OR_CHARACTER",
@@ -362,7 +365,13 @@ export const ST01_016_DIABLE_JAMBE: EffectSchema = {
             count: { up_to: 1 },
             filter: { traits: ["Straw Hat Crew"] },
           },
-          params: { prohibition_type: "CANNOT_ACTIVATE_BLOCKER" },
+          params: {
+            prohibition_type: "CANNOT_ACTIVATE_BLOCKER",
+            scope: {
+              controller: "OPPONENT",
+              when_attacking: { type: "SELECTED_CARDS" },
+            },
+          },
           duration: { type: "THIS_TURN" },
         },
       ],
