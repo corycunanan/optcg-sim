@@ -146,6 +146,32 @@ describe("validateDeck copy limit", () => {
     expect(result.passed).toBe(false);
     expect(result.cardIds).toEqual(["OP16-050"]);
   });
+
+  it("renders alternate-art rows once with the number total (OPT-860)", () => {
+    const result = copyLimitResult([
+      makeCard("OP01-075", "Pacifista", 3),
+      makeCard("OP01-075_p1", "Pacifista", 2),
+    ]);
+    expect(result).toMatchObject({
+      passed: false,
+      message: "Pacifista (5) exceed 4-copy limit",
+      cardIds: ["OP01-075", "OP01-075_p1"],
+    });
+  });
+
+  it("renders each over-limit number once in first-row order (OPT-860)", () => {
+    const result = copyLimitResult([
+      makeCard("OP01-075_p1", "Pacifista", 2),
+      makeCard("OP16-048", "Buggy", 5),
+      makeCard("OP01-075", "Pacifista", 3),
+      makeCard("OP16-050", "Miss Olive", 4),
+    ]);
+    expect(result).toMatchObject({
+      passed: false,
+      message: "Pacifista (5), Buggy (5) exceed 4-copy limit",
+      cardIds: ["OP01-075_p1", "OP16-048", "OP01-075"],
+    });
+  });
 });
 
 describe("OPT-852 restricted card numbers", () => {

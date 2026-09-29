@@ -407,12 +407,19 @@ export function validateDeck(
         DEFAULT_COPY_LIMIT &&
       !unlimitedNumbers.has(stripVariantSuffix(dc.cardId))
   );
+  // Alternate-art rows share a number; name each over-limit number once.
+  const overLimitNamesByNumber = new Map<string, string>();
+  for (const dc of overLimitCards) {
+    const number = stripVariantSuffix(dc.cardId);
+    if (!overLimitNamesByNumber.has(number))
+      overLimitNamesByNumber.set(number, dc.card.name);
+  }
   results.push({
     id: "copy-limit",
     rule: "Copy Limit",
     message:
       overLimitCards.length > 0
-        ? `${overLimitCards.map((dc) => `${dc.card.name} (${quantitiesByNumber.get(stripVariantSuffix(dc.cardId))})`).join(", ")} exceed 4-copy limit`
+        ? `${Array.from(overLimitNamesByNumber, ([number, name]) => `${name} (${quantitiesByNumber.get(number)})`).join(", ")} exceed 4-copy limit`
         : "All cards within 4-copy limit",
     severity: "error",
     passed: overLimitCards.length === 0,
