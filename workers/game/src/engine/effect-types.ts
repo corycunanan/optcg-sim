@@ -1282,10 +1282,47 @@ export interface PerTypeSelection {
   count_per_type: CountMode;
 }
 
+/**
+ * OPT-792: one selection pool spanning several target types ("rest up to a
+ * total of 2 of your opponent's Characters or DON!! cards"). The resolver
+ * resolves each listed type as its own sub-target under the parent
+ * `controller`, unions the ids, and bounds the whole selection by
+ * `total_count`.
+ *
+ * Per-type qualifiers live in `filters`, keyed by pool type, and apply only to
+ * that type — a Character cost cap never excludes DON!!, and a DON!! state
+ * filter never excludes Characters. The parent `Target.filter` is not used for
+ * mixed pools (schema lint rejects it). The parent `type` must be one of
+ * `types` (schema lint enforces it) and is the primary type seen by consumers
+ * that only read `Target.type`; the parent `count`, when present, must equal
+ * `total_count`.
+ */
 export interface MixedPool {
   types: TargetType[];
   total_count: CountMode;
+  filters?: Partial<Record<TargetType, TargetFilter>>;
 }
+
+/**
+ * Target types a `mixed_pool` may union. Each is a field-presence type whose
+ * sub-target resolution honors the parent controller; anything else is
+ * rejected by schema lint and skipped (fail-closed) by the resolver.
+ */
+export const MIXED_POOL_TYPES: ReadonlySet<TargetType> = new Set<TargetType>([
+  "CHARACTER",
+  "LEADER_OR_CHARACTER",
+  "YOUR_LEADER",
+  "OPPONENT_LEADER",
+  "STAGE",
+  "FIELD_CARD",
+  "DON_IN_COST_AREA",
+]);
+
+/** Filter keys the DON_IN_COST_AREA resolver honors; any other key is inert. */
+export const DON_POOL_FILTER_KEYS: ReadonlySet<string> = new Set([
+  "is_active",
+  "is_rested",
+]);
 
 // ─── Costs (01-SCHEMA-OVERVIEW) ──────────────────────────────────────────────
 

@@ -1300,12 +1300,13 @@ export const OP12_037_DEMON_AURA_NINE_SWORD_STYLE: EffectSchema = {
         {
           type: "SET_REST",
           target: {
-            type: "LEADER_OR_CHARACTER",
+            type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 2 },
             mixed_pool: {
               types: ["CHARACTER", "DON_IN_COST_AREA"],
               total_count: { up_to: 2 },
+              filters: { DON_IN_COST_AREA: { is_active: true } },
             },
           },
         },

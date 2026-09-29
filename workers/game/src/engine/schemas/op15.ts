@@ -971,11 +971,22 @@ export const OP15_023_ARLONG: EffectSchema = {
       actions: [
         {
           type: "APPLY_PROHIBITION",
+          // OPT-792: "rested cards" = rested Leader, Character, Stage or
+          // cost-area DON!! (qa_op14_eb04.md OP14-024: "cards" on the
+          // field spans all four).
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 2 },
-            filter: { is_rested: true },
+            mixed_pool: {
+              types: ["LEADER_OR_CHARACTER", "STAGE", "DON_IN_COST_AREA"],
+              total_count: { up_to: 2 },
+              filters: {
+                LEADER_OR_CHARACTER: { is_rested: true },
+                STAGE: { is_rested: true },
+                DON_IN_COST_AREA: { is_rested: true },
+              },
+            },
           },
           params: { prohibition_type: "CANNOT_REFRESH" },
           duration: { type: "SKIP_NEXT_REFRESH" },
@@ -1313,10 +1324,21 @@ export const OP15_032_BROOK: EffectSchema = {
       actions: [
         {
           type: "SET_REST",
+          // OPT-792: "your opponent's cards" = one active Leader, Character,
+          // Stage or DON!! card (qa_op14_eb04.md OP14-024).
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
+            mixed_pool: {
+              types: ["LEADER_OR_CHARACTER", "STAGE", "DON_IN_COST_AREA"],
+              total_count: { up_to: 1 },
+              filters: {
+                LEADER_OR_CHARACTER: { is_active: true },
+                STAGE: { is_active: true },
+                DON_IN_COST_AREA: { is_active: true },
+              },
+            },
           },
         },
       ],

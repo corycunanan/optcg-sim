@@ -29,6 +29,7 @@ import {
   type ReplacementBatchResumeContext,
 } from "../engine/replacements.js";
 import { isDeclineResponse } from "./coordinator.js";
+import { releaseMovedDonEffects } from "../engine/don-area-effects.js";
 import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
 
 export interface PromptLifecycleServices {
@@ -48,6 +49,28 @@ export interface PromptLifecycleResult {
  * deterministic continuation has fully drained.
  */
 export function resumePromptLifecycle(
+  stateBeforeResume: GameState,
+  reply: GameAction,
+  cardDb: Map<string, CardData>,
+  services: PromptLifecycleServices
+): PromptLifecycleResult {
+  const result = resumePromptLifecycleUnreleased(
+    stateBeforeResume,
+    reply,
+    cardDb,
+    services
+  );
+  if (result.responseRejected) return result;
+  // Rule 3-1-6-1 catch-all for prompt resumes (OPT-792): any DON!! a resume
+  // handler moved — including handlers that call leave-field helpers such as
+  // trashCharacter directly (rule-trash for play, replacement finalization,
+  // battle-damage continuations) — sheds its id-keyed effects. Effect
+  // actions, cost payments and the Refresh Phase already release per step.
+  const released = releaseMovedDonEffects(stateBeforeResume, result.state);
+  return released === result.state ? result : { ...result, state: released };
+}
+
+function resumePromptLifecycleUnreleased(
   stateBeforeResume: GameState,
   reply: GameAction,
   cardDb: Map<string, CardData>,

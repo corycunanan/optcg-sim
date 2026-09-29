@@ -29,6 +29,7 @@ import {
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
 import { applyRedistributeDonTransfers } from "../actions/don.js";
+import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import { trashFromHandSelection } from "../actions/removal.js";
 import type { EffectResolverResult, EffectResolverServices } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
@@ -107,7 +108,8 @@ export function handleRedistributeDon(
       transfers,
       controller
     );
-    nextState = actionResult.state;
+    // Rule 3-1-6-1: moved DON!! shed their effects.
+    nextState = releaseMovedDonEffects(nextState, actionResult.state);
     events.push(...actionResult.events);
     if (actionResult.result && pausedAction.result_ref) {
       resultRefs.set(pausedAction.result_ref, actionResult.result);

@@ -252,6 +252,9 @@ export function applyRefreshProhibitions(
     player.leader.instanceId,
     ...player.characters.filter((c): c is CardInstance => c !== null).map((c) => c.instanceId),
     ...(player.stage ? [player.stage.instanceId] : []),
+    // OPT-792: "rested ... DON!! cards will not become active" (OP07-026,
+    // OP10-033, OP15-023) holds cost-area DON!! by instance id too.
+    ...player.donCostArea.map((d) => d.instanceId),
   ]);
 
   const consumedIds = new Set<string>();

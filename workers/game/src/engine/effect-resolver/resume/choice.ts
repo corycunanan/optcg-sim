@@ -61,6 +61,7 @@ import {
 } from "../actions/don.js";
 import type { EffectResolverResult, EffectResolverServices } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
+import { releaseMovedDonEffects } from "../../don-area-effects.js";
 
 export interface ChoiceFallthrough {
   kind: "fallthrough";
@@ -251,7 +252,11 @@ export function handlePlayerChoiceDonReturn(
       : controller === 0 ? 1 : 0;
   const applied = applyFieldDonReturn(state, owner, decoded.plan);
   events.push(...applied.events);
-  return { kind: "fallthrough", state: applied.state };
+  // Rule 3-1-6-1: DON!! returned to the deck shed their effects.
+  return {
+    kind: "fallthrough",
+    state: releaseMovedDonEffects(state, applied.state),
+  };
 }
 
 /** Resume exactly the selected field cards with a concrete destination. */

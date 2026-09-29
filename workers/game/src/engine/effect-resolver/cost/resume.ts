@@ -1,4 +1,5 @@
 /** Mutations applied after a player answers a cost-selection prompt. */
+import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import type { Cost } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
 import { transitionCards } from "../../zone-transition.js";
@@ -12,7 +13,31 @@ export interface AppliedCostSelection {
 }
 
 /** Apply a validated cost-selection response and return its movement events. */
+/**
+ * Apply a selection-based cost, then release rule-3-1-6-1 effects from any
+ * DON!! the payment moved (e.g. a GIVE_DON cost paid on resume).
+ */
 export function applyCostSelection(
+  state: GameState,
+  cost: Cost,
+  selectedIds: string[],
+  controller: 0 | 1,
+  cardDb?: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): AppliedCostSelection {
+  const applied = applyCostSelectionUnreleased(
+    state,
+    cost,
+    selectedIds,
+    controller,
+    cardDb,
+    sourceCardInstanceId,
+  );
+  const released = releaseMovedDonEffects(state, applied.state);
+  return released === applied.state ? applied : { ...applied, state: released };
+}
+
+function applyCostSelectionUnreleased(
   state: GameState,
   cost: Cost,
   selectedIds: string[],

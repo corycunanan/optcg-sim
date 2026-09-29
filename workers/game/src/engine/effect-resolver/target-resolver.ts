@@ -14,7 +14,7 @@ import type {
   TargetFilter,
   UniquenessConstraint,
 } from "../effect-types.js";
-import { TRIGGERING_CARD_REF } from "../effect-types.js";
+import { MIXED_POOL_TYPES, TRIGGERING_CARD_REF } from "../effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -136,6 +136,63 @@ export function matchesFilterForTarget(
   return matchesFilterImpl(card, filter, cardDb, state, resultRefs, undefined, filterController);
 }
 
+// ─── Mixed pools (OPT-792) ───────────────────────────────────────────────────
+
+/**
+ * The count bounding a target's whole selection. A mixed pool's
+ * `total_count` spans every pool type; schema lint keeps any parent `count`
+ * equal to it, and validation still checks both.
+ */
+export function effectiveTargetCount(
+  target: Target | undefined,
+): CountMode | undefined {
+  return target?.mixed_pool?.total_count ?? target?.count;
+}
+
+function violatesCount(selected: number, count: CountMode | undefined): boolean {
+  if (!count) return false;
+  if ("exact" in count) return selected !== count.exact;
+  if ("up_to" in count) return selected > count.up_to;
+  return false;
+}
+
+/**
+ * Resolve each pool type as its own sub-target and union the ids. Only the
+ * pool type's own entry in `mixed_pool.filters` applies to it, so per-type
+ * qualifiers cannot leak across types.
+ */
+function computeMixedPoolTargets(
+  state: GameState,
+  target: Target,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+  resultRefs: Map<string, EffectResult>,
+): string[] {
+  const pool = target.mixed_pool!;
+  const union = new Set<string>();
+  for (const poolType of pool.types) {
+    if (!MIXED_POOL_TYPES.has(poolType)) continue;
+    const poolFilter = pool.filters?.[poolType];
+    const subTarget: Target = {
+      type: poolType,
+      ...(target.controller !== undefined ? { controller: target.controller } : {}),
+      ...(poolFilter ? { filter: poolFilter } : {}),
+    };
+    for (const id of computeAllValidTargets(
+      state,
+      subTarget,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      resultRefs,
+    )) {
+      union.add(id);
+    }
+  }
+  return [...union];
+}
+
 // ─── validateTargetConstraints ───────────────────────────────────────────────
 
 /**
@@ -156,6 +213,8 @@ export function validateTargetConstraints(
   const count = target.count;
   if (count && "exact" in count && selectedIds.length !== count.exact) return false;
   if (count && "up_to" in count && selectedIds.length > count.up_to) return false;
+  // OPT-792: one shared maximum across every mixed-pool type.
+  if (violatesCount(selectedIds.length, target.mixed_pool?.total_count)) return false;
 
   if (selectedIds.length === 0) {
     // Empty selection is invalid if dual_targets has exact-count slots
@@ -373,6 +432,18 @@ export function computeAllValidTargets(
   _resultRefs: Map<string, EffectResult>,
 ): string[] {
   if (!target) return [];
+  // OPT-792: a mixed pool is the union of its per-type sub-targets. It is
+  // resolved before the single-type dispatch below, which reads only `type`.
+  if (target.mixed_pool) {
+    return computeMixedPoolTargets(
+      state,
+      target,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      _resultRefs,
+    );
+  }
   const targetType = target.type;
   if (!targetType) return [];
 
@@ -611,7 +682,7 @@ export function autoSelectTargets(
   if (target.type === "ALL_YOUR_CHARACTERS" || target.type === "ALL_OPPONENT_CHARACTERS") {
     return allValidIds;
   }
-  const count = target.count;
+  const count = effectiveTargetCount(target);
   if (!count) return allValidIds.slice(0, 1);
   if ("all" in count) return allValidIds;
   if ("exact" in count) return allValidIds.slice(0, count.exact);
@@ -627,10 +698,10 @@ export function needsPlayerTargetSelection(
   allValidIds: string[],
 ): boolean {
   if (!target) return false;
-  if (!target.type) return false;
+  if (!target.type && !target.mixed_pool) return false;
   // Deterministic targets — never prompt
   const auto = ["SELF", "YOUR_LEADER", "OPPONENT_LEADER", "ALL_YOUR_CHARACTERS", "ALL_OPPONENT_CHARACTERS", "TRIGGERING_CARD"];
-  if (auto.includes(target.type)) return false;
+  if (!target.mixed_pool && target.type && auto.includes(target.type)) return false;
   if (target.self_ref) return false;
   // Dual targets always require player selection — assignment is combinatorial
   if (target.dual_targets && target.dual_targets.length > 0) {
@@ -640,7 +711,7 @@ export function needsPlayerTargetSelection(
   if (target.aggregate_constraint || target.uniqueness_constraint || target.named_distribution) {
     return allValidIds.length > 0;
   }
-  const count = target.count;
+  const count = effectiveTargetCount(target);
   if (!count) return allValidIds.length > 1;
   if ("all" in count || "any_number" in count) return false;
   // "up to N" — always prompt when there are valid targets, since the player
@@ -693,7 +764,7 @@ export function buildSelectTargetPrompt(
     countMin = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMin, 0);
     countMax = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMax, 0);
   } else {
-    const count = target?.count;
+    const count = effectiveTargetCount(target);
     countMin = (count && "exact" in count) ? count.exact : 0;
     countMax = !count ? 1
       : "exact" in count ? count.exact
