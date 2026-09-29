@@ -5,6 +5,7 @@
  * and turn handoff. Extracted from execute.ts for clarity.
  */
 
+import { releaseMovedDonEffects } from "./don-area-effects.js";
 import type {
   CardData,
   EffectStackFrame,
@@ -62,7 +63,11 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
       nextState = expireRefreshPhaseEffects(nextState);
       // Step 2: "at start of your/opponent's turn" auto effects (M4)
       // Step 3: Return attached DON!! to cost area (rested)
+      const beforeDonReturn = nextState;
       nextState = returnAttachedDonToCostArea(nextState, pi);
+      // Rule 3-1-6-1: the returned DON!! changed area, so effects applied to
+      // them end now — before step 4 decides what stays rested.
+      nextState = releaseMovedDonEffects(beforeDonReturn, nextState);
       events.push({ type: "DON_DETACHED", playerIndex: pi });
       // Step 4: Activate all rested cards — except those held rested by a
       // CANNOT_REFRESH prohibition, which is consumed by the refresh it skips

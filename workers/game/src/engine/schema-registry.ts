@@ -16,6 +16,8 @@ import {
   ALL_ACTION_TYPES,
   ALL_COST_TYPES,
   ALL_TARGET_TYPES,
+  DON_POOL_FILTER_KEYS,
+  MIXED_POOL_TYPES,
   getNestedActions,
   type EffectSchema,
   type EffectBlock,
@@ -664,8 +666,105 @@ function validateTriggerShape(trigger: unknown, prefix: string): string[] {
   return [`${prefix}: Trigger must define 'keyword', 'event', or 'any_of'`];
 }
 
+/**
+ * OPT-792 [C10]: mixed_pool shape. The resolver unions per-type sub-targets,
+ * so the pool must name supported field types, keep per-type qualifiers in
+ * `mixed_pool.filters` (a parent `filter` would be ambiguous across types),
+ * declare a primary `type` from the pool for single-type consumers, and keep
+ * any parent `count` equal to `total_count`.
+ */
+function validateMixedPool(target: Target, prefix: string): string[] {
+  const pool = target.mixed_pool;
+  if (!pool) return [];
+  const errors: string[] = [];
+  const at = `${prefix}.target.mixed_pool`;
+  const types = Array.isArray(pool.types) ? pool.types : [];
+  if (types.length < 2) {
+    errors.push(`${at}.types: [C10] A mixed pool must list at least 2 target types`);
+  }
+  if (new Set(types).size !== types.length) {
+    errors.push(`${at}.types: [C10] Duplicate target type in mixed pool`);
+  }
+  for (const poolType of types) {
+    if (!MIXED_POOL_TYPES.has(poolType)) {
+      errors.push(
+        `${at}.types: [C10] Target type '${poolType}' is not supported in a mixed pool; use ${[...MIXED_POOL_TYPES].join(", ")}`,
+      );
+      continue;
+    }
+    const controller = target.controller;
+    if (controller !== undefined) {
+      const modes = TARGET_CONTROLLER_MODES[poolType] ?? NO_SLOT_CONTROLLERS;
+      if (!modes.has(controller)) {
+        errors.push(
+          `${at}.types: [C10] Pool type '${poolType}' does not support controller '${controller}'`,
+        );
+      }
+    }
+  }
+  if (!target.type) {
+    errors.push(
+      `${prefix}.target.type: [C10] A mixed_pool target must declare a primary 'type' from mixed_pool.types`,
+    );
+  } else if (!types.includes(target.type)) {
+    errors.push(
+      `${prefix}.target.type: [C10] Primary type '${target.type}' must be one of mixed_pool.types (${types.join(", ")})`,
+    );
+  }
+  if (target.filter !== undefined) {
+    errors.push(
+      `${prefix}.target.filter: [C10] A mixed_pool target must scope qualifiers per type in mixed_pool.filters, not target.filter`,
+    );
+  }
+  if (!pool.total_count) {
+    errors.push(`${at}.total_count: [C10] A mixed pool must declare total_count`);
+  } else if (
+    target.count !== undefined &&
+    JSON.stringify(target.count) !== JSON.stringify(pool.total_count)
+  ) {
+    errors.push(
+      `${prefix}.target.count: [C10] Parent count must equal mixed_pool.total_count`,
+    );
+  }
+  for (const key of [
+    "dual_targets",
+    "per_type_selection",
+    "named_distribution",
+    "aggregate_constraint",
+    "uniqueness_constraint",
+    "self_ref",
+    "ref",
+    "source_zone",
+  ] as const) {
+    if (target[key] !== undefined) {
+      errors.push(`${prefix}.target.${key}: [C10] '${key}' cannot be combined with mixed_pool`);
+    }
+  }
+  for (const [filterType, filter] of Object.entries(pool.filters ?? {})) {
+    if (!types.includes(filterType as TargetType)) {
+      errors.push(
+        `${at}.filters.${filterType}: [C10] Filter keyed by '${filterType}', which is not in mixed_pool.types`,
+      );
+      continue;
+    }
+    if (filterType === "DON_IN_COST_AREA") {
+      for (const key of Object.keys(filter ?? {})) {
+        if (!DON_POOL_FILTER_KEYS.has(key)) {
+          errors.push(
+            `${at}.filters.DON_IN_COST_AREA.${key}: [C10] DON!! pool filters support only ${[...DON_POOL_FILTER_KEYS].join(", ")}`,
+          );
+        }
+      }
+    }
+    errors.push(...validateTargetFilterShape(filter, `${at}.filters.${filterType}`));
+    errors.push(...validateTargetFilterController(filter, `${at}.filters.${filterType}`));
+  }
+  return errors;
+}
+
 function validateTargetController(target: Action["target"], prefix: string): string[] {
   const errors: string[] = [];
+  if (target?.mixed_pool) errors.push(...validateMixedPool(target, prefix));
   if (target?.type && !VALID_TARGET_TYPES.has(target.type)) {
     errors.push(`${prefix}.target: Unknown target type '${target.type}'`);
   }

@@ -1207,14 +1207,19 @@ export const OP09_036_MONKEY_D_LUFFY: EffectSchema = {
       actions: [
         {
           type: "SET_REST",
+          // OPT-792: the cost cap binds Characters only (DON!! has no cost).
           target: {
+            type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
             mixed_pool: {
               types: ["DON_IN_COST_AREA", "CHARACTER"],
               total_count: { up_to: 1 },
+              filters: {
+                CHARACTER: { cost_max: 6 },
+                DON_IN_COST_AREA: { is_active: true },
+              },
             },
-            filter: { cost_max: 6 },
           },
         },
       ],

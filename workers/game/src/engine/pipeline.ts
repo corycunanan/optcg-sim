@@ -37,6 +37,7 @@ import {
 import { log } from "../lib/log.js";
 import { beginEngineResolution, isEngineTerminated } from "./engine-limits.js";
 import { takeEngineTimestamp } from "./execution-context.js";
+import { releaseMovedDonEffects } from "./don-area-effects.js";
 
 export interface PipelineResult {
   state: GameState;
@@ -109,8 +110,11 @@ export function runPipeline(
 
   // Step 4: Execute — produce new state snapshot
   log("pipeline.step", { ...logCtx, step: "execute" });
+  const stateBeforeExecute = nextState;
   const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
-  nextState = execResult.state;
+  // Rule 3-1-6-1: DON!! moved by a game action (attach, DON!! phase, …)
+  // shed their effects. Effect actions and cost payments release per step.
+  nextState = releaseMovedDonEffects(stateBeforeExecute, execResult.state);
 
   if (isEngineTerminated(nextState)) {
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);

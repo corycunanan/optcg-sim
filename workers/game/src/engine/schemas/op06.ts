@@ -656,18 +656,21 @@ export const OP06_020_HODY_JONES: EffectSchema = {
       actions: [
         {
           type: "SET_REST",
+          // OPT-792: "DON!! cards or Characters with a cost of 3 or less" —
+          // the cost cap binds Characters only; DON!! must be active
+          // (qa_st-01-st-04.md ST02-008: an already rested DON!! cannot be
+          // chosen to rest).
           target: {
-            type: "LEADER_OR_CHARACTER",
+            type: "CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
-            filter: {
-              any_of: [
-                { card_type: "CHARACTER", cost_max: 3 },
-              ],
-            },
             mixed_pool: {
               types: ["CHARACTER", "DON_IN_COST_AREA"],
               total_count: { up_to: 1 },
+              filters: {
+                CHARACTER: { cost_max: 3 },
+                DON_IN_COST_AREA: { is_active: true },
+              },
             },
           },
         },
@@ -1244,6 +1247,7 @@ export const OP06_035_HODY_JONES_CHARACTER: EffectSchema = {
             mixed_pool: {
               types: ["CHARACTER", "DON_IN_COST_AREA"],
               total_count: { up_to: 2 },
+              filters: { DON_IN_COST_AREA: { is_active: true } },
             },
           },
         },

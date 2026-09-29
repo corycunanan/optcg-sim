@@ -289,6 +289,8 @@ function PlayerFieldComponent({
       {/* Zone 2: Leader row — DON / LDR / STG */}
       <DonZone
         player={me}
+        targetSelectionById={targetSelectionById}
+        onTargetToggle={onTargetToggle}
         enableDrag={canInteract}
         zoneKey={zoneKey("don")}
         donArtUrl={me?.donArtUrl}

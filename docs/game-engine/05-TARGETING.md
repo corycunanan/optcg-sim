@@ -589,38 +589,62 @@ Selecting from a pool that spans multiple card types (Characters, DON!!, Stages,
 interface MixedPool {
   types: TargetType[];
   total_count: CountMode;
+  /** Per-type qualifiers; each applies only to its own pool type. */
+  filters?: Partial<Record<TargetType, TargetFilter>>;
 }
 ```
 
-**Cards:** OP06-035 Hody Jones, OP12-037 Demon Aura, EB02-007
+**Cards:** OP06-020, OP06-035, OP09-036, OP12-037, EB03-012, EB03-061, OP07-026, ST26-002, OP14-024, OP15-023, OP15-032
 
-**Example** — OP06-035 Hody Jones: "Rest up to a total of 2 of your opponent's Characters or DON!! cards."
+**Resolution (OPT-792).** The resolver resolves each entry of `types` as its own sub-target — `{ type, controller: target.controller, filter: filters[type] }` — and unions the ids. `total_count` bounds the whole selection (prompt `countMin`/`countMax`, auto-select, and response validation). The SELECT_TARGET prompt lists the union in `validTargets`; cost-area DON!! appear there by instance id (they are not `cards`), and the board offers them in place in the DON!! zone.
+
+**Per-type scoping.** A qualifier printed on one noun binds only that noun: "DON!! cards or Characters with a cost of 3 or less" puts `cost_max: 3` on `filters.CHARACTER` only (DON!! has no cost). A DON!! pool accepts only `is_active` / `is_rested`. A rest action's DON!! pool is `{ is_active: true }` — an already rested DON!! cannot be chosen to rest (ST02-008 FAQ).
+
+**Schema lint [C10].** A `mixed_pool` target must:
+- declare a primary `type` that is one of `types` (single-type consumers read it);
+- keep qualifiers in `mixed_pool.filters`, never the parent `filter`;
+- keep any parent `count` equal to `total_count`;
+- list at least two of `CHARACTER`, `LEADER_OR_CHARACTER`, `YOUR_LEADER`, `OPPONENT_LEADER`, `STAGE`, `FIELD_CARD`, `DON_IN_COST_AREA`, each supporting the parent controller;
+- not combine with `dual_targets`, `per_type_selection`, `named_distribution`, `aggregate_constraint`, `uniqueness_constraint`, `self_ref`, `ref` or `source_zone`.
+
+**Example** — OP09-036 Monkey.D.Luffy: "rest up to 1 of your opponent's DON!! cards or Characters with a cost of 6 or less."
 
 ```json
 {
   "type": "CHARACTER",
   "controller": "OPPONENT",
+  "count": { "up_to": 1 },
   "mixed_pool": {
-    "types": ["CHARACTER", "DON_IN_COST_AREA"],
-    "total_count": { "up_to": 2 }
+    "types": ["DON_IN_COST_AREA", "CHARACTER"],
+    "total_count": { "up_to": 1 },
+    "filters": {
+      "CHARACTER": { "cost_max": 6 },
+      "DON_IN_COST_AREA": { "is_active": true }
+    }
   }
 }
 ```
 
-**Example** — EB02-007: "Up to a total of 3 of your Leader and Character cards gain +1000 power."
+**Example** — OP14-024 Kin'emon: "Rest up to 1 of your opponent's cards." "Cards" on the field are a Leader, Character, Stage or cost-area DON!!, and only an active one can be rested (qa_op14_eb04.md).
 
 ```json
 {
   "type": "LEADER_OR_CHARACTER",
-  "controller": "SELF",
+  "controller": "OPPONENT",
+  "count": { "up_to": 1 },
   "mixed_pool": {
-    "types": ["YOUR_LEADER", "CHARACTER"],
-    "total_count": { "up_to": 3 }
+    "types": ["LEADER_OR_CHARACTER", "STAGE", "DON_IN_COST_AREA"],
+    "total_count": { "up_to": 1 },
+    "filters": {
+      "LEADER_OR_CHARACTER": { "is_active": true },
+      "STAGE": { "is_active": true },
+      "DON_IN_COST_AREA": { "is_active": true }
+    }
   }
 }
 ```
 
-The engine presents all matching cards of any listed type as a single selection pool. The total number selected across all types is bounded by `total_count`.
+A mixed pool on `APPLY_PROHIBITION` `CANNOT_REFRESH` (OP07-026, OP15-023) holds a cost-area DON!! rested through its owner's next Refresh Phase, the same as a Character.
 
 ---
 
