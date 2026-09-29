@@ -2,7 +2,7 @@
 import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
-import { isProhibitedForCard, isRemovalProhibited } from "../../prohibitions.js";
+import { isDonAttachProhibited, isProhibitedForCard, isRemovalProhibited } from "../../prohibitions.js";
 import { namedPlayCandidates } from "./named-play.js";
 import { isPresent } from "../../type-guards.js";
 import { computeAllValidTargets } from "../target-resolver.js";
@@ -48,6 +48,12 @@ export function activeCostAreaDonCount(player: PlayerState): number {
  * Characters matching the cost's target, resolved exactly as the GIVE_DON
  * action resolves its target. Empty when fewer than `amount` active DON!!
  * remain, so every returned recipient is a complete payment (rule 8-3-1-3).
+ * OPT-869: a card covered by an active CANNOT_ATTACH_DON prohibition is
+ * excluded with the manual-attach predicate. Feasibility, the prompt, the
+ * resume checks and `applyCostSelection` all read this list, so none of them
+ * can offer or accept a prohibited recipient. The resume reads prohibition
+ * coverage in the staged payment state (rule 8-3-1-1; see
+ * `stagedProhibitionView`) and the live state for presence only.
  */
 function giveDonRecipients(
   state: GameState,
@@ -69,7 +75,7 @@ function giveDonRecipients(
     cardDb,
     sourceCardInstanceId ?? "",
     new Map(),
-  ).filter((id) => ownField.has(id));
+  ).filter((id) => ownField.has(id) && !isDonAttachProhibited(state, id, cardDb, controller));
 }
 
 /** Return active field cards that can be offered for a rest cost. */
