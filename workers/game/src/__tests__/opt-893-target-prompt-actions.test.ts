@@ -5,9 +5,10 @@
  * prompt already allows 0" only for TARGET_COUNT actions. This suite re-derives
  * that set from the resolver's source: a handler registered in ACTION_HANDLERS
  * is TARGET_COUNT exactly when its body (or a same-file helper it calls) asks
- * `needsPlayerTargetSelection(action.target, …)` and prompts through
- * `buildSelectTargetPrompt`. A new or changed handler that drifts from the
- * table fails here.
+ * `needsPlayerTargetSelection(action.target, …)` — directly or through a
+ * same-file helper that forwards its `action.target` argument there — and
+ * prompts through `buildSelectTargetPrompt`. A new or changed handler that
+ * drifts from the table fails here.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -55,6 +56,62 @@ function functionBodies(): Map<string, { file: string; body: string }> {
   return bodies;
 }
 
+/** Split a parameter or argument list on top-level commas. */
+function splitTopLevel(list: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of list) {
+    if ("([{<".includes(ch)) depth++;
+    else if (")]}>".includes(ch)) depth--;
+    if (ch === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else current += ch;
+  }
+  if (current.trim()) parts.push(current);
+  return parts;
+}
+
+/** Declared parameter names of a function body captured by `functionBodies`. */
+function parameterNames(body: string): string[] {
+  const open = body.indexOf("(");
+  let depth = 0;
+  let end = open;
+  for (let i = open; i < body.length; i++) {
+    if (body[i] === "(") depth++;
+    else if (body[i] === ")" && --depth === 0) {
+      end = i;
+      break;
+    }
+  }
+  return splitTopLevel(body.slice(open + 1, end)).map((p) => p.trim().match(/^(\w+)/)?.[1] ?? "");
+}
+
+/**
+ * Whether `body` asks `needsPlayerTargetSelection` about `action.target`,
+ * directly or through a same-file helper that receives `action.target` and
+ * passes that parameter on to `needsPlayerTargetSelection` (OPT-885's
+ * `any_number` wrapper in removal.ts is one such helper).
+ */
+function asksTargetSelection(
+  body: string,
+  file: string,
+  bodies: ReturnType<typeof functionBodies>,
+): boolean {
+  if (/needsPlayerTargetSelection\(\s*action\.target\b/.test(body)) return true;
+  for (const call of body.matchAll(/\b(\w+)\(([^()]*?)\baction\.target\b(?!\.|\?\.)/g)) {
+    const helper = bodies.get(call[1]);
+    if (!helper || helper.file !== file) continue;
+    const position = splitTopLevel(call[2]).length;
+    const param = parameterNames(helper.body)[position];
+    if (param && new RegExp(`needsPlayerTargetSelection\\(\\s*${param}\\b(?!\\.|\\?\\.)`).test(helper.body)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function derivedKind(handler: string, bodies: ReturnType<typeof functionBodies>): TargetPromptKind {
   const own = bodies.get(handler);
   if (!own) throw new Error(`handler ${handler} not found in effect-resolver sources`);
@@ -64,9 +121,8 @@ function derivedKind(handler: string, bodies: ReturnType<typeof functionBodies>)
     const callee = bodies.get(call[1]);
     if (call[1] !== handler && callee?.file === own.file) text.push(callee.body);
   }
-  const joined = text.join("\n");
-  return /needsPlayerTargetSelection\(\s*action\.target\b/.test(joined) &&
-    /buildSelectTargetPrompt\(/.test(joined)
+  return text.some((body) => asksTargetSelection(body, own.file, bodies)) &&
+    /buildSelectTargetPrompt\(/.test(text.join("\n"))
     ? "TARGET_COUNT"
     : "OTHER";
 }

@@ -491,7 +491,7 @@ For effects where amounts scale based on game state or prior action results rath
 ```typescript
 type DynamicValue =
   | { type: "FIXED"; value: number }
-  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number }
+  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number; ref?: string }
   | { type: "GAME_STATE"; source: GameStateSource; controller?: Controller }
   | { type: "ACTION_RESULT"; ref: string }
   | { type: "CHOSEN_VALUE" };
@@ -525,6 +525,12 @@ type DynamicSource =
 | `CARDS_IN_TRASH` | 1000 | 5 | EB04-048 Rob Lucci |
 | `CARDS_PLACED_TO_DECK_THIS_WAY` | 1000 | 3 | OP07-091 |
 | `REVEALED_CARD_COST` | 1000 | 1 | OP15-119 |
+
+`*_THIS_WAY` sources count either a cost or a preceding action (OPT-885).
+Without `ref`, the value is the count from the block's cost payment. With
+`ref`, it is the `result.count` of the earlier action in the same block whose
+`result_ref` matches. OP15-002 Lucy uses the action form; OP13-001 Luffy
+uses the cost form. See `workers/game/src/engine/schemas/README.md`.
 
 ### GAME_STATE — Live Game State Values
 

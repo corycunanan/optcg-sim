@@ -1990,10 +1990,11 @@ export const OP09_059_MURDER_AT_THE_STEAM_BATH: EffectSchema = {
             count: { up_to: 2 },
           },
           chain: "THEN",
+          result_ref: "cards_trashed",
         },
         {
           type: "MILL",
-          params: { amount: { type: "PER_COUNT", source: "CARDS_TRASHED_THIS_WAY", multiplier: 1 } },
+          params: { amount: { type: "PER_COUNT", source: "CARDS_TRASHED_THIS_WAY", ref: "cards_trashed", multiplier: 1 } },
           chain: "THEN",
         },
       ],

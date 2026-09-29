@@ -3206,6 +3206,7 @@ export const OP07_091_MONKEY_D_LUFFY: EffectSchema = {
           },
           params: { position: "BOTTOM" },
           chain: "THEN",
+          result_ref: "cards_placed_to_deck",
         },
         {
           type: "MODIFY_POWER",
@@ -3214,6 +3215,7 @@ export const OP07_091_MONKEY_D_LUFFY: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CARDS_PLACED_TO_DECK_THIS_WAY",
+              ref: "cards_placed_to_deck",
               multiplier: 1000,
               divisor: 3,
             },
