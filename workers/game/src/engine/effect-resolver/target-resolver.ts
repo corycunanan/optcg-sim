@@ -11,6 +11,7 @@ import type {
   NamedCardDistribution,
   SourceZone,
   Target,
+  TargetType,
   TargetFilter,
   UniquenessConstraint,
 } from "../effect-types.js";
@@ -437,6 +438,68 @@ function validateDualTargetConstraints(
   }
 
   return backtrack(0);
+}
+
+// ─── Candidate pool bounds ───────────────────────────────────────────────────
+
+/**
+ * Most candidates `computeAllValidTargets` can return for a target type, per
+ * controlled side: `1` where its case returns at most one id (the player
+ * marker, the deck's top card, the top Life card, a player's single Stage, the
+ * single triggering card), otherwise unbounded. Keyed by every TargetType so a
+ * new type must be classified here, next to the switch it mirrors.
+ */
+const TARGET_TYPE_POOL_PER_SIDE: Record<TargetType, number> = {
+  SELF: 1,
+  YOUR_LEADER: 1,
+  OPPONENT_LEADER: 1,
+  CHARACTER: Infinity,
+  STAGE: 1,
+  LEADER_OR_CHARACTER: Infinity,
+  FIELD_CARD: Infinity,
+  ALL_YOUR_CHARACTERS: Infinity,
+  ALL_OPPONENT_CHARACTERS: Infinity,
+  CHARACTER_CARD: Infinity,
+  STAGE_CARD: Infinity,
+  EVENT_CARD: Infinity,
+  CARD_IN_HAND: Infinity,
+  CARD_IN_TRASH: Infinity,
+  CARD_ON_TOP_OF_DECK: 1,
+  CARD_IN_DECK: Infinity,
+  LIFE_CARD: 1,
+  DON_IN_COST_AREA: Infinity,
+  DON_ATTACHED: Infinity,
+  DON_IN_DON_DECK: Infinity,
+  PLAYER: 1,
+  SELECTED_CARDS: Infinity,
+  OPPONENT_LIFE: Infinity,
+  TRIGGERING_CARD: 1,
+  TRIGGERING_CARD_IN_TRASH: 1,
+  BATTLE_TARGET: Infinity,
+  REPLACED_CARD: Infinity,
+};
+
+/** Target types whose case resolves both players' pools for `controller: "EITHER"`. */
+const EITHER_SIDE_TARGET_TYPES: ReadonlySet<TargetType> = new Set<TargetType>([
+  "STAGE",
+  "LIFE_CARD",
+]);
+
+/**
+ * Upper bound on the candidate pool `computeAllValidTargets` can produce for
+ * this target (OPT-893). Optional-action validation probes
+ * `needsPlayerTargetSelection` with a pool this large, so a target that can
+ * never offer more than one candidate is not treated as a multi-candidate
+ * prompt.
+ */
+export function targetCandidatePoolMax(target: Target | undefined): number {
+  if (!target) return 0;
+  if (target.mixed_pool || target.dual_targets?.length) return Infinity;
+  if (!target.type) return 0;
+  const perSide = TARGET_TYPE_POOL_PER_SIDE[target.type];
+  return EITHER_SIDE_TARGET_TYPES.has(target.type) && target.controller === "EITHER"
+    ? perSide * 2
+    : perSide;
 }
 
 // ─── computeAllValidTargets ──────────────────────────────────────────────────
