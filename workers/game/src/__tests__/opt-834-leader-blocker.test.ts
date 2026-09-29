@@ -592,7 +592,7 @@ describe("OPT-834 OP16-058 The Prisoners Are Rioting!!", () => {
       owner: 1,
     };
     f.state.players[1].hand = [ev];
-    f.act({ type: "USE_COUNTER_EVENT", cardInstanceId: ev.instanceId }, 1);
+    f.act({ type: "USE_COUNTER_EVENT", cardInstanceId: ev.instanceId, counterTargetInstanceId: f.leader.instanceId }, 1);
     const options = f.state.pendingPrompt?.options;
     if (options?.promptType !== "SELECT_TARGET") throw new Error("expected Counter target prompt");
     // Buggy (OP16-048) is on the field and always a legal [Buggy] target.
