@@ -43,6 +43,24 @@ describe("promptDialogTitle", () => {
   it("falls back to Card Effect without a timing", () => {
     expect(promptDialogTitle("Select how to pay the cost")).toBe("Card Effect");
   });
+
+  it("prefers the action label over the timing", () => {
+    expect(promptDialogTitle("[On Play] KO 1 Character.", "KO Characters")).toBe(
+      "Card Effect: KO Characters"
+    );
+  });
+
+  it("uses the timing when the action label is absent or blank", () => {
+    expect(promptDialogTitle("[On Play] Draw 1 card.", undefined)).toBe(
+      "Card Effect: On Play"
+    );
+    expect(promptDialogTitle("[On Play] Draw 1 card.", "  ")).toBe(
+      "Card Effect: On Play"
+    );
+    expect(promptDialogTitle("Choose a cost to pay", "Pay Cost")).toBe(
+      "Card Effect: Pay Cost"
+    );
+  });
 });
 
 describe("promptSourceCardName", () => {
