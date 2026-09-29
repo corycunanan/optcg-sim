@@ -681,6 +681,70 @@ describe("REPLACED_CARD survives a substitute's own prompt and a persisted round
   });
 });
 
+describe("REPLACED_CARD on every replacement execution path", () => {
+  // Test-only: "If your other Character would be K.O.'d, [you may] add it to
+  // the top of your Life cards face-down instead." No cause filter, so both
+  // effect K.O.s (batch scan) and battle K.O.s (single check) reach it.
+  const schema = (optional: boolean): EffectSchema => ({
+    card_id: optional ? "OPT797-LIFE-MAY" : "OPT797-LIFE-MUST",
+    card_name: "Life proxy",
+    card_type: "Character",
+    effects: [
+      {
+        id: "life_it",
+        category: "replacement",
+        ...(optional ? { flags: { optional: true } } : {}),
+        replaces: {
+          event: "WOULD_BE_KO",
+          target_filter: { controller: "SELF", card_type: "CHARACTER", exclude_self: true },
+        },
+        replacement_actions: [
+          { type: "ADD_TO_LIFE_FROM_FIELD", target: { type: "REPLACED_CARD" }, params: { face: "DOWN", position: "TOP" } },
+        ],
+      },
+    ],
+  });
+
+  function setup(optional: boolean) {
+    const f = fixture();
+    const id = optional ? "OPT797-LIFE-MAY" : "OPT797-LIFE-MUST";
+    f.def(id, {}, schema(optional));
+    f.def("OPT797-PROTECTED", { power: 3000 });
+    f.def("OPP-C5", { cost: 5, power: 7000 });
+    const host = f.put(id, 0);
+    const protectedCard = f.put("OPT797-PROTECTED", 0);
+    return { f, host, protectedCard };
+  }
+
+  function expectInLife(f: Fixture, host: CardInstance, protectedCard: CardInstance) {
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.onField(protectedCard)).toBe(false);
+    expect(f.state.players[0].life[0]).toMatchObject({ cardId: "OPT797-PROTECTED", face: "DOWN" });
+    expect(f.trashIds(0)).not.toContain("OPT797-PROTECTED");
+    expect(f.onField(host)).toBe(true);
+  }
+
+  it("non-optional, effect K.O. (batch scan applies it without a prompt)", () => {
+    const { f, host, protectedCard } = setup(false);
+    removeWith(f, 1, "KO", protectedCard);
+    expectInLife(f, host, protectedCard);
+  });
+
+  it("non-optional, battle K.O. (single-target check)", () => {
+    const { f, host, protectedCard } = setup(false);
+    f.attack(f.put("OPP-C5", 1), protectedCard); // 7000 vs 3000
+    expectInLife(f, host, protectedCard);
+  });
+
+  it("optional, battle K.O. (single-target prompt, then resume)", () => {
+    const { f, host, protectedCard } = setup(true);
+    f.attack(f.put("OPP-C5", 1), protectedCard);
+    expect(f.prompt()).toBe("OPTIONAL_EFFECT");
+    f.accept();
+    expectInLife(f, host, protectedCard);
+  });
+});
+
 describe("REPLACED_CARD substitute feasibility is checked against the replaced card", () => {
   // Test-only: "If your Character would be K.O.'d by your opponent's effect,
   // you may rest it instead." Infeasible (§8-1-3-4-5) when it is already rested.
