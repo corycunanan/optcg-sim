@@ -1745,7 +1745,6 @@ export const OP12_048_DONQUIXOTE_ROSINANTE: EffectSchema = {
           card_type: "CHARACTER",
           color: "BLUE",
           traits: ["Navy"],
-          exclude_self: true,
         },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
