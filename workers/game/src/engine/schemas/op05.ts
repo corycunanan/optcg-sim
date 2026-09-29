@@ -38,6 +38,7 @@ export const OP05_001_SABO: EffectSchema = {
       replacement_actions: [
         {
           type: "MODIFY_POWER",
+          target: { type: "REPLACED_CARD" },
           params: { amount: -1000 },
           duration: { type: "THIS_TURN" },
         },
