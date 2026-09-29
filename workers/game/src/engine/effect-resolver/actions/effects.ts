@@ -65,6 +65,16 @@ export function executeApplyProhibition(
   const attackerBinding = params.scope?.when_attacking;
   if (
     params.prohibition_type === "CANNOT_ACTIVATE_BLOCKER" &&
+    attackerBinding?.type === "YOUR_LEADER"
+  ) {
+    // OPT-899: "whenever your Leader attacks" — the applying player's Leader
+    // instance never leaves the field, so freeze its id now.
+    const leaderId = state.players[controller].leader?.instanceId;
+    if (!leaderId) return { state, events, succeeded: false };
+    attackerInstanceIds = [leaderId];
+    targetIds = [];
+  } else if (
+    params.prohibition_type === "CANNOT_ACTIVATE_BLOCKER" &&
     attackerBinding?.type === "SELECTED_CARDS"
   ) {
     attackerInstanceIds = attackerBinding.ref

@@ -286,6 +286,21 @@ describe("OPT-549 spectator per-viewer merge", () => {
     );
   });
 
+  it("throws when the filtered player views are swapped", () => {
+    // OPT-901 rebuilds the receiver's own tuple entry to redact face-down
+    // Life, so the owner-view check compares hand references instead.
+    const { state } = getMainPhaseState();
+    const { playerZeroView, playerOneView } = filteredViews(state);
+
+    expect(mergeDirectly(
+      state,
+      playerOneView,
+      playerZeroView,
+    )).toThrow(
+      "Spectator visibility invariant violated: player views are not their indexed owner views",
+    );
+  });
+
   it("exercises every viewer-divergent field and applies its spectator rule", () => {
     const { state, cardDb } = getMainPhaseState();
     const source = stateWithEveryViewerDivergence(state);
