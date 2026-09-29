@@ -874,6 +874,15 @@ function dealOneLeaderDamage(
         firstDamageOfAttack,
       },
     });
+    // OPT-886: the win check is made once, "at the point when it is
+    // determined that damage will be dealt" (7-1-4-1-1-1). A 2-damage attack
+    // repeats only the Life-to-hand step 7-1-4-1-1-2 (7-1-4-1-1-3), which
+    // does nothing at 0 Life — so a [Double Attack]'s later damage finding 0
+    // Life is dealt but does not defeat (qa_rules.md:156-158). Only the
+    // attack's first damage at 0 Life fulfils 9-2-1-1.
+    if (!firstDamageOfAttack) {
+      return { state: popResult.state, events, paused: false };
+    }
     return {
       state: popResult.state,
       events,
@@ -959,8 +968,10 @@ function dealOneLeaderDamage(
 
 /**
  * Drive `dealOneLeaderDamage` while `battle.damagesRemaining > 0`, pausing
- * on [Trigger] Life cards and aborting if the attacker leaves the field
- * between damages. Calls `endBattle` once the sequence completes (or aborts).
+ * on [Trigger] Life cards. The count locked at Damage Step entry is always
+ * dealt in full, even if the attacker leaves the field between damages
+ * (qa_rules.md:152-154, OPT-886). Calls `endBattle` once the sequence
+ * completes.
  *
  * Between damages, runs `recalculateBattlePowers` so Life-threshold power
  * buffs (e.g., ST09-001 Yamato gaining +1000 at ≤2 Life) apply to the 2nd
@@ -986,22 +997,26 @@ function continueLeaderDamageSequence(
     const remaining = battle.damagesRemaining ?? 0;
     if (remaining <= 0) break;
 
-    // Attacker must still be on field to deal further damage (inferred from
-    // §7-1-4 — damage dealing requires a source). If a [Trigger] K.O.'d the
-    // attacker during the previous damage's window, skip remaining damage.
+    // OPT-886 (qa_rules.md:152-154): the damage count is fixed when the
+    // Damage Step locks it, so the remaining damage is still dealt when the
+    // attacker left the field (a [Trigger] K.O., its own effect, …) or lost
+    // [Double Attack] after an earlier damage.
     const attackerFound = findCardInState(nextState, battle.attackerInstanceId);
     const onField =
       !!attackerFound &&
       (attackerFound.card.zone === "CHARACTER" ||
         attackerFound.card.zone === "LEADER");
-    if (!onField) break;
 
     // Re-apply modifiers so between-damage power conditions are honored.
     nextState = recalculateBattlePowers(nextState, cardDb);
 
-    const attackerData = cardDb.get(attackerFound!.card.cardId);
+    const attackerData = onField
+      ? cardDb.get(attackerFound!.card.cardId)
+      : undefined;
     // OPT-253: [Banish] is suppressed while the attacker is effect-negated,
-    // preserved if it came from an external GRANT_KEYWORD.
+    // preserved if it came from an external GRANT_KEYWORD. An attacker that
+    // left the field no longer has keyword effects, so its remaining damage
+    // is ordinary damage.
     const isBanish = attackerData
       ? hasEffectiveKeyword(
           attackerFound!.card,
@@ -1011,6 +1026,8 @@ function continueLeaderDamageSequence(
           cardDb
         )
       : false;
+    // A Leader never leaves the field, so an off-field attacker was a
+    // Character.
     const attackerType: "LEADER" | "CHARACTER" =
       attackerData?.type?.toUpperCase() === "LEADER" ? "LEADER" : "CHARACTER";
 

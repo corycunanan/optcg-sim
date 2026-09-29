@@ -14,6 +14,7 @@
 import {
   ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
   ALL_ACTION_TYPES,
+  ALL_CAUSE_FILTER_BY,
   ALL_COST_TYPES,
   ALL_TARGET_TYPES,
   DON_POOL_FILTER_KEYS,
@@ -31,6 +32,12 @@ import {
 } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
+import {
+  needsPlayerTargetSelection,
+  targetCandidatePoolMax,
+  targetPromptCountMin,
+} from "./effect-resolver/target-resolver.js";
+import { promptsFromTargetCount } from "./effect-resolver/target-prompt-actions.js";
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
 import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
 import { derivePrintedKeywords } from "./printed-keywords.js";
@@ -230,6 +237,8 @@ const TARGET_CONTROLLER_MODES = {
   REPLACED_CARD: NO_SLOT_CONTROLLERS,
 } satisfies Record<TargetType, ReadonlySet<Controller>>;
 
+const CAUSE_FILTER_BY_VALUES = new Set<string>(ALL_CAUSE_FILTER_BY);
+
 /**
  * Validate an effect schema and return a list of error messages.
  * Returns an empty array if the schema is valid.
@@ -338,6 +347,16 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
     case "replacement":
       if (!block.replaces) {
         errors.push(`${prefix}: 'replacement' block missing 'replaces'`);
+      } else if (block.replaces.cause_filter != null) {
+        // OPT-873: the runtime (replacements.ts isCauseFilter) drops a
+        // replacement whose cause filter it does not recognize, silently
+        // disabling the whole block. Reject it at authoring time instead.
+        const by: unknown = block.replaces.cause_filter.by;
+        if (typeof by !== "string" || !CAUSE_FILTER_BY_VALUES.has(by)) {
+          errors.push(
+            `${prefix}.replaces.cause_filter.by: must be one of ${ALL_CAUSE_FILTER_BY.join(", ")}`,
+          );
+        }
       }
       if (!block.replacement_actions || block.replacement_actions.length === 0) {
         errors.push(`${prefix}: 'replacement' block missing 'replacement_actions'`);
@@ -1082,7 +1101,7 @@ function validateOptionalAction(
     ];
   }
   const errors: string[] = [];
-  for (const path of zeroAllowingTargetCounts(action.target)) {
+  for (const path of zeroAllowingTargetCounts(action)) {
     errors.push(
       `${prefix}.optional: ${path} already allows choosing 0; drop 'optional' (the selection prompt is the decline)`,
     );
@@ -1104,19 +1123,46 @@ function countAllowsZero(count: unknown): boolean {
   );
 }
 
-/** Every count on a target shape whose selection may pick zero cards. */
-function zeroAllowingTargetCounts(target: Target | undefined): string[] {
+/**
+ * Every place a target's selection prompt lets the player choose 0, derived
+ * from the resolver's own bounds (`targetPromptCountMin`, and
+ * `needsPlayerTargetSelection` for whether a prompt is issued at all) rather
+ * than per-key inspection. dual_targets is judged on the combined minimum, so
+ * `{exact:1}` + `{up_to:1}` (countMin 1) is not zero-allowing.
+ *
+ * An omitted count is zero-allowing (countMin 0, countMax 1) only when the
+ * action's handler builds its SELECT_TARGET from the target's count
+ * (`promptsFromTargetCount`) and the target type can offer more than one
+ * candidate (`targetCandidatePoolMax`). Otherwise no zero-choice prompt exists
+ * (e.g. TRASH_FROM_LIFE never prompts; TRASH_FROM_HAND with an amount asks for
+ * exactly that many), and action-level `optional` is the only decline.
+ */
+function zeroAllowingTargetCounts(action: Action): string[] {
+  const target = action.target;
   if (!target) return [];
   const paths: string[] = [];
+  const perTypeZero = countAllowsZero(target.per_type_selection?.count_per_type);
+  if (perTypeZero) paths.push("target.per_type_selection.count_per_type");
+  if (target.dual_targets?.length) {
+    if (targetPromptCountMin(target) === 0) {
+      target.dual_targets.forEach((_slot, index) =>
+        paths.push(`target.dual_targets[${index}].count`),
+      );
+    }
+    return paths;
+  }
   if (countAllowsZero(target.count)) paths.push("target.count");
-  target.dual_targets?.forEach((slot, index) => {
-    if (countAllowsZero(slot?.count))
-      paths.push(`target.dual_targets[${index}].count`);
-  });
-  if (countAllowsZero(target.per_type_selection?.count_per_type))
-    paths.push("target.per_type_selection.count_per_type");
   if (countAllowsZero(target.mixed_pool?.total_count))
     paths.push("target.mixed_pool.total_count");
+  const hasCount = !!(target.mixed_pool?.total_count ?? target.count);
+  if (hasCount || perTypeZero || !promptsFromTargetCount(action.type)) return paths;
+  // Probe with the largest pool this target type can produce (capped), so
+  // the predicate reports whether a multi-candidate prompt is possible.
+  const poolMax = Math.min(targetCandidatePoolMax(target), 1000);
+  const probe = Array.from({ length: poolMax }, (_, i) => `probe-${i}`);
+  if (needsPlayerTargetSelection(target, probe) && targetPromptCountMin(target) === 0) {
+    paths.push("target (omits count, so the multi-candidate prompt defaults to choosing 0 or 1)");
+  }
   return paths;
 }
 

@@ -10,7 +10,9 @@ import { ALL_ACTION_TYPES } from "../engine/effect-types.js";
 import {
   allocateEngineId,
   ensureExecutionContext,
+  reconcileExecutionContextIdCounter,
 } from "../engine/execution-context.js";
+import { log } from "../lib/log.js";
 import { buildGameResultCallbackPayload } from "../util/result.js";
 import {
   CONSUMED_TOKEN_JTIS_STORAGE_KEY,
@@ -232,9 +234,12 @@ export class SessionRepository {
         : this.storage.get<unknown>(SESSION_UNDO_HISTORY_STORAGE_KEY),
     ]);
     const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
-    const restoredState = ensureExecutionContext(stored.state);
-    const restoredUndoHistory = (stored.undoHistory ?? []).map((snapshot) =>
-      ensureExecutionContext(snapshot),
+    const restoredState = restoreIdCounterInvariant(
+      ensureExecutionContext(stored.state),
+      "state",
+    );
+    const restoredUndoHistory = (stored.undoHistory ?? []).map((snapshot, index) =>
+      restoreIdCounterInvariant(ensureExecutionContext(snapshot), `undoHistory[${index}]`),
     );
     const compacted = compactSessionHistory(
       restoredState,
@@ -851,6 +856,25 @@ function isPriorityRollSequence(value: unknown): value is number[] | null {
           roll <= 6
       ))
   );
+}
+
+/**
+ * OPT-891: a restored context must not re-issue an id already in its state.
+ * The engine persists state and counter together, so this is a no-op for any
+ * snapshot it wrote; a lower counter (corrupt or hand-edited storage) is
+ * raised and logged rather than allowed to collide later.
+ */
+function restoreIdCounterInvariant(state: GameState, location: string): GameState {
+  const restored = reconcileExecutionContextIdCounter(state);
+  if (restored !== state) {
+    log("session.id_counter_repaired", {
+      gameId: state.id,
+      location,
+      storedIdCounter: state.executionContext.idCounter,
+      restoredIdCounter: restored.executionContext.idCounter,
+    });
+  }
+  return restored;
 }
 
 function ensurePromptId(state: GameState): GameState {

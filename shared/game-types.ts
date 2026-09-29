@@ -341,6 +341,11 @@ export interface GameEventPayloadMap {
     attackerInstanceId: string;
     attackerType: string;
     target?: string;
+    /**
+     * The damage found 0 Life, so no Life card was checked. Only an attack's
+     * first damage at 0 Life defeats the Leader (9-2-1-1); a [Double Attack]'s
+     * second damage at 0 Life does not (qa_rules.md:156-158, OPT-886).
+     */
     lethal?: boolean;
     /** OPT-796: true only for the first Life damage an attack deals ([Double Attack] deals two). */
     firstDamageOfAttack?: boolean;

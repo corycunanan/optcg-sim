@@ -110,7 +110,7 @@ Intrinsic keywords require no trigger, no action resolution, and no duration —
 
 **Reminder text:** This card deals 2 damage.
 
-**Engine behavior:** When a Character or Leader with Double Attack deals damage to the opponent's Life (i.e., the attack is not blocked and resolves against the Leader), the engine removes 2 Life cards instead of 1. Each Life card removed triggers its own Trigger check independently.
+**Engine behavior:** When a Character or Leader with Double Attack deals damage to the opponent's Life (i.e., the attack is not blocked and resolves against the Leader), the engine removes 2 Life cards instead of 1. Each Life card removed triggers its own Trigger check independently. The 2 damage is fixed when the Damage Step begins: the second damage is still dealt if the attacker leaves the field or loses [Double Attack] after the first (qa_rules.md:152-154). Only the first damage can win the game: a [Double Attack] against 1 Life empties the Life area, and its second damage finds 0 Life without defeating the Leader (qa_rules.md:156-158; rules 7-1-4-1-1-1 and 7-1-4-1-1-3).
 
 **Intrinsic encoding:**
 
