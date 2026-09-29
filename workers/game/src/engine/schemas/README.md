@@ -995,6 +995,36 @@ for the actual discarded count. Do not use a discarded-card target filter for
 Navy. The OP14 activation-cost interpretation is explicitly flagged in
 [the rules handoff](../../../../../docs/project/handoffs/opt-795-hand-trash-watchers.md).
 
+### `*_THIS_WAY` counts: cost or action
+
+`CARDS_TRASHED_THIS_WAY`, `DON_RESTED_THIS_WAY`, `CHARACTERS_RETURNED_THIS_WAY`,
+`CHARACTERS_KO_THIS_WAY` and `CARDS_PLACED_TO_DECK_THIS_WAY` count the cards
+moved by the step the text points back to ("for every card trashed"). Encode
+exactly one of two shapes (OPT-885):
+
+- **Counted by a cost** (pre-colon text such as `You may rest any number of
+  DON!!:`): omit `ref`. The value reads the implicit `__cost_*` ref that cost
+  payment fills, so the block must have a filling cost.
+- **Counted by an action** (no colon: "You may trash any number of ... from
+  your hand. ... +1000 for every card trashed"): give the moving action a
+  `result_ref` and set the same name as the PER_COUNT `ref`. The value is that
+  action's `result.count`, the cards actually moved. Result refs persist with a
+  paused frame and exist only for the current resolution, so the count survives
+  a selection prompt and never leaks into a later resolution.
+
+```ts
+{ type: "TRASH_FROM_HAND", target: { type: "CARD_IN_HAND", controller: "SELF", count: { any_number: true } }, result_ref: "cards_trashed" },
+{ type: "MODIFY_POWER", target: { type: "SELF" }, chain: "THEN", duration: { type: "THIS_BATTLE" },
+  params: { amount: { type: "PER_COUNT", source: "CARDS_TRASHED_THIS_WAY", ref: "cards_trashed", multiplier: 1000 } } },
+```
+
+A block with both a cost and an action keeps them apart: the ref-less source
+reads the cost, the `ref` source reads the action. Action producers are
+`TRASH_FROM_HAND`/`TRASH_CARD` (trashed), `KO`, `RETURN_TO_HAND` (returned) and
+`RETURN_TO_DECK` (placed to deck). `schema-this-way-source-lint.ts` rejects a
+source with no filling cost, a `ref` not produced by an earlier action in the
+same block, a producer of the wrong kind, and any source outside `actions`.
+
 ### Field-wide dynamic counts
 
 `PER_COUNT` source `MATCHING_CARDS_ON_FIELD` counts the controller's Leader, present Characters and Stage. It uses the same filter and unique-name semantics as `MATCHING_CHARACTERS_ON_FIELD`, which remains Character-only. A filter requires card data and a filter resolver; missing dependencies retain the unresolved-value contract.

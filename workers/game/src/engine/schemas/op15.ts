@@ -108,6 +108,7 @@ export const OP15_002_LUCY: EffectSchema = {
             count: { any_number: true },
             filter: { card_type: ["EVENT", "STAGE"] },
           },
+          result_ref: "cards_trashed",
         },
         {
           type: "MODIFY_POWER",
@@ -116,6 +117,7 @@ export const OP15_002_LUCY: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CARDS_TRASHED_THIS_WAY",
+              ref: "cards_trashed",
               multiplier: 1000,
             },
           },

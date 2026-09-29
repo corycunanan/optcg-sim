@@ -330,7 +330,8 @@ Example: "+2000 power to 1 Character. Then, if 2 or less Life, **that card** gai
 
 | Card Text | Dynamic Value |
 |---|---|
-| "for every DON!! rested this way" (x2000) | `{ "type": "PER_COUNT", "source": "DON_RESTED_THIS_WAY", "multiplier": 2000 }` |
+| "for every DON!! rested this way" (x2000) | `{ "type": "PER_COUNT", "source": "DON_RESTED_THIS_WAY", "multiplier": 2000 }` (the DON!! rest is a cost) |
+| "You may trash any number of ... from your hand. ... for every card trashed" (no colon) | action `TRASH_FROM_HAND` with `"result_ref": "cards_trashed"`, then `{ "type": "PER_COUNT", "source": "CARDS_TRASHED_THIS_WAY", "ref": "cards_trashed", "multiplier": 1000 }` |
 | "+1000 for every 2 Events in your trash" | `{ "type": "PER_COUNT", "source": "EVENTS_IN_TRASH", "multiplier": 1000, "divisor": 2 }` |
 | "cost equal to or less than your opponent's Life count" | `{ "type": "GAME_STATE", "source": "OPPONENT_LIFE_COUNT" }` |
 | "draw cards equal to the number returned" | `{ "type": "ACTION_RESULT", "ref": "returned_count" }` |
