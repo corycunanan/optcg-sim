@@ -25,7 +25,8 @@ import type {
   GameAction,
   GameState,
 } from "../types.js";
-import type { EffectBlock, EffectSchema } from "../engine/effect-types.js";
+import type { EffectBlock, EffectSchema, Target } from "../engine/effect-types.js";
+import { targetPromptCountMin } from "../engine/effect-resolver/target-resolver.js";
 import {
   getAllAuthoredSchemas,
   getEffectSchema,
@@ -665,6 +666,65 @@ describe("OPT-799 schema validation of action-level optional", () => {
     ],
   ])("rejects %s", (_label, block, message) => {
     expect(errorsFor([block]).join("\n")).toContain(message);
+  });
+
+  // OPT-893: the zero-allowed verdict must equal the prompt the resolver
+  // issues. Each row's `expectedPromptCountMin` is the countMin the resolver
+  // gives buildSelectTargetPrompt for that target shape (exact -> N, summed
+  // across dual slots; up_to / any_number / omitted count -> 0).
+  const bounce = (target: Target): EffectBlock =>
+    auto([{ type: "RETURN_TO_HAND", target, optional: true }]);
+  it.each<[string, Target, number, boolean]>([
+    ["omitted count on opponent Characters", { type: "CHARACTER", controller: "OPPONENT" }, 0, true],
+    ["exact 1", { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } }, 1, false],
+    ["up_to 1", { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } }, 0, true],
+    ["any_number", { type: "CHARACTER", controller: "OPPONENT", count: { any_number: true } }, 0, true],
+    ["all", { type: "CHARACTER", controller: "OPPONENT", count: { all: true } }, 0, false],
+    ["deterministic SELF without count", { type: "SELF" }, 0, false],
+    [
+      "mixed dual slots exact 1 + up_to 1",
+      {
+        type: "CHARACTER",
+        controller: "EITHER",
+        dual_targets: [
+          { filter: { cost_max: 8 }, count: { exact: 1 } },
+          { filter: { cost_max: 3 }, count: { up_to: 1 } },
+        ],
+      },
+      1,
+      false,
+    ],
+    [
+      "dual slots up_to 1 + up_to 1",
+      {
+        type: "CHARACTER",
+        controller: "EITHER",
+        dual_targets: [
+          { filter: { cost_max: 8 }, count: { up_to: 1 } },
+          { filter: { cost_max: 3 }, count: { up_to: 1 } },
+        ],
+      },
+      0,
+      true,
+    ],
+    [
+      "mixed_pool total_count exact 1",
+      {
+        mixed_pool: { types: ["CHARACTER", "STAGE"], total_count: { exact: 1 } },
+        controller: "OPPONENT",
+      } as Target,
+      1,
+      false,
+    ],
+  ])("optional verdict matches resolver prompt: %s", (_label, target, promptMin, rejected) => {
+    expect(targetPromptCountMin(target)).toBe(promptMin);
+    const errors = errorsFor([bounce(target)]).filter((e) => e.includes(".optional:"));
+    expect(errors.length > 0).toBe(rejected);
+  });
+
+  it("names the count-less target in the omitted-count rejection", () => {
+    const errors = errorsFor([bounce({ type: "CHARACTER", controller: "OPPONENT" })]);
+    expect(errors.join("\n")).toContain("omits count");
   });
 
   it("rejects optional on the authored OP04-044 dual-target bounce", () => {

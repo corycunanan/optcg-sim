@@ -31,6 +31,7 @@ import {
 } from "./effect-types.js";
 import { log } from "../lib/log.js";
 import { SIMULTANEOUS_ACTION_TYPES } from "./effect-resolver/simultaneous.js";
+import { needsPlayerTargetSelection, targetPromptCountMin } from "./effect-resolver/target-resolver.js";
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
 import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
 import { derivePrintedKeywords } from "./printed-keywords.js";
@@ -1099,19 +1100,39 @@ function countAllowsZero(count: unknown): boolean {
   );
 }
 
-/** Every count on a target shape whose selection may pick zero cards. */
+/**
+ * Every place a target's selection prompt lets the player choose 0, derived
+ * from the resolver's own bounds (`targetPromptCountMin`, and
+ * `needsPlayerTargetSelection` for whether a prompt is issued at all) rather
+ * than per-key inspection. dual_targets is judged on the combined minimum, so
+ * `{exact:1}` + `{up_to:1}` (countMin 1) is not zero-allowing. An omitted
+ * count is zero-allowing (`countMin: 0`, countMax 1) whenever the target can
+ * prompt, i.e. with more than one candidate.
+ */
 function zeroAllowingTargetCounts(target: Target | undefined): string[] {
   if (!target) return [];
   const paths: string[] = [];
+  const perTypeZero = countAllowsZero(target.per_type_selection?.count_per_type);
+  if (perTypeZero) paths.push("target.per_type_selection.count_per_type");
+  // Probe with a pool larger than any exact count so the predicate reports
+  // whether a multi-candidate prompt is possible for this shape.
+  const probe = Array.from({ length: 1000 }, (_, i) => `probe-${i}`);
+  const promptable = needsPlayerTargetSelection(target, probe);
+  if (target.dual_targets?.length) {
+    if (targetPromptCountMin(target) === 0) {
+      target.dual_targets.forEach((_slot, index) =>
+        paths.push(`target.dual_targets[${index}].count`),
+      );
+    }
+    return paths;
+  }
   if (countAllowsZero(target.count)) paths.push("target.count");
-  target.dual_targets?.forEach((slot, index) => {
-    if (countAllowsZero(slot?.count))
-      paths.push(`target.dual_targets[${index}].count`);
-  });
-  if (countAllowsZero(target.per_type_selection?.count_per_type))
-    paths.push("target.per_type_selection.count_per_type");
   if (countAllowsZero(target.mixed_pool?.total_count))
     paths.push("target.mixed_pool.total_count");
+  const hasCount = !!(target.mixed_pool?.total_count ?? target.count);
+  if (!hasCount && !perTypeZero && promptable && targetPromptCountMin(target) === 0) {
+    paths.push("target (omits count, so the multi-candidate prompt defaults to choosing 0 or 1)");
+  }
   return paths;
 }
 

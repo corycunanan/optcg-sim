@@ -149,6 +149,24 @@ export function effectiveTargetCount(
   return target?.mixed_pool?.total_count ?? target?.count;
 }
 
+/**
+ * The `countMin` a SELECT_TARGET prompt for this target carries: the summed
+ * slot minimums for dual_targets, otherwise the effective count's `exact`
+ * (an omitted, up_to, all or any_number count allows choosing 0).
+ * `buildSelectTargetPrompt` and optional-action validation (OPT-893) share
+ * this so the authoring check agrees with the prompt the resolver issues.
+ */
+export function targetPromptCountMin(target: Target | undefined): number {
+  if (target?.dual_targets?.length) {
+    return target.dual_targets.reduce(
+      (sum, slot) => sum + (slot.count ? resolveCountMin(slot.count) : 0),
+      0,
+    );
+  }
+  const count = effectiveTargetCount(target);
+  return count && "exact" in count ? count.exact : 0;
+}
+
 function violatesCount(selected: number, count: CountMode | undefined): boolean {
   if (!count) return false;
   if ("exact" in count) return selected !== count.exact;
@@ -788,7 +806,7 @@ export function buildSelectTargetPrompt(
     countMax = dualTargetsMetadata.slots.reduce((sum, s) => sum + s.countMax, 0);
   } else {
     const count = effectiveTargetCount(target);
-    countMin = (count && "exact" in count) ? count.exact : 0;
+    countMin = targetPromptCountMin(target);
     countMax = !count ? 1
       : "exact" in count ? count.exact
       : "up_to" in count ? count.up_to
