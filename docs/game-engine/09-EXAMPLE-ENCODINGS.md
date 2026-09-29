@@ -488,7 +488,11 @@ Trigger Effect: [Trigger] K.O. up to 1 of your opponent's [Blocker] Characters w
             "filter": { "traits": ["Straw Hat Crew"] }
           },
           "params": {
-            "prohibition_type": "CANNOT_ACTIVATE_BLOCKER"
+            "prohibition_type": "CANNOT_ACTIVATE_BLOCKER",
+            "scope": {
+              "controller": "OPPONENT",
+              "when_attacking": { "type": "SELECTED_CARDS" }
+            }
           },
           "duration": { "type": "THIS_TURN" }
         }
@@ -522,7 +526,7 @@ Trigger Effect: [Trigger] K.O. up to 1 of your opponent's [Blocker] Characters w
 #### Annotations
 - **Dual-timing Event:** This Event card has two separate EffectBlocks: a `[Main]` effect (played from hand during Main Phase) and a `[Trigger]` effect (activated when revealed from Life). These are independent — the player uses one or the other depending on context.
 - **MAIN_EVENT trigger:** Event cards use `MAIN_EVENT` (not `ACTIVATE_MAIN`) for their `[Main]` timing. The distinction is cosmetic in the schema — both indicate Main Phase activation — but `MAIN_EVENT` is the canonical trigger for Events.
-- **CANNOT_ACTIVATE_BLOCKER targeting the selected card:** The prohibition target is the Straw Hat Crew Leader/Character being selected. The engine applies the prohibition such that when the selected card attacks, the opponent cannot activate Blocker. This is a deferred conditional prohibition — it grants the property now but the restriction only activates during an attack by that specific card. See [06 — CANNOT_ACTIVATE_BLOCKER](./06-PROHIBITIONS-AND-REPLACEMENTS.md).
+- **CANNOT_ACTIVATE_BLOCKER bound to the selected attacker:** The action's `target` is the Straw Hat Crew Leader/Character being selected; `params.scope.when_attacking: { type: "SELECTED_CARDS" }` (no `ref`) binds the prohibition to that exact card as the attacker, and `controller: "OPPONENT"` names who is barred from activating [Blocker]. The selected card is not the prohibition's `appliesTo`; without the scope the engine would compare it against the defending Blocker and never match (OPT-898). The ban covers only battles in which the selected card attacks, so another card attacking (even after the selected one has attacked) can be blocked. Selecting none applies nothing. See [06 §7.9](./06-PROHIBITIONS-AND-REPLACEMENTS.md).
 - **keywords filter on KO target:** "your opponent's [Blocker] Characters" uses `keywords: ["BLOCKER"]` in the filter. This checks for the Blocker keyword on the card (intrinsic or granted). Combined with `cost_max: 3`, the target must have both Blocker and cost 3 or less.
 - **No REUSE_EFFECT:** These are two separate EffectBlocks, not a Trigger that reuses the Main effect. The Trigger effect has its own distinct action (KO vs prohibition).
 
