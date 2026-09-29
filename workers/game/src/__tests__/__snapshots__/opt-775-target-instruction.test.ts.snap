@@ -573,7 +573,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST31-004 :: on_play_crew_debuff :: actions[0] (MODIFY_POWER)",
     "ST31-004.effects.0.modifiers.0.target (non-action target)",
   ],
-  "generatedCount": 1976,
+  "generatedCount": 1977,
   "instructions": [
     "Add to Life the card being replaced.",
     "Add to Life up to 1 of Characters with a cost of 6 or less.",
@@ -845,6 +845,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Give −1 cost to up to 1 of your opponent's Characters.",
     "Give −1 cost to your opponent's Characters.",
     "Give −10 cost to up to 1 of your opponent's Characters.",
+    "Give −1000 power to the card being replaced.",
     "Give −1000 power to up to 1 of your opponent's Characters.",
     "Give −1000 power to up to 1 of your opponent's Leaders or Characters.",
     "Give −1000 power to your opponent's Leaders or Characters.",
@@ -1257,6 +1258,6 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Trash your cards in hand with the {Music} type.",
     "Trash your cards in hand.",
   ],
-  "targetCount": 2544,
+  "targetCount": 2545,
 }
 `;
