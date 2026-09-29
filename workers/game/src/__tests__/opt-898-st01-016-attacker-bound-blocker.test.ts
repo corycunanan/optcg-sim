@@ -7,6 +7,7 @@ import { checkProhibitions } from "../engine/prohibitions.js";
 import { parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { SessionTransport } from "../session/transport.js";
 import { isBlockerProhibited } from "../../../../shared/blocker-prohibition.js";
 
 // OPT-898 — ST01-016 Diable Jambe binds its Blocker ban to the selected attacker.
@@ -49,7 +50,7 @@ function fixture(owner: P) {
   ) {
     const card: CardInstance = {
       cardId: id,
-      instanceId: `opt826-${controller}-${serial++}`,
+      instanceId: `opt898-${controller}-${serial++}`,
       owner: controller,
       controller,
       zone,
@@ -86,8 +87,6 @@ function fixture(owner: P) {
     put,
     act,
     respond,
-    accept: () => respond({ type: "PLAYER_CHOICE", choiceId: "accept" }),
-    decline: () => respond({ type: "PLAYER_CHOICE", choiceId: "skip" }),
     select: (ids: string[]) => respond({ type: "SELECT_TARGET", selectedInstanceIds: ids }),
     persist() {
       state = parseStoredSession(
@@ -104,8 +103,6 @@ function fixture(owner: P) {
 }
 
 type Fixture = ReturnType<typeof fixture>;
-
-const STRAW_HAT = { types: ["Straw Hat Crew"], power: 6000 };
 
 /** Common board: an opposing [Blocker] and rested opposing attack targets. */
 function board(f: Fixture) {
@@ -149,13 +146,6 @@ function blockerProhibitions(f: Fixture) {
   return f.state.prohibitions.filter((p) => p.prohibitionType === "CANNOT_ACTIVATE_BLOCKER");
 }
 
-function liveCard(f: Fixture, card: CardInstance) {
-  const p = f.state.players[card.controller];
-  return p.leader.instanceId === card.instanceId
-    ? p.leader
-    : p.characters.find((c) => c?.instanceId === card.instanceId)!;
-}
-
 /** End this turn and the opponent's, landing in the owner's next Main Phase. */
 function toOwnersNextMain(f: Fixture) {
   for (const player of [f.owner, other(f.owner)] as const) {
@@ -172,6 +162,27 @@ function toOwnersNextMain(f: Fixture) {
   }
 }
 
+/** Candidate ids as the worker sends them (SessionTransport.sendPendingPrompts, as GameSession does). */
+function blockerPrompt(f: Fixture) {
+  const messages: Array<{ type: string; options?: { promptType: string; validTargets: string[] } }> = [];
+  const ws = {
+    send: (raw: string) => messages.push(JSON.parse(raw)),
+    deserializeAttachment: () => null,
+  } as unknown as WebSocket;
+  const transport = new SessionTransport(
+    { getWebSockets: () => [ws], acceptWebSocket: () => {}, getTags: () => [] },
+    () => {},
+  );
+  transport.sendPendingPrompts(f.state, f.db);
+  const prompt = messages.find((m) => m.type === "game:prompt")?.options;
+  expect(prompt?.promptType).toBe("SELECT_BLOCKER");
+  return prompt!.validTargets;
+}
+
+function declareAttack(f: Fixture, attacker: CardInstance, target: CardInstance) {
+  f.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId });
+  expect(f.state.turn.battleSubPhase).toBe("BLOCK_STEP");
+}
 
 function setup(owner: P) {
   const f = fixture(owner);
@@ -214,14 +225,16 @@ describe("OPT-898 ST01-016 binds the Blocker lock to the selected attacker", () 
     });
   }
 
-  it("the SELECT_BLOCKER candidates exclude the prohibited blocker for the selected attacker only", () => {
+  it("the worker's SELECT_BLOCKER prompt lists no candidates for the selected attacker, and every blocker for another attacker", () => {
     const { f, chosen, other2, event, blocker, targets } = setup(0);
+    const secondBlocker = f.put(CARDS.BLOCKER.id, 1);
     play(f, event, [chosen]);
-    f.act({ type: "DECLARE_ATTACK", attackerInstanceId: chosen.instanceId, targetInstanceId: targets[0].instanceId });
-    expect(checkProhibitions(f.state, { type: "DECLARE_BLOCKER", blockerInstanceId: blocker.instanceId }, f.db, 1)).not.toBeNull();
+    declareAttack(f, chosen, targets[0]);
+    expect(blockerPrompt(f)).toEqual([]);
+    expect(checkProhibitions(f.state, blockerAction(blocker), f.db, 1)).not.toBeNull();
     for (let i = 0; i < 6 && f.state.turn.battleSubPhase; i++) f.act({ type: "PASS" }, 1);
-    f.act({ type: "DECLARE_ATTACK", attackerInstanceId: other2.instanceId, targetInstanceId: targets[1].instanceId });
-    expect(checkProhibitions(f.state, { type: "DECLARE_BLOCKER", blockerInstanceId: blocker.instanceId }, f.db, 1)).toBeNull();
+    declareAttack(f, other2, targets[1]);
+    expect(new Set(blockerPrompt(f))).toEqual(new Set([blocker.instanceId, secondBlocker.instanceId]));
   });
 
   it("selecting none creates no prohibition (no blanket Blocker lock)", () => {
