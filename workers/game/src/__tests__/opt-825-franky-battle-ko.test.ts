@@ -308,17 +308,22 @@ describe("OP10-034 Franky — battle K.O. offers the replacement", () => {
   });
 
   // Rules §8-1-3-4-5: a replacement that cannot be carried out cannot be
-  // applied. The substitute-feasibility gate (canExecuteReplacementSubstitute)
-  // has no LIFE_TO_HAND case, so with 0 Life the prompt is offered and
-  // accepting saves Franky without moving any card.
-  it.fails("empty Life: the replacement is not offered (rules §8-1-3-4-5)", () => {
+  // applied. With 0 Life the LIFE_TO_HAND substitute cannot be carried out, so
+  // it is not offered and the battle K.O. proceeds (OPT-873).
+  it("empty Life: the replacement is not offered; Franky is K.O.'d (rules §8-1-3-4-5)", () => {
     const f = fixture();
     const franky = f.franky();
     f.state.players[0].life = [];
+    const handBefore = f.state.players[0].hand.map((c) => c.instanceId);
 
     f.battle(1, franky);
 
-    expect(f.promptType()).not.toBe("OPTIONAL_EFFECT");
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.onField(franky)).toBe(false);
+    expect(f.inTrash(franky)).toBe(true);
+    expect(f.state.players[0].life).toHaveLength(0);
+    expect(f.state.players[0].hand.map((c) => c.instanceId)).toEqual(handBefore);
+    expect(f.state.turn.battle).toBeNull();
   });
 });
 
