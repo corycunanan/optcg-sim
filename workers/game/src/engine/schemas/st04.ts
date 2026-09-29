@@ -26,7 +26,7 @@ export const ST04_001_KAIDO: EffectSchema = {
       actions: [
         {
           type: "TRASH_FROM_LIFE",
-          params: { amount: 1, position: "TOP", controller: "OPPONENT" },
+          params: { amount: 1, position: "TOP", controller: "OPPONENT", up_to: true },
         },
       ],
       flags: { once_per_turn: true },
