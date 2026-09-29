@@ -171,6 +171,14 @@ type EventCause = "BY_EFFECT" | "BY_YOUR_EFFECT" | "BY_OPPONENT_EFFECT"
 ### OPPONENT_CHARACTER_KO
 
 Fires when any of the opponent's Characters are K.O.'d, regardless of cause.
+"Opponent" is relative to the watcher's controller: the engine compares the
+K.O.'d Character's field controller (`CARD_KO` `payload.sourceController`,
+falling back to the event's `playerIndex`, the owner) with the trigger source's
+controller and never matches your own Characters, whoever caused the K.O.
+(OPT-906). Authors need no `filter.controller`; an explicit one is applied on
+top, so `OPPONENT` is redundant and `SELF` can never match.
+`OPPONENT_CHARACTER_TRASHED` (`CARD_TRASHED`, hand trashes excluded) applies the
+same check.
 
 ```typescript
 { event: "OPPONENT_CHARACTER_KO" }
