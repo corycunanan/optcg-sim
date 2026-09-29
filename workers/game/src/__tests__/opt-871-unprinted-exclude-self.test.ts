@@ -71,7 +71,7 @@ function fixture() {
     opts: { suffix?: string; watch?: boolean; zone?: CardInstance["zone"] } = {},
   ) {
     const zone = opts.zone ?? "CHARACTER";
-    const real = getEffectSchema(id);
+    const real = getEffectSchema(id) ?? undefined;
     if (!db.has(id)) {
       const schema: EffectSchema | undefined =
         real && opts.watch
