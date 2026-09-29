@@ -49,9 +49,11 @@ export function activeCostAreaDonCount(player: PlayerState): number {
  * action resolves its target. Empty when fewer than `amount` active DON!!
  * remain, so every returned recipient is a complete payment (rule 8-3-1-3).
  * OPT-869: a card covered by an active CANNOT_ATTACH_DON prohibition is
- * excluded with the manual-attach predicate. Feasibility, the prompt, both
- * live/staged resume checks and `applyCostSelection` all read this list, so
- * none of them can offer or accept a prohibited recipient.
+ * excluded with the manual-attach predicate. Feasibility, the prompt, the
+ * resume checks and `applyCostSelection` all read this list, so none of them
+ * can offer or accept a prohibited recipient. The resume reads prohibition
+ * coverage in the staged payment state (rule 8-3-1-1; see
+ * `stagedProhibitionView`) and the live state for presence only.
  */
 function giveDonRecipients(
   state: GameState,

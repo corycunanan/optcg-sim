@@ -430,6 +430,78 @@ describe("OPT-869 GIVE_DON cost honors CANNOT_ATTACH_DON", () => {
     });
   });
 
+  describe("an earlier staged cost that removes the prohibition's source (rule 8-3-1-1)", () => {
+    // Synthetic: a permanent aura forbidding DON!! on your Leader, and an
+    // effect of the same Character whose costs are "trash this Character,
+    // then give 1 active DON!! to your Leader". Paying the first cost ends the
+    // aura (its source left the field), so the Leader is a legal recipient of
+    // the second cost even though the live (pre-cost) state still has the aura.
+    const TRASH_THEN_GIVE: EffectBlock = {
+      id: "opt869_trash_then_give",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      costs: [{ type: "TRASH_SELF" }, { type: "GIVE_DON", amount: 1, target: { type: "YOUR_LEADER" } }],
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    };
+    function auraSetup() {
+      const f = fixture();
+      const schema = wardSchema({ type: "YOUR_LEADER" });
+      schema.effects.push(TRASH_THEN_GIVE);
+      f.data("OPT869-WARD", { cost: 4, effectSchema: schema });
+      const ward = f.put("OPT869-WARD", P0);
+      const leader = f.state.players[P0].leader;
+      setDon(f, P0, 3);
+      expect(manualAttachValid(f, leader.instanceId)).toBe(false);
+      expect(isCostSequencePayable(f.state, TRASH_THEN_GIVE.costs!, P0, f.db, ward.instanceId)).toBe(true);
+      return { f, ward, leader };
+    }
+    function auraThenGiveSetup() {
+      const { f, ward, leader } = auraSetup();
+      // Resolve the block directly (the ACTIVATE_EFFECT step-2 gate is the
+      // separate follow-up ratchet below).
+      const prompted = resolveEffect(f.state, TRASH_THEN_GIVE, ward.instanceId, P0, f.db);
+      f.state = { ...prompted.state, pendingPrompt: prompted.pendingPrompt ?? null };
+      expect(selectPrompt(f).validTargets).toEqual([leader.instanceId]);
+      // The live state is still pre-cost: the aura is in force there.
+      expect(isDonAttachProhibited(f.state, leader.instanceId, f.db, P0)).toBe(true);
+      f.persist();
+      return { f, ward, leader };
+    }
+
+    it("accepts the persisted reply and gives the DON!! to the Leader", () => {
+      const { f, ward, leader } = auraThenGiveSetup();
+      f.select([leader.instanceId]);
+      expect(attached(f.state, leader.instanceId)).toBe(1);
+      expect(activeCostDon(f)).toBe(2);
+      // Rule 3-1-6: the trashed card is a new instance, so match by card id.
+      expect(f.state.players[P0].characters.some((c) => c?.instanceId === ward.instanceId)).toBe(false);
+      expect(f.state.players[P0].trash.some((c) => c.cardId === ward.cardId)).toBe(true);
+      expect(f.state.prohibitions.some((p) => p.prohibitionType === "CANNOT_ATTACH_DON")).toBe(false);
+    });
+
+    it("still rejects the reply when an unrelated prohibition appeared in the live state", () => {
+      const { f, leader } = auraThenGiveSetup();
+      // A second, Leader-sourced prohibition the staged costs do not end.
+      f.data(leader.cardId, { ...f.db.get(leader.cardId)!, name: "Warded Leader" });
+      prohibitByName(f, P0, "Warded Leader", "SELF");
+      f.persist();
+      const before = structuredClone(f.state);
+      f.select([leader.instanceId], true);
+      expect(f.state).toEqual(before);
+      expect(attached(f.state, leader.instanceId)).toBe(0);
+    });
+
+    // Known gap, follow-up to PR #725 (no ticket yet): pipeline step 2
+    // (validation.ts areEffectCostsPayable) checks each cost independently
+    // against the pre-cost state, so it refuses an [Activate: Main] whose
+    // GIVE_DON is only payable after an earlier cost. No authored card has
+    // this shape today (no schema grants CANNOT_ATTACH_DON).
+    it.fails("allows ACTIVATE_EFFECT when an earlier cost ends the prohibition", () => {
+      const { f, ward } = auraSetup();
+      f.act({ type: "ACTIVATE_EFFECT", cardInstanceId: ward.instanceId, effectId: TRASH_THEN_GIVE.id });
+    });
+  });
+
   it("applyCostSelection refuses a prohibited recipient for direct callers", () => {
     const { f, rayleigh } = rayleighSetup();
     prohibitByName(f, P0, "Silvers Rayleigh", "SELF");
