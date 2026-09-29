@@ -363,6 +363,7 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
     }
     errors.push(...validateActionConnectors(block.actions, `${prefix}.actions`));
     errors.push(...validateOptionalActionPlacement(block, `${prefix}.actions`));
+    errors.push(...validateReuseEffectTailPosition(block.actions, `${prefix}.actions`));
     errors.push(...validateResultReferences(block.actions, `${prefix}.actions`, block.trigger && "event" in block.trigger && block.trigger.event === "CARD_TRASHED_FROM_HAND" ? new Set(["__triggering_hand_trash"]) : undefined));
   }
 
@@ -379,6 +380,10 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
       ));
     }
     errors.push(...validateActionConnectors(
+      block.replacement_actions,
+      `${prefix}.replacement_actions`,
+    ));
+    errors.push(...validateReuseEffectTailPosition(
       block.replacement_actions,
       `${prefix}.replacement_actions`,
     ));
@@ -1131,6 +1136,58 @@ function validateOptionalActionPlacement(block: EffectBlock, prefix: string): st
       errors.push(
         `${prefix}[0].optional: block flags.optional already asks before this first action; remove one of the two`,
       );
+    }
+  });
+  return errors;
+}
+
+/**
+ * OPT-863: REUSE_EFFECT must be the last action of its chain and of every
+ * enclosing chain (a choice option, OPPONENT_ACTION or SCHEDULE_ACTION body
+ * counts as a chain inside its parent). When the reused block opens a prompt
+ * the resolver surfaces that block's own frame; a trailing caller action has no
+ * continuation of its own there and would run with the reused block's result
+ * refs, controller and success value, or be lost when that frame is declined,
+ * abandoned or replaced by a cost frame. Every authored use is a lone/last
+ * [Trigger] action, so the shape is banned rather than supported.
+ */
+function validateReuseEffectTailPosition(
+  actions: Action[],
+  prefix: string,
+  enclosingTail = true,
+): string[] {
+  const errors: string[] = [];
+  actions.forEach((action, index) => {
+    if (!action || typeof action !== "object") return;
+    const isTail = enclosingTail && index === actions.length - 1;
+    const path = `${prefix}[${index}]`;
+    if (action.type === "REUSE_EFFECT" && !isTail) {
+      errors.push(
+        `${path}: REUSE_EFFECT must be the last action of its chain and of every enclosing chain; actions after it would run in the reused block's frame with the wrong result refs/controller or be dropped (OPT-863)`,
+      );
+    }
+    if (action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") {
+      const options = action.params?.options;
+      if (Array.isArray(options)) {
+        options.forEach((option, optionIndex) => {
+          if (Array.isArray(option)) {
+            errors.push(...validateReuseEffectTailPosition(
+              option,
+              `${path}.params.options[${optionIndex}]`,
+              isTail,
+            ));
+          }
+        });
+      }
+    } else if (action.type === "OPPONENT_ACTION" || action.type === "SCHEDULE_ACTION") {
+      const nested = action.params?.action;
+      if (nested) {
+        errors.push(...validateReuseEffectTailPosition(
+          [nested],
+          `${path}.params.action`,
+          isTail,
+        ));
+      }
     }
   });
   return errors;
