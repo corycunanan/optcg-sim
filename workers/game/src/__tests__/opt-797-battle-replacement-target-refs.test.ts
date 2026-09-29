@@ -40,7 +40,8 @@ import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { moveCard } from "../engine/state.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
-import { battleTargetRefFor } from "../engine/effect-resolver/resolver.js";
+import { battleTargetRefFor, resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
+import { checkReplacementForKO } from "../engine/replacements.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { SessionRepository, type SessionStorage } from "../session/persistence.js";
 import { findContextTargetViolations } from "../engine/schema-context-target-lint.js";
@@ -792,6 +793,17 @@ describe("REPLACED_CARD substitute feasibility is checked against the replaced c
 
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.onField(protectedCard)).toBe(false);
+  });
+
+  it("single-target check (battle / cost paths): offered only while the replaced card is active", () => {
+    for (const cardState of ["ACTIVE", "RESTED"] as const) {
+      const f = fixture();
+      f.def("OPT797-REST-IT", {}, schema);
+      f.put("OPT797-REST-IT", 0);
+      const protectedCard = f.put(CARDS.VANILLA.id, 0, { state: cardState });
+      const result = checkReplacementForKO(f.state, protectedCard.instanceId, "effect", 1, f.db, resolverExecutionServices);
+      expect(result.pendingPrompt !== undefined, cardState).toBe(cardState === "ACTIVE");
+    }
   });
 });
 
