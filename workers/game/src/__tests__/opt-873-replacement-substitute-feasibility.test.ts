@@ -320,6 +320,49 @@ describe("RETURN_DON_TO_DECK substitute (EB04-030)", () => {
     expect(f.state.players[0].donCostArea).toHaveLength(0);
     expect(f.state.players[0].donDeck).toHaveLength(donDeckBefore + 1);
   });
+
+  // "Return 1 DON!! from your field": DON!! attached to the Leader is on the
+  // field, so the printed cost can be paid with no cost-area DON!!.
+  function allAttached() {
+    const s = setup();
+    s.f.giveDon(0, 0);
+    s.f.state.players[0].leader.attachedDon = [
+      { instanceId: "don-p0-attached", state: "ACTIVE", attachedTo: s.f.state.players[0].leader.instanceId },
+    ];
+    return s;
+  }
+
+  it("effect K.O. with every DON!! attached to the Leader: offered", () => {
+    const { f, card } = allAttached();
+
+    f.opponentEffectKO(card);
+
+    expect(f.replacementOffered()).toBe(true);
+  });
+
+  it("battle K.O. with every DON!! attached to the Leader: offered", () => {
+    const { f, card } = allAttached();
+
+    f.battle(card);
+
+    expect(f.replacementOffered()).toBe(true);
+  });
+
+  // OPT-921: executeReturnDonToDeck's `amount` path returns only unattached
+  // cost-area DON!!, so accepting here saves the card without returning the
+  // attached DON!!.
+  it.fails("accepting with every DON!! attached returns the attached DON!! (OPT-921)", () => {
+    const { f, card } = allAttached();
+    const donDeckBefore = f.state.players[0].donDeck.length;
+
+    f.opponentEffectKO(card);
+    expect(f.replacementOffered()).toBe(true);
+    f.accept();
+
+    expect(f.onField(card)).toBe(true);
+    expect(f.state.players[0].leader.attachedDon).toHaveLength(0);
+    expect(f.state.players[0].donDeck).toHaveLength(donDeckBefore + 1);
+  });
 });
 
 // ─── RETURN_TO_DECK (targeted substitute) ────────────────────────────────────
@@ -394,9 +437,11 @@ describe("RETURN_TO_DECK substitute", () => {
   });
 });
 
-// ─── PLACE_HAND_TO_DECK (EB04-043) ───────────────────────────────────────────
+// ─── RETURN_TO_DECK from trash (EB04-043) ────────────────────────────────────
 
-describe("PLACE_HAND_TO_DECK substitute (EB04-043)", () => {
+describe("RETURN_TO_DECK substitute from trash (EB04-043 Kaku)", () => {
+  // Printed: "you may place 3 cards from your trash at the bottom of your deck
+  // in any order instead." The hand is irrelevant.
   function setup() {
     const f = fixture();
     f.data("EB04-043", { cost: 5, power: 5000, color: ["Black"] });
@@ -404,11 +449,10 @@ describe("PLACE_HAND_TO_DECK substitute (EB04-043)", () => {
     return { f, card };
   }
 
-  // Printed: "place 3 cards from your trash at the bottom of your deck". The
-  // authored action is PLACE_HAND_TO_DECK (see PR follow-ups); with an empty
-  // hand and an empty trash neither reading can be carried out.
-  it("empty hand and empty trash: not offered; the K.O. proceeds", () => {
+  it("3 cards in hand but only 2 in trash: not offered; the K.O. proceeds", () => {
     const { f, card } = setup();
+    f.fill(0, "HAND", 3);
+    f.fill(0, "TRASH", 2);
     const before = snapshotZones(f, 0);
 
     f.opponentEffectKO(card);
@@ -416,14 +460,33 @@ describe("PLACE_HAND_TO_DECK substitute (EB04-043)", () => {
     expectKOProceededUnpaid(f, card, before);
   });
 
-  it("3 cards in hand and 3 in trash: offered", () => {
+  it("empty hand and 3 cards in trash: offered; accepting places those 3 at the deck bottom", () => {
     const { f, card } = setup();
-    f.fill(0, "HAND", 3);
-    f.fill(0, "TRASH", 3);
+    const trashCards = f.fill(0, "TRASH", 3);
+    const deckBefore = f.state.players[0].deck.map((c) => c.instanceId);
 
     f.opponentEffectKO(card);
-
     expect(f.replacementOffered()).toBe(true);
+    f.accept();
+    // "in any order": the controller orders the three trash cards.
+    const trash = f.state.players[0].trash.map((c) => c.instanceId);
+    expect(trash).toHaveLength(3);
+    expect(f.promptType()).toBe("ARRANGE_TOP_CARDS");
+    f.respond({
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: "",
+      orderedInstanceIds: [trash[2], trash[0], trash[1]],
+      destination: "bottom",
+    });
+
+    expect(f.onField(card)).toBe(true);
+    expect(f.state.players[0].trash).toHaveLength(0);
+    expect(f.state.players[0].hand).toHaveLength(0);
+    const deck = f.state.players[0].deck;
+    expect(deck).toHaveLength(deckBefore.length + 3);
+    // The original deck is untouched on top; the three trash cards are at the bottom.
+    expect(deck.slice(0, deckBefore.length).map((c) => c.instanceId)).toEqual(deckBefore);
+    expect(deck.slice(-3).every((c) => c.cardId === trashCards[0].cardId)).toBe(true);
   });
 });
 
