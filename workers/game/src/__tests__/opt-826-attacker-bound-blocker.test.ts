@@ -558,18 +558,17 @@ describe("OPT-826 the worker's SELECT_BLOCKER prompt hides exactly the prohibite
   for (const owner of [0, 1] as const) {
     it(`player ${owner}: bound attacker → blocker absent; unbound attacker → present`, () => {
       const { f, chosen, unchosen, sanji, blocker, targets } = sanjiSetup(owner);
-      const vanilla = f.put(CARDS.VANILLA.id, other(owner));
+      const secondBlocker = f.put(CARDS.BLOCKER.id, other(owner));
       playSanji(f, sanji, [chosen]);
 
       declareAttack(f, unchosen, targets[0]);
-      expect(blockerPrompt(f)).toEqual(expect.arrayContaining([blocker.instanceId, vanilla.instanceId]));
+      expect(new Set(blockerPrompt(f))).toEqual(new Set([blocker.instanceId, secondBlocker.instanceId]));
       f.act({ type: "PASS" }, other(owner));
       for (let i = 0; i < 6 && f.state.turn.battleSubPhase; i++) f.act({ type: "PASS" }, other(owner));
 
       declareAttack(f, chosen, targets[1]);
       const valid = blockerPrompt(f);
-      expect(valid).not.toContain(blocker.instanceId);
-      expect(valid).not.toContain(vanilla.instanceId);
+      expect(valid).toEqual([]);
     });
   }
 
@@ -581,7 +580,7 @@ describe("OPT-826 the worker's SELECT_BLOCKER prompt hides exactly the prohibite
     expect(blockerPrompt(f)).not.toContain(blocker.instanceId);
   });
 
-  it("a blanket P-097 ban leaves no candidates; the prompt is still sent (optional), as with no active Characters", () => {
+  it("a blanket P-097 ban leaves no candidates; the prompt is still sent (optional), as with no legal blocker", () => {
     const f = fixture(0);
     f.data("P-097", { cost: 1, power: 5000, effectText: "[On Play]/[When Attacking] Your opponent cannot activate [Blocker] during this turn." });
     const attacker = f.put(CARDS.VANILLA.id, 0);
@@ -593,12 +592,13 @@ describe("OPT-826 the worker's SELECT_BLOCKER prompt hides exactly the prohibite
     expect(blocker.state).toBe("ACTIVE");
   });
 
-  it("without any prohibition every ACTIVE Character remains a candidate (set otherwise unchanged)", () => {
+  it("without any prohibition the candidate set is unchanged (every ACTIVE [Blocker], OPT-834)", () => {
     const f = fixture(0);
     const attacker = f.put(CARDS.VANILLA.id, 0);
     const { blocker, targets } = board(f);
-    const vanilla = f.put(CARDS.VANILLA.id, 1);
+    const secondBlocker = f.put(CARDS.BLOCKER.id, 1);
+    f.put(CARDS.VANILLA.id, 1);
     declareAttack(f, attacker, targets[0]);
-    expect(new Set(blockerPrompt(f))).toEqual(new Set([blocker.instanceId, vanilla.instanceId]));
+    expect(new Set(blockerPrompt(f))).toEqual(new Set([blocker.instanceId, secondBlocker.instanceId]));
   });
 });

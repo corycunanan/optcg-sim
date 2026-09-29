@@ -460,7 +460,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **[Rush]** | 10-1-1 | **IMPL** | `keywords.ts → hasRush()`, `canAttackThisTurn()` | Bypasses summoning sickness |
 | **[Double Attack]** | 10-1-2 | **IMPL** | `keywords.ts → hasDoubleAttack()`, `battle.ts:301` | 2 damage instead of 1 to Leader |
 | **[Banish]** | 10-1-3 | **IMPL** | `keywords.ts → hasBanish()`, `battle.ts:321–338` | Life card goes to trash, no Trigger |
-| **[Blocker]** | 10-1-4 | **IMPL** | `keywords.ts → hasBlocker()`, `validation.ts:189`, `battle.ts → executeDeclareBlocker()` | Rests blocker, replaces target |
+| **[Blocker]** | 10-1-4 | **IMPL** | `validation.ts → validateDeclareBlocker()`, `blocker-candidates.ts → getBlockerCandidateIds()`, `battle.ts → executeDeclareBlocker()`; [`opt-834-leader-blocker.test.ts`](../../workers/game/src/__tests__/opt-834-leader-blocker.test.ts) | Rests blocker, replaces target. The defender's Leader or a Character may block when it has an effective [Blocker]; a Leader can only get one from a grant (OP16-048, OPT-834) |
 | **[Trigger]** | 10-1-5 | **IMPL** | `keywords.ts → hasTrigger()`, `battle.ts:339–353`, `executeRevealTrigger()` | Pause for choice; reveal → trash, or add to hand |
 | **[Trigger] — §10-1-5-3** | 10-1-5-3 | **IMPL** | `executeRevealTrigger()` | Card trashed after trigger effect (or added to hand if declined) |
 | **[Rush: Character]** | 10-1-6 | **IMPL** | `keywords.ts → hasRushCharacter()`, `canAttackLeader()` | Can attack Characters only on turn played |

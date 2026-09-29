@@ -8,7 +8,7 @@ import type {
 } from "../types.js";
 import { filterPromptOptionsForPlayer } from "../engine/visibility.js";
 import { withPromptSourceCard } from "../engine/prompt-source.js";
-import { checkProhibitions } from "../engine/prohibitions.js";
+import { getBlockerCandidateIds } from "../engine/blocker-candidates.js";
 import { log } from "../lib/log.js";
 import {
   SPECTATOR_MESSAGE_RATE_LIMIT_BURST,
@@ -495,26 +495,9 @@ export class SessionTransport {
     if (!ws) return;
 
     if (battleSubPhase === "BLOCK_STEP") {
-      // OPT-826: drop candidates the DECLARE_BLOCKER prohibition gate would
-      // veto (blanket bans and attacker-bound ones against the current
-      // attacker), using the pipeline's own check. An empty list is sent
-      // like a board with no ACTIVE Characters: the optional prompt the
-      // defender answers by passing.
-      const blockers = state.players[inactivePlayer].characters
-        .filter(
-          (card): card is CardInstance =>
-            card !== null && card.state === "ACTIVE"
-        )
-        .filter(
-          (card) =>
-            checkProhibitions(
-              state,
-              { type: "DECLARE_BLOCKER", blockerInstanceId: card.instanceId },
-              cardDb,
-              inactivePlayer
-            ) === null
-        )
-        .map((card) => card.instanceId);
+      // OPT-834: the legal Blocker set (Leader included when it holds an
+      // effective [Blocker]), not every active Character.
+      const blockers = getBlockerCandidateIds(state, cardDb);
       this.send(ws, {
         type: "game:prompt",
         options: {

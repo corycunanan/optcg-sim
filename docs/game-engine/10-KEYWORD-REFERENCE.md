@@ -102,6 +102,8 @@ Intrinsic keywords require no trigger, no action resolution, and no duration —
 
 **Example cards (intrinsic):** ST01-013 Roronoa Zoro, OP01-051 Trafalgar Law
 
+**Leader Blockers (OPT-834):** [Blocker] belongs to "this card", not only to Characters (rules §10-1-4-1). No Leader prints [Blocker], but OP16-048 Buggy grants it to "up to 1 of your [Prisoner of Impel Down] cards", which includes a Leader treated as having all card names (qa_op16.md / qa_op17.md OP16-048). `validateDeclareBlocker` therefore accepts the defender's Leader or a Character. The same checks apply to both: the card must be active, hold an effective [Blocker] that has not been removed, be the only Blocker of the battle, and face an attacker without [Unblockable]. Blocking rests the Leader and retargets the battle to it. From then on it resolves as a normal Leader target: Life damage and [Trigger], and the Leader's own [When Attacked] effects. The Block Step candidate set is `getBlockerCandidateIds` (`engine/blocker-candidates.ts`), which feeds the reconnect `SELECT_BLOCKER` prompt. The board computes the same set in `player-field.tsx`. When the Leader is already the attack target, it may still activate its granted [Blocker]: it rests and the target stays the same. The engine follows the card-specific OP16-048 ruling here ("the attacked card given [Blocker] can use it against that attack") and does not apply the general `qa_rules.md` answer.
+
 ---
 
 ### Double Attack

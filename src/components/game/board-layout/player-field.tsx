@@ -140,6 +140,47 @@ function PlayerFieldComponent({
         "UNBLOCKABLE",
       )
     : false;
+  // Block Step candidates: any of the defender's Leader or Characters that is
+  // active and holds an effective [Blocker]. A Leader only qualifies through a
+  // granted [Blocker] (OPT-834: OP16-048 on an all-names Leader).
+  const isBlockerCandidate = (card: CardInstance): boolean => {
+    if (
+      interactionMode === "spectator" ||
+      !inBlockStep ||
+      blockerAlreadyDeclared ||
+      attackerUnblockable ||
+      card.state !== "ACTIVE"
+    ) {
+      return false;
+    }
+    const cardData = cardDb[card.cardId];
+    const blockerProhibited = isBlockerProhibited(
+      prohibitions,
+      {
+        instanceId: card.instanceId,
+        controller: card.controller,
+        cardType: cardData?.type ?? "Character",
+      },
+      playerIndex,
+      attackerInstanceId ?? null,
+      {
+        matchesFilter: (filter) =>
+          matchesBlockerFilter(card, cardData, filter, activeEffects),
+      },
+    );
+    return (
+      !blockerProhibited &&
+      hasRuntimeKeyword(
+        card.instanceId,
+        cardData?.keywords,
+        activeEffects,
+        "BLOCKER",
+      )
+    );
+  };
+  const leaderBlockerEligible = me?.leader
+    ? isBlockerCandidate(me.leader)
+    : false;
   const zoneKey = (zone: string) =>
     boardZoneKey(playerIndex, bottomPlayerIndex, zone);
   const handlePreviewLife = useCallback(
@@ -205,39 +246,7 @@ function PlayerFieldComponent({
             />
           );
         }
-        const charData = cardDb[char.cardId];
-        const blockerProhibited = isBlockerProhibited(
-          prohibitions,
-          {
-            instanceId: char.instanceId,
-            controller: char.controller,
-            cardType: charData?.type ?? "Character",
-          },
-          playerIndex,
-          attackerInstanceId ?? null,
-          {
-            matchesFilter: (filter) =>
-              matchesBlockerFilter(
-                char,
-                charData,
-                filter,
-                activeEffects,
-              ),
-          },
-        );
-        const isBlockerEligible =
-          interactionMode !== "spectator" &&
-          inBlockStep &&
-          !blockerAlreadyDeclared &&
-          !attackerUnblockable &&
-          !blockerProhibited &&
-          char.state === "ACTIVE" &&
-          hasRuntimeKeyword(
-            char.instanceId,
-            charData?.keywords,
-            activeEffects,
-            "BLOCKER",
-          );
+        const isBlockerEligible = isBlockerCandidate(char);
         return (
           <PlayerFieldCard
             key={`plr-c${i}`}
@@ -305,6 +314,8 @@ function PlayerFieldComponent({
           cardDb={cardDb}
           activeDragType={activeDragType}
           canAttack={canInteract && me.leader.state === "ACTIVE"}
+          blockerSelectable={leaderBlockerEligible}
+          selected={selectedBlockerId === me.leader.instanceId}
           isAttacker={attackerInstanceId === me.leader.instanceId}
           isDefender={defenderInstanceId === me.leader.instanceId}
           winnerPulse={winnerPulseIds?.has(me.leader.instanceId)}
@@ -320,6 +331,15 @@ function PlayerFieldComponent({
           oncePerTurnUsed={oncePerTurnUsed}
           targetSelection={targetSelectionById?.get(me.leader.instanceId)}
           onTargetToggle={() => onTargetToggle?.(me.leader.instanceId)}
+          onSelect={
+            leaderBlockerEligible
+              ? () => setSelectedBlockerId(
+                  selectedBlockerId === me.leader.instanceId
+                    ? null
+                    : me.leader.instanceId,
+                )
+              : undefined
+          }
           onAction={onAction}
           zoneKey={zoneKey("leader")}
           style={{ position: "absolute", left: leaderLeft, top: playerLeaderTop }}
