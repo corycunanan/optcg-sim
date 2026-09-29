@@ -683,7 +683,7 @@ Used in `permanent` effect blocks via the `prohibitions` array:
 | `CANNOT_PLAY_FROM_HAND` | "Unable to play cards from hand" | `controller: "SELF" \| "OPPONENT"` |
 | `CANNOT_BE_REMOVED_FROM_FIELD` | "Cannot be removed" | |
 | `CANNOT_BE_RESTED` | "Cannot be rested" | |
-| `CANNOT_DRAW` | "Cannot draw by effects" | |
+| `CANNOT_DRAW` | "Cannot draw by effects" | `cause`: `BY_YOUR_EFFECT` (default; the bound player's own effect draws), `BY_OPPONENT_EFFECT` (an opponent's effect makes them draw), `BY_EFFECT` / `ANY` (every effect draw). Other values fail schema lint. The causing controller is the effect source card's controller, so it survives `OPPONENT_ACTION` (OP06-047). Enforced in `executeDraw` and `HAND_WHEEL` via `isDrawProhibitedByEffect` (OPT-876). Draw Phase draws are never blocked |
 | `CANNOT_ADD_LIFE_TO_HAND` | "Cannot add Life to hand" | |
 | `CANNOT_SET_DON_ACTIVE` | "Cannot activate DON!!" | |
 | `CANNOT_BE_BLOCKED` | "Cannot be blocked" | |
