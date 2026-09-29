@@ -1,3 +1,4 @@
+import { getBattleOpponentInstanceId } from "../events.js";
 import { releaseMovedDonEffects } from "../don-area-effects.js";
 import { finishReplacedLifeCost } from "./cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect, TRIGGERING_HAND_TRASH_REF } from "../hand-trash.js";
@@ -92,6 +93,7 @@ import {
   ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
   ALL_ACTION_TYPES,
   TRIGGERING_CARD_REF,
+  BATTLE_TARGET_REF,
   EFFECT_SOURCE_SNAPSHOT_REF,
   isOncePerTurnBlock,
   type ActionType,
@@ -326,6 +328,18 @@ export const resolverExecutionServices = Object.freeze(
 
 // ─── resolveEffect ───────────────────────────────────────────────────────────
 
+/**
+ * OPT-797: "the opponent's Character you battled with" — the BATTLE_TARGET
+ * reference seeded from the battle event that triggered this effect.
+ */
+export function battleTargetRefFor(
+  triggeringEvent: PendingEvent | undefined,
+  sourceCardInstanceId: string,
+): [string, EffectResult] | null {
+  const opposing = getBattleOpponentInstanceId(triggeringEvent, sourceCardInstanceId);
+  return opposing ? [BATTLE_TARGET_REF, { targetInstanceIds: [opposing], count: 1 }] : null;
+}
+
 export function resolveEffect(
   state: GameState,
   block: EffectBlock,
@@ -374,6 +388,10 @@ export function resolveEffect(
       targetInstanceIds: [], count: triggeringEvent.payload?.count ?? 0,
     }]);
   }
+  // OPT-797: rides with the other context refs into the optional-prompt
+  // frame, the cost-prompt frame and the action chain.
+  const battleTargetRef = battleTargetRefFor(triggeringEvent, sourceCardInstanceId);
+  if (battleTargetRef) sourceSnapshotRef.push(battleTargetRef);
   const fullText = sourceTextForBlock(sourceCardData, block);
   const blockDescription = extractEffectDescription(fullText, block);
 

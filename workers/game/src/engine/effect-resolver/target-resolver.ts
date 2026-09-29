@@ -14,7 +14,7 @@ import type {
   TargetFilter,
   UniquenessConstraint,
 } from "../effect-types.js";
-import { MIXED_POOL_TYPES, TRIGGERING_CARD_REF } from "../effect-types.js";
+import { BATTLE_TARGET_REF, MIXED_POOL_TYPES, REPLACED_CARD_REF, TRIGGERING_CARD_REF } from "../effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -664,6 +664,27 @@ export function computeAllValidTargets(
       const ids = _resultRefs.get(TRIGGERING_CARD_REF)?.targetInstanceIds ?? [];
       return ids.filter((id) => findCardInstance(state, id)?.zone === "TRASH");
     }
+    case "BATTLE_TARGET": {
+      // OPT-797: the opposing combatant seeded by resolveEffect from the
+      // battle event. A card that left the field is a new card (Rule 3-1-6)
+      // with a new instance id, so a K.O.'d or moved combatant resolves to
+      // nothing and is never substituted.
+      const ids = _resultRefs.get(BATTLE_TARGET_REF)?.targetInstanceIds ?? [];
+      return ids.filter((id) => {
+        const card = findCardInstance(state, id);
+        if (!card || (card.zone !== "CHARACTER" && card.zone !== "LEADER")) return false;
+        return !target.filter || matchesFilterForTarget(card, target.filter, cardDb, state, _resultRefs, controller);
+      });
+    }
+    case "REPLACED_CARD": {
+      // OPT-797: the card(s) whose event this replacement replaces, seeded by
+      // applyReplacement. Only cards still on the field resolve.
+      const ids = _resultRefs.get(REPLACED_CARD_REF)?.targetInstanceIds ?? [];
+      return ids.filter((id) => {
+        const zone = findCardInstance(state, id)?.zone;
+        return zone === "CHARACTER" || zone === "STAGE" || zone === "LEADER";
+      });
+    }
     default: return [];
   }
 }
@@ -679,7 +700,9 @@ export function autoSelectTargets(
   if (!target) return allValidIds;
   // dual_targets: return all provided IDs — they've already been validated by feasibility check
   if (target.dual_targets && target.dual_targets.length > 0) return allValidIds;
-  if (target.type === "ALL_YOUR_CHARACTERS" || target.type === "ALL_OPPONENT_CHARACTERS") {
+  // OPT-797: a replacement covering several cards in one event replaces the
+  // event for each of them, so its substitute acts on every replaced card.
+  if (target.type === "ALL_YOUR_CHARACTERS" || target.type === "ALL_OPPONENT_CHARACTERS" || target.type === "REPLACED_CARD") {
     return allValidIds;
   }
   const count = effectiveTargetCount(target);
@@ -700,7 +723,7 @@ export function needsPlayerTargetSelection(
   if (!target) return false;
   if (!target.type && !target.mixed_pool) return false;
   // Deterministic targets — never prompt
-  const auto = ["SELF", "YOUR_LEADER", "OPPONENT_LEADER", "ALL_YOUR_CHARACTERS", "ALL_OPPONENT_CHARACTERS", "TRIGGERING_CARD"];
+  const auto = ["SELF", "YOUR_LEADER", "OPPONENT_LEADER", "ALL_YOUR_CHARACTERS", "ALL_OPPONENT_CHARACTERS", "TRIGGERING_CARD", "BATTLE_TARGET", "REPLACED_CARD"];
   if (!target.mixed_pool && target.type && auto.includes(target.type)) return false;
   if (target.self_ref) return false;
   // Dual targets always require player selection — assignment is combinatorial

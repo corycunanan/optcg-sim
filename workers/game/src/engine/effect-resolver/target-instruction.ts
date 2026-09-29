@@ -217,6 +217,10 @@ function targetNoun(target: Target): TargetNoun | undefined {
     case "TRIGGERING_CARD":
     case "TRIGGERING_CARD_IN_TRASH":
       return { text: "the triggering card", plural: false };
+    case "BATTLE_TARGET":
+      return { text: "the card battled with", plural: false };
+    case "REPLACED_CARD":
+      return { text: "the card being replaced", plural: false };
     case "SELECTED_CARDS":
     case undefined:
       return undefined;

@@ -593,6 +593,8 @@ actions: [
 | `OPPONENT_LIFE` | Opponent's Life zone | N/A |
 | `TRIGGERING_CARD` | Exact card instance that caused the resolving trigger | Seeded runtime reference |
 | `TRIGGERING_CARD_IN_TRASH` | Triggering card only if its current instance is in trash | Seeded source-identity reference |
+| `BATTLE_TARGET` | The card on the other side of the battle from the source ("the Character you battled with") | Seeded from `END_OF_BATTLE` / `COMBAT_VICTORY` / `CHARACTER_BATTLES`; only in those auto blocks' `actions` |
+| `REPLACED_CARD` | The card(s) whose event the replacement replaces ("add it … instead") | Seeded by `applyReplacement`; only in `replacement_actions` |
 
 ### Count Modes
 

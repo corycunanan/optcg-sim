@@ -27,6 +27,7 @@ import { findMillCostIntentViolations } from "../schema-cost-lint.js";
 import { findLifeCostOrderIntentViolations } from "../schema-life-cost-lint.js";
 import { findReplacementControllerIntentViolations } from "../schema-replacement-controller-lint.js";
 import { findTriggerEventIntentViolations } from "../schema-trigger-event-lint.js";
+import { findContextTargetIntentViolations } from "../schema-context-target-lint.js";
 import { findDonGivenIntentViolations } from "../schema-don-given-lint.js";
 import { findWholeHandTrashIntentViolations } from "../schema-hand-trash-amount-lint.js";
 
@@ -276,6 +277,7 @@ async function main(): Promise<void> {
     ...findLifeCostOrderIntentViolations(schemas),
     ...findReplacementControllerIntentViolations(schemas),
     ...findTriggerEventIntentViolations(schemas),
+    ...findContextTargetIntentViolations(schemas),
     ...findDonGivenIntentViolations(loadCanonicalCardBlocks(), schemas),
     // Full runs walk the generated registry; a single-file run checks only
     // that file's schemas and skips the missing-card disposition check.

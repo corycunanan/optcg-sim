@@ -60,7 +60,7 @@
 
 ## DON!!
 
-**Qualification.** Each operation registers an unqualified tag plus `:self` and `:opponent` forms. `target.controller` supplies a qualifier when it is `SELF` or `OPPONENT`; `target.type` set to `SELF` also identifies self. `EITHER`, `ANY`, or an absent controller stays unqualified. Explicit opponent action names identify the opponent.
+**Qualification.** Each operation registers an unqualified tag plus `:self` and `:opponent` forms. `target.controller` supplies a qualifier when it is `SELF` or `OPPONENT`; `target.type` set to `SELF` also identifies self. A `REPLACED_CARD` target in `replacement_actions` takes the controller of the replacement's `replaces.target_filter` (OP11-101 "add it to the top of your Life" is `life:add:self`). `EITHER`, `ANY`, or an absent controller stays unqualified. Explicit opponent action names identify the opponent.
 
 **Ramp.** `ADD_DON_FROM_DECK` alone produces `don:ramp`, `don:ramp:self`, or `don:ramp:opponent`.
 

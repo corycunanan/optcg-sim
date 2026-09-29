@@ -24,6 +24,8 @@ const RESOLUTION_CONTEXT_TARGETS = new Set<Target["type"]>([
   "SELECTED_CARDS",
   "TRIGGERING_CARD",
   "TRIGGERING_CARD_IN_TRASH",
+  "BATTLE_TARGET",
+  "REPLACED_CARD",
 ]);
 
 function relevantCards(state: GameState): CardInstance[] {

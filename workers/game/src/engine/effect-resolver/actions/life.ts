@@ -10,6 +10,7 @@ import type {
   GameState,
   PendingEvent,
   ResumeContext,
+  ReturnToDeckArrangement,
 } from "../../../types.js";
 import { moveLifeToHand } from "../life-movement.js";
 import type { ActionResult } from "../types.js";
@@ -396,6 +397,8 @@ export function executeAddToLifeFromField(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets?: string[],
+  _services?: unknown,
+  arrangement?: ReturnToDeckArrangement,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
@@ -484,9 +487,74 @@ export function executeAddToLifeFromField(
     };
   }
 
+  // Rule 3-1-7: cards placed in an area simultaneously are ordered by their
+  // owner. When 2+ of one owner's Characters enter Life together (a
+  // REPLACED_CARD batch, OP11-101), that owner arranges them first, one owner
+  // at a time — the RETURN_TO_DECK arrangement continuation, reused. No card
+  // moves until every owner has answered.
+  const movableCards = movableIds.flatMap((id) => {
+    const card = findCardInstance(state, id);
+    return card ? [card] : [];
+  });
+  const owners = movableCards.reduce<Array<0 | 1>>((result, card) => {
+    if (!result.includes(card.owner)) result.push(card.owner);
+    return result;
+  }, []);
+  const arrangementProgress: ReturnToDeckArrangement = arrangement ?? {
+    targetIds: movableIds,
+    orderedOwnerGroups: [],
+    remainingOwners: owners.filter((owner) =>
+      movableCards.filter((card) => card.owner === owner).length > 1),
+  };
+  const pendingOwner = arrangementProgress.remainingOwners[0];
+  if (pendingOwner !== undefined) {
+    const ownerCards = movableCards.filter((card) => card.owner === pendingOwner);
+    return {
+      state,
+      events,
+      succeeded: false,
+      pendingPrompt: {
+        options: {
+          promptType: "ARRANGE_TOP_CARDS",
+          cards: ownerCards,
+          effectDescription: promptEffectDescription(
+            state,
+            cardDb,
+            sourceCardInstanceId,
+          ) || `Place the cards at the ${position === "TOP" ? "top" : "bottom"} of your Life in any order`,
+          canSendToBottom: position === "BOTTOM",
+          validTargets: [],
+          maxKeep: 0,
+        },
+        respondingPlayer: pendingOwner,
+        resumeContext: {
+          effectSourceInstanceId: sourceCardInstanceId,
+          controller,
+          pausedAction: { ...action, params: { ...params, position } },
+          remainingActions: [],
+          resultRefs: [...resultRefs.entries()],
+          validTargets: ownerCards.map((card) => card.instanceId),
+          fieldToLifeTargetIds: movableIds,
+          returnToDeckArrangement: arrangementProgress,
+        } satisfies ResumeContext,
+      },
+    };
+  }
+
+  // Each owner's arranged group lists its Life from the top down; inserting
+  // at TOP goes in reverse so the first chosen card ends on top.
+  const orderedByOwner = new Map(
+    arrangementProgress.orderedOwnerGroups.map((group) => [group.owner, group.targetIds]),
+  );
+  const orderedIds = owners.flatMap((owner) =>
+    orderedByOwner.get(owner) ??
+    movableCards.filter((card) => card.owner === owner).map((card) => card.instanceId),
+  );
+  const placementOrder = position === "TOP" ? [...orderedIds].reverse() : orderedIds;
+
   let nextState = state;
   const movedIds: string[] = [];
-  for (const id of targetIds) {
+  for (const id of placementOrder) {
     const card = findCardInstance(nextState, id);
     if (
       card?.zone !== "CHARACTER" ||

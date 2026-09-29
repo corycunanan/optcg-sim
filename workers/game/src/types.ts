@@ -153,7 +153,10 @@ export interface ResumeContext {
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, import("./engine/effect-types.js").EffectResult][];
   validTargets: string[];
-  /** Per-owner Rule 3-1-7 ordering choices collected before a deck-return batch commits. */
+  /**
+   * Per-owner Rule 3-1-7 ordering choices collected before a RETURN_TO_DECK or
+   * (OPT-797) ADD_TO_LIFE_FROM_FIELD batch commits.
+   */
   returnToDeckArrangement?: ReturnToDeckArrangement;
   /** Selected field identities waiting for a Life destination choice. */
   fieldToLifeTargetIds?: string[];
@@ -253,7 +256,7 @@ export interface EffectStackFrame {
   remainingActions: import("./engine/effect-types.js").Action[];
   resultRefs: [string, import("./engine/effect-types.js").EffectResult][];
   validTargets: string[];
-  /** Persisted per-owner Rule 3-1-7 ordering progress for RETURN_TO_DECK. */
+  /** Persisted per-owner Rule 3-1-7 ordering progress for RETURN_TO_DECK and ADD_TO_LIFE_FROM_FIELD. */
   returnToDeckArrangement?: ReturnToDeckArrangement;
   /** Selected field identities waiting for a Life destination choice. */
   fieldToLifeTargetIds?: string[];

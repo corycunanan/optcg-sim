@@ -216,6 +216,14 @@ export interface EventFilter {
   includes_trigger_keyword?: boolean;
   includes_blocker_keyword?: boolean;
   attribute?: Attribute;
+  /**
+   * "…this Character battles your opponent's Character/Leader". On
+   * END_OF_BATTLE (OPT-797) it binds the trigger to a completed battle the
+   * hosting card fought in (attacker or final, post-Blocker target) and checks
+   * the card on the other side; `target_filter` is then evaluated against that
+   * opposing card, not the payload's target. Elsewhere it reads the live
+   * battle's target.
+   */
   battle_target_type?: "CHARACTER" | "LEADER";
   no_base_effect?: boolean;
   // OPT-238: filter EVENT_ACTIVATED_FROM_HAND by whether the Event's cost was
@@ -1110,7 +1118,15 @@ export type TargetType =
   // OPT-432: the triggering card resolved in the TRASH — "play this Character
   // card from your trash" targets the exact source instance; empty (the play
   // is skipped, Rule 1-3-2) when that instance is no longer in the trash.
-  | "TRIGGERING_CARD_IN_TRASH";
+  | "TRIGGERING_CARD_IN_TRASH"
+  // OPT-797: "the opponent's Character you battled with" — the card on the
+  // other side of the battle from this effect's source, seeded from the
+  // battle event (END_OF_BATTLE / COMBAT_VICTORY / CHARACTER_BATTLES).
+  // Empty once that card has left the field (Rule 3-1-6).
+  | "BATTLE_TARGET"
+  // OPT-797: the card(s) a replacement effect is replacing the event for
+  // ("you may add it to ... instead"). Seeded only inside replacement_actions.
+  | "REPLACED_CARD";
 
 /**
  * Runtime mirror of TargetType. Keep this next to the union so semantic
@@ -1143,6 +1159,8 @@ export const ALL_TARGET_TYPES = [
   "OPPONENT_LIFE",
   "TRIGGERING_CARD",
   "TRIGGERING_CARD_IN_TRASH",
+  "BATTLE_TARGET",
+  "REPLACED_CARD",
 ] as const satisfies readonly TargetType[];
 
 type _AllTargetTypesCoverUnion = Exclude<TargetType, typeof ALL_TARGET_TYPES[number]> extends never ? true : never;
@@ -1155,6 +1173,23 @@ void _allTargetTypesCoverUnion;
  * Seeded by resolveEffect; consumed by the TRIGGERING_CARD target type.
  */
 export const TRIGGERING_CARD_REF = "__triggering_card";
+/**
+ * OPT-797: result_ref holding the opposing combatant of the battle that
+ * triggered the resolving auto effect. Seeded by resolveEffect from a battle
+ * event payload; consumed by the BATTLE_TARGET target type.
+ */
+export const BATTLE_TARGET_REF = "__battle_target";
+/**
+ * OPT-797: result_ref holding the card(s) whose event a replacement effect is
+ * replacing. Seeded by applyReplacement; consumed by REPLACED_CARD.
+ */
+export const REPLACED_CARD_REF = "__replaced_card";
+/** OPT-797: trigger events whose payload names both combatants of a battle. */
+export const BATTLE_TARGET_TRIGGER_EVENTS = [
+  "END_OF_BATTLE",
+  "COMBAT_VICTORY",
+  "CHARACTER_BATTLES",
+] as const;
 /** Reserved provenance reference; never a selectable target result. */
 export const EFFECT_SOURCE_SNAPSHOT_REF = "__effect_source_snapshot";
 

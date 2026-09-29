@@ -260,14 +260,12 @@ export const ST08_013_MR_2_BON_KUREI_BENTHAM: EffectSchema = {
         filter: { battle_target_type: "CHARACTER" },
         don_requirement: 1,
       },
+      // OPT-797: BATTLE_TARGET is exactly the opponent's Character this one
+      // battled; IF_DO K.O.s this Character only when that K.O. happened.
       actions: [
         {
           type: "KO",
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { exact: 1 },
-          },
+          target: { type: "BATTLE_TARGET" },
         },
         {
           type: "KO",

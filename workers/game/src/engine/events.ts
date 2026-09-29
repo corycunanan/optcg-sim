@@ -8,6 +8,7 @@
 
 import type { GameEvent, GameEventType, GameEventPayloadMap, GameState, PendingEvent } from "../types.js";
 import { takeEngineTimestamp } from "./execution-context.js";
+import { BATTLE_TARGET_TRIGGER_EVENTS } from "./effect-types.js";
 
 export function withTriggerScanned(event: PendingEvent): PendingEvent {
   if (event.propagation?.triggerScanned) return event;
@@ -45,6 +46,31 @@ export function getEventCardInstanceId(
   if (typeof payload !== "object" || payload === null) return undefined;
   const instanceId = Reflect.get(payload, "cardInstanceId");
   return typeof instanceId === "string" ? instanceId : undefined;
+}
+
+const BATTLE_COMBATANT_EVENTS: ReadonlySet<string> = new Set(BATTLE_TARGET_TRIGGER_EVENTS);
+
+/**
+ * OPT-797: the card on the other side of a battle from `sourceInstanceId` —
+ * the final (post-Blocker) target when the source attacked, the attacker when
+ * the source was attacked, `null` when the source fought in neither seat or
+ * the event names no battle. END_OF_BATTLE names the attacker
+ * `attackerInstanceId`; COMBAT_VICTORY / CHARACTER_BATTLES name it
+ * `cardInstanceId`.
+ */
+export function getBattleOpponentInstanceId(
+  event: { type: string; payload?: unknown } | null | undefined,
+  sourceInstanceId: string,
+): string | null {
+  if (!event || !BATTLE_COMBATANT_EVENTS.has(event.type)) return null;
+  const payload = event.payload;
+  if (typeof payload !== "object" || payload === null) return null;
+  const attacker = Reflect.get(payload, "attackerInstanceId") ?? Reflect.get(payload, "cardInstanceId");
+  const target = Reflect.get(payload, "targetInstanceId");
+  if (typeof attacker !== "string" || typeof target !== "string") return null;
+  if (sourceInstanceId === attacker) return target;
+  if (sourceInstanceId === target) return attacker;
+  return null;
 }
 
 export function emitEvent<T extends GameEventType>(

@@ -19,11 +19,12 @@ import type { EffectSourceIdentity } from "../../../../shared/game-types.js";
 import type {
   Action,
   CauseFilter,
+  EffectResult,
   RuntimeActiveEffect,
   Target,
   TargetFilter,
 } from "./effect-types.js";
-import { ALL_ACTION_TYPES, ALL_CAUSE_FILTER_BY } from "./effect-types.js";
+import { ALL_ACTION_TYPES, ALL_CAUSE_FILTER_BY, REPLACED_CARD_REF } from "./effect-types.js";
 import type {
   CardData,
   CardInstance,
@@ -320,7 +321,7 @@ function checkReplacementForEvent(
     // already rested, or with no valid targets), decline the replacement and
     // fall through to the original consequence. Checked at match time, before
     // prompting — an infeasible replacement should not surface a prompt.
-    if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb)) {
+    if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, [targetInstanceId])) {
       continue;
     }
 
@@ -330,7 +331,7 @@ function checkReplacementForEvent(
     }
 
     // Non-optional: apply immediately
-    return applyReplacement(state, effect, params, targetInstanceId, cardDb, services);
+    return applyReplacement(state, effect, params, [targetInstanceId], cardDb, services);
   }
 
   return { replaced: false, state, events: [] };
@@ -379,17 +380,23 @@ export function scanReplacementsForBatch(
     if (params.trigger !== event) continue;
     if (params.once_per_turn && hasUsedThisTurn(state, effect)) continue;
     if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) continue;
-    // OPT-232: skip replacements whose substitute action cannot execute.
-    if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb)) continue;
 
     const matchedIds = targetInstanceIds.filter((id) =>
       replacementMatchesTarget(state, effect, params, id, event, cause, causingController, cardDb, causingSource),
     );
     if (matchedIds.length === 0) continue;
+    // OPT-232: skip replacements whose substitute action cannot execute.
+    // OPT-797: feasibility is per replaced card (REPLACED_CARD = that card):
+    // a member whose substitute cannot resolve is not covered, so its event
+    // proceeds (§8-1-3-4-5), while the feasible members stay protected.
+    const feasibleIds = matchedIds.filter((id) =>
+      canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, [id]),
+    );
+    if (feasibleIds.length === 0) continue;
 
     matches.push({
       effectId: effect.id,
-      matchedTargetIds: matchedIds,
+      matchedTargetIds: feasibleIds,
       optional: params.optional,
     });
   }
@@ -407,6 +414,7 @@ export function applyBatchReplacement(
   effectId: string,
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
+  replacedInstanceIds: string[] = [],
 ): ReplacementCheckResult {
   const effects = state.activeEffects;
   const effect = effects.find((e) => e.id === effectId);
@@ -415,7 +423,7 @@ export function applyBatchReplacement(
   const params = mod?.params;
   if (!isReplacementParams(params))
     return { replaced: false, state, events: [] };
-  return applyReplacement(state, effect, params, "", cardDb, services);
+  return applyReplacement(state, effect, params, replacedInstanceIds, cardDb, services);
 }
 
 /**
@@ -529,7 +537,9 @@ function canExecuteReplacementSubstitute(
   effect: RuntimeActiveEffect,
   actions: Action[],
   cardDb: Map<string, CardData>,
+  replacedInstanceIds: string[] = [],
 ): boolean {
+  const refs = replacedCardRefs(replacedInstanceIds);
   for (const action of actions) {
     if (!isActionFeasible(
       state,
@@ -537,11 +547,11 @@ function canExecuteReplacementSubstitute(
       effect.sourceCardInstanceId,
       effect.controller,
       cardDb,
-      new Map(),
+      refs,
     )) return false;
 
     if (action.type === "SET_REST") {
-      if (!canSetRestSucceed(state, action, effect, cardDb)) return false;
+      if (!canSetRestSucceed(state, action, effect, cardDb, replacedInstanceIds)) return false;
     } else if (action.type === "TURN_LIFE_FACE_UP") {
       // OPT-234: Shirahoshi / Bonney "flip 1 Life instead of removal". Per
       // Bandai rulings, if every Life is already face-up (or Life is empty)
@@ -559,7 +569,7 @@ function canExecuteReplacementSubstitute(
       // branch is fully feasible.
       const options = action.params?.options ?? [];
       const anyFeasible = options.some(
-        (branch) => branch.length > 0 && canExecuteReplacementSubstitute(state, effect, branch, cardDb),
+        (branch) => branch.length > 0 && canExecuteReplacementSubstitute(state, effect, branch, cardDb, replacedInstanceIds),
       );
       if (!anyFeasible) return false;
     }
@@ -575,9 +585,18 @@ function canSetRestSucceed(
   action: import("./effect-types.js").ActionOf<"SET_REST">,
   effect: RuntimeActiveEffect,
   cardDb: Map<string, CardData>,
+  replacedInstanceIds: string[],
 ): boolean {
   const target = action.target;
   if (!target) return true; // malformed schemas flow through to the dispatcher.
+
+  if (target.type === "REPLACED_CARD") {
+    return replacedInstanceIds.some((id) => {
+      const card = findCardInstance(state, id);
+      return card?.state === "ACTIVE" &&
+        !isProhibitedForCard(state, id, "CANNOT_BE_RESTED", cardDb, { causingController: effect.controller, sourceCardInstanceId: effect.sourceCardInstanceId });
+    });
+  }
 
   if (target.type === "SELF") {
     const source = findCardInstance(state, effect.sourceCardInstanceId);
@@ -639,11 +658,22 @@ function collectSubstituteCandidates(
 
 // ─── Apply Replacement ───────────────────────────────────────────────────────
 
+/**
+ * OPT-797: the REPLACED_CARD reference — the card(s) whose event the
+ * replacement replaces ("you may add it to ... instead", OP11-101).
+ */
+function replacedCardRefs(replacedInstanceIds: string[]): Map<string, EffectResult> {
+  const ids = replacedInstanceIds.filter((id) => id !== "");
+  return new Map(ids.length > 0
+    ? [[REPLACED_CARD_REF, { targetInstanceIds: ids, count: ids.length }]]
+    : []);
+}
+
 function applyReplacement(
   state: GameState,
   effect: RuntimeActiveEffect,
   params: ReplacementParams,
-  _targetInstanceId: string,
+  replacedInstanceIds: string[],
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
 ): ReplacementCheckResult {
@@ -660,12 +690,15 @@ function applyReplacement(
   // prompt gets its own stack frame and later substitute actions are retained.
   // sourceCardInstanceId = the replacement's source (e.g. Tashigi), so that
   // target: { type: "SELF" } resolves to her, not the event's original target.
+  // The event's card is reachable as REPLACED_CARD (OPT-797); the ref rides
+  // in the chain's result refs, which a substitute prompt persists per frame.
   const result = services.executeActionChain(
     nextState,
     params.replacement_actions,
     effect.sourceCardInstanceId,
     effect.controller,
     cardDb,
+    replacedCardRefs(replacedInstanceIds),
   );
   nextState = result.state;
   events.push(...result.events);
@@ -786,7 +819,7 @@ export function resumeReplacement(
     return { replaced: false, state, events: [] };
   }
 
-  return applyReplacement(state, effect, params, ctx.targetInstanceId, cardDb, services);
+  return applyReplacement(state, effect, params, [ctx.targetInstanceId], cardDb, services);
 }
 
 // ─── Batch Resume (OPT-219) ──────────────────────────────────────────────────
@@ -880,7 +913,7 @@ function stepBatch(
     }
 
     // Non-optional: apply once, mark covered targets as protected.
-    const applied = applyBatchReplacement(nextState, match.effectId, cardDb, services);
+    const applied = applyBatchReplacement(nextState, match.effectId, cardDb, services, applicable);
     nextState = applied.state;
     events.push(...applied.events);
     if (applied.pendingPrompt) {
@@ -1010,7 +1043,7 @@ export function resumeReplacementBatch(
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
   if (accepted && currentMatch) {
     const applicable = currentMatch.matchedTargetIds.filter((id) => !protectedIds.has(id));
-    const applied = applyBatchReplacement(nextState, currentMatch.effectId, cardDb, services);
+    const applied = applyBatchReplacement(nextState, currentMatch.effectId, cardDb, services, applicable);
     nextState = applied.state;
     events.push(...applied.events);
     if (applied.pendingPrompt) {

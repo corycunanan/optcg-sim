@@ -3248,10 +3248,11 @@ export const OP11_101_CAPONE_GANG_BEGE: EffectSchema = {
         },
         cause_filter: { by: "OPPONENT_EFFECT" },
       },
+      // OPT-797: "add it" is the protected Supernovas Character, not Bege.
       replacement_actions: [
         {
           type: "ADD_TO_LIFE_FROM_FIELD",
-          target: { type: "SELF" },
+          target: { type: "REPLACED_CARD" },
           params: { face: "DOWN", position: "TOP" },
         },
       ],
