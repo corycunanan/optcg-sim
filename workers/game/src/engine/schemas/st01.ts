@@ -269,7 +269,7 @@ export const ST01_014_GUARD_POINT: EffectSchema = {
   effects: [
     {
       id: "counter_power_boost",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

@@ -320,7 +320,7 @@ export const ST03_016_THRUST_PAD_CANNON: EffectSchema = {
   effects: [
     {
       id: "counter_bounce",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -355,7 +355,7 @@ export const ST03_017_LOVE_LOVE_MELLOW: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_draw",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

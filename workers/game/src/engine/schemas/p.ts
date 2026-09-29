@@ -1505,7 +1505,7 @@ export const P_059_THE_WORLDS_CONTINUATION: EffectSchema = {
   effects: [
     {
       id: "counter_bounce_and_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",
