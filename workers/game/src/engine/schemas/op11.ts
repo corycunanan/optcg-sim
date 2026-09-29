@@ -3101,14 +3101,11 @@ export const OP11_098_BLUE_HOLE: EffectSchema = {
   card_type: "Event",
   effects: [
     {
-      id: "main_mill_and_ko",
-      category: "auto",
+      id: "main_ko",
+      category: "activate",
       trigger: { keyword: "MAIN_EVENT" },
+      costs: [{ type: "MILL", amount: 3 }],
       actions: [
-        {
-          type: "MILL",
-          params: { amount: 3 },
-        },
         {
           type: "KO",
           target: {
@@ -3117,9 +3114,9 @@ export const OP11_098_BLUE_HOLE: EffectSchema = {
             count: { up_to: 1 },
             filter: { cost_max: 2 },
           },
-          chain: "IF_DO",
         },
       ],
+      flags: { optional: true },
     },
     {
       id: "trigger_buff",
