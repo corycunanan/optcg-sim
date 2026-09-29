@@ -215,6 +215,16 @@ export function resumeEffectChain(
     nextState = fieldToLife.state;
     events.push(...fieldToLife.events);
     pausedActionSucceeded = fieldToLife.succeeded;
+    // OPT-797: a position choice or one owner's Life order can open the next
+    // owner's Rule 3-1-7 ordering prompt.
+    if (fieldToLife.pendingPrompt) {
+      return {
+        state: nextState,
+        events,
+        resolved: false,
+        pendingPrompt: fieldToLife.pendingPrompt,
+      };
+    }
   }
 
   // ── PLAYER_CHOICE branches ────────────────────────────────────────────────

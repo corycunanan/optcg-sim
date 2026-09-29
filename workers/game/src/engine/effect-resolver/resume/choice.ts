@@ -54,6 +54,7 @@ import { payCostsWithSelection } from "../cost-handler.js";
 import { costResultToEntries, costResultRefsFromEntries } from "../types.js";
 import { postCostConditionsMet } from "../post-cost.js";
 import { executeAddToLifeFromField } from "../actions/life.js";
+import { findCardInstance } from "../../state.js";
 import { executePlayCard } from "../actions/play.js";
 import {
   applyFieldDonReturn,
@@ -276,6 +277,8 @@ export function handleFieldToLifePosition(
   } = resumeCtx;
   if (pausedAction?.type !== "ADD_TO_LIFE_FROM_FIELD" || !fieldToLifeTargetIds)
     return null;
+  if (resumeCtx.returnToDeckArrangement)
+    return handleFieldToLifeArrangement(state, action, resumeCtx, resultRefs, cardDb);
   if (
     action.type !== "PLAYER_CHOICE" ||
     !validTargets.includes(action.choiceId)
@@ -302,6 +305,76 @@ export function handleFieldToLifePosition(
   if (pausedAction.result_ref && result.result)
     resultRefs.set(pausedAction.result_ref, result.result);
   return { ...result, resolved: true };
+}
+
+/**
+ * OPT-797, Rule 3-1-7: the pending owner's order for their Characters entering
+ * Life together. The response must be exactly that owner's group, each card
+ * once and nothing kept; anything else is rejected with no state change and
+ * the prompt stays pending. The next owner, if any, is prompted in turn; the
+ * cards move only after the last answer.
+ */
+function handleFieldToLifeArrangement(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+): EffectResolverResult & { succeeded?: boolean } {
+  const {
+    pausedAction,
+    fieldToLifeTargetIds,
+    returnToDeckArrangement: arrangement,
+    validTargets,
+    controller,
+    effectSourceInstanceId,
+  } = resumeCtx;
+  const rejected = { state, events: [], resolved: false, rejected: true };
+  const pendingOwner = arrangement?.remainingOwners[0];
+  if (
+    pausedAction?.type !== "ADD_TO_LIFE_FROM_FIELD" ||
+    !arrangement ||
+    pendingOwner === undefined ||
+    action.type !== "ARRANGE_TOP_CARDS"
+  ) {
+    return rejected;
+  }
+  const kept = [
+    ...(action.keptCardInstanceIds ?? []),
+    ...(action.keptCardInstanceId ? [action.keptCardInstanceId] : []),
+  ];
+  const ordered = action.orderedInstanceIds ?? [];
+  const group = new Set(validTargets);
+  if (
+    kept.length > 0 ||
+    ordered.length !== group.size ||
+    new Set(ordered).size !== ordered.length ||
+    ordered.some((id) => !group.has(id)) ||
+    ordered.some((id) => findCardInstance(state, id)?.zone !== "CHARACTER")
+  ) {
+    return rejected;
+  }
+  const result = executeAddToLifeFromField(
+    state,
+    pausedAction,
+    effectSourceInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    fieldToLifeTargetIds,
+    undefined,
+    {
+      ...arrangement,
+      orderedOwnerGroups: [
+        ...arrangement.orderedOwnerGroups,
+        { owner: pendingOwner, targetIds: ordered },
+      ],
+      remainingOwners: arrangement.remainingOwners.slice(1),
+    },
+  );
+  if (pausedAction.result_ref && result.result)
+    resultRefs.set(pausedAction.result_ref, result.result);
+  return { ...result, resolved: !result.pendingPrompt };
 }
 
 export function handleChooseValue(

@@ -43,6 +43,8 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { battleTargetRefFor, resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import { checkReplacementForKO } from "../engine/replacements.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { SessionCoordinator } from "../session/coordinator.js";
+import { filterStateForPlayer } from "../engine/state.js";
 import { SessionRepository, type SessionStorage } from "../session/persistence.js";
 import { findContextTargetViolations } from "../engine/schema-context-target-lint.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
@@ -564,6 +566,8 @@ describe("OP11-101 — the protected Supernovas Character goes to Life, Bege sta
       expect(f.state.players[0].life[0]).toMatchObject({ cardId: "OPT797-SUPERNOVA", face: "DOWN" });
       expect(f.trashIds(0)).not.toContain("OPT797-SUPERNOVA");
       expect(f.state.players[0].hand.map((c) => c.cardId)).not.toContain("OPT797-SUPERNOVA");
+      // One card: nothing to order (Rule 3-1-7), so no ARRANGE prompt.
+      expect(f.promptTypes).not.toContain("ARRANGE_TOP_CARDS");
     });
   }
 
@@ -646,6 +650,188 @@ describe("OP11-101 — the protected Supernovas Character goes to Life, Bege sta
     expect(f.onField(protectedCard)).toBe(false);
     expect(f.state.players[0].life[0]).toMatchObject({ cardId: "OPT797-SUPERNOVA", face: "DOWN" });
     expect(f.onField(me)).toBe(true);
+  });
+});
+
+// ─── OP11-101 batch: the owner orders the cards entering Life (Rule 3-1-7) ────
+
+describe("OP11-101 — two Supernovas removed at once: one use protects both, owner orders them", () => {
+  // qa_op11.md OP11-001 Koby: one [Once Per Turn] "would be removed … instead"
+  // replacement protects every Character removed simultaneously. Rule 3-1-7:
+  // cards placed in an area at the same time are ordered by their owner.
+  function setup() {
+    const f = fixture();
+    const host = bege(f);
+    const a = f.put("OPT797-SUPERNOVA", 0);
+    const b = f.put("OPT797-SUPERNOVA-2", 0);
+    koAllOpponentCharactersExcept(f, 'Capone"Gang"Bege');
+    expect(f.prompt()).toBe("OPTIONAL_EFFECT");
+    f.accept();
+    return { f, host, a, b };
+  }
+
+  function expectArrangePrompt(f: Fixture, a: CardInstance, b: CardInstance) {
+    expect(f.prompt()).toBe("ARRANGE_TOP_CARDS");
+    const prompt = f.state.pendingPrompt!;
+    expect(prompt.respondingPlayer).toBe(0);
+    expect(prompt.options.promptType === "ARRANGE_TOP_CARDS" && prompt.options.cards.map((c) => c.instanceId).sort())
+      .toEqual([a.instanceId, b.instanceId].sort());
+    // Nothing has moved yet.
+    expect(f.onField(a)).toBe(true);
+    expect(f.onField(b)).toBe(true);
+  }
+
+  const arrange = (ids: string[]) =>
+    ({ type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ids, destination: "top" }) as GameAction;
+
+  for (const order of [["a", "b"], ["b", "a"]] as const) {
+    it(`the owner's order ${order.join("/")} is the Life order, top down; Bege stays`, () => {
+      const { f, host, a, b } = setup();
+      expectArrangePrompt(f, a, b);
+      const cards = { a, b };
+      const life = f.state.players[0].life.length;
+
+      f.act(0, arrange(order.map((key) => cards[key].instanceId)));
+
+      expect(f.state.pendingPrompt).toBeNull();
+      expect(f.onField(a)).toBe(false);
+      expect(f.onField(b)).toBe(false);
+      expect(f.onField(host)).toBe(true);
+      expect(f.state.players[0].life).toHaveLength(life + 2);
+      expect(f.state.players[0].life.slice(0, 2).map((c) => [c.cardId, c.face])).toEqual(
+        order.map((key) => [cards[key].cardId, "DOWN"]),
+      );
+    });
+  }
+
+  it("only the owner sees the cards being ordered", () => {
+    const { f, a, b } = setup();
+    expectArrangePrompt(f, a, b);
+    expect(filterStateForPlayer(f.state, 1).pendingPrompt).toBeNull();
+    const own = filterStateForPlayer(f.state, 0).pendingPrompt;
+    expect(own?.resumeContext).toBeNull();
+    expect(own?.options.promptType === "ARRANGE_TOP_CARDS" && own.options.cards).toHaveLength(2);
+  });
+
+  it("the order prompt survives a persisted save/load", async () => {
+    const { f, host, a, b } = setup();
+    expectArrangePrompt(f, a, b);
+    const storage = new MemoryStorage();
+    const config = { nextJsUrl: "https://x.test", workerSecret: "s" };
+    await new SessionRepository(storage, config)
+      .save({ state: f.state, cardDb: f.db, undoHistory: [], mode: "PVP" } as never);
+    f.state = (await new SessionRepository(storage, config).load())!.state;
+    expectArrangePrompt(f, a, b);
+
+    f.act(0, arrange([b.instanceId, a.instanceId]));
+
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[0].life.slice(0, 2).map((c) => c.cardId)).toEqual(["OPT797-SUPERNOVA-2", "OPT797-SUPERNOVA"]);
+    expect(f.onField(host)).toBe(true);
+  });
+
+  it("the engine rejects an invalid order with no state change and keeps the prompt", () => {
+    const { f, a, b } = setup();
+    expectArrangePrompt(f, a, b);
+    const invalid: GameAction[] = [
+      arrange([a.instanceId]),
+      arrange([a.instanceId, a.instanceId]),
+      arrange([a.instanceId, "not-a-card"]),
+      arrange([a.instanceId, b.instanceId, f.state.players[0].leader.instanceId]),
+      { ...arrange([b.instanceId]), keptCardInstanceId: a.instanceId } as GameAction,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+    ];
+    for (const action of invalid) {
+      const before = f.state;
+      const r = resumePromptLifecycle(f.state, action, f.db, {
+        drainPregame: (s) => s,
+        advanceStartOfTurn: (s) => s,
+      });
+      expect(r.responseRejected, JSON.stringify(action)).toBe(true);
+      expect(r.state.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+      expect(r.state.players).toEqual(before.players);
+    }
+  });
+
+  it("the session rejects a stale, duplicate or wrong-player response", async () => {
+    const { f, a, b } = setup();
+    expectArrangePrompt(f, a, b);
+    // The session stamps the prompt id when it persists the prompt.
+    const storage = new MemoryStorage();
+    const config = { nextJsUrl: "https://x.test", workerSecret: "s" };
+    f.state = (await new SessionRepository(storage, config)
+      .save({ state: f.state, cardDb: f.db, undoHistory: [], mode: "PVP" } as never)).state;
+    expect(f.state.pendingPrompt?.promptId).toEqual(expect.any(String));
+    const coordinator = new SessionCoordinator();
+    const promptId = f.state.pendingPrompt!.promptId;
+    const send = (player: 0 | 1, action: GameAction) => coordinator.executeAction(f.state, [], player, action, f.db);
+
+    expect(send(0, { ...arrange([a.instanceId, b.instanceId]), promptId: "stale" } as GameAction).kind).toBe("reject");
+    expect(send(0, { ...arrange([a.instanceId, a.instanceId]), promptId } as GameAction).kind).toBe("reject");
+    expect(send(1, { ...arrange([a.instanceId, b.instanceId]), promptId } as GameAction).kind).toBe("reject");
+
+    const ok = send(0, { ...arrange([a.instanceId, b.instanceId]), promptId } as GameAction);
+    expect(ok.kind).toBe("resume");
+    const resumed = resumePromptLifecycle(ok.state, { ...arrange([a.instanceId, b.instanceId]), promptId } as GameAction, f.db, {
+      drainPregame: (s) => s,
+      advanceStartOfTurn: (s) => s,
+    });
+    expect(resumed.responseRejected).toBe(false);
+    f.state = resumed.state;
+    expect(f.state.pendingPrompt).toBeNull();
+    // Replaying the answered response is rejected.
+    expect(send(0, { ...arrange([a.instanceId, b.instanceId]), promptId } as GameAction).kind).toBe("reject");
+  });
+});
+
+describe("field → Life order after a top-or-bottom choice (Rule 3-1-7)", () => {
+  // Test-only: "... you may add them to the top or bottom of your Life cards
+  // face-down instead." The position is chosen first; the order prompt follows.
+  const schema: EffectSchema = {
+    card_id: "OPT797-TOB",
+    card_name: "Top or bottom",
+    card_type: "Character",
+    effects: [
+      {
+        id: "tob",
+        category: "replacement",
+        flags: { optional: true },
+        replaces: {
+          event: "WOULD_BE_KO",
+          target_filter: { controller: "SELF", card_type: "CHARACTER", exclude_self: true },
+        },
+        replacement_actions: [
+          { type: "ADD_TO_LIFE_FROM_FIELD", target: { type: "REPLACED_CARD" }, params: { face: "DOWN", position: "TOP_OR_BOTTOM" } },
+        ],
+      },
+    ],
+  };
+
+  it("bottom: the owner's order is kept at the bottom of Life", () => {
+    const f = fixture();
+    f.def("OPT797-TOB", {}, schema);
+    f.def("OPT797-X", {});
+    f.def("OPT797-Y", {});
+    f.put("OPT797-TOB", 0);
+    const x = f.put("OPT797-X", 0);
+    const y = f.put("OPT797-Y", 0);
+    koAllOpponentCharactersExcept(f, "Top or bottom");
+    f.accept();
+    expect(f.prompt()).toBe("PLAYER_CHOICE");
+    const bottom = f.state.pendingPrompt!.options.promptType === "PLAYER_CHOICE"
+      ? f.state.pendingPrompt!.options.choices.find((c) => c.label === "Bottom")!.id
+      : "";
+    f.act(0, { type: "PLAYER_CHOICE", choiceId: bottom });
+    expect(f.prompt()).toBe("ARRANGE_TOP_CARDS");
+    f.act(0, {
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: "",
+      orderedInstanceIds: [y.instanceId, x.instanceId],
+      destination: "bottom",
+    } as GameAction);
+
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[0].life.slice(-2).map((c) => c.cardId)).toEqual(["OPT797-Y", "OPT797-X"]);
   });
 });
 
