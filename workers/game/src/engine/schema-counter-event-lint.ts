@@ -32,6 +32,18 @@ export const KNOWN_COMPOUND_COUNTER_EVENT_GAP: readonly string[] = [
   "OP08-094", "OP10-040", "OP10-078", "OP15-021", "ST12-016",
 ];
 
+/**
+ * Deliberately deferred (OPT-912): Counter Events whose COUNTER_EVENT block is
+ * kept `activate` (non-executing) because running it today would be harmful.
+ * P-059 "return any number of Characters ... +2000 for every returned
+ * Character": `count: { any_number }` auto-selects EVERY own Character (no
+ * subset prompt) and PER_COUNT CHARACTERS_RETURNED_THIS_WAY reads only cost
+ * refs, so the boost is +0. Doing nothing is safer until OPT-912 lands.
+ * Two-way ratchet: a listed card MUST still have a non-auto COUNTER_EVENT block
+ * (flipping it to `auto` while listed is a violation, forcing its removal here).
+ */
+export const KNOWN_DEFERRED_COUNTER_EVENT: readonly string[] = ["P-059"];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -58,7 +70,15 @@ function collect(node: unknown, path: string, found: string[], cardId: string): 
   if (!node || typeof node !== "object") return;
   const record = node as Record<string, unknown>;
   if ("category" in record) {
+    const deferred = KNOWN_DEFERRED_COUNTER_EVENT.includes(cardId);
     if (
+      deferred &&
+      isDirectCounterEvent(record.trigger) &&
+      COUNTER_EVENT_EXECUTED_CATEGORIES.includes(String(record.category))
+    ) {
+      found.push(`${path} category "${String(record.category)}": card is listed in KNOWN_DEFERRED_COUNTER_EVENT (OPT-912) but its COUNTER_EVENT block now executes; remove it from the list`);
+    } else if (
+      !deferred &&
       isDirectCounterEvent(record.trigger) &&
       !COUNTER_EVENT_EXECUTED_CATEGORIES.includes(String(record.category))
     ) {

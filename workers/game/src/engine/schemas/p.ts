@@ -1505,7 +1505,12 @@ export const P_059_THE_WORLDS_CONTINUATION: EffectSchema = {
   effects: [
     {
       id: "counter_bounce_and_power",
-      category: "auto",
+      // Deliberately non-executing (OPT-912): as `auto`, `any_number` would
+      // return EVERY own Character with no subset prompt and PER_COUNT
+      // CHARACTERS_RETURNED_THIS_WAY yields +0. Listed in
+      // KNOWN_DEFERRED_COUNTER_EVENT (schema-counter-event-lint.ts); flip to
+      // "auto" and drop it from that list when OPT-912 lands.
+      category: "activate",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "LEADER_PROPERTY",

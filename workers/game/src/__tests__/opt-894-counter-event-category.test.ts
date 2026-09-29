@@ -5,13 +5,16 @@
  * `category === "auto"` and `trigger.keyword === "COUNTER_EVENT"`; 40 Counter
  * Events were authored `activate`, so DON!! was paid and the card trashed but
  * the [Counter] effect never resolved. Convention (this ticket): every
- * COUNTER_EVENT block is `category: "auto"`.
+ * COUNTER_EVENT block is `category: "auto"`. 39 are re-authored `auto`; P-059
+ * is deliberately kept `activate` (non-executing) until OPT-912, because as
+ * `auto` it would return every own Character for +0 power.
  *
  * Every card here is played from hand through `runPipeline` during a real
  * battle (declare attack -> USE_COUNTER_EVENT with real DON!! payment) and every
- * prompt is answered through the real prompt response. Expected values come
- * from the canonical text in docs/cards/ (read by this file and installed as
- * the card's effect text), never from what the engine currently does.
+ * prompt is answered through the real prompt response. Expected values are
+ * literals hand-derived from the card text in docs/cards/, never from what the
+ * engine currently does. This file reads docs/cards only to install the card's
+ * display text and for a few structural checks ([Main]/[Trigger] presence).
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -556,6 +559,36 @@ describe("OPT-894 — conditional [Counter] power boosts", () => {
   });
 });
 
+describe("OPT-894 — OP17-018 counts base power, not buffed power", () => {
+  // "If you have 2 or more Characters with a base power of 8000 or more":
+  // a 7000-base Character buffed to 8000 does not count.
+  it("a 7000-base Character buffed to 8000 does not satisfy the condition", () => {
+    const f = fixture();
+    f.state.players.forEach((p) => (p.characters = padChars([])));
+    const ally = f.put("ALLY-A", 1, "CHARACTER", { cost: 3, power: 4000 });
+    f.put("BIG-0", 1, "CHARACTER", { cost: 3, power: 8000 });
+    const buffed = f.put("SMALL-0", 1, "CHARACTER", { cost: 3, power: 7000 });
+    f.state.activeEffects.push({
+      id: "test-buff",
+      sourceCardInstanceId: buffed.instanceId,
+      sourceEffectBlockId: "test",
+      category: "auto",
+      modifiers: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 } }],
+      duration: { type: "THIS_TURN" },
+      expiresAt: { wave: "END_OF_TURN", turn: f.state.turn.number },
+      controller: 1,
+      appliesTo: [buffed.instanceId],
+      timestamp: 1,
+    } as never);
+    expect(f.power(buffed)).toBe(8000);
+    const don = f.activeDon();
+    f.counter("OP17-018", []);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.power(ally)).toBe(4000);
+    expectPaidAndTrashed(f, "OP17-018", don);
+  });
+});
+
 // ─── Shape 6: multi-step Counters ────────────────────────────────────────────
 
 describe("OPT-894 — multi-step [Counter] effects", () => {
@@ -775,16 +808,37 @@ describe("OPT-894 — Life / deck / bounce Counters", () => {
     expect(f.trashCount("P-059")).toBe(1);
   });
 
-  // GAP (follow-up, engine support): P-059 "you may return ANY NUMBER of Characters
-  // ... +2000 for every returned Character" resolves wrongly today. (1) A
-  // `count: { any_number }` target auto-selects EVERY valid card instead of letting
-  // the player choose how many (target-resolver.ts resolveTargets /
-  // needsPlayerTargetSelection); (2) PER_COUNT CHARACTERS_RETURNED_THIS_WAY reads
-  // only the `__cost_cards_returned` ref, which a costs[] entry fills, but no cost
-  // supports a variable count, so the action-based return yields +0
-  // (dynamic-values.ts THIS_WAY_TO_COST_REF). Ratchet: flips to a real failure
-  // when the gap is fixed, at which point drop `.fails`.
-  it.fails("P-059 (GAP): with [Uta], returning 2 of 3 Characters gives the Leader +4000 and keeps the third", () => {
+  it("P-059 (deferred, OPT-912): with [Uta], the Counter stays non-executing: no Character returns, no power", () => {
+    const f = fixture();
+    f.state.players.forEach((p) => (p.characters = padChars([])));
+    f.leaderData({ name: "Uta" });
+    const a = f.put("RET-A", 1, "CHARACTER", { cost: 2, power: 3000 });
+    const b = f.put("RET-B", 1, "CHARACTER", { cost: 2, power: 3000 });
+    const c = f.put("STAY-C", 1, "CHARACTER", { cost: 2, power: 3000 });
+    const leaderBase = f.power(f.p1Leader());
+    const don = f.activeDon();
+    f.counter("P-059", []);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[1].characters.filter(Boolean).map((x) => x!.instanceId)).toEqual(
+      [a, b, c].map((x) => x.instanceId),
+    );
+    expect(f.state.players[1].hand.some((x) => x.cardId.startsWith("RET-") || x.cardId === "STAY-C")).toBe(false);
+    expect(f.power(f.p1Leader())).toBe(leaderBase);
+    expectPaidAndTrashed(f, "P-059", don);
+  });
+
+  // GAP (OPT-912): P-059 "you may return ANY NUMBER of Characters ... +2000 for
+  // every returned Character". Its Counter block is kept `activate` (see
+  // KNOWN_DEFERRED_COUNTER_EVENT) because flipping it to `auto` today is
+  // harmful: (1) a `count: { any_number }` target auto-selects EVERY valid card
+  // instead of letting the player choose how many (target-resolver.ts
+  // resolveTargets / needsPlayerTargetSelection); (2) PER_COUNT
+  // CHARACTERS_RETURNED_THIS_WAY reads only the `__cost_cards_returned` ref,
+  // which a costs[] entry fills, so the action-based return yields +0
+  // (dynamic-values.ts THIS_WAY_TO_COST_REF). Ratchet: when OPT-912 lands, flip
+  // P-059 to `auto`, drop it from KNOWN_DEFERRED_COUNTER_EVENT, drop `.fails`,
+  // and delete the deferred test above.
+  it.fails("P-059 (GAP, OPT-912): with [Uta], returning 2 of 3 Characters gives the Leader +4000 and keeps the third", () => {
     const f = fixture();
     f.state.players.forEach((p) => (p.characters = padChars([])));
     f.leaderData({ name: "Uta" });
@@ -826,17 +880,18 @@ describe("OPT-894 — compound [Main]/[Counter] triggers (known gap, follow-up)"
   });
 });
 
-// ─── The 40 re-authored cards: block inventory ───────────────────────────────
+// ─── The 39 re-authored cards: block inventory (P-059 deferred, OPT-912) ───────────────────────────────
 
+// 39 cards; P-059 is deferred (OPT-912) and ratcheted in opt-894-counter-event-lint.test.ts.
 const REAUTHORED = [
   "OP16-020", "OP16-038", "OP16-040", "OP16-057", "OP16-059", "OP16-076", "OP16-099", "OP16-100",
   "OP17-017", "OP17-018", "OP17-036", "OP17-037", "OP17-038", "OP17-055", "OP17-056", "OP17-076",
   "OP17-077", "OP17-078", "OP17-096", "OP17-097", "OP17-098", "OP17-115", "OP17-116", "OP17-117",
-  "P-059", "ST01-014", "ST02-015", "ST02-016", "ST03-016", "ST03-017", "ST04-016", "ST06-014",
+  "ST01-014", "ST02-015", "ST02-016", "ST03-016", "ST03-017", "ST04-016", "ST06-014",
   "ST06-016", "ST07-016", "ST09-014", "ST10-015", "ST12-017", "ST13-017", "ST13-018", "ST14-014",
 ];
 
-describe("OPT-894 — the 40 re-authored Counter Events", () => {
+describe("OPT-894 — the 39 re-authored Counter Events", () => {
   it.each(REAUTHORED)("%s: exactly one auto COUNTER_EVENT block; [Main]/[Trigger] blocks untouched", (id) => {
     const schema = getAllAuthoredSchemas()[id];
     const text = canonicalText(id);

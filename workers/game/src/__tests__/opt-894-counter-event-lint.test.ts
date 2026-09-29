@@ -2,6 +2,8 @@
  * OPT-894 — schema lint: a COUNTER_EVENT trigger must sit on a block category
  * that `executeUseCounterEvent` (battle.ts) executes (`auto`). 40 Counter
  * Events shipped as `activate`: cost paid, card trashed, [Counter] never ran.
+ * 39 are now `auto`; P-059 is deliberately kept `activate` until OPT-912
+ * (KNOWN_DEFERRED_COUNTER_EVENT, two-way ratcheted below).
  */
 
 import {
@@ -17,6 +19,7 @@ import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 import {
   COUNTER_EVENT_EXECUTED_CATEGORIES,
   KNOWN_COMPOUND_COUNTER_EVENT_GAP,
+  KNOWN_DEFERRED_COUNTER_EVENT,
   findCounterEventCategoryIntentViolations,
   findCounterEventCategoryViolations,
 } from "../engine/schema-counter-event-lint.js";
@@ -79,6 +82,31 @@ describe("OPT-894 — COUNTER_EVENT blocks must use an executed category", () =>
     expect(compound).toEqual([...KNOWN_COMPOUND_COUNTER_EVENT_GAP].sort());
   });
 
+  it("deferred list (OPT-912): tolerates activate, rejects auto (forces removal from the list)", () => {
+    const deferred = (category: string) =>
+      findCounterEventCategoryViolations({
+        ...schemaWith([{ id: "c", category, trigger: { keyword: "COUNTER_EVENT" }, actions: draw }]),
+        card_id: "P-059",
+      });
+    expect(deferred("activate")).toEqual([]);
+    expect(deferred("auto")).toEqual([
+      'P-059 effects[0] category "auto": card is listed in KNOWN_DEFERRED_COUNTER_EVENT (OPT-912) but its COUNTER_EVENT block now executes; remove it from the list',
+    ]);
+  });
+
+  it("the deferred list is exactly the registry's non-auto direct COUNTER_EVENT cards (two-way ratchet)", () => {
+    expect([...KNOWN_DEFERRED_COUNTER_EVENT]).toEqual(["P-059"]);
+    const nonAuto = Object.entries(getAllAuthoredSchemas())
+      .filter(([, schema]) =>
+        schema.effects.some(
+          (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "COUNTER_EVENT" && b.category !== "auto",
+        ),
+      )
+      .map(([id]) => id)
+      .sort();
+    expect(nonAuto).toEqual([...KNOWN_DEFERRED_COUNTER_EVENT].sort());
+  });
+
   it("accepts auto COUNTER_EVENT, and activate blocks on other keywords", () => {
     expect(
       findCounterEventCategoryViolations(
@@ -99,6 +127,7 @@ describe("OPT-894 — COUNTER_EVENT blocks must use an executed category", () =>
     let counterEvents = 0;
     for (const [id, schema] of Object.entries(schemas)) {
       if (KNOWN_COMPOUND_COUNTER_EVENT_GAP.includes(id)) continue; // compound trigger; see the gap ratchet
+      if (KNOWN_DEFERRED_COUNTER_EVENT.includes(id)) continue; // OPT-912; see the deferred ratchet
       const blocks = schema.effects.filter(
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "COUNTER_EVENT",
       );
@@ -108,7 +137,6 @@ describe("OPT-894 — COUNTER_EVENT blocks must use an executed category", () =>
         (b) =>
           b.category === "auto" && b.trigger && "keyword" in b.trigger && b.trigger.keyword === "COUNTER_EVENT",
       );
-      if (KNOWN_COMPOUND_COUNTER_EVENT_GAP.includes(id)) continue; // any_of; see the gap ratchet
       expect(consumed, `${id} has a COUNTER_EVENT block the consumer would not select`).toBeDefined();
       expect(blocks.map((b) => b.category), id).toEqual(
         blocks.map(() => COUNTER_EVENT_EXECUTED_CATEGORIES[0]),
