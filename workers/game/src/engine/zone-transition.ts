@@ -114,6 +114,25 @@ function locateCard(state: GameState, instanceId: string): LocatedCard | null {
   return null;
 }
 
+/**
+ * Removes exactly the located card. A zone holding two cards with the same
+ * instance id would otherwise lose both to an id filter while only one moves
+ * (OPT-891), so a duplicate throws instead of dropping a card silently.
+ */
+function withoutExactlyOne<T extends { instanceId: string }>(
+  cards: readonly T[],
+  oldId: string,
+  source: CardZone,
+): T[] {
+  const remaining = cards.filter((card) => card.instanceId !== oldId);
+  if (cards.length - remaining.length > 1) {
+    throw new Error(
+      `[zone-transition] instance id collision: ${cards.length - remaining.length} cards in ${source} share instance id '${oldId}'`,
+    );
+  }
+  return remaining;
+}
+
 function removeFromSource(player: PlayerState, located: LocatedCard): PlayerState {
   const oldId = located.card.instanceId;
   switch (located.source) {
@@ -124,15 +143,51 @@ function removeFromSource(player: PlayerState, located: LocatedCard): PlayerStat
       return { ...player, characters };
     }
     case "STAGE": return { ...player, stage: null };
-    case "HAND": return { ...player, hand: player.hand.filter((card) => card.instanceId !== oldId) };
-    case "DECK": return { ...player, deck: player.deck.filter((card) => card.instanceId !== oldId) };
-    case "TRASH": return { ...player, trash: player.trash.filter((card) => card.instanceId !== oldId) };
-    case "LIFE": return { ...player, life: player.life.filter((card) => card.instanceId !== oldId) };
+    case "HAND": return { ...player, hand: withoutExactlyOne(player.hand, oldId, "HAND") };
+    case "DECK": return { ...player, deck: withoutExactlyOne(player.deck, oldId, "DECK") };
+    case "TRASH": return { ...player, trash: withoutExactlyOne(player.trash, oldId, "TRASH") };
+    case "LIFE": return { ...player, life: withoutExactlyOne(player.life, oldId, "LIFE") };
     case "REMOVED_FROM_GAME": return {
       ...player,
-      removedFromGame: player.removedFromGame.filter((card) => card.instanceId !== oldId),
+      removedFromGame: withoutExactlyOne(player.removedFromGame, oldId, "REMOVED_FROM_GAME"),
     };
     case "LEADER": return player;
+  }
+}
+
+/** Card zones of either player that already hold `instanceId`. */
+function zonesHoldingInstanceId(state: GameState, instanceId: string): string[] {
+  const hits: string[] = [];
+  for (const playerIndex of [0, 1] as const) {
+    const player = state.players[playerIndex];
+    const has = (cards: readonly ({ instanceId: string } | null)[]) =>
+      cards.some((card) => card?.instanceId === instanceId);
+    if (player.leader.instanceId === instanceId) hits.push(`p${playerIndex}.LEADER`);
+    if (player.stage?.instanceId === instanceId) hits.push(`p${playerIndex}.STAGE`);
+    if (has(player.characters)) hits.push(`p${playerIndex}.CHARACTER`);
+    if (has(player.hand)) hits.push(`p${playerIndex}.HAND`);
+    if (has(player.deck)) hits.push(`p${playerIndex}.DECK`);
+    if (has(player.trash)) hits.push(`p${playerIndex}.TRASH`);
+    if (has(player.life)) hits.push(`p${playerIndex}.LIFE`);
+    if (has(player.removedFromGame)) hits.push(`p${playerIndex}.REMOVED_FROM_GAME`);
+  }
+  return hits;
+}
+
+/**
+ * OPT-891: a transition's new identity must be unused in every card zone of
+ * both players. A reused id makes two cards indistinguishable, and the next
+ * id-keyed removal drops one of them. Throwing aborts the whole action before
+ * the corrupt state can be persisted; see ZONE-TRANSITION-CONTRACT.md.
+ */
+function assertFreshInstanceId(state: GameState, newInstanceId: string, oldInstanceId: string): void {
+  const holders = zonesHoldingInstanceId(state, newInstanceId);
+  if (newInstanceId === oldInstanceId || holders.length > 0) {
+    throw new Error(
+      `[zone-transition] instance id collision: allocated '${newInstanceId}' for '${oldInstanceId}' ` +
+        `but it is already in use (${holders.join(", ") || "moving card"}); ` +
+        `executionContext.idCounter (${state.executionContext.idCounter}) is behind ids in state`,
+    );
   }
 }
 
@@ -248,6 +303,7 @@ function commitTransition(
   const allocated = allocateEngineId(state, "card");
   state = allocated.state;
   const newInstanceId = allocated.id;
+  assertFreshInstanceId(state, newInstanceId, located.card.instanceId);
   const movedCard: CardInstance = {
     ...located.card,
     instanceId: newInstanceId,
