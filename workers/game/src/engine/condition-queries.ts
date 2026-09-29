@@ -477,13 +477,15 @@ function evaluateSimple(
           );
         }
         if (_actionType === "USED_BLOCKER") {
+          // Rules 10-1-4-1 / 7-1-2-1: [Blocker] is a keyword of any "card"; a
+          // Leader with an effective [Blocker] (OPT-834) blocks too (OPT-895).
           if (a.actionType !== "DECLARE_BLOCKER") return false;
           return matchesPerformedCard(
             state,
             a,
             cond.controller,
             cond.filter,
-            "CHARACTER",
+            ["CHARACTER", "LEADER"],
             ctx
           );
         }
@@ -816,6 +818,8 @@ function resolveConditionNumericValue(
   return null;
 }
 
+type PerformedCardType = "CHARACTER" | "EVENT" | "LEADER";
+
 /**
  * Match a card-backed performed action against its player scope, semantic card
  * category, and optional TargetFilter (OPT-443).
@@ -831,7 +835,7 @@ function matchesPerformedCard(
   action: GameState["turn"]["actionsPerformedThisTurn"][number],
   controller: Controller | undefined,
   filter: TargetFilter | undefined,
-  requiredCardType: "CHARACTER" | "EVENT",
+  requiredCardType: PerformedCardType | readonly PerformedCardType[],
   ctx: ConditionContext
 ): boolean {
   if (action.controller === undefined || !action.cardId || !action.cardType)
@@ -843,7 +847,10 @@ function matchesPerformedCard(
     if (action.controller !== expectedController) return false;
   }
 
-  if (action.cardType.toUpperCase() !== requiredCardType) return false;
+  const allowedTypes: readonly PerformedCardType[] = Array.isArray(requiredCardType)
+    ? requiredCardType
+    : [requiredCardType as PerformedCardType];
+  if (!allowedTypes.includes(action.cardType.toUpperCase() as PerformedCardType)) return false;
   if (!filter) return true;
 
   const cardData = ctx.cardDb.get(action.cardId);
