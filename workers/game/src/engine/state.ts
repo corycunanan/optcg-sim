@@ -471,13 +471,36 @@ export function obfuscateCards(
 }
 
 /**
+ * Replace every face-down Life card's identity with a zone-local placeholder
+ * (`hidden-<player>-life-<stack index>`), keeping stack size and face state.
+ *
+ * Rules §3-10-2: neither player — the owner included — can check face-down
+ * Life, so this applies to every viewer. Face-up Life (§3-10-2-1) is an open
+ * card and passes through. Look-at-Life effects (§3-10-3, §11-3) disclose
+ * cards to their player through prompt payloads and owner-only events, never
+ * through this zone.
+ */
+export function obfuscateFaceDownLife(
+  life: readonly LifeCard[],
+  playerIndex: 0 | 1,
+): LifeCard[] {
+  return life.map((lc, index) =>
+    lc.face === "DOWN"
+      ? { ...lc, instanceId: `hidden-${playerIndex}-life-${index}`, cardId: "hidden" }
+      : lc,
+  );
+}
+
+/**
  * Obfuscate one player's deck order and face-down Life identities.
  *
- * The player-specific path applies this only to the opponent: each receiving
- * player legitimately receives their own deck and face-down Life identities
- * in full. Callers of this lower-level helper own matching `playerIndex` to
- * the supplied player. Use obfuscatePlayersDecksAndFaceDownLife when applying
- * the policy to both players so their indices are derived positionally.
+ * The player-specific path applies the full helper only to the opponent.
+ * Face-down Life is redacted for its owner too (OPT-901, §3-10-2) through
+ * obfuscateFaceDownLife. The receiving player still receives their own deck in
+ * full; own-deck visibility (§3-2-2) is tracked separately in OPT-908.
+ * Callers of this lower-level helper own matching `playerIndex` to the
+ * supplied player. Use obfuscatePlayersDecksAndFaceDownLife when applying the
+ * policy to both players so their indices are derived positionally.
  */
 export function obfuscatePlayerDeckAndFaceDownLife(
   player: PlayerState,
@@ -486,11 +509,7 @@ export function obfuscatePlayerDeckAndFaceDownLife(
   return {
     ...player,
     deck: obfuscateCards(player.deck, playerIndex, "deck"),
-    life: player.life.map((lc, index) =>
-      lc.face === "DOWN"
-        ? { ...lc, instanceId: `hidden-${playerIndex}-life-${index}`, cardId: "hidden" }
-        : lc,
-    ),
+    life: obfuscateFaceDownLife(player.life, playerIndex),
   };
 }
 
@@ -536,9 +555,10 @@ type PlayerViewRewrittenField =
   (typeof PLAYER_VIEW_REWRITTEN_FIELDS)[number];
 
 /**
- * Create a player-specific view of the game state that hides secret zone data
- * from the opponent. The receiving player sees their own zones in full; the
- * opponent's hand, deck, and face-down life cards are obfuscated.
+ * Create a player-specific view of the game state that hides secret zone data.
+ * The opponent's hand, deck, and face-down Life cards are obfuscated. The
+ * receiving player sees their own hand and deck, but not their own face-down
+ * Life identities (§3-10-2: neither player can check them; OPT-901).
  *
  * Also filters the event log and pending prompt through exhaustive visibility
  * policies. Engine-only continuation frames are never sent to either client.
@@ -562,8 +582,15 @@ export function filterStateForPlayer(
     opponentIndex,
   );
 
+  const receiver = state.players[receivingPlayer];
   const newPlayers: [PlayerState, PlayerState] = [...state.players] as [PlayerState, PlayerState];
   newPlayers[opponentIndex] = filteredOpponent;
+  // Own hand and deck keep their authoritative references (own-deck policy is
+  // OPT-908); only own face-down Life identities are replaced.
+  newPlayers[receivingPlayer] = {
+    ...receiver,
+    life: obfuscateFaceDownLife(receiver.life, receivingPlayer),
+  };
 
   const filteredEventLog = state.eventLog.map((event) =>
     filterEventForPlayer(event, receivingPlayer));
