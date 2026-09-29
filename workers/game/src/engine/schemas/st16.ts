@@ -63,8 +63,18 @@ export const ST16_002_GORDON: EffectSchema = {
       id: "opponent_attack_power_boost",
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
-      costs: [{ type: "TRASH_FROM_HAND", amount: "ANY_NUMBER", filter: { traits: ["Music"] } }],
+      // OPT-885: no colon in the card text — the trash is an action.
       actions: [
+        {
+          type: "TRASH_FROM_HAND",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { any_number: true },
+            filter: { traits: ["Music"] },
+          },
+          result_ref: "cards_trashed",
+        },
         {
           type: "MODIFY_POWER",
           target: {
@@ -76,10 +86,12 @@ export const ST16_002_GORDON: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CARDS_TRASHED_THIS_WAY",
+              ref: "cards_trashed",
               multiplier: 1000,
             },
           },
           duration: { type: "THIS_BATTLE" },
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
