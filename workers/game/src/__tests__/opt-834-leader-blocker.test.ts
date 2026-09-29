@@ -30,7 +30,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
+import type { CardInstance, GameAction, GameState } from "../types.js";
 import type { EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
