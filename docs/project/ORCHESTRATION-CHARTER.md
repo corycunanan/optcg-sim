@@ -66,14 +66,15 @@ Default dependency mode is **merged**: successors start after verified prerequis
 
 Dispatch full ticket content, source references, acceptance criteria, dependency/base SHAs, ownership fences, validation expectations and deliverables using the run-record reference. Give the implementer a concrete failure-class brief, not merely “be careful.” The brief is the implementer's complete policy: do not send this charter, the records document, or the coordinator's conversation.
 
-**Model roles (defaults as of 2026-09-27; override per run when a provider's budget is exhausted, and verify the configured model before dispatch):**
+**Model roles (defaults as of 2026-09-28; override per run when a provider's budget is exhausted, and verify the configured model before dispatch):**
 
 | Role | Default | Notes |
 | --- | --- | --- |
 | Coordinator | The Claude session running `/orchestrate`. Codex `$orchestrate` is the fallback coordinator | Session default |
-| Implementer | Fresh Claude Opus subagent (Agent tool) working in a coordinator-created worktree; fix rounds continue the same agent | Codex CLI `gpt-6-astra` (`low` Small, `medium` otherwise) is the quota fallback and suits wide Small encoding batches |
-| Claude reviewer | Fresh Claude subagent, on a different model from the implementer when one is available; delta rounds continue the same reviewer | At most two reviewers run concurrently |
-| Codex review lens | `codex exec -m gpt-6-astra`, effort `medium`, `--sandbox workspace-write`, in its own detached worktree | Required for Large; recommended for Medium engine or protocol work |
+| Implementer | Fresh Claude Opus subagent (Agent tool) working in a coordinator-created worktree; fix rounds continue the same agent | Codex CLI `gpt-6-astra` (`low` Small, `medium` otherwise) is the quota fallback and suits wide Small encoding batches. Sonnet for Small/Medium is an open experiment (below), not a default |
+| Claude reviewer | Fresh Claude subagent on the other Claude model from the implementer: Sonnet reviews an Opus implementation, Opus reviews a Sonnet implementation. Delta rounds continue the same reviewer | At most two reviewers run concurrently. Record both models in the ledger |
+| Codex review lens | `codex exec -m gpt-6-astra`, effort `medium`, `--sandbox workspace-write`, in its own detached worktree | Required for Large; recommended for Medium engine or protocol work. A Claude reviewer on another Claude model does not replace it: that is same-family diversity, not cross-family |
+| Coordinator chores | Fresh Claude Sonnet subagent, one bounded chore per dispatch, returning a structured result | See "Delegated coordinator chores" below. The coordinator keeps every decision |
 
 Evidence for the split (run ledger `docs/project/handoffs/runs/2026-09-26-opt798-827-824-828-857.md`, five Large cost tickets, PRs #681–#685):
 - Opus implementers reached a verified PR in 10–24 minutes, with no sandbox or `.git` friction, and needed at most one full review plus one delta.
@@ -83,6 +84,18 @@ Evidence for the split (run ledger `docs/project/handoffs/runs/2026-09-26-opt798
 Cross-family review is therefore the correctness backstop, not a budget convenience. When one provider is unavailable, record the lost diversity in the ledger, raise the coordinator's mutation-check expectation, and continue.
 
 An implementer claim that a scenario is "unreachable" or "cannot happen" is a finding for the reviewers to disprove, not evidence. Two such claims were false in that run.
+
+**Sonnet implementer experiment (open).** Sonnet may implement Small and Medium tickets only in a run the user has designated as this experiment; Large stays on Opus. In that run, Opus is the Claude reviewer. A Medium ticket moves to a fresh Opus implementer when its first full review returns a material finding. For each ticket, record in the ledger: implementer model, minutes to a verified PR, review rounds, and each material finding with the reviewer that caught it. Compare against the Opus baseline above. The results decide whether this table changes; until then Opus remains the default for every tier.
+
+**Delegated coordinator chores.** The coordinator may hand these to a Sonnet subagent to keep its own context for adjudication:
+
+- Integration overlap check (§6): the changed-file intersection, the command, and its output.
+- Generated-registry conflict repair: merge main, regenerate, and return a per-card token diff against the reviewed delta.
+- Required-check polling for a named head SHA, returning the check inventory and conclusions.
+- Consumer inventory for a changed shared mechanism ([OPTCG verification](./ORCHESTRATION-OPTCG.md)), returning the command and result.
+- Close-out read-back of Linear audit comments, returning any missing comment.
+
+A chore agent reports observations only. It does not dispatch, adjudicate findings, write Linear, or merge. Registry repair is the only chore that pushes, and only to the ticket branch it was given; the coordinator then treats it as a head change under §6. The coordinator verifies one decisive line of each result before relying on it. Chore agents that run tests count toward the machine's concurrency: host load from concurrent sessions already causes unrelated timeouts, so a cheaper model is not a reason to run more test-heavy agents at once.
 
 Measure relevant validation baselines before edits. For bug fixes, reproduce the defect with a failing regression through a meaningful public boundary, then fix it. If no practical automated reproduction exists, record the live reproduction and limitation; do not claim a red test. Work one behavioral slice at a time. Expected values come from the specification or independent worked examples, not recomputation of the implementation.
 

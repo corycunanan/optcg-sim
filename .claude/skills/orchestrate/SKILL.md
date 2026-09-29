@@ -14,6 +14,8 @@ The coordinator declares a risk tier per issue (charter §3), delegates isolated
 
 Model roles follow charter §4. The implementer is a fresh Claude Opus subagent, launched with the Agent tool as a background agent, and it works in a worktree you create from `origin/main` with dependencies installed. Save the brief as a packet file under the ledger's `packets/` directory. The dispatch prompt names the worktree, the packet path and the reply contents, and nothing else. Send review findings back to the same agent with SendMessage, and send deltas to the same reviewer.
 
+Launch the Claude reviewer with the Agent tool's `model` set to the other Claude model from the implementer (`sonnet` for an Opus implementation, `opus` for a Sonnet one). Use a Sonnet implementer only in a run the user designated as the §4 Sonnet experiment. Delegate the §4 coordinator chores (overlap check, registry regeneration, check polling, consumer inventory, audit read-back) to a background `sonnet` subagent with a brief that names the one chore, its inputs and the structured result to return.
+
 For Large tickets, run both §4 reviewers in parallel. Each works in its own detached worktree at the PR head and gets the same brief. The Codex lens runs as follows; its brief also gets the Codex environment entries from `GOTCHAS.md`:
 
 ```sh
