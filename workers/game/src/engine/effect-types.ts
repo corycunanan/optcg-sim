@@ -1597,8 +1597,10 @@ export interface ProhibitionScope {
    * CANNOT_ATTACK: the attack target the prohibition applies to.
    * CANNOT_ACTIVATE_BLOCKER (OPT-826): `{ type: "SELECTED_CARDS", ref? }`
    * binds the prohibition to the exact attacker(s) — the cards in result ref
-   * `ref`, or, without `ref`, this action's own `target` selection. Any other
-   * Target shape on a Blocker prohibition is not enforced by the engine.
+   * `ref`, or, without `ref`, this action's own `target` selection.
+   * OPT-899: `{ type: "YOUR_LEADER" }` binds it to the applying player's
+   * Leader, resolved at apply time. Any other Target shape on a Blocker
+   * prohibition is not enforced by the engine.
    */
   when_attacking?: Target;
   // OPT-260: keyword trigger type negated by NEGATE_TRIGGER_TYPE (OP09-081).
@@ -1799,7 +1801,9 @@ export interface RuntimeProhibition {
    * action's own selection), so it survives serialization and expires with
    * the prohibition. The Blocker check compares the current battle's attacker
    * against it — a card that leaves and returns is a new instance (§3-1-6)
-   * and is not covered. Absent on every other prohibition.
+   * and is not covered. OPT-899: also set by `when_attacking: { type:
+   * "YOUR_LEADER" }` (OP13-057), which freezes the applying player's Leader
+   * instance id. Absent on every other prohibition.
    */
   attackerInstanceIds?: string[];
   /**
