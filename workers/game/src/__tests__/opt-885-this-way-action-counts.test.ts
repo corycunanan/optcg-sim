@@ -311,6 +311,66 @@ describe("OPT-885 other action-sourced *_THIS_WAY consumers", () => {
     playOp06095(fixture(), 1, false);
   });
 
+  /**
+   * Rule 6-2 batch pause: when a K.O.'d Character has an [On K.O.] (OP15-079
+   * Absalom — docs/cards/OP-15.md:580, "[On K.O.] Add up to 1 {Thriller Bark
+   * Pirates} type card from your trash to your hand."), the KO handler pauses
+   * for that trigger before OP06-095's PER_COUNT runs. The bonus must still be
+   * +1000 per Character actually K.O.'d, across a persistence round-trip at the
+   * trigger's prompt.
+   */
+  it.each([
+    ["accept", 2],
+    ["accept", 3],
+    ["skip", 2],
+  ] as const)("OP06-095 K.O. batch paused by an [On K.O.] (%s the trigger, K.O. %i) keeps the count", (answer, n) => {
+    const f = fixture();
+    const absalom = f.put("OP15-079", 0, "CHARACTER", {
+      cost: 2,
+      color: ["Black"],
+      types: ["Thriller Bark Pirates"],
+    });
+    const others = [0, 1].map(() =>
+      f.put("tb", 0, "CHARACTER", { cost: 2, types: ["Thriller Bark Pirates"] }),
+    );
+    const bystander = f.put("tb", 0, "CHARACTER", { cost: 2, types: ["Thriller Bark Pirates"] });
+    const inTrash = f.put("tb", 0, "TRASH", { cost: 2, types: ["Thriller Bark Pirates"] });
+    const authored = getEffectSchema("OP06-095")!;
+    const id = "OP06-095-main-only";
+    const event = f.put(id, 0, "HAND", {
+      type: "Event",
+      cost: 1,
+      effectText: OP06_095_TEXT,
+      effectSchema: {
+        ...authored,
+        card_id: id,
+        effects: [{ ...authored.effects[0], trigger: { keyword: "MAIN_EVENT" } }],
+      },
+    });
+    const leader = f.state.players[0].leader;
+    f.act({ type: "PLAY_CARD", cardInstanceId: event.instanceId });
+    f.select([absalom, ...others].slice(0, n).map((c) => c.instanceId));
+    // Absalom's [On K.O.] is pending before the PER_COUNT action resolves.
+    expect(f.state.pendingPrompt).not.toBeNull();
+    f.roundTrip();
+    for (let guard = 0; f.state.pendingPrompt && guard < 5; guard++) {
+      const options = f.state.pendingPrompt.options;
+      if (options.promptType === "OPTIONAL_EFFECT") f.choose(answer);
+      else if (options.promptType === "SELECT_TARGET") {
+        f.roundTrip();
+        f.select(answer === "accept" ? [inTrash.instanceId] : []);
+      } else throw new Error(`unexpected prompt ${options.promptType}`);
+    }
+    expect(f.state.pendingPrompt).toBeNull();
+    const field = f.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
+    expect(field).toEqual([...others.slice(n - 1).map((c) => c.instanceId), bystander.instanceId]);
+    // Absalom returned the pre-placed trash card (a zone move mints a new id).
+    expect(f.state.players[0].hand.map((c) => c.cardId)).toEqual(answer === "accept" ? ["tb"] : []);
+    expect(f.state.players[0].trash.some((c) => c.instanceId === inTrash.instanceId)).toBe(answer !== "accept");
+    // "+1000 ... Then ... an additional +1000 for every Character K.O.'d."
+    expect(f.power(leader)).toBe(5000 + 1000 + 1000 * n);
+  });
+
   it.each([0, 1, 2])("OP09-059 trashes %i from hand → mills the same number", (n) => {
     const f = fixture();
     const handCards = [0, 1, 2].map(() => f.put("fodder", 1, "HAND"));
