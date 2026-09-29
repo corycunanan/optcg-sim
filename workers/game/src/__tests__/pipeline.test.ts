@@ -666,7 +666,7 @@ describe("defeat conditions", () => {
     expect(result.gameOver).toBeFalsy();
   });
 
-  it("Double Attack with 1 life: first damage reduces to 0, second triggers defeat", () => {
+  it("Double Attack with 1 life: both damages resolve and the defender does not lose (qa_rules.md:156-158, OPT-886)", () => {
     const cardDb = createTestCardDb();
     let state = createBattleReadyState(cardDb);
 
@@ -698,10 +698,12 @@ describe("defeat conditions", () => {
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
 
-    // First damage removed the life card; second damage hit 0 life → defeat
-    expect(result.state.status).toBe("FINISHED");
-    expect(result.state.winner).toBe(0);
-    expect(result.gameOver).toBeTruthy();
+    // First damage removed the life card; the second damage finds 0 Life,
+    // which repeats only the Life-to-hand step (7-1-4-1-1-3) — no defeat.
+    expect(result.state.players[1].life.length).toBe(0);
+    expect(result.state.status).toBe("IN_PROGRESS");
+    expect(result.state.winner).toBeNull();
+    expect(result.gameOver).toBeFalsy();
   });
 });
 

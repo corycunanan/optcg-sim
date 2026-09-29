@@ -3645,7 +3645,7 @@ export const OP09_107_NICO_ROBIN: EffectSchema = {
       actions: [
         {
           type: "TRASH_FROM_LIFE",
-          params: { amount: 1, position: "TOP", controller: "OPPONENT" },
+          params: { amount: 1, position: "TOP", controller: "OPPONENT", up_to: true },
         },
       ],
     },

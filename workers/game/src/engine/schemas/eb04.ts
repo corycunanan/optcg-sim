@@ -1984,7 +1984,7 @@ export const EB04_043_KAKU: EffectSchema = {
       },
       replacement_actions: [
         {
-          type: "PLACE_HAND_TO_DECK",
+          type: "RETURN_TO_DECK",
           target: {
             type: "CARD_IN_TRASH",
             controller: "SELF",

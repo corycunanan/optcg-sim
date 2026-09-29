@@ -3816,7 +3816,7 @@ export const OP10_109_BASIL_HAWKINS: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           target: { type: "OPPONENT_LIFE" },
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
@@ -3928,7 +3928,7 @@ export const OP10_112_EUSTASS_CAPTAIN_KID: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           target: { type: "OPPONENT_LIFE" },
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },

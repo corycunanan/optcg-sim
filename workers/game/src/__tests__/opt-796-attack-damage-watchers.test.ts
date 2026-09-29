@@ -447,10 +447,9 @@ describe("OPT-796 [Double Attack] against 1 Life (qa_rules.md:156-158)", () => {
     expect(state.status).toBe("IN_PROGRESS");
   });
 
-  // OPT-886: with no watcher prompting, the engine currently ends the game on
-  // the second damage. The official FAQ says [Double Attack] against 1 Life
-  // cannot win. Flip to `it` when OPT-886 lands.
-  it.fails("no-watcher control: the game continues (fails today — OPT-886)", () => {
+  // OPT-886: without a watcher prompting, the second damage finds 0 Life and
+  // must not end the game either (full coverage in opt-886-double-attack-one-life).
+  it("no-watcher control: the game continues (OPT-886)", () => {
     const f = fixture({ lifeTop: [CARDS.VANILLA.id] });
     const da = f.put(CARDS.DOUBLE_ATK.id, 0);
     const { state, steps } = attack(f, da.instanceId);
