@@ -696,7 +696,7 @@ Used in `permanent` effect blocks via the `prohibitions` array:
 | `CANNOT_BE_PLAYED_BY_EFFECTS` | "Cannot be played by effects" | |
 | `CANNOT_LEAVE_FIELD` | "Cannot leave field" | |
 | `CANNOT_REFRESH` | "Cannot refresh (stays rested)" | |
-| `CANNOT_ATTACH_DON` | "Cannot receive DON!!" | |
+| `CANNOT_ATTACH_DON` | "Cannot receive DON!!" | Optional `controller` (read relative to the prohibition's owner vs the player giving). Vetoes manual attach (rule 6-5-5), the `GIVE_DON` action and the `GIVE_DON` cost through the shared `isDonAttachProhibited` predicate (OPT-869); `DISTRIBUTE_DON`, `REDISTRIBUTE_DON`, `GIVE_OPPONENT_DON_TO_OPPONENT` and the DON!! Phase `GIVEN_TO_LEADER` rule modification are not yet gated |
 | `CANNOT_BE_RETURNED_TO_HAND` | "Cannot be returned to hand" | |
 | `CANNOT_BE_RETURNED_TO_DECK` | "Cannot be returned to deck" | |
 
