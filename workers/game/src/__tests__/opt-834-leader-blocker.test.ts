@@ -307,6 +307,26 @@ describe("OPT-834 Leader [Blocker] legality and candidates", () => {
     expect(validate(f.state, declareBlocker(f.leader.instanceId), f.db, 1)).toBeNull();
   });
 
+  it("a CANNOT_ACTIVATE_BLOCKER prohibition on the Leader removes it from the candidates and the pipeline", () => {
+    const f = fixture();
+    f.attack(f.plainChar.instanceId);
+    f.grantBlocker([f.leader.instanceId]);
+    const prohibition = {
+      id: "opt834-no-leader-block",
+      sourceCardInstanceId: "char-0-v1",
+      sourceEffectBlockId: "",
+      prohibitionType: "CANNOT_ACTIVATE_BLOCKER",
+      controller: 0,
+      appliesTo: [f.leader.instanceId],
+      scope: {},
+      duration: { type: "THIS_TURN" },
+      usesRemaining: null,
+    } as unknown as GameState["prohibitions"][number];
+    f.state = { ...f.state, prohibitions: [...f.state.prohibitions, prohibition] };
+    expect(getBlockerCandidateIds(f.state, f.db)).toEqual([f.charBlocker.instanceId]);
+    expect(runPipeline(f.state, declareBlocker(f.leader.instanceId), f.db, 1).valid).toBe(false);
+  });
+
   it("[Unblockable] attacker rejects the Leader Blocker", () => {
     const f = fixture();
     const unblk: CardInstance = {
