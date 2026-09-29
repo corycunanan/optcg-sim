@@ -890,4 +890,10 @@ describe("schema lint — context-seeded targets only where they are seeded", ()
     expect(violations).toHaveLength(2);
     expect(violations[1]).toContain("params.effect.actions[0].target: REPLACED_CARD");
   });
+
+  it("rejects REPLACED_CARD in replacement_actions of a non-replacement block", () => {
+    expect(findContextTargetViolations(schemaWith([
+      { id: "a", category: "auto", trigger: { keyword: "ON_PLAY" }, actions: ko("SELF"), replacement_actions: ko("REPLACED_CARD") },
+    ]))).toHaveLength(1);
+  });
 });
