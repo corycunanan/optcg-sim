@@ -98,6 +98,7 @@ import { transitionCards } from "../../zone-transition.js";
 import {
   applyCostTransactionState,
   captureCostTransactionState,
+  stagedProhibitionView,
   type CostTransactionState,
 } from "../cost/transaction.js";
 
@@ -1205,6 +1206,15 @@ export function handleAwaitingCostSelection(
     // the staged payment state — mirroring the named-play branch above — so
     // a stale, replayed or diverged response can never resurrect a departed
     // recipient, spend unavailable DON!!, or pay partially or twice.
+    //
+    // OPT-869: the one recipient predicate runs twice with an explicit split.
+    // The LIVE check guards identity, presence, target match and DON!!
+    // availability only, so it reads the live board with prohibitions
+    // cleared: the live state is pre-cost, and a prohibition that an earlier
+    // staged cost ended (e.g. trashing an aura's source) must not veto a
+    // legal payment (rule 8-3-1-1). Prohibition coverage is read once, in
+    // the staged payment state, where `stagedProhibitionView` also carries
+    // in any prohibition that appeared only in the live state after the offer.
     const selected = [...new Set(action.selectedInstanceIds ?? [])];
     const recipient = selected.length === 1 ? selected[0] : undefined;
     const eligibleIn = (candidateState: GameState): boolean =>
@@ -1212,8 +1222,8 @@ export function handleAwaitingCostSelection(
     if (
       !recipient ||
       !topFrame.validTargets.includes(recipient) ||
-      !eligibleIn(baselineState) ||
-      !eligibleIn(nextState)
+      !eligibleIn({ ...baselineState, prohibitions: [] }) ||
+      !eligibleIn(stagedProhibitionView(baselineState, nextState))
     ) {
       return { state, events: [], resolved: false };
     }

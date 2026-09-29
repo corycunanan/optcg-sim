@@ -26,6 +26,7 @@ import {
 } from "../target-resolver.js";
 import { promptEffectDescription, resolveAmount, tryResolveAmount } from "../action-utils.js";
 import { donIdentityChoiceMatters } from "../cost/targets.js";
+import { isDonAttachProhibited } from "../../prohibitions.js";
 
 export function executeGiveDon(
   state: GameState,
@@ -40,7 +41,10 @@ export function executeGiveDon(
   const params = action.params ?? {};
   const amount = params.amount ?? 1;
   const donState = params.don_state ?? "ACTIVE";
-  const allValidIds =
+  // OPT-869: a card covered by an active CANNOT_ATTACH_DON prohibition is
+  // never a recipient — neither offered nor accepted from a resumed
+  // (preselected) reply, which is re-checked against the current state.
+  const allValidIds = (
     preselectedTargets ??
     computeAllValidTargets(
       state,
@@ -49,7 +53,8 @@ export function executeGiveDon(
       cardDb,
       sourceCardInstanceId,
       resultRefs
-    );
+    )
+  ).filter((id) => !isDonAttachProhibited(state, id, cardDb, controller));
   if (
     !preselectedTargets &&
     needsPlayerTargetSelection(action.target, allValidIds)

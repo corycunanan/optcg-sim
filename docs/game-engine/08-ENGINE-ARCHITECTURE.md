@@ -887,6 +887,8 @@ Per rules 7-1-4-1-1-1 and 9-2-1:
 - Triggered when: a player has 0 Life cards AND their Leader has damage determined against it in the current action.
 - The check happens at the point damage is determined, before Life cards are actually moved.
 - If 0 Life at damage determination: the player whose Leader was attacked loses.
+- The check belongs to the attack's first damage only. Rule 7-1-4-1-1-3 repeats just the Life-to-hand step for a [Double Attack], so a second damage that finds 0 Life does not defeat the Leader (qa_rules.md:156-158, OPT-886).
+- The defeat is checked immediately (9-1-2): if an auto effect from the same action suspends for input, the game still ends and that prompt is discarded.
 
 ### Deck-Out (Loss by Empty Deck)
 
