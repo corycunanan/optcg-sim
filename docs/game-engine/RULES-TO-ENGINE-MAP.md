@@ -388,7 +388,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **8-1-3-1-1.** Auto effect keywords: [On Play], [When Attacking], etc. | **IMPL** | `triggers.ts` | Matches ON_PLAY, WHEN_ATTACKING, ON_KO, ON_BLOCK, END_OF_TURN, etc. |
 | **8-1-3-1-3.** Auto effect doesn't activate if card moved zones before activation | **IMPL** | `triggers.ts` | Zone-presence check at trigger resolution time |
 | **8-1-3-2.** Activate effects ([Activate: Main], [Main]) | **IMPL** | `execute.ts → executeActivateEffect()` | Full activation with cost payment and resolution |
-| **8-1-3-3.** Permanent effects | **IMPL** | `triggers.ts → registerPermanentEffectsForCard()` via `registerCardEnteredField()`; [`opt-818-field-entry-registration.test.ts`](../../workers/game/src/__tests__/opt-818-field-entry-registration.test.ts), [`opt-819-effect-played-permanent-effects.test.ts`](../../workers/game/src/__tests__/opt-819-effect-played-permanent-effects.test.ts) | Continuous modifier/prohibition effects register once per field entry, for direct plays (`pipeline.ts`) and effect plays, including before nested play-prompt continuations (`trigger-ordering.ts`). The earlier effect-play gap (OPT-819) and duplicate registration (OPT-818) are merged (#650, #645) |
+| **8-1-3-3.** Permanent effects | **IMPL** | `triggers.ts → registerPermanentEffectsForCard()` via `registerCardEnteredField()`; [`opt-818-field-entry-registration.test.ts`](../../workers/game/src/__tests__/opt-818-field-entry-registration.test.ts), [`opt-819-effect-played-permanent-effects.test.ts`](../../workers/game/src/__tests__/opt-819-effect-played-permanent-effects.test.ts) | Continuous modifier/prohibition effects register once per field entry. The named tests cover effect plays (both drive `ACTIVATE_EFFECT` on OP13-082), including before nested play-prompt continuations (`trigger-ordering.ts`). Direct plays register through `pipeline.ts` (`registerNewCardTriggers` → `registerCardEnteredField`); no test named here asserts that path. The earlier effect-play gap (OPT-819) and duplicate registration (OPT-818) are merged (#650, #645) |
 | **8-1-3-4.** Replacement effects ("instead") | **IMPL** | `replacements.ts → checkReplacements()` | Full replacement detection, matching, optional prompts |
 | **8-1-3-4-2.** Replacement effect priority (card owner → turn player → non-turn player) | **IMPL** | `replacements.ts` | Priority ordering implemented |
 | **8-1-3-4-3.** Same replacement can't apply twice to same process | **IMPL** | `replacements.ts` | Once-per-event tracking |
@@ -528,6 +528,17 @@ Merged means a commit with that ID is on `main`; anything without one is
 | Field-entry and event ordering | OPT-818 (#645), OPT-819 (#650), OPT-820 (#651), OPT-821 (#646) |
 | Generic mechanics | OPT-788 (#668), OPT-789 (#673), OPT-790 (#664), OPT-791 (#666), OPT-792 (#694), OPT-793 (#697), OPT-794 (#670), OPT-795 (#674), OPT-796 (#700), OPT-797 (#708), OPT-798 (#681), OPT-799 (#704), OPT-800 (#687), OPT-801 (#691) |
 | Authored-set sweeps | OPT-805 (#659), OPT-806 (#661), OPT-807 (#654), OPT-808 (#657), OPT-809 (#662), OPT-810 (#660), OPT-811 (#655), OPT-812 (#656), OPT-813 (#663), OPT-814 (#658) |
+
+Known residuals and follow-ups for the merged rows (commit messages and
+`docs/project/handoffs/` on `main`):
+
+- OPT-892 (open, no merged commit): `DEAL_DAMAGE` effects emit no `DAMAGE_DEALT`, so OP03-043 Gaimon never sees them; whether it should is an open rules question (`docs/game-engine/02-TRIGGERS.md`, OPT-796 commit a6c97437).
+- OPT-796: its Double Attack lethal case is fixed by OPT-886 (#721, bfb9d8d7), which flipped the OPT-796 `it.fails` ratchet.
+- OPT-792: OP15-035 was left unchanged (it rests your own cards as a replacement; "see PR follow-ups" in commit 7e925017).
+- OPT-788: follow-ups OPT-834 (merged, #705) and OPT-852 (merged, #677), per `opt-788-name-aliases.md`.
+- OPT-806: Kanjuro ownership follow-up OPT-848 (merged, #672), per `opt-806-schema-sweep-b.md`.
+- OPT-814: PRB02-006 rest-source follow-up OPT-847 (merged, #669), per `OPT-814.md`.
+- OPT-807: successor OPT-845 (merged, #671).
 
 No merged commit on `main` names OPT-802, OPT-803 or OPT-804; treat them as
 open (see OPT-802, OPT-803, OPT-804). Later fidelity tickets (for example

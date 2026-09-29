@@ -41,7 +41,7 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `docs/design/` | UI/UX design — branding guidelines, audits, critiques, game board layout |
 | `docs/project/` | Project management — PRD, planning, workflows, learnings |
 | `docs/rules/` | Official OPTCG Comprehensive Rules v1.2.0 |
-| `docs/cards/` | Card effect text for 55 sets (OP-01–OP-17, ST-01–ST-32, EB-01–EB-04, PRB-01–PRB-02) plus `UNKNOWN.md` |
+| `docs/cards/` | Card effect text for 55 sets (OP-01–OP-17, ST-01–ST-32, EB-01–EB-04, PRB-01–PRB-02) plus `UNKNOWN.md` (alongside `EFFECT-FACET-TAXONOMY.md`) |
 | `docs/research/` | Technical investigations and evaluations |
 
 ### Key Files
