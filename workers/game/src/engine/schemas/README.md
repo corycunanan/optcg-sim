@@ -192,7 +192,8 @@ For effects that react to game events (not bracket-tag abilities):
 | "When Character returned to hand" | `{ event: "CHARACTER_RETURNED_TO_HAND" }` |
 | "When you take damage" | `{ event: "DAMAGE_TAKEN" }` |
 | "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED" }` |
-| "When Leader attack deals damage" | `{ event: "LEADER_ATTACK_DEALS_DAMAGE" }` |
+| "When this Leader's/Character's attack deals damage" | `{ event: "ATTACK_DEALS_DAMAGE", filter: { attacker: "SELF" } }` |
+| "When you deal damage to your opponent's Life" | `{ event: "ATTACK_DEALS_DAMAGE" }` |
 | "At end of your turn" (event) | `{ event: "END_OF_YOUR_TURN" }` |
 
 **Custom triggers support filters:**
@@ -422,7 +423,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `RETURN_TO_HAND` | "Return to hand" | Target |
 | `RETURN_TO_DECK` | "Place at top/bottom of deck" | Target, `{ position: "TOP" \| "BOTTOM" }` |
 | `TRASH_CARD` | "Trash" (not K.O.) | Target |
-| `TRASH_FROM_HAND` | "Trash N from hand" | `{ amount: N }` |
+| `TRASH_FROM_HAND` | "Trash N from hand" | `{ amount: N }`; "until you have N" → `{ until_count: N }` |
 | `PLAY_CARD` | "Play from hand/trash/life" | Target, source zone |
 | `ADD_TO_LIFE` | "Add card from trash to Life" | `CARD_IN_TRASH` target, `{ face, position }` |
 | `MILL` | "Trash N from top of deck" | `{ amount: N }` |
@@ -449,7 +450,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | Type | Card Text |
 |------|-----------|
 | `GIVE_DON` | "Give up to N DON!! to card" |
-| `RETURN_DON_TO_DECK` | "Return N DON!! to deck" |
+| `RETURN_DON_TO_DECK` | "Return N DON!! to deck" (`amount`), or "until you have N" (`until_count`) |
 | `ADD_DON_FROM_DECK` | "Add N from DON!! deck" |
 | `SET_DON_ACTIVE` | "Set up to N DON!! active" |
 | `REST_DON` | "Rest N DON!!" |

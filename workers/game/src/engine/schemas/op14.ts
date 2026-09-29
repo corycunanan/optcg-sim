@@ -848,10 +848,21 @@ export const OP14_024_KINEMON: EffectSchema = {
       actions: [
         {
           type: "SET_REST",
+          // OPT-792: "your opponent's cards" = one active Leader, Character,
+          // Stage or DON!! card (qa_op14_eb04.md OP14-024).
           target: {
             type: "LEADER_OR_CHARACTER",
             controller: "OPPONENT",
             count: { up_to: 1 },
+            mixed_pool: {
+              types: ["LEADER_OR_CHARACTER", "STAGE", "DON_IN_COST_AREA"],
+              total_count: { up_to: 1 },
+              filters: {
+                LEADER_OR_CHARACTER: { is_active: true },
+                STAGE: { is_active: true },
+                DON_IN_COST_AREA: { is_active: true },
+              },
+            },
           },
         },
       ],
@@ -2073,7 +2084,7 @@ export const OP14_054_FISHER_TIGER: EffectSchema = {
             type: "CARD_IN_HAND",
             controller: "SELF",
           },
-          params: { until_count: 5, _comment: "Trash from hand until 5 cards remain — needs custom engine handling" },
+          params: { until_count: 5 },
         },
       ],
     },
@@ -3036,9 +3047,12 @@ export const OP14_079_CROCODILE: EffectSchema = {
           duration: { type: "THIS_TURN" },
         },
         {
+          // "Then, you may trash 2 cards from the top of your deck." — a
+          // clause-level choice after the mandatory −10 cost (OPT-799).
           type: "MILL",
           params: { amount: 2 },
           chain: "THEN",
+          optional: true,
         },
       ],
     },

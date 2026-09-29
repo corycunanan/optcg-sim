@@ -20,6 +20,7 @@ interface Action {
   target_ref?: string;
   result_ref?: string;
   conditions?: Condition;
+  optional?: true;
 }
 ```
 
@@ -31,6 +32,29 @@ interface Action {
 - `target_ref` — Resolves this action's target from a prior action's `result_ref`.
 - `result_ref` — Assigns a reference ID for later actions to use via `target_ref` or `DynamicValue`.
 - `conditions` — Inline condition that gates this specific action without affecting the rest of the chain.
+- `optional` — Clause-level "you may" (OPT-799). See [Action-level `optional`](#action-level-optional).
+
+### Action-level `optional`
+
+`optional: true` encodes a "you may" that covers one clause after the colon, such as OP14-079 "…−10 cost during this turn. Then, you may trash 2 cards from the top of your deck." Block-level `flags.optional` remains the encoding for a "you may" that covers the whole effect or its cost ("You may K.O. 1 of your Characters…:").
+
+Resolution order for an optional action:
+
+1. The `chain` connector is checked (an `IF_DO` whose prerequisite failed is skipped without asking).
+2. Inline `conditions` are evaluated. When they fail there is no prompt (EB04-001 "Then, if you have 2 or more Life cards, you may…").
+3. The chain's controller gets an `OPTIONAL_EFFECT` prompt. Its `effectDescription` names the clause: the block description's single "you may" sentence, else its single "up to" sentence, else the whole block description. Earlier clauses have already resolved; the continuation (paused action, remaining actions, result refs) persists on the effect stack.
+4. Accept runs the action once (its conditions are not re-evaluated), then the rest of the chain. Decline skips only this action.
+
+A declined optional action counts as not performed, the same as an action that could not be performed: a following `IF_DO` is skipped (Rules 4-10-1), a following `THEN` still resolves (Rules 4-10-2), and its `result_ref` is not recorded.
+
+Constraints enforced by schema validation:
+
+- Allowed only on a block's top-level `actions`. It is not allowed in `replacement_actions`, choice branches, `OPPONENT_ACTION`, or `SCHEDULE_ACTION`.
+- Not inside an `AND` transaction.
+- Not with a selection that already allows choosing zero: an `up_to` / `any_number` count on `target.count`, any `target.dual_targets[*].count`, `target.per_type_selection.count_per_type` or `target.mixed_pool.total_count`, `params.optional` (TRASH_FROM_HAND and similar), or `params.up_to`. That selection prompt is already the decline (Rules 4-8-1).
+- Not on the first action of a block with `flags.optional` and no costs. The block prompt already asks for that clause.
+
+For "up to 1 of your Leader" (P-036), the single deterministic Leader target has no selection prompt, so choosing 0 or 1 is encoded as `optional: true` on the Leader action.
 
 ---
 
@@ -1231,6 +1255,8 @@ Return DON!! card(s) from the field to the DON!! deck.
 ```typescript
 interface ReturnDonToDeckParams {
   amount: number | DynamicValue;
+  /** "…until you have N DON!! cards on your field"; replaces amount. */
+  until_count?: number | DynamicValue;
   source_state?: "ACTIVE" | "RESTED" | "ANY";
   source: "COST_AREA" | "ATTACHED" | "ANY";
 }
@@ -1239,14 +1265,25 @@ interface ReturnDonToDeckParams {
 | Field | Value |
 |-------|-------|
 | **Target** | None (operates on the controller's DON!! on field) or a specific card's attached DON!! |
-| **Failure mode** | If insufficient DON!! exist on the field, return as many as possible. |
+| **Failure mode** | If insufficient DON!! exist on the field, return as many as possible. With `until_count`, return max(0, field DON!! − N); at or below N nothing is returned, and an unresolvable N returns nothing. |
 | **Fired events** | `DON_RETURNED_TO_DON_DECK` (triggers `DON_RETURNED_TO_DON_DECK` custom event) |
-| **Example cards** | Various DON!! -N cost effects |
+| **Example cards** | Various DON!! -N cost effects; OP08-074 Black Maria (`until_count`) |
+
+`until_count` is resolved when the action resolves — for a `SCHEDULE_ACTION` at end of turn, that is the end of turn. The whole field is eligible (cost-area active/rested DON!! and DON!! attached to the Leader/Characters, Rules 3-1-2 / 8-3-1-6); when more than one distribution exists, the controller answers the same `PLAYER_CHOICE` (`donReturn`) prompt as `FORCE_OPPONENT_DON_RETURN`. Returned DON!! go to the DON!! deck active and unattached.
 
 ```json
 {
   "type": "RETURN_DON_TO_DECK",
   "params": { "amount": 2, "source": "ANY" }
+}
+```
+
+```json
+{
+  "type": "RETURN_DON_TO_DECK",
+  "params": {
+    "until_count": { "type": "GAME_STATE", "source": "DON_FIELD_COUNT", "controller": "OPPONENT" }
+  }
 }
 ```
 

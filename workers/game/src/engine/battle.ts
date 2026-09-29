@@ -847,7 +847,8 @@ function dealOneLeaderDamage(
   cardDb: Map<string, CardData>,
   attackerInstanceId: string,
   isBanish: boolean,
-  attackerType: "LEADER" | "CHARACTER"
+  attackerType: "LEADER" | "CHARACTER",
+  firstDamageOfAttack: boolean
 ): {
   state: GameState;
   events: PendingEvent[];
@@ -870,6 +871,7 @@ function dealOneLeaderDamage(
         lethal: true,
         attackerInstanceId,
         attackerType,
+        firstDamageOfAttack,
       },
     });
     return {
@@ -889,7 +891,7 @@ function dealOneLeaderDamage(
   events.push({
     type: "DAMAGE_DEALT",
     playerIndex: pi,
-    payload: { amount: 1, attackerInstanceId, attackerType },
+    payload: { amount: 1, attackerInstanceId, attackerType, firstDamageOfAttack },
   });
   events.push(...popResult.events);
 
@@ -966,11 +968,17 @@ function dealOneLeaderDamage(
  */
 function continueLeaderDamageSequence(
   state: GameState,
-  cardDb: Map<string, CardData>
+  cardDb: Map<string, CardData>,
+  enteringDamageStep = false
 ): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
   const events: PendingEvent[] = [];
   let nextState = state;
   let damagedPlayerIndex: 0 | 1 | undefined;
+  // OPT-796: only the Damage Step entry deals the attack's first damage; every
+  // resume (after a [Trigger] window or a paused Life removal) continues an
+  // attack that has already dealt one. "When ... deals damage" watchers fire
+  // once per attack, including [Double Attack] (qa_op03.md Gaimon).
+  let firstDamageOfAttack = enteringDamageStep;
 
   while (true) {
     const battle = nextState.turn.battle;
@@ -1011,8 +1019,10 @@ function continueLeaderDamageSequence(
       cardDb,
       battle.attackerInstanceId,
       isBanish,
-      attackerType
+      attackerType,
+      firstDamageOfAttack
     );
+    firstDamageOfAttack = false;
     nextState = one.state;
     events.push(...one.events);
     if (one.damagedPlayerIndex !== undefined)
@@ -1283,7 +1293,7 @@ function executeDamageStep(
           },
         };
 
-        const cont = continueLeaderDamageSequence(nextState, cardDb);
+        const cont = continueLeaderDamageSequence(nextState, cardDb, true);
         events.push(...cont.events);
         return {
           state: cont.state,

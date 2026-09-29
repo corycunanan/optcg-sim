@@ -259,6 +259,8 @@ function OpponentFieldComponent({
 
       <DonZone
         player={opp}
+        targetSelectionById={targetSelectionById}
+        onTargetToggle={onTargetToggle}
         zoneKey={zoneKey("don")}
         donArtUrl={opp?.donArtUrl}
         style={{ left: zone2Right - stgDonWidth, top: oppLeaderTop, width: stgDonWidth, height: SQUARE }}

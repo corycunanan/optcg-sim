@@ -323,7 +323,9 @@ export function activateAllRested(
     leader: activate(player.leader),
     characters: player.characters.map((c) => c ? activate(c) : null),
     stage: player.stage ? activate(player.stage) : null,
-    donCostArea: player.donCostArea.map((d) => ({ ...d, state: "ACTIVE" as const })),
+    donCostArea: player.donCostArea.map((d) =>
+      skipInstanceIds?.has(d.instanceId) ? d : { ...d, state: "ACTIVE" as const }
+    ),
   };
   return { ...state, players: newPlayers };
 }

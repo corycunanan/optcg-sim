@@ -1071,7 +1071,10 @@ export const OP16_048_BUGGY: EffectSchema = {
       actions: [
         {
           type: "GRANT_KEYWORD",
-          target: { type: "CHARACTER", controller: "SELF", count: { up_to: 1 }, filter: { name: "Prisoner of Impel Down" } },
+          // "Up to 1 of your [Prisoner of Impel Down] cards" — cards, not
+          // Characters: an all-names Leader qualifies (qa_op16.md OP16-048;
+          // qa_op17.md p.9). The name filter keeps arbitrary Leaders out.
+          target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { up_to: 1 }, filter: { name: "Prisoner of Impel Down" } },
           params: { keyword: "BLOCKER" },
           duration: { type: "THIS_TURN" },
         },
@@ -1270,7 +1273,9 @@ export const OP16_058_THE_PRISONERS_ARE_RIOTING: EffectSchema = {
       actions: [
         {
           type: "SET_BASE_POWER",
-          target: { type: "CHARACTER", controller: "SELF", count: { all: true }, filter: { name: "Prisoner of Impel Down" } },
+          // "all of your [Prisoner of Impel Down] cards" includes an all-names
+          // Leader (qa_op16.md OP16-058: its base power becomes 7000).
+          target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { all: true }, filter: { name: "Prisoner of Impel Down" } },
           params: { value: 7000 },
           duration: { type: "THIS_TURN" },
         },
@@ -1278,7 +1283,9 @@ export const OP16_058_THE_PRISONERS_ARE_RIOTING: EffectSchema = {
     },
     {
       id: "counter_buggy_power",
-      category: "activate",
+      // USE_COUNTER_EVENT resolves only the "auto" COUNTER_EVENT block
+      // (battle.ts executeUseCounterEvent); "activate" left it inert (OPT-834).
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

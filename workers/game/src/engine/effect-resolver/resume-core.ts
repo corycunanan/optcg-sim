@@ -59,6 +59,7 @@ import {
   handleFieldToLifePosition,
   handlePlayerChoiceBranch,
   handleAwaitingOptionalResponse,
+  handleAwaitingOptionalActionResponse,
   handleAwaitingTriggerOrderSelection,
 } from "./resume/choice.js";
 import { handleAwaitingCostSelection } from "./resume/cost.js";
@@ -429,6 +430,17 @@ export function resumeFromStack(
 
   switch (phase) {
     case "AWAITING_OPTIONAL_RESPONSE":
+      // OPT-799: an action-level "you may" parks its undecided action;
+      // block-level optional frames have no paused action.
+      if (topFrame.pausedAction?.optional === true) {
+        return handleAwaitingOptionalActionResponse(
+          state,
+          action,
+          topFrame,
+          cardDb,
+          services
+        );
+      }
       return handleAwaitingOptionalResponse(
         state,
         action,

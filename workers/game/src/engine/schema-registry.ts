@@ -16,6 +16,8 @@ import {
   ALL_ACTION_TYPES,
   ALL_COST_TYPES,
   ALL_TARGET_TYPES,
+  DON_POOL_FILTER_KEYS,
+  MIXED_POOL_TYPES,
   getNestedActions,
   type EffectSchema,
   type EffectBlock,
@@ -135,7 +137,7 @@ const IMPLICIT_COST_RESULT_REFS = new Set([
 ]);
 const VALID_ACTION_FIELDS: ReadonlySet<string> = new Set([
   "type", "params", "target", "duration", "chain", "target_ref",
-  "result_ref", "conditions", "requires",
+  "result_ref", "conditions", "requires", "optional",
 ]);
 const VALID_TARGET_FILTER_FIELDS: ReadonlySet<string> = new Set(
   TARGET_FILTER_KEYS,
@@ -349,9 +351,10 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
       return errors;
     }
     for (let i = 0; i < block.actions.length; i++) {
-      errors.push(...validateAction(block.actions[i], `${prefix}.actions[${i}]`, i === 0));
+      errors.push(...validateAction(block.actions[i], `${prefix}.actions[${i}]`, i === 0, true));
     }
     errors.push(...validateActionConnectors(block.actions, `${prefix}.actions`));
+    errors.push(...validateOptionalActionPlacement(block, `${prefix}.actions`));
     errors.push(...validateResultReferences(block.actions, `${prefix}.actions`, block.trigger && "event" in block.trigger && block.trigger.event === "CARD_TRASHED_FROM_HAND" ? new Set(["__triggering_hand_trash"]) : undefined));
   }
 
@@ -663,8 +666,105 @@ function validateTriggerShape(trigger: unknown, prefix: string): string[] {
   return [`${prefix}: Trigger must define 'keyword', 'event', or 'any_of'`];
 }
 
+/**
+ * OPT-792 [C10]: mixed_pool shape. The resolver unions per-type sub-targets,
+ * so the pool must name supported field types, keep per-type qualifiers in
+ * `mixed_pool.filters` (a parent `filter` would be ambiguous across types),
+ * declare a primary `type` from the pool for single-type consumers, and keep
+ * any parent `count` equal to `total_count`.
+ */
+function validateMixedPool(target: Target, prefix: string): string[] {
+  const pool = target.mixed_pool;
+  if (!pool) return [];
+  const errors: string[] = [];
+  const at = `${prefix}.target.mixed_pool`;
+  const types = Array.isArray(pool.types) ? pool.types : [];
+  if (types.length < 2) {
+    errors.push(`${at}.types: [C10] A mixed pool must list at least 2 target types`);
+  }
+  if (new Set(types).size !== types.length) {
+    errors.push(`${at}.types: [C10] Duplicate target type in mixed pool`);
+  }
+  for (const poolType of types) {
+    if (!MIXED_POOL_TYPES.has(poolType)) {
+      errors.push(
+        `${at}.types: [C10] Target type '${poolType}' is not supported in a mixed pool; use ${[...MIXED_POOL_TYPES].join(", ")}`,
+      );
+      continue;
+    }
+    const controller = target.controller;
+    if (controller !== undefined) {
+      const modes = TARGET_CONTROLLER_MODES[poolType] ?? NO_SLOT_CONTROLLERS;
+      if (!modes.has(controller)) {
+        errors.push(
+          `${at}.types: [C10] Pool type '${poolType}' does not support controller '${controller}'`,
+        );
+      }
+    }
+  }
+  if (!target.type) {
+    errors.push(
+      `${prefix}.target.type: [C10] A mixed_pool target must declare a primary 'type' from mixed_pool.types`,
+    );
+  } else if (!types.includes(target.type)) {
+    errors.push(
+      `${prefix}.target.type: [C10] Primary type '${target.type}' must be one of mixed_pool.types (${types.join(", ")})`,
+    );
+  }
+  if (target.filter !== undefined) {
+    errors.push(
+      `${prefix}.target.filter: [C10] A mixed_pool target must scope qualifiers per type in mixed_pool.filters, not target.filter`,
+    );
+  }
+  if (!pool.total_count) {
+    errors.push(`${at}.total_count: [C10] A mixed pool must declare total_count`);
+  } else if (
+    target.count !== undefined &&
+    JSON.stringify(target.count) !== JSON.stringify(pool.total_count)
+  ) {
+    errors.push(
+      `${prefix}.target.count: [C10] Parent count must equal mixed_pool.total_count`,
+    );
+  }
+  for (const key of [
+    "dual_targets",
+    "per_type_selection",
+    "named_distribution",
+    "aggregate_constraint",
+    "uniqueness_constraint",
+    "self_ref",
+    "ref",
+    "source_zone",
+  ] as const) {
+    if (target[key] !== undefined) {
+      errors.push(`${prefix}.target.${key}: [C10] '${key}' cannot be combined with mixed_pool`);
+    }
+  }
+  for (const [filterType, filter] of Object.entries(pool.filters ?? {})) {
+    if (!types.includes(filterType as TargetType)) {
+      errors.push(
+        `${at}.filters.${filterType}: [C10] Filter keyed by '${filterType}', which is not in mixed_pool.types`,
+      );
+      continue;
+    }
+    if (filterType === "DON_IN_COST_AREA") {
+      for (const key of Object.keys(filter ?? {})) {
+        if (!DON_POOL_FILTER_KEYS.has(key)) {
+          errors.push(
+            `${at}.filters.DON_IN_COST_AREA.${key}: [C10] DON!! pool filters support only ${[...DON_POOL_FILTER_KEYS].join(", ")}`,
+          );
+        }
+      }
+    }
+    errors.push(...validateTargetFilterShape(filter, `${at}.filters.${filterType}`));
+    errors.push(...validateTargetFilterController(filter, `${at}.filters.${filterType}`));
+  }
+  return errors;
+}
+
 function validateTargetController(target: Action["target"], prefix: string): string[] {
   const errors: string[] = [];
+  if (target?.mixed_pool) errors.push(...validateMixedPool(target, prefix));
   if (target?.type && !VALID_TARGET_TYPES.has(target.type)) {
     errors.push(`${prefix}.target: Unknown target type '${target.type}'`);
   }
@@ -731,12 +831,18 @@ function validateTargetController(target: Action["target"], prefix: string): str
   return errors;
 }
 
-function validateAction(action: Action, prefix: string, firstInChain = false): string[] {
+function validateAction(
+  action: Action,
+  prefix: string,
+  firstInChain = false,
+  optionalAllowed = false,
+): string[] {
   const errors: string[] = [];
 
   if (!action || typeof action !== "object" || Array.isArray(action)) {
     return [`${prefix}: Action must be an object`];
   }
+  errors.push(...validateOptionalAction(action, prefix, optionalAllowed));
 
   for (const key of Object.keys(action)) {
     if (!VALID_ACTION_FIELDS.has(key)) {
@@ -882,6 +988,86 @@ function collectConsumedResultRefs(
     }
     collectConsumedResultRefs(nested, consumed, depth + 1);
   }
+}
+
+/**
+ * OPT-799: action-level `optional` ("Then, you may …") is honored only by the
+ * top-level block action chain. It must be `true`, and never stacks on a
+ * selection that already lets the player choose zero — that selection prompt
+ * is the decline (Rules 4-8-1), so a second yes/no prompt would double-ask.
+ */
+function validateOptionalAction(
+  action: Action,
+  prefix: string,
+  optionalAllowed: boolean,
+): string[] {
+  if (!("optional" in action)) return [];
+  if (action.optional !== true) {
+    return [`${prefix}.optional: Expected true (omit the field for a mandatory action)`];
+  }
+  if (!optionalAllowed) {
+    return [
+      `${prefix}.optional: action-level optional is only supported on a block's top-level actions`,
+    ];
+  }
+  const errors: string[] = [];
+  for (const path of zeroAllowingTargetCounts(action.target)) {
+    errors.push(
+      `${prefix}.optional: ${path} already allows choosing 0; drop 'optional' (the selection prompt is the decline)`,
+    );
+  }
+  const params = action.params as Record<string, unknown> | undefined;
+  if (params?.optional !== undefined || params?.up_to === true) {
+    errors.push(
+      `${prefix}.optional: params.${params?.optional !== undefined ? "optional" : "up_to"} already makes this action optional; do not combine it with action-level 'optional'`,
+    );
+  }
+  return errors;
+}
+
+function countAllowsZero(count: unknown): boolean {
+  return (
+    !!count &&
+    typeof count === "object" &&
+    ("up_to" in count || "any_number" in count)
+  );
+}
+
+/** Every count on a target shape whose selection may pick zero cards. */
+function zeroAllowingTargetCounts(target: Target | undefined): string[] {
+  if (!target) return [];
+  const paths: string[] = [];
+  if (countAllowsZero(target.count)) paths.push("target.count");
+  target.dual_targets?.forEach((slot, index) => {
+    if (countAllowsZero(slot?.count))
+      paths.push(`target.dual_targets[${index}].count`);
+  });
+  if (countAllowsZero(target.per_type_selection?.count_per_type))
+    paths.push("target.per_type_selection.count_per_type");
+  if (countAllowsZero(target.mixed_pool?.total_count))
+    paths.push("target.mixed_pool.total_count");
+  return paths;
+}
+
+function validateOptionalActionPlacement(block: EffectBlock, prefix: string): string[] {
+  const actions = block.actions ?? [];
+  const errors: string[] = [];
+  actions.forEach((action, index) => {
+    if (action?.optional !== true) return;
+    const inAndGroup =
+      action.chain === "AND" || actions[index + 1]?.chain === "AND";
+    if (inAndGroup) {
+      errors.push(
+        `${prefix}[${index}].optional: an optional action cannot be part of an AND transaction`,
+      );
+    }
+    if (index === 0 && block.flags?.optional && !block.costs?.length) {
+      errors.push(
+        `${prefix}[0].optional: block flags.optional already asks before this first action; remove one of the two`,
+      );
+    }
+  });
+  return errors;
 }
 
 function validateActionConnectors(actions: Action[], prefix: string): string[] {

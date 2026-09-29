@@ -854,6 +854,10 @@ it("recursively accounts for all authored SET_REST DON consumers", async () => {
     "OP06-062",
     "OP09-036",
     "OP12-037",
+    // OPT-792: mixed pools adopted for "your opponent's cards" and ST26-002.
+    "OP14-024",
+    "OP15-032",
+    "ST26-002",
   ]);
 });
 

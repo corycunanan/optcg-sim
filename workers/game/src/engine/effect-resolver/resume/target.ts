@@ -29,6 +29,8 @@ import {
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
 import { applyRedistributeDonTransfers } from "../actions/don.js";
+import { releaseMovedDonEffects } from "../../don-area-effects.js";
+import { trashFromHandSelection } from "../actions/removal.js";
 import type { EffectResolverResult, EffectResolverServices } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
 import { isEngineTerminated } from "../../engine-limits.js";
@@ -106,7 +108,8 @@ export function handleRedistributeDon(
       transfers,
       controller
     );
-    nextState = actionResult.state;
+    // Rule 3-1-6-1: moved DON!! shed their effects.
+    nextState = releaseMovedDonEffects(nextState, actionResult.state);
     events.push(...actionResult.events);
     if (actionResult.result && pausedAction.result_ref) {
       resultRefs.set(pausedAction.result_ref, actionResult.result);
@@ -357,6 +360,23 @@ export function handleSelectTarget(
 
   let nextState = state;
   const selected = action.selectedInstanceIds ?? [];
+  // OPT-793: a hand trash takes exactly its required count (0..N when
+  // optional). The TRASH_FROM_HAND target carries no `count`, so the generic
+  // constraint check below cannot enforce it; recompute the bounds from the
+  // unchanged paused state (the hand has not moved since the prompt).
+  if (pausedAction.type === "TRASH_FROM_HAND") {
+    const bounds = trashFromHandSelection(nextState, pausedAction, controller, cardDb, resultRefs);
+    if (
+      new Set(selected).size !== selected.length ||
+      selected.length < bounds.min ||
+      selected.length > bounds.max
+    ) {
+      return {
+        kind: "terminal",
+        result: { state, events: [], resolved: false, rejected: true },
+      };
+    }
+  }
   // Validate — all selected ids must be in validTargets
   if (selected.some((id) => !validTargets.includes(id))) {
     const reprompt = buildSelectTargetPrompt(

@@ -191,7 +191,7 @@ export type CustomEventType =
   | "CHARACTER_RETURNED_TO_HAND"
   | "DAMAGE_TAKEN"
   | "BLOCKER_ACTIVATED"
-  | "LEADER_ATTACK_DEALS_DAMAGE"
+  | "ATTACK_DEALS_DAMAGE"
   | "END_OF_YOUR_TURN";
 
 export type KOCause = "ANY" | "BATTLE" | "EFFECT" | "OPPONENT_EFFECT";
@@ -199,6 +199,13 @@ export type KOCause = "ANY" | "BATTLE" | "EFFECT" | "OPPONENT_EFFECT";
 export interface EventFilter {
   /** Scope the event subject to the Character hosting this trigger. */
   target?: "SELF";
+  /**
+   * OPT-796: ATTACK_DEALS_DAMAGE only — bind to attacks by the card hosting
+   * this trigger ("When this Leader's/Character's attack deals damage").
+   * Omitted, any attack by the host's controller matches ("When you deal
+   * damage", OP03-043).
+   */
+  attacker?: "SELF";
   controller?: Controller;
   cause?: EventCause;
   /** Causal effect source, distinct from the discarded card. */
@@ -606,6 +613,18 @@ export interface ActionBase {
   result_ref?: string;
   conditions?: Condition;
   requires?: ActionFeasibilityRequirement;
+  /**
+   * OPT-799: clause-level "you may" ("Then, you may trash 2 cards…"). After
+   * the chain connector and inline `conditions` pass, the resolver asks the
+   * chain's controller an OPTIONAL_EFFECT prompt scoped to this clause.
+   * Declining skips only this action: later THEN clauses still resolve and an
+   * IF_DO dependent is skipped (Rules 4-10-1 / 4-10-2). Top-level block
+   * actions only; never combined with a selection that already allows zero
+   * (`target.count` up_to / any_number, `params.optional`, `params.up_to`).
+   * Block-level "you may" (before a cost, or covering the whole effect) stays
+   * `flags.optional`.
+   */
+  optional?: true;
 }
 
 export interface ActionFeasibilityRequirement {
@@ -875,7 +894,16 @@ export interface ActionParamsMap {
   NEGATE_EFFECTS: Record<string, never>;
 
   GIVE_DON: { amount?: number; don_state?: CardState };
-  RETURN_DON_TO_DECK: { amount?: number | DynamicValue };
+  RETURN_DON_TO_DECK: {
+    amount?: number | DynamicValue;
+    /**
+     * "Return DON!! … until you have N DON!! on your field" (OP08-074): return
+     * max(0, field DON!! − N), resolved when the action resolves. The whole
+     * field (cost area + attached) is eligible; the controller chooses.
+     * Replaces `amount`.
+     */
+    until_count?: number | DynamicValue;
+  };
   ADD_DON_FROM_DECK: { amount?: number | DynamicValue; target_state?: CardState; up_to?: boolean };
   SET_DON_ACTIVE: { amount?: number | DynamicValue; up_to?: boolean };
   REST_DON: { amount?: number };
@@ -985,6 +1013,11 @@ export interface ActionParamsMap {
     chooser?: "SELF" | "OPPONENT";
     amount?: number | DynamicValue;
     optional?: boolean;
+    /**
+     * "Trash cards from your hand until you have N": trash exactly
+     * max(0, hand − N) from the hand owner's hand, counted at resolution.
+     * Replaces `amount`; the hand owner chooses (OP14-054, OP05-058).
+     */
     until_count?: number;
     filter?: TargetFilter;
     _comment?: string;
@@ -1249,10 +1282,47 @@ export interface PerTypeSelection {
   count_per_type: CountMode;
 }
 
+/**
+ * OPT-792: one selection pool spanning several target types ("rest up to a
+ * total of 2 of your opponent's Characters or DON!! cards"). The resolver
+ * resolves each listed type as its own sub-target under the parent
+ * `controller`, unions the ids, and bounds the whole selection by
+ * `total_count`.
+ *
+ * Per-type qualifiers live in `filters`, keyed by pool type, and apply only to
+ * that type — a Character cost cap never excludes DON!!, and a DON!! state
+ * filter never excludes Characters. The parent `Target.filter` is not used for
+ * mixed pools (schema lint rejects it). The parent `type` must be one of
+ * `types` (schema lint enforces it) and is the primary type seen by consumers
+ * that only read `Target.type`; the parent `count`, when present, must equal
+ * `total_count`.
+ */
 export interface MixedPool {
   types: TargetType[];
   total_count: CountMode;
+  filters?: Partial<Record<TargetType, TargetFilter>>;
 }
+
+/**
+ * Target types a `mixed_pool` may union. Each is a field-presence type whose
+ * sub-target resolution honors the parent controller; anything else is
+ * rejected by schema lint and skipped (fail-closed) by the resolver.
+ */
+export const MIXED_POOL_TYPES: ReadonlySet<TargetType> = new Set<TargetType>([
+  "CHARACTER",
+  "LEADER_OR_CHARACTER",
+  "YOUR_LEADER",
+  "OPPONENT_LEADER",
+  "STAGE",
+  "FIELD_CARD",
+  "DON_IN_COST_AREA",
+]);
+
+/** Filter keys the DON_IN_COST_AREA resolver honors; any other key is inert. */
+export const DON_POOL_FILTER_KEYS: ReadonlySet<string> = new Set([
+  "is_active",
+  "is_rested",
+]);
 
 // ─── Costs (01-SCHEMA-OVERVIEW) ──────────────────────────────────────────────
 

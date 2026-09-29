@@ -658,6 +658,7 @@ function matchesCustomTrigger(
     const target = targetId ? findCardInstance(state, targetId) : undefined;
     if (target?.zone !== "CHARACTER") return false;
   }
+  if (trigger.event === "ATTACK_DEALS_DAMAGE" && !matchesAttackDamage(trigger, event, sourceCard)) return false;
   if (trigger.filter?.target === "SELF") {
     const payload = event.payload as { targetInstanceId?: string; cardInstanceId?: string };
     if ((payload.targetInstanceId ?? payload.cardInstanceId) !== sourceCard.instanceId) return false;
@@ -771,6 +772,26 @@ function getSourceFilteredAttackCardId(
   return null;
 }
 
+/**
+ * OPT-796: an attack by the host's controller dealt damage to the opponent's
+ * Life. DAMAGE_DEALT is emitted only by battle damage (DEAL_DAMAGE effects
+ * emit none today; whether Gaimon should see them is OPT-892), once per Life
+ * card; the watcher binds to the attack's first damage so [Double Attack]
+ * fires it once (qa_op03.md OP03-043). A lethal DAMAGE_DEALT checks no Life
+ * card, so it matches no watcher ([Double Attack] vs 1 Life: OPT-886).
+ */
+function matchesAttackDamage(
+  trigger: CustomTrigger,
+  event: GameEvent,
+  sourceCard: CardInstance,
+): boolean {
+  if (event.type !== "DAMAGE_DEALT") return false;
+  if (event.playerIndex !== sourceCard.controller) return false;
+  if (event.payload.lethal === true || event.payload.firstDamageOfAttack !== true) return false;
+  if (trigger.filter?.attacker === "SELF" && event.payload.attackerInstanceId !== sourceCard.instanceId) return false;
+  return true;
+}
+
 function containsRemovalTrigger(trigger: Trigger): boolean {
   if ("event" in trigger) return trigger.event === "CHARACTER_REMOVED_FROM_FIELD";
   return "any_of" in trigger && trigger.any_of.some(containsRemovalTrigger);
@@ -846,7 +867,10 @@ const CUSTOM_EVENT_TO_GAME_EVENT: Partial<Record<CustomEventType, GameEventType>
   TRIGGER_ACTIVATED: "TRIGGER_ACTIVATED",
   DAMAGE_TAKEN: "DAMAGE_DEALT",
   BLOCKER_ACTIVATED: "BLOCK_DECLARED",
-  LEADER_ATTACK_DEALS_DAMAGE: "DAMAGE_DEALT",
+  // OPT-796: "When this Leader's/Character's attack deals damage to your
+  // opponent's Life" and "When you deal damage to your opponent's Life".
+  // Refined in matchesCustomTrigger (controller, first damage, attacker).
+  ATTACK_DEALS_DAMAGE: "DAMAGE_DEALT",
   CARD_ADDED_TO_HAND_FROM_LIFE: "CARD_ADDED_TO_HAND_FROM_LIFE",
   CARD_TRASHED_FROM_HAND: "CARD_TRASHED",
   CHARACTER_BECOMES_RESTED: "CARD_STATE_CHANGED",

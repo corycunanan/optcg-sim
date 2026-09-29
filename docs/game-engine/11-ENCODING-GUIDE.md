@@ -93,7 +93,8 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "When your opponent's Character is returned to the owner's hand by your effect" | `{ "event": "CHARACTER_RETURNED_TO_HAND", "filter": { "controller": "OPPONENT", "cause": "BY_YOUR_EFFECT" } }` |
 | "When you take damage" | `{ "event": "DAMAGE_TAKEN" }` |
 | "When your opponent activates [Blocker]" | `{ "event": "BLOCKER_ACTIVATED", "filter": { "controller": "OPPONENT" } }` |
-| "When this Leader's attack deals damage to your opponent's Life" | `{ "event": "LEADER_ATTACK_DEALS_DAMAGE" }` |
+| "When this Leader's/Character's attack deals damage to your opponent's Life" | `{ "event": "ATTACK_DEALS_DAMAGE", "filter": { "attacker": "SELF" } }` |
+| "When you deal damage to your opponent's Life" | `{ "event": "ATTACK_DEALS_DAMAGE" }` |
 
 ### Compound Triggers
 
@@ -198,6 +199,8 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "Play up to 1 {Trait} Character with cost X or less from your hand" | `{ "type": "PLAY_CARD", "target": { "type": "CHARACTER_CARD", "source_zone": "HAND", "count": { "up_to": 1 }, "filter": { "traits": ["Trait"], "cost_max": X } }, "params": { "source_zone": "HAND", "cost_override": "FREE" } }` |
 | "Play...from your trash rested" | above with `"source_zone": "TRASH"` and `"play_state": "RESTED"` |
 | "Trash N cards from the top of your deck" | `{ "type": "MILL", "params": { "amount": N } }` |
+| "Trash cards from your hand until you have N cards in your hand" | `{ "type": "TRASH_FROM_HAND", "params": { "until_count": N } }` — trashes max(0, hand − N) counted at resolution; the hand owner chooses. "You and your opponent … until you each have N" adds `{ "type": "OPPONENT_ACTION", "params": { "action": { "type": "TRASH_FROM_HAND", "params": { "until_count": N } } }, "chain": "THEN" }` after your own clause (turn player first, OP05-058 FAQ) |
+| "Trash all cards from your hand" | `{ "type": "TRASH_FROM_HAND", "params": { "amount": { "type": "GAME_STATE", "source": "HAND_COUNT", "controller": "SELF" } } }` — schema lint requires a reviewed `WHOLE_HAND_TRASH_DISPOSITIONS` entry (`schema-hand-trash-amount-lint.ts`) naming the card, clause path and printed words; never use it for "until you have N" |
 | "Place N card(s) from your hand at the bottom of your deck" | `{ "type": "PLACE_HAND_TO_DECK", "params": { "amount": N, "position": "BOTTOM" } }` |
 | "Look at N cards from the top of your deck; place them at the top or bottom" | `{ "type": "DECK_SCRY", "params": { "look_at": N } }` (top only: add `"destination": "TOP"`) |
 
@@ -228,6 +231,7 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "give this Leader/Character up to N DON!!" | `{ "type": "GIVE_DON", "params": { "amount": N } }` |
 | "add N DON!! from your DON!! deck to your field active" | `{ "type": "ADD_DON_FROM_DECK", "params": { "amount": N, "target_state": "ACTIVE" } }` |
 | "return N DON!! from your field to the DON!! deck" | `{ "type": "RETURN_DON_TO_DECK", "params": { "amount": N, "source": "ANY" } }` |
+| "return DON!! cards from your field to your DON!! deck until you have the same number of DON!! cards on your field as your opponent" | `{ "type": "RETURN_DON_TO_DECK", "params": { "until_count": { "type": "GAME_STATE", "source": "DON_FIELD_COUNT", "controller": "OPPONENT" } } }` — returns max(0, own field DON!! − N) with N read when the action resolves (end of turn for a `SCHEDULE_ACTION`); cost-area and attached DON!! are eligible and the controller chooses (OP08-074) |
 | "set N of your DON!! cards as active" | `{ "type": "SET_DON_ACTIVE", "params": { "amount": N } }` |
 | "your opponent returns N DON!! to their DON!! deck" | `{ "type": "FORCE_OPPONENT_DON_RETURN", "params": { "amount": N } }` |
 
@@ -426,6 +430,7 @@ Encode as separate `permanent` EffectBlocks, each with its own condition. All qu
 |---|---|
 | `[Once Per Turn]` | `flags.once_per_turn: true` |
 | "You may..." (optional activation) | `flags.optional: true` |
+| "Then, you may..." (one optional clause after a mandatory one) | `optional: true` on that action ([04-ACTIONS](./04-ACTIONS.md#action-level-optional)) |
 | `[Blocker]` / `[Rush]` / etc. (printed keywords) | `flags.keywords: ["BLOCKER"]` etc. |
 
 ---
@@ -440,7 +445,7 @@ Encode as separate `permanent` EffectBlocks, each with its own condition. All qu
 - [ ] Duration matches card text exactly
 - [ ] Chain connectors: `THEN` for "Then,", `IF_DO` for "If you do,"
 - [ ] `[Once Per Turn]` mapped to `flags.once_per_turn: true`
-- [ ] "You may" mapped to `flags.optional: true`
+- [ ] "You may" mapped to `flags.optional: true` for the whole effect or its cost, or to action-level `optional: true` for a single later clause
 - [ ] Intrinsic keywords in `flags.keywords`, not as actions
 - [ ] Costs are before the colon, actions are after
 - [ ] Back-references (`result_ref` / `target_ref`) used when a later action refers to "that card"

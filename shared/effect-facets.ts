@@ -71,6 +71,7 @@ export const EFFECT_FACET_GROUPS = [
       ["damage_taken", "Damage Taken"],
       ["blocker_activated", "Blocker Activated"],
       ["leader_attack_deals_damage", "Leader Attack Deals Damage"],
+      ["attack_deals_damage", "Attack Deals Damage"],
     ]),
   },
   {

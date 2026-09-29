@@ -91,7 +91,7 @@ Every trigger requires an event to be emitted. If the event isn't emitted, the t
 | `DON_GIVEN_TO_CARD` | DON_GIVEN_TO_CARD | don.ts, execute.ts |
 | `CARD_ADDED_TO_HAND_FROM_LIFE` | CARD_ADDED_TO_HAND_FROM_LIFE | life.ts, battle.ts |
 | `CARD_REMOVED_FROM_LIFE` | CARD_REMOVED_FROM_LIFE | battle.ts, effect-damage.ts, actions/life.ts, actions/battle-actions.ts, cost/payment.ts, card-mutations.ts:returnToDeck |
-| `DAMAGE_DEALT` | DAMAGE_TAKEN, LEADER_ATTACK_DEALS_DAMAGE | battle.ts:executeDamageStep (includes attackerInstanceId, attackerType) |
+| `DAMAGE_DEALT` | DAMAGE_TAKEN, ATTACK_DEALS_DAMAGE | battle.ts:executeDamageStep (includes attackerInstanceId, attackerType, firstDamageOfAttack) |
 | `BATTLE_RESOLVED` | END_OF_BATTLE | battle.ts:endBattle |
 | `COMBAT_VICTORY` | COMBAT_VICTORY | battle.ts:executeDamageStep (attacker wins vs CHARACTER) |
 | `CHARACTER_BATTLES` | CHARACTER_BATTLES | battle.ts:executeDeclareAttack (attacker is CHARACTER) |
@@ -140,7 +140,7 @@ matchesTrigger(trigger, event, state, sourceCard, cardDb)
 | TRIGGER_ACTIVATED | TRIGGER_ACTIVATED |
 | DAMAGE_TAKEN | DAMAGE_DEALT |
 | BLOCKER_ACTIVATED | BLOCK_DECLARED |
-| LEADER_ATTACK_DEALS_DAMAGE | DAMAGE_DEALT |
+| ATTACK_DEALS_DAMAGE | DAMAGE_DEALT |
 | CARD_ADDED_TO_HAND_FROM_LIFE | CARD_ADDED_TO_HAND_FROM_LIFE |
 | CHARACTER_BECOMES_RESTED | CARD_STATE_CHANGED |
 | CHARACTER_RETURNED_TO_HAND | CARD_RETURNED_TO_HAND |
