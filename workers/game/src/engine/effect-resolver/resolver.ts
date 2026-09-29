@@ -1034,7 +1034,8 @@ export function executeActionChain(
       if (
         (action.type === "PLAYER_CHOICE" ||
           action.type === "OPPONENT_CHOICE" ||
-          action.type === "OPPONENT_ACTION") &&
+          action.type === "OPPONENT_ACTION" ||
+          action.type === "REUSE_EFFECT") &&
         nestedPromptFrame &&
         result.state.effectStack.length > stackDepthBeforeAction
       ) {
