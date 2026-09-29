@@ -47,6 +47,21 @@ function filterProhibitedTargets(
   ));
 }
 
+/**
+ * OPT-885: "any number of" is the player's choice of 0..N (rules 1-3-5-1), so
+ * it prompts whenever a candidate exists — `needsPlayerTargetSelection`
+ * auto-selects every candidate for `any_number`. Mirrors RETURN_TO_DECK.
+ * Scoped to the handlers whose `*_THIS_WAY` consumers count the result.
+ */
+function needsAnyNumberOrTargetSelection(
+  target: ActionOf<"KO">["target"],
+  allValidIds: string[],
+): boolean {
+  const anyNumber = !!target?.count && "any_number" in target.count;
+  return (anyNumber && allValidIds.length > 0) ||
+    needsPlayerTargetSelection(target, allValidIds);
+}
+
 export function executeKO(
   state: GameState,
   action: ActionOf<"KO">,
@@ -60,7 +75,7 @@ export function executeKO(
   const events: PendingEvent[] = [];
   const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+  if (!preselectedTargets && needsAnyNumberOrTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
@@ -139,7 +154,7 @@ export function executeReturnToHand(
   const events: PendingEvent[] = [];
   const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   const allValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
-  if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
+  if (!preselectedTargets && needsAnyNumberOrTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);

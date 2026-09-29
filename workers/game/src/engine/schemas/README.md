@@ -167,10 +167,10 @@ For effects that react to game events (not bracket-tag abilities):
 
 | Card Text Pattern | Trigger |
 |-------------------|---------|
-| "When your opponent's Character is K.O.'d" | `{ event: "OPPONENT_CHARACTER_KO" }` |
+| "When your opponent's Character is K.O.'d" | `{ event: "OPPONENT_CHARACTER_KO" }` — the engine matches only Characters that left the field of the watcher's opponent (the removed card's controller ≠ the watcher's controller); no `filter.controller` needed |
 | "When a Character is K.O.'d" | `{ event: "ANY_CHARACTER_KO" }` |
 | "When a Character is trashed" | `{ event: "ANY_CHARACTER_TRASHED" }` |
-| "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` |
+| "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` — same engine opponent check as `OPPONENT_CHARACTER_KO`; no `filter.controller` needed |
 | "When a Character is removed from the field" | `{ event: "CHARACTER_REMOVED_FROM_FIELD" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
@@ -374,7 +374,8 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `PLACE_FROM_TRASH_TO_DECK` | "Return N from trash to deck" |
 | `PLACE_STAGE_TO_DECK` | "Place Stage at deck bottom" |
 | `PLACE_HAND_TO_DECK` | "Place N from hand to deck" |
-| `GIVE_OPPONENT_DON` | "Give DON!! to opponent" |
+| `GIVE_OPPONENT_DON` | Legacy: moves N of the payer's own unattached DON!! to the opponent's cost area. No printed cost matches it — do not use for "give 1 of your opponent's rested DON!! …" |
+| `GIVE_OPPONENT_DON_TO_OPPONENT` | "Give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters" before the colon — `{ amount: 1, target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } } }`; rested is intrinsic (no cost `filter`); unpayable when the opponent has no rested cost-area DON!! or no Character; the payer picks the Character, and also the DON!! when the opponent's rested DON!! carry different effects |
 | `GIVE_DON` | "Give N active DON!! card(s) to 1 of your [Name]/Leader or Character cards" before the colon — `{ amount: N, target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { exact: 1 }, filter } }`; only active, unattached cost-area DON!! pay; the player picks the recipient, exposed as result ref `__cost_don_given` |
 | `RETURN_ATTACHED_DON_TO_COST` | "Return attached DON!!" |
 | `PLACE_SELF_AND_HAND_TO_DECK` | "Place this card and hand to deck" |
@@ -696,7 +697,7 @@ Used in `permanent` effect blocks via the `prohibitions` array:
 | `CANNOT_BE_PLAYED_BY_EFFECTS` | "Cannot be played by effects" | |
 | `CANNOT_LEAVE_FIELD` | "Cannot leave field" | |
 | `CANNOT_REFRESH` | "Cannot refresh (stays rested)" | |
-| `CANNOT_ATTACH_DON` | "Cannot receive DON!!" | |
+| `CANNOT_ATTACH_DON` | "Cannot receive DON!!" | Optional `controller` (read relative to the prohibition's owner vs the player giving). Vetoes manual attach (rule 6-5-5), the `GIVE_DON` action and the `GIVE_DON` cost through the shared `isDonAttachProhibited` predicate (OPT-869); `DISTRIBUTE_DON`, `REDISTRIBUTE_DON`, `GIVE_OPPONENT_DON_TO_OPPONENT` and the DON!! Phase `GIVEN_TO_LEADER` rule modification are not yet gated |
 | `CANNOT_BE_RETURNED_TO_HAND` | "Cannot be returned to hand" | |
 | `CANNOT_BE_RETURNED_TO_DECK` | "Cannot be returned to deck" | |
 
@@ -993,6 +994,36 @@ to the filter and read `{ type: "ACTION_RESULT", ref: "__triggering_hand_trash" 
 for the actual discarded count. Do not use a discarded-card target filter for
 Navy. The OP14 activation-cost interpretation is explicitly flagged in
 [the rules handoff](../../../../../docs/project/handoffs/opt-795-hand-trash-watchers.md).
+
+### `*_THIS_WAY` counts: cost or action
+
+`CARDS_TRASHED_THIS_WAY`, `DON_RESTED_THIS_WAY`, `CHARACTERS_RETURNED_THIS_WAY`,
+`CHARACTERS_KO_THIS_WAY` and `CARDS_PLACED_TO_DECK_THIS_WAY` count the cards
+moved by the step the text points back to ("for every card trashed"). Encode
+exactly one of two shapes (OPT-885):
+
+- **Counted by a cost** (pre-colon text such as `You may rest any number of
+  DON!!:`): omit `ref`. The value reads the implicit `__cost_*` ref that cost
+  payment fills, so the block must have a filling cost.
+- **Counted by an action** (no colon: "You may trash any number of ... from
+  your hand. ... +1000 for every card trashed"): give the moving action a
+  `result_ref` and set the same name as the PER_COUNT `ref`. The value is that
+  action's `result.count`, the cards actually moved. Result refs persist with a
+  paused frame and exist only for the current resolution, so the count survives
+  a selection prompt and never leaks into a later resolution.
+
+```ts
+{ type: "TRASH_FROM_HAND", target: { type: "CARD_IN_HAND", controller: "SELF", count: { any_number: true } }, result_ref: "cards_trashed" },
+{ type: "MODIFY_POWER", target: { type: "SELF" }, chain: "THEN", duration: { type: "THIS_BATTLE" },
+  params: { amount: { type: "PER_COUNT", source: "CARDS_TRASHED_THIS_WAY", ref: "cards_trashed", multiplier: 1000 } } },
+```
+
+A block with both a cost and an action keeps them apart: the ref-less source
+reads the cost, the `ref` source reads the action. Action producers are
+`TRASH_FROM_HAND`/`TRASH_CARD` (trashed), `KO`, `RETURN_TO_HAND` (returned) and
+`RETURN_TO_DECK` (placed to deck). `schema-this-way-source-lint.ts` rejects a
+source with no filling cost, a `ref` not produced by an earlier action in the
+same block, a producer of the wrong kind, and any source outside `actions`.
 
 ### Field-wide dynamic counts
 
