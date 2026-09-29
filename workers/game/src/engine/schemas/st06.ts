@@ -291,7 +291,7 @@ export const ST06_014_SHOCKWAVE: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_ko",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -398,7 +398,7 @@ export const ST06_016_WHITE_OUT: EffectSchema = {
   effects: [
     {
       id: "counter_power_boost",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
