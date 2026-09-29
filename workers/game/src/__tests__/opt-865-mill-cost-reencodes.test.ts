@@ -199,20 +199,19 @@ describe("OPT-865 OP11-098 Blue Hole — [Main] MILL 3 is an activation cost", (
     expect(f.millEvents()[0]).toMatchObject({ playerIndex: 0, payload: { count: 3, reason: "mill", from: "DECK" } });
   });
 
-  it("with exactly 3 cards the cost is payable: the deck empties and the K.O. prompt still opens", () => {
+  // Rules 9-1-2 (rule processing is immediate) + 9-2-1-2 (a player with 0
+  // cards in deck loses): paying with exactly 3 cards empties the deck, so the
+  // game must end before the K.O. prompt. Known engine gap (OPT-862); this
+  // ratchet fails loudly once immediate deck-out processing lands.
+  it.fails("an exactly-3-card deck pays, then loses immediately before the K.O. prompt (rule 9-1-2)", () => {
     const f = fixture();
     f.deck(0, 3);
-    const victim = f.put("victim", 1, "CHARACTER", { cost: 2 });
+    f.put("victim", 1, "CHARACTER", { cost: 2 });
     f.act({ type: "PLAY_CARD", cardInstanceId: putBlueHole(f).instanceId });
     f.accept();
     expect(f.state.players[0].deck).toHaveLength(0);
-    // Observed engine behavior (shared with the OPT-798 ratchets, rule 9-1-2
-    // gap): the game stays in progress and the prompt is still offered.
-    expect(f.state.status).toBe("IN_PROGRESS");
-    expect(f.validTargets()).toEqual([victim.instanceId]);
-    f.select([victim.instanceId]);
-    expect(onField(f.state, victim.instanceId)).toBe(false);
-    expect(f.millEvents()).toHaveLength(1);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state).toMatchObject({ status: "FINISHED", winner: 1 });
   });
 
   it("declining the optional cost trashes nothing and K.O.s nothing", () => {
@@ -280,20 +279,31 @@ describe("OPT-865 OP12-090 Belo Betty — [When Attacking] MILL 2 is an activati
     expect(f.millEvents()[0].payload).toMatchObject({ count: 2, reason: "mill", from: "DECK" });
   });
 
-  it("pays with an empty hand (no hand discard is required)", () => {
+  it("with a 3-card deck and an empty hand pays 2 from the deck, discards nothing, gives -2 cost", () => {
     const f = fixture();
-    f.deck(0, 2);
+    f.deck(0, 3);
     const target = f.put("target", 1, "CHARACTER", { cost: 3 });
     bettyAttack(f);
     f.accept();
-    expect(f.state.players[0].deck).toHaveLength(0);
-    // Observed engine behavior for an exactly-2-card deck: the game stays in
-    // progress and the prompt still opens.
-    expect(f.state.status).toBe("IN_PROGRESS");
+    expect(f.state.players[0].deck).toHaveLength(1);
+    expect(f.state.players[0].hand).toHaveLength(0);
     expect(f.validTargets()).toEqual([target.instanceId]);
     f.select([target.instanceId]);
     expect(getEffectiveCost(f.db.get("target")!, f.state, target.instanceId, f.db)).toBe(1);
     expect(f.millEvents()).toHaveLength(1);
+  });
+
+  // Same rule 9-1-2 / 9-2-1-2 gap (OPT-862): an exactly-2-card deck empties
+  // when the cost is paid, so the game must end before the -2 cost prompt.
+  it.fails("an exactly-2-card deck pays, then loses immediately before the -2 cost prompt (rule 9-1-2)", () => {
+    const f = fixture();
+    f.deck(0, 2);
+    f.put("target", 1, "CHARACTER", { cost: 3 });
+    bettyAttack(f);
+    f.accept();
+    expect(f.state.players[0].deck).toHaveLength(0);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state).toMatchObject({ status: "FINISHED", winner: 1 });
   });
 
   it("declining the optional cost trashes nothing and changes no cost", () => {
