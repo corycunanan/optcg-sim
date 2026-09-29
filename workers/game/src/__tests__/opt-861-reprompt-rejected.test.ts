@@ -468,3 +468,177 @@ describe("OPT-861 GameSession wire contract", () => {
     expect(reveals(session.gameState)).toEqual([]);
   });
 });
+
+// Integration with OPT-868: the post-colon GIVE_DON identity step re-uses the
+// paused GIVE_DON and asks another SELECT_TARGET after a valid recipient
+// reply. Its binding is a continuation marker (`giveDonIdentity`), so it is a
+// legitimate follow-up — never a re-prompt — while a stale REVEAL_HAND reply
+// still is. Canonical text: docs/cards/OP-15.md OP15-003; FAQ
+// docs/FAQs/faq_op15-eb04.md (the activating player chooses the DON!!).
+describe("OPT-861 × OPT-868 GIVE_DON identity step", () => {
+  function opponentDonSetup() {
+    const f = fixture();
+    f.state.turn.activePlayerIndex = 0;
+    f.data("OP15-003", { cost: 4, power: 5000 });
+    const source = f.put("OP15-003", 0);
+    const foes = [0, 1].map(() => f.put(CARDS.VANILLA.id, 1));
+    for (const [player, active, rested] of [[0, 2, 2], [1, 2, 3]] as const) {
+      const p = f.state.players[player];
+      const pool = [...p.donCostArea, ...p.donDeck];
+      p.donCostArea = pool.slice(0, active + rested).map((d, i) => ({
+        ...d,
+        state: i < active ? ("ACTIVE" as const) : ("RESTED" as const),
+        attachedTo: null,
+      }));
+      p.donDeck = pool.slice(active + rested);
+    }
+    const rested = f.state.players[1].donCostArea
+      .filter((d) => d.state === "RESTED")
+      .map((d) => d.instanceId);
+    const [held, payment, free] = rested;
+    // A hold on one DON!! makes the opponent's DON!! differ (rule 3-1-6-1),
+    // so which one is given is a real choice.
+    f.state = {
+      ...f.state,
+      prohibitions: [
+        ...f.state.prohibitions,
+        {
+          id: "opt861-hold",
+          sourceCardInstanceId: "seed",
+          sourceEffectBlockId: "",
+          prohibitionType: "CANNOT_REFRESH",
+          scope: {},
+          duration: { type: "SKIP_NEXT_REFRESH" },
+          controller: 0,
+          appliesTo: [held],
+          usesRemaining: null,
+        } as GameState["prohibitions"][number],
+      ],
+    };
+    f.act({
+      type: "ACTIVATE_EFFECT",
+      cardInstanceId: source.instanceId,
+      effectId: "OP15-003_activate_don_move",
+    });
+    for (const step of [
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+      { type: "SELECT_TARGET", selectedInstanceIds: [foes[0].instanceId] },
+      { type: "SELECT_TARGET", selectedInstanceIds: [payment] },
+    ] as GameAction[]) {
+      expect(f.reply(step).responseRejected).toBe(false);
+    }
+    return { f, held, free, oppLeader: f.state.players[1].leader.instanceId };
+  }
+
+  it("the identity step after a valid recipient reply is accepted, not re-prompted", () => {
+    const { f, held, free, oppLeader } = opponentDonSetup();
+    f.persist();
+
+    const recipient = f.select([oppLeader]);
+
+    expect(recipient.responseRejected).toBe(false);
+    expect(recipient.reprompted).toBeUndefined();
+    expect(new Set(f.targets().validTargets)).toEqual(new Set([held, free]));
+    expect(f.state.effectStack.at(-1)?.giveDonIdentity).toEqual({
+      owner: 1,
+      recipient: oppLeader,
+    });
+    f.persist();
+    expect(f.select([free])).toMatchObject({ responseRejected: false });
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(
+      f.state.players[1].leader.attachedDon.map((d) => d.instanceId)
+    ).toEqual([free]);
+
+    // …while a stale REVEAL_HAND reply in the same engine still re-prompts.
+    const g = fixture();
+    g.data("OP01-105", { cost: 2 });
+    const bao = g.put("OP01-105", 0, "HAND");
+    const hand = [0, 1, 2].map(() => g.put(CARDS.VANILLA.id, 1, "HAND"));
+    g.state.turn.activePlayerIndex = 0;
+    g.act({ type: "PLAY_CARD", cardInstanceId: bao.instanceId });
+    g.persist();
+    g.state.players[1].hand = hand.slice(1);
+    expect(g.select([hand[0].instanceId, hand[2].instanceId])).toMatchObject({
+      responseRejected: true,
+      reprompted: true,
+    });
+  });
+
+  it("an identity step opened directly by the action chain keeps its binding", () => {
+    const { f, held, free } = opponentDonSetup();
+    // Drop the paused OP15-003 effect and leave the opponent one Character;
+    // a fresh chain's GIVE_DON auto-selects it and pauses on the DON!!
+    // identity inside executeActionChain.
+    const [recipient, ...others] = f.state.players[1].characters.filter(
+      (c) => c !== null
+    );
+    f.state = {
+      ...f.state,
+      pendingPrompt: null,
+      effectStack: [],
+      players: [
+        f.state.players[0],
+        { ...f.state.players[1], characters: padChars([recipient!]) },
+      ],
+    };
+    expect(others).toHaveLength(1);
+    const result = resolveEffect(
+      f.state,
+      {
+        id: "opt861-give-opponent-don",
+        category: "auto",
+        trigger: { keyword: "ON_PLAY" },
+        actions: [
+          {
+            type: "GIVE_DON",
+            target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
+            params: { amount: 1, don_state: "RESTED" },
+          },
+        ],
+      } as EffectBlock,
+      f.state.players[0].leader.instanceId,
+      0,
+      f.db
+    );
+    f.state = { ...result.state, pendingPrompt: result.pendingPrompt! };
+    expect(new Set(f.targets().validTargets)).toEqual(new Set([held, free]));
+    expect(f.state.effectStack.at(-1)?.giveDonIdentity).toEqual({
+      owner: 1,
+      recipient: recipient!.instanceId,
+    });
+    f.persist();
+    expect(f.select([free])).toMatchObject({ responseRejected: false });
+    expect(
+      f.state.players[1].characters
+        .find((c) => c?.instanceId === recipient!.instanceId)
+        ?.attachedDon.map((d) => d.instanceId)
+    ).toContain(free);
+  });
+
+  it("a session saved with the legacy validTargets marker still resumes", () => {
+    const { f, held, free, oppLeader } = opponentDonSetup();
+    f.select([oppLeader]);
+    const frame = f.state.effectStack.at(-1)!;
+    const { giveDonIdentity: _binding, ...legacy } = frame;
+    f.state = {
+      ...f.state,
+      effectStack: [
+        ...f.state.effectStack.slice(0, -1),
+        {
+          ...legacy,
+          validTargets: [`give-don-identity:1:${oppLeader}`, held, free],
+        },
+      ],
+    };
+    f.persist();
+    expect(f.state.effectStack.at(-1)?.giveDonIdentity).toBeUndefined();
+
+    expect(f.select([`give-don-identity:1:${oppLeader}`]).responseRejected).toBe(true);
+    expect(f.select([free])).toMatchObject({ responseRejected: false });
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(
+      f.state.players[1].leader.attachedDon.map((d) => d.instanceId)
+    ).toEqual([free]);
+  });
+});

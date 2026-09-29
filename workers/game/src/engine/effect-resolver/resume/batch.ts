@@ -139,6 +139,7 @@ export function reenterBatchResume(
         validTargets: context.validTargets,
         returnToDeckArrangement: context.returnToDeckArrangement,
         fieldToLifeTargetIds: context.fieldToLifeTargetIds,
+        giveDonIdentity: context.giveDonIdentity,
         costs: [],
         currentCostIndex: 0,
         costsPaid: true,

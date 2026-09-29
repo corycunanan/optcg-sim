@@ -340,6 +340,9 @@ const StackFrameCore = z.strictObject({
   validTargets: StringArray,
   returnToDeckArrangement: ReturnToDeckArrangement.optional(),
   fieldToLifeTargetIds: StringArray.optional(),
+  giveDonIdentity: z
+    .strictObject({ owner: PlayerIndex, recipient: z.string() })
+    .optional(),
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
   replacementBatchContinuation: z.unknown().optional(),

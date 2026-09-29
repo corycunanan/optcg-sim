@@ -32,6 +32,7 @@ import {
   applyRedistributeDonTransfers,
   fieldSideOf,
   giveableDon,
+  GIVE_DON_IDENTITY_PREFIX,
   parseGiveDonIdentityMarker,
 } from "../actions/don.js";
 import { attachDonToCard } from "../card-mutations.js";
@@ -131,7 +132,8 @@ export function handleRedistributeDon(
 
 /**
  * OPT-868: GIVE_DON identity resume — the activating player chose which of the
- * opponent's DON!! to give the recipient bound in the frame's marker
+ * opponent's DON!! to give the recipient bound in `giveDonIdentity` (or, for
+ * sessions saved before OPT-861, the legacy validTargets marker)
  * (faq_op15-eb04.md OP15-003/010/012/017/023). The reply must be exactly one
  * offered DON!! that is still an unattached cost-area DON!! of the bound owner
  * in the action's DON!! state, and the recipient must still be on that
@@ -151,7 +153,8 @@ export function handleGiveDonIdentity(
   ) {
     return null;
   }
-  const binding = parseGiveDonIdentityMarker(validTargets);
+  const binding =
+    resumeCtx.giveDonIdentity ?? parseGiveDonIdentityMarker(validTargets);
   if (!binding) return null;
   const reject: TargetBranchResult = {
     kind: "terminal",
@@ -162,7 +165,7 @@ export function handleGiveDonIdentity(
   const donState = pausedAction.params?.don_state ?? "ACTIVE";
   if (
     !donId ||
-    donId === binding.marker ||
+    donId.startsWith(GIVE_DON_IDENTITY_PREFIX) ||
     !validTargets.includes(donId) ||
     fieldSideOf(state, binding.recipient) !== binding.owner ||
     !giveableDon(state, binding.owner, donState).some((d) => d.instanceId === donId)

@@ -503,6 +503,7 @@ export function resumeFromStack(
         validTargets: topFrame.validTargets,
         returnToDeckArrangement: topFrame.returnToDeckArrangement,
         fieldToLifeTargetIds: topFrame.fieldToLifeTargetIds,
+        giveDonIdentity: topFrame.giveDonIdentity,
         ruleTrashForPlay: topFrame.ruleTrashForPlay,
         stateDistributionForPlay: topFrame.stateDistributionForPlay,
       };
@@ -573,6 +574,7 @@ export function resumeFromStack(
             validTargets: promptCtx.validTargets,
             returnToDeckArrangement: promptCtx.returnToDeckArrangement,
             fieldToLifeTargetIds: promptCtx.fieldToLifeTargetIds,
+            giveDonIdentity: promptCtx.giveDonIdentity,
             accumulatedEvents: [...events],
             ruleTrashForPlay: promptCtx.ruleTrashForPlay,
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,
