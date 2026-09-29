@@ -14,6 +14,7 @@
 import {
   ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
   ALL_ACTION_TYPES,
+  ALL_CAUSE_FILTER_BY,
   ALL_COST_TYPES,
   ALL_TARGET_TYPES,
   DON_POOL_FILTER_KEYS,
@@ -230,6 +231,8 @@ const TARGET_CONTROLLER_MODES = {
   REPLACED_CARD: NO_SLOT_CONTROLLERS,
 } satisfies Record<TargetType, ReadonlySet<Controller>>;
 
+const CAUSE_FILTER_BY_VALUES = new Set<string>(ALL_CAUSE_FILTER_BY);
+
 /**
  * Validate an effect schema and return a list of error messages.
  * Returns an empty array if the schema is valid.
@@ -338,6 +341,16 @@ function validateBlock(block: EffectBlock, prefix: string): string[] {
     case "replacement":
       if (!block.replaces) {
         errors.push(`${prefix}: 'replacement' block missing 'replaces'`);
+      } else if (block.replaces.cause_filter != null) {
+        // OPT-873: the runtime (replacements.ts isCauseFilter) drops a
+        // replacement whose cause filter it does not recognize, silently
+        // disabling the whole block. Reject it at authoring time instead.
+        const by: unknown = block.replaces.cause_filter.by;
+        if (typeof by !== "string" || !CAUSE_FILTER_BY_VALUES.has(by)) {
+          errors.push(
+            `${prefix}.replaces.cause_filter.by: must be one of ${ALL_CAUSE_FILTER_BY.join(", ")}`,
+          );
+        }
       }
       if (!block.replacement_actions || block.replacement_actions.length === 0) {
         errors.push(`${prefix}: 'replacement' block missing 'replacement_actions'`);
