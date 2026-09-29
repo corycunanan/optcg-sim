@@ -30,7 +30,10 @@ export interface TargetActionPresentation {
 export const TARGET_ACTION_PRESENTATION: Partial<
   Record<ActionType, TargetActionPresentation>
 > = {
-  KO: { verb: () => "KO", title: () => "KO Characters" },
+  KO: {
+    verb: () => "KO",
+    title: (action) => cardKindTitle(action, "KO Characters", "KO Stage", "KO"),
+  },
   SET_REST: { verb: () => "Rest", title: () => "Rest" },
   SET_ACTIVE: { verb: () => "Set active", title: () => "Set Active" },
   RETURN_TO_HAND: { verb: () => "Return to hand", title: () => "Return to Hand" },
@@ -79,8 +82,17 @@ export const TARGET_ACTION_PRESENTATION: Partial<
         ? `Give [${displayKeyword(action.params?.keyword)}] to`
         : undefined,
   },
-  PLAY_CARD: { verb: () => "Play", title: () => "Play Character" },
-  PLAY_FROM_LIFE: { verb: () => "Play", title: () => "Play Character" },
+  PLAY_CARD: {
+    verb: () => "Play",
+    title: (action) =>
+      cardKindTitle(action, "Play Character", "Play Stage", "Play Card"),
+  },
+  PLAY_SELF: { title: () => "Play This Card" },
+  PLAY_FROM_LIFE: {
+    verb: () => "Play",
+    title: (action) =>
+      cardKindTitle(action, "Play Character", "Play Stage", "Play Card"),
+  },
   ADD_TO_LIFE: { verb: () => "Add to Life", title: () => "Add to Life" },
   ADD_TO_LIFE_FROM_DECK: { verb: () => "Add to Life", title: () => "Add to Life" },
   ADD_TO_LIFE_FROM_HAND: { verb: () => "Add to Life", title: () => "Add to Life" },
@@ -192,18 +204,64 @@ function renderSignedVerb(
   return `Give ${signedAmount} ${property} to`;
 }
 
+/** Static sign of an amount, or `undefined` when it depends on game state. */
+function amountSign(amount: unknown): -1 | 1 | undefined {
+  if (typeof amount === "number") return amount < 0 ? -1 : 1;
+  if (!amount || typeof amount !== "object") return undefined;
+  const value = amount as { type?: string; value?: unknown; multiplier?: unknown };
+  if (value.type === "FIXED") return amountSign(value.value);
+  // A PER_COUNT total is count (>= 0) times the multiplier, so the multiplier
+  // fixes the sign.
+  if (value.type === "PER_COUNT") return amountSign(value.multiplier);
+  return undefined;
+}
+
 function renderSignedTitle(
   property: "Power" | "Cost",
   amount: unknown
 ): string {
-  if (typeof amount === "number") {
-    if (property === "Power") {
-      return amount < 0 ? "Decrease Power" : "Increase Power";
-    }
-    return amount < 0 ? "Reduce Cost" : "Increase Cost";
-  }
-  // Dynamic amounts have no static sign.
-  return `Modify ${property}`;
+  const sign = amountSign(amount);
+  if (sign === undefined) return `Modify ${property}`;
+  if (property === "Power") return sign < 0 ? "Decrease Power" : "Increase Power";
+  return sign < 0 ? "Reduce Cost" : "Increase Cost";
+}
+
+type CardKind = "CHARACTER" | "STAGE";
+
+function kindOfTypeName(name: string): CardKind | undefined {
+  const upper = name.toUpperCase();
+  if (upper === "CHARACTER" || upper === "CHARACTER_CARD") return "CHARACTER";
+  if (upper === "STAGE" || upper === "STAGE_CARD") return "STAGE";
+  return undefined;
+}
+
+/**
+ * Whether the action's target is only Characters or only Stages. Mixed or
+ * unknown targets return `undefined` so the title stays neutral.
+ */
+function targetCardKind(action: Action): CardKind | undefined {
+  const target = (action as { target?: Target }).target;
+  if (!target) return undefined;
+  const byType = kindOfTypeName(target.type ?? "");
+  if (byType) return byType;
+  const filterType = (target.filter as { card_type?: string | string[] } | undefined)
+    ?.card_type;
+  if (filterType === undefined) return undefined;
+  const kinds = new Set(
+    (Array.isArray(filterType) ? filterType : [filterType]).map(kindOfTypeName)
+  );
+  if (kinds.size !== 1) return undefined;
+  return [...kinds][0];
+}
+
+function cardKindTitle(
+  action: Action,
+  character: string,
+  stage: string,
+  neutral: string
+): string {
+  const kind = targetCardKind(action);
+  return kind === "CHARACTER" ? character : kind === "STAGE" ? stage : neutral;
 }
 
 function ownerPrefix(controller: Controller | undefined): string {

@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Action, EffectBlock } from "../engine/effect-types.js";
+import { getAllAuthoredSchemas } from "../engine/schema-registry.js";
 import { actionTitle } from "../engine/effect-resolver/target-instruction.js";
 import { resolveEffect } from "../engine/effect-resolver/resolver.js";
 import {
@@ -58,14 +59,15 @@ function stateWithFrame(frame: Partial<EffectStackFrame>): GameState {
 
 describe("actionTitle", () => {
   it.each([
-    ["KO", "KO Characters"],
+    ["KO", "KO"],
     ["RETURN_TO_HAND", "Return to Hand"],
     ["RETURN_TO_DECK", "Return to Deck"],
     ["SET_REST", "Rest"],
     ["SET_ACTIVE", "Set Active"],
     ["TRASH_CARD", "Trash"],
     ["GIVE_DON", "Give DON!!"],
-    ["PLAY_CARD", "Play Character"],
+    ["PLAY_CARD", "Play Card"],
+    ["PLAY_SELF", "Play This Card"],
     ["SEARCH_DECK", "Search Deck"],
     ["SEARCH_AND_PLAY", "Search and Play"],
     ["DRAW", "Draw Cards"],
@@ -117,6 +119,101 @@ describe("actionTitle", () => {
         params: { action: { type: "APPLY_PROHIBITION" } },
       } as Action)
     ).toBeUndefined();
+  });
+});
+
+function authoredBlock(cardId: string, blockId: string): EffectBlock {
+  const block = getAllAuthoredSchemas()[cardId]?.effects.find(
+    (candidate) => candidate.id === blockId
+  );
+  if (!block) throw new Error(`${cardId} ${blockId} not authored`);
+  return block;
+}
+
+describe("card-kind aware titles (F1)", () => {
+  const ko = (type: string, extra: object = {}) =>
+    ({ type: "KO", target: { type, controller: "OPPONENT", ...extra } }) as Action;
+  const play = (type: string, extra: object = {}) =>
+    ({ type: "PLAY_CARD", target: { type, controller: "SELF", ...extra } }) as Action;
+
+  it("names Character, Stage and neutral KO targets", () => {
+    expect(actionTitle(ko("CHARACTER"))).toBe("KO Characters");
+    expect(actionTitle(ko("STAGE"))).toBe("KO Stage");
+    expect(actionTitle(ko("FIELD_CARD"))).toBe("KO");
+    expect(actionTitle({ type: "KO" } as Action)).toBe("KO");
+  });
+
+  it("names Character, Stage and neutral PLAY_CARD targets", () => {
+    expect(actionTitle(play("CHARACTER_CARD"))).toBe("Play Character");
+    expect(actionTitle(play("STAGE_CARD"))).toBe("Play Stage");
+    expect(actionTitle(play("CARD_IN_HAND", { filter: { card_type: "CHARACTER" } }))).toBe("Play Character");
+    expect(actionTitle(play("CARD_IN_HAND", { filter: { card_type: ["CHARACTER", "STAGE"] } }))).toBe("Play Card");
+    expect(actionTitle(play("CARD_IN_HAND"))).toBe("Play Card");
+  });
+
+  it("OP03-096 titles the Character branch and the Stage branch differently", () => {
+    const choice = authoredBlock("OP03-096", "main_ko_choice").actions![0] as {
+      params: { options: Action[][] };
+    };
+    expect(actionTitle(choice.params.options[0][0])).toBe("KO Characters");
+    expect(actionTitle(choice.params.options[1][0])).toBe("KO Stage");
+  });
+
+  it("OP08-110 plays a Stage, not a Character", () => {
+    const actions = authoredBlock("OP08-110", "on_play_search_and_play").actions!;
+    expect(actionTitle(actions.find((a) => a.type === "PLAY_CARD"))).toBe("Play Stage");
+  });
+});
+
+describe("dynamic amount titles (F3, T1)", () => {
+  const perCount = (multiplier: number) => ({
+    type: "PER_COUNT",
+    source: "MATCHING_CARDS_ON_FIELD",
+    multiplier,
+  });
+  it("uses the PER_COUNT multiplier sign", () => {
+    expect(actionTitle({ type: "MODIFY_POWER", params: { amount: perCount(-1000) } } as Action)).toBe("Decrease Power");
+    expect(actionTitle({ type: "MODIFY_POWER", params: { amount: perCount(1000) } } as Action)).toBe("Increase Power");
+    expect(actionTitle({ type: "MODIFY_COST", params: { amount: perCount(-1) } } as Action)).toBe("Reduce Cost");
+    expect(actionTitle({ type: "MODIFY_COST", params: { amount: perCount(1) } } as Action)).toBe("Increase Cost");
+  });
+
+  it("stays neutral only when the sign is truly unknown", () => {
+    const unknown = { type: "GAME_STATE", source: "OPPONENT_LIFE_COUNT" };
+    expect(actionTitle({ type: "MODIFY_POWER", params: { amount: unknown } } as Action)).toBe("Modify Power");
+    expect(actionTitle({ type: "MODIFY_COST", params: { amount: unknown } } as Action)).toBe("Modify Cost");
+  });
+
+  it("ST31-004 (-1000 per Straw Hat Crew card) is Decrease Power", () => {
+    const block = authoredBlock("ST31-004", "on_play_crew_debuff");
+    expect(actionTitle(block.actions![0])).toBe("Decrease Power");
+  });
+});
+
+describe("optional block labels (F2)", () => {
+  const optionalPrompt: PendingPromptState = {
+    options: { promptType: "OPTIONAL_EFFECT", effectDescription: "x" },
+    respondingPlayer: 0,
+    resumeContext: "f1",
+  };
+  const frameFor = (block: EffectBlock) =>
+    stateWithFrame({ pausedAction: null, costs: [], costsPaid: true, effectBlock: block });
+
+  it("OP08-104 [Trigger] (PLAY_SELF, DRAW) is titled for the play, not the draw", () => {
+    const state = frameFor(authoredBlock("OP08-104", "trigger_trash_play_draw"));
+    expect(resolvePromptActionLabel(state, optionalPrompt)).toBe("Play This Card");
+  });
+
+  it("OP08-113 (PLAY_SELF, KO) is titled for the play, not the KO", () => {
+    const state = frameFor(authoredBlock("OP08-113", "trigger_trash_play_ko"));
+    expect(resolvePromptActionLabel(state, optionalPrompt)).toBe("Play This Card");
+  });
+
+  it("falls back to the timing when the first player-facing action is unmapped", () => {
+    const state = frameFor({
+      actions: [{ type: "APPLY_PROHIBITION" }, { type: "WIN_GAME" }, { type: "DRAW" }],
+    } as unknown as EffectBlock);
+    expect(resolvePromptActionLabel(state, optionalPrompt)).toBeUndefined();
   });
 });
 
@@ -256,7 +353,7 @@ describe("resolvePromptActionLabel", () => {
         ...prompt,
         resumeContext: resumeContext({ type: "PLAY_CARD" } as Action),
       })
-    ).toBe("Play Character");
+    ).toBe("Play Card");
   });
 
   it("gives blocker and pregame prompts no label", () => {

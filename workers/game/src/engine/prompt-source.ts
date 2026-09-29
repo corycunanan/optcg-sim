@@ -78,15 +78,32 @@ function isPayingCosts(frame: EffectStackFrame): boolean {
   return (frame.costs?.length ?? 0) > 0 && !frame.costsPaid;
 }
 
-/** First action in the block that has a player-facing label. */
+/**
+ * Actions that never take a player-facing step of their own, so a block's
+ * label looks past them to the first real action.
+ */
+const INTERNAL_ACTION_TYPES: ReadonlySet<string> = new Set([
+  "APPLY_PROHIBITION",
+  "REMOVE_PROHIBITION",
+  "SCHEDULE_ACTION",
+  "REUSE_EFFECT",
+  "NEGATE_EFFECTS",
+  "NEGATE_TRIGGER_TYPE",
+  "APPLY_ONE_TIME_MODIFIER",
+  "SHUFFLE_DECK",
+]);
+
+/**
+ * Label of the first player-facing action in the block. If that action has no
+ * title, return `undefined` (timing fallback) rather than naming a later one.
+ */
 function firstPlayerFacingLabel(
   actions: readonly Action[] | undefined
 ): string | undefined {
-  for (const action of actions ?? []) {
-    const label = actionTitle(action);
-    if (label) return label;
-  }
-  return undefined;
+  const first = (actions ?? []).find(
+    (action) => !INTERNAL_ACTION_TYPES.has(action.type)
+  );
+  return actionTitle(first);
 }
 
 /**
