@@ -540,7 +540,7 @@ function blockerPrompt(f: Fixture) {
     deserializeAttachment: () => null,
   } as unknown as WebSocket;
   const transport = new SessionTransport(
-    { getWebSockets: () => [ws], acceptWebSocket: () => {} },
+    { getWebSockets: () => [ws], acceptWebSocket: () => {}, getTags: () => [] },
     () => {},
   );
   transport.sendPendingPrompts(f.state, f.db);
