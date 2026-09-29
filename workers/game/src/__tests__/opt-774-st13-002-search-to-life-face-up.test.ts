@@ -207,6 +207,34 @@ export const OPT_774_SPREAD_FIXTURE = {
   }]
 };
 
+export const OPT_774_CONDITIONAL_FIXTURE = {
+  card_id: "TEST-774-CONDITIONAL",
+  card_name: "Conditional override schema lint fixture",
+  card_type: "Leader",
+  effects: [{
+    id: "conditional_unknown",
+    category: "activate",
+    trigger: { keyword: "ACTIVATE_MAIN" },
+    actions: [{
+      type: "APPLY_PROHIBITION",
+      params: {
+        prohibition_type: "CANNOT_ATTACK",
+        conditional_override: {
+          action: {
+            type: "SEARCH_DECK",
+            params: {
+              look_at: 5,
+              pick: { up_to: 1 },
+              pick_destination: "CONDITIONAL_UNKNOWN",
+              rest_destination: "BOTTOM"
+            }
+          }
+        }
+      }
+    }]
+  }]
+};
+
 export const OPT_774_VALID_FIXTURE = {
   card_id: "TEST-774-VALID",
   card_name: "Valid schema lint fixture",
@@ -347,6 +375,8 @@ describe("OPT-774: ST13-002 search to face-up Life", () => {
             face: "UP",
           });
           break;
+        default:
+          throw new Error(`unrouted destination ${pickDestination}`);
       }
     }
   });
@@ -375,6 +405,9 @@ describe("OPT-774: ST13-002 search to face-up Life", () => {
       );
       expect(output).toContain(
         'invalid.ts TEST-774-SPREAD spread_unknown action[1] pick_destination "CONSTANT_UNKNOWN"',
+      );
+      expect(output).toContain(
+        'invalid.ts TEST-774-CONDITIONAL conditional_unknown action[1] pick_destination "CONDITIONAL_UNKNOWN"',
       );
       expect(output).not.toContain("TEST-774-VALID valid_life_top");
       expect(execFileSync("node", [linter, validFixture], execOptions)).toContain(
