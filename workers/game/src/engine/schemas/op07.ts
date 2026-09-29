@@ -1997,9 +1997,14 @@ export const OP07_057_PERFUME_FEMUR: EffectSchema = {
           result_ref: "selected_card",
         },
         {
-          type: "GRANT_KEYWORD",
-          target_ref: "selected_card",
-          params: { keyword: "UNBLOCKABLE" },
+          type: "APPLY_PROHIBITION",
+          params: {
+            prohibition_type: "CANNOT_ACTIVATE_BLOCKER",
+            scope: {
+              controller: "OPPONENT",
+              when_attacking: { type: "SELECTED_CARDS", ref: "selected_card" },
+            },
+          },
           duration: { type: "THIS_TURN" },
           chain: "THEN",
         },
