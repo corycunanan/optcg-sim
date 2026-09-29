@@ -31,6 +31,9 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
     case "ADD_OWN_CHARACTER_TO_LIFE":
     // OPT-824: the player selects the recipient of the given DON!!.
     case "GIVE_DON":
+    // OPT-868: the player selects the opponent's Character (and, when it
+    // matters, which of the opponent's rested DON!!).
+    case "GIVE_OPPONENT_DON_TO_OPPONENT":
       return true;
     // OPT-798: the top N cards of the deck are fixed — no choice to prompt.
     case "MILL":
@@ -243,6 +246,7 @@ export function isCostPayable(
     case "PLAY_NAMED_CARD_FROM_HAND":
     case "PLACE_FROM_TRASH_TO_DECK":
     case "GIVE_DON":
+    case "GIVE_OPPONENT_DON_TO_OPPONENT":
       return true;
     default:
       return assertNever(cost);

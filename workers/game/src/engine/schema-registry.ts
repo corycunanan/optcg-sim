@@ -557,6 +557,30 @@ export function validateCost(cost: Cost, prefix: string, insideChoice: boolean):
     }
   }
 
+  // OPT-868: "give 1 of your opponent's rested DON!! cards to 1 of your
+  // opponent's Characters" — exactly 1 DON!! (rested is intrinsic) and
+  // exactly one of the opponent's Characters as the recipient.
+  if (cost.type === "GIVE_OPPONENT_DON_TO_OPPONENT") {
+    const amount = (cost as { amount?: unknown }).amount;
+    if (amount !== undefined && amount !== 1) {
+      errors.push(`${prefix}: GIVE_OPPONENT_DON_TO_OPPONENT gives exactly 1 DON!! ('amount' must be 1)`);
+    }
+    if ((cost as { filter?: unknown }).filter !== undefined) {
+      errors.push(`${prefix}: GIVE_OPPONENT_DON_TO_OPPONENT always gives a rested DON!! — narrow the recipient with 'target.filter', not a cost 'filter'`);
+    }
+    const target = (cost as { target?: Target }).target;
+    if (!target) {
+      errors.push(`${prefix}: GIVE_OPPONENT_DON_TO_OPPONENT requires a 'target' naming the recipient`);
+    } else {
+      if (target.type !== "CHARACTER" || target.controller !== "OPPONENT") {
+        errors.push(`${prefix}: GIVE_OPPONENT_DON_TO_OPPONENT recipient must be a CHARACTER target with controller 'OPPONENT'`);
+      }
+      if (!(target.count && "exact" in target.count && target.count.exact === 1)) {
+        errors.push(`${prefix}: GIVE_OPPONENT_DON_TO_OPPONENT recipient count must be { exact: 1 }`);
+      }
+    }
+  }
+
   return errors;
 }
 
