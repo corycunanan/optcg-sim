@@ -624,7 +624,7 @@ export const ST13_017_FLAME_DRAGON_KING: EffectSchema = {
   effects: [
     {
       id: "counter_power_reorder",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -670,7 +670,7 @@ export const ST13_018_GUM_GUM_JET_SPEAR: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_draw",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
