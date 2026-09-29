@@ -47,6 +47,10 @@ New effect blocks SHOULD set `source_text` to the complete clause line that the 
 | "If X would be K.O.'d... instead", "would be removed... instead" | `replacement` | replaces + replacement_actions |
 | "Under the rules of this game", "according to the rules", "Also treat this card's name as", deck restrictions, "you may have any number" | `rule_modification` | rule |
 
+### Event `[Counter]` blocks must be `auto` (OPT-894)
+
+An Event's `[Counter]` effect is authored as `category: "auto"` with `trigger: { "keyword": "COUNTER_EVENT" }`. `executeUseCounterEvent` (`workers/game/src/engine/battle.ts`) selects the block with `category === "auto"` and a direct `keyword` of `COUNTER_EVENT`; an `activate` block is never run, because the Event moves from hand to trash without ever being on the field for trigger registration to fire it. The schema lint (`schema-counter-event-lint.ts`, part of `pnpm schema:check`) walks the generated registry and rejects any other category. The `[Main]` block keeps `category: "activate"` (`MAIN_EVENT` is selected by keyword only). Known gap, tracked as a follow-up: a compound `any_of: [MAIN_EVENT, COUNTER_EVENT]` block is not selected by either consumer, so those cards resolve neither effect until the consumers or the authoring are changed; the lint holds the list of affected cards steady.
+
 ---
 
 ## Trigger Patterns
