@@ -21,7 +21,10 @@ import { runPipeline } from "../engine/pipeline.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { executeDraw } from "../engine/effect-resolver/actions/draw-search.js";
 import { executeHandWheel } from "../engine/effect-resolver/actions/hand-deck.js";
+import { executeActionChain } from "../engine/effect-resolver/resolver.js";
+import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { parseStoredSession } from "../session/persistence.js";
+import { findDrawProhibitionCauseViolations } from "../engine/schema-draw-prohibition-lint.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 const KALGARA = "OP12-099";
@@ -233,5 +236,160 @@ describe("OPT-876 — CANNOT_DRAW frame (drawer vs effect controller)", () => {
     f.advanceToMainOf(1);
     expect(f.state.prohibitions.some((p) => p.id === "p-draw")).toBe(true);
     expect(f.state.players[1].hand).toHaveLength(handBefore + 1);
+  });
+});
+
+// ─── Review findings on PR #716 ──────────────────────────────────────────────
+
+/** Replace the live prohibitions with one CANNOT_DRAW bound to `player`. */
+function withInjectedProhibition(player: 0 | 1, cause: string | undefined) {
+  const f = fixture(0);
+  f.setState({
+    ...f.state,
+    prohibitions: [{
+      id: "p-draw", sourceCardInstanceId: "x", sourceEffectBlockId: "", prohibitionType: "CANNOT_DRAW",
+      scope: cause === undefined ? {} : { cause: cause as never },
+      duration: { type: "THIS_TURN" }, expiresAt: { wave: "NEVER" },
+      controller: player, appliesTo: [], usesRemaining: null,
+    }],
+  });
+  return f;
+}
+
+describe("OPT-876 — OPPONENT_ACTION-wrapped draws are caused by the wrapper's controller", () => {
+  // OP06-047 Charlotte Pudding: "[On Play] Your opponent returns all cards in
+  // their hand to their deck and shuffles their deck. Then, your opponent
+  // draws 5 cards." The draw is caused by Pudding's controller's effect, so a
+  // Kalgara prohibition ("you cannot draw cards using your own effects") on
+  // the opponent does not stop it.
+  function puddingActions(): Action[] {
+    const schema = getEffectSchema("OP06-047");
+    expect(schema, "OP06-047 authored").toBeDefined();
+    const block = schema!.effects.find((b) =>
+      b.actions?.some((a) => a.type === "OPPONENT_ACTION" && (a.params as { action?: Action }).action?.type === "DRAW"));
+    expect(block, "OP06-047 OPPONENT_ACTION DRAW block").toBeDefined();
+    return block!.actions!;
+  }
+
+  it("Kalgara's owner still draws 5 from the opponent's OP06-047 (real Kalgara prohibition)", () => {
+    const f = fixture(0);
+    f.attackLeader(f.attacker.instanceId); // Kalgara (player 0) draws 1 and is now prohibited
+    expect(f.state.prohibitions.some((p) => p.prohibitionType === "CANNOT_DRAW" && p.controller === 0)).toBe(true);
+    const deckBefore = f.state.players[0].deck.length;
+    const handBefore = f.state.players[0].hand.length;
+    expect(deckBefore + handBefore).toBeGreaterThanOrEqual(5);
+
+    const r = executeActionChain(f.state, puddingActions(), "pudding-src", 1, f.db);
+    expect(r.pendingPrompt).toBeUndefined();
+    expect(r.state.players[0].hand).toHaveLength(5);
+    expect(r.events.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 0)).toHaveLength(5);
+  });
+
+  it("the Kalgara owner's own OPPONENT_ACTION-wrapped draw is still their opponent's draw (control)", () => {
+    // Player 0 (prohibited) resolves an OPPONENT_ACTION DRAW: player 1 draws,
+    // player 1 carries no prohibition, and player 0 draws nothing.
+    const f = withInjectedProhibition(0, "BY_YOUR_EFFECT");
+    const wrapped = { type: "OPPONENT_ACTION", params: { action: { type: "DRAW", params: { amount: 2 } } } } as Action;
+    const r = executeActionChain(f.state, [wrapped], "src", 0, f.db);
+    expect(r.state.players[1].hand).toHaveLength(f.state.players[1].hand.length + 2);
+    expect(r.state.players[0].hand).toHaveLength(f.state.players[0].hand.length);
+  });
+
+  it("a prohibited player's OPPONENT_ACTION-wrapped draw imposed by an opponent is blocked only under BY_OPPONENT_EFFECT", () => {
+    // Player 1's effect makes player 0 draw 2 via OPPONENT_ACTION.
+    const wrapped = { type: "OPPONENT_ACTION", params: { action: { type: "DRAW", params: { amount: 2 } } } } as Action;
+    const blocked = withInjectedProhibition(0, "BY_OPPONENT_EFFECT");
+    const r1 = executeActionChain(blocked.state, [wrapped], "src", 1, blocked.db);
+    expect(r1.state.players[0].hand).toHaveLength(blocked.state.players[0].hand.length);
+
+    const open = withInjectedProhibition(0, "BY_YOUR_EFFECT");
+    const r2 = executeActionChain(open.state, [wrapped], "src", 1, open.db);
+    expect(r2.state.players[0].hand).toHaveLength(open.state.players[0].hand.length + 2);
+  });
+});
+
+describe("OPT-876 — OPPONENT_ACTION effect controller survives a paused, serialized resume", () => {
+  // Hypothetical shape (no authored card today): "your opponent may draw 2".
+  // The wrapped draw pauses for the opponent's decision; the continuation
+  // frame keeps the wrapper's effect controller across persistence.
+  const wrappedOptional = {
+    type: "OPPONENT_ACTION",
+    params: { action: { type: "DRAW", optional: true, params: { amount: 2 } } },
+  } as Action;
+
+  it.each([
+    ["BY_YOUR_EFFECT", 2],
+    ["BY_OPPONENT_EFFECT", 0],
+  ] as const)("prohibition %s on the drawer: resumed draw adds %i", (cause, drawn) => {
+    const f = withInjectedProhibition(0, cause);
+    const handBefore = f.state.players[0].hand.length;
+    const paused = executeActionChain(f.state, [wrappedOptional], "src-opt", 1, f.db);
+    expect(paused.pendingPrompt, "optional wrapped draw pauses").toBeDefined();
+    const frame = paused.state.effectStack.at(-1)!;
+    expect(frame.controller).toBe(0);
+    expect(frame.effectController).toBe(1);
+
+    f.setState(paused.state);
+    f.persist();
+    expect(f.state.effectStack.at(-1)!.effectController).toBe(1);
+    const resumed = resumeFromStack(f.state, { type: "PLAYER_CHOICE", choiceId: "accept" } as GameAction, f.db);
+    expect(resumed.state.players[0].hand).toHaveLength(handBefore + drawn);
+  });
+});
+
+describe("OPT-876 — CANNOT_DRAW scope.cause values", () => {
+  const OWN = (f: ReturnType<typeof fixture>) => executeDraw(f.state, SELF_DRAW as never, "src", 0, f.db, new Map());
+  // Player 1's effect: "your opponent draws 1" -> drawer 0, causing controller 1.
+  const OPPONENT_CAUSED = (f: ReturnType<typeof fixture>) => executeDraw(f.state, OPP_DRAW as never, "src", 1, f.db, new Map());
+
+  it.each([
+    // cause, own-effect draw blocked, opponent-caused draw blocked
+    [undefined, true, false],
+    ["BY_YOUR_EFFECT", true, false],
+    ["BY_OPPONENT_EFFECT", false, true],
+    ["BY_EFFECT", true, true],
+    ["ANY", true, true],
+  ] as const)("cause %s: own blocked=%s, opponent-caused blocked=%s", (cause, ownBlocked, oppBlocked) => {
+    const f = withInjectedProhibition(0, cause);
+    expect(OWN(f).succeeded).toBe(!ownBlocked);
+    expect(OPPONENT_CAUSED(f).succeeded).toBe(!oppBlocked);
+  });
+
+  it("pins the frame: ANY binds to the drawer, not to the causing controller", () => {
+    // Prohibition on player 0. Player 1's effect makes player 0 draw: blocked.
+    // Player 0's effect makes player 1 draw: not blocked (player 1 is free).
+    const f = withInjectedProhibition(0, "ANY");
+    expect(OPPONENT_CAUSED(f).succeeded).toBe(false);
+    const r = executeDraw(f.state, OPP_DRAW as never, "src", 0, f.db, new Map());
+    expect(r.succeeded).toBe(true);
+    expect(r.state.players[1].hand).toHaveLength(f.state.players[1].hand.length + 1);
+  });
+
+  it.each(["BATTLE", "IN_BATTLE", "OPPONENT_EFFECT", "EFFECT", "BY_CHARACTER_EFFECT"])(
+    "unsupported cause %s is rejected by the schema lint and never blocks at runtime",
+    (cause) => {
+      const f = withInjectedProhibition(0, cause);
+      expect(OWN(f).succeeded).toBe(true);
+      expect(OPPONENT_CAUSED(f).succeeded).toBe(true);
+      const schema = {
+        card_id: "TEST-001",
+        effects: [{
+          id: "e", category: "auto", trigger: { keyword: "ON_PLAY" },
+          actions: [{
+            type: "APPLY_PROHIBITION", target: { type: "PLAYER", controller: "SELF" },
+            params: { prohibition_type: "CANNOT_DRAW", scope: { cause } },
+            duration: { type: "THIS_TURN" },
+          }],
+        }],
+      } as never;
+      expect(findDrawProhibitionCauseViolations(schema)).toEqual([
+        expect.stringContaining(`TEST-001`),
+      ]);
+    },
+  );
+
+  it("every authored CANNOT_DRAW uses a supported cause", () => {
+    const schema = getEffectSchema(KALGARA)!;
+    expect(findDrawProhibitionCauseViolations(schema)).toEqual([]);
   });
 });

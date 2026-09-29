@@ -10,7 +10,7 @@ import type {
   PendingPromptState,
   ResumeContext,
 } from "../../../types.js";
-import type { ActionResult } from "../types.js";
+import type { ActionResult, EffectResolverServices } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
 import {
   getSearchAndPlayPickLimit,
@@ -29,6 +29,8 @@ export function executeDraw(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  _preselectedTargets?: string[],
+  services?: Pick<EffectResolverServices, "effectController">,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "DRAW");
@@ -45,7 +47,10 @@ export function executeDraw(
       : controller;
   // OPT-876: CANNOT_DRAW (OP12-099). A prevented draw moves nothing, emits no
   // CARD_DRAWN / DRAW_OUTSIDE_DRAW_PHASE, and is not a failed empty-deck draw.
-  if (isDrawProhibitedByEffect(state, drawer, controller, cardDb)) {
+  // The causing controller is the effect's controller, which differs from
+  // `controller` inside an OPPONENT_ACTION wrapper (OP06-047).
+  const causingController = services?.effectController ?? controller;
+  if (isDrawProhibitedByEffect(state, drawer, causingController, cardDb)) {
     return { state, events, succeeded: false };
   }
   const player = state.players[drawer];

@@ -7,7 +7,7 @@ import { handTrashEvent } from "../../hand-trash.js";
 import type { ActionOf, EffectResult } from "../../effect-types.js";
 import { getActionParams } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
-import type { ActionResult } from "../types.js";
+import type { ActionResult, EffectResolverServices } from "../types.js";
 import {
   getSearchAndPlayPickLimit,
   promptEffectDescription,
@@ -115,6 +115,8 @@ export function executeHandWheel(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
+  _preselectedTargets?: string[],
+  services?: Pick<EffectResolverServices, "effectController">,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -155,7 +157,14 @@ export function executeHandWheel(
 
   // Draw cards
   // OPT-876: CANNOT_DRAW blocks only the draw half; the trash half still happens.
-  const drawBlocked = isDrawProhibitedByEffect(nextState, controller, controller, cardDb);
+  // The drawer is `controller`; the causing controller is the effect's, which
+  // differs inside an OPPONENT_ACTION wrapper.
+  const drawBlocked = isDrawProhibitedByEffect(
+    nextState,
+    controller,
+    services?.effectController ?? controller,
+    cardDb,
+  );
   const actualDraw = drawBlocked
     ? 0
     : Math.min(drawCount, nextState.players[controller].deck.length);

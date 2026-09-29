@@ -323,6 +323,7 @@ const StackFrameCore = z.strictObject({
   controller: PlayerIndex,
   effectDescription: z.string().optional(),
   remainingActionsController: PlayerIndex.optional(),
+  effectController: PlayerIndex.optional(),
   effectBlock: z.unknown(),
   phase: z.enum([
     "AWAITING_OPTIONAL_RESPONSE",

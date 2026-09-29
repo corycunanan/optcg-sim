@@ -1565,7 +1565,8 @@ export type ProhibitionType =
   | "CANNOT_ADD_LIFE"
   // OPT-876: enforced by isDrawProhibitedByEffect (prohibitions.ts). The bound
   // player is the drawer; BY_YOUR_EFFECT = the causing effect's controller is the
-  // drawer. Draw Phase draws are exempt.
+  // drawer. Draw Phase draws are exempt. Accepted scope.cause values are
+  // CANNOT_DRAW_CAUSES (prohibitions.ts); others fail schema lint.
   | "CANNOT_DRAW"
   | "CANNOT_BE_PLAYED_BY_EFFECTS"
   | "CANNOT_ACTIVATE_BLOCKER"

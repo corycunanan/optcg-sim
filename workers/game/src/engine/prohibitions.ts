@@ -839,14 +839,50 @@ function findCardOnField(state: GameState, instanceId: string): CardInstance | n
 //   - The prohibited player is the DRAWER: the prohibition applies only when
 //     `prohibition.controller` (the player the effect bound it to via
 //     target SELF) equals the drawer.
-//   - "Your own effects" means the causing effect's controller equals the
-//     drawer. With scope.cause BY_YOUR_EFFECT (the default for this type) an
-//     opponent-caused draw ("your opponent draws 1 card", OP07-090 Morgans)
-//     is NOT blocked. scope.cause ANY/EFFECT blocks every effect draw.
+//   - The CAUSING controller is the controller of the effect that makes the
+//     player draw. It is the resolver's `controller` except inside an
+//     OPPONENT_ACTION wrapper, which flips the acting `controller` but keeps
+//     the effect's controller in `EffectResolverServices.effectController`
+//     (OP06-047 "your opponent draws 5 cards" is caused by OP06-047's
+//     controller). Callers pass `services.effectController ?? controller`.
 //   - The Draw Phase draw (§6-2-1) and setup draws never consult this helper.
+//
+// Accepted `scope.cause` values (CANNOT_DRAW_CAUSES; any other value is a
+// schema-lint error, see schema-draw-prohibition-lint.ts, and never blocks):
+//   - omitted / BY_YOUR_EFFECT: causing controller === drawer.
+//   - BY_OPPONENT_EFFECT: causing controller !== drawer.
+//   - BY_EFFECT / ANY: every effect draw (still never the Draw Phase draw).
 //
 // Every effect-caused draw (DRAW, HAND_WHEEL's draw half) must call this
 // before moving cards or emitting CARD_DRAWN / DRAW_OUTSIDE_DRAW_PHASE.
+
+export const CANNOT_DRAW_CAUSES = [
+  "BY_YOUR_EFFECT",
+  "BY_OPPONENT_EFFECT",
+  "BY_EFFECT",
+  "ANY",
+] as const;
+export type CannotDrawCause = (typeof CANNOT_DRAW_CAUSES)[number];
+
+export function isCannotDrawCause(cause: unknown): cause is CannotDrawCause {
+  return (CANNOT_DRAW_CAUSES as readonly unknown[]).includes(cause);
+}
+
+function drawCauseMatches(
+  cause: CannotDrawCause,
+  drawer: 0 | 1,
+  causingController: 0 | 1,
+): boolean {
+  switch (cause) {
+    case "BY_YOUR_EFFECT":
+      return causingController === drawer;
+    case "BY_OPPONENT_EFFECT":
+      return causingController !== drawer;
+    case "BY_EFFECT":
+    case "ANY":
+      return true;
+  }
+}
 
 export function isDrawProhibitedByEffect(
   state: GameState,
@@ -861,7 +897,8 @@ export function isDrawProhibitedByEffect(
     if (isProhibitionOverridden(p, state, cardDb)) continue;
     if (p.controller !== drawer) continue;
     const cause = p.scope?.cause ?? "BY_YOUR_EFFECT";
-    if (cause === "BY_YOUR_EFFECT" && causingController !== drawer) continue;
+    if (!isCannotDrawCause(cause)) continue;
+    if (!drawCauseMatches(cause, drawer, causingController)) continue;
     return true;
   }
   return false;

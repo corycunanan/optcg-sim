@@ -248,6 +248,12 @@ export interface EffectStackFrame {
   effectDescription?: string;
   /** Controller for the chain after a responder-controlled paused action. */
   remainingActionsController?: 0 | 1;
+  /**
+   * OPT-876: controller of the effect that pushed this frame when an
+   * OPPONENT_ACTION wrapper flipped `controller` (the acting player). Restored
+   * as `EffectResolverServices.effectController` on resume.
+   */
+  effectController?: 0 | 1;
   effectBlock: import("./engine/effect-types.js").EffectBlock;
   phase: import("../../../shared/game-types.js").EffectStackPhase;
 
