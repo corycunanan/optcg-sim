@@ -286,26 +286,35 @@ interface CannotBePlayedByEffects extends Prohibition {
 
 #### CANNOT_ACTIVATE_BLOCKER (7.9)
 
-Prevents the opponent from activating the Blocker keyword. Always scoped to a specific attacker — the prohibition is only active when the designated card is attacking.
+Prevents the opponent from activating the [Blocker] keyword (rules 7-1-2, 10-1-4-1: [Blocker] is activated in the Block Step of the battle being fought).
 
 ```typescript
 interface CannotActivateBlocker extends Prohibition {
   type: "CANNOT_ACTIVATE_BLOCKER";
   scope?: {
-    when_attacking?: Target;
+    controller?: "OPPONENT";
+    filter?: TargetFilter;          // which opposing blockers (e.g. power_max)
+    when_attacking?: Target;        // attacker binding — see below
   };
   duration?: Duration;
 }
 ```
 
-| Variant | Card Text | Example |
-|---------|-----------|---------|
-| When given DON attacks | "opponent cannot activate Blocker when the card given these DON cards attacks" | OP12-016 |
-| When selected card attacks | "if the selected card attacks during this turn, opponent cannot activate Blocker" | OP12-077, OP07-057 |
-| During this battle | "opponent cannot activate Blocker during this battle" | ST01-012 |
-| When Leader/Character attacks | "opponent cannot activate Blocker if that Leader or Character attacks" | ST01-016 Diable Jambe |
+| Variant | Card Text | Encoding | Example |
+|---------|-----------|----------|---------|
+| Blanket | "your opponent cannot activate [Blocker] during this turn/battle" | no `target`, or `target: PLAYER/OPPONENT`; optional `scope.filter` | P-097, ST01-012, OP01-120 |
+| Specific opposing Characters | "up to 1 of your opponent's Characters cannot activate [Blocker]" | `target` = the opposing Characters | OP09-014, OP16-063 |
+| Selected attacker (result ref) | "when the card given these DON!! cards attacks" / "if the selected card attacks during this turn" | `scope: { controller: "OPPONENT", when_attacking: { type: "SELECTED_CARDS", ref } }`, no `target` | OP12-016 (`ref: "__cost_don_given"`), OP12-077 |
+| Selected attacker (own selection) | "Select up to 1 of your … Characters. If the selected Character attacks …" | `target` = the selection, `scope: { controller: "OPPONENT", when_attacking: { type: "SELECTED_CARDS" } }` | ST21-003 |
 
-This prohibition type interacts with deferred conditional prohibitions (see section 9.7 of CARD-ANALYSIS-FINDINGS.md). The prohibition is granted to a target now, but only takes effect when that target declares an attack.
+**Attacker binding (OPT-826).** `when_attacking: { type: "SELECTED_CARDS" }` on a CANNOT_ACTIVATE_BLOCKER prohibition names the attacker, not a card that cannot block. When `APPLY_PROHIBITION` executes, the engine resolves the binding — the cards in result ref `ref`, or, without `ref`, the action's own `target` selection — and freezes those instance ids into `RuntimeProhibition.attackerInstanceIds`, leaving `appliesTo` empty. Result refs are frame-local, so the freeze is what lets the binding survive serialization and later battles. `isBlockerProhibited` (`shared/blocker-prohibition.ts`) then applies the prohibition only while the current battle's attacker (`turn.battle.attackerInstanceId`) is one of the frozen ids; it never compares them with the would-be blocker. Consequences:
+
+- Another card attacking in the same turn can be blocked (FAQ `qa_st-21.md` ST21-003; `qa_st-01-st-04.md` ST01-016).
+- A bound card that leaves the field and returns is a new instance (rule 3-1-6) and is not covered.
+- An empty binding ("up to 1" with none selected, or a declined/unpaid cost) creates no prohibition.
+- The prohibition expires with its `duration` like any other.
+
+Schema lint rejects the binding on any other prohibition type, with both `ref` and a `target`/`target_ref`, with neither, with keys other than `type`/`ref`, or without `scope.controller: "OPPONENT"`. Any other `when_attacking` shape on a Blocker prohibition (e.g. OP13-057's `{ type: "YOUR_LEADER" }`) is not enforced by the Blocker check.
 
 ---
 

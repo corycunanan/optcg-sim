@@ -22,6 +22,7 @@ import {
   type EffectSchema,
   type EffectBlock,
   type Action,
+  type ActionOf,
   type Controller,
   type Cost,
   type Target,
@@ -891,6 +892,10 @@ function validateAction(
     }
   }
 
+  if (action.type === "APPLY_PROHIBITION") {
+    errors.push(...validateAttackerBoundProhibition(action, prefix));
+  }
+
   if (action.type === "CHOOSE_VALUE") {
     if (!action.result_ref) {
       errors.push(`${prefix}: CHOOSE_VALUE requires 'result_ref'`);
@@ -958,6 +963,50 @@ function validateAction(
   return errors;
 }
 
+/**
+ * OPT-826: `scope.when_attacking: { type: "SELECTED_CARDS", ref? }` binds a
+ * CANNOT_ACTIVATE_BLOCKER prohibition to the exact attacker(s) — the result
+ * ref's cards, or (without `ref`) the action's own `target` selection. The
+ * engine freezes those ids at execution and ignores the binding elsewhere,
+ * so reject any shape it would silently drop or misread.
+ */
+function validateAttackerBoundProhibition(
+  action: ActionOf<"APPLY_PROHIBITION">,
+  prefix: string,
+): string[] {
+  const scope = action.params?.scope;
+  const binding = scope?.when_attacking;
+  if (binding?.type !== "SELECTED_CARDS") return [];
+  const at = `${prefix}.params.scope.when_attacking`;
+  const errors: string[] = [];
+  if (action.params?.prohibition_type !== "CANNOT_ACTIVATE_BLOCKER") {
+    errors.push(
+      `${at}: a SELECTED_CARDS attacker binding is only supported on CANNOT_ACTIVATE_BLOCKER`,
+    );
+  }
+  const extraKeys = Object.keys(binding).filter((key) => key !== "type" && key !== "ref");
+  if (extraKeys.length > 0) {
+    errors.push(`${at}: attacker binding accepts only 'type' and 'ref' (found ${extraKeys.join(", ")})`);
+  }
+  if (binding.ref !== undefined && (typeof binding.ref !== "string" || binding.ref.length === 0)) {
+    errors.push(`${at}.ref: Expected a non-empty result ref name`);
+  }
+  if (binding.ref !== undefined && (action.target || action.target_ref)) {
+    errors.push(
+      `${at}: bind the attacker either by 'ref' or by the action's own target, not both — the action target would otherwise be read as the attacker`,
+    );
+  }
+  if (binding.ref === undefined && !action.target) {
+    errors.push(`${at}: without 'ref' the attacker is the action's own target, which is missing`);
+  }
+  if (scope?.controller !== "OPPONENT") {
+    errors.push(
+      `${prefix}.params.scope.controller: an attacker-bound Blocker prohibition restricts the opponent; set controller 'OPPONENT'`,
+    );
+  }
+  return errors;
+}
+
 function collectConsumedResultRefs(
   value: unknown,
   consumed: Set<string>,
@@ -976,6 +1025,16 @@ function collectConsumedResultRefs(
     }
     if ((key === "target_ref" || key.endsWith("_ref")) && typeof nested === "string") {
       consumed.add(nested);
+    }
+    // OPT-826: an attacker-bound Blocker prohibition consumes its ref.
+    if (
+      key === "when_attacking" &&
+      nested &&
+      typeof nested === "object" &&
+      (nested as { type?: unknown }).type === "SELECTED_CARDS" &&
+      typeof (nested as { ref?: unknown }).ref === "string"
+    ) {
+      consumed.add((nested as { ref: string }).ref);
     }
     if (
       nested &&

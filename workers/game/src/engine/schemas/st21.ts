@@ -82,6 +82,9 @@ export const ST21_003_SANJI: EffectSchema = {
       trigger: { keyword: "ON_PLAY" },
       actions: [
         {
+          // The selected Character is the attacker the prohibition binds to
+          // (OPT-826), not a card that cannot block: the opponent cannot
+          // activate [Blocker] only in battles that exact Character attacks.
           type: "APPLY_PROHIBITION",
           target: {
             type: "CHARACTER",
@@ -91,6 +94,10 @@ export const ST21_003_SANJI: EffectSchema = {
           },
           params: {
             prohibition_type: "CANNOT_ACTIVATE_BLOCKER",
+            scope: {
+              controller: "OPPONENT",
+              when_attacking: { type: "SELECTED_CARDS" },
+            },
           },
           duration: { type: "THIS_TURN" },
         },

@@ -471,6 +471,7 @@ describe("OPT-812 authored card pipeline", () => {
         f.state.prohibitions,
         { instanceId: usopp.instanceId, controller: 1, cardType: "Character" },
         1,
+        null,
         { matchesFilter: () => true }
       )
     ).toBe(false);

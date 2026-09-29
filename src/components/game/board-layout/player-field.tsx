@@ -162,6 +162,7 @@ function PlayerFieldComponent({
         cardType: cardData?.type ?? "Character",
       },
       playerIndex,
+      attackerInstanceId ?? null,
       {
         matchesFilter: (filter) =>
           matchesBlockerFilter(card, cardData, filter, activeEffects),

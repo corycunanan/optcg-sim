@@ -17,6 +17,14 @@ export interface BlockerProhibition {
   prohibitionType: string;
   controller: 0 | 1;
   appliesTo?: readonly string[];
+  /**
+   * OPT-826: attacker binding frozen when the prohibition was applied ("if the
+   * selected Character attacks, your opponent cannot activate [Blocker]").
+   * When present, the prohibition covers only battles whose attacker is one of
+   * these exact instances. It is compared against the current attacker, never
+   * against the would-be blocker.
+   */
+  attackerInstanceIds?: readonly string[];
   target?: BlockerProhibitionTarget;
   scope?: {
     cause?: string;
@@ -127,11 +135,32 @@ function coversCandidate(
   return true;
 }
 
-/** Return whether an active runtime prohibition vetoes DECLARE_BLOCKER. */
+/**
+ * An attacker-bound prohibition applies only while one of its bound instances
+ * is the current battle's attacker. With no battle in progress (no attacker)
+ * it covers nothing.
+ */
+function coversAttacker(
+  prohibition: BlockerProhibition,
+  attackerInstanceId: string | null,
+): boolean {
+  if (prohibition.attackerInstanceIds === undefined) return true;
+  return (
+    attackerInstanceId !== null &&
+    prohibition.attackerInstanceIds.includes(attackerInstanceId)
+  );
+}
+
+/**
+ * Return whether an active runtime prohibition vetoes DECLARE_BLOCKER.
+ * `attackerInstanceId` is the current battle's attacker (null outside a
+ * battle); it gates attacker-bound prohibitions only.
+ */
 export function isBlockerProhibited(
   prohibitions: ReadonlyArray<BlockerProhibition>,
   candidate: BlockerCandidate,
   actingPlayerIndex: 0 | 1,
+  attackerInstanceId: string | null,
   services: BlockerProhibitionServices,
 ): boolean {
   for (const prohibition of prohibitions) {
@@ -142,6 +171,8 @@ export function isBlockerProhibited(
     ) {
       continue;
     }
+
+    if (!coversAttacker(prohibition, attackerInstanceId)) continue;
 
     // Blocker's rest is an activation cost, not an opponent's effect.
     if (
