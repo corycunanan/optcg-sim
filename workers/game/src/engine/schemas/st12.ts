@@ -435,7 +435,7 @@ export const ST12_017_PLASTIC_SURGERY_SHOT: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_reveal_play",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

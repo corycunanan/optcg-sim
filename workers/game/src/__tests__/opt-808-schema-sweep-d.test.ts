@@ -420,6 +420,8 @@ describe("OPT-808 authored pipeline", () => {
         if (state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
           state = choose(state, "activate", f.db);
         state = choose(state, "choose-value:0", f.db);
+        // OPT-889: the trailing "trash up to 1" of the opponent's Life is optional too.
+        if (state.pendingPrompt) state = choose(state, "choose-value:0", f.db);
       }
       expect(
         state.players[0].characters.some((c) => c?.instanceId === "thatch")

@@ -519,7 +519,7 @@ export const ST10_015_GUM_GUM_GIANT_SUMO_SLAP: EffectSchema = {
   effects: [
     {
       id: "counter_boost_ko",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

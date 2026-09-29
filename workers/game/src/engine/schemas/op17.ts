@@ -564,7 +564,7 @@ export const OP17_017_GA_HA_HA_HA: EffectSchema = {
   effects: [
     {
       id: "counter_power_swing",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -620,7 +620,7 @@ export const OP17_018_THE_POWER_TO_DESTROY_THE_WORLD: EffectSchema = {
     },
     {
       id: "counter_high_power_characters",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "CARD_ON_FIELD",
@@ -1222,7 +1222,7 @@ export const OP17_036_WITHDRAW_NOW: EffectSchema = {
     },
     {
       id: "counter_shanks_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -1266,7 +1266,7 @@ export const OP17_037_AFRAID_OF_THE_NEW_ERA: EffectSchema = {
     },
     {
       id: "counter_rest_card_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [
         {
@@ -1372,7 +1372,7 @@ export const OP17_038_UGLY_FUTURE: EffectSchema = {
     },
     {
       id: "counter_trash_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
       actions: [
@@ -2477,7 +2477,7 @@ export const OP17_055_NO_AUTHORITY_LASTS_FOREVER: EffectSchema = {
     },
     {
       id: "counter_rocks_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -2523,7 +2523,7 @@ export const OP17_056_ROCKS_PIRATES: EffectSchema = {
     },
     {
       id: "counter_rocks_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -2615,7 +2615,7 @@ export const OP17_076_I_THINK_IVE_SOBERED_UP: EffectSchema = {
   effects: [
     {
       id: "counter_trash_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       // Official print typo: "Charactes" is interpreted as "Characters".
       costs: [{ type: "TRASH_FROM_HAND", amount: 1 }],
@@ -2673,7 +2673,7 @@ export const OP17_077_KUNDALI_DRAGON_SWARM: EffectSchema = {
     },
     {
       id: "counter_leader_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
       actions: [
@@ -2718,7 +2718,7 @@ export const OP17_078_DRUNKEN_DRAGON_BAGUA: EffectSchema = {
     },
     {
       id: "counter_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -3322,7 +3322,7 @@ export const OP17_096_IM_LUFFY: EffectSchema = {
   effects: [
     {
       id: "counter_cost_12_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "BOARD_WIDE_EXISTENCE",
@@ -3382,7 +3382,7 @@ export const OP17_097_FEED_ON_THIS_RAGE: EffectSchema = {
     },
     {
       id: "counter_leader_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -3427,7 +3427,7 @@ export const OP17_098_GUM_GUM_KONG_GUN: EffectSchema = {
     },
     {
       id: "counter_leader_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -4013,7 +4013,7 @@ export const OP17_115_CODE_OF_HONOR: EffectSchema = {
     },
     {
       id: "counter_linlin_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -4058,7 +4058,7 @@ export const OP17_116_FULGORA: EffectSchema = {
     },
     {
       id: "counter_trigger_characters",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "CARD_ON_FIELD",
@@ -4091,7 +4091,7 @@ export const OP17_117_MASER_SABER: EffectSchema = {
   effects: [
     {
       id: "counter_linlin_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

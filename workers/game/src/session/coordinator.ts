@@ -431,6 +431,15 @@ function validatePromptPayload(
   action: GameAction
 ): string | null {
   if (
+    prompt.options.promptType === "SELECT_TARGET" &&
+    action.type === "SELECT_TARGET"
+  ) {
+    return selectTargetReplyViolation(
+      prompt.options,
+      action.selectedInstanceIds ?? []
+    );
+  }
+  if (
     prompt.options.promptType === "ARRANGE_TOP_CARDS" &&
     action.type === "ARRANGE_TOP_CARDS"
   ) {
@@ -458,6 +467,49 @@ function validatePromptPayload(
       action.choiceId === "skip"
       ? null
       : "That choice is no longer available";
+  }
+  return null;
+}
+
+type SelectTargetOptions = Extract<
+  PendingPromptState["options"],
+  { promptType: "SELECT_TARGET" }
+>;
+
+/**
+ * OPT-870: the shape check every SELECT_TARGET reply must pass before any
+ * resume handler runs — each card named at most once, and a selection size
+ * within the prompt's advertised countMin..countMax. The minimum is clamped
+ * to what the offer can actually satisfy (the offered cards, and for
+ * dual_targets each slot's own candidates), so a prompt whose countMin
+ * exceeds the legal candidates never deadlocks. Membership, per-slot
+ * assignment and resume-time eligibility stay with the resume handlers.
+ * Returns a rejection reason, or null when the reply is well-formed.
+ */
+export function selectTargetReplyViolation(
+  options: SelectTargetOptions,
+  selectedIds: readonly string[]
+): string | null {
+  if (new Set(selectedIds).size !== selectedIds.length) {
+    return "Selection contains duplicate cards";
+  }
+  if (selectedIds.length > options.countMax) {
+    return "Too many cards were selected";
+  }
+  let min = Math.min(options.countMin, new Set(options.validTargets).size);
+  const slots = options.dualTargets?.slots;
+  if (slots?.length) {
+    min = Math.min(
+      min,
+      slots.reduce(
+        (sum, slot) =>
+          sum + Math.min(slot.countMin, new Set(slot.validIds).size),
+        0
+      )
+    );
+  }
+  if (selectedIds.length < min) {
+    return `Select at least ${min} card${min === 1 ? "" : "s"}`;
   }
   return null;
 }
