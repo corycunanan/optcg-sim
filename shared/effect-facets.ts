@@ -275,6 +275,10 @@ export const EFFECT_FACET_GROUPS = [
       ["place_from_trash_to_deck", "Place from Trash to Deck"],
       ["leader_power_reduction", "Leader Power Reduction"],
       ["give_opponent_don", "Give Opponent DON!!"],
+      [
+        "give_opponent_don_to_opponent",
+        "Give Opponent's Rested DON!! to Their Character",
+      ],
       ["give_don", "Give Active DON!!"],
       ["return_attached_don_to_cost", "Return Attached DON!! to Cost Area"],
       ["place_self_and_hand_to_deck", "Place Self and Hand to Deck"],

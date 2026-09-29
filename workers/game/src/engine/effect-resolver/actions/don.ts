@@ -25,6 +25,7 @@ import {
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
 import { promptEffectDescription, resolveAmount, tryResolveAmount } from "../action-utils.js";
+import { donIdentityChoiceMatters } from "../cost/targets.js";
 import { isDonAttachProhibited } from "../../prohibitions.js";
 
 export function executeGiveDon(
@@ -71,6 +72,26 @@ export function executeGiveDon(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  // OPT-868: giving 1 of the OPPONENT's DON!! (OP15-003/010/012/017/023
+  // "give up to 1 ... DON!! card to its owner's Leader or 1 of their
+  // Characters" aimed at the opponent's side) — the activating player chooses
+  // which of the opponent's DON!! is given (faq_op15-eb04.md). Only when those
+  // DON!! differ in the effects applied to them (rule 3-1-6-1) is it a real
+  // choice; interchangeable DON!! and own-DON!! gives stay prompt-free.
+  if (amount === 1 && targetIds.length === 1) {
+    const recipient = targetIds[0];
+    const owner = fieldSideOf(state, recipient);
+    if (owner !== null && owner !== controller) {
+      const pool = giveableDon(state, owner, donState);
+      if (donIdentityChoiceMatters(state, pool)) {
+        return buildGiveDonIdentityPrompt(
+          state, action, owner, recipient, pool.map((d) => d.instanceId),
+          sourceCardInstanceId, controller, cardDb, resultRefs,
+        );
+      }
+    }
+  }
+
   let nextState = state;
   for (const targetId of targetIds) {
     for (let i = 0; i < amount; i++) {
@@ -83,6 +104,76 @@ export function executeGiveDon(
   events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: amount } });
 
   return { state: nextState, events, succeeded: true };
+}
+
+/**
+ * OPT-868: marker kept in a GIVE_DON identity prompt's frame validTargets. It
+ * binds the recipient already chosen — and the side (owner) whose cost area
+ * supplies the DON!! — across the resumed DON!! choice and session restore.
+ * The client only ever sees the DON!! ids.
+ */
+export const GIVE_DON_IDENTITY_PREFIX = "give-don-identity:";
+
+export function parseGiveDonIdentityMarker(
+  validTargets: readonly string[],
+): { marker: string; owner: 0 | 1; recipient: string } | null {
+  const marker = validTargets.find((id) => id.startsWith(GIVE_DON_IDENTITY_PREFIX));
+  if (!marker) return null;
+  const rest = marker.slice(GIVE_DON_IDENTITY_PREFIX.length);
+  const owner = rest[0] === "0" ? 0 : rest[0] === "1" ? 1 : null;
+  if (owner === null || rest[1] !== ":" || rest.length < 3) return null;
+  return { marker, owner, recipient: rest.slice(2) };
+}
+
+/** Player index whose Leader/Character area holds `instanceId`, else null. */
+export function fieldSideOf(state: GameState, instanceId: string): 0 | 1 | null {
+  for (const pi of [0, 1] as const) {
+    const p = state.players[pi];
+    if (p.leader.instanceId === instanceId) return pi;
+    if (p.characters.some((c) => c?.instanceId === instanceId)) return pi;
+  }
+  return null;
+}
+
+/** Unattached cost-area DON!! of `owner` in `donState` — what a give may use. */
+export function giveableDon(state: GameState, owner: 0 | 1, donState: "ACTIVE" | "RESTED") {
+  return state.players[owner].donCostArea.filter((d) => d.state === donState && !d.attachedTo);
+}
+
+function buildGiveDonIdentityPrompt(
+  state: GameState,
+  action: ActionOf<"GIVE_DON">,
+  owner: 0 | 1,
+  recipient: string,
+  donIds: string[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+): ActionResult {
+  const resumeContext: ResumeContext = {
+    effectSourceInstanceId: sourceCardInstanceId,
+    controller,
+    pausedAction: action,
+    remainingActions: [], // filled in by executeActionChain / the resume frame
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [`${GIVE_DON_IDENTITY_PREFIX}${owner}:${recipient}`, ...donIds],
+  };
+  const pendingPrompt: PendingPromptState = {
+    options: {
+      promptType: "SELECT_TARGET",
+      cards: [],
+      validTargets: donIds,
+      effectDescription: promptEffectDescription(state, cardDb, sourceCardInstanceId) || "",
+      instruction: "Choose 1 of your opponent's DON!! cards to give",
+      countMin: 1,
+      countMax: 1,
+      ctaLabel: "Give DON!!",
+    },
+    respondingPlayer: controller,
+    resumeContext,
+  };
+  return { state, events: [], succeeded: false, pendingPrompt };
 }
 
 export function executeAddDonFromDeck(
