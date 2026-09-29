@@ -217,7 +217,10 @@ type CostType =
   | "LEADER_POWER_REDUCTION"  // Reduce own Leader's power by amount
 
   // DON!! manipulation costs
-  | "GIVE_OPPONENT_DON"       // Give opponent's DON!! to opponent's character
+  | "GIVE_OPPONENT_DON"       // Legacy: move N of YOUR unattached DON!! to the opponent's cost area
+                              // (no printed cost matches it)
+  | "GIVE_OPPONENT_DON_TO_OPPONENT" // Give 1 of the OPPONENT's rested cost-area DON!! to 1 of the
+                              // opponent's Characters (target = CHARACTER/OPPONENT, count exact 1)
   | "GIVE_DON"                // Give N of your ACTIVE cost-area DON!! to 1 of your Leader/Characters
                               // (target = the recipient, count exact 1; ref __cost_don_given)
   | "RETURN_ATTACHED_DON_TO_COST" // Return given DON!! to cost area
@@ -488,7 +491,7 @@ For effects where amounts scale based on game state or prior action results rath
 ```typescript
 type DynamicValue =
   | { type: "FIXED"; value: number }
-  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number }
+  | { type: "PER_COUNT"; source: DynamicSource; multiplier: number; divisor?: number; ref?: string }
   | { type: "GAME_STATE"; source: GameStateSource; controller?: Controller }
   | { type: "ACTION_RESULT"; ref: string }
   | { type: "CHOSEN_VALUE" };
@@ -522,6 +525,12 @@ type DynamicSource =
 | `CARDS_IN_TRASH` | 1000 | 5 | EB04-048 Rob Lucci |
 | `CARDS_PLACED_TO_DECK_THIS_WAY` | 1000 | 3 | OP07-091 |
 | `REVEALED_CARD_COST` | 1000 | 1 | OP15-119 |
+
+`*_THIS_WAY` sources count either a cost or a preceding action (OPT-885).
+Without `ref`, the value is the count from the block's cost payment. With
+`ref`, it is the `result.count` of the earlier action in the same block whose
+`result_ref` matches. OP15-002 Lucy uses the action form; OP13-001 Luffy
+uses the cost form. See `workers/game/src/engine/schemas/README.md`.
 
 ### GAME_STATE — Live Game State Values
 

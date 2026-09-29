@@ -221,6 +221,9 @@ export function attachDonToCard(
   controller: 0 | 1,
   targetInstanceId: string,
   donState: "ACTIVE" | "RESTED" = "ACTIVE",
+  // OPT-868: give this specific DON!! (the player's identity choice) instead
+  // of the first matching one. It must still be unattached and in `donState`.
+  donInstanceId?: string,
 ): GameState | null {
   // Infer owner side from the target — DON flows from its owner's cost area.
   let ownerIdx: 0 | 1 = controller;
@@ -231,7 +234,8 @@ export function attachDonToCard(
   }
 
   const p = state.players[ownerIdx];
-  const don = p.donCostArea.find((d) => d.state === donState && !d.attachedTo);
+  const don = p.donCostArea.find((d) =>
+    d.state === donState && !d.attachedTo && (donInstanceId === undefined || d.instanceId === donInstanceId));
   if (!don) return null;
 
   const newDonCostArea = p.donCostArea.filter((d) => d.instanceId !== don.instanceId);

@@ -48,7 +48,23 @@ type PermanentDynamicValueResolutionContext = Omit<
   "resultRefs"
 >;
 
-const THIS_WAY_TO_COST_REF: Record<string, string> = {
+/**
+ * `*_THIS_WAY` sources ("for every card trashed", "for every Character
+ * K.O.'d", ...) count the cards moved by the step the card text points back
+ * to. OPT-885 convention — one of two explicit shapes, never inferred:
+ *
+ * - Counted by a preceding ACTION: that action declares `result_ref` and the
+ *   PER_COUNT names it in `ref`. The value is that action's result `count`
+ *   (cards actually moved). Result refs live only for the current resolution
+ *   and are persisted with paused frames, so a count survives a prompt and
+ *   never leaks into a later, separate resolution.
+ * - Counted by a COST (no `ref`): the value is read from the implicit cost
+ *   ref below, filled only while paying that block's costs.
+ *
+ * `schema-this-way-source-lint.ts` rejects a source that nothing preceding it
+ * in the block can fill.
+ */
+export const THIS_WAY_TO_COST_REF: Record<string, string> = {
   DON_RESTED_THIS_WAY: "__cost_don_rested",
   CARDS_TRASHED_THIS_WAY: "__cost_cards_trashed",
   CHARACTERS_RETURNED_THIS_WAY: "__cost_cards_returned",
@@ -130,7 +146,7 @@ export function resolveDynamicValue(
     const multiplier = value.multiplier ?? 1;
     const costRefKey = THIS_WAY_TO_COST_REF[value.source];
     if (costRefKey) {
-      const count = context.resultRefs.get(costRefKey)?.count ?? 0;
+      const count = context.resultRefs.get(value.ref ?? costRefKey)?.count ?? 0;
       return resolved(Math.floor(count / divisor) * multiplier);
     }
 

@@ -4,8 +4,8 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
 import { transitionCards } from "../../zone-transition.js";
 import { getEffectiveBasePower } from "../../modifiers.js";
-import { attachDonToCard, trashStage } from "../card-mutations.js";
-import { computeCostTargets, isOpponentLifePlacement } from "./targets.js";
+import { attachDonToCard, reattachDon, trashStage } from "../card-mutations.js";
+import { computeCostTargets, isOpponentLifePlacement, opponentRestedCostDon } from "./targets.js";
 
 export interface AppliedCostSelection {
   state: GameState;
@@ -267,6 +267,43 @@ function applyCostSelectionUnreleased(
           type: "DON_GIVEN_TO_CARD",
           playerIndex: controller,
           payload: { targetInstanceId: recipient, count: amount },
+        }],
+      };
+    }
+
+    case "GIVE_OPPONENT_DON_TO_OPPONENT": {
+      // OPT-868: move 1 of the opponent's RESTED, unattached cost-area DON!!
+      // under the selected opponent Character. `selectedIds` is
+      // [recipient, chosenDonId] — the DON!! is always bound explicitly by
+      // the resume path (chosen by the payer, or the first DON!! eligible in
+      // both the live and staged states when all are interchangeable). The
+      // DON!! stays its owner's (the
+      // opponent's) and keeps its stored state; given DON!! are neither
+      // active nor rested (rule 4-4-2). All or nothing (rule 8-3-1-3).
+      const [recipient, chosenDonId, ...extra] = selectedIds;
+      if (!recipient || !chosenDonId || extra.length > 0) return { state, events: [] };
+      if (!cardDb || !computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).includes(recipient)) {
+        return { state, events: [] };
+      }
+      const eligible = opponentRestedCostDon(state, controller);
+      const don = eligible.find((d) => d.instanceId === chosenDonId);
+      if (!don) return { state, events: [] };
+      const opp: 0 | 1 = controller === 0 ? 1 : 0;
+      const oppPlayer = state.players[opp];
+      const withoutDon: GameState = {
+        ...state,
+        players: state.players.map((player, index) => index === opp
+          ? { ...oppPlayer, donCostArea: oppPlayer.donCostArea.filter((d) => d.instanceId !== don.instanceId) }
+          : player) as GameState["players"],
+      };
+      const given = reattachDon(withoutDon, opp, don, recipient);
+      if (!given) return { state, events: [] };
+      return {
+        state: given,
+        events: [{
+          type: "DON_GIVEN_TO_CARD",
+          playerIndex: opp,
+          payload: { targetInstanceId: recipient, count: 1 },
         }],
       };
     }
