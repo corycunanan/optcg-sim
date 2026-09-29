@@ -1650,24 +1650,20 @@ export const OP04_047_ICE_ONI: EffectSchema = {
     {
       id: "end_of_battle_bottom_deck",
       category: "auto",
+      // OPT-797: battle_target_type binds the trigger to a completed battle
+      // this Character fought in; target_filter reads the opposing Character.
       trigger: {
         event: "END_OF_BATTLE",
         filter: {
-          controller: "OPPONENT",
           battle_target_type: "CHARACTER",
           target_filter: { cost_max: 5 },
         },
         turn_restriction: "YOUR_TURN",
       },
-      // Target is the opponent's battled Character; needs engine back-reference to battle target
       actions: [
         {
           type: "RETURN_TO_DECK",
-          target: {
-            type: "CHARACTER",
-            controller: "OPPONENT",
-            count: { up_to: 1 },
-          },
+          target: { type: "BATTLE_TARGET" },
           params: { position: "BOTTOM" },
         },
       ],
