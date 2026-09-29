@@ -31,7 +31,11 @@ import {
 import { applyRedistributeDonTransfers } from "../actions/don.js";
 import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import { trashFromHandSelection } from "../actions/removal.js";
-import type { EffectResolverResult, EffectResolverServices } from "../types.js";
+import type {
+  ActionResult,
+  EffectResolverResult,
+  EffectResolverServices,
+} from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
 import { isEngineTerminated } from "../../engine-limits.js";
 import { replacePendingEventReferences } from "../../events.js";
@@ -477,6 +481,9 @@ export function handleSelectTarget(
         events,
         resolved: false,
         pendingPrompt: actionResult.pendingPrompt,
+        ...(isSelectionReprompt(resumeCtx, actionResult)
+          ? { reprompted: true }
+          : {}),
       },
     };
   }
@@ -529,4 +536,82 @@ export function handleSelectTarget(
     state: nextState,
     succeeded: actionResult.succeeded,
   };
+}
+
+/**
+ * ResumeContext fields a handler legitimately refreshes when it asks the same
+ * selection again: the live candidates, the result references it copies, and
+ * chain bookkeeping the resume path restores from the paused frame.
+ */
+const REFRESHABLE_RESUME_FIELDS = new Set<string>([
+  "validTargets",
+  "resultRefs",
+  "remainingActions",
+  "remainingActionsController",
+  "effectDescription",
+]);
+
+/**
+ * OPT-861: true when the paused action, handed the reply as preselected
+ * targets, declined it and asked for the SAME selection again (for example a
+ * REVEAL_HAND whose persisted choice names a card that has since left the
+ * hand). Structurally, such a re-prompt:
+ *   - produced no events and no nested activation or batch continuation,
+ *   - is again a SELECT_TARGET prompt, and
+ *   - resumes through a plain ResumeContext whose identity (source,
+ *     controller, paused action and every continuation marker such as
+ *     ruleTrashForPlay) matches the context being resumed; only the fields in
+ *     REFRESHABLE_RESUME_FIELDS may differ.
+ * A legitimate follow-up prompt differs in at least one of those: it names a
+ * different paused action, adds a continuation marker (rule 3-7-6-1 overflow
+ * trash, state distribution, Life position, deck arrangement), changes the
+ * prompt type, or emitted events for the part of the reply it consumed.
+ */
+function isSelectionReprompt(
+  resumed: ResumeContext,
+  actionResult: Pick<
+    ActionResult,
+    "events" | "pendingPrompt" | "nestedEventActivation" | "pendingBatchTriggers"
+  >
+): boolean {
+  const prompt = actionResult.pendingPrompt;
+  if (
+    !prompt ||
+    actionResult.events.length > 0 ||
+    actionResult.nestedEventActivation ||
+    actionResult.pendingBatchTriggers ||
+    prompt.options.promptType !== "SELECT_TARGET"
+  ) {
+    return false;
+  }
+  const next = prompt.resumeContext;
+  if (
+    typeof next !== "object" ||
+    next === null ||
+    "type" in next ||
+    !("pausedAction" in next)
+  ) {
+    return false;
+  }
+  const keys = new Set(
+    [...Object.keys(resumed), ...Object.keys(next)] as (keyof ResumeContext)[]
+  );
+  for (const key of keys) {
+    if (REFRESHABLE_RESUME_FIELDS.has(key)) continue;
+    if (canonicalJson(resumed[key]) !== canonicalJson(next[key])) return false;
+  }
+  return true;
+}
+
+/** Key-order-independent JSON; undefined and absent compare equal. */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, nested: unknown) =>
+    nested && typeof nested === "object" && !Array.isArray(nested)
+      ? Object.fromEntries(
+          Object.entries(nested as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0
+          )
+        )
+      : nested
+  ) ?? "undefined";
 }

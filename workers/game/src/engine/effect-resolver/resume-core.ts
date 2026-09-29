@@ -583,6 +583,7 @@ export function resumeFromStack(
           resolved: false,
           pendingPrompt,
           rejected: result.rejected,
+          ...(result.reprompted ? { reprompted: true } : {}),
         };
       }
 

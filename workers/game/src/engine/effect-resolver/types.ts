@@ -106,6 +106,14 @@ export interface EffectResolverResult {
   pendingPrompt?: PendingPromptState;
   /** The supplied prompt response was invalid and must not consume its frame. */
   rejected?: boolean;
+  /**
+   * OPT-861: the reply was not consumed — the paused action declined it and
+   * `pendingPrompt` asks the same selection again with refreshed candidates
+   * (e.g. a persisted choice went stale). Unlike `rejected`, the returned
+   * state and prompt are kept (they carry the refreshed candidates); the
+   * session still reports the reply as rejected (`action:rejected`).
+   */
+  reprompted?: boolean;
   /** The block was skipped before activation (once-per-turn spent or its
    * activation cost unpayable, rules 8-3-1-3). An unmet "if" still activates. */
   effectNotActivated?: boolean;
