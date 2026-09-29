@@ -1019,6 +1019,35 @@ function validateAction(
 }
 
 /**
+ * OPT-899: `when_attacking: { type: "YOUR_LEADER" }` on a CANNOT_ACTIVATE_BLOCKER
+ * prohibition binds it to the applier's Leader (frozen at apply time). Only
+ * called for that prohibition type; other types keep their own when_attacking
+ * meaning (e.g. CANNOT_ATTACK target gating).
+ */
+function validateLeaderAttackerBinding(
+  action: ActionOf<"APPLY_PROHIBITION">,
+  prefix: string,
+): string[] {
+  const scope = action.params?.scope;
+  const binding = scope?.when_attacking as Record<string, unknown>;
+  const at = `${prefix}.params.scope.when_attacking`;
+  const errors: string[] = [];
+  const extraKeys = Object.keys(binding).filter((key) => key !== "type");
+  if (extraKeys.length > 0) {
+    errors.push(`${at}: YOUR_LEADER attacker binding accepts only 'type' (found ${extraKeys.join(", ")})`);
+  }
+  if (action.target || action.target_ref) {
+    errors.push(`${at}: a YOUR_LEADER attacker binding names the attacker; the action must not also carry a target`);
+  }
+  if (scope?.controller !== "OPPONENT") {
+    errors.push(
+      `${prefix}.params.scope.controller: an attacker-bound Blocker prohibition restricts the opponent; set controller 'OPPONENT'`,
+    );
+  }
+  return errors;
+}
+
+/**
  * OPT-826: `scope.when_attacking: { type: "SELECTED_CARDS", ref? }` binds a
  * CANNOT_ACTIVATE_BLOCKER prohibition to the exact attacker(s) — the result
  * ref's cards, or (without `ref`) the action's own `target` selection. The
@@ -1031,6 +1060,12 @@ function validateAttackerBoundProhibition(
 ): string[] {
   const scope = action.params?.scope;
   const binding = scope?.when_attacking;
+  if (
+    binding?.type === "YOUR_LEADER" &&
+    action.params?.prohibition_type === "CANNOT_ACTIVATE_BLOCKER"
+  ) {
+    return validateLeaderAttackerBinding(action, prefix);
+  }
   if (binding?.type !== "SELECTED_CARDS") return [];
   const at = `${prefix}.params.scope.when_attacking`;
   const errors: string[] = [];

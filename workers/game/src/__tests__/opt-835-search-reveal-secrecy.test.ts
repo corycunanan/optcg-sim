@@ -217,7 +217,14 @@ describe("OPT-835: OP16-119 searched Life pick stays secret", () => {
       source: "search",
       cards: [{ instanceId: "opt835-deck-0", cardId: SECRET }],
     });
-    expect(ownerView.players[0].life[0]).toMatchObject({ cardId: SECRET, face: "DOWN" });
+    // The owner knows the pick from the search they performed (the reveal
+    // event above), but the face-down Life zone itself is secret to its
+    // owner too (§3-10-2, OPT-901).
+    expect(ownerView.players[0].life[0]).toEqual({
+      instanceId: "hidden-0-life-0",
+      cardId: "hidden",
+      face: "DOWN",
+    });
   });
 });
 
