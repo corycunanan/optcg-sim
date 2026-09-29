@@ -167,10 +167,10 @@ For effects that react to game events (not bracket-tag abilities):
 
 | Card Text Pattern | Trigger |
 |-------------------|---------|
-| "When your opponent's Character is K.O.'d" | `{ event: "OPPONENT_CHARACTER_KO" }` |
+| "When your opponent's Character is K.O.'d" | `{ event: "OPPONENT_CHARACTER_KO" }` — the engine matches only Characters that left the field of the watcher's opponent (the removed card's controller ≠ the watcher's controller); no `filter.controller` needed |
 | "When a Character is K.O.'d" | `{ event: "ANY_CHARACTER_KO" }` |
 | "When a Character is trashed" | `{ event: "ANY_CHARACTER_TRASHED" }` |
-| "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` |
+| "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` — same engine opponent check as `OPPONENT_CHARACTER_KO`; no `filter.controller` needed |
 | "When a Character is removed from the field" | `{ event: "CHARACTER_REMOVED_FROM_FIELD" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
@@ -696,7 +696,7 @@ Used in `permanent` effect blocks via the `prohibitions` array:
 | `CANNOT_BE_PLAYED_BY_EFFECTS` | "Cannot be played by effects" | |
 | `CANNOT_LEAVE_FIELD` | "Cannot leave field" | |
 | `CANNOT_REFRESH` | "Cannot refresh (stays rested)" | |
-| `CANNOT_ATTACH_DON` | "Cannot receive DON!!" | |
+| `CANNOT_ATTACH_DON` | "Cannot receive DON!!" | Optional `controller` (read relative to the prohibition's owner vs the player giving). Vetoes manual attach (rule 6-5-5), the `GIVE_DON` action and the `GIVE_DON` cost through the shared `isDonAttachProhibited` predicate (OPT-869); `DISTRIBUTE_DON`, `REDISTRIBUTE_DON`, `GIVE_OPPONENT_DON_TO_OPPONENT` and the DON!! Phase `GIVEN_TO_LEADER` rule modification are not yet gated |
 | `CANNOT_BE_RETURNED_TO_HAND` | "Cannot be returned to hand" | |
 | `CANNOT_BE_RETURNED_TO_DECK` | "Cannot be returned to deck" | |
 

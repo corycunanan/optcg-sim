@@ -35,6 +35,7 @@ import type {
   PartialPlayerState,
 } from "@/lib/sandbox/scenarios/types";
 import { runPipeline } from "@engine/engine/pipeline";
+import { reconcileExecutionContextIdCounter } from "@engine/engine/execution-context";
 import { createSandboxExecutionContext } from "@/lib/sandbox/execution-context";
 import type {
   SandboxGameSession,
@@ -65,7 +66,9 @@ export interface SandboxEngineState {
 // ─── Pure builders ─────────────────────────────────────────────────────
 
 export function hydrateToGameState(partial: PartialGameState): GameState {
-  return {
+  // OPT-891: the fixed sandbox context starts at idCounter 0; raise it past any
+  // allocator-format ids a scenario authored so the engine never reuses one.
+  return reconcileExecutionContextIdCounter({
     id: "sandbox",
     executionContext: createSandboxExecutionContext(),
     players: [
@@ -85,7 +88,7 @@ export function hydrateToGameState(partial: PartialGameState): GameState {
     status: "IN_PROGRESS",
     winner: null,
     winReason: null,
-  };
+  });
 }
 
 export function withSandboxPromptIdentity(

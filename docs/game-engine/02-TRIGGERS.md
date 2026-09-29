@@ -171,6 +171,14 @@ type EventCause = "BY_EFFECT" | "BY_YOUR_EFFECT" | "BY_OPPONENT_EFFECT"
 ### OPPONENT_CHARACTER_KO
 
 Fires when any of the opponent's Characters are K.O.'d, regardless of cause.
+"Opponent" is relative to the watcher's controller: the engine compares the
+K.O.'d Character's field controller (`CARD_KO` `payload.sourceController`,
+falling back to the event's `playerIndex`, the owner) with the trigger source's
+controller and never matches your own Characters, whoever caused the K.O.
+(OPT-906). Authors need no `filter.controller`; an explicit one is applied on
+top, so `OPPONENT` is redundant and `SELF` can never match.
+`OPPONENT_CHARACTER_TRASHED` (`CARD_TRASHED`, hand trashes excluded) applies the
+same check.
 
 ```typescript
 { event: "OPPONENT_CHARACTER_KO" }
@@ -792,7 +800,7 @@ Fires when an attack by this card's controller deals damage to the opponent's Li
 
 - matches only the controller's own attacks — never the opponent's;
 - matches once per attack: only the damage the Damage Step deals first (`firstDamageOfAttack`), so a [Double Attack] attack dealing 2 damage fires it once (qa_op03.md OP03-043);
-- never matches a lethal `DAMAGE_DEALT` (damage determined at 0 Life, §7-1-4-1-1-1: no Life card is checked). This is per event; what a [Double Attack] against 1 Life should do is OPT-886;
+- never matches a lethal `DAMAGE_DEALT` (damage determined at 0 Life, §7-1-4-1-1-1: no Life card is checked). This is per event. A [Double Attack] against 1 Life emits a lethal second `DAMAGE_DEALT` that does not defeat the Leader (OPT-886);
 - still matches [Banish] damage and damage whose Life card is redirected by a replacement.
 
 The watcher activates after the Life check and before the resulting [Trigger] choice (qa_op03.md:88-140): the revealed Life card waits in `battle.pendingTriggerLifeCard` while the watcher resolves.

@@ -653,6 +653,14 @@ function matchesCustomTrigger(
   _cardDb: Map<string, CardData>,
 ): boolean {
   if (!customEventMatchesGameEvent(trigger.event, event, _cardDb)) return false;
+  // OPT-906: "your opponent's Character" is relative to the watcher's
+  // controller. Compare the removed card's field controller (payload
+  // `sourceController`, falling back to the event player = owner) — never the
+  // cause. An authored `filter.controller` still applies on top (conjunction).
+  if (trigger.event === "OPPONENT_CHARACTER_KO" || trigger.event === "OPPONENT_CHARACTER_TRASHED") {
+    const removedController = (event.payload as { sourceController?: 0 | 1 }).sourceController ?? event.playerIndex;
+    if (removedController === sourceCard.controller) return false;
+  }
   if (trigger.event === "CHARACTER_BECOMES_RESTED") {
     if (event.type !== "CARD_STATE_CHANGED" || event.payload.newState !== "RESTED") return false;
     const targetId = event.payload.targetInstanceId ?? event.payload.cardInstanceId;

@@ -24,8 +24,35 @@ import {
 import { findCardInstance } from "../../state.js";
 import { isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
+import type { ZoneTransitionResult } from "../../zone-transition.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
 import { effectSourceController, promptEffectDescription, resolveAmount } from "../action-utils.js";
+
+/**
+ * OPT-877: every effect-driven Life exit publishes one CARD_REMOVED_FROM_LIFE
+ * per card that actually left Life, with `playerIndex` = the Life owner and
+ * the payload shape of the OPT-240 emitters (executeTrashFromLife,
+ * executeLifeToHand, cost/payment.ts). Callers push these after their own
+ * domain event, into the same batch, so watchers (OP11-041, OP08-105,
+ * OP12-099) resolve after the effect's continuation like the other emitters.
+ */
+function pushLifeRemovals(
+  events: PendingEvent[],
+  lifeOwner: 0 | 1,
+  transitions: readonly ZoneTransitionResult[],
+): void {
+  for (const transition of transitions) {
+    if (transition.fact.source !== "LIFE") continue;
+    events.push({
+      type: "CARD_REMOVED_FROM_LIFE",
+      playerIndex: lifeOwner,
+      payload: {
+        cardInstanceId: transition.fact.oldInstanceId,
+        newCardInstanceId: transition.fact.newInstanceId,
+      },
+    });
+  }
+}
 
 export function executeAddToLifeFromDeck(
   state: GameState,
@@ -641,6 +668,7 @@ export function executePlayFromLife(
         sourceZone: "LIFE",
       },
     });
+    pushLifeRemovals(events, controller, [moved]);
 
     return {
       state: moved.state,
@@ -685,6 +713,7 @@ export function executeLifeCardToDeck(
   );
 
   events.push({ type: "LIFE_CARD_TO_DECK", playerIndex: targetController, payload: { count } });
+  pushLifeRemovals(events, targetController, moved.transitions);
 
   return {
     state: moved.state,
@@ -714,6 +743,7 @@ export function executeTrashFaceUpLife(
   );
 
   events.push({ type: "CARD_TRASHED", playerIndex: controller, payload: { count: faceUp.length, reason: "face_up_life", from: "LIFE" } });
+  pushLifeRemovals(events, controller, moved.transitions);
 
   return {
     state: moved.state,
@@ -870,6 +900,7 @@ export function executeDrainLifeToThreshold(
     "TRASH",
     { position: "TOP" },
   );
+  pushLifeRemovals(events, controller, moved.transitions);
 
   return {
     state: moved.state,

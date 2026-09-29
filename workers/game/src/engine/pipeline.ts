@@ -155,6 +155,16 @@ export function runPipeline(
 
   // If triggers paused for player input, skip steps 6-7 and surface the prompt
   if (nextState.pendingPrompt) {
+    const defeated = defeatAtSuspension(nextState, actingPlayerIndex, cardDb, execResult);
+    if (defeated) {
+      log("pipeline.end", {
+        ...logCtx,
+        outcome: "game_over",
+        winner: defeated.gameOver!.winner,
+        reason: defeated.gameOver!.reason,
+      });
+      return defeated;
+    }
     log("pipeline.end", {
       ...logCtx,
       outcome: "prompt_pending",
@@ -287,6 +297,8 @@ export function continuePipelineFromExecution(
   }
 
   if (nextState.pendingPrompt) {
+    const defeated = defeatAtSuspension(nextState, actingPlayerIndex, cardDb, execResult);
+    if (defeated) return defeated;
     return { state: nextState, valid: true, pendingPrompt: nextState.pendingPrompt };
   }
 
@@ -487,6 +499,34 @@ function updateDeckHitZeroFlag(state: GameState): GameState {
     ...state,
     turn: { ...state.turn, deckHitZeroThisTurn: [next0, next1] },
   };
+}
+
+/**
+ * OPT-886: a Leader damaged at 0 Life has fulfilled 9-2-1-1, and rule
+ * processing "is immediately resolved when the corresponding event occurs,
+ * even if other actions are in the process of being carried out" (9-1-2).
+ * The damage context lives only on this execution result, so when an auto
+ * effect from the same action suspends for input, run the defeat check now
+ * instead of losing it to the prompt: the game ends and the prompt is
+ * discarded. Returns null when no damage at 0 Life was dealt.
+ */
+function defeatAtSuspension(
+  state: GameState,
+  actingPlayerIndex: 0 | 1,
+  cardDb: Map<string, CardData>,
+  execResult: ExecuteResult,
+): PipelineResult | null {
+  const damaged = execResult.damagedPlayerIndex;
+  if (damaged === undefined || state.players[damaged].life.length > 0) return null;
+  const suspended: GameState = {
+    ...state,
+    pendingPrompt: null,
+    effectStack: [],
+    pendingEventActivationEvents: undefined,
+    turn: { ...state.turn, pendingBattleDamageContinuation: null },
+  };
+  const result = finishPipeline(suspended, actingPlayerIndex, cardDb, execResult);
+  return result.gameOver ? result : null;
 }
 
 function finishPipeline(
