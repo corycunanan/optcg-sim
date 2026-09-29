@@ -995,11 +995,10 @@ function validateAction(
 }
 
 /**
- * OPT-826: `scope.when_attacking: { type: "SELECTED_CARDS", ref? }` binds a
- * CANNOT_ACTIVATE_BLOCKER prohibition to the exact attacker(s) — the result
- * ref's cards, or (without `ref`) the action's own `target` selection. The
- * engine freezes those ids at execution and ignores the binding elsewhere,
- * so reject any shape it would silently drop or misread.
+ * OPT-899: `when_attacking: { type: "YOUR_LEADER" }` on a CANNOT_ACTIVATE_BLOCKER
+ * prohibition binds it to the applier's Leader (frozen at apply time). Only
+ * called for that prohibition type; other types keep their own when_attacking
+ * meaning (e.g. CANNOT_ATTACK target gating).
  */
 function validateLeaderAttackerBinding(
   action: ActionOf<"APPLY_PROHIBITION">,
@@ -1009,11 +1008,6 @@ function validateLeaderAttackerBinding(
   const binding = scope?.when_attacking as Record<string, unknown>;
   const at = `${prefix}.params.scope.when_attacking`;
   const errors: string[] = [];
-  if (action.params?.prohibition_type !== "CANNOT_ACTIVATE_BLOCKER") {
-    errors.push(
-      `${at}: a YOUR_LEADER attacker binding is only supported on CANNOT_ACTIVATE_BLOCKER`,
-    );
-  }
   const extraKeys = Object.keys(binding).filter((key) => key !== "type");
   if (extraKeys.length > 0) {
     errors.push(`${at}: YOUR_LEADER attacker binding accepts only 'type' (found ${extraKeys.join(", ")})`);
@@ -1029,13 +1023,23 @@ function validateLeaderAttackerBinding(
   return errors;
 }
 
+/**
+ * OPT-826: `scope.when_attacking: { type: "SELECTED_CARDS", ref? }` binds a
+ * CANNOT_ACTIVATE_BLOCKER prohibition to the exact attacker(s) — the result
+ * ref's cards, or (without `ref`) the action's own `target` selection. The
+ * engine freezes those ids at execution and ignores the binding elsewhere,
+ * so reject any shape it would silently drop or misread.
+ */
 function validateAttackerBoundProhibition(
   action: ActionOf<"APPLY_PROHIBITION">,
   prefix: string,
 ): string[] {
   const scope = action.params?.scope;
   const binding = scope?.when_attacking;
-  if (binding?.type === "YOUR_LEADER") {
+  if (
+    binding?.type === "YOUR_LEADER" &&
+    action.params?.prohibition_type === "CANNOT_ACTIVATE_BLOCKER"
+  ) {
     return validateLeaderAttackerBinding(action, prefix);
   }
   if (binding?.type !== "SELECTED_CARDS") return [];

@@ -1791,7 +1791,9 @@ export interface RuntimeProhibition {
    * action's own selection), so it survives serialization and expires with
    * the prohibition. The Blocker check compares the current battle's attacker
    * against it — a card that leaves and returns is a new instance (§3-1-6)
-   * and is not covered. Absent on every other prohibition.
+   * and is not covered. OPT-899: also set by `when_attacking: { type:
+   * "YOUR_LEADER" }` (OP13-057), which freezes the applying player's Leader
+   * instance id. Absent on every other prohibition.
    */
   attackerInstanceIds?: string[];
   /**

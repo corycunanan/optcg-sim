@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
-import { getEffectSchema } from "../engine/schema-registry.js";
+import { getEffectSchema, validateEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { checkProhibitions } from "../engine/prohibitions.js";
@@ -267,5 +267,53 @@ describe("OPT-899 OP13-057 binds the Blocker lock to the Leader attacker", () =>
     toOwnersNextMain(f);
     expect(blockerProhibitions(f)).toEqual([]);
     expect(attackAndProbeBlocker(f, leader, targets[1], blocker).blockerAllowed).toBe(true);
+  });
+});
+
+describe("OPT-899 YOUR_LEADER attacker-binding validator", () => {
+  const base = (action: Record<string, unknown>) => ({
+    card_id: "TEST-899",
+    card_name: "Test",
+    card_type: "Event",
+    effects: [{ id: "main", category: "auto", trigger: { keyword: "MAIN_EVENT" }, actions: [action] }],
+  });
+  const leader = { type: "YOUR_LEADER" };
+  const blocker = (scope: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+    base({ type: "APPLY_PROHIBITION", ...extra, params: { prohibition_type: "CANNOT_ACTIVATE_BLOCKER", scope } });
+  const relevant = (errors: string[]) => errors.filter((e) => e.includes("when_attacking") || e.includes("scope.controller"));
+  const target = { type: "CHARACTER", controller: "SELF", count: { up_to: 1 } };
+
+  it("accepts the authored OP13-057", () => {
+    expect(validateEffectSchema(getEffectSchema("OP13-057"), "OP13-057")).toEqual([]);
+  });
+
+  it("rejects a missing or non-opponent controller", () => {
+    expect(relevant(validateEffectSchema(blocker({ when_attacking: leader })))).toEqual([
+      expect.stringContaining("set controller 'OPPONENT'"),
+    ]);
+    expect(relevant(validateEffectSchema(blocker({ controller: "SELF", when_attacking: leader })))).toEqual([
+      expect.stringContaining("set controller 'OPPONENT'"),
+    ]);
+  });
+
+  it("rejects extra binding keys", () => {
+    expect(relevant(validateEffectSchema(blocker({ controller: "OPPONENT", when_attacking: { ...leader, ref: "x" } })))).toEqual([
+      expect.stringContaining("accepts only 'type'"),
+    ]);
+  });
+
+  it("rejects a target or target_ref alongside the binding", () => {
+    const scope = { controller: "OPPONENT", when_attacking: leader };
+    expect(relevant(validateEffectSchema(blocker(scope, { target })))).toEqual([expect.stringContaining("must not also carry a target")]);
+    expect(relevant(validateEffectSchema(blocker(scope, { target_ref: "sel" })))).toEqual([expect.stringContaining("must not also carry a target")]);
+  });
+
+  it("leaves CANNOT_ATTACK with when_attacking YOUR_LEADER (attack-target gating) accepted", () => {
+    const action = base({
+      type: "APPLY_PROHIBITION",
+      target,
+      params: { prohibition_type: "CANNOT_ATTACK", scope: { controller: "OPPONENT", when_attacking: leader } },
+    });
+    expect(relevant(validateEffectSchema(action))).toEqual([]);
   });
 });
