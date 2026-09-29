@@ -1040,6 +1040,24 @@ export function executeActionChain(
         result.state.effectStack.length > stackDepthBeforeAction
       ) {
         const remainingActions = actions.slice(i + 1);
+        if (action.type === "REUSE_EFFECT") {
+          // OPT-863: the reused block's frame and prompt keep that block's own
+          // description (e.g. the [Main] text with its cost), not the reusing
+          // [Trigger]'s. Nothing is appended to the reused frame: schema
+          // validation (validateReuseEffectTailPosition) rejects any action
+          // after REUSE_EFFECT, because a suffix merged here would run with the
+          // reused block's resultRefs/controller/success and be lost whenever
+          // that frame is declined, abandoned or replaced by a cost frame.
+          return {
+            state: retainEventsOnFrame(
+              result.state,
+              stackDepthBeforeAction,
+              events
+            ),
+            events,
+            pendingPrompt: result.pendingPrompt,
+          };
+        }
         const nestedState =
           remainingActions.length > 0 || effectDescription
             ? updateTopFrame(result.state, {
