@@ -3770,7 +3770,7 @@ export const OP03_114_CHARLOTTE_LINLIN: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           target: { type: "OPPONENT_LIFE" },
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
           chain: "THEN",
         },
       ],
@@ -4002,7 +4002,7 @@ export const OP03_120_TROPICAL_TORMENT: EffectSchema = {
         {
           type: "TRASH_FROM_LIFE",
           target: { type: "OPPONENT_LIFE" },
-          params: { amount: 1, position: "TOP" },
+          params: { amount: 1, position: "TOP", up_to: true },
         },
       ],
     },
