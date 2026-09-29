@@ -199,3 +199,66 @@ describe("ARRANGE_TOP_CARDS prompt identity", () => {
     expect(arrangeText(renderer)).toContain("Order the remaining");
   });
 });
+
+describe("actionLabel titles every effect modal (OPT-779)", () => {
+  const card = arrangeCards[0];
+  const base = { effectDescription: "[On Play] Do a thing." };
+  const cases: Array<[string, PromptOptions]> = [
+    [
+      "ARRANGE_TOP_CARDS",
+      { ...base, promptType: "ARRANGE_TOP_CARDS", cards: arrangeCards, canSendToBottom: true },
+    ],
+    [
+      "SELECT_TARGET",
+      {
+        ...base,
+        promptType: "SELECT_TARGET",
+        cards: [card],
+        validTargets: [card.instanceId],
+        countMin: 1,
+        countMax: 1,
+        ctaLabel: "Confirm",
+      },
+    ],
+    [
+      "PLAYER_CHOICE",
+      { ...base, promptType: "PLAYER_CHOICE", choices: [{ id: "0", label: "A" }, { id: "1", label: "B" }] },
+    ],
+    ["OPTIONAL_EFFECT", { ...base, promptType: "OPTIONAL_EFFECT", cards: [card] }],
+    [
+      "REVEAL_TRIGGER",
+      {
+        ...base,
+        promptType: "REVEAL_TRIGGER",
+        cards: [card],
+        optional: true,
+        timeoutMs: 1000,
+      },
+    ],
+  ];
+
+  it.each(cases)("%s prompt renders the label in its title", async (_type, options) => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <BoardModals
+          activePrompt={{ ...options, actionLabel: "KO Characters" } as PromptOptions}
+          activePromptId="p1"
+          isPromptHidden={false}
+          onHide={vi.fn()}
+          cardDb={{} as CardDb}
+          onAction={vi.fn()}
+          zonePreview={null}
+          onCloseZonePreview={vi.fn()}
+          me={null}
+          opp={null}
+          redistributeTransfers={[]}
+          onRedistributeUndo={vi.fn()}
+        />
+      );
+    });
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain("Card Effect: KO Characters");
+    expect(json).not.toContain("Card Effect: On Play");
+  });
+});

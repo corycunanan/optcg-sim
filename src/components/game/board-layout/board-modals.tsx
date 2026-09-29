@@ -70,6 +70,7 @@ export function BoardModals({
             cards={activePrompt.cards}
             effectDescription={activePrompt.effectDescription}
             sourceCard={activePrompt.sourceCard}
+            actionLabel={activePrompt.actionLabel}
             canSendToBottom={activePrompt.canSendToBottom}
             restDestination={activePrompt.restDestination}
             validTargets={activePrompt.validTargets}
@@ -91,6 +92,7 @@ export function BoardModals({
             effectDescription={activePrompt.effectDescription}
             instruction={activePrompt.instruction}
             sourceCard={activePrompt.sourceCard}
+            actionLabel={activePrompt.actionLabel}
             countMin={activePrompt.countMin}
             countMax={activePrompt.countMax}
             aggregateConstraint={activePrompt.aggregateConstraint}
@@ -114,6 +116,7 @@ export function BoardModals({
             effectDescription={activePrompt.effectDescription}
             sourceEffectDescription={activePrompt.sourceEffectDescription}
             sourceCard={activePrompt.sourceCard}
+            actionLabel={activePrompt.actionLabel}
             choices={activePrompt.choices}
             donReturn={activePrompt.donReturn}
             confirmOrSkip={activePrompt.confirmOrSkip}
@@ -139,6 +142,7 @@ export function BoardModals({
           effectDescription={activePrompt.effectDescription}
           card={activePrompt.cards?.[0]}
           sourceCard={activePrompt.sourceCard}
+          actionLabel={activePrompt.actionLabel}
           cardDb={cardDb}
           isHidden={isPromptHidden}
           onHide={onHide}
@@ -152,6 +156,7 @@ export function BoardModals({
             cards={activePrompt.cards}
             effectDescription={activePrompt.effectDescription}
             sourceCard={activePrompt.sourceCard}
+            actionLabel={activePrompt.actionLabel}
             cardDb={cardDb}
             isHidden={isPromptHidden}
             onHide={onHide}

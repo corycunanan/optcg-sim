@@ -24,6 +24,8 @@ export interface EffectPromptDialogProps {
   effectDescription: string;
   /** Card whose effect raised the prompt; its name heads the description. */
   sourceCard?: Pick<PromptSourceCard, "cardId">;
+  /** Action the prompt is for ("KO Characters"); wins over the timing in the title. */
+  actionLabel?: string;
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -48,12 +50,13 @@ export interface EffectPromptDialogProps {
 
 /**
  * The one frame every card-effect prompt renders through (see
- * docs/design/INTERRUPTION-MODALS.md): the effect timing in the title, the
+ * docs/design/INTERRUPTION-MODALS.md): the action (else the effect timing) in the title, the
  * source card's name over its effect text, the choice, then Skip and Confirm.
  */
 export function EffectPromptDialog({
   effectDescription,
   sourceCard,
+  actionLabel,
   cardDb,
   isHidden,
   onHide,
@@ -67,7 +70,7 @@ export function EffectPromptDialog({
   onEscapeKeyDown,
 }: EffectPromptDialogProps) {
   const descriptionId = useId();
-  const title = promptDialogTitle(effectDescription);
+  const title = promptDialogTitle(effectDescription, actionLabel);
   const sourceName = promptSourceCardName(cardDb, sourceCard);
 
   return (

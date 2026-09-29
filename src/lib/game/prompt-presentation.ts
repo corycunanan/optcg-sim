@@ -28,10 +28,17 @@ export function promptEffectType(effectDescription: string): string | null {
   return null;
 }
 
-/** Modal title: `Card Effect: <timing>`, or `Card Effect` without a timing. */
-export function promptDialogTitle(effectDescription: string): string {
-  const effectType = promptEffectType(effectDescription);
-  return effectType ? `Card Effect: ${effectType}` : "Card Effect";
+/**
+ * Modal title: `Card Effect: <action>` when the worker named the action
+ * (`actionLabel`), else `Card Effect: <timing>`, else `Card Effect`. The timing
+ * chip still renders inside the effect text, so the label loses nothing.
+ */
+export function promptDialogTitle(
+  effectDescription: string,
+  actionLabel?: string
+): string {
+  const suffix = actionLabel?.trim() || promptEffectType(effectDescription);
+  return suffix ? `Card Effect: ${suffix}` : "Card Effect";
 }
 
 /** Printed name of the prompt's source card, or `null` when there is none. */
