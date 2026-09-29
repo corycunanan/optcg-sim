@@ -510,19 +510,15 @@ export const OP12_016_TO_NEVER_DOUBT: EffectSchema = {
       actions: [
         {
           // "the card given these DON!! cards" is the GIVE_DON cost's
-          // recipient (result ref __cost_don_given, OPT-824). Binding the
-          // attack scope to that exact card is OPT-826; until then the scope
-          // names the [Silvers Rayleigh] recipient class.
+          // recipient (result ref __cost_don_given, OPT-824). The attack
+          // scope binds to that exact card (OPT-826), not every [Silvers
+          // Rayleigh].
           type: "APPLY_PROHIBITION",
-          target: { type: "OPPONENT_LEADER" },
           params: {
             prohibition_type: "CANNOT_ACTIVATE_BLOCKER",
             scope: {
-              when_attacking: {
-                type: "LEADER_OR_CHARACTER",
-                controller: "SELF",
-                filter: { name: "Silvers Rayleigh" },
-              },
+              controller: "OPPONENT",
+              when_attacking: { type: "SELECTED_CARDS", ref: "__cost_don_given" },
             },
           },
           duration: { type: "THIS_TURN" },
@@ -2714,18 +2710,17 @@ export const OP12_077_EXTINGUISHES_ALL_SOUND: EffectSchema = {
           },
           params: { amount: 2000 },
           duration: { type: "THIS_TURN" },
+          result_ref: "selected_law",
         },
         {
+          // "if the selected card attacks": bound to the exact card chosen
+          // above (OPT-826); none chosen → no prohibition.
           type: "APPLY_PROHIBITION",
-          target: { type: "OPPONENT_LEADER" },
           params: {
             prohibition_type: "CANNOT_ACTIVATE_BLOCKER",
             scope: {
-              when_attacking: {
-                type: "LEADER_OR_CHARACTER",
-                controller: "SELF",
-                filter: { name: "Trafalgar Law" },
-              },
+              controller: "OPPONENT",
+              when_attacking: { type: "SELECTED_CARDS", ref: "selected_law" },
             },
           },
           duration: { type: "THIS_TURN" },
