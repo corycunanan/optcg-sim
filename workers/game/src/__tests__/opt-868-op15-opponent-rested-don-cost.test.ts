@@ -515,3 +515,270 @@ describe("OPT-868 OP15-023 post-colon give (active or rested DON!!)", () => {
     expect(costDon(f, P1, "ACTIVE")).toHaveLength(2);
   });
 });
+
+// ─── Fix round 1 (review of PR #727) ─────────────────────────────────────────
+
+function withDonEffect(f: Fixture, donId: string, id = "opt868-don-effect") {
+  f.state = {
+    ...f.state,
+    activeEffects: [
+      ...f.state.activeEffects,
+      {
+        id,
+        sourceCardInstanceId: "seed",
+        sourceEffectBlockId: "",
+        category: "auto",
+        modifiers: [],
+        duration: { type: "THIS_TURN" },
+        expiresAt: { wave: "END_OF_TURN", turn: f.state.turn.number },
+        controller: P0,
+        appliesTo: [donId],
+        timestamp: 0,
+      } as unknown as GameState["activeEffects"][number],
+    ],
+  };
+}
+
+/**
+ * Pay the cost with `payment` (a DON!! step is forced by the hold on `held`),
+ * then — for Arlong — take the rested branch, and aim the post-colon give at
+ * the opponent's Leader.
+ */
+function payThenAimAtOpponentLeader(cardId: string) {
+  const ctx = setup(cardId, { oppRested: 3 });
+  const { f, source, foes } = ctx;
+  const [held, payment, free] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+  withDonHold(f, held);
+  expect(activate(f, cardId, source).valid).toBe(true);
+  f.accept();
+  f.select([foes[0].instanceId]);
+  f.select([payment]);
+  if (cardId === "OP15-023") {
+    const options = f.state.pendingPrompt?.options;
+    if (options?.promptType !== "PLAYER_CHOICE") throw new Error(JSON.stringify(options));
+    f.respond({ type: "PLAYER_CHOICE", choiceId: options.choices[1].id });
+  }
+  const oppLeader = f.state.players[P1].leader.instanceId;
+  f.select([oppLeader]);
+  return { ...ctx, held, payment, free, oppLeader };
+}
+
+describe.each(["OP15-003", "OP15-017", "OP15-023"])("OPT-868 %s post-colon give of the opponent's DON!! (FAQ: the activating player chooses)", (cardId) => {
+  it("offers the held and the free rested DON!!; giving the free one keeps the hold", () => {
+    const { f, held, free, oppLeader } = payThenAimAtOpponentLeader(cardId);
+    const step = selectPrompt(f);
+    expect(new Set(step.validTargets)).toEqual(new Set([held, free]));
+    expect(step.countMin).toBe(1);
+    expect(step.countMax).toBe(1);
+    // Nothing is given until the DON!! is chosen.
+    expect(f.state.players[P1].leader.attachedDon).toHaveLength(0);
+    f.persist();
+    f.select([free]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[P1].leader.attachedDon.map((d) => d.instanceId)).toEqual([free]);
+    expect(f.state.players[P1].leader.attachedDon[0].attachedTo).toBe(oppLeader);
+    expect(costDon(f, P1, "RESTED").map((d) => d.instanceId)).toEqual([held]);
+    expect(f.state.prohibitions.find((p) => p.id === "opt868-hold")?.appliesTo).toEqual([held]);
+  });
+
+  it("giving the held one instead removes its hold (3-1-6-1)", () => {
+    const { f, held, free } = payThenAimAtOpponentLeader(cardId);
+    f.select([held]);
+    expect(f.state.players[P1].leader.attachedDon.map((d) => d.instanceId)).toEqual([held]);
+    expect(costDon(f, P1, "RESTED").map((d) => d.instanceId)).toEqual([free]);
+    expect(f.state.prohibitions.find((p) => p.id === "opt868-hold")).toBeUndefined();
+  });
+});
+
+describe("OPT-868 post-colon DON!! identity step — guards and scope", () => {
+  it("rejects the marker, the recipient, an active DON!!, two DON!! and strangers, including after restore", () => {
+    const { f, held, free, oppLeader } = payThenAimAtOpponentLeader("OP15-017");
+    f.persist();
+    const marker = f.state.effectStack.at(-1)!.validTargets.find((id) => id.startsWith("give-don-identity:"));
+    expect(marker).toBe(`give-don-identity:1:${oppLeader}`);
+    expect(selectPrompt(f).validTargets).not.toContain(marker);
+    const pending = structuredClone(f.state);
+    const active = costDon(f, P1, "ACTIVE")[0].instanceId;
+    for (const ids of [[], [marker!], [oppLeader], [active], [held, free], ["foreign"]]) {
+      f.select(ids, true);
+      expect(f.state).toEqual(pending);
+    }
+    f.select([free]);
+    expect(f.state.players[P1].leader.attachedDon.map((d) => d.instanceId)).toEqual([free]);
+  });
+
+  it("rejects an offered DON!! that is no longer rested in the cost area", () => {
+    const { f, free } = payThenAimAtOpponentLeader("OP15-017");
+    f.persist();
+    f.state.players[P1].donCostArea.find((d) => d.instanceId === free)!.state = "ACTIVE";
+    const before = structuredClone(f.state);
+    f.select([free], true);
+    expect(f.state).toEqual(before);
+  });
+
+  it("rejects a DON!! that became giveable after the prompt but was never offered", () => {
+    const { f } = payThenAimAtOpponentLeader("OP15-017");
+    const late = costDon(f, P1, "ACTIVE")[0].instanceId;
+    f.state.players[P1].donCostArea.find((d) => d.instanceId === late)!.state = "RESTED";
+    const before = structuredClone(f.state);
+    f.select([late], true);
+    expect(f.state).toEqual(before);
+  });
+
+  it("rejects the choice once the bound recipient left the field", () => {
+    const ctx = setup("OP15-017", { oppRested: 3 });
+    const { f, source, foes } = ctx;
+    const [held, payment, free] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    withDonHold(f, held);
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.select([foes[0].instanceId]);
+    f.select([payment]);
+    f.select([foes[1].instanceId]);
+    expect(new Set(selectPrompt(f).validTargets)).toEqual(new Set([held, free]));
+    f.state = transitionCard(f.state, foes[1].instanceId, "TRASH", { position: "TOP" })!.state;
+    const before = structuredClone(f.state);
+    f.select([free], true);
+    expect(f.state).toEqual(before);
+  });
+
+  it("stays prompt-free when the opponent's rested DON!! are interchangeable", () => {
+    const { f, source, foes } = setup("OP15-017", { oppRested: 3 });
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.select([foes[0].instanceId]);
+    f.select([foes[1].instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(live(f, foes[1])!.attachedDon).toHaveLength(1);
+  });
+
+  it("an own-DON!! give never prompts, even when the payer's rested DON!! differ", () => {
+    const { f, source, foes } = setup("OP15-017", { ownRested: 3 });
+    const [ownHeld] = costDon(f, P0, "RESTED").map((d) => d.instanceId);
+    withDonHold(f, ownHeld, "opt868-own-hold");
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.select([foes[0].instanceId]);
+    f.select([f.state.players[P0].leader.instanceId]);
+    expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.players[P0].leader.attachedDon).toHaveLength(1);
+  });
+
+  it("OP15-023's ACTIVE branch also lets the payer choose among differing opponent DON!!", () => {
+    const { f, source, foes } = setup("OP15-023", { oppActive: 2, oppRested: 2 });
+    const [marked, plain] = costDon(f, P1, "ACTIVE").map((d) => d.instanceId);
+    withDonEffect(f, marked);
+    activate(f, "OP15-023", source);
+    f.accept();
+    f.select([foes[0].instanceId]);
+    const options = f.state.pendingPrompt?.options;
+    if (options?.promptType !== "PLAYER_CHOICE") throw new Error(JSON.stringify(options));
+    f.respond({ type: "PLAYER_CHOICE", choiceId: options.choices[0].id });
+    f.select([foes[1].instanceId]);
+    expect(new Set(selectPrompt(f).validTargets)).toEqual(new Set([marked, plain]));
+    f.select([plain]);
+    expect(live(f, foes[1])!.attachedDon.map((d) => d.instanceId)).toEqual([plain]);
+  });
+
+  it("OP15-010 (same printed give, same FAQ ruling) lets the activating player choose", () => {
+    const f = fixture();
+    f.data("OP15-010", { cost: 2, power: 3000 });
+    const source = f.put("OP15-010", P0);
+    const foe = f.put(CARDS.VANILLA.id, P1);
+    setDon(f, P0, 2, 0);
+    setDon(f, P1, 1, 2);
+    const [held, free] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    withDonHold(f, held);
+    f.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "OP15-010_activate" });
+    f.select([foe.instanceId]);
+    expect(new Set(selectPrompt(f).validTargets)).toEqual(new Set([held, free]));
+    f.select([free]);
+    expect(live(f, foe)!.attachedDon.map((d) => d.instanceId)).toEqual([free]);
+    expect(f.state.prohibitions.find((p) => p.id === "opt868-hold")?.appliesTo).toEqual([held]);
+  });
+});
+
+describe("OPT-868 cost DON!! binding against live and staged state", () => {
+  it("an effect applied to one rested DON!! (activeEffects, not only prohibitions) forces the DON!! step", () => {
+    const { f, source, foes } = setup("OP15-017", { oppRested: 2 });
+    const [marked, plain] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    withDonEffect(f, marked);
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.select([foes[0].instanceId]);
+    expect(new Set(selectPrompt(f).validTargets)).toEqual(new Set([marked, plain]));
+    f.select([plain]);
+    expect(live(f, foes[0])!.attachedDon.map((d) => d.instanceId)).toEqual([plain]);
+  });
+
+  it("the automatic (interchangeable) payment never gives a DON!! that is no longer rested live", () => {
+    const { f, source, foes } = setup("OP15-017", { oppActive: 2, oppRested: 2 });
+    const [first, second] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.persist();
+    // Live state diverges from the staged transaction: `first` is active now.
+    f.state.players[P1].donCostArea.find((d) => d.instanceId === first)!.state = "ACTIVE";
+    f.select([foes[0].instanceId]);
+    expect(live(f, foes[0])!.attachedDon.map((d) => d.instanceId)).toEqual([second]);
+  });
+
+  it("the automatic payment is rejected when no DON!! is rested in both live and staged state", () => {
+    const { f, source, foes } = setup("OP15-017", { oppActive: 2, oppRested: 1 });
+    const [only] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.persist();
+    f.state.players[P1].donCostArea.find((d) => d.instanceId === only)!.state = "ACTIVE";
+    const before = structuredClone(f.state);
+    f.select([foes[0].instanceId], true);
+    expect(f.state).toEqual(before);
+  });
+
+  it("a hold applied live after the staged snapshot restores the explicit DON!! step", () => {
+    const { f, source, foes } = setup("OP15-017", { oppRested: 2 });
+    const [held, free] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.persist();
+    withDonHold(f, held);
+    f.select([foes[0].instanceId]);
+    expect(new Set(selectPrompt(f).validTargets)).toEqual(new Set([held, free]));
+  });
+
+  it("rejects a cost DON!! reply once that DON!! is no longer rested live", () => {
+    const { f, source, foes } = setup("OP15-017", { oppActive: 1, oppRested: 2 });
+    const [held, free] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    withDonHold(f, held);
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.select([foes[0].instanceId]);
+    f.persist();
+    f.state.players[P1].donCostArea.find((d) => d.instanceId === free)!.state = "ACTIVE";
+    const before = structuredClone(f.state);
+    f.select([free], true);
+    expect(f.state).toEqual(before);
+  });
+
+  it("rejects a cost DON!! that is rested in both states but was never offered", () => {
+    const { f, source, foes } = setup("OP15-017", { oppActive: 1, oppRested: 2 });
+    const [held] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    const late = costDon(f, P1, "ACTIVE")[0].instanceId;
+    withDonHold(f, held);
+    activate(f, "OP15-017", source);
+    f.accept();
+    f.select([foes[0].instanceId]);
+    f.persist();
+    const frame = f.state.effectStack.at(-1)!;
+    const staged = structuredClone(frame.costTransactionState!);
+    staged.players[P1].donCostArea.find((d) => d.instanceId === late)!.state = "RESTED";
+    f.state.players[P1].donCostArea.find((d) => d.instanceId === late)!.state = "RESTED";
+    f.state = {
+      ...f.state,
+      effectStack: [...f.state.effectStack.slice(0, -1), { ...frame, costTransactionState: staged }],
+    };
+    const before = structuredClone(f.state);
+    f.select([late], true);
+    expect(f.state).toEqual(before);
+  });
+});

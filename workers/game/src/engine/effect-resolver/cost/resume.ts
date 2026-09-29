@@ -274,20 +274,19 @@ function applyCostSelectionUnreleased(
     case "GIVE_OPPONENT_DON_TO_OPPONENT": {
       // OPT-868: move 1 of the opponent's RESTED, unattached cost-area DON!!
       // under the selected opponent Character. `selectedIds` is
-      // [recipient] or [recipient, chosenDonId]; without a DON!! id the
-      // first eligible one is given (only when all are interchangeable — the
-      // resume path prompts otherwise). The DON!! stays its owner's (the
+      // [recipient, chosenDonId] — the DON!! is always bound explicitly by
+      // the resume path (chosen by the payer, or the first DON!! eligible in
+      // both the live and staged states when all are interchangeable). The
+      // DON!! stays its owner's (the
       // opponent's) and keeps its stored state; given DON!! are neither
       // active nor rested (rule 4-4-2). All or nothing (rule 8-3-1-3).
       const [recipient, chosenDonId, ...extra] = selectedIds;
-      if (!recipient || extra.length > 0) return { state, events: [] };
+      if (!recipient || !chosenDonId || extra.length > 0) return { state, events: [] };
       if (!cardDb || !computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).includes(recipient)) {
         return { state, events: [] };
       }
       const eligible = opponentRestedCostDon(state, controller);
-      const don = chosenDonId === undefined
-        ? eligible[0]
-        : eligible.find((d) => d.instanceId === chosenDonId);
+      const don = eligible.find((d) => d.instanceId === chosenDonId);
       if (!don) return { state, events: [] };
       const opp: 0 | 1 = controller === 0 ? 1 : 0;
       const oppPlayer = state.players[opp];

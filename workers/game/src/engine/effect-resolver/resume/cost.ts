@@ -48,8 +48,8 @@ import {
   computeCostTargets,
   costSelectionCount,
   isOpponentLifePlacement,
+  donIdentityChoiceMatters,
   opponentRestedCostDon,
-  opponentRestedDonChoiceMatters,
 } from "../cost/targets.js";
 
 const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
@@ -1147,8 +1147,19 @@ export function handleAwaitingCostSelection(
       ) {
         return reject();
       }
-      if (opponentRestedDonChoiceMatters(nextState, controller)) {
-        const donIds = opponentRestedCostDon(nextState, controller).map((don) => don.instanceId);
+      // The DON!! is always bound explicitly: only a DON!! eligible in BOTH
+      // the live and the staged payment state may pay (a diverged staged
+      // transaction never gives a DON!! that is no longer rested live).
+      const candidates = opponentRestedCostDon(nextState, controller)
+        .filter((don) => donEligibleIn(baselineState, don.instanceId));
+      const donIds = candidates.map((don) => don.instanceId);
+      if (donIds.length === 0) return reject();
+      // Distinguishable in either state (e.g. a live hold the staged
+      // snapshot predates) → the payer picks explicitly.
+      if (
+        donIdentityChoiceMatters(nextState, candidates) ||
+        donIdentityChoiceMatters(baselineState, candidates)
+      ) {
         nextState = updateTopFrame(nextState, {
           validTargets: [`${OPPONENT_DON_RECIPIENT_PREFIX}${recipient}`, ...donIds],
         });
@@ -1166,7 +1177,7 @@ export function handleAwaitingCostSelection(
           resumeContext: topFrame.id,
         });
       }
-      payment = [recipient];
+      payment = [recipient, donIds[0]];
     } else {
       const recipient = marker.slice(OPPONENT_DON_RECIPIENT_PREFIX.length);
       const donId = selected.length === 1 ? selected[0] : undefined;

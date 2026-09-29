@@ -56,7 +56,7 @@ export function opponentRestedCostDon(state: GameState, controller: 0 | 1): DonI
  * DON!! with the same set of referencing prohibitions and active effects are
  * the same choice; rule 3-1-6-1 removes those effects when the DON!! moves.
  */
-function donEffectSignature(state: GameState, donId: string): string {
+export function donEffectSignature(state: GameState, donId: string): string {
   return [
     ...state.prohibitions.filter((p) => p.appliesTo.includes(donId)).map((p) => `p:${p.id}`),
     ...state.activeEffects.filter((e) => e.appliesTo.includes(donId)).map((e) => `e:${e.id}`),
@@ -64,16 +64,14 @@ function donEffectSignature(state: GameState, donId: string): string {
 }
 
 /**
- * OPT-868: true when the opponent's rested DON!! differ in the effects applied
- * to them, so which one the payer gives is a real choice (faq_op15-eb04.md
- * OP15-017: "The player who activated the effect chooses a rested DON!! card
- * from their opponent's cost area"). Otherwise any one is the same payment.
+ * OPT-868: true when the given DON!! differ in the effects applied to them,
+ * so which one is moved is a real choice (rule 3-1-6-1; faq_op15-eb04.md:
+ * "The player who activated the effect chooses a ... DON!! card from their
+ * opponent's cost area"). Interchangeable DON!! (all the same signature) are
+ * the same payment and never need a prompt.
  */
-export function opponentRestedDonChoiceMatters(state: GameState, controller: 0 | 1): boolean {
-  const signatures = new Set(
-    opponentRestedCostDon(state, controller).map((don) => donEffectSignature(state, don.instanceId)),
-  );
-  return signatures.size > 1;
+export function donIdentityChoiceMatters(state: GameState, dons: readonly DonInstance[]): boolean {
+  return new Set(dons.map((don) => donEffectSignature(state, don.instanceId))).size > 1;
 }
 
 /**
