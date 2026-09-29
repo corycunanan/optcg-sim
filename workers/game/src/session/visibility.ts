@@ -74,7 +74,7 @@ const SPECTATOR_REDACTED_EVENT_RULES = {
  */
 export const SPECTATOR_PLAYER_VIEW_FIELDS = [
   "executionContext", // Both views contain the same redacted context; assert.
-  "players", // Owner-view union, followed by deck/face-down-Life intersection.
+  "players", // Owner-view union (own face-down Life already redacted), then deck/face-down-Life intersection.
   "turn", // Assert both views, then omit private in-flight Trigger identities.
   "eventLog", // Validate player views, then apply observer event semantics.
   "pendingPrompt", // Apply observer semantics to the authoritative prompt.
@@ -530,12 +530,14 @@ export function mergePlayerViewsForSpectator(
       "Spectator visibility invariant violated: player views do not match authoritative state id",
     );
   }
-  // filterStateForPlayer preserves the receiving player's authoritative object
-  // reference and replaces only the opponent tuple entry. Besides being cheap,
-  // checking both indexed owner references rejects swapped or duplicated views.
+  // filterStateForPlayer preserves the receiving player's authoritative hand
+  // array reference and replaces the opponent's hand with placeholders. (The
+  // receiver's own tuple entry is rebuilt to redact face-down Life, OPT-901.)
+  // Besides being cheap, checking both indexed owner hand references rejects
+  // swapped or duplicated views.
   if (
-    playerZeroView.players[0] !== stripped.players[0] ||
-    playerOneView.players[1] !== stripped.players[1]
+    playerZeroView.players[0].hand !== stripped.players[0].hand ||
+    playerOneView.players[1].hand !== stripped.players[1].hand
   ) {
     throw new Error(
       "Spectator visibility invariant violated: player views are not their indexed owner views",
