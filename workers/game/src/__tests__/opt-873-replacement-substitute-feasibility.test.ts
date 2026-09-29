@@ -237,21 +237,35 @@ describe("TRASH_FROM_LIFE substitute", () => {
     expect(f.state.turn.battle).toBeNull();
   });
 
-  it("ST09-010 battle K.O. with 1 Life: offered; accepting trashes that Life card", () => {
-    const f = fixture();
-    f.data("ST09-010", { cost: 4, power: 5000 });
-    const ace = f.put("ST09-010", 0);
-    f.state.players[0].life = f.state.players[0].life.slice(0, 1);
-    const lifeCard = f.state.players[0].life[0];
+  // ST09-010 is authored as a PLAYER_CHOICE between trashing the top and the
+  // bottom Life card (OPT-889). With 1 Life, either end is that one card.
+  it.each(["top", "bottom"] as const)(
+    "ST09-010 battle K.O. with 1 Life: offered; accepting and choosing %s trashes that Life card",
+    (end) => {
+      const f = fixture();
+      f.data("ST09-010", { cost: 4, power: 5000 });
+      const ace = f.put("ST09-010", 0);
+      f.state.players[0].life = f.state.players[0].life.slice(0, 1);
+      const lifeCard = f.state.players[0].life[0];
 
-    f.battle(ace);
-    expect(f.replacementOffered()).toBe(true);
-    f.accept();
+      f.battle(ace);
+      expect(f.replacementOffered()).toBe(true);
+      f.accept();
 
-    expect(f.onField(ace)).toBe(true);
-    expect(f.state.players[0].life).toHaveLength(0);
-    expect(f.state.players[0].trash.map((c) => c.cardId)).toEqual([lifeCard.cardId]);
-  });
+      const prompt = f.state.pendingPrompt;
+      expect(prompt?.options.promptType).toBe("PLAYER_CHOICE");
+      if (prompt?.options.promptType !== "PLAYER_CHOICE") throw new Error("no top/bottom prompt");
+      expect(prompt.respondingPlayer).toBe(0);
+      expect(prompt.options.choices).toHaveLength(2);
+      const pick = prompt.options.choices.find((c) => c.label.toLowerCase().includes(end));
+      expect(pick).toBeTruthy();
+      f.respond({ type: "PLAYER_CHOICE", choiceId: pick!.id });
+
+      expect(f.onField(ace)).toBe(true);
+      expect(f.state.players[0].life).toHaveLength(0);
+      expect(f.state.players[0].trash.map((c) => c.cardId)).toEqual([lifeCard.cardId]);
+    },
+  );
 
   it("ST20-002 effect K.O. with 0 Life: not offered; the K.O. proceeds (FAQ)", () => {
     const f = fixture();
