@@ -12,6 +12,8 @@ import { checkProhibitions } from "../engine/prohibitions.js";
 import { parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { transitionCard } from "../engine/zone-transition.js";
+import { getEffectivePower } from "../engine/modifiers.js";
+import { SessionTransport } from "../session/transport.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 import { isBlockerProhibited } from "../../../../shared/blocker-prohibition.js";
 
@@ -349,6 +351,9 @@ describe("OPT-826 OP12-077 binds the Blocker lock to the selected [Trafalgar Law
       f.persist(); // resume with the selection prompt open
       f.select([law.instanceId]);
       expect(f.state.pendingPrompt).toBeNull();
+      // The +2000 and the Blocker binding land on the same selected card.
+      expect(getEffectivePower(liveCard(f, law), f.db.get(law.cardId)!, f.state, f.db)).toBe(8000);
+      expect(getEffectivePower(liveCard(f, leader), f.db.get(leader.cardId)!, f.state, f.db)).toBe(5000);
       const [entry] = blockerProhibitions(f);
       expect(entry).toMatchObject({ controller: owner, appliesTo: [], attackerInstanceIds: [law.instanceId] });
 
@@ -518,5 +523,82 @@ describe("OPT-826 attacker-binding schema contract", () => {
     expect(validateEffectSchema(dangling, "TEST-826")).toEqual(
       expect.arrayContaining([expect.stringContaining("'missing' has no matching result_ref")]),
     );
+  });
+});
+
+// ─── Worker SELECT_BLOCKER prompt (transport) ─────────────────────────────
+
+/**
+ * The prompt the defender receives in the Block Step via
+ * SessionTransport.sendPendingPrompts — the same path GameSession uses after
+ * every action and on (re)connect.
+ */
+function blockerPrompt(f: Fixture) {
+  const messages: Array<{ type: string; options?: { promptType: string; validTargets: string[] } }> = [];
+  const ws = {
+    send: (raw: string) => messages.push(JSON.parse(raw)),
+    deserializeAttachment: () => null,
+  } as unknown as WebSocket;
+  const transport = new SessionTransport(
+    { getWebSockets: () => [ws], acceptWebSocket: () => {} },
+    () => {},
+  );
+  transport.sendPendingPrompts(f.state, f.db);
+  const prompt = messages.find((m) => m.type === "game:prompt")?.options;
+  expect(prompt?.promptType).toBe("SELECT_BLOCKER");
+  return prompt!.validTargets;
+}
+
+function declareAttack(f: Fixture, attacker: CardInstance, target: CardInstance) {
+  f.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId });
+  expect(f.state.turn.battleSubPhase).toBe("BLOCK_STEP");
+}
+
+describe("OPT-826 the worker's SELECT_BLOCKER prompt hides exactly the prohibited blockers", () => {
+  for (const owner of [0, 1] as const) {
+    it(`player ${owner}: bound attacker → blocker absent; unbound attacker → present`, () => {
+      const { f, chosen, unchosen, sanji, blocker, targets } = sanjiSetup(owner);
+      const vanilla = f.put(CARDS.VANILLA.id, other(owner));
+      playSanji(f, sanji, [chosen]);
+
+      declareAttack(f, unchosen, targets[0]);
+      expect(blockerPrompt(f)).toEqual(expect.arrayContaining([blocker.instanceId, vanilla.instanceId]));
+      f.act({ type: "PASS" }, other(owner));
+      for (let i = 0; i < 6 && f.state.turn.battleSubPhase; i++) f.act({ type: "PASS" }, other(owner));
+
+      declareAttack(f, chosen, targets[1]);
+      const valid = blockerPrompt(f);
+      expect(valid).not.toContain(blocker.instanceId);
+      expect(valid).not.toContain(vanilla.instanceId);
+    });
+  }
+
+  it("survives a serialized resume in the Block Step", () => {
+    const { f, chosen, sanji, blocker, targets } = sanjiSetup(0);
+    playSanji(f, sanji, [chosen]);
+    declareAttack(f, chosen, targets[0]);
+    f.persist();
+    expect(blockerPrompt(f)).not.toContain(blocker.instanceId);
+  });
+
+  it("a blanket P-097 ban leaves no candidates; the prompt is still sent (optional), as with no active Characters", () => {
+    const f = fixture(0);
+    f.data("P-097", { cost: 1, power: 5000, effectText: "[On Play]/[When Attacking] Your opponent cannot activate [Blocker] during this turn." });
+    const attacker = f.put(CARDS.VANILLA.id, 0);
+    const shanks = f.put("P-097", 0, "HAND");
+    const { blocker, targets } = board(f);
+    f.act({ type: "PLAY_CARD", cardInstanceId: shanks.instanceId });
+    declareAttack(f, attacker, targets[0]);
+    expect(blockerPrompt(f)).toEqual([]);
+    expect(blocker.state).toBe("ACTIVE");
+  });
+
+  it("without any prohibition every ACTIVE Character remains a candidate (set otherwise unchanged)", () => {
+    const f = fixture(0);
+    const attacker = f.put(CARDS.VANILLA.id, 0);
+    const { blocker, targets } = board(f);
+    const vanilla = f.put(CARDS.VANILLA.id, 1);
+    declareAttack(f, attacker, targets[0]);
+    expect(new Set(blockerPrompt(f))).toEqual(new Set([blocker.instanceId, vanilla.instanceId]));
   });
 });
