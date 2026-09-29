@@ -39,7 +39,20 @@ export interface PromptLifecycleServices {
 
 export interface PromptLifecycleResult {
   state: GameState;
+  /**
+   * The reply did not resolve the prompt it answered. Either `state` is the
+   * pre-resume state (the prompt is unchanged), or — when `reprompted` is set —
+   * `state` carries a refreshed prompt for the same choice that must be
+   * persisted and sent. Either way the session answers with `action:rejected`.
+   */
   responseRejected: boolean;
+  /**
+   * OPT-861: set with `responseRejected` when the reply was declined at resume
+   * time and the same choice was asked again with refreshed candidates (for
+   * example a persisted selection that went stale). Any resume-time
+   * revalidation that re-asks instead of restoring state reports this way.
+   */
+  reprompted?: boolean;
   gameOver?: { winner: 0 | 1 | null; reason: string };
 }
 
@@ -130,6 +143,7 @@ function resumePromptLifecycleUnreleased(
 
   let state: GameState = { ...stateBeforeResume, pendingPrompt: null };
   let responseRejected = false;
+  let reprompted = false;
   let gameOver: PromptLifecycleResult["gameOver"];
 
   if (
@@ -279,7 +293,8 @@ function resumePromptLifecycleUnreleased(
         );
       }
       state = { ...state, pendingPrompt: resumed.pendingPrompt };
-      responseRejected = !!resumed.rejected;
+      reprompted = !!resumed.reprompted;
+      responseRejected = !!resumed.rejected || reprompted;
     } else if (!resumed.resolved && resumed.events.length === 0) {
       state = stateBeforeResume;
       responseRejected = true;
@@ -321,8 +336,14 @@ function resumePromptLifecycleUnreleased(
     state = resumed.state;
     if (state.engineOutcome) {
       gameOver = terminalEngineOutcome(state);
+    } else if (resumed.rejected) {
+      // The reply must not consume this prompt: keep it exactly as persisted.
+      state = stateBeforeResume;
+      responseRejected = true;
     } else if (resumed.pendingPrompt) {
       state = { ...state, pendingPrompt: resumed.pendingPrompt };
+      reprompted = !!resumed.reprompted;
+      responseRejected = reprompted;
     } else if (!resumed.resolved && resumed.events.length === 0) {
       state = stateBeforeResume;
       responseRejected = true;
@@ -384,7 +405,12 @@ function resumePromptLifecycleUnreleased(
   if (!state.pendingPrompt) {
     state = services.advanceStartOfTurn(state);
   }
-  return { state, responseRejected, gameOver };
+  return {
+    state,
+    responseRejected,
+    ...(reprompted ? { reprompted: true } : {}),
+    gameOver,
+  };
 }
 
 function isResumeContext(
