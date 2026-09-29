@@ -127,6 +127,8 @@ const REF_DEPENDENT_TARGET_TYPES: ReadonlySet<TargetType> = new Set([
   "SELECTED_CARDS",
   "TRIGGERING_CARD",
   "TRIGGERING_CARD_IN_TRASH",
+  "BATTLE_TARGET",
+  "REPLACED_CARD",
 ]);
 const IMPLICIT_COST_RESULT_REFS = new Set([
   "__cost_don_rested",
@@ -188,6 +190,8 @@ const DUAL_TARGET_SLOT_CONTROLLER_MODES = {
   OPPONENT_LIFE: NO_SLOT_CONTROLLERS,
   TRIGGERING_CARD: NO_SLOT_CONTROLLERS,
   TRIGGERING_CARD_IN_TRASH: NO_SLOT_CONTROLLERS,
+  BATTLE_TARGET: NO_SLOT_CONTROLLERS,
+  REPLACED_CARD: NO_SLOT_CONTROLLERS,
 } satisfies Record<TargetType, ReadonlySet<Controller>>;
 
 // Parent Target.controller support is deliberately exhaustive and fail-closed.
@@ -221,6 +225,9 @@ const TARGET_CONTROLLER_MODES = {
   OPPONENT_LIFE: OPPONENT_CONTROLLER,
   TRIGGERING_CARD: NO_SLOT_CONTROLLERS,
   TRIGGERING_CARD_IN_TRASH: SELF_CONTROLLER,
+  // OPT-797: scope is fixed by the seeded reference.
+  BATTLE_TARGET: NO_SLOT_CONTROLLERS,
+  REPLACED_CARD: NO_SLOT_CONTROLLERS,
 } satisfies Record<TargetType, ReadonlySet<Controller>>;
 
 /**

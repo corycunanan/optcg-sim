@@ -1,3 +1,4 @@
+import { getBattleOpponentInstanceId } from "./events.js";
 import { isHandTrashByEffect } from "./hand-trash.js";
 /**
  * M4 Trigger System
@@ -704,6 +705,10 @@ function matchesCustomTrigger(
       if (filter.cause && !["ANY", "BY_EFFECT", "BY_YOUR_EFFECT", "BY_OPPONENT_EFFECT"].includes(filter.cause)) return false;
       filter = { ...filter, controller: undefined, cause: undefined };
     }
+    if (trigger.event === "END_OF_BATTLE" && filter.battle_target_type) {
+      if (!matchesBattleParticipantFilter(filter, event, state, sourceCard, _cardDb)) return false;
+      filter = { ...filter, battle_target_type: undefined, target_filter: undefined };
+    }
     if (!matchesEventFilter(filter, event, sourceCard.controller, state, _cardDb)) return false;
   }
 
@@ -789,6 +794,43 @@ function matchesAttackDamage(
   if (event.playerIndex !== sourceCard.controller) return false;
   if (event.payload.lethal === true || event.payload.firstDamageOfAttack !== true) return false;
   if (trigger.filter?.attacker === "SELF" && event.payload.attackerInstanceId !== sourceCard.instanceId) return false;
+  return true;
+}
+
+/**
+ * OPT-797: "At the end of a battle in which this Character battles your
+ * opponent's Character [with a cost of N or less]" (OP04-047, ST08-013).
+ * `turn.battle` is already cleared when END_OF_BATTLE is matched, so the
+ * payload is the only record of the combatants.
+ * - The host must have fought in the battle, as attacker or as the final
+ *   (post-Blocker) target (qa_st-08.md ST08-013; qa_st-01-st-04.md ST02-010
+ *   Blocker ruling).
+ * - An aborted battle never "battles" (qa_st-01-st-04.md ST02-010: a target
+ *   that left before the Damage Step does not satisfy the requirement).
+ * - The opposing card must be a Character/Leader per `battle_target_type`.
+ *   A Leader never leaves the field, so a combatant that is not a Leader was a
+ *   Character even when it was K.O.'d in the battle.
+ * - `target_filter` is checked against the opposing card as it is now, at End
+ *   of the Battle (§7-1-5-2). A combatant that already left the field (K.O.'d
+ *   in battle, qa_op04.md OP04-047) is a new card (§3-1-6) and fails it.
+ */
+function matchesBattleParticipantFilter(
+  filter: EventFilter,
+  event: GameEvent,
+  state: GameState,
+  sourceCard: CardInstance,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (event.type !== "END_OF_BATTLE" || event.payload.aborted) return false;
+  const opposingId = getBattleOpponentInstanceId(event, sourceCard.instanceId);
+  if (!opposingId) return false;
+  const opposingIsLeader = state.players.some((p) => p.leader.instanceId === opposingId);
+  if ((opposingIsLeader ? "LEADER" : "CHARACTER") !== filter.battle_target_type) return false;
+  if (filter.target_filter) {
+    const opposing = findCardInstance(state, opposingId);
+    if (!opposing || (opposing.zone !== "CHARACTER" && opposing.zone !== "LEADER")) return false;
+    if (!matchesFilter(opposing, filter.target_filter, cardDb, state)) return false;
+  }
   return true;
 }
 
