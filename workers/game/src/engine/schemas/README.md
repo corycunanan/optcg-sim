@@ -374,7 +374,8 @@ All costs go in the `costs` array. They represent text **before the colon**.
 | `PLACE_FROM_TRASH_TO_DECK` | "Return N from trash to deck" |
 | `PLACE_STAGE_TO_DECK` | "Place Stage at deck bottom" |
 | `PLACE_HAND_TO_DECK` | "Place N from hand to deck" |
-| `GIVE_OPPONENT_DON` | "Give DON!! to opponent" |
+| `GIVE_OPPONENT_DON` | Legacy: moves N of the payer's own unattached DON!! to the opponent's cost area. No printed cost matches it — do not use for "give 1 of your opponent's rested DON!! …" |
+| `GIVE_OPPONENT_DON_TO_OPPONENT` | "Give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters" before the colon — `{ amount: 1, target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } } }`; rested is intrinsic (no cost `filter`); unpayable when the opponent has no rested cost-area DON!! or no Character; the payer picks the Character, and also the DON!! when the opponent's rested DON!! carry different effects |
 | `GIVE_DON` | "Give N active DON!! card(s) to 1 of your [Name]/Leader or Character cards" before the colon — `{ amount: N, target: { type: "LEADER_OR_CHARACTER", controller: "SELF", count: { exact: 1 }, filter } }`; only active, unattached cost-area DON!! pay; the player picks the recipient, exposed as result ref `__cost_don_given` |
 | `RETURN_ATTACHED_DON_TO_COST` | "Return attached DON!!" |
 | `PLACE_SELF_AND_HAND_TO_DECK` | "Place this card and hand to deck" |

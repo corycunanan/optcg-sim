@@ -44,9 +44,24 @@ import {
   buildTrashToDeckArrangePrompt,
 } from "../cost-handler.js";
 import { COST_DON_GIVEN_REF, costResultToEntries, costResultRefsFromEntries } from "../types.js";
-import { computeCostTargets, costSelectionCount, isOpponentLifePlacement } from "../cost/targets.js";
+import {
+  computeCostTargets,
+  costSelectionCount,
+  isOpponentLifePlacement,
+  donIdentityChoiceMatters,
+  opponentRestedCostDon,
+} from "../cost/targets.js";
 
 const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
+
+/**
+ * OPT-868: marker kept in a GIVE_OPPONENT_DON_TO_OPPONENT frame's
+ * validTargets while the payer picks which rested DON!! to give. It binds the
+ * already-chosen opponent Character to the DON!! step (never offered to the
+ * client, which only sees the DON!! ids) and survives session restore.
+ */
+const OPPONENT_DON_RECIPIENT_PREFIX = "cost-opp-don-recipient:";
+import { getCostCtaLabel } from "../cost/prompts.js";
 
 /** OPT-828: a Life-end choice id bound to the Characters chosen to pay the cost. */
 function lifeDestinationChoiceId(ids: string[], end: "TOP" | "BOTTOM"): string {
@@ -1108,6 +1123,82 @@ export function handleAwaitingCostSelection(
     if (placed.events.length !== amount) return reject();
     nextState = placed.state;
     events.push(...placed.events);
+  } else if (action.type === "SELECT_TARGET" && cost.type === "GIVE_OPPONENT_DON_TO_OPPONENT") {
+    // OPT-868: OP15-003/017/023 — the payer chose 1 of the opponent's
+    // Characters, then (only when the opponent's rested DON!! differ in the
+    // effects applied to them) which rested DON!! to give it. Every reply is
+    // validated against the frame's offer AND the live and staged payment
+    // states, so a stale, replayed or diverged reply can never give a DON!!
+    // that became active or left the cost area, or a departed Character.
+    const reject = (): EffectResolverResult => ({ state, events: [], resolved: false });
+    const selected = [...new Set(action.selectedInstanceIds ?? [])];
+    const recipientEligibleIn = (candidateState: GameState, id: string): boolean =>
+      computeCostTargets(candidateState, cost, controller, cardDb, sourceCardInstanceId).includes(id);
+    const donEligibleIn = (candidateState: GameState, id: string): boolean =>
+      opponentRestedCostDon(candidateState, controller).some((don) => don.instanceId === id);
+    const marker = topFrame.validTargets.find((id) => id.startsWith(OPPONENT_DON_RECIPIENT_PREFIX));
+    let payment: string[];
+    if (!marker) {
+      const recipient = selected.length === 1 ? selected[0] : undefined;
+      if (
+        !recipient ||
+        !topFrame.validTargets.includes(recipient) ||
+        !recipientEligibleIn(baselineState, recipient) ||
+        !recipientEligibleIn(nextState, recipient)
+      ) {
+        return reject();
+      }
+      // The DON!! is always bound explicitly: only a DON!! eligible in BOTH
+      // the live and the staged payment state may pay (a diverged staged
+      // transaction never gives a DON!! that is no longer rested live).
+      const candidates = opponentRestedCostDon(nextState, controller)
+        .filter((don) => donEligibleIn(baselineState, don.instanceId));
+      const donIds = candidates.map((don) => don.instanceId);
+      if (donIds.length === 0) return reject();
+      // Distinguishable in either state (e.g. a live hold the staged
+      // snapshot predates) → the payer picks explicitly.
+      if (
+        donIdentityChoiceMatters(nextState, candidates) ||
+        donIdentityChoiceMatters(baselineState, candidates)
+      ) {
+        nextState = updateTopFrame(nextState, {
+          validTargets: [`${OPPONENT_DON_RECIPIENT_PREFIX}${recipient}`, ...donIds],
+        });
+        return suspendCurrentFrame(nextState, events, {
+          options: {
+            promptType: "SELECT_TARGET",
+            validTargets: donIds,
+            countMin: 1,
+            countMax: 1,
+            effectDescription: "Choose 1 of your opponent's rested DON!! cards to give as cost",
+            ctaLabel: getCostCtaLabel(cost),
+            cards: [],
+          },
+          respondingPlayer: controller,
+          resumeContext: topFrame.id,
+        });
+      }
+      payment = [recipient, donIds[0]];
+    } else {
+      const recipient = marker.slice(OPPONENT_DON_RECIPIENT_PREFIX.length);
+      const donId = selected.length === 1 ? selected[0] : undefined;
+      if (
+        !donId ||
+        donId === marker ||
+        !topFrame.validTargets.includes(donId) ||
+        !donEligibleIn(baselineState, donId) ||
+        !donEligibleIn(nextState, donId) ||
+        !recipientEligibleIn(baselineState, recipient) ||
+        !recipientEligibleIn(nextState, recipient)
+      ) {
+        return reject();
+      }
+      payment = [recipient, donId];
+    }
+    const appliedGive = applyCostSelection(nextState, cost, payment, controller, cardDb, sourceCardInstanceId);
+    if (appliedGive.events.length === 0) return reject();
+    nextState = appliedGive.state;
+    events.push(...appliedGive.events);
   } else if (action.type === "SELECT_TARGET" && cost.type === "GIVE_DON") {
     // OPT-824: the player chose the single recipient of the given DON!!.
     // Accept exactly one offered card that is still an eligible recipient
