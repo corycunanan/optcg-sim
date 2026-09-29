@@ -194,7 +194,7 @@ For effects that react to game events (not bracket-tag abilities):
 | "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED" }` |
 | "When this Leader's/Character's attack deals damage" | `{ event: "ATTACK_DEALS_DAMAGE", filter: { attacker: "SELF" } }` |
 | "When you deal damage to your opponent's Life" | `{ event: "ATTACK_DEALS_DAMAGE" }` |
-| "At end of your turn" (event) | `{ event: "END_OF_YOUR_TURN" }` |
+| "At end of your turn" | Use the keyword trigger `{ keyword: "END_OF_YOUR_TURN" }` (not a custom event). |
 
 **Custom triggers support filters:**
 
