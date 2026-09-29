@@ -404,7 +404,7 @@ export const ST14_014_GUM_GUM_GIANT_RIFLE: EffectSchema = {
   effects: [
     {
       id: "counter_conditional_power",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "CARD_ON_FIELD",
