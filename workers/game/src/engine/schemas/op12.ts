@@ -3220,12 +3220,7 @@ export const OP12_090_BELO_BETTY: EffectSchema = {
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
       flags: { optional: true },
-      costs: [
-        {
-          type: "TRASH_FROM_HAND",
-          amount: 2,
-        },
-      ],
+      costs: [{ type: "MILL", amount: 2 }],
       actions: [
         {
           type: "MODIFY_COST",

@@ -141,4 +141,32 @@ describe("OPT-798 schema lint — pre-colon deck trash must be a MILL cost", () 
     };
     expect(findMillCostViolations("When your Character is K.O.'d, you may trash 1 card from the top of your deck: Draw 1 card.", schema)).toEqual([]);
   });
+
+  // OPT-865: the timing is the bracket that precedes the clause's colon;
+  // brackets after the colon belong to the effect text, not the cost.
+  it.each([
+    ["[Trigger]", "[Main] You may trash 2 cards from the top of your deck: Add up to 1 card with a [Trigger] from your trash to your hand.", "MAIN_EVENT"],
+    ["[Counter]", "[Main] You may trash 2 cards from the top of your deck: Add up to 1 Event with a [Counter] from your trash to your hand.", "MAIN_EVENT"],
+  ] as const)("ignores a post-colon %s bracket when timing a clause", (_label, printed, keyword) => {
+    expect(preColonMillClauses(printed)).toEqual([{ amount: 2, keywords: [keyword] }]);
+    const schema: EffectSchema = {
+      card_id: "SYN-020",
+      card_type: "Event",
+      effects: [{
+        id: "main",
+        category: "activate",
+        trigger: { keyword: "MAIN_EVENT" },
+        flags: { optional: true },
+        costs: [{ type: "MILL", amount: 2 }],
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      }],
+    };
+    expect(findMillCostViolations(printed, schema)).toEqual([]);
+  });
+
+  it("uses the bracket before the colon when earlier timings precede it", () => {
+    expect(preColonMillClauses("[On Play] Draw 1 card. [When Attacking] You may trash 1 card from the top of your deck: Draw a card with a [Counter].")).toEqual([
+      { amount: 1, keywords: ["WHEN_ATTACKING"] },
+    ]);
+  });
 });

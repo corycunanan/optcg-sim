@@ -17,12 +17,7 @@ const DECK_TRASH = /\btrash (\d+|a|an|one|two|three|four|five) cards? from the t
  * not yet re-encoded. Each entry is a tracked follow-up; the lint reports an
  * entry that no longer violates so the deferral cannot go stale.
  */
-export const MILL_COST_ENCODING_DEFERRALS: ReadonlySet<string> = new Set([
-  // OP11-098 Blue Hole: MILL-first action encoding (OPT-798 follow-up).
-  "OP11-098",
-  // OP12-090 Belo Betty: encoded as TRASH_FROM_HAND ×2 (OPT-798 follow-up).
-  "OP12-090",
-]);
+export const MILL_COST_ENCODING_DEFERRALS: ReadonlySet<string> = new Set<string>();
 
 function toAmount(token: string): number {
   return /^\d+$/.test(token) ? Number(token) : WORD_NUMBERS[token.toLowerCase()] ?? 1;
@@ -62,19 +57,30 @@ export function preColonMillClauses(cardText: string): PreColonMillClause[] {
   const clauses: PreColonMillClause[] = [];
   const lines = cardText.replace(/<br\s*\/?\s*>/gi, "\n").split("\n");
   for (const line of lines) {
-    let keywords: readonly KeywordTriggerType[] | null = null;
+    // Timing brackets with their offsets; a clause takes the last one that
+    // precedes its own colon, so brackets after the colon (e.g. "a card with
+    // a [Trigger]") never re-time it.
+    const timings: { index: number; keywords: readonly KeywordTriggerType[] }[] = [];
     for (const bracket of line.matchAll(/\[([^\]]*)\]/g)) {
       const mapped = TIMING_KEYWORDS[bracket[1].trim().toLowerCase()];
-      if (mapped) keywords = mapped;
+      if (mapped) timings.push({ index: bracket.index, keywords: mapped });
     }
-    // Keyword brackets such as [Activate: Main] carry their own colon.
-    const unbracketed = line.replace(/\[[^\]]*\]/g, " ");
-    for (const sentence of unbracketed.split(/(?<=\.)\s+/)) {
+    // Keyword brackets such as [Activate: Main] carry their own colon; mask
+    // them with spaces of equal length so offsets stay aligned with the line.
+    const masked = line.replace(/\[[^\]]*\]/g, (m) => " ".repeat(m.length));
+    let start = 0;
+    for (const boundary of [...masked.matchAll(/(?<=\.)\s+/g), null]) {
+      const end = boundary ? boundary.index : masked.length;
+      const sentence = masked.slice(start, end);
       const colon = sentence.indexOf(":");
-      if (colon < 0) continue;
-      for (const match of sentence.slice(0, colon).matchAll(DECK_TRASH)) {
-        clauses.push({ amount: toAmount(match[1]), keywords });
+      if (colon >= 0) {
+        const colonIndex = start + colon;
+        const keywords = timings.filter((t) => t.index < colonIndex).at(-1)?.keywords ?? null;
+        for (const match of sentence.slice(0, colon).matchAll(DECK_TRASH)) {
+          clauses.push({ amount: toAmount(match[1]), keywords });
+        }
       }
+      if (boundary) start = boundary.index + boundary[0].length;
     }
   }
   return clauses;
