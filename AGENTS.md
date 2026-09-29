@@ -31,7 +31,7 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `src/lib/validators/` | Zod validation schemas for all API domains (9 files) |
 | `src/types/` | Global TypeScript types (supplements Prisma-generated types) |
 | `pipeline/` | Card data ETL: vegapull JSON → transform → PostgreSQL + R2 (8 stages) |
-| `workers/game/` | Cloudflare Worker + Durable Object — game engine, effect resolver, 51 card schema sets |
+| `workers/game/` | Cloudflare Worker + Durable Object — game engine, effect resolver, 56 authored card schema set modules |
 | `workers/images/` | Cloudflare Worker — CDN image serving with CORS |
 | `prisma/` | Database schema (`schema.prisma`) and migrations |
 | `docs/` | Project documentation (see `docs/README.md` for full index) |
@@ -41,7 +41,7 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `docs/design/` | UI/UX design — branding guidelines, audits, critiques, game board layout |
 | `docs/project/` | Project management — PRD, planning, workflows, learnings |
 | `docs/rules/` | Official OPTCG Comprehensive Rules v1.2.0 |
-| `docs/cards/` | Card effect text for all 51 sets |
+| `docs/cards/` | Card effect text for 55 sets (OP-01–OP-17, ST-01–ST-32, EB-01–EB-04, PRB-01–PRB-02) plus `UNKNOWN.md` |
 | `docs/research/` | Technical investigations and evaluations |
 
 ### Key Files
@@ -60,7 +60,7 @@ One Piece Trading Card Game simulator — deck builder, card database, and game 
 | `workers/game/src/engine/pipeline.ts` | 7-step action pipeline — entry point for every game state mutation |
 | `workers/game/src/engine/effect-resolver/resolver.ts` | Core effect resolver — 50+ action handlers for all game mechanics |
 | `workers/game/src/engine/triggers.ts` | Auto effect trigger registration, matching, and ordering |
-| `workers/game/src/engine/schema-registry.ts` | Loads card effect schemas from 51 set files at runtime |
+| `workers/game/src/engine/schema-registry.ts` | Loads the generated authored-schema registry (`authored-schemas.generated.ts`, built from 56 set modules) at runtime |
 | `workers/game/src/GameSession.ts` | Durable Object — WebSocket session management, game lifecycle |
 | `workers/game/wrangler.toml` | Cloudflare Worker config for game server |
 
@@ -125,8 +125,9 @@ Emotional goals: delight when browsing cards, focus when building decks, immersi
   - One Piece red (`oklch(55% 0.20 25)`) for emphasis, energy, and destructive actions only
   - Six TCG card colors (Red, Blue, Green, Purple, Black, Yellow) remain functional identifiers only
 - **Typography:**
-  - **Display/headings:** DM Serif Display (Google Fonts) — high-contrast display serif for page titles, section headers. Uppercase. Italic variant for featured callouts and pull-quotes.
-  - **Body:** Geist Sans — all body text, labels, UI elements.
+  - **Authority:** the shipped type system is `src/app/layout.tsx` (loaders) plus `docs/design/TYPOGRAPHY.md`; `CLAUDE.md` "Design Context" carries the same summary. Use only the families below; no other display or body family is prescribed.
+  - **Display/headings:** Erode variable (self-hosted, `next/font/local`, `--font-erode`) — `.font-display` (600, uppercase, `0.025em` tracking) for page titles and section headers; `.font-nav` (700, uppercase, `0.04em`) for navbar links.
+  - **Body:** Public Sans variable (self-hosted, `--font-public-sans`; weights 400/500/600) — all body text, labels, UI elements. Geist Mono (`--font-geist-mono`) for codes/digests only.
   - Strict type scale: 12/14/16/18/20/24/30/36/48px. No custom `text-[Xpx]` sizes in components. See `docs/design/BRANDING-GUIDELINES.md` for full scale.
 - **Accessibility:** WCAG AA — 4.5:1 contrast for text, keyboard navigable, focus visible.
 - **Card presentation:** Warm white or light surfaces let art breathe. Single, clean hover state — no stacking of lift + shadow + blur.
