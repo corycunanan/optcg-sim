@@ -147,7 +147,7 @@ These map to printed bracket tags on cards:
 | `[Trigger]` | `{ keyword: "TRIGGER" }` | When revealed from Life |
 | `[End of Your Turn]` | `{ keyword: "END_OF_YOUR_TURN" }` | End of your turn |
 | `[End of Your Opponent's Turn]` | `{ keyword: "END_OF_OPPONENT_TURN" }` | End of opponent's turn |
-| `Start of Your Turn` | `{ keyword: "START_OF_TURN" }` | Start of your turn |
+| `Start of Your Turn` | `{ keyword: "START_OF_TURN", turn_restriction: "YOUR_TURN" }` | Start of your turn |
 
 **Keyword Trigger Modifiers** (all optional):
 
@@ -174,10 +174,11 @@ For effects that react to game events (not bracket-tag abilities):
 | "When a Character is removed from the field" | `{ event: "CHARACTER_REMOVED_FROM_FIELD" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
-| "When [you/your opponent] activate(s) an Event" (card activation, rule 8-5-4) | `{ event: "EVENT_ACTIVATED_FROM_HAND" }` |
+| "When you activate an Event" (card activation, rule 8-5-4) | `{ event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "SELF" } }` |
+| "When your opponent activates an Event" (card activation, rule 8-5-4) | `{ event: "EVENT_ACTIVATED_FROM_HAND", filter: { controller: "OPPONENT" } }` |
 | A Character resolved an Event's [Main] from trash (EB03-031); not "activates an Event" per the EB03-031 FAQ, so no printed watcher uses it | `{ event: "EVENT_MAIN_RESOLVED_FROM_TRASH" }` |
 | "When an Event's [Trigger] resolves from Life" | `{ event: "EVENT_TRIGGER_RESOLVED" }` |
-| "When you play a Character" | `{ event: "CHARACTER_PLAYED" }` |
+| "When you play a Character" | `{ event: "CHARACTER_PLAYED", filter: { controller: "SELF" } }` |
 | "When a card is removed from Life" | `{ event: "CARD_REMOVED_FROM_LIFE" }` |
 | "When [Trigger] is activated" | `{ event: "TRIGGER_ACTIVATED" }` |
 | "When this Character battles and K.O.'s" | `{ event: "COMBAT_VICTORY" }` |
@@ -191,7 +192,7 @@ For effects that react to game events (not bracket-tag abilities):
 | "When Character becomes rested" | `{ event: "CHARACTER_BECOMES_RESTED" }` |
 | "When Character returned to hand" | `{ event: "CHARACTER_RETURNED_TO_HAND" }` |
 | "When you take damage" | `{ event: "DAMAGE_TAKEN" }` |
-| "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED" }` |
+| "When opponent activates [Blocker]" | `{ event: "BLOCKER_ACTIVATED", filter: { controller: "OPPONENT" } }` |
 | "When this Leader's/Character's attack deals damage" | `{ event: "ATTACK_DEALS_DAMAGE", filter: { attacker: "SELF" } }` |
 | "When you deal damage to your opponent's Life" | `{ event: "ATTACK_DEALS_DAMAGE" }` |
 | "At end of your turn" (event) | `{ event: "END_OF_YOUR_TURN" }` |
