@@ -329,7 +329,7 @@ export const ST04_016_BLAST_BREATH: EffectSchema = {
   effects: [
     {
       id: "counter_power_boost",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       costs: [{ type: "DON_MINUS", amount: 1 }],
       actions: [
