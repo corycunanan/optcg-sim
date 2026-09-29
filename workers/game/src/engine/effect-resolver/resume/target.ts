@@ -201,8 +201,12 @@ export function handleSelectTargetRuleTrashForPlay(
       const { newCardInstanceId: _newCardInstanceId, ...payload } = event.payload;
       return { ...event, payload } as PendingEvent;
     });
+    // Scan against the last-known field, but continue the execution context
+    // the rule trash already advanced: grafting the pre-trash context back
+    // would rewind idCounter and re-issue the trashed victim's new instance id
+    // to the played card (OPT-891).
     const scan = scanEventsForTriggers(
-      stateBeforeRuleTrash,
+      { ...stateBeforeRuleTrash, executionContext: nextState.executionContext },
       matchEvents,
       controller,
       cardDb,
