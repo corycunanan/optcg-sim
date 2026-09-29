@@ -9,6 +9,10 @@ import type { CardData, CardInstance, DonInstance, GameState, KeywordSet, GameIn
 import type { EffectSchema } from "../engine/effect-types.js";
 import { buildInitialState } from "../engine/setup.js";
 import { runPipeline } from "../engine/pipeline.js";
+import {
+  createDeterministicExecutionContext,
+  reconcileExecutionContextIdCounter,
+} from "../engine/execution-context.js";
 
 function noKeywords(): KeywordSet {
   return { rush: false, rushCharacter: false, doubleAttack: false, banish: false, blocker: false, trigger: false, unblockable: false };
@@ -131,6 +135,23 @@ export function padChars(chars: CardInstance[]): (CardInstance | null)[] {
   const slots: (CardInstance | null)[] = [null, null, null, null, null];
   for (let i = 0; i < Math.min(chars.length, 5); i++) slots[i] = chars[i];
   return slots;
+}
+
+/**
+ * Re-seed a test state's engine RNG without rewinding its id counter.
+ * Swapping in a bare `createDeterministicExecutionContext` resets `idCounter`
+ * to 0, and the next zone transition would re-issue a setup instance id
+ * (OPT-891: the transition now throws on that collision instead of silently
+ * dropping a card). Use this whenever a fixture needs a specific seed.
+ */
+export function reseedExecutionContext(state: GameState, seed: string): GameState {
+  return reconcileExecutionContextIdCounter({
+    ...state,
+    executionContext: {
+      ...createDeterministicExecutionContext(seed, { gameId: state.id }),
+      idCounter: state.executionContext.idCounter,
+    },
+  });
 }
 
 export function setupGame(): { state: GameState; cardDb: Map<string, CardData> } {
