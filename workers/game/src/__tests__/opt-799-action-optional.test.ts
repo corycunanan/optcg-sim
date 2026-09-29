@@ -25,7 +25,8 @@ import type {
   GameAction,
   GameState,
 } from "../types.js";
-import type { EffectBlock, EffectSchema } from "../engine/effect-types.js";
+import type { Action, EffectBlock, EffectSchema, Target } from "../engine/effect-types.js";
+import { targetPromptCountMin } from "../engine/effect-resolver/target-resolver.js";
 import {
   getAllAuthoredSchemas,
   getEffectSchema,
@@ -524,6 +525,67 @@ describe("OPT-799 declined vs performed optional action and its dependents", () 
   });
 });
 
+// ─── OPT-893: optional shapes whose handler offers no zero choice ───────────
+
+describe("OPT-893 optional clause is the only decline when no zero-choice prompt exists", () => {
+  function start(action: Action) {
+    const f = fixture();
+    const block: EffectBlock = {
+      id: "opt893_synthetic",
+      category: "auto",
+      trigger: { keyword: "ON_PLAY" },
+      actions: [action],
+    };
+    expect(validateEffectSchema({ card_id: "OPT893-X", effects: [block] } as EffectSchema)).toEqual([]);
+    const result = resolveEffect(f.state, block, f.state.players[0].leader.instanceId, 0, f.db);
+    f.state = { ...result.state, pendingPrompt: result.pendingPrompt ?? null };
+    return f;
+  }
+  const trashOpponentLife: Action = {
+    type: "TRASH_FROM_LIFE",
+    target: { type: "OPPONENT_LIFE" },
+    params: { amount: 1 },
+    optional: true,
+  };
+
+  it("optional TRASH_FROM_LIFE on OPPONENT_LIFE asks once (OPTIONAL_EFFECT) and accept trashes 1", () => {
+    const f = start(trashOpponentLife);
+    const life = f.state.players[1].life.length;
+    expect(life).toBeGreaterThan(1);
+    const prompts: string[] = [String(f.promptType())];
+    expect(f.optionalPrompt().respondingPlayer).toBe(0);
+    expect(f.accept()).toBe(false);
+    if (f.prompt()) prompts.push(String(f.promptType()));
+    expect(prompts).toEqual(["OPTIONAL_EFFECT"]);
+    expect(f.state.players[1].life).toHaveLength(life - 1);
+  });
+
+  it("declining the OPTIONAL_EFFECT leaves the opponent's Life untouched", () => {
+    const f = start(trashOpponentLife);
+    const life = f.state.players[1].life.length;
+    expect(f.decline()).toBe(false);
+    expect(f.prompt()).toBeNull();
+    expect(f.state.players[1].life).toHaveLength(life);
+  });
+
+  it("optional TRASH_FROM_HAND with amount 1 asks OPTIONAL_EFFECT, then a SELECT_TARGET that cannot choose 0", () => {
+    const f = start({
+      type: "TRASH_FROM_HAND",
+      target: { type: "CARD_IN_HAND", controller: "SELF" },
+      params: { amount: 1 },
+      optional: true,
+    });
+    expect(f.state.players[0].hand.length).toBeGreaterThan(1);
+    expect(f.optionalPrompt().respondingPlayer).toBe(0);
+    expect(f.accept()).toBe(false);
+    const options = f.prompt()?.options;
+    expect(options?.promptType).toBe("SELECT_TARGET");
+    if (options?.promptType !== "SELECT_TARGET") throw new Error("expected SELECT_TARGET");
+    expect(options.countMin).toBe(1);
+    expect(options.countMax).toBe(1);
+  });
+});
+
 // ─── Clause text extraction ──────────────────────────────────────────────────
 
 describe("OPT-799 optional clause text", () => {
@@ -665,6 +727,131 @@ describe("OPT-799 schema validation of action-level optional", () => {
     ],
   ])("rejects %s", (_label, block, message) => {
     expect(errorsFor([block]).join("\n")).toContain(message);
+  });
+
+  // OPT-893: the zero-allowed verdict must equal the prompt the resolver
+  // issues. Each row's `expectedPromptCountMin` is the countMin the resolver
+  // gives buildSelectTargetPrompt for that target shape (exact -> N, summed
+  // across dual slots; up_to / any_number / omitted count -> 0).
+  const bounce = (target: Target): EffectBlock =>
+    auto([{ type: "RETURN_TO_HAND", target, optional: true }]);
+  it.each<[string, Target, number, boolean]>([
+    ["omitted count on opponent Characters", { type: "CHARACTER", controller: "OPPONENT" }, 0, true],
+    ["exact 1", { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } }, 1, false],
+    ["up_to 1", { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } }, 0, true],
+    ["any_number", { type: "CHARACTER", controller: "OPPONENT", count: { any_number: true } }, 0, true],
+    ["all", { type: "CHARACTER", controller: "OPPONENT", count: { all: true } }, 0, false],
+    ["deterministic SELF without count", { type: "SELF" }, 0, false],
+    [
+      "mixed dual slots exact 1 + up_to 1",
+      {
+        type: "CHARACTER",
+        controller: "EITHER",
+        dual_targets: [
+          { filter: { cost_max: 8 }, count: { exact: 1 } },
+          { filter: { cost_max: 3 }, count: { up_to: 1 } },
+        ],
+      },
+      1,
+      false,
+    ],
+    [
+      "dual slots up_to 1 + up_to 1",
+      {
+        type: "CHARACTER",
+        controller: "EITHER",
+        dual_targets: [
+          { filter: { cost_max: 8 }, count: { up_to: 1 } },
+          { filter: { cost_max: 3 }, count: { up_to: 1 } },
+        ],
+      },
+      0,
+      true,
+    ],
+    [
+      "mixed_pool total_count exact 1",
+      {
+        mixed_pool: { types: ["CHARACTER", "STAGE"], total_count: { exact: 1 } },
+        controller: "OPPONENT",
+      } as Target,
+      1,
+      false,
+    ],
+  ])("optional verdict matches resolver prompt: %s", (_label, target, promptMin, rejected) => {
+    expect(targetPromptCountMin(target)).toBe(promptMin);
+    const errors = errorsFor([bounce(target)]).filter((e) => e.includes(".optional:"));
+    expect(errors.length > 0).toBe(rejected);
+  });
+
+  it("names the count-less target in the omitted-count rejection", () => {
+    const errors = errorsFor([bounce({ type: "CHARACTER", controller: "OPPONENT" })]);
+    expect(errors.join("\n")).toContain("omits count");
+  });
+
+  // OPT-893 fix round: the omitted-count rule applies only where the handler
+  // builds SELECT_TARGET from the target's count and the target type can offer
+  // more than one candidate. Elsewhere no zero-choice prompt exists, so
+  // action-level optional is the only decline and must be accepted.
+  it.each<[string, Action, boolean]>([
+    [
+      "TRASH_FROM_LIFE on OPPONENT_LIFE (handler never prompts)",
+      { type: "TRASH_FROM_LIFE", target: { type: "OPPONENT_LIFE" }, params: { amount: 1 }, optional: true },
+      false,
+    ],
+    [
+      "LIFE_TO_HAND on the top Life card (handler never prompts from target)",
+      { type: "LIFE_TO_HAND", target: { type: "LIFE_CARD", controller: "SELF" }, params: { amount: 1 }, optional: true },
+      false,
+    ],
+    [
+      "LIFE_TO_HAND without a target",
+      { type: "LIFE_TO_HAND", params: { amount: 1, position: "TOP_OR_BOTTOM" }, optional: true },
+      false,
+    ],
+    [
+      "TRASH_FROM_HAND with amount (own prompt, countMin = amount)",
+      { type: "TRASH_FROM_HAND", target: { type: "CARD_IN_HAND", controller: "SELF" }, params: { amount: 1 }, optional: true },
+      false,
+    ],
+    [
+      "REVEAL on CARD_ON_TOP_OF_DECK",
+      { type: "REVEAL", target: { type: "CARD_ON_TOP_OF_DECK", controller: "OPPONENT" }, optional: true },
+      false,
+    ],
+    [
+      "APPLY_PROHIBITION on PLAYER (prompting handler, single-candidate pool)",
+      {
+        type: "APPLY_PROHIBITION",
+        target: { type: "PLAYER", controller: "OPPONENT" },
+        params: { prohibition_type: "CANNOT_ACTIVATE_BLOCKER" },
+        duration: { type: "THIS_TURN" },
+        optional: true,
+      } as Action,
+      false,
+    ],
+    [
+      "KO on a single-controller STAGE (one Stage per player)",
+      { type: "KO", target: { type: "STAGE", controller: "OPPONENT" }, optional: true },
+      false,
+    ],
+    [
+      "RETURN_TO_HAND on opponent Characters without count (original ticket case)",
+      { type: "RETURN_TO_HAND", target: { type: "CHARACTER", controller: "OPPONENT" }, optional: true },
+      true,
+    ],
+    [
+      "KO on SELECTED_CARDS without count (prompting handler, multi-card ref)",
+      { type: "KO", target: { type: "SELECTED_CARDS", ref: "picked" }, optional: true },
+      true,
+    ],
+    [
+      "TRASH_FROM_HAND with up_to 1 (own prompt honors up_to)",
+      { type: "TRASH_FROM_HAND", target: { type: "CARD_IN_HAND", controller: "SELF", count: { up_to: 1 } }, optional: true },
+      true,
+    ],
+  ])("optional verdict per handler prompt: %s", (_label, action, rejected) => {
+    const errors = errorsFor([auto([action])]).filter((e) => e.includes(".optional:"));
+    expect(errors.length > 0, errors.join("\n")).toBe(rejected);
   });
 
   it("rejects optional on the authored OP04-044 dual-target bounce", () => {
