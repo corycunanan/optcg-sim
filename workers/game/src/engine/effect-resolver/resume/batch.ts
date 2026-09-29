@@ -72,6 +72,10 @@ export function reenterBatchResume(
     const stackDepth = nextState.effectStack.length;
     const marker = top.batchResumeMarker;
     const resultRefs = new Map<string, EffectResult>(top.resultRefs);
+    // The paused handler's `result_ref` must describe the whole batch on every
+    // exit below (OPT-885): record the progress carried on the marker before
+    // re-entry, then widen it with whatever the re-entered handler adds.
+    recordBatchResult(resultRefs, marker);
 
     const actionResult = dispatchBatchResume(
       nextState,
@@ -84,17 +88,12 @@ export function reenterBatchResume(
     );
     nextState = actionResult.state;
     events.push(...actionResult.events);
+    recordBatchResult(resultRefs, marker, actionResult.result);
 
     if (actionResult.pendingPrompt) {
       const context = actionResult.pendingPrompt.resumeContext;
       if (!isResumeContext(context)) {
         const progressTargetIds = batchProgressTargetIds(marker);
-        if (marker.pausedAction.result_ref) {
-          resultRefs.set(marker.pausedAction.result_ref, {
-            targetInstanceIds: progressTargetIds,
-            count: progressTargetIds.length,
-          });
-        }
         const generated = generateFrameId(nextState);
         const continuationFrame: EffectStackFrame = {
           id: generated.id,
@@ -258,6 +257,32 @@ export function reenterBatchResume(
     }
     // Loop: check for another AWAITING_BATCH_RESUME frame underneath.
   }
+}
+
+/**
+ * Store the paused action's result under its `result_ref`: the targets the
+ * batch already processed before the pause, plus any the re-entered handler
+ * reports. A re-entry that processes nothing returns no result, so the
+ * marker's progress is the only record of what the batch did.
+ */
+function recordBatchResult(
+  resultRefs: Map<string, EffectResult>,
+  marker: BatchResumeMarker,
+  reentered?: EffectResult,
+): void {
+  const ref = marker.pausedAction.result_ref;
+  if (!ref) return;
+  const targetInstanceIds = [
+    ...new Set([
+      ...batchProgressTargetIds(marker),
+      ...(reentered?.targetInstanceIds ?? []),
+    ]),
+  ];
+  resultRefs.set(ref, {
+    ...reentered,
+    targetInstanceIds,
+    count: targetInstanceIds.length,
+  });
 }
 
 function batchProgressTargetIds(marker: BatchResumeMarker): string[] {

@@ -1091,11 +1091,14 @@ function collectConsumedResultRefs(
     ) {
       consumed.add((nested as { ref: string }).ref);
     }
+    // OPT-885: a PER_COUNT `ref` (e.g. CARDS_TRASHED_THIS_WAY counted from a
+    // preceding action's result) consumes that action's result_ref.
     if (
       nested &&
       typeof nested === "object" &&
       ((nested as { type?: unknown }).type === "ACTION_RESULT" ||
-        (nested as { type?: unknown }).type === "CHOSEN_VALUE") &&
+        (nested as { type?: unknown }).type === "CHOSEN_VALUE" ||
+        (nested as { type?: unknown }).type === "PER_COUNT") &&
       typeof (nested as { ref?: unknown }).ref === "string"
     ) {
       consumed.add((nested as { ref: string }).ref);

@@ -388,11 +388,19 @@ export const OP06_014_RATCHET: EffectSchema = {
       id: "OP06-014_effect_1",
       category: "auto",
       trigger: { keyword: "ON_OPPONENT_ATTACK" },
-      costs: [
-        { type: "TRASH_FROM_HAND", amount: "ANY_NUMBER", filter: { traits: ["FILM"] } },
-      ],
       flags: { optional: true },
+      // OPT-885: no colon in the card text — the trash is an action.
       actions: [
+        {
+          type: "TRASH_FROM_HAND",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { any_number: true },
+            filter: { traits: ["FILM"] },
+          },
+          result_ref: "cards_trashed",
+        },
         {
           type: "MODIFY_POWER",
           target: {
@@ -404,10 +412,12 @@ export const OP06_014_RATCHET: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CARDS_TRASHED_THIS_WAY",
+              ref: "cards_trashed",
               multiplier: 1000,
             },
           },
           duration: { type: "THIS_BATTLE" },
+          chain: "THEN",
         },
       ],
     },
@@ -3474,6 +3484,7 @@ export const OP06_095_SHADOWS_ASGARD: EffectSchema = {
             },
           },
           chain: "THEN",
+          result_ref: "characters_ko",
         },
         {
           type: "MODIFY_POWER",
@@ -3482,6 +3493,7 @@ export const OP06_095_SHADOWS_ASGARD: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CHARACTERS_KO_THIS_WAY",
+              ref: "characters_ko",
               multiplier: 1000,
             },
           },
