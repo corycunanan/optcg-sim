@@ -10,7 +10,8 @@
  *     end (OP12-020 Zoro / OP16-080 Teach redirect).
  *  7. FORCE_OPPONENT_DON_RETURN lets the DON owner pick the active/rested
  *     split (OP16-074 Magellan).
- * (Finding 2, OP16-058, is deferred per the ticket.)
+ * (Finding 2, OP16-058, was deferred here and is covered by OPT-834 in
+ *  opt-834-leader-blocker.test.ts.)
  */
 
 import { describe, it, expect } from "vitest";

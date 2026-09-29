@@ -28,13 +28,19 @@ vi.mock("./field-card", () => ({
   PlayerFieldCard: ({
     card,
     blockerSelectable,
+    selected,
+    onSelect,
   }: {
     card: CardInstance;
     blockerSelectable?: boolean;
+    selected?: boolean;
+    onSelect?: () => void;
   }) => (
     <div
       data-testid={`field-card-${card.instanceId}`}
       data-blocker-selectable={String(!!blockerSelectable)}
+      data-selected={String(!!selected)}
+      onClick={onSelect}
     />
   ),
 }));
@@ -55,6 +61,10 @@ const cardDb = {
   },
   VANILLA: {
     type: "Character",
+    keywords: {},
+  },
+  LEADER: {
+    type: "Leader",
     keywords: {},
   },
   ATTACKER: {
@@ -357,3 +367,101 @@ function blockerProhibition(
     ...overrides,
   } as unknown as ActiveProhibition;
 }
+
+// OPT-834: OP16-048 can grant [Blocker] to an all-names Leader; the Leader is
+// then a Block Step candidate on the same terms as a Character.
+describe("PlayerField Leader blocker eligibility", () => {
+  const leader: CardInstance = {
+    ...makeCard("leader-1", "LEADER"),
+    zone: "LEADER",
+  };
+
+  function renderLeader({
+    card = leader,
+    activeEffects = [],
+    prohibitions = [],
+    selectedBlockerId = null,
+    setSelectedBlockerId = vi.fn(),
+  }: {
+    card?: CardInstance;
+    activeEffects?: ActiveEffect[];
+    prohibitions?: ActiveProhibition[];
+    selectedBlockerId?: string | null;
+    setSelectedBlockerId?: (id: string | null) => void;
+  } = {}) {
+    act(() => {
+      renderer = create(
+        <ActiveEffectsProvider value={activeEffects}>
+          <InteractionModeProvider value="full">
+            <PlayerField
+              me={{ ...makePlayer(printedBlocker), leader: card }}
+              playerIndex={0}
+              bottomPlayerIndex={0}
+              owner="me"
+              cardDb={cardDb}
+              prohibitions={prohibitions}
+              activeDragType={null}
+              activeDrag={null}
+              refreshWave={false}
+              canInteract={false}
+              canActivateMain={false}
+              canDragCounter={false}
+              inBlockStep
+              selectedBlockerId={selectedBlockerId}
+              setSelectedBlockerId={setSelectedBlockerId}
+              onAction={vi.fn()}
+              onPreviewZone={vi.fn()}
+            />
+          </InteractionModeProvider>
+        </ActiveEffectsProvider>,
+      );
+    });
+    if (!renderer) throw new Error("PlayerField renderer did not mount");
+    return renderer.root.findByProps({
+      "data-testid": `field-card-${card.instanceId}`,
+    });
+  }
+
+  it("offers an active Leader granted Blocker, and selecting it records the Leader", () => {
+    const setSelectedBlockerId = vi.fn();
+    const node = renderLeader({
+      activeEffects: [keywordEffect(leader.instanceId, "BLOCKER")],
+      setSelectedBlockerId,
+    });
+    expect(node.props["data-blocker-selectable"]).toBe("true");
+    act(() => node.props.onClick());
+    expect(setSelectedBlockerId).toHaveBeenCalledWith(leader.instanceId);
+  });
+
+  it("marks the selected Leader blocker", () => {
+    const node = renderLeader({
+      activeEffects: [keywordEffect(leader.instanceId, "BLOCKER")],
+      selectedBlockerId: leader.instanceId,
+    });
+    expect(node.props["data-selected"]).toBe("true");
+  });
+
+  it("does not offer a Leader without a Blocker grant", () => {
+    const node = renderLeader();
+    expect(node.props["data-blocker-selectable"]).toBe("false");
+    expect(node.props.onClick).toBeUndefined();
+  });
+
+  it("does not offer a rested Leader even with a Blocker grant", () => {
+    const node = renderLeader({
+      card: { ...leader, state: "RESTED" },
+      activeEffects: [keywordEffect(leader.instanceId, "BLOCKER")],
+    });
+    expect(node.props["data-blocker-selectable"]).toBe("false");
+  });
+
+  it("does not offer a Leader whose Blocker is prohibited", () => {
+    const node = renderLeader({
+      activeEffects: [keywordEffect(leader.instanceId, "BLOCKER")],
+      prohibitions: [
+        blockerProhibition("CANNOT_BLOCK", { appliesTo: [leader.instanceId] }),
+      ],
+    });
+    expect(node.props["data-blocker-selectable"]).toBe("false");
+  });
+});
