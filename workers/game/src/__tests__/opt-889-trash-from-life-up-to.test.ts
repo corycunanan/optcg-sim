@@ -427,16 +427,26 @@ describe("OPT-889 authored shape", () => {
     const f = fixture({ donCount: 8 });
     f.register("ST04-001", { type: "Leader", cost: null });
     f.state.players[0].leader = inst("ldr", "ST04-001", 0, "LEADER");
+    // Zone transitions mint a new instance id, so the face-up card gets a
+    // unique cardId to identify it after it reaches the trash.
+    const FACE_UP_ID = "OPT889-FACEUP";
+    f.db.set(FACE_UP_ID, { ...CARDS.VANILLA, id: FACE_UP_ID });
     f.state.players[1].life = f.state.players[1].life.map((c, i) => ({
       ...c,
+      ...(i === 2 ? { cardId: FACE_UP_ID } : {}),
       face: i === 2 ? "UP" : "DOWN",
     }));
     const lifeBefore = structuredClone(f.state.players[1].life);
     const top = lifeBefore[0];
     const faceUp = lifeBefore[2];
+    expect(lifeBefore.filter((c) => c.cardId === FACE_UP_ID)).toHaveLength(1);
+    expect(top.cardId).toBe(CARDS.TRIGGER.id);
     f.act({ type: "ACTIVATE_EFFECT", cardInstanceId: "ldr", effectId: "activate_trash_life" });
     // Drive whatever prompts the effect raises: accept the optional, choose 1
     // for an up-to count, and pick the face-up card when targets are offered.
+    // Assumes OPT-917 offers a SELECT_TARGET over current Life instance ids;
+    // if it uses another prompt shape (e.g. a position PLAYER_CHOICE), adapt
+    // this loop, not the end-state assertions below.
     let picked = false;
     for (let guard = 0; f.state.pendingPrompt && guard < 5; guard++) {
       const opts = f.state.pendingPrompt.options;
@@ -454,11 +464,13 @@ describe("OPT-889 authored shape", () => {
     }
     expect(picked).toBe(true);
     const opp = f.state.players[1];
-    expect(opp.trash.map((c) => c.instanceId)).toEqual([faceUp.instanceId]);
+    expect(opp.trash.map((c) => c.cardId)).toEqual([FACE_UP_ID]);
+    // The other Life cards never moved, so their instance ids are unchanged.
     expect(opp.life.map((c) => c.instanceId)).toEqual(
       lifeBefore.filter((c) => c.instanceId !== faceUp.instanceId).map((c) => c.instanceId),
     );
     expect(opp.life[0].instanceId).toBe(top.instanceId);
+    expect(opp.life.some((c) => c.cardId === FACE_UP_ID)).toBe(false);
     expect(f.state.pendingPrompt).toBeNull();
   });
 });
