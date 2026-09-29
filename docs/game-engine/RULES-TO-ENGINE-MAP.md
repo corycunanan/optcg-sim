@@ -360,9 +360,9 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 |------|--------|----------------|-------|
 | **7-1-4-1.** Compare power: attacker ≥ defender = win | **IMPL** | `battle.ts:294` | `attackerPower >= defenderPower` |
 | **7-1-4-1-1.** Leader attacked: 1 damage | **IMPL** | `battle.ts:297–375` | Full damage processing with life removal |
-| **7-1-4-1-1-1.** 0 life + damage = defeat | **IMPL** | `battle.ts` damage loop + `defeat.ts:31–34` | Life-0 check runs at the start of each damage instance |
+| **7-1-4-1-1-1.** 0 life + damage = defeat | **IMPL** | `battle.ts → dealOneLeaderDamage()` + `defeat.ts`; [`opt-886-double-attack-one-life.test.ts`](../../workers/game/src/__tests__/opt-886-double-attack-one-life.test.ts) | Checked once, for the attack's first damage (`firstDamageOfAttack`). A later [Double Attack] damage that finds 0 Life is dealt but cannot defeat (7-1-4-1-1-3 repeats only 7-1-4-1-1-2; qa_rules.md:156-158, OPT-886) |
 | **7-1-4-1-1-2.** Life → hand; trigger option | **IMPL** | `battle.ts:339–372` | Normal: add to hand. Trigger: pause for REVEAL_TRIGGER |
-| **7-1-4-1-1-3.** Double Attack: 2 damage | **IMPL** | `battle.ts:301` | `damageCount = hasDoubleAttack ? 2 : 1` |
+| **7-1-4-1-1-3.** Double Attack: 2 damage | **IMPL** | `battle.ts → executeDamageStep()` / `continueLeaderDamageSequence()`; [`opt-886-double-attack-one-life.test.ts`](../../workers/game/src/__tests__/opt-886-double-attack-one-life.test.ts) | `damagesRemaining` is locked at Damage Step entry and always dealt in full, even if the attacker leaves the field or loses [Double Attack] between damages (qa_rules.md:152-154, OPT-886) |
 | **7-1-4-1-2.** Character attacked: K.O. | **IMPL** | `battle.ts → koBattleLoser()`; [`opt-872-battle-ko-replacement-continuation.test.ts`](../../workers/game/src/__tests__/opt-872-battle-ko-replacement-continuation.test.ts) | `koCharacter()` + `CARD_KO` (cause `BATTLE`). An optional replacement prompt pauses the Damage Step through a `CHARACTER_KO_REPLACEMENT` continuation; the answer resumes it exactly once (see 06 §Battle K.O. replacements) |
 | **7-1-4-2.** Attacker loses: nothing happens | **IMPL** | `battle.ts:384` comment | Falls through to `endBattle()` |
 
@@ -443,7 +443,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **9-1-1.** Rule processing = automatic processing on specific events | **IMPL** | `pipeline.ts` step 7 calls `checkDefeat()` | |
-| **9-1-2.** Rule processing is immediate, even during other actions | **PARTIAL** | Runs after every pipeline call, but not mid-execution (e.g., not between individual damage points) | |
+| **9-1-2.** Rule processing is immediate, even during other actions | **PARTIAL** | Runs after every pipeline call, but not mid-execution (e.g., not between individual damage points). A Leader damaged at 0 Life ends the game even when an auto effect from the same action suspends for input (`pipeline.ts → defeatAtSuspension()`, OPT-886) | |
 | **9-2-1.** Defeat judgment processing | **IMPL** | `defeat.ts → checkDefeat()` | |
 | **9-2-1-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts:31–34` | |
 | **9-2-1-2.** 0 deck = defeat | **IMPL** | `defeat.ts:26–27` | |
