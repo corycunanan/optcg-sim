@@ -239,11 +239,20 @@ describe("OPT-848 authored Kanjuro blind discard", () => {
             ...action,
             selectedInstanceIds: f.asSlots(selectedInstanceIds),
           };
-          // GameSession routes SELECT_TARGET into this lifecycle after authorization.
+          // GameSession routes SELECT_TARGET into this lifecycle after
+          // authorization. OPT-870: a wrong count or a duplicate is refused
+          // at the session boundary itself; a non-offered card still reaches
+          // the lifecycle, which rejects it below either way.
+          const shapeInvalid =
+            selectedInstanceIds.length !== 1 ||
+            new Set(selectedInstanceIds).size !== selectedInstanceIds.length;
           expect(
             coordinator.executeAction(f.state, [], opponent, malformed, f.db)
-              .kind
-          ).toBe("resume");
+          ).toMatchObject(
+            shapeInvalid
+              ? { kind: "reject", state: f.state }
+              : { kind: "resume" }
+          );
           f.choice(malformed, true);
           expect(f.state).toEqual(before);
           f.persist();

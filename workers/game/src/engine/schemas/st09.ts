@@ -207,10 +207,17 @@ export const ST09_010_PORTGAS_D_ACE: EffectSchema = {
       id: "ko_replacement",
       category: "replacement",
       replaces: { event: "WOULD_BE_KO" },
+      // "top or bottom": the controller picks the end of their own Life.
       replacement_actions: [
         {
-          type: "TRASH_FROM_LIFE",
-          params: { amount: 1, position: "TOP" },
+          type: "PLAYER_CHOICE",
+          params: {
+            labels: ["Trash from the top of Life", "Trash from the bottom of Life"],
+            options: [
+              [{ type: "TRASH_FROM_LIFE", params: { amount: 1, position: "TOP" } }],
+              [{ type: "TRASH_FROM_LIFE", params: { amount: 1, position: "BOTTOM" } }],
+            ],
+          },
         },
       ],
       flags: { once_per_turn: true, optional: true },

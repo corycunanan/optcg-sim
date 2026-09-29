@@ -477,7 +477,7 @@ Actions go in the `actions` array. They represent text **after the colon**.
 | `ADD_TO_LIFE_FROM_DECK` | "Add N from deck to Life" | `{ amount: N, face: "UP"\|"DOWN", position: "TOP"\|"BOTTOM" }` |
 | `ADD_TO_LIFE_FROM_HAND` | "Add from hand to Life" | `{ amount: N, face: "UP"\|"DOWN", position: "TOP"\|"BOTTOM" }` |
 | `ADD_TO_LIFE_FROM_FIELD` | "Add card from field to Life" | `{ face: "UP"\|"DOWN" }` |
-| `TRASH_FROM_LIFE` | "Trash N from Life" | `{ amount: N, position: "TOP"\|"BOTTOM" }` |
+| `TRASH_FROM_LIFE` | "Trash N from Life" | `{ amount: N, position: "TOP"\|"BOTTOM", up_to?: true }` — `up_to` lets the controller choose 0..N (OPT-731). "Top or bottom" is authored as a `PLAYER_CHOICE` of TOP/BOTTOM branches (ST09-010); the action has no `TOP_OR_BOTTOM` (only the cost does). |
 | `TURN_LIFE_FACE_UP` | "Face up N Life cards" | `{ amount: N, position: "TOP"\|"BOTTOM"\|"ALL" }` |
 | `TURN_LIFE_FACE_DOWN` | "Turn N Life face down" | `{ amount: N }` |
 | `TURN_ALL_LIFE_FACE_DOWN` | "Turn all Life face down" | — |
