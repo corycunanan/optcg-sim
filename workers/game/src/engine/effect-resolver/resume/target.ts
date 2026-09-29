@@ -28,7 +28,13 @@ import {
   validateTargetConstraints,
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
-import { applyRedistributeDonTransfers } from "../actions/don.js";
+import {
+  applyRedistributeDonTransfers,
+  fieldSideOf,
+  giveableDon,
+  parseGiveDonIdentityMarker,
+} from "../actions/don.js";
+import { attachDonToCard } from "../card-mutations.js";
 import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import { trashFromHandSelection } from "../actions/removal.js";
 import type { EffectResolverResult, EffectResolverServices } from "../types.js";
@@ -117,6 +123,54 @@ export function handleRedistributeDon(
   }
 
   return { kind: "fallthrough", state: nextState };
+}
+
+/**
+ * OPT-868: GIVE_DON identity resume — the activating player chose which of the
+ * opponent's DON!! to give the recipient bound in the frame's marker
+ * (faq_op15-eb04.md OP15-003/010/012/017/023). The reply must be exactly one
+ * offered DON!! that is still an unattached cost-area DON!! of the bound owner
+ * in the action's DON!! state, and the recipient must still be on that
+ * owner's field; otherwise the reply is rejected and the prompt stays.
+ */
+export function handleGiveDonIdentity(
+  state: GameState,
+  action: GameAction,
+  resumeCtx: ResumeContext,
+  events: PendingEvent[]
+): TargetBranchResult {
+  const { pausedAction, controller, validTargets } = resumeCtx;
+  if (
+    action.type !== "SELECT_TARGET" ||
+    !pausedAction ||
+    pausedAction.type !== "GIVE_DON"
+  ) {
+    return null;
+  }
+  const binding = parseGiveDonIdentityMarker(validTargets);
+  if (!binding) return null;
+  const reject: TargetBranchResult = {
+    kind: "terminal",
+    result: { state, events: [], resolved: false, rejected: true },
+  };
+  const selected = action.selectedInstanceIds ?? [];
+  const donId = selected.length === 1 ? selected[0] : undefined;
+  const donState = pausedAction.params?.don_state ?? "ACTIVE";
+  if (
+    !donId ||
+    donId === binding.marker ||
+    !validTargets.includes(donId) ||
+    fieldSideOf(state, binding.recipient) !== binding.owner ||
+    !giveableDon(state, binding.owner, donState).some((d) => d.instanceId === donId)
+  ) {
+    return reject;
+  }
+  const given = attachDonToCard(state, binding.owner, binding.recipient, donState, donId);
+  if (!given) return reject;
+  // Rule 3-1-6-1: the moved DON!! sheds the effects applied to it.
+  const nextState = releaseMovedDonEffects(state, given);
+  events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: 1 } });
+  return { kind: "fallthrough", state: nextState, succeeded: true };
 }
 
 /**

@@ -217,7 +217,10 @@ type CostType =
   | "LEADER_POWER_REDUCTION"  // Reduce own Leader's power by amount
 
   // DON!! manipulation costs
-  | "GIVE_OPPONENT_DON"       // Give opponent's DON!! to opponent's character
+  | "GIVE_OPPONENT_DON"       // Legacy: move N of YOUR unattached DON!! to the opponent's cost area
+                              // (no printed cost matches it)
+  | "GIVE_OPPONENT_DON_TO_OPPONENT" // Give 1 of the OPPONENT's rested cost-area DON!! to 1 of the
+                              // opponent's Characters (target = CHARACTER/OPPONENT, count exact 1)
   | "GIVE_DON"                // Give N of your ACTIVE cost-area DON!! to 1 of your Leader/Characters
                               // (target = the recipient, count exact 1; ref __cost_don_given)
   | "RETURN_ATTACHED_DON_TO_COST" // Return given DON!! to cost area

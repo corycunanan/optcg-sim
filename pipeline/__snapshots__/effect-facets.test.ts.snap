@@ -181,7 +181,7 @@ exports[`extractCardFacets > snapshots every distinct authored tag and rejects u
   "cost:don_minus",
   "cost:don_rest",
   "cost:give_don",
-  "cost:give_opponent_don",
+  "cost:give_opponent_don_to_opponent",
   "cost:ko_own_character",
   "cost:leader_power_reduction",
   "cost:life_to_hand",

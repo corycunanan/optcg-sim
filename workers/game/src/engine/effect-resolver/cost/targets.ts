@@ -1,8 +1,8 @@
 /** Candidate computation for player-selected costs. */
 import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
-import type { CardData, CardInstance, GameState, PlayerState } from "../../../types.js";
+import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
-import { isProhibitedForCard, isRemovalProhibited } from "../../prohibitions.js";
+import { isDonAttachProhibited, isProhibitedForCard, isRemovalProhibited } from "../../prohibitions.js";
 import { namedPlayCandidates } from "./named-play.js";
 import { isPresent } from "../../type-guards.js";
 import { computeAllValidTargets } from "../target-resolver.js";
@@ -35,7 +35,73 @@ export function resolveAmount(cost: SimpleCost, fallback = 1): number {
  * player selects exactly one recipient (OPT-824).
  */
 export function costSelectionCount(cost: SimpleCost): number {
-  return cost.type === "GIVE_DON" ? 1 : resolveAmount(cost);
+  return cost.type === "GIVE_DON" || cost.type === "GIVE_OPPONENT_DON_TO_OPPONENT"
+    ? 1
+    : resolveAmount(cost);
+}
+
+/**
+ * OPT-868: the opponent's RESTED, unattached cost-area DON!! — the only DON!!
+ * a GIVE_OPPONENT_DON_TO_OPPONENT cost may give ("1 of your opponent's rested
+ * DON!! cards", OP15-003/017/023). Active DON!! never qualify.
+ */
+export function opponentRestedCostDon(state: GameState, controller: 0 | 1): DonInstance[] {
+  return state.players[controller === 0 ? 1 : 0].donCostArea
+    .filter((don) => don.state === "RESTED" && !don.attachedTo);
+}
+
+/**
+ * OPT-868: DON!! are interchangeable except for the effects applied to them
+ * by id (e.g. an OP07-026 / OP15-023 "will not become active" hold). Two
+ * DON!! with the same set of referencing prohibitions and active effects are
+ * the same choice; rule 3-1-6-1 removes those effects when the DON!! moves.
+ */
+export function donEffectSignature(state: GameState, donId: string): string {
+  return [
+    ...state.prohibitions.filter((p) => p.appliesTo.includes(donId)).map((p) => `p:${p.id}`),
+    ...state.activeEffects.filter((e) => e.appliesTo.includes(donId)).map((e) => `e:${e.id}`),
+  ].sort().join("|");
+}
+
+/**
+ * OPT-868: true when the given DON!! differ in the effects applied to them,
+ * so which one is moved is a real choice (rule 3-1-6-1; faq_op15-eb04.md:
+ * "The player who activated the effect chooses a ... DON!! card from their
+ * opponent's cost area"). Interchangeable DON!! (all the same signature) are
+ * the same payment and never need a prompt.
+ */
+export function donIdentityChoiceMatters(state: GameState, dons: readonly DonInstance[]): boolean {
+  return new Set(dons.map((don) => donEffectSignature(state, don.instanceId))).size > 1;
+}
+
+/**
+ * OPT-868: recipients a GIVE_OPPONENT_DON_TO_OPPONENT cost may select — the
+ * opponent's Characters matching the cost's target. Empty when the opponent
+ * has no rested cost-area DON!!, so every returned recipient is a complete
+ * payment (rule 8-3-1-3; faq_op15-eb04.md OP15-017/023: no opponent
+ * Character or no opponent rested DON!! → cannot activate).
+ */
+function opponentDonRecipients(
+  state: GameState,
+  cost: Extract<SimpleCost, { type: "GIVE_OPPONENT_DON_TO_OPPONENT" }>,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): string[] {
+  if (opponentRestedCostDon(state, controller).length === 0) return [];
+  const opponentCharacters = new Set(
+    state.players[controller === 0 ? 1 : 0].characters
+      .filter(isPresent)
+      .map((card) => card.instanceId),
+  );
+  return computeAllValidTargets(
+    state,
+    cost.target,
+    controller,
+    cardDb,
+    sourceCardInstanceId ?? "",
+    new Map(),
+  ).filter((id) => opponentCharacters.has(id));
 }
 
 /** OPT-824: unattached ACTIVE DON!! in the cost area — the only DON!! a give can use (rule 6-5-5-1). */
@@ -48,6 +114,12 @@ export function activeCostAreaDonCount(player: PlayerState): number {
  * Characters matching the cost's target, resolved exactly as the GIVE_DON
  * action resolves its target. Empty when fewer than `amount` active DON!!
  * remain, so every returned recipient is a complete payment (rule 8-3-1-3).
+ * OPT-869: a card covered by an active CANNOT_ATTACH_DON prohibition is
+ * excluded with the manual-attach predicate. Feasibility, the prompt, the
+ * resume checks and `applyCostSelection` all read this list, so none of them
+ * can offer or accept a prohibited recipient. The resume reads prohibition
+ * coverage in the staged payment state (rule 8-3-1-1; see
+ * `stagedProhibitionView`) and the live state for presence only.
  */
 function giveDonRecipients(
   state: GameState,
@@ -69,7 +141,7 @@ function giveDonRecipients(
     cardDb,
     sourceCardInstanceId ?? "",
     new Map(),
-  ).filter((id) => ownField.has(id));
+  ).filter((id) => ownField.has(id) && !isDonAttachProhibited(state, id, cardDb, controller));
 }
 
 /** Return active field cards that can be offered for a rest cost. */
@@ -244,6 +316,9 @@ export function computeCostTargets(
     case "GIVE_DON":
       return giveDonRecipients(state, cost, controller, cardDb, sourceCardInstanceId);
 
+    case "GIVE_OPPONENT_DON_TO_OPPONENT":
+      return opponentDonRecipients(state, cost, controller, cardDb, sourceCardInstanceId);
+
     case "CHOOSE_ONE_COST":
       // Targets are computed per-option after selection; no aggregate list.
       return [];
@@ -278,6 +353,11 @@ export function getCostCards(
 
     case "PLACE_FROM_TRASH_TO_DECK":
       return player.trash.filter((c) => targetSet.has(c.instanceId));
+
+    case "GIVE_OPPONENT_DON_TO_OPPONENT":
+      // OPT-868: the recipients are the opponent's Characters.
+      return state.players[controller === 0 ? 1 : 0].characters
+        .filter((c): c is CardInstance => c !== null && targetSet.has(c.instanceId));
 
     case "PLACE_SELF_AND_TRASH_TO_DECK":
       // Selection stage offers trash candidates only; the self half is fixed.
