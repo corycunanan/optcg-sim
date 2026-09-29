@@ -160,6 +160,13 @@ export interface ResumeContext {
   returnToDeckArrangement?: ReturnToDeckArrangement;
   /** Selected field identities waiting for a Life destination choice. */
   fieldToLifeTargetIds?: string[];
+  /**
+   * OPT-868/OPT-861: a GIVE_DON identity step — the recipient already chosen
+   * and the side (owner) whose cost area supplies the DON!!. Sessions saved
+   * before this field carry the binding as a `give-don-identity:` marker in
+   * validTargets instead; both forms resume.
+   */
+  giveDonIdentity?: { owner: 0 | 1; recipient: string };
   // Rule 3-7-6-1: when an effect-driven play hits a full board, the prompt asks
   // the controller to pick one of their own Characters to trash before the play
   // resolves. On resume, the chosen victim is rule-trashed (no On K.O. triggers
@@ -266,6 +273,13 @@ export interface EffectStackFrame {
   returnToDeckArrangement?: ReturnToDeckArrangement;
   /** Selected field identities waiting for a Life destination choice. */
   fieldToLifeTargetIds?: string[];
+  /**
+   * OPT-868/OPT-861: a GIVE_DON identity step — the recipient already chosen
+   * and the side (owner) whose cost area supplies the DON!!. Sessions saved
+   * before this field carry the binding as a `give-don-identity:` marker in
+   * validTargets instead; both forms resume.
+   */
+  giveDonIdentity?: { owner: 0 | 1; recipient: string };
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;
   /** AND transaction waiting for all snapshot-locked target choices. */

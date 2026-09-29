@@ -1385,7 +1385,7 @@ export type SimpleCost = {
   [Type in SimpleCostType]: SimpleCostFields & { type: Type } & (
     Type extends "PLACE_OWN_CHARACTER_TO_DECK"
       ? PlaceCharacterToDeckCostFields
-      : Type extends "GIVE_DON"
+      : Type extends "GIVE_DON" | "GIVE_OPPONENT_DON_TO_OPPONENT"
         ? GiveDonCostFields
         : Type extends "ADD_OWN_CHARACTER_TO_LIFE"
           ? AddCharacterToLifeCostFields
@@ -1430,6 +1430,14 @@ interface GiveDonCostFields {
   target: Target;
 }
 
+// OPT-868: GIVE_OPPONENT_DON_TO_OPPONENT reuses GiveDonCostFields — "give 1 of
+// your opponent's rested DON!! cards to 1 of your opponent's Characters"
+// before the colon (OP15-003/017/023). The DON!! is 1 RESTED, unattached DON!!
+// from the OPPONENT's cost area (rested is intrinsic to the cost); `target` is
+// the single recipient — one of the opponent's Characters. The paying player
+// chooses the Character and, when the rested DON!! are distinguishable by the
+// effects applied to them, which DON!! (faq_op15-eb04.md OP15-017).
+
 export interface ChoiceCost {
   type: "CHOICE";
   options: Cost[][];
@@ -1471,6 +1479,8 @@ export type CostType =
   | "GIVE_OPPONENT_DON"
   // OPT-824: give N of your active DON!! to 1 of your Leader or Characters.
   | "GIVE_DON"
+  // OPT-868: give 1 of the opponent's rested DON!! to 1 of their Characters.
+  | "GIVE_OPPONENT_DON_TO_OPPONENT"
   | "RETURN_ATTACHED_DON_TO_COST"
   | "PLACE_SELF_AND_HAND_TO_DECK"
   | "PLACE_SELF_AND_TRASH_TO_DECK"
@@ -1489,7 +1499,7 @@ export const ALL_COST_TYPES = [
   "TRASH_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK",
   "MILL", "PLACE_SELF_TO_DECK", "PLACE_STAGE_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
   "TRASH_OWN_STAGE", "PLACE_FROM_TRASH_TO_DECK", "LEADER_POWER_REDUCTION",
-  "GIVE_OPPONENT_DON", "GIVE_DON", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
+  "GIVE_OPPONENT_DON", "GIVE_DON", "GIVE_OPPONENT_DON_TO_OPPONENT", "RETURN_ATTACHED_DON_TO_COST", "PLACE_SELF_AND_HAND_TO_DECK",
   "PLACE_SELF_AND_TRASH_TO_DECK", "LIFE_TO_HAND", "REST_DON", "TURN_LIFE_FACE_UP",
   "TURN_LIFE_FACE_DOWN", "CHOOSE_ONE_COST", "CHOICE",
 ] as const satisfies readonly CostType[];
@@ -1591,8 +1601,10 @@ export interface ProhibitionScope {
    * CANNOT_ATTACK: the attack target the prohibition applies to.
    * CANNOT_ACTIVATE_BLOCKER (OPT-826): `{ type: "SELECTED_CARDS", ref? }`
    * binds the prohibition to the exact attacker(s) — the cards in result ref
-   * `ref`, or, without `ref`, this action's own `target` selection. Any other
-   * Target shape on a Blocker prohibition is not enforced by the engine.
+   * `ref`, or, without `ref`, this action's own `target` selection.
+   * OPT-899: `{ type: "YOUR_LEADER" }` binds it to the applying player's
+   * Leader, resolved at apply time. Any other Target shape on a Blocker
+   * prohibition is not enforced by the engine.
    */
   when_attacking?: Target;
   // OPT-260: keyword trigger type negated by NEGATE_TRIGGER_TYPE (OP09-081).
@@ -1793,7 +1805,9 @@ export interface RuntimeProhibition {
    * action's own selection), so it survives serialization and expires with
    * the prohibition. The Blocker check compares the current battle's attacker
    * against it — a card that leaves and returns is a new instance (§3-1-6)
-   * and is not covered. Absent on every other prohibition.
+   * and is not covered. OPT-899: also set by `when_attacking: { type:
+   * "YOUR_LEADER" }` (OP13-057), which freezes the applying player's Leader
+   * instance id. Absent on every other prohibition.
    */
   attackerInstanceIds?: string[];
   /**

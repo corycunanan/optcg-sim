@@ -160,6 +160,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
   z.strictObject({
     promptType: z.literal("REVEAL_TRIGGER"),
     sourceCard: PromptSourceCard.optional(),
+    actionLabel: z.string().optional(),
     cards: z.array(CardInstance),
     effectDescription: z.string(),
     optional: z.boolean(),
@@ -168,6 +169,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
   z.strictObject({
     promptType: z.literal("ARRANGE_TOP_CARDS"),
     sourceCard: PromptSourceCard.optional(),
+    actionLabel: z.string().optional(),
     cards: z.array(CardInstance),
     effectDescription: z.string(),
     canSendToBottom: z.boolean(),
@@ -178,6 +180,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
   z.strictObject({
     promptType: z.literal("SELECT_TARGET"),
     sourceCard: PromptSourceCard.optional(),
+    actionLabel: z.string().optional(),
     cards: z.array(CardInstance),
     validTargets: StringArray,
     effectDescription: z.string(),
@@ -212,6 +215,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
   z.strictObject({
     promptType: z.literal("REDISTRIBUTE_DON"),
     sourceCard: PromptSourceCard.optional(),
+    actionLabel: z.string().optional(),
     validSourceCardIds: StringArray,
     validTargetCardIds: StringArray,
     maxTransfers: NonNegativeInteger,
@@ -220,6 +224,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
   z.strictObject({
     promptType: z.literal("PLAYER_CHOICE"),
     sourceCard: PromptSourceCard.optional(),
+    actionLabel: z.string().optional(),
     choices: z.array(
       z.strictObject({
         id: z.string(),
@@ -248,6 +253,7 @@ const PromptOptions = z.discriminatedUnion("promptType", [
   z.strictObject({
     promptType: z.literal("OPTIONAL_EFFECT"),
     sourceCard: PromptSourceCard.optional(),
+    actionLabel: z.string().optional(),
     effectDescription: z.string(),
     cards: z.array(CardInstance).optional(),
   }),
@@ -341,6 +347,9 @@ const StackFrameCore = z.strictObject({
   validTargets: StringArray,
   returnToDeckArrangement: ReturnToDeckArrangement.optional(),
   fieldToLifeTargetIds: StringArray.optional(),
+  giveDonIdentity: z
+    .strictObject({ owner: PlayerIndex, recipient: z.string() })
+    .optional(),
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
   replacementBatchContinuation: z.unknown().optional(),

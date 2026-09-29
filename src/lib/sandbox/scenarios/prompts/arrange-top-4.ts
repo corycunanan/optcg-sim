@@ -114,6 +114,7 @@ export const arrangeTopFourScenario: Scenario = {
         promptType: "ARRANGE_TOP_CARDS",
         cards: [PEEK_1, PEEK_2, PEEK_3, PEEK_4],
         sourceCard: { cardId: "OP01-001", instanceId: "p0-leader" },
+        actionLabel: "Search Deck",
         effectDescription:
           "Look at the top 4 cards of your deck. Add 1 to your hand, then place the rest at the bottom of your deck in any order.",
         canSendToBottom: true,

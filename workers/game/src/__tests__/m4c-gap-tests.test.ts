@@ -702,7 +702,8 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       // Event for high-cost KO should match
       const highKoEvent: GameEvent = {
         type: "CARD_KO",
-        playerIndex: 0,
+        // CARD_KO playerIndex is the K.O.'d card's owner (player 1 here).
+        playerIndex: 1,
         payload: { cardInstanceId: "high-cost-inst", cardId: "HIGH-COST-CHAR", cause: "battle", preKO_donCount: 0 },
         timestamp: Date.now(),
       };
@@ -712,7 +713,8 @@ describe("OPT-107 Batch 2: Stub Completions", () => {
       // Event for low-cost KO should NOT match
       const lowKoEvent: GameEvent = {
         type: "CARD_KO",
-        playerIndex: 0,
+        // CARD_KO playerIndex is the K.O.'d card's owner (player 1 here).
+        playerIndex: 1,
         payload: { cardInstanceId: "low-cost-inst", cardId: "LOW-COST-CHAR", cause: "battle", preKO_donCount: 0 },
         timestamp: Date.now(),
       };

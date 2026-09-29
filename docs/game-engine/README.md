@@ -42,7 +42,7 @@
 | [GAME-ENGINE-AUDIT-2026-07.md](./GAME-ENGINE-AUDIT-2026-07.md) | Consolidated Luna Max + Terra Max audit, independent verification, and sequenced Linear hardening plan | — |
 | [ZONE-TRANSITION-CONTRACT.md](./ZONE-TRANSITION-CONTRACT.md) | Authoritative cross-zone identity, cleanup, event, atomicity, and ordering contract | — |
 | [GAME-ENGINE-REQUIREMENTS.md](./GAME-ENGINE-REQUIREMENTS.md) | Complete rules-to-engine mapping from Comprehensive Rules v1.2.0 | 1,079 |
-| [CARD-ANALYSIS-FINDINGS.md](./CARD-ANALYSIS-FINDINGS.md) | ~200 distinct card effect patterns identified across all 51 sets | 1,168 |
+| [CARD-ANALYSIS-FINDINGS.md](./CARD-ANALYSIS-FINDINGS.md) | ~200 distinct card effect patterns identified across 51 sets (the original analysis corpus; the authored corpus is now 56 schema set modules) | 1,168 |
 | [CARD-EFFECT-EXAMPLES.md](./CARD-EFFECT-EXAMPLES.md) | Complex card examples collected for schema validation | 250 |
 
 ## Agent Skill
@@ -55,7 +55,7 @@
 
 ## Spec Coverage
 
-The schema was designed by analyzing every card with an effect across all 51 OPTCG sets (OP-01 through OP-15, ST-01 through ST-29, EB-01 through EB-04, PRB-01, PRB-02). The [CARD-ANALYSIS-FINDINGS.md](./CARD-ANALYSIS-FINDINGS.md) document catalogs the ~200 distinct patterns that informed the type system.
+The schema was designed by analyzing every card with an effect across the original 51 OPTCG sets (OP-01 through OP-15, ST-01 through ST-29, EB-01 through EB-04, PRB-01, PRB-02); the authored corpus has since grown to 56 schema set modules (OP01–OP17, ST01–ST32, EB01–EB04, PRB01–PRB02, P). The [CARD-ANALYSIS-FINDINGS.md](./CARD-ANALYSIS-FINDINGS.md) document catalogs the ~200 distinct patterns that informed the type system.
 
 **Total spec size:** ~12,000 lines across 11 spec files.
 

@@ -53,14 +53,14 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | `effect-types.ts` | TypeScript types for EffectSchema, actions, triggers, conditions |
 | `events.ts` | Event bus — appends typed events to state log |
 | `keywords.ts` | Keyword queries (Rush, Blocker, etc.) |
-| `schema-registry.ts` | Loads card effect schemas from 51 set files at runtime |
+| `schema-registry.ts` | Loads the generated authored-schema registry (`authored-schemas.generated.ts`, built from 56 set modules) at runtime |
 | `effect-resolver/resolver.ts` | Core effect resolver — 50+ action handlers |
 | `effect-resolver/target-resolver.ts` | Target validation and constraint checking |
 | `effect-resolver/cost-handler.ts` | Activation cost payment (DON rest, trash, etc.) |
 | `effect-resolver/card-mutations.ts` | Card state mutations during effect resolution |
 | `effect-resolver/resume.ts` | Resume paused effect chains after player input |
 | `effect-resolver/actions/*.ts` | Action handler modules (battle, choice, don, draw-search, effects, hand-deck, life, modifiers, play, removal) |
-| `schemas/*.ts` | 51 card schema files (OP01–OP15, ST01–ST29, EB01–EB04, PRB01–PRB02, P) |
+| `schemas/*.ts` | 56 card schema set modules (OP01–OP17, ST01–ST32, EB01–EB04, PRB01–PRB02, P) |
 
 **Shared types**: `shared/game-types.ts`
 
@@ -131,7 +131,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **2-6-3.** Effects modify power | **IMPL** | `modifiers.ts` Layers 1 (base-setting) & 2 (additive) | Both layers fully implemented |
 | **2-7-1 to 2-7-4.** Cost payment to play cards | **IMPL** | `executePlayCard()` in `execute.ts`, `restDonForCost()` in `state.ts` | Correctly handles Character, Event, and Stage cost payment |
 | **2-7-6.** Effects modify cost | **IMPL** | `modifiers.ts → getEffectiveCost()` Layers 1 & 2 | Includes hand-zone and field-to-hand cost modifiers |
-| **2-8-1 to 2-8-3.** Effect text, zone validity, top-to-bottom | **IMPL** | `schema-registry.ts`, `effect-resolver/resolver.ts` | Effect schemas loaded from 51 set files; resolver processes actions sequentially |
+| **2-8-1 to 2-8-3.** Effect text, zone validity, top-to-bottom | **IMPL** | `schema-registry.ts`, `effect-resolver/resolver.ts` | Effect schemas loaded from the 56-module generated registry; resolver processes actions sequentially |
 | **2-9-1/2.** Life value on Leader | **IMPL** | `setup.ts:48–50` with fallback chain | Life cards dealt from deck during setup |
 | **2-9-4.** Effects can increase Life value | **IMPL** | `effect-resolver/actions/life.ts` | ADD_TO_LIFE_FROM_DECK, PLAY_FROM_LIFE actions implemented |
 
@@ -360,9 +360,9 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 |------|--------|----------------|-------|
 | **7-1-4-1.** Compare power: attacker ≥ defender = win | **IMPL** | `battle.ts:294` | `attackerPower >= defenderPower` |
 | **7-1-4-1-1.** Leader attacked: 1 damage | **IMPL** | `battle.ts:297–375` | Full damage processing with life removal |
-| **7-1-4-1-1-1.** 0 life + damage = defeat | **IMPL** | `battle.ts` damage loop + `defeat.ts:31–34` | Life-0 check runs at the start of each damage instance |
+| **7-1-4-1-1-1.** 0 life + damage = defeat | **IMPL** | `battle.ts → dealOneLeaderDamage()` + `defeat.ts`; [`opt-886-double-attack-one-life.test.ts`](../../workers/game/src/__tests__/opt-886-double-attack-one-life.test.ts) | Checked once, for the attack's first damage (`firstDamageOfAttack`). A later [Double Attack] damage that finds 0 Life is dealt but cannot defeat (7-1-4-1-1-3 repeats only 7-1-4-1-1-2; qa_rules.md:156-158, OPT-886) |
 | **7-1-4-1-1-2.** Life → hand; trigger option | **IMPL** | `battle.ts:339–372` | Normal: add to hand. Trigger: pause for REVEAL_TRIGGER |
-| **7-1-4-1-1-3.** Double Attack: 2 damage | **IMPL** | `battle.ts:301` | `damageCount = hasDoubleAttack ? 2 : 1` |
+| **7-1-4-1-1-3.** Double Attack: 2 damage | **IMPL** | `battle.ts → executeDamageStep()` / `continueLeaderDamageSequence()`; [`opt-886-double-attack-one-life.test.ts`](../../workers/game/src/__tests__/opt-886-double-attack-one-life.test.ts) | `damagesRemaining` is locked at Damage Step entry and always dealt in full, even if the attacker leaves the field or loses [Double Attack] between damages (qa_rules.md:152-154, OPT-886) |
 | **7-1-4-1-2.** Character attacked: K.O. | **IMPL** | `battle.ts → koBattleLoser()`; [`opt-872-battle-ko-replacement-continuation.test.ts`](../../workers/game/src/__tests__/opt-872-battle-ko-replacement-continuation.test.ts) | `koCharacter()` + `CARD_KO` (cause `BATTLE`). An optional replacement prompt pauses the Damage Step through a `CHARACTER_KO_REPLACEMENT` continuation; the answer resumes it exactly once (see 06 §Battle K.O. replacements) |
 | **7-1-4-2.** Attacker loses: nothing happens | **IMPL** | `battle.ts:384` comment | Falls through to `endBattle()` |
 
@@ -388,7 +388,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **8-1-3-1-1.** Auto effect keywords: [On Play], [When Attacking], etc. | **IMPL** | `triggers.ts` | Matches ON_PLAY, WHEN_ATTACKING, ON_KO, ON_BLOCK, END_OF_TURN, etc. |
 | **8-1-3-1-3.** Auto effect doesn't activate if card moved zones before activation | **IMPL** | `triggers.ts` | Zone-presence check at trigger resolution time |
 | **8-1-3-2.** Activate effects ([Activate: Main], [Main]) | **IMPL** | `execute.ts → executeActivateEffect()` | Full activation with cost payment and resolution |
-| **8-1-3-3.** Permanent effects | **IMPL** | `triggers.ts → registerPermanentEffectsForCard()` | Continuous modifier effects registered on zone entry |
+| **8-1-3-3.** Permanent effects | **IMPL** | `triggers.ts → registerPermanentEffectsForCard()` via `registerCardEnteredField()`; [`opt-818-field-entry-registration.test.ts`](../../workers/game/src/__tests__/opt-818-field-entry-registration.test.ts), [`opt-819-effect-played-permanent-effects.test.ts`](../../workers/game/src/__tests__/opt-819-effect-played-permanent-effects.test.ts) | Continuous modifier/prohibition effects register once per field entry. The named tests cover effect plays (both drive `ACTIVATE_EFFECT` on OP13-082), including before nested play-prompt continuations (`trigger-ordering.ts`). Direct plays register through `pipeline.ts` (`registerNewCardTriggers` → `registerCardEnteredField`); no test named here asserts that path. The earlier effect-play gap (OPT-819) and duplicate registration (OPT-818) are merged (#650, #645) |
 | **8-1-3-4.** Replacement effects ("instead") | **IMPL** | `replacements.ts → checkReplacements()` | Full replacement detection, matching, optional prompts |
 | **8-1-3-4-2.** Replacement effect priority (card owner → turn player → non-turn player) | **IMPL** | `replacements.ts` | Priority ordering implemented |
 | **8-1-3-4-3.** Same replacement can't apply twice to same process | **IMPL** | `replacements.ts` | Once-per-event tracking |
@@ -443,7 +443,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **9-1-1.** Rule processing = automatic processing on specific events | **IMPL** | `pipeline.ts` step 7 calls `checkDefeat()` | |
-| **9-1-2.** Rule processing is immediate, even during other actions | **PARTIAL** | Runs after every pipeline call, but not mid-execution (e.g., not between individual damage points) | |
+| **9-1-2.** Rule processing is immediate, even during other actions | **PARTIAL** | Runs after every pipeline call, but not mid-execution (e.g., not between individual damage points). A Leader damaged at 0 Life ends the game even when an auto effect from the same action suspends for input (`pipeline.ts → defeatAtSuspension()`, OPT-886) | |
 | **9-2-1.** Defeat judgment processing | **IMPL** | `defeat.ts → checkDefeat()` | |
 | **9-2-1-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts:31–34` | |
 | **9-2-1-2.** 0 deck = defeat | **IMPL** | `defeat.ts:26–27` | |
@@ -506,6 +506,54 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 ---
 
 ## Remaining Gaps
+
+### Generic mechanic coverage vs authored-card fidelity
+
+The **IMPL** rows in this map describe generic engine mechanics. They do not
+certify every authored card. The registry currently builds from 56 authored set
+modules (OP01–OP17, ST01–ST32, EB01–EB04, PRB01–PRB02, P; see
+`workers/game/src/engine/schemas/` and `authored-schemas.generated.ts`), and
+`pnpm schema:check` only proves those schemas are lint-clean, in sync with the
+generated registry, and covered by their authored-schema tests. It does not close
+a card-specific fidelity defect, and a passing gate must not be read as "no open
+defect". Known exceptions are tracked as issues; where an `it.fails` ratchet exists
+in `workers/game/src/__tests__/` it is named next to the row, but not every open
+gap has one (no test under `workers/game/src/__tests__/` references OPT-802 or
+OPT-803, and ST-31/ST-32 incompleteness has no ratchet).
+
+Fidelity backlog status derived from merged commits on `main` (`git log --grep`).
+Merged means a commit with that ID is on `main`; anything without one is
+**open or unverified** (this document does not read Linear):
+
+| Merged | Issues |
+|---|---|
+| Field-entry and event ordering | OPT-818 (#645), OPT-819 (#650), OPT-820 (#651), OPT-821 (#646) |
+| Generic mechanics | OPT-788 (#668), OPT-789 (#673), OPT-790 (#664), OPT-791 (#666), OPT-792 (#694), OPT-793 (#697), OPT-794 (#670), OPT-795 (#674), OPT-796 (#700), OPT-797 (#708), OPT-798 (#681), OPT-799 (#704), OPT-800 (#687), OPT-801 (#691) |
+| Authored-set sweeps | OPT-805 (#659), OPT-806 (#661), OPT-807 (#654), OPT-808 (#657), OPT-809 (#662), OPT-810 (#660), OPT-811 (#655), OPT-812 (#656), OPT-813 (#663), OPT-814 (#658) |
+
+Known residuals and follow-ups for the merged rows (commit messages and
+`docs/project/handoffs/` on `main`):
+
+- OPT-892 (open, no merged commit): `DEAL_DAMAGE` effects emit no `DAMAGE_DEALT`, so OP03-043 Gaimon never sees them; whether it should is an open rules question (`docs/game-engine/02-TRIGGERS.md`, OPT-796 commit a6c97437).
+- OPT-796: its Double Attack lethal case is fixed by OPT-886 (#721, bfb9d8d7), which flipped the OPT-796 `it.fails` ratchet.
+- OPT-792: OP15-035 was left unchanged (it rests your own cards as a replacement; "see PR follow-ups" in commit 7e925017).
+- OPT-788: follow-ups OPT-834 (merged, #705) and OPT-852 (merged, #677), per `opt-788-name-aliases.md`.
+- OPT-806: Kanjuro ownership follow-up OPT-848 (merged, #672), per `opt-806-schema-sweep-b.md`.
+- OPT-814: PRB02-006 rest-source follow-up OPT-847 (merged, #669), per `OPT-814.md`.
+- OPT-807: successor OPT-845 (merged, #671).
+
+OPT-804 was a tracking parent (`docs/project/handoffs/runs/2026-09-26-opt798-827-824-828-857.md`:
+"Parent OPT-804 out of scope (tracking only)"); its split-out gaps merged as
+OPT-824 (#683), OPT-825 (#688), OPT-826 (#706), OPT-827 (#682) and OPT-828 (#684),
+so it is an umbrella with merged children rather than an open defect. OPT-803
+was split into OPT-829 (preview schemas, merged #679), OPT-830 (docs coverage,
+merged #735) and OPT-831 (full ST31/ST32 sets, no merged commit, open; see
+`docs/audit/2026-09-09-faq-engine-gap-audit.md`). No merged commit names
+OPT-802; treat it as open (see OPT-802). Later fidelity tickets (for example
+OPT-824–OPT-828, OPT-865, OPT-869, OPT-872, OPT-886, OPT-889, OPT-894, OPT-903)
+carry their own `opt-NNN-*.test.ts` files in `workers/game/src/__tests__/`.
+
+### Rules-completeness residuals
 
 The following residual items are not covered by the reconciled executable
 contracts above:

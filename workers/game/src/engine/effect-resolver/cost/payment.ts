@@ -485,6 +485,9 @@ function payCostsUnreleased(
         break;
 
       case "GIVE_DON":
+      // OPT-868: the opponent's Character recipient is the paying player's
+      // choice as well — same prompt-only payment, same fail-closed fallback.
+      case "GIVE_OPPONENT_DON_TO_OPPONENT":
         // OPT-824: the recipient is always the player's choice, paid through
         // payCostsWithSelection's prompt and the AWAITING_COST_SELECTION
         // resume. No synchronous caller reaches a GIVE_DON cost, so fail

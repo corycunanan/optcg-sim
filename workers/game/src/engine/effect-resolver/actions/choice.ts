@@ -317,5 +317,8 @@ export function executeReuseEffect(
     state: resolveResult.state,
     events: [...events, ...resolveResult.events],
     succeeded: resolveResult.resolved,
+    ...(resolveResult.pendingPrompt
+      ? { pendingPrompt: resolveResult.pendingPrompt }
+      : {}),
   };
 }

@@ -209,7 +209,8 @@ describe("OPT-855 registered Bao Huang", () => {
       f.act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
       f.persist();
       f.state.players[opponent].hand = hand.slice(1);
-      f.select([hand[0].instanceId, hand[2].instanceId]);
+      // OPT-861: the re-prompt reports the stale reply as rejected.
+      f.select([hand[0].instanceId, hand[2].instanceId], true);
       expect(reveals(f)).toEqual([]);
       expect(f.state.pendingPrompt?.respondingPlayer).toBe(owner);
       expect(f.targets()).toMatchObject({ blindSelection: true, countMin: 2, countMax: 2 });
@@ -284,7 +285,7 @@ describe("registered REVEAL_HAND consumers", () => {
         if (kind === "stale Event") {
           const stale = hand.pop()!;
           f.state.players[opponent].hand = [...hand];
-          f.select([stale.instanceId]);
+          f.select([stale.instanceId], true);
           expect(reveals(f)).toEqual([]);
           expect(f.state.pendingPrompt?.respondingPlayer).toBe(owner);
           expect(f.targets().blindSelection).toBe(true);

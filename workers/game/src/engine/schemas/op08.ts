@@ -4315,7 +4315,7 @@ export const OP08_119_KAIDO_AND_LINLIN: EffectSchema = {
         },
         {
           type: "TRASH_FROM_LIFE",
-          params: { amount: 1, position: "TOP", controller: "OPPONENT" },
+          params: { amount: 1, position: "TOP", controller: "OPPONENT", up_to: true },
           chain: "THEN",
         },
       ],

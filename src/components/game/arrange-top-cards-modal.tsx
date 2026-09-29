@@ -186,6 +186,7 @@ interface ArrangeTopCardsModalProps {
   cards: CardInstance[];
   effectDescription: string;
   sourceCard?: PromptSourceCard;
+  actionLabel?: string;
   canSendToBottom: boolean;
   restDestination?: string;
   /** If provided, only these instanceIds may be picked in the choose step. */
@@ -208,6 +209,7 @@ export function ArrangeTopCardsModal({
   cards: initialCards,
   effectDescription,
   sourceCard,
+  actionLabel,
   canSendToBottom,
   restDestination,
   validTargets,
@@ -353,6 +355,7 @@ export function ArrangeTopCardsModal({
     <EffectPromptDialog
       effectDescription={effectDescription}
       sourceCard={sourceCard}
+      actionLabel={actionLabel}
       cardDb={cardDb}
       isHidden={isHidden}
       onHide={onHide}

@@ -341,6 +341,11 @@ export interface GameEventPayloadMap {
     attackerInstanceId: string;
     attackerType: string;
     target?: string;
+    /**
+     * The damage found 0 Life, so no Life card was checked. Only an attack's
+     * first damage at 0 Life defeats the Leader (9-2-1-1); a [Double Attack]'s
+     * second damage at 0 Life does not (qa_rules.md:156-158, OPT-886).
+     */
     lethal?: boolean;
     /** OPT-796: true only for the first Life damage an attack deals ([Double Attack] deals two). */
     firstDamageOfAttack?: boolean;
@@ -785,6 +790,8 @@ export interface SelectBlockerPrompt {
 export interface RevealTriggerPrompt {
   promptType: "REVEAL_TRIGGER";
   sourceCard?: PromptSourceCard;
+  /** Player-facing action the prompt is for; titles the modal (OPT-779). */
+  actionLabel?: string;
   cards: CardInstance[];
   effectDescription: string;
   optional: boolean;
@@ -794,6 +801,8 @@ export interface RevealTriggerPrompt {
 export interface ArrangeTopCardsPrompt {
   promptType: "ARRANGE_TOP_CARDS";
   sourceCard?: PromptSourceCard;
+  /** Player-facing action the prompt is for; titles the modal (OPT-779). */
+  actionLabel?: string;
   cards: CardInstance[];
   effectDescription: string;
   canSendToBottom: boolean;
@@ -806,6 +815,8 @@ export interface ArrangeTopCardsPrompt {
 export interface SelectTargetPrompt {
   promptType: "SELECT_TARGET";
   sourceCard?: PromptSourceCard;
+  /** Player-facing action the prompt is for; titles the modal (OPT-779). */
+  actionLabel?: string;
   cards: CardInstance[];
   validTargets: string[];
   effectDescription: string;
@@ -829,6 +840,8 @@ export interface SelectTargetPrompt {
 export interface RedistributeDonPrompt {
   promptType: "REDISTRIBUTE_DON";
   sourceCard?: PromptSourceCard;
+  /** Player-facing action the prompt is for; titles the modal (OPT-779). */
+  actionLabel?: string;
   validSourceCardIds: string[];
   validTargetCardIds: string[];
   maxTransfers: number;
@@ -838,6 +851,8 @@ export interface RedistributeDonPrompt {
 export interface PlayerChoicePrompt {
   promptType: "PLAYER_CHOICE";
   sourceCard?: PromptSourceCard;
+  /** Player-facing action the prompt is for; titles the modal (OPT-779). */
+  actionLabel?: string;
   choices: { id: string; label: string; disabled?: boolean }[];
   effectDescription: string;
   sourceEffectDescription?: string;
@@ -858,6 +873,8 @@ export interface PlayerChoicePrompt {
 export interface OptionalEffectPrompt {
   promptType: "OPTIONAL_EFFECT";
   sourceCard?: PromptSourceCard;
+  /** Player-facing action the prompt is for; titles the modal (OPT-779). */
+  actionLabel?: string;
   effectDescription: string;
   cards?: CardInstance[];
 }

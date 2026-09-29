@@ -13,30 +13,42 @@ type VerbBuilder = (action: Action) => string | undefined;
 
 export interface TargetActionPresentation {
   /** Player-facing imperative used at the start of a target instruction. */
-  verb: VerbBuilder;
+  verb?: VerbBuilder;
+  /**
+   * Modal title naming the action the player is choosing for (OPT-779), shown
+   * as `Card Effect: <title>`. Entries without a `verb` only contribute a title.
+   */
+  title?: VerbBuilder;
 }
 
 /**
- * Action-keyed target copy. OPT-779 can add its title column beside `verb`
- * without introducing a second action-label registry.
+ * Action-keyed player-facing copy: the target-instruction verb (OPT-775) and
+ * the modal title (OPT-779) live side by side so they cannot drift. Internal
+ * action types (APPLY_PROHIBITION, SCHEDULE_ACTION, REUSE_EFFECT,
+ * NEGATE_EFFECTS, ...) deliberately have no entry, so they never surface.
  */
 export const TARGET_ACTION_PRESENTATION: Partial<
   Record<ActionType, TargetActionPresentation>
 > = {
-  KO: { verb: () => "KO" },
-  SET_REST: { verb: () => "Rest" },
-  SET_ACTIVE: { verb: () => "Set active" },
-  RETURN_TO_HAND: { verb: () => "Return to hand" },
+  KO: {
+    verb: () => "KO",
+    title: (action) => cardKindTitle(action, "KO Characters", "KO Stage", "KO"),
+  },
+  SET_REST: { verb: () => "Rest", title: () => "Rest" },
+  SET_ACTIVE: { verb: () => "Set active", title: () => "Set Active" },
+  RETURN_TO_HAND: { verb: () => "Return to hand", title: () => "Return to Hand" },
   RETURN_TO_DECK: {
+    title: () => "Return to Deck",
     verb: (action) =>
       action.type === "RETURN_TO_DECK"
         ? `Return to the ${action.params?.position === "TOP" ? "top" : "bottom"} of the deck`
         : undefined,
   },
-  TRASH_CARD: { verb: () => "Trash" },
-  TRASH_FROM_HAND: { verb: () => "Trash" },
-  TRASH_FROM_LIFE: { verb: () => "Trash" },
+  TRASH_CARD: { verb: () => "Trash", title: () => "Trash" },
+  TRASH_FROM_HAND: { verb: () => "Trash", title: () => "Trash" },
+  TRASH_FROM_LIFE: { verb: () => "Trash", title: () => "Trash" },
   GIVE_DON: {
+    title: () => "Give DON!!",
     verb: (action) => {
       const amount =
         action.type === "GIVE_DON" ? (action.params?.amount ?? 1) : 1;
@@ -44,30 +56,81 @@ export const TARGET_ACTION_PRESENTATION: Partial<
     },
   },
   MODIFY_POWER: {
+    title: (action) =>
+      action.type === "MODIFY_POWER"
+        ? renderSignedTitle("Power", action.params?.amount)
+        : undefined,
     verb: (action) =>
       action.type === "MODIFY_POWER"
         ? renderSignedVerb("power", action.params?.amount)
         : undefined,
   },
   MODIFY_COST: {
+    title: (action) =>
+      action.type === "MODIFY_COST"
+        ? renderSignedTitle("Cost", action.params?.amount)
+        : undefined,
     verb: (action) =>
       action.type === "MODIFY_COST"
         ? renderSignedVerb("cost", action.params?.amount)
         : undefined,
   },
   GRANT_KEYWORD: {
+    title: () => "Grant Keyword",
     verb: (action) =>
       action.type === "GRANT_KEYWORD"
         ? `Give [${displayKeyword(action.params?.keyword)}] to`
         : undefined,
   },
-  PLAY_CARD: { verb: () => "Play" },
-  PLAY_FROM_LIFE: { verb: () => "Play" },
-  ADD_TO_LIFE: { verb: () => "Add to Life" },
-  ADD_TO_LIFE_FROM_DECK: { verb: () => "Add to Life" },
-  ADD_TO_LIFE_FROM_HAND: { verb: () => "Add to Life" },
-  ADD_TO_LIFE_FROM_FIELD: { verb: () => "Add to Life" },
+  PLAY_CARD: {
+    verb: () => "Play",
+    title: (action) =>
+      cardKindTitle(action, "Play Character", "Play Stage", "Play Card"),
+  },
+  PLAY_SELF: { title: () => "Play This Card" },
+  PLAY_FROM_LIFE: {
+    verb: () => "Play",
+    title: (action) =>
+      cardKindTitle(action, "Play Character", "Play Stage", "Play Card"),
+  },
+  ADD_TO_LIFE: { verb: () => "Add to Life", title: () => "Add to Life" },
+  ADD_TO_LIFE_FROM_DECK: { verb: () => "Add to Life", title: () => "Add to Life" },
+  ADD_TO_LIFE_FROM_HAND: { verb: () => "Add to Life", title: () => "Add to Life" },
+  ADD_TO_LIFE_FROM_FIELD: { verb: () => "Add to Life", title: () => "Add to Life" },
+  // Title-only entries: actions whose prompts are not target instructions.
+  DRAW: { title: () => "Draw Cards" },
+  SEARCH_DECK: { title: () => "Search Deck" },
+  FULL_DECK_SEARCH: { title: () => "Search Deck" },
+  SEARCH_TRASH_THE_REST: { title: () => "Search Deck" },
+  SEARCH_AND_PLAY: { title: () => "Search and Play" },
+  DECK_SCRY: { title: () => "Look at Deck" },
+  LIFE_SCRY: { title: () => "Look at Life" },
+  REVEAL: { title: () => "Reveal" },
+  REVEAL_HAND: { title: () => "Reveal" },
+  PLACE_HAND_TO_DECK: { title: () => "Place on Deck" },
+  RETURN_HAND_TO_DECK: { title: () => "Place on Deck" },
+  MILL: { title: () => "Trash from Deck" },
+  LIFE_TO_HAND: { title: () => "Add to Hand" },
+  ADD_DON_FROM_DECK: { title: () => "Add DON!!" },
+  RETURN_DON_TO_DECK: { title: () => "Return DON!!" },
+  FORCE_OPPONENT_DON_RETURN: { title: () => "Return DON!!" },
+  SET_DON_ACTIVE: { title: () => "Set DON!! Active" },
+  REST_DON: { title: () => "Rest DON!!" },
+  REDISTRIBUTE_DON: { title: () => "Move DON!!" },
 };
+
+/**
+ * Modal title for an action (OPT-779), or `undefined` for internal or unmapped
+ * types so the client falls back to its timing title. OPPONENT_ACTION unwraps
+ * to the inner action, since the opponent is the one choosing.
+ */
+export function actionTitle(action: Action | null | undefined): string | undefined {
+  if (!action) return undefined;
+  if (action.type === "OPPONENT_ACTION") {
+    return actionTitle(action.params?.action);
+  }
+  return TARGET_ACTION_PRESENTATION[action.type]?.title?.(action);
+}
 
 const SUPPORTED_FILTER_KEYS = new Set<keyof TargetFilter>([
   "cost_exact",
@@ -139,6 +202,66 @@ function renderSignedVerb(
   if (typeof amount !== "number") return undefined;
   const signedAmount = amount < 0 ? `−${Math.abs(amount)}` : `+${amount}`;
   return `Give ${signedAmount} ${property} to`;
+}
+
+/** Static sign of an amount, or `undefined` when it depends on game state. */
+function amountSign(amount: unknown): -1 | 1 | undefined {
+  if (typeof amount === "number") return amount < 0 ? -1 : 1;
+  if (!amount || typeof amount !== "object") return undefined;
+  const value = amount as { type?: string; value?: unknown; multiplier?: unknown };
+  if (value.type === "FIXED") return amountSign(value.value);
+  // A PER_COUNT total is count (>= 0) times the multiplier, so the multiplier
+  // fixes the sign.
+  if (value.type === "PER_COUNT") return amountSign(value.multiplier);
+  return undefined;
+}
+
+function renderSignedTitle(
+  property: "Power" | "Cost",
+  amount: unknown
+): string {
+  const sign = amountSign(amount);
+  if (sign === undefined) return `Modify ${property}`;
+  if (property === "Power") return sign < 0 ? "Decrease Power" : "Increase Power";
+  return sign < 0 ? "Reduce Cost" : "Increase Cost";
+}
+
+type CardKind = "CHARACTER" | "STAGE";
+
+function kindOfTypeName(name: string): CardKind | undefined {
+  const upper = name.toUpperCase();
+  if (upper === "CHARACTER" || upper === "CHARACTER_CARD") return "CHARACTER";
+  if (upper === "STAGE" || upper === "STAGE_CARD") return "STAGE";
+  return undefined;
+}
+
+/**
+ * Whether the action's target is only Characters or only Stages. Mixed or
+ * unknown targets return `undefined` so the title stays neutral.
+ */
+function targetCardKind(action: Action): CardKind | undefined {
+  const target = (action as { target?: Target }).target;
+  if (!target) return undefined;
+  const byType = kindOfTypeName(target.type ?? "");
+  if (byType) return byType;
+  const filterType = (target.filter as { card_type?: string | string[] } | undefined)
+    ?.card_type;
+  if (filterType === undefined) return undefined;
+  const kinds = new Set(
+    (Array.isArray(filterType) ? filterType : [filterType]).map(kindOfTypeName)
+  );
+  if (kinds.size !== 1) return undefined;
+  return [...kinds][0];
+}
+
+function cardKindTitle(
+  action: Action,
+  character: string,
+  stage: string,
+  neutral: string
+): string {
+  const kind = targetCardKind(action);
+  return kind === "CHARACTER" ? character : kind === "STAGE" ? stage : neutral;
 }
 
 function ownerPrefix(controller: Controller | undefined): string {

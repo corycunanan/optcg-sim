@@ -232,6 +232,31 @@ export function checkProhibitions(
 }
 
 /**
+ * OPT-869: may `actingPlayerIndex` attach DON!! to `targetInstanceId`?
+ *
+ * The one predicate shared by manual attach (rule 6-5-5, vetoed in pipeline
+ * step 2), the GIVE_DON action and the GIVE_DON cost. It runs the exact
+ * `checkProhibitions` evaluation the manual ATTACH_DON action gets — active
+ * uses, carried conditions, conditional overrides, the CANNOT_ATTACH_DON
+ * case's instance coverage (static `appliesTo` or OPT-451 dynamic population)
+ * and its `scope.controller` frame relative to the acting player — so an
+ * effect that gives DON!! can never reach a card manual attach could not.
+ */
+export function isDonAttachProhibited(
+  state: GameState,
+  targetInstanceId: string,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): boolean {
+  return checkProhibitions(
+    state,
+    { type: "ATTACH_DON", targetInstanceId, count: 1 },
+    cardDb,
+    actingPlayerIndex,
+  ) !== null;
+}
+
+/**
  * Refresh Phase step 4 support: collect the refreshing player's cards held
  * rested by a CANNOT_REFRESH prohibition ("will not become active in your
  * opponent's next Refresh Phase") and consume those prohibitions — the effect

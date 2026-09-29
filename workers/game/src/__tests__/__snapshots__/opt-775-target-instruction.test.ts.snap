@@ -2,7 +2,7 @@
 
 exports[`OPT-775 target instructions > snapshots every authored action target and the distinct wording set 1`] = `
 {
-  "fallbackCount": 567,
+  "fallbackCount": 568,
   "fallbacks": [
     "EB01-008 :: ko_replacement :: replacement_actions[0] (TRASH_FROM_HAND)",
     "EB01-013 :: activate_play_and_draw :: actions[0] (PLAY_CARD)",
@@ -113,7 +113,8 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "OP02-095.effects.0.modifiers.0.target (non-action target)",
     "OP02-114.effects.0.modifiers.0.target (non-action target)",
     "OP02-121.effects.0.modifiers.0.target (non-action target)",
-    "OP03-001 :: attack_or_attacked_trash_buff :: actions[0] (MODIFY_POWER)",
+    "OP03-001 :: attack_or_attacked_trash_buff :: actions[0] (TRASH_FROM_HAND)",
+    "OP03-001 :: attack_or_attacked_trash_buff :: actions[1] (MODIFY_POWER)",
     "OP03-004.effects.0.modifiers.0.target (non-action target)",
     "OP03-014 :: when_attacking_play :: actions[0] (PLAY_CARD)",
     "OP03-018 :: main_dual_ko :: actions[0] (KO)",
@@ -177,7 +178,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "OP05-119 :: on_play_don_minus_return_extra_turn :: actions[0] (RETURN_TO_DECK)",
     "OP06-002.effects.0.modifiers.0.target (non-action target)",
     "OP06-010.effects.0.modifiers.0.target (non-action target)",
-    "OP06-014 :: OP06-014_effect_1 :: actions[0] (MODIFY_POWER)",
+    "OP06-014 :: OP06-014_effect_1 :: actions[1] (MODIFY_POWER)",
     "OP06-015 :: OP06-015_effect_1 :: actions[0] (PLAY_CARD)",
     "OP06-020 :: OP06-020_effect_1 :: actions[0] (SET_REST)",
     "OP06-024 :: OP06-024_effect_1 :: actions[0] (PLAY_CARD)",
@@ -487,7 +488,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "P-039.effects.1.modifiers.0.target (non-action target)",
     "P-044.effects.0.modifiers.0.target (non-action target)",
     "P-050.effects.1.modifiers.0.target (non-action target)",
-    "P-051 :: when_attacking_trash_for_power :: actions[0] (MODIFY_POWER)",
+    "P-051 :: when_attacking_trash_for_power :: actions[1] (MODIFY_POWER)",
     "P-059 :: counter_bounce_and_power :: actions[1] (MODIFY_POWER)",
     "P-078.effects.0.modifiers.0.target (non-action target)",
     "P-084.effects.1.prohibitions.0.target (non-action target)",
@@ -539,7 +540,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST14-014 :: trigger_retrieve_trash :: actions[0] (RETURN_TO_HAND)",
     "ST14-017.effects.0.modifiers.0.target (non-action target)",
     "ST15-005.effects.0.modifiers.0.target (non-action target)",
-    "ST16-002 :: opponent_attack_power_boost :: actions[0] (MODIFY_POWER)",
+    "ST16-002 :: opponent_attack_power_boost :: actions[1] (MODIFY_POWER)",
     "ST16-003.effects.0.modifiers.0.target (non-action target)",
     "ST16-005.effects.0.modifiers.0.target (non-action target)",
     "ST18-005 :: on_play_play_from_hand :: actions[0] (PLAY_CARD)",
@@ -572,7 +573,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "ST31-004 :: on_play_crew_debuff :: actions[0] (MODIFY_POWER)",
     "ST31-004.effects.0.modifiers.0.target (non-action target)",
   ],
-  "generatedCount": 1973,
+  "generatedCount": 1978,
   "instructions": [
     "Add to Life the card being replaced.",
     "Add to Life up to 1 of Characters with a cost of 6 or less.",
@@ -598,7 +599,6 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Choose 2 of your Characters with the {Supernovas} or {Heart Pirates} type.",
     "Choose 2 of your DON!! cards that are active.",
     "Choose 2 of your opponent's Characters with a base power of 9000 or less.",
-    "Choose 3 of your cards in the trash.",
     "Choose cards in your opponent's Life.",
     "Choose this card.",
     "Choose up to 1 of Life cards.",
@@ -844,6 +844,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Give −1 cost to up to 1 of your opponent's Characters.",
     "Give −1 cost to your opponent's Characters.",
     "Give −10 cost to up to 1 of your opponent's Characters.",
+    "Give −1000 power to the card being replaced.",
     "Give −1000 power to up to 1 of your opponent's Characters.",
     "Give −1000 power to up to 1 of your opponent's Leaders or Characters.",
     "Give −1000 power to your opponent's Leaders or Characters.",
@@ -1252,8 +1253,10 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Trash up to 2 of your cards in hand.",
     "Trash up to 3 of your cards in hand.",
     "Trash your Characters.",
+    "Trash your cards in hand with the {FILM} type.",
+    "Trash your cards in hand with the {Music} type.",
     "Trash your cards in hand.",
   ],
-  "targetCount": 2540,
+  "targetCount": 2546,
 }
 `;

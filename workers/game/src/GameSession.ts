@@ -781,11 +781,9 @@ export class GameSession implements DurableObject {
     // rejection from acceptance without diffing state. Surface it explicitly,
     // matching the gate paths.
     if (result.responseRejected) {
-      this.rejectAction(
-        ws,
-        action,
-        "That prompt response was rejected; the pending prompt is unchanged"
-      );
+      this.rejectAction(ws, action, result.reprompted
+        ? "That selection is no longer valid; choose again from the updated prompt"
+        : "That prompt response was rejected; the pending prompt is unchanged");
     }
 
     if (this.gameState.pendingPrompt) {
