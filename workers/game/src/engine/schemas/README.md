@@ -167,10 +167,10 @@ For effects that react to game events (not bracket-tag abilities):
 
 | Card Text Pattern | Trigger |
 |-------------------|---------|
-| "When your opponent's Character is K.O.'d" | `{ event: "OPPONENT_CHARACTER_KO" }` |
+| "When your opponent's Character is K.O.'d" | `{ event: "OPPONENT_CHARACTER_KO" }` — the engine matches only Characters that left the field of the watcher's opponent (the removed card's controller ≠ the watcher's controller); no `filter.controller` needed |
 | "When a Character is K.O.'d" | `{ event: "ANY_CHARACTER_KO" }` |
 | "When a Character is trashed" | `{ event: "ANY_CHARACTER_TRASHED" }` |
-| "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` |
+| "When your opponent's Character is trashed" | `{ event: "OPPONENT_CHARACTER_TRASHED" }` — same engine opponent check as `OPPONENT_CHARACTER_KO`; no `filter.controller` needed |
 | "When a Character is removed from the field" | `{ event: "CHARACTER_REMOVED_FROM_FIELD" }` |
 | "When DON!! returned to DON!! deck" | `{ event: "DON_RETURNED_TO_DON_DECK" }` |
 | "When given a DON!!" | `{ event: "DON_GIVEN_TO_CARD" }` |
