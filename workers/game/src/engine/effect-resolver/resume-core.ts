@@ -51,6 +51,7 @@ import {
   handleRedistributeDon,
   handleSelectTargetRuleTrashForPlay,
   handleSelectTarget,
+  handleGiveDonIdentity,
 } from "./resume/target.js";
 import {
   handlePlayerChoiceStateDistribution,
@@ -289,32 +290,47 @@ export function resumeEffectChain(
   if (redistribute?.kind === "terminal") return redistribute.result;
   if (redistribute?.kind === "fallthrough") nextState = redistribute.state;
 
-  // ── SELECT_TARGET branches (rule-trash-for-play first, then generic) ──────
-  const ruleTrash = handleSelectTargetRuleTrashForPlay(
+  // ── SELECT_TARGET branches (GIVE_DON identity, rule-trash-for-play, then
+  //    generic) ──────────────────────────────────────────────────────────────
+  const giveDonIdentity = handleGiveDonIdentity(
     nextState,
     action,
     resumeCtx,
-    resultRefs,
-    cardDb,
-    events,
-    services
+    events
   );
-  if (ruleTrash?.kind === "terminal") return ruleTrash.result;
-  // ruleTrash always returns terminal or null — no fallthrough case
+  if (giveDonIdentity?.kind === "terminal") return giveDonIdentity.result;
+  if (giveDonIdentity?.kind === "fallthrough") {
+    // The identity choice completed the paused GIVE_DON; the generic
+    // SELECT_TARGET branch must not re-run it with the DON!! id as a target.
+    nextState = giveDonIdentity.state;
+    pausedActionSucceeded = giveDonIdentity.succeeded;
+  } else {
+    const ruleTrash = handleSelectTargetRuleTrashForPlay(
+      nextState,
+      action,
+      resumeCtx,
+      resultRefs,
+      cardDb,
+      events,
+      services
+    );
+    if (ruleTrash?.kind === "terminal") return ruleTrash.result;
+    // ruleTrash always returns terminal or null — no fallthrough case
 
-  const selectTarget = handleSelectTarget(
-    nextState,
-    action,
-    resumeCtx,
-    resultRefs,
-    cardDb,
-    events,
-    services
-  );
-  if (selectTarget?.kind === "terminal") return selectTarget.result;
-  if (selectTarget?.kind === "fallthrough") {
-    nextState = selectTarget.state;
-    pausedActionSucceeded = selectTarget.succeeded;
+    const selectTarget = handleSelectTarget(
+      nextState,
+      action,
+      resumeCtx,
+      resultRefs,
+      cardDb,
+      events,
+      services
+    );
+    if (selectTarget?.kind === "terminal") return selectTarget.result;
+    if (selectTarget?.kind === "fallthrough") {
+      nextState = selectTarget.state;
+      pausedActionSucceeded = selectTarget.succeeded;
+    }
   }
 
   // ── Tail: execute remainingActions (also handles OPTIONAL_EFFECT resume

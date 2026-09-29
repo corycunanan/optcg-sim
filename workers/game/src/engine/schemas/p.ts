@@ -1225,8 +1225,17 @@ export const P_051_SHANKS: EffectSchema = {
       id: "when_attacking_trash_for_power",
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
-      costs: [{ type: "TRASH_FROM_HAND", amount: "ANY_NUMBER" }],
+      // OPT-885: no colon in the card text — the trash is an action.
       actions: [
+        {
+          type: "TRASH_FROM_HAND",
+          target: {
+            type: "CARD_IN_HAND",
+            controller: "SELF",
+            count: { any_number: true },
+          },
+          result_ref: "cards_trashed",
+        },
         {
           type: "MODIFY_POWER",
           target: { type: "SELF" },
@@ -1234,10 +1243,12 @@ export const P_051_SHANKS: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CARDS_TRASHED_THIS_WAY",
+              ref: "cards_trashed",
               multiplier: 1000,
             },
           },
           duration: { type: "THIS_BATTLE" },
+          chain: "THEN",
         },
       ],
       flags: { optional: true },
@@ -1525,6 +1536,7 @@ export const P_059_THE_WORLDS_CONTINUATION: EffectSchema = {
             controller: "SELF",
             count: { any_number: true },
           },
+          result_ref: "characters_returned",
         },
         {
           type: "MODIFY_POWER",
@@ -1537,6 +1549,7 @@ export const P_059_THE_WORLDS_CONTINUATION: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CHARACTERS_RETURNED_THIS_WAY",
+              ref: "characters_returned",
               multiplier: 2000,
             },
           },

@@ -6,7 +6,7 @@ import { trashCharacter } from "../card-mutations.js";
 import { payCosts } from "./payment.js";
 import { costNeedsPlayerSelection } from "./payability.js";
 import { applyCostSelection } from "./resume.js";
-import { computeCostTargets, costSelectionCount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, opponentRestedCostDon } from "./targets.js";
 
 /** Lazily yield every `count`-sized combination of `values` in index order. */
 function* combinations(values: string[], count: number): Generator<string[]> {
@@ -98,11 +98,20 @@ function* selectionPayments(
   );
   for (const amount of selectionAmounts(cost, targets.length)) {
     for (const selected of combinations(targets, amount)) {
+      // OPT-868: the paid DON!! is always bound explicitly. Which rested
+      // DON!! pays never changes payability (every candidate is an
+      // unattached rested DON!! of the same cost area), so one suffices.
+      const donForGive = cost.type === "GIVE_OPPONENT_DON_TO_OPPONENT"
+        ? opponentRestedCostDon(state, controller)[0]?.instanceId
+        : undefined;
+      if (cost.type === "GIVE_OPPONENT_DON_TO_OPPONENT" && !donForGive) continue;
       const paymentTargets =
         cost.type === "PLACE_SELF_AND_TRASH_TO_DECK" ||
         cost.type === "PLACE_SELF_AND_HAND_TO_DECK"
           ? [sourceCardInstanceId, ...selected]
-          : selected;
+          : donForGive
+            ? [...selected, donForGive]
+            : selected;
       yield applyCostSelection(state, cost, paymentTargets, controller, cardDb, sourceCardInstanceId).state;
     }
   }

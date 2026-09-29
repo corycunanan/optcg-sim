@@ -108,6 +108,7 @@ export const OP15_002_LUCY: EffectSchema = {
             count: { any_number: true },
             filter: { card_type: ["EVENT", "STAGE"] },
           },
+          result_ref: "cards_trashed",
         },
         {
           type: "MODIFY_POWER",
@@ -116,6 +117,7 @@ export const OP15_002_LUCY: EffectSchema = {
             amount: {
               type: "PER_COUNT",
               source: "CARDS_TRASHED_THIS_WAY",
+              ref: "cards_trashed",
               multiplier: 1000,
             },
           },
@@ -177,10 +179,12 @@ export const OP15_003_ALVIDA: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [
+        // OPT-868: 1 of the opponent's rested DON!! (rested is intrinsic to
+        // the cost) to 1 of the opponent's Characters, both chosen by the
+        // payer (faq_op15-eb04.md).
         {
-          type: "GIVE_OPPONENT_DON",
+          type: "GIVE_OPPONENT_DON_TO_OPPONENT",
           amount: 1,
-          filter: { is_rested: true },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -686,10 +690,12 @@ export const OP15_017_MORGAN: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [
+        // OPT-868: 1 of the opponent's rested DON!! (rested is intrinsic to
+        // the cost) to 1 of the opponent's Characters, both chosen by the
+        // payer (faq_op15-eb04.md).
         {
-          type: "GIVE_OPPONENT_DON",
+          type: "GIVE_OPPONENT_DON_TO_OPPONENT",
           amount: 1,
-          filter: { is_rested: true },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -999,10 +1005,12 @@ export const OP15_023_ARLONG: EffectSchema = {
       trigger: { keyword: "ACTIVATE_MAIN" },
       flags: { once_per_turn: true, optional: true },
       costs: [
+        // OPT-868: 1 of the opponent's rested DON!! (rested is intrinsic to
+        // the cost) to 1 of the opponent's Characters, both chosen by the
+        // payer (faq_op15-eb04.md).
         {
-          type: "GIVE_OPPONENT_DON",
+          type: "GIVE_OPPONENT_DON_TO_OPPONENT",
           amount: 1,
-          filter: { is_rested: true },
           target: {
             type: "CHARACTER",
             controller: "OPPONENT",
@@ -1011,14 +1019,40 @@ export const OP15_023_ARLONG: EffectSchema = {
         },
       ],
       actions: [
+        // OPT-868: "1 DON!! card from its owner's cost area" is active OR
+        // rested (faq_op15-eb04.md OP15-023: "regardless of whether it is
+        // active or rested"). GIVE_DON gives one state at a time, so the
+        // payer chooses which state to give; the DON!! comes from the chosen
+        // recipient's owner's cost area either way.
         {
-          type: "GIVE_DON",
-          target: {
-            type: "LEADER_OR_CHARACTER",
-            controller: "EITHER",
-            count: { up_to: 1 },
+          type: "PLAYER_CHOICE",
+          params: {
+            options: [
+              [
+                {
+                  type: "GIVE_DON",
+                  target: {
+                    type: "LEADER_OR_CHARACTER",
+                    controller: "EITHER",
+                    count: { up_to: 1 },
+                  },
+                  params: { amount: 1, don_state: "ACTIVE" },
+                },
+              ],
+              [
+                {
+                  type: "GIVE_DON",
+                  target: {
+                    type: "LEADER_OR_CHARACTER",
+                    controller: "EITHER",
+                    count: { up_to: 1 },
+                  },
+                  params: { amount: 1, don_state: "RESTED" },
+                },
+              ],
+            ],
+            labels: ["Give an active DON!! card", "Give a rested DON!! card"],
           },
-          params: { amount: 1 },
         },
       ],
     },
