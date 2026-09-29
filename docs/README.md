@@ -76,7 +76,7 @@ Each milestone doc covers scope, implementation plan, roadmap, architecture spec
 - [PRD](./project/PRD.md) — product requirements document (source of truth)
 - [Comprehensive Rules](./rules/rule_comprehensive.md) — official OPTCG rules v1.2.0
 - [Rule Index](./rules/RULE-INDEX.md) — concept-to-rule lookup table (start here, then read specific rules)
-- [Card Set Data](./cards/) — effect text for 55 card sets (OP-01–OP-17, ST-01–ST-32, EB-01–EB-04, PRB-01–PRB-02) plus `UNKNOWN.md` (alongside `EFFECT-FACET-TAXONOMY.md`)
+- [Card Set Data](./cards/) — effect text for 55 card sets (OP-01–OP-17, ST-01–ST-32, EB-01–EB-04, PRB-01–PRB-02) plus `UNKNOWN.md` (alongside `EFFECT-FACET-TAXONOMY.md`); ST-31 and ST-32 contain preview cards only ("the rest of this set is not yet imported"; full import is OPT-831)
 
 ## Research
 

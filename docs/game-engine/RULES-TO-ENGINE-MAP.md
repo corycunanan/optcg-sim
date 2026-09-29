@@ -516,8 +516,10 @@ modules (OP01–OP17, ST01–ST32, EB01–EB04, PRB01–PRB02, P; see
 `pnpm schema:check` only proves those schemas are lint-clean, in sync with the
 generated registry, and covered by their authored-schema tests. It does not close
 a card-specific fidelity defect, and a passing gate must not be read as "no open
-defect". Known exceptions stay tracked as issues and as `it.fails` ratchets in
-`workers/game/src/__tests__/`.
+defect". Known exceptions are tracked as issues; where an `it.fails` ratchet exists
+in `workers/game/src/__tests__/` it is named next to the row, but not every open
+gap has one (no test under `workers/game/src/__tests__/` references OPT-802 or
+OPT-803, and ST-31/ST-32 incompleteness has no ratchet).
 
 Fidelity backlog status derived from merged commits on `main` (`git log --grep`).
 Merged means a commit with that ID is on `main`; anything without one is
@@ -540,8 +542,14 @@ Known residuals and follow-ups for the merged rows (commit messages and
 - OPT-814: PRB02-006 rest-source follow-up OPT-847 (merged, #669), per `OPT-814.md`.
 - OPT-807: successor OPT-845 (merged, #671).
 
-No merged commit on `main` names OPT-802, OPT-803 or OPT-804; treat them as
-open (see OPT-802, OPT-803, OPT-804). Later fidelity tickets (for example
+OPT-804 was a tracking parent (`docs/project/handoffs/runs/2026-09-26-opt798-827-824-828-857.md`:
+"Parent OPT-804 out of scope (tracking only)"); its split-out gaps merged as
+OPT-824 (#683), OPT-825 (#688), OPT-826 (#706), OPT-827 (#682) and OPT-828 (#684),
+so it is an umbrella with merged children rather than an open defect. OPT-803
+was split into OPT-829 (preview schemas, merged #679), OPT-830 (docs coverage,
+merged #735) and OPT-831 (full ST31/ST32 sets, no merged commit, open; see
+`docs/audit/2026-09-09-faq-engine-gap-audit.md`). No merged commit names
+OPT-802; treat it as open (see OPT-802). Later fidelity tickets (for example
 OPT-824–OPT-828, OPT-865, OPT-869, OPT-872, OPT-886, OPT-889, OPT-894, OPT-903)
 carry their own `opt-NNN-*.test.ts` files in `workers/game/src/__tests__/`.
 
