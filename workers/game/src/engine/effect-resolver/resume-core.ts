@@ -374,11 +374,6 @@ export function resumeFromStack(
   if (!topFrame) {
     return { state, events: [], resolved: true };
   }
-  // OPT-876: resume an OPPONENT_ACTION continuation under its effect's
-  // controller (the acting `controller` stays flipped on the frame).
-  if (topFrame.effectController !== undefined) {
-    services = services.withEffectController(topFrame.effectController);
-  }
 
   const { sourceCardInstanceId, controller, phase } = topFrame;
 

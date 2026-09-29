@@ -7,8 +7,9 @@ import { handTrashEvent } from "../../hand-trash.js";
 import type { ActionOf, EffectResult } from "../../effect-types.js";
 import { getActionParams } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent, PendingPromptState, ResumeContext } from "../../../types.js";
-import type { ActionResult, EffectResolverServices } from "../types.js";
+import type { ActionResult } from "../types.js";
 import {
+  effectSourceController,
   getSearchAndPlayPickLimit,
   promptEffectDescription,
   resolveAmount,
@@ -115,8 +116,6 @@ export function executeHandWheel(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  _preselectedTargets?: string[],
-  services?: Pick<EffectResolverServices, "effectController">,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
@@ -157,12 +156,13 @@ export function executeHandWheel(
 
   // Draw cards
   // OPT-876: CANNOT_DRAW blocks only the draw half; the trash half still happens.
-  // The drawer is `controller`; the causing controller is the effect's, which
-  // differs inside an OPPONENT_ACTION wrapper.
+  // The drawer is `controller`; the causing controller is derived from the
+  // effect's source card (pre-trash state), so an OPPONENT_ACTION wrapper's
+  // flipped `controller` never changes whose effect caused the draw.
   const drawBlocked = isDrawProhibitedByEffect(
     nextState,
     controller,
-    services?.effectController ?? controller,
+    effectSourceController(state, _sourceCardInstanceId, controller, resultRefs),
     cardDb,
   );
   const actualDraw = drawBlocked

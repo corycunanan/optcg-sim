@@ -828,9 +828,7 @@ function applyReplacement(
   // target: { type: "SELF" } resolves to her, not the event's original target.
   // The event's card is reachable as REPLACED_CARD (OPT-797); the ref rides
   // in the chain's result refs, which a substitute prompt persists per frame.
-  // OPT-876: the substitute is the replacement effect's own action chain, so
-  // it never inherits an OPPONENT_ACTION wrapper's effect controller.
-  const result = services.withEffectController(undefined).executeActionChain(
+  const result = services.executeActionChain(
     nextState,
     params.replacement_actions,
     effect.sourceCardInstanceId,

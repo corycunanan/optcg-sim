@@ -39,18 +39,6 @@ export interface EffectResolverServices {
   withCommittedEvents(events: PendingEvent[]): EffectResolverServices;
   publishCommittedEvents(state: GameState): GameState;
 
-  /**
-   * OPT-876: the controller of the effect being resolved, set only while an
-   * OPPONENT_ACTION wrapper runs its action with the acting controller
-   * flipped. Handlers that must know whose effect caused an action (CANNOT_DRAW
-   * "using your own effects") read `effectController ?? controller`.
-   * Dropped when a new effect starts (resolveEffect, trigger processing,
-   * replacement substitutes); persisted on the wrapper's continuation frames
-   * as `EffectStackFrame.effectController`.
-   */
-  readonly effectController?: 0 | 1;
-  withEffectController(controller: 0 | 1 | undefined): EffectResolverServices;
-
   executeActionChain(
     state: GameState,
     actions: Action[],

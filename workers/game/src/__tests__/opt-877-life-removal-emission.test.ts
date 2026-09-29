@@ -441,11 +441,10 @@ describe("OPT-877 — authored users against printed watcher text", () => {
     expect(kalgaraDraws(f.state)).toBeGreaterThanOrEqual(1);
   });
 
-  // Known gap OPT-876: CANNOT_DRAW (Kalgara's "Then, you cannot draw cards
-  // using your own effects during this turn") is not enforced, so each of the
-  // three triggers draws. qa_op12: after the first draw the rest draw nothing.
-  // The same happens with the pre-existing TRASH_FROM_LIFE emitter.
-  it.fails("EB01-059 + Kalgara draws exactly 1 across three removals (qa_op12; OPT-876)", () => {
+  // OPT-876 enforces CANNOT_DRAW (Kalgara's "Then, you cannot draw cards
+  // using your own effects during this turn"): qa_op12, after the first draw
+  // the remaining triggers draw nothing. Formerly an it.fails ratchet.
+  it("EB01-059 + Kalgara draws exactly 1 across three removals (qa_op12; OPT-876)", () => {
     const f = playKingdomCome();
     f.orderTriggers();
     f.done();

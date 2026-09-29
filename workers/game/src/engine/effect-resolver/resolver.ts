@@ -256,26 +256,13 @@ if (_missingActionHandlers.length > 0) {
  * call returns, existing frames own any unpublished events across persistence.
  */
 function createResolverServices(
-  publishPrefix: (state: GameState) => GameState = (state) => state,
-  effectController?: 0 | 1
+  publishPrefix: (state: GameState) => GameState = (state) => state
 ): EffectResolverServices {
-  // OPT-876: a new effect (resolveEffect, trigger processing, batch re-entry)
-  // has its own controller, so it never inherits the OPPONENT_ACTION frame.
-  const newEffectServices = (): EffectResolverServices =>
-    effectController === undefined
-      ? services
-      : createResolverServices(publishPrefix);
   const services: EffectResolverServices = {
-    ...(effectController !== undefined ? { effectController } : {}),
     withCommittedEvents: (events) =>
-      createResolverServices(
-        (state) => publishCommittedEvents(publishPrefix(state), events),
-        effectController
+      createResolverServices((state) =>
+        publishCommittedEvents(publishPrefix(state), events)
       ),
-    withEffectController: (controller) =>
-      controller === effectController
-        ? services
-        : createResolverServices(publishPrefix, controller),
     publishCommittedEvents: publishPrefix,
     executeActionChain: (
       state,
@@ -286,8 +273,8 @@ function createResolverServices(
       refs,
       description,
       succeeded
-    ) => {
-      const result = executeActionChain(
+    ) =>
+      executeActionChain(
         state,
         actions,
         source,
@@ -297,19 +284,7 @@ function createResolverServices(
         description,
         succeeded,
         services
-      );
-      return effectController === undefined || !result.pendingPrompt
-        ? result
-        : {
-            ...result,
-            state: stampEffectController(
-              result.state,
-              state.effectStack.length,
-              source,
-              effectController
-            ),
-          };
-    },
+      ),
     executeEffectAction: (
       state,
       action,
@@ -330,16 +305,7 @@ function createResolverServices(
         services
       ),
     resolveEffect: (state, block, source, controller, db, triggering, event) =>
-      resolveEffect(
-        state,
-        block,
-        source,
-        controller,
-        db,
-        triggering,
-        newEffectServices(),
-        event
-      ),
+      resolveEffect(state, block, source, controller, db, triggering, services, event),
     continueSimultaneousGroup: (...args) =>
       continueSimultaneousGroup(...args, services),
     processRemainingTriggers: (state, triggers, cardDb, events, group) =>
@@ -347,41 +313,14 @@ function createResolverServices(
         state,
         triggers,
         cardDb,
-        newEffectServices(),
+        services,
         events,
         group
       ),
     reenterBatchResume: (state, cardDb, events) =>
-      reenterBatchResume(state, cardDb, newEffectServices(), events),
+      reenterBatchResume(state, cardDb, services, events),
   };
   return services;
-}
-
-/**
- * OPT-876: persist the OPPONENT_ACTION wrapper's effect controller on the
- * continuation frames its paused chain pushed (same effect source, above the
- * pre-call stack depth), so a resumed draw still knows whose effect caused it.
- * Frames of other effects pushed meanwhile (different source) are untouched.
- */
-function stampEffectController(
-  state: GameState,
-  depthBefore: number,
-  sourceCardInstanceId: string,
-  effectController: 0 | 1
-): GameState {
-  let changed = false;
-  const effectStack = state.effectStack.map((frame, index) => {
-    if (
-      index < depthBefore ||
-      frame.sourceCardInstanceId !== sourceCardInstanceId ||
-      frame.effectController !== undefined
-    ) {
-      return frame;
-    }
-    changed = true;
-    return { ...frame, effectController };
-  });
-  return changed ? { ...state, effectStack } : state;
 }
 export const resolverExecutionServices = Object.freeze(
   createResolverServices()

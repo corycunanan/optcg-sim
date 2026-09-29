@@ -865,11 +865,15 @@ function findCardOnField(state: GameState, instanceId: string): CardInstance | n
 //     `prohibition.controller` (the player the effect bound it to via
 //     target SELF) equals the drawer.
 //   - The CAUSING controller is the controller of the effect that makes the
-//     player draw. It is the resolver's `controller` except inside an
-//     OPPONENT_ACTION wrapper, which flips the acting `controller` but keeps
-//     the effect's controller in `EffectResolverServices.effectController`
-//     (OP06-047 "your opponent draws 5 cards" is caused by OP06-047's
-//     controller). Callers pass `services.effectController ?? controller`.
+//     player draw, derived statelessly from the effect's source card with
+//     `effectSourceController(state, sourceCardInstanceId, controller, refs)`
+//     (action-utils.ts, shared with the OPT-794/795 removal and hand-trash
+//     causes). An OPPONENT_ACTION wrapper flips the acting `controller` but
+//     not the source card, so OP06-047 "your opponent draws 5 cards" is caused
+//     by OP06-047's controller, and every continuation (batch re-entry,
+//     simultaneous groups, choice/target/optional resumes, trigger queue,
+//     serialized resume) already carries the source id: nothing is threaded.
+//     A new effect resolved mid-chain has its own source, hence its own cause.
 //   - The Draw Phase draw (§6-2-1) and setup draws never consult this helper.
 //
 // Accepted `scope.cause` values (CANNOT_DRAW_CAUSES; any other value is a

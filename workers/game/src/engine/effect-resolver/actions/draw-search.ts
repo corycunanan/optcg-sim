@@ -10,9 +10,10 @@ import type {
   PendingPromptState,
   ResumeContext,
 } from "../../../types.js";
-import type { ActionResult, EffectResolverServices } from "../types.js";
+import type { ActionResult } from "../types.js";
 import { getActionParams } from "../../effect-types.js";
 import {
+  effectSourceController,
   getSearchAndPlayPickLimit,
   promptEffectDescription,
   resolveAmount,
@@ -25,12 +26,10 @@ import { shuffleWithEngineContext } from "../../execution-context.js";
 export function executeDraw(
   state: GameState,
   action: ActionOf<"DRAW">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  _preselectedTargets?: string[],
-  services?: Pick<EffectResolverServices, "effectController">,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const p = getActionParams(action, "DRAW");
@@ -47,9 +46,10 @@ export function executeDraw(
       : controller;
   // OPT-876: CANNOT_DRAW (OP12-099). A prevented draw moves nothing, emits no
   // CARD_DRAWN / DRAW_OUTSIDE_DRAW_PHASE, and is not a failed empty-deck draw.
-  // The causing controller is the effect's controller, which differs from
-  // `controller` inside an OPPONENT_ACTION wrapper (OP06-047).
-  const causingController = services?.effectController ?? controller;
+  // The causing controller is derived from the effect's source card, never the
+  // acting `controller`, which an OPPONENT_ACTION wrapper flips (OP06-047).
+  // Stateless: every resume path already carries the source instance id.
+  const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
   if (isDrawProhibitedByEffect(state, drawer, causingController, cardDb)) {
     return { state, events, succeeded: false };
   }

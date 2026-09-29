@@ -7,6 +7,9 @@
  * CANNOT_DRAW_CAUSES and ignores anything else, so an unsupported value would
  * silently never block. This rule makes that value unauthorable.
  *
+ * Also rejects an APPLY_PROHIBITION CANNOT_DRAW whose target is not the
+ * applying player: the runtime binds the prohibition to the applier.
+ *
  * Covers both encodings: APPLY_PROHIBITION params
  * (`prohibition_type: "CANNOT_DRAW"`) and permanent `prohibitions` entries
  * (`type: "CANNOT_DRAW"`).
@@ -22,6 +25,23 @@ function collect(node: unknown, path: string, cardId: string, out: string[]): vo
   if (!node || typeof node !== "object") return;
 
   const record = node as Record<string, unknown>;
+  // APPLY_PROHIBITION binds the prohibition to the applying player
+  // (effects.ts executeApplyProhibition: `controller`), whatever the target
+  // says, and isDrawProhibitedByEffect reads only that binding. A target other
+  // than the applying player would silently prohibit the wrong drawer.
+  if (record.type === "APPLY_PROHIBITION") {
+    const params = record.params as Record<string, unknown> | undefined;
+    const target = record.target as Record<string, unknown> | undefined;
+    if (
+      params?.prohibition_type === "CANNOT_DRAW" &&
+      target !== undefined &&
+      !(target.type === "PLAYER" && target.controller === "SELF")
+    ) {
+      out.push(
+        `${cardId} ${path}: CANNOT_DRAW binds the applying player; target must be omitted or { type: "PLAYER", controller: "SELF" } (got ${JSON.stringify(target)})`,
+      );
+    }
+  }
   if (record.prohibition_type === "CANNOT_DRAW" || record.type === "CANNOT_DRAW") {
     const scope = record.scope as Record<string, unknown> | undefined;
     const cause = scope?.cause;

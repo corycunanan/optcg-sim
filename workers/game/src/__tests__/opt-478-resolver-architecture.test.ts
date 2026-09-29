@@ -24,7 +24,6 @@ describe("OPT-478 resolver architecture contract", () => {
     expect(Object.isFrozen(resolverExecutionServices)).toBe(true);
     expect(resolverExecutionServices).toEqual({
       withCommittedEvents: expect.any(Function),
-      withEffectController: expect.any(Function),
       publishCommittedEvents: expect.any(Function),
       executeActionChain: expect.any(Function),
       executeEffectAction: expect.any(Function),

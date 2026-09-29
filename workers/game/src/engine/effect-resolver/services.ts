@@ -9,6 +9,6 @@ import type { EffectResolverServices } from "./types.js";
  */
 export type ReplacementExecutionServices = Pick<
   EffectResolverServices,
-  "executeActionChain" | "withEffectController"
+  "executeActionChain"
 >;
 export type { EffectResolverServices } from "./types.js";

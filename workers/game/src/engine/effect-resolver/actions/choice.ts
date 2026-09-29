@@ -246,19 +246,14 @@ export function executeOpponentAction(
   if (!wrappedAction) return { state, events, succeeded: false };
 
   const oppController = controller === 0 ? 1 : 0;
-  // OPT-876: the wrapped action is performed by the opponent but is still
-  // caused by this effect, whose controller is `controller` (or an outer
-  // wrapper's effect controller). CANNOT_DRAW "using your own effects" reads it.
-  const result = services
-    .withEffectController(services.effectController ?? controller)
-    .executeActionChain(
-      state,
-      [wrappedAction],
-      sourceCardInstanceId,
-      oppController,
-      cardDb,
-      resultRefs,
-    );
+  const result = services.executeActionChain(
+    state,
+    [wrappedAction],
+    sourceCardInstanceId,
+    oppController,
+    cardDb,
+    resultRefs,
+  );
 
   return {
     state: result.state,
