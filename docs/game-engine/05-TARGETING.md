@@ -76,7 +76,9 @@ type TargetType =
   | "SELECTED_CARDS"
   | "OPPONENT_LIFE"
   | "TRIGGERING_CARD"
-  | "TRIGGERING_CARD_IN_TRASH";
+  | "TRIGGERING_CARD_IN_TRASH"
+  | "BATTLE_TARGET"
+  | "REPLACED_CARD";
 ```
 
 ### Quick Reference
@@ -104,6 +106,23 @@ type TargetType =
 | `DON_IN_DON_DECK` | No | DON!! in the DON!! deck (not yet in play). |
 | `PLAYER` | -- | A player (for actions like "opponent trashes from hand"). |
 | `SELECTED_CARDS` | -- | Cards chosen from a prior search/reveal step. Uses `target_ref`. |
+| `TRIGGERING_CARD` | Yes | The card that caused the resolving trigger. Seeded reference. |
+| `TRIGGERING_CARD_IN_TRASH` | No | The triggering card, only while its instance is in the trash. |
+| `BATTLE_TARGET` | Yes | The card on the other side of the battle from this effect's source. Seeded reference; see below. |
+| `REPLACED_CARD` | Yes | The card(s) whose event a replacement is replacing. Seeded reference; see below. |
+
+### Context-seeded targets
+
+`BATTLE_TARGET` and `REPLACED_CARD` (OPT-797) never prompt and take no controller or count. They resolve from a reference the engine seeds into the resolving effect, the same way `TRIGGERING_CARD` does.
+
+| Target type | Seeded by | Resolves to | Valid only in (schema lint) |
+|---|---|---|---|
+| `BATTLE_TARGET` | `resolveEffect`, from the triggering `END_OF_BATTLE` / `COMBAT_VICTORY` / `CHARACTER_BATTLES` event | The final target when the source attacked; the attacker when the source was attacked. Nothing when the source was in neither seat. Resolves only while that card is still on the field. A card that left is a new card (Rule 3-1-6), so a combatant K.O.'d in the battle resolves to nothing. `target.filter`, if present, is applied. | `actions` of an `auto` block whose every trigger branch is one of those events |
+| `REPLACED_CARD` | `applyReplacement`, for every path (single check, batch scan, optional-prompt resume, batch resume) | The card(s) the replacement is replacing the event for, while still on the field. A batch replacement covering several cards acts on each of them. | `replacement_actions` of a `replacement` block |
+
+Both references ride in the effect's result refs, so they persist in the effect-stack frame across a prompt and a save/load. Inside a replacement, `SELF` is still the replacement's own source. "You may trash this Character instead" (OP13-008) uses `SELF`; "you may add it to your Life instead" (OP11-101) uses `REPLACED_CARD`.
+
+The rule lives in `workers/game/src/engine/schema-context-target-lint.ts`, which `lint-schemas.sh` runs.
 
 ### SELF vs YOUR_LEADER
 
@@ -144,7 +163,7 @@ controller modes. An omitted controller retains the resolver's existing default.
 | `CHARACTER_CARD`, `STAGE_CARD`, `EVENT_CARD`, `CARD_IN_HAND`, `CARD_IN_TRASH`, `CARD_ON_TOP_OF_DECK`, `CARD_IN_DECK`, `DON_IN_COST_AREA`, `PLAYER` | `SELF`, `OPPONENT` |
 | `SELF`, `YOUR_LEADER`, `ALL_YOUR_CHARACTERS`, `ALL_OPPONENT_CHARACTERS`, `TRIGGERING_CARD_IN_TRASH` | `SELF` (redundant on fixed-scope types, tolerated for authored-schema compatibility) |
 | `OPPONENT_LEADER`, `OPPONENT_LIFE` | `OPPONENT` (redundant on fixed-scope types) |
-| `DON_ATTACHED`, `DON_IN_DON_DECK`, `SELECTED_CARDS`, `TRIGGERING_CARD` | none; scope is fixed by the target type |
+| `DON_ATTACHED`, `DON_IN_DON_DECK`, `SELECTED_CARDS`, `TRIGGERING_CARD`, `BATTLE_TARGET`, `REPLACED_CARD` | none; scope is fixed by the target type |
 
 For `STAGE`, `EITHER` returns candidates belonging to both players. For
 `LIFE_CARD`, each selected player contributes only their top Life card;

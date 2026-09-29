@@ -546,24 +546,31 @@ Example — ST05-010 Zephyr:
 
 ### END_OF_BATTLE
 
-Fires at the conclusion of a battle in which this Character participated. Provides access to the battle context for targeting "the opponent's Character you battled with."
+Fires at End of the Battle (§7-1-5) for every battle, completed or aborted. The payload carries `attackerInstanceId`, the final (post-Blocker) `targetInstanceId`, and `aborted`; `turn.battle` is already cleared when triggers match.
 
 ```typescript
 {
   event: "END_OF_BATTLE",
   filter?: {
     battle_target_type?: CardType,
-    target_filter?: TargetFilter   // cost, power constraints on the battled opponent
+    target_filter?: TargetFilter   // evaluated against the opposing card
   }
 }
 ```
+
+With `battle_target_type` ("…this Character battles your opponent's Character/Leader", OPT-797):
+
+- the host must have fought in the battle, as attacker or as the final target (a Blocker that redirected the attack is the battled card);
+- the battle must have completed (`aborted: false`); a combatant that left before the Damage Step never "battles" (qa_st-01-st-04.md, ST02-010);
+- the opposing card must be of that type — a combatant that is not a Leader was a Character even if it was K.O.'d in the battle;
+- `target_filter` is checked against the opposing card as it is at End of the Battle. A card K.O.'d in the battle has left the field (Rule 3-1-6) and fails it.
 
 | Text Pattern | Example Cards |
 |-------------|---------------|
 | "At the end of a battle in which this Character battles your opponent's Character" | ST08-013 Mr.2.Bon.Kurei |
 | "At the end of a battle in which this Character battles your opponent's Character with a cost of 5 or less" | OP04-047 Ice Oni |
 
-The engine must track battle participants so that actions referencing "the opponent's Character you battled with" can resolve. This is handled via `target_ref` on the trigger, which the action chain can reference.
+"The opponent's Character you battled with" is the `BATTLE_TARGET` target type (see [05-TARGETING](./05-TARGETING.md#context-seeded-targets)).
 
 Example — OP04-047 Ice Oni:
 
@@ -573,9 +580,13 @@ Example — OP04-047 Ice Oni:
     "event": "END_OF_BATTLE",
     "filter": {
       "battle_target_type": "CHARACTER",
-      "target_filter": { "cost_max": 5, "controller": "OPPONENT" }
-    }
-  }
+      "target_filter": { "cost_max": 5 }
+    },
+    "turn_restriction": "YOUR_TURN"
+  },
+  "actions": [
+    { "type": "RETURN_TO_DECK", "target": { "type": "BATTLE_TARGET" }, "params": { "position": "BOTTOM" } }
+  ]
 }
 ```
 
