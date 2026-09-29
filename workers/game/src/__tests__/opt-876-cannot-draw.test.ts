@@ -479,7 +479,7 @@ describe("OPT-876 — CANNOT_DRAW scope.cause values", () => {
 // not. Every prompt is answered after a serialized round trip, so each resume
 // re-derives the cause from persisted data alone.
 
-function pipelineHarness(cause: string, actions: Action[]) {
+function pipelineHarness(cause: string, actions: Action[], costs?: unknown[]) {
   const f = withInjectedProhibition(0, cause);
   const s = f.state;
   s.turn.activePlayerIndex = 1;
@@ -492,7 +492,7 @@ function pipelineHarness(cause: string, actions: Action[]) {
     ...CARDS.VANILLA, id: srcId, name: srcId, effectText: "",
     effectSchema: {
       card_id: srcId, card_name: srcId, card_type: "Character",
-      effects: [{ id: "src", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions }],
+      effects: [{ id: "src", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, ...(costs ? { costs } : {}), actions }],
     } as never,
   });
   const src: CardInstance = {
@@ -712,5 +712,64 @@ describe("OPT-876 — OPPONENT_ACTION draw cause survives every continuation pat
     expect(prompts).toBeGreaterThan(0);
     expect(h.f.state.players[1].trash.map((c) => c.cardId)).toEqual(expect.arrayContaining(["OPT876-p1-q-0", "OPT876-p1-q-1"]));
     expect(h.hand0()).toHaveLength(2);
+  });
+});
+
+describe("OPT-876 — the cause survives the source leaving its zone (TRASH_SELF cost mints a new instance id)", () => {
+  // Zone moves allocate a new instance id, so after a "trash this Character"
+  // cost the source id no longer resolves by lookup. The resolver's guarded
+  // source snapshot (EFFECT_SOURCE_SNAPSHOT_REF) still names player 1, on
+  // every continuation below, each resumed after a serialized round trip.
+  const TRASH_SELF = [{ type: "TRASH_SELF" }];
+  const answer = (h: ReturnType<typeof pipelineHarness>) => {
+    for (let i = 0; i < 6 && h.prompt(); i++) {
+      const options = h.prompt()!.options;
+      if (options.promptType === "OPTIONAL_EFFECT") h.step({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      else if (options.promptType === "SELECT_TARGET") h.step({ type: "SELECT_TARGET", selectedInstanceIds: [options.validTargets![0]] });
+      else h.step({ type: "PLAYER_CHOICE", choiceId: firstChoiceId(options) });
+    }
+    h.settled();
+  };
+  const sourceTrashed = (h: ReturnType<typeof pipelineHarness>) =>
+    expect(h.f.state.players[1].trash.map((c) => c.cardId)).toContain("OPT876-SRC");
+
+  it("batch re-entry after an On K.O. pause: 1 opponent-caused card, the own On K.O. draw blocked", () => {
+    const h = pipelineHarness("BY_YOUR_EFFECT", [wrap(chooseOnly([
+      { type: "KO", target: { type: "CHARACTER", controller: "SELF", count: { all: true } } } as Action,
+      SELF_DRAW,
+    ]))], TRASH_SELF);
+    h.putOnKo("p0-onko", 0, [OPTIONAL_SELF_DRAW]);
+    h.activate();
+    answer(h);
+    sourceTrashed(h);
+    expect(h.hand0()).toHaveLength(1);
+  });
+
+  it("simultaneous target group: the opponent-caused draw draws", () => {
+    const h = pipelineHarness("BY_YOUR_EFFECT", [wrap(chooseOnly([
+      { type: "MODIFY_COST", target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } }, params: { amount: -1 }, duration: { type: "THIS_TURN" } } as Action,
+      { type: "MODIFY_POWER", target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } }, params: { amount: -1000 }, duration: { type: "THIS_TURN" }, chain: "AND" } as Action,
+      SELF_DRAW,
+    ]))], TRASH_SELF);
+    for (const i of [1, 2]) {
+      h.f.state.players[1].characters[i] = {
+        instanceId: `p1-other-${i}`, cardId: CARDS.VANILLA.id, controller: 1, owner: 1,
+        zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: 0,
+      };
+    }
+    h.activate();
+    answer(h);
+    sourceTrashed(h);
+    expect(h.hand0()).toHaveLength(1);
+  });
+
+  it("optional response: the opponent-caused draw draws under BY_YOUR_EFFECT and is blocked under BY_OPPONENT_EFFECT", () => {
+    for (const [cause, drawn] of [["BY_YOUR_EFFECT", 2], ["BY_OPPONENT_EFFECT", 0]] as const) {
+      const h = pipelineHarness(cause, [{ ...wrap({ type: "DRAW", params: { amount: 2 } } as Action), optional: true } as Action], TRASH_SELF);
+      h.activate();
+      answer(h);
+      sourceTrashed(h);
+      expect(h.hand0(), cause).toHaveLength(drawn);
+    }
   });
 });
