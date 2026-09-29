@@ -441,7 +441,7 @@ function walk(actions: Action[] | undefined, visit: (a: Action) => void) {
 }
 
 describe("OPT-826 attacker-binding schema contract", () => {
-  it("only ST21-003, OP12-016 and OP12-077 carry an attacker binding among authored Blocker prohibitions", () => {
+  it("only ST01-016, ST21-003, OP12-016 and OP12-077 carry an attacker binding among authored Blocker prohibitions", () => {
     const uses: string[] = [];
     const bound: string[] = [];
     for (const [cardId, schema] of Object.entries(getAllAuthoredSchemas())) {
@@ -458,7 +458,7 @@ describe("OPT-826 attacker-binding schema contract", () => {
         }
       }
     }
-    expect(bound.sort()).toEqual(["OP12-016", "OP12-077", "ST21-003"]);
+    expect(bound.sort()).toEqual(["OP12-016", "OP12-077", "ST01-016", "ST21-003"]);
     // Inventory size at this change; a new Blocker prohibition should be
     // classified (bound vs blanket) deliberately.
     expect(uses).toHaveLength(20);
@@ -472,8 +472,8 @@ describe("OPT-826 attacker-binding schema contract", () => {
   });
   const bindingOf = (errors: string[]) => errors.filter((e) => e.includes("when_attacking") || e.includes("scope.controller"));
 
-  it("accepts the three authored shapes", () => {
-    for (const id of ["ST21-003", "OP12-016", "OP12-077"]) {
+  it("accepts the four authored shapes", () => {
+    for (const id of ["ST01-016", "ST21-003", "OP12-016", "OP12-077"]) {
       expect(validateEffectSchema(getEffectSchema(id), id)).toEqual([]);
     }
   });

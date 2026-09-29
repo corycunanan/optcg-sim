@@ -844,6 +844,7 @@ exports[`OPT-775 target instructions > snapshots every authored action target an
     "Give −1 cost to up to 1 of your opponent's Characters.",
     "Give −1 cost to your opponent's Characters.",
     "Give −10 cost to up to 1 of your opponent's Characters.",
+    "Give −1000 power to the card being replaced.",
     "Give −1000 power to up to 1 of your opponent's Characters.",
     "Give −1000 power to up to 1 of your opponent's Leaders or Characters.",
     "Give −1000 power to your opponent's Leaders or Characters.",
