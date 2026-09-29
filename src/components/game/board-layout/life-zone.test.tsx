@@ -2,6 +2,7 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { lifeDamageImpact } from "@/lib/motion";
+import type { LifeCard } from "@shared/game-types";
 import { LifeZone } from "./life-zone";
 
 const motionState = vi.hoisted(() => ({ reduced: false }));
@@ -26,6 +27,7 @@ vi.mock("./pile-receipt", () => ({
 let renderer: ReactTestRenderer | null = null;
 
 function renderLifeZone(props: {
+  life?: LifeCard[];
   triggerPulse?: boolean;
   damagePulseNonce?: number;
   scryPulseNonce?: number;
@@ -85,6 +87,34 @@ describe("LifeZone battle feedback", () => {
       }),
     );
     expect(onInspect).toHaveBeenCalledTimes(2);
+  });
+
+  // OPT-901: the server redacts the viewer's own face-down Life to
+  // zone-local placeholders; the zone still shows its size, card backs, and
+  // face-up Life.
+  it("renders a redacted own Life payload by count, backs, and face-up cards", () => {
+    const root = renderLifeZone({
+      life: [
+        { instanceId: "hidden-0-life-0", cardId: "hidden", face: "DOWN" },
+        { instanceId: "faceup-life", cardId: "OP01-001", face: "UP" },
+        { instanceId: "hidden-0-life-2", cardId: "hidden", face: "DOWN" },
+      ],
+    });
+
+    expect(
+      root.findByProps({ role: "group", "aria-label": "Your life area, 3 cards" }),
+    ).toBeDefined();
+    const cards = root.findAllByProps({ variant: "life" });
+    expect(
+      cards.map((card) => ({
+        cardId: card.props.data.cardId,
+        faceDown: card.props.faceDown,
+      })),
+    ).toEqual([
+      { cardId: undefined, faceDown: true },
+      { cardId: "OP01-001", faceDown: false },
+      { cardId: undefined, faceDown: true },
+    ]);
   });
 
   // The zone box is `CARD_SIZES.field` and the top life card fills it exactly,

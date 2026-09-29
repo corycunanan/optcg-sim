@@ -27,6 +27,7 @@ import {
 } from "../engine/effect-resolver/actions/life.js";
 import type { ActionOf } from "../engine/effect-types.js";
 import { filterStateForPlayer, removeTopLifeCard } from "../engine/state.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
 import { filterPromptForPlayer } from "../engine/visibility.js";
 import type { SessionFilteredState } from "../session/filtered-state.js";
 import type { SessionTransport } from "../session/transport.js";
@@ -557,5 +558,162 @@ describe("OPT-901 GameSession frames", () => {
     );
     expect(sockets["player-1"].sent).toEqual([]);
     expect(sockets.spectator.sent).toEqual([]);
+  });
+});
+
+// ─── Authored look-at-Life through the real session boundary ─────────────────
+
+const PUDDING_ID = "ST07-008";
+const PUDDING_INSTANCE = "opt901-pudding";
+
+function createPuddingSession() {
+  const created = createSession();
+  const { session } = created;
+  const schema = getEffectSchema(PUDDING_ID);
+  if (!schema) throw new Error("ST07-008 schema must be registered");
+  session.cardDb.set(PUDDING_ID, {
+    ...CARDS.VANILLA,
+    id: PUDDING_ID,
+    name: schema.card_name ?? PUDDING_ID,
+    cost: 1,
+    effectSchema: schema,
+  });
+  const players = [...session.gameState.players] as [PlayerState, PlayerState];
+  players[0] = {
+    ...players[0],
+    hand: [
+      ...players[0].hand,
+      {
+        instanceId: PUDDING_INSTANCE,
+        cardId: PUDDING_ID,
+        zone: "HAND",
+        state: "ACTIVE",
+        attachedDon: [],
+        turnPlayed: null,
+        controller: 0,
+        owner: 0,
+      },
+    ],
+  };
+  session.gameState = { ...session.gameState, players };
+  return created;
+}
+
+describe("OPT-901 authored look-at-Life (ST07-008 Charlotte Pudding)", () => {
+  // ST07-008 [On Play]: "Look at up to 1 card from the top of your or your
+  // opponent's Life cards, and place it at the top or bottom of the Life
+  // cards." The look discloses that one card to its player (§3-10-3); the
+  // rest of the stack, and the looked-at card once placed back face-down,
+  // stay secret in every zone snapshot.
+  it("discloses the looked-at card only through its player's prompt and private event", async () => {
+    const { session, sockets } = createPuddingSession();
+
+    await act(session, sockets["player-0"], {
+      type: "PLAY_CARD",
+      cardInstanceId: PUDDING_INSTANCE,
+    });
+    const choose = session.gameState.pendingPrompt;
+    expect(choose?.options.promptType).toBe("SELECT_TARGET");
+    await act(session, sockets["player-0"], {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: [secretInstanceId(0, 0)],
+      promptId: choose?.promptId,
+    });
+    const arrange = session.gameState.pendingPrompt;
+    expect(arrange?.options.promptType).toBe("ARRANGE_TOP_CARDS");
+    await act(session, sockets["player-0"], {
+      type: "ARRANGE_TOP_CARDS",
+      keptCardInstanceId: "",
+      orderedInstanceIds: [secretInstanceId(0, 0)],
+      destination: "bottom",
+      promptId: arrange?.promptId,
+    });
+
+    // Authoritative result: the looked-at card went to the bottom, face-down.
+    expect(session.gameState.pendingPrompt).toBeNull();
+    expect(session.gameState.players[0].life).toEqual([
+      { instanceId: faceUpInstanceId(0), cardId: faceUpCardId(0), face: "UP" },
+      { instanceId: secretInstanceId(0, 2), cardId: secretCardId(0, 2), face: "DOWN" },
+      { instanceId: secretInstanceId(0, 0), cardId: secretCardId(0, 0), face: "DOWN" },
+    ]);
+    for (const socket of Object.values(sockets)) {
+      expect(frames(socket).some((frame) => frame.type === "action:rejected")).toBe(false);
+    }
+
+    const ownFrames = frames(sockets["player-0"]);
+    const promptFrames = ownFrames.flatMap((frame) =>
+      frame.type === "game:prompt" ? [frame] : [],
+    );
+    // The blind choice shows no identity; the look discloses exactly the
+    // chosen card to its player.
+    expect(promptFrames.map((frame) => frame.options.promptType)).toEqual([
+      "SELECT_TARGET",
+      "ARRANGE_TOP_CARDS",
+    ]);
+    const [blind, look] = promptFrames;
+    if (blind?.options.promptType !== "SELECT_TARGET") throw new Error("blind");
+    expect(blind.options.cards.map((card) => card.cardId)).toEqual(["hidden", "hidden"]);
+    if (look?.options.promptType !== "ARRANGE_TOP_CARDS") throw new Error("look");
+    expect(look.options.cards.map((card) => card.cardId)).toEqual([secretCardId(0, 0)]);
+
+    // Every own state frame redacts the owner's face-down Life, before and
+    // after the look.
+    const ownStates = stateFrames(sockets["player-0"]);
+    expect(ownStates.length).toBeGreaterThan(0);
+    for (const view of ownStates) {
+      for (const card of view.players[0].life) {
+        if (card.face === "DOWN") expect(card.cardId).toBe("hidden");
+      }
+    }
+    expect(ownStates[ownStates.length - 1]!.players[0].life).toEqual([
+      { instanceId: faceUpInstanceId(0), cardId: faceUpCardId(0), face: "UP" },
+      { instanceId: "hidden-0-life-1", cardId: "hidden", face: "DOWN" },
+      { instanceId: "hidden-0-life-2", cardId: "hidden", face: "DOWN" },
+    ]);
+    // Outside the ARRANGE prompt (as a frame or as the responder's
+    // pendingPrompt) and the owner-only LIFE_SCRIED event, the owner never
+    // receives a face-down Life identity.
+    const ownWithoutLook = ownFrames.map((frame) => {
+      if (frame.type === "game:prompt") {
+        return frame.options.promptType === "ARRANGE_TOP_CARDS" ? null : frame;
+      }
+      if (frame.type !== "game:state" && frame.type !== "game:update") return frame;
+      const view = frame.state as GameState;
+      return {
+        ...view,
+        pendingPrompt:
+          view.pendingPrompt?.options.promptType === "ARRANGE_TOP_CARDS"
+            ? null
+            : view.pendingPrompt,
+        eventLog: view.eventLog.filter((event) => event.type !== "LIFE_SCRIED"),
+      };
+    });
+    const ownSerialized = JSON.stringify(ownWithoutLook);
+    for (const player of PLAYERS) {
+      for (const index of [0, 2]) {
+        expect(ownSerialized).not.toContain(secretCardId(player, index));
+      }
+    }
+
+    // The opponent and spectators learn nothing about either face-down stack.
+    expectNoFaceDownSecrets(sockets["player-1"].sent);
+    expectNoFaceDownSecrets(sockets.spectator.sent);
+    expect(stateFrames(sockets["player-1"]).length).toBeGreaterThan(0);
+  });
+});
+
+describe("OPT-901 connect snapshots", () => {
+  it("redacts face-down Life in reconnect snapshots for both players and spectators", () => {
+    const { session } = createSession();
+
+    for (const recipient of [0, 1, null] as const) {
+      const snapshot = session.filteredState.buildStateSnapshot(recipient);
+      expect(snapshot.type).toBe("game:state");
+      const view = snapshot.state as GameState;
+      for (const owner of PLAYERS) {
+        expect(view.players[owner].life).toEqual(expectedProjectedLife(owner));
+      }
+      expectNoFaceDownSecrets(snapshot);
+    }
   });
 });
