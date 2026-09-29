@@ -1196,6 +1196,7 @@ export function executeActionChain(
         validTargets: ctx.validTargets,
         returnToDeckArrangement: ctx.returnToDeckArrangement,
         fieldToLifeTargetIds: ctx.fieldToLifeTargetIds,
+        giveDonIdentity: ctx.giveDonIdentity,
         costs: [],
         currentCostIndex: 0,
         costsPaid: true, // costs already paid before action chain

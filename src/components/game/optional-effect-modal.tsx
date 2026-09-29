@@ -14,6 +14,7 @@ interface OptionalEffectModalProps {
   effectDescription: string;
   card?: CardInstance;
   sourceCard?: PromptSourceCard;
+  actionLabel?: string;
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -25,6 +26,7 @@ export function OptionalEffectModal({
   effectDescription,
   card,
   sourceCard,
+  actionLabel,
   cardDb,
   isHidden,
   onHide,
@@ -34,6 +36,7 @@ export function OptionalEffectModal({
     <EffectPromptDialog
       effectDescription={effectDescription}
       sourceCard={sourceCard ?? card}
+      actionLabel={actionLabel}
       cardDb={cardDb}
       isHidden={isHidden}
       onHide={onHide}

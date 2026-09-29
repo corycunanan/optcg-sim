@@ -2,8 +2,9 @@
  * Tests for secret zone filtering (§8-4-5).
  *
  * Ensures filterStateForPlayer() strips opponent's hand/deck card identities
- * and face-down life cards, while leaving the player's own zones and all
- * public zones intact.
+ * and face-down life cards, while leaving the player's own hand/deck and all
+ * public zones intact. Own face-down Life is covered by
+ * opt-901-own-life-redaction.test.ts.
  */
 
 import { describe, it, expect } from "vitest";

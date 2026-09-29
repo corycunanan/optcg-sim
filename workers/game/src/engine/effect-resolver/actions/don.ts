@@ -107,10 +107,11 @@ export function executeGiveDon(
 }
 
 /**
- * OPT-868: marker kept in a GIVE_DON identity prompt's frame validTargets. It
- * binds the recipient already chosen — and the side (owner) whose cost area
- * supplies the DON!! — across the resumed DON!! choice and session restore.
- * The client only ever sees the DON!! ids.
+ * OPT-868 legacy form: a GIVE_DON identity frame persisted before OPT-861
+ * bound the recipient and owner as this marker in validTargets. New prompts
+ * carry `ResumeContext.giveDonIdentity` instead (a distinct continuation
+ * marker, so the step is never mistaken for a re-prompt of the recipient
+ * choice); the parser keeps already-saved sessions resumable.
  */
 export const GIVE_DON_IDENTITY_PREFIX = "give-don-identity:";
 
@@ -157,7 +158,8 @@ function buildGiveDonIdentityPrompt(
     pausedAction: action,
     remainingActions: [], // filled in by executeActionChain / the resume frame
     resultRefs: [...resultRefs.entries()],
-    validTargets: [`${GIVE_DON_IDENTITY_PREFIX}${owner}:${recipient}`, ...donIds],
+    validTargets: donIds,
+    giveDonIdentity: { owner, recipient },
   };
   const pendingPrompt: PendingPromptState = {
     options: {

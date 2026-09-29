@@ -594,8 +594,10 @@ describe("OPT-868 post-colon DON!! identity step — guards and scope", () => {
   it("rejects the marker, the recipient, an active DON!!, two DON!! and strangers, including after restore", () => {
     const { f, held, free, oppLeader } = payThenAimAtOpponentLeader("OP15-017");
     f.persist();
-    const marker = f.state.effectStack.at(-1)!.validTargets.find((id) => id.startsWith("give-don-identity:"));
-    expect(marker).toBe(`give-don-identity:1:${oppLeader}`);
+    // OPT-861: the binding lives in its own continuation field; a forged
+    // legacy marker string is still never a valid reply.
+    expect(f.state.effectStack.at(-1)!.giveDonIdentity).toEqual({ owner: 1, recipient: oppLeader });
+    const marker = `give-don-identity:1:${oppLeader}`;
     expect(selectPrompt(f).validTargets).not.toContain(marker);
     const pending = structuredClone(f.state);
     const active = costDon(f, P1, "ACTIVE")[0].instanceId;

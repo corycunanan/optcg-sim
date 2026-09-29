@@ -10,6 +10,7 @@ interface PlayerChoiceModalProps {
   effectDescription: string;
   sourceEffectDescription?: string;
   sourceCard?: PromptSourceCard;
+  actionLabel?: string;
   choices: { id: string; label: string; disabled?: boolean }[];
   donReturn?: {
     count: number;
@@ -36,6 +37,7 @@ export function PlayerChoiceModal({
   effectDescription,
   sourceEffectDescription,
   sourceCard,
+  actionLabel,
   choices,
   donReturn,
   confirmOrSkip = false,
@@ -124,6 +126,7 @@ export function PlayerChoiceModal({
       <EffectPromptDialog
         effectDescription={effectDescription}
         sourceCard={sourceCard}
+        actionLabel={actionLabel}
         cardDb={cardDb}
         isHidden={isHidden}
         onHide={onHide}
@@ -187,6 +190,7 @@ export function PlayerChoiceModal({
     <EffectPromptDialog
       effectDescription={effectDescription}
       sourceCard={sourceCard}
+      actionLabel={actionLabel}
       cardDb={cardDb}
       isHidden={isHidden}
       onHide={onHide}

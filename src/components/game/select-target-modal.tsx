@@ -116,6 +116,7 @@ interface SelectTargetModalProps {
   effectDescription: string;
   instruction?: string;
   sourceCard?: PromptSourceCard;
+  actionLabel?: string;
   countMin: number;
   countMax: number;
   aggregateConstraint?: {
@@ -140,6 +141,7 @@ export function SelectTargetModal({
   effectDescription,
   instruction,
   sourceCard,
+  actionLabel,
   countMin,
   countMax,
   aggregateConstraint,
@@ -199,6 +201,7 @@ export function SelectTargetModal({
     <EffectPromptDialog
       effectDescription={effectDescription}
       sourceCard={sourceCard}
+      actionLabel={actionLabel}
       cardDb={cardDb}
       isHidden={isHidden}
       onHide={onHide}

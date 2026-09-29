@@ -14,6 +14,7 @@ interface RevealTriggerModalProps {
   cards: CardInstance[];
   effectDescription: string;
   sourceCard?: PromptSourceCard;
+  actionLabel?: string;
   cardDb: CardDb;
   isHidden: boolean;
   onHide: () => void;
@@ -28,6 +29,7 @@ export function RevealTriggerModal({
   cards,
   effectDescription,
   sourceCard,
+  actionLabel,
   cardDb,
   isHidden,
   onHide,
@@ -38,6 +40,7 @@ export function RevealTriggerModal({
     <EffectPromptDialog
       effectDescription={effectDescription}
       sourceCard={sourceCard ?? firstCard}
+      actionLabel={actionLabel}
       cardDb={cardDb}
       isHidden={isHidden}
       onHide={onHide}
