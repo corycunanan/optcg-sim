@@ -50,7 +50,7 @@ function fixture(owner: P) {
   ) {
     const card: CardInstance = {
       cardId: id,
-      instanceId: `opt898-${controller}-${serial++}`,
+      instanceId: `opt899-${controller}-${serial++}`,
       owner: controller,
       controller,
       zone,
@@ -208,7 +208,7 @@ function play(f: Fixture, event: CardInstance, pay: boolean) {
 
 describe("OPT-899 OP13-057 binds the Blocker lock to the Leader attacker", () => {
   it("authors the Leader binding with an opponent scope and no target", () => {
-    const action = getEffectSchema("OP13-057")!.effects[0].actions[0] as { params: { scope: unknown }; target?: unknown };
+    const action = getEffectSchema("OP13-057")!.effects[0]!.actions![0] as unknown as { params: { scope: unknown }; target?: unknown };
     expect(action.params.scope).toEqual({ controller: "OPPONENT", when_attacking: { type: "YOUR_LEADER" } });
     expect(action.target).toBeUndefined();
   });
