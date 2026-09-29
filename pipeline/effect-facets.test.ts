@@ -135,6 +135,34 @@ describe("extractCardFacets", () => {
     });
   });
 
+  it("qualifies a REPLACED_CARD substitute by the protected card's controller (OPT-797)", () => {
+    const { tags } = extractCardFacets(schemaFor("OP11-101"));
+    expect(tags).toContain("life:add:self");
+    expect(tags).not.toContain("life:add");
+
+    const opponentProxy: EffectSchema = {
+      card_id: "TEST-797",
+      card_name: "t",
+      card_type: "Character",
+      effects: [
+        {
+          id: "r",
+          category: "replacement",
+          replaces: { event: "WOULD_BE_KO", target_filter: { controller: "OPPONENT" } },
+          replacement_actions: [
+            {
+              type: "PLAYER_CHOICE",
+              params: {
+                options: [[{ type: "ADD_TO_LIFE_FROM_FIELD", target: { type: "REPLACED_CARD" } }]],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(extractCardFacets(opponentProxy).tags).toContain("life:add:opponent");
+  });
+
   it("classifies power-to-zero as a stat change rather than removal", () => {
     const { tags } = extractCardFacets(schemaFor("EB04-010"));
 

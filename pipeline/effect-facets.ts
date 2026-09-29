@@ -493,6 +493,36 @@ function visitTraitReferences(
   }
 }
 
+/**
+ * OPT-797: REPLACED_CARD is the card the replacement protects, so it belongs
+ * to whoever `replaces.target_filter.controller` names (OP11-101 "add it to
+ * the top of your Life" stays `life:add:self`).
+ */
+function qualifyReplacedCard(action: Action, block: EffectBlock): Action {
+  const controller = block.replaces?.target_filter?.controller;
+  if (controller !== "SELF" && controller !== "OPPONENT") return action;
+  const qualified =
+    action.target?.type === "REPLACED_CARD"
+      ? ({ ...action, target: { ...action.target, controller } } as Action)
+      : action;
+  if (
+    (qualified.type === "PLAYER_CHOICE" ||
+      qualified.type === "OPPONENT_CHOICE") &&
+    qualified.params?.options
+  ) {
+    return {
+      ...qualified,
+      params: {
+        ...qualified.params,
+        options: qualified.params.options.map((option) =>
+          option.map((nested) => qualifyReplacedCard(nested, block))
+        ),
+      },
+    } as Action;
+  }
+  return qualified;
+}
+
 function visitBlock(
   block: EffectBlock,
   tags: Set<EffectFacetTag>,
@@ -519,7 +549,7 @@ function visitBlock(
   for (const cost of block.costs ?? []) visitCost(cost, tags);
   for (const action of block.actions ?? []) visitAction(action, tags);
   for (const action of block.replacement_actions ?? [])
-    visitAction(action, tags);
+    visitAction(qualifyReplacedCard(action, block), tags);
   for (const modifier of block.modifiers ?? []) {
     visitStatChange(modifier, tags);
     visitGrantedKeyword(modifier, tags);
