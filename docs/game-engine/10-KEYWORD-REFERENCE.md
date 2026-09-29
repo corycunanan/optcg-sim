@@ -283,7 +283,7 @@ If the described behavior differs from the keyword in any mechanical dimension �
 | Card Text | Why Not a Keyword | Correct Encoding |
 |-----------|-------------------|------------------|
 | "Your opponent cannot activate [Blocker] during this battle" (ST01-012) | Conditional on "during this battle," scoped to attacker | `APPLY_PROHIBITION` with `prohibition_type: "CANNOT_ACTIVATE_BLOCKER"`, `duration: THIS_BATTLE` |
-| "If the selected card attacks during this turn, your opponent cannot activate [Blocker]" (OP07-057) | Deferred conditional — only activates when the target attacks | Deferred `APPLY_PROHIBITION` bound to target's attack event |
+| "If the selected card attacks during this turn, your opponent cannot activate [Blocker]" (OP07-057) | Deferred conditional — only activates when the selected card attacks | `APPLY_PROHIBITION` `CANNOT_ACTIVATE_BLOCKER` with `scope.when_attacking: { type: "SELECTED_CARDS", ref }` (attacker binding, [06 §7.9](./06-PROHIBITIONS-AND-REPLACEMENTS.md)) |
 | "This Character can also attack your opponent's active Characters" (OP01-021) | Not Rush — enables active-targeting, not play-turn attacks | `GRANT_KEYWORD` with `keyword: "CAN_ATTACK_ACTIVE"` |
 
 ### Rule 3: Negation of a Keyword = Prohibition
