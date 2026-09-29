@@ -255,7 +255,7 @@ export const ST09_014_NARIKABURA_ARROW: EffectSchema = {
   effects: [
     {
       id: "counter_power_reduction",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "LIFE_COUNT",

@@ -309,7 +309,7 @@ export const ST02_015_SCALPEL: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_don",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {
@@ -350,7 +350,7 @@ export const ST02_016_REPEL: EffectSchema = {
   effects: [
     {
       id: "counter_power_and_don",
-      category: "activate",
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       actions: [
         {

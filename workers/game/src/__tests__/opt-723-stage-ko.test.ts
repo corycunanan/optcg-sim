@@ -394,7 +394,8 @@ describe("OPT-723 Stage K.O.", () => {
       flags: { optional: true },
     });
     expect(schema.effects[1]).toMatchObject({
-      category: "activate",
+      // OPT-894: executeUseCounterEvent only runs `auto` COUNTER_EVENT blocks.
+      category: "auto",
       trigger: { keyword: "COUNTER_EVENT" },
       conditions: {
         type: "CARD_ON_FIELD",
