@@ -164,6 +164,29 @@ describe("hydrateToGameState", () => {
     expect(state.players[0].playerId).toBe("p0");
     expect(state.players[1].playerId).toBe("p1");
   });
+
+  it("keeps the fixed idCounter for human-readable scenario ids (OPT-891)", () => {
+    expect(hydrateToGameState(fixtureState()).executionContext.idCounter).toBe(0);
+  });
+
+  it("raises idCounter past allocator-format scenario ids so PLAY_CARD cannot reuse one (OPT-891)", () => {
+    const partial = fixtureState();
+    partial.players[0].hand[0] = { ...partial.players[0].hand[0], instanceId: "card_00000001" };
+    partial.players[0].leader = { ...partial.players[0].leader, instanceId: "card_00000002" };
+    const state = hydrateToGameState(partial);
+    expect(state.executionContext.idCounter).toBe(2);
+
+    const result = runPipeline(
+      state,
+      { type: "PLAY_CARD", cardInstanceId: "card_00000001" },
+      fixtureCardDb(),
+      0,
+    );
+    expect(result.valid).toBe(true);
+    const played = result.state.players[0].characters.find((c) => c !== null);
+    expect(played?.instanceId).toBe("card_00000003");
+    expect(result.state.players[0].leader.instanceId).toBe("card_00000002");
+  });
 });
 
 describe("engine-driven dispatch", () => {
