@@ -198,10 +198,10 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     expect(after.state.players[1].hand.some((c) => c.instanceId === bot.instanceId)).toBe(false);
   });
 
-  it("source K.O. during the Trigger window aborts the 2nd damage", () => {
+  it("source K.O. during the Trigger window still deals the 2nd damage (qa_rules.md:152-154, OPT-886)", () => {
     // Simulate the 1st-damage Trigger K.O.'ing the DA attacker by removing it
     // from the field between the REVEAL_TRIGGER pause and its resume. The
-    // continuation must detect the attacker is gone and not deal damage #2.
+    // damage is fixed at 2, so damage #2 is still dealt.
     const cardDb = createTestCardDb();
     const top: LifeCard = { instanceId: "life-top-trig-ko", cardId: CARDS.TRIGGER.id, face: "DOWN" };
     const bot: LifeCard = { instanceId: "life-bot-v-ko", cardId: CARDS.VANILLA.id, face: "DOWN" };
@@ -225,9 +225,12 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     const after = runPipeline(yanked, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
     expect(after.valid).toBe(true);
     expect(after.state.turn.battleSubPhase).toBeNull();
-    // 1st Life still went to hand (decline), but the 2nd Life MUST remain.
-    expect(after.state.players[1].life.length).toBe(1);
-    expect(after.state.players[1].life[0].instanceId).toBe(bot.instanceId);
+    // 1st Life went to hand (decline) and the 2nd damage took the 2nd Life.
+    expect(after.state.players[1].life.length).toBe(0);
+    expect(after.state.players[1].hand.map((c) => c.cardId)).toEqual(
+      expect.arrayContaining([top.cardId, bot.cardId]),
+    );
+    expect(after.state.status).toBe("IN_PROGRESS");
   });
 
   it("regression (OP03-108 / qa_rules.md:154): DA damage count is locked at Damage Step entry", () => {
@@ -347,11 +350,10 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     expect(final.players[1].trash.some((c) => c.instanceId === bot.instanceId)).toBe(false);
   });
 
-  it("DA with 1 Life + 1st Life is [Trigger]: after decline, 2nd damage hits 0-Life and defeats the defender", () => {
-    // Classic lethal check: DA into exactly 1 Life where that 1 Life is a
-    // [Trigger]. Pre-OPT-239 this silently ended the battle on `endBattle`
-    // during REVEAL_TRIGGER, so defeat never fired. Post-OPT-239, the 2nd
-    // damage sees life.length === 0 and triggers the defeat condition.
+  it("DA with 1 Life + 1st Life is [Trigger]: after decline, 2nd damage finds 0 Life and does not defeat (OPT-886)", () => {
+    // DA into exactly 1 Life where that 1 Life is a [Trigger]. The 2nd damage
+    // is still dealt after the Trigger window, but it repeats only the
+    // Life-to-hand step (7-1-4-1-1-3), so it cannot win (qa_rules.md:156-158).
     const cardDb = createTestCardDb();
     const top: LifeCard = { instanceId: "life-lethal-trig", cardId: CARDS.TRIGGER.id, face: "DOWN" };
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, null);
@@ -365,8 +367,10 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
 
     const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
     expect(after.valid).toBe(true);
-    expect(after.state.status).toBe("FINISHED");
-    expect(after.state.winner).toBe(0);
+    expect(after.state.players[1].life.length).toBe(0);
+    expect(after.state.turn.battle).toBeNull();
+    expect(after.state.status).toBe("IN_PROGRESS");
+    expect(after.gameOver).toBeFalsy();
   });
 
   it("single-damage attacker (no DA): Trigger decline still resolves and battle ends (no 2nd damage)", () => {

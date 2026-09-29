@@ -201,12 +201,30 @@ describe("OPT-441 — prompted Life Trigger preserves damage continuation", () =
     expect(final.state.turn.battle).toBeNull();
   });
 
-  it("runs lethal rule processing when the resumed second damage hits zero Life", () => {
+  it("the resumed second damage at zero Life deals no defeat (qa_rules.md:156-158, OPT-886)", () => {
     const { state, cardDb, attackerId } = setup(1);
     const revealed = reachOptionalTriggerPrompt(state, attackerId, cardDb);
     const final = finishPromptAndDamage(revealed.state, cardDb, { type: "PASS" });
 
-    expect(final.gameOver).toEqual({ winner: 0, reason: "Player 2's life reached 0" });
+    expect(final.gameOver).toBeFalsy();
+    expect(final.state.status).toBe("IN_PROGRESS");
+    expect(final.state.players[1].life).toHaveLength(0);
+    expect(final.state.turn.battle).toBeNull();
+    expect(final.state.turn.pendingBattleDamageContinuation).toBeNull();
+  });
+
+  it("still runs rule processing on the resumed path (the accepted Trigger draws the last card)", () => {
+    const { state, cardDb, attackerId } = setup(1);
+    const players = [...state.players] as [PlayerState, PlayerState];
+    players[1] = { ...players[1], deck: players[1].deck.slice(0, 1) };
+    const revealed = reachOptionalTriggerPrompt({ ...state, players }, attackerId, cardDb);
+    const final = finishPromptAndDamage(
+      revealed.state,
+      cardDb,
+      { type: "PLAYER_CHOICE", choiceId: "accept" },
+    );
+
+    expect(final.gameOver).toEqual({ winner: 0, reason: "Player 2 decked out" });
     expect(final.state.status).toBe("FINISHED");
     expect(final.state.winner).toBe(0);
   });
