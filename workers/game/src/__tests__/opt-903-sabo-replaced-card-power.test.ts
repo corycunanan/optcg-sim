@@ -239,6 +239,25 @@ describe("OP05-001 Sabo — effect K.O.", () => {
     expect(f.power(c)).toBe(6000);
   });
 
+  it("the −1000 lasts this turn only: back at base power once the turn number advances", () => {
+    const f = fixture();
+    sabo(f);
+    const c = protectedChar(f, "OPT903-C7", 7000);
+    koWith(f, 1, c);
+    f.accept();
+    expect(f.power(c)).toBe(6000);
+
+    const startTurn = f.state.turn.number;
+    for (let guard = 0; guard < 12 && f.state.turn.number === startTurn; guard++) {
+      expect(f.state.pendingPrompt, "unexpected prompt while advancing").toBeNull();
+      f.act(f.state.turn.activePlayerIndex, { type: "ADVANCE_PHASE" });
+    }
+
+    expect(f.state.turn.number).toBeGreaterThan(startTurn);
+    expect(f.onField(c)).toBe(true);
+    expect(f.power(c)).toBe(7000);
+  });
+
   it("decline: the Character is K.O.'d and keeps no modifier", () => {
     const f = fixture();
     sabo(f);
@@ -407,7 +426,7 @@ describe("OP05-001 Sabo — battle K.O.", () => {
     expect(f.trashIds(0)).toContain("OPT903-C5");
   });
 
-  // Known engine gap (no ticket yet; see the PR Follow-ups): the WOULD_BE_KO
+  // Known engine gap (tracked by OPT-909): the WOULD_BE_KO
   // power_min filter reads getEffectivePower, which excludes the Counter Step
   // bonus stored on BattleContext.counterPowerAdded, so the Character reads
   // 4000 and Sabo is never offered. Fails loudly once the filter uses battle
