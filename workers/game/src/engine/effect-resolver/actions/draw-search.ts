@@ -17,6 +17,7 @@ import {
   promptEffectDescription,
   resolveAmount,
 } from "../action-utils.js";
+import { isDrawProhibitedByEffect } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { shuffleWithEngineContext } from "../../execution-context.js";
@@ -42,6 +43,11 @@ export function executeDraw(
         ? 1
         : 0
       : controller;
+  // OPT-876: CANNOT_DRAW (OP12-099). A prevented draw moves nothing, emits no
+  // CARD_DRAWN / DRAW_OUTSIDE_DRAW_PHASE, and is not a failed empty-deck draw.
+  if (isDrawProhibitedByEffect(state, drawer, controller, cardDb)) {
+    return { state, events, succeeded: false };
+  }
   const player = state.players[drawer];
   const drawCount = Math.min(amount, player.deck.length);
   if (drawCount === 0) return { state, events, succeeded: false };

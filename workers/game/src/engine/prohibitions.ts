@@ -831,3 +831,38 @@ function findCardOnField(state: GameState, instanceId: string): CardInstance | n
   }
   return null;
 }
+
+// ─── Draw Prohibition (OPT-876, CANNOT_DRAW) ─────────────────────────────────
+//
+// Frame (OP12-099 Kalgara: "you cannot draw cards using your own effects
+// during this turn"):
+//   - The prohibited player is the DRAWER: the prohibition applies only when
+//     `prohibition.controller` (the player the effect bound it to via
+//     target SELF) equals the drawer.
+//   - "Your own effects" means the causing effect's controller equals the
+//     drawer. With scope.cause BY_YOUR_EFFECT (the default for this type) an
+//     opponent-caused draw ("your opponent draws 1 card", OP07-090 Morgans)
+//     is NOT blocked. scope.cause ANY/EFFECT blocks every effect draw.
+//   - The Draw Phase draw (§6-2-1) and setup draws never consult this helper.
+//
+// Every effect-caused draw (DRAW, HAND_WHEEL's draw half) must call this
+// before moving cards or emitting CARD_DRAWN / DRAW_OUTSIDE_DRAW_PHASE.
+
+export function isDrawProhibitedByEffect(
+  state: GameState,
+  drawer: 0 | 1,
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): boolean {
+  for (const p of state.prohibitions) {
+    if (p.prohibitionType !== "CANNOT_DRAW") continue;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
+    if (isProhibitionOverridden(p, state, cardDb)) continue;
+    if (p.controller !== drawer) continue;
+    const cause = p.scope?.cause ?? "BY_YOUR_EFFECT";
+    if (cause === "BY_YOUR_EFFECT" && causingController !== drawer) continue;
+    return true;
+  }
+  return false;
+}

@@ -240,6 +240,8 @@ interface CannotPlayCards extends Prohibition {
 
 Prevents the controller from drawing cards via their own effects. Does not prevent the mandatory draw during the Draw Phase.
 
+**Enforcement (OPT-876):** `isDrawProhibitedByEffect(state, drawer, causingController, cardDb)` in `prohibitions.ts`. The prohibited player is the drawer (`prohibition.controller === drawer`); "your own effects" means the causing effect's controller equals the drawer (default `scope.cause: "BY_YOUR_EFFECT"`), so an opponent's "your opponent draws" effect still draws. `executeDraw` and the draw half of `HAND_WHEEL` consult it; a prevented draw moves no cards and emits no `CARD_DRAWN` / `DRAW_OUTSIDE_DRAW_PHASE`. The Draw Phase draw does not consult it. FAQ: with two OP12-099, the second draws nothing after the first.
+
 ```typescript
 interface CannotDraw extends Prohibition {
   type: "CANNOT_DRAW";

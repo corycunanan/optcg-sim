@@ -13,6 +13,7 @@ import {
   promptEffectDescription,
   resolveAmount,
 } from "../action-utils.js";
+import { isDrawProhibitedByEffect } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCards } from "../../zone-transition.js";
 import { shuffleWithEngineContext } from "../../execution-context.js";
@@ -153,7 +154,11 @@ export function executeHandWheel(
   }
 
   // Draw cards
-  const actualDraw = Math.min(drawCount, nextState.players[controller].deck.length);
+  // OPT-876: CANNOT_DRAW blocks only the draw half; the trash half still happens.
+  const drawBlocked = isDrawProhibitedByEffect(nextState, controller, controller, cardDb);
+  const actualDraw = drawBlocked
+    ? 0
+    : Math.min(drawCount, nextState.players[controller].deck.length);
   if (actualDraw > 0) {
     const drawn = nextState.players[controller].deck.slice(0, actualDraw);
     nextState = transitionCards(
