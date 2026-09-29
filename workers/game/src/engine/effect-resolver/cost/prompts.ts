@@ -81,6 +81,7 @@ export function getCostLabel(cost: Cost): string {
     case "REVEAL_FROM_HAND": return `Choose ${amount} card(s) from hand to reveal as cost`;
     case "CHOOSE_ONE_COST": return "Choose a cost to pay";
     case "GIVE_DON": return `Choose 1 card to give ${amount} active DON!! card${amount === 1 ? "" : "s"} to as cost`;
+    case "GIVE_OPPONENT_DON_TO_OPPONENT": return "Choose 1 of your opponent's Characters to give 1 of their rested DON!! cards to as cost";
     default: return "Select card(s) as cost";
   }
 }
@@ -108,7 +109,8 @@ export function getCostCtaLabel(cost: Cost): string {
     case "REST_CARDS":
     case "REST_NAMED_CARD": return "Rest";
     case "REVEAL_FROM_HAND": return "Reveal";
-    case "GIVE_DON": return "Give DON!!";
+    case "GIVE_DON":
+    case "GIVE_OPPONENT_DON_TO_OPPONENT": return "Give DON!!";
     default: return "Confirm";
   }
 }

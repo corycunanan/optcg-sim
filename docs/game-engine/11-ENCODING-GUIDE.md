@@ -179,6 +179,7 @@ An Event's `[Counter]` effect is authored as `category: "auto"` with `trigger: {
 | "place 1 Character with a cost of N or less at the bottom of the owner's deck:" (no "your") | `{ "type": "PLACE_OWN_CHARACTER_TO_DECK", "amount": 1, "filter": { "cost_max": N }, "controller": "EITHER", "position": "BOTTOM" }` |
 | "Place 1 of your opponent's Characters with a cost of N or less at the top or bottom of your opponent's Life cards face-up:" | `{ "type": "ADD_OWN_CHARACTER_TO_LIFE", "controller": "OPPONENT", "amount": 1, "filter": { "cost_max": N }, "position": "TOP_OR_BOTTOM", "face": "UP" }` — a cost, never a first `ADD_TO_LIFE_FROM_FIELD` action; the card goes to its owner's (the opponent's) Life |
 | "You may give N active DON!! card(s) to 1 of your [Name]:" | `{ "type": "GIVE_DON", "amount": N, "target": { "type": "LEADER_OR_CHARACTER", "controller": "SELF", "count": { "exact": 1 }, "filter": { "name": "Name" } } }` — a Leader or Character with that name; never `GIVE_OPPONENT_DON` or a first `GIVE_DON` action |
+| "You may give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters:" | `{ "type": "GIVE_OPPONENT_DON_TO_OPPONENT", "amount": 1, "target": { "type": "CHARACTER", "controller": "OPPONENT", "count": { "exact": 1 } } }` — the opponent's DON!! goes to the opponent's Character; never `GIVE_OPPONENT_DON` (which moves your own DON!!) |
 | "return 1 of your Characters to your hand:" | `{ "type": "RETURN_OWN_CHARACTER_TO_HAND" }` |
 | "rest any number of your DON!!" | `{ "type": "DON_REST", "amount": "ANY_NUMBER" }` |
 
