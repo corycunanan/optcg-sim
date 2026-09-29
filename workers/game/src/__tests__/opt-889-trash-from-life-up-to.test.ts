@@ -199,18 +199,21 @@ describe("OPT-889 opponent-Life trashes are 'up to 1'", () => {
     });
   });
 
-  it("OP10-112 with an empty opponent Life leaves nothing to choose", () => {
+  it("OP10-112 with an empty opponent Life offers only 0 and trashes nothing", () => {
     const f = fixture({ oppLife: 0 });
     f.register("OP10-112");
     f.state.players[0].hand = [inst("h", "OP10-112", 0, "HAND")];
     f.act({ type: "PLAY_CARD", cardInstanceId: "h" });
-    if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT") {
-      f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
-    }
-    if (f.state.pendingPrompt) answerUpTo(f, 0, 0);
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+    // Pins current behavior: CHOOSE_VALUE with max 0 still raises a
+    // single-choice "0" PLAYER_CHOICE. OPT-918 makes it auto-resolve; when
+    // that lands, replace this answer with `expect(pendingPrompt).toBeNull()`.
+    answerUpTo(f, 0, 0);
     expect(f.state.players[1].life).toHaveLength(0);
     expect(f.state.players[1].trash).toHaveLength(0);
     expect(f.state.pendingPrompt).toBeNull();
+    expect(f.state.effectStack).toHaveLength(0);
   });
 
   describe.each(["EB03-057", "OP10-109"])("%s (On K.O.)", (id) => {
@@ -258,10 +261,14 @@ describe("OPT-889 opponent-Life trashes are 'up to 1'", () => {
     const before = structuredClone(f.state.players[1].life);
     const ownLife = f.state.players[0].life.length;
     f.act({ type: "PLAY_CARD", cardInstanceId: "h" });
-    answerUpTo(f, 0, 1);
+    answerUpTo(f, 0, 1); // decline "add up to 1 card ... to the top of your Life"
     expect(f.state.players[0].life).toHaveLength(ownLife);
-    if (f.state.pendingPrompt) answerUpTo(f, 1, 1);
-    expectOppLife(f, before, f.state.players[1].life.length < before.length ? 1 : 0);
+    // "Then, trash up to 1 card" is still offered after the add is declined.
+    answerUpTo(f, 1, 1);
+    // Printed "up to 1" and the player chose 1: exactly one card, the top.
+    expectOppLife(f, before, 1);
+    expect(f.state.players[1].life).toHaveLength(before.length - 1);
+    expect(f.state.players[0].life).toHaveLength(ownLife);
   });
 
   describe.each([0, 1] as const)("OP03-120 (Main event, 4+ Life), choose %i", (choose) => {
@@ -413,10 +420,10 @@ describe("OPT-889 authored shape", () => {
   });
 
   // ST04-001 prints "Trash up to 1 of your opponent's Life cards" (any
-  // position). Choosing among face-down cards needs a hidden-identity target
-  // prompt that does not exist yet; the leader is authored top-only.
-  // Tracked as an OPT-889 follow-up.
-  it.fails("ST04-001 lets the activating player pick a non-top Life card (OPT-889 follow-up)", () => {
+  // position). Choosing among Life cards needs a target prompt over Life that
+  // does not exist yet; the leader is authored top-only. Tracked by OPT-917.
+  // This pins the intended end state and must pass once OPT-917 lands.
+  it.fails("ST04-001 lets the activating player trash a non-top Life card (OPT-917)", () => {
     const f = fixture({ donCount: 8 });
     f.register("ST04-001", { type: "Leader", cost: null });
     f.state.players[0].leader = inst("ldr", "ST04-001", 0, "LEADER");
@@ -424,15 +431,34 @@ describe("OPT-889 authored shape", () => {
       ...c,
       face: i === 2 ? "UP" : "DOWN",
     }));
-    const faceUp = f.state.players[1].life[2];
+    const lifeBefore = structuredClone(f.state.players[1].life);
+    const top = lifeBefore[0];
+    const faceUp = lifeBefore[2];
     f.act({ type: "ACTIVATE_EFFECT", cardInstanceId: "ldr", effectId: "activate_trash_life" });
-    if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT") {
-      f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+    // Drive whatever prompts the effect raises: accept the optional, choose 1
+    // for an up-to count, and pick the face-up card when targets are offered.
+    let picked = false;
+    for (let guard = 0; f.state.pendingPrompt && guard < 5; guard++) {
+      const opts = f.state.pendingPrompt.options;
+      if (opts.promptType === "OPTIONAL_EFFECT") {
+        f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      } else if (opts.promptType === "PLAYER_CHOICE" && opts.choices.some((c) => c.id === "choose-value:1")) {
+        f.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+      } else if (opts.promptType === "SELECT_TARGET") {
+        expect(opts.validTargets).toContain(faceUp.instanceId);
+        f.act({ type: "SELECT_TARGET", selectedInstanceIds: [faceUp.instanceId] });
+        picked = true;
+      } else {
+        throw new Error(`unexpected prompt ${opts.promptType}`);
+      }
     }
-    if (f.state.pendingPrompt) answerUpTo(f, 1, 1);
-    // Expected per printed text: the face-up card is selectable. Today the top is trashed.
-    expect(f.state.players[1].life.some((c) => c.instanceId === faceUp.instanceId)).toBe(true);
-    expect(f.state.players[1].life[0].instanceId).not.toBe(faceUp.instanceId);
-    expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(picked).toBe(true);
+    const opp = f.state.players[1];
+    expect(opp.trash.map((c) => c.instanceId)).toEqual([faceUp.instanceId]);
+    expect(opp.life.map((c) => c.instanceId)).toEqual(
+      lifeBefore.filter((c) => c.instanceId !== faceUp.instanceId).map((c) => c.instanceId),
+    );
+    expect(opp.life[0].instanceId).toBe(top.instanceId);
+    expect(f.state.pendingPrompt).toBeNull();
   });
 });
