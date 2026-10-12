@@ -16,6 +16,7 @@ import {
 import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader, hasEffectiveKeyword } from "./keywords.js";
 import { isCostSequencePayable } from "./effect-resolver/cost-handler.js";
+import { activationProhibitionVeto } from "./prohibitions.js";
 import type { Cost } from "./effect-types.js";
 import { evaluateCondition } from "./conditions.js";
 
@@ -397,6 +398,16 @@ function validateActivateEffect(
   if (!meetsAttachedDonRequirement(found.card, block.trigger)) {
     return "Attached DON!! requirement is not met";
   }
+
+  // OPT-864 (Decision 11, rule 1-3-3): an activation-time prohibition vetoes
+  // the activation before any cost is judged or paid.
+  const prohibited = activationProhibitionVeto(
+    state,
+    { type: "ACTIVATE_EFFECT", cardInstanceId, effectId },
+    cardDb,
+    actingPlayerIndex,
+  );
+  if (prohibited) return prohibited;
 
   const controller = found.playerIndex;
   if (

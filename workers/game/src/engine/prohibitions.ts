@@ -8,13 +8,14 @@
  * Characters with cost 2 or less", "Cannot be K.O.'d by effects"
  */
 
-import type {
-  ConditionalOverride,
-  Condition,
-  RuntimeProhibition,
-  ProhibitionType,
-  Target,
-  TargetFilter,
+import {
+  PROHIBITION_FEASIBILITY_TIMING,
+  type ConditionalOverride,
+  type Condition,
+  type RuntimeProhibition,
+  type ProhibitionType,
+  type Target,
+  type TargetFilter,
 } from "./effect-types.js";
 import type {
   CardData,
@@ -229,6 +230,28 @@ export function checkProhibitions(
   }
 
   return null;
+}
+
+/**
+ * OPT-864 (Decision 11, rule 1-3-3): the activation-time prohibition veto
+ * shared by availability and validation.
+ *
+ * It runs the same evaluation as pipeline step 2 (`checkProhibitions`), but
+ * only over prohibitions classified "ACTIVATION" in
+ * PROHIBITION_FEASIBILITY_TIMING. A resolution-time restriction never vetoes
+ * an offer here.
+ */
+export function activationProhibitionVeto(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): string | null {
+  const gating = state.prohibitions.filter(
+    (p) => PROHIBITION_FEASIBILITY_TIMING[p.prohibitionType] === "ACTIVATION",
+  );
+  if (gating.length === 0) return null;
+  return checkProhibitions({ ...state, prohibitions: gating }, action, cardDb, actingPlayerIndex);
 }
 
 /**

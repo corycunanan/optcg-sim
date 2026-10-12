@@ -1588,6 +1588,73 @@ export type ProhibitionType =
   | "CANNOT_BE_RETURNED_TO_HAND"
   | "CANNOT_BE_RETURNED_TO_DECK";
 
+/**
+ * OPT-864 (Decision 11, rule 1-3-3): when each prohibition gates feasibility.
+ *
+ * - ACTIVATION: the prohibited thing is a player's declaration (play,
+ *   activate, attack, block, counter, give DON!!) or the payment of a cost.
+ *   Availability and validation consult it before offering the action, and
+ *   cost feasibility consults it before offering the cost.
+ * - RESOLUTION: the prohibition restricts what happens while an effect or
+ *   rule process resolves. Rule 1-3-2 then skips only the impossible part, so
+ *   it never vetoes activation (for example, CANNOT_DRAW stops the draw after
+ *   the colon, not the activation).
+ *
+ * `activationProhibitionVeto` (prohibitions.ts) reads this table. Entries
+ * marked "assumed" have no ruling in docs/rules or docs/FAQs.
+ */
+export type ProhibitionFeasibilityTiming = "ACTIVATION" | "RESOLUTION";
+
+export const PROHIBITION_FEASIBILITY_TIMING: Readonly<
+  Record<ProhibitionType, ProhibitionFeasibilityTiming>
+> = {
+  // 6-5-4: activating an effect is the prohibited declaration.
+  CANNOT_ACTIVATE_EFFECT: "ACTIVATION",
+  // 6-5-3: playing a card is the prohibited declaration.
+  CANNOT_PLAY_FROM_HAND: "ACTIVATION",
+  CANNOT_PLAY_CHARACTER: "ACTIVATION",
+  CANNOT_PLAY_EVENT: "ACTIVATION",
+  // 7-1-1: declaring an attack is the prohibited declaration.
+  CANNOT_ATTACK: "ACTIVATION",
+  // 7-1-2: activating [Blocker] is the prohibited declaration.
+  CANNOT_BLOCK: "ACTIVATION",
+  CANNOT_ACTIVATE_BLOCKER: "ACTIVATION",
+  CANNOT_USE_BLOCKER: "ACTIVATION",
+  // 7-1-3-2: activating a Counter is the prohibited declaration.
+  CANNOT_USE_COUNTER: "ACTIVATION",
+  // 6-5-5 (manual give) and the GIVE_DON cost (OPT-869 cost targets).
+  CANNOT_ATTACH_DON: "ACTIVATION",
+  // docs/FAQs/qa_rules.md:268-278: "cannot be rested" Characters cannot
+  // attack, activate rest-cost effects, or activate [Blocker]. Cost
+  // feasibility reads it for REST_SELF / REST_CARDS (OPT-250).
+  CANNOT_BE_RESTED: "ACTIVATION",
+  // 7-1-2 runs the Block Step for the defender; whether an attack can be
+  // blocked is decided there, not when the attack is declared.
+  CANNOT_BE_BLOCKED: "RESOLUTION",
+  // Stops the [On Play] auto effect when it would activate; the play itself
+  // (6-5-3) stays legal. Assumed: no ruling names this prohibition.
+  CANNOT_ACTIVATE_ON_PLAY: "RESOLUTION",
+  // 4-5 + 1-3-2: the draw instruction is skipped; activation is not vetoed.
+  CANNOT_DRAW: "RESOLUTION",
+  // 1-3-2: the Life addition or Life-to-hand move is skipped at resolution.
+  CANNOT_ADD_LIFE: "RESOLUTION",
+  CANNOT_ADD_LIFE_TO_HAND: "RESOLUTION",
+  // 1-3-2: the K.O. / removal / return is skipped at resolution. Assumed for
+  // field-exit costs (KO_OWN_CHARACTER etc.): no ruling found; see the
+  // OPT-961 PR Follow-ups.
+  CANNOT_BE_KO: "RESOLUTION",
+  CANNOT_BE_REMOVED_FROM_FIELD: "RESOLUTION",
+  CANNOT_LEAVE_FIELD: "RESOLUTION",
+  CANNOT_BE_RETURNED_TO_HAND: "RESOLUTION",
+  CANNOT_BE_RETURNED_TO_DECK: "RESOLUTION",
+  // 1-3-2: the effect-play instruction is skipped for that card.
+  CANNOT_BE_PLAYED_BY_EFFECTS: "RESOLUTION",
+  // 6-2-4 Refresh Phase and set-active instructions: the state change is
+  // skipped when it would happen. Assumed: no ruling found.
+  CANNOT_SET_DON_ACTIVE: "RESOLUTION",
+  CANNOT_REFRESH: "RESOLUTION",
+};
+
 export interface ProhibitionScope {
   cause?: KOCause | EventCause;
   controller?: Controller;

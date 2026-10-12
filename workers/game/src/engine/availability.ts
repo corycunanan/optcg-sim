@@ -19,6 +19,7 @@ import {
   areEffectCostsPayable,
   getActivateEffectTimingError,
 } from "./validation.js";
+import { activationProhibitionVeto } from "./prohibitions.js";
 
 const RESOLUTION_CONTEXT_TARGETS = new Set<Target["type"]>([
   "SELECTED_CARDS",
@@ -232,6 +233,20 @@ function availabilityForBlock(
   }
 
   if (!meetsAttachedDonRequirement(card, block.trigger)) {
+    return { effectId: block.id, status: "blocked", reason: "CONDITION" };
+  }
+
+  // OPT-864 (Decision 11, rule 1-3-3): the same activation-time veto that
+  // validation applies, so availability never offers what execution rejects.
+  // The wire type has no prohibition reason; CONDITION is the closest.
+  if (
+    activationProhibitionVeto(
+      state,
+      { type: "ACTIVATE_EFFECT", cardInstanceId: card.instanceId, effectId: block.id },
+      cardDb,
+      controller
+    ) !== null
+  ) {
     return { effectId: block.id, status: "blocked", reason: "CONDITION" };
   }
 
