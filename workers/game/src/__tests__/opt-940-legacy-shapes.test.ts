@@ -60,17 +60,20 @@ const lifecycleServices = {
 };
 
 describe("OPT-940 stage-less PhaseBoundaryContinuation: lossless, legacy semantics preserved", () => {
-  it("loads live and as undo, classified, with the remaining scheduled action intact", async () => {
+  // OPT-980: the v1 → v2 converter gives the stage-less frame the dedicated
+  // legacy stage and changes nothing else (SAVED-STATE-COMPATIBILITY.md §6).
+  it("loads live and as undo, converted to LEGACY_SCHEDULED_ACTIONS, classified, with the remaining scheduled action intact", async () => {
     for (const state of [loadLive("end-phase-parked"), await loadAsUndo("end-phase-parked")]) {
       const phaseFrame = state.effectStack.find((frame) => frame.phaseBoundaryContinuation)!;
       expect(phaseFrame.phaseBoundaryContinuation).toEqual({
         kind: "END_PHASE",
         endingPlayerIndex: 0,
+        stage: "LEGACY_SCHEDULED_ACTIONS",
         remainingScheduledActions: [
           { action: { type: "DRAW", params: { amount: 1 } }, controller: 0, sourceEffectId: "golden-when-attacking-2" },
         ],
       });
-      expect(phaseFrame.phaseBoundaryContinuation).not.toHaveProperty("stage");
+      expect(phaseFrame.phaseBoundaryContinuation).not.toHaveProperty("activatedWaveEffects");
       expect(state.turn.phase).toBe("END");
       expect(classifyLegacyShapes(state)).toEqual([
         { shape: "legacy.stage_less_phase_boundary", frameId: phaseFrame.id },

@@ -2,7 +2,7 @@
 
 > Written before the reader code for OPT-940 (PR 1 of the Game Engine Consolidation, parent OPT-959). This is the contract every later consolidation PR writes through. Code of record: `workers/game/src/session/game-state-schema.ts` (version dispatch and conversion), `workers/game/src/session/persisted-game-state.ts` (strict shape), `workers/game/src/session/persistence.ts` (storage boundary).
 
-**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today.
+**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6) and the writer still writes version 1 (§1.5).
 
 **Related:** [Rev 4 proposal snapshot §7, §10](./audits/consolidation-2026-10/proposal-rev4-snapshot.md) · [Handoff doc](../project/handoffs/game-engine-consolidation.md) · [Doc 08](./08-ENGINE-ARCHITECTURE.md)
 
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | `SESSION_STORAGE_FORMAT_VERSION` (`persistence.ts`, currently `2`) | `session.formatVersion` | How the Durable Object splits one session across storage keys (`session`, `session:card-db`, `session:undo-history`) and which envelope fields exist. Says nothing about the shape of a game state. | Storage layout changes only. |
 | `executionContext.version` (`execution-context.ts`, currently `1`) | `state.executionContext.version` | The RNG, id-allocation, clock and budget algorithm. Replays are byte-equivalent only under the same context version. | RNG or id-allocation algorithm changes only. |
-| **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
+| **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1; the writer's version. PR 4a adds `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2`, the reader's) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
 
 The three are independent. A game-state bump never implies a session-format bump and vice versa.
 
@@ -49,6 +49,14 @@ Writers do not change. Persisted output for every state the current engine can p
 
 PR 2 (OPT-949/OPT-925/OPT-862) writes new values into existing v1 fields only: `engineOutcome.type: "ENGINE_LIMIT"` (the v1 schema parses `engineOutcome` as `z.unknown().nullable().optional()`), new `winReason` strings (a free string), and terminal states whose `turn.battle`/`battleSubPhase` are `null` and whose `pendingTriggerFromEffect`/`pendingBattleDamageContinuation` are absent (all optional or nullable in v1). The `GAME_OVER` payload keeps its strict v1 keys (`winner`, `reason`, `diagnostic`). No new key, frame kind, or field is written, so the version stays 1 and the PR 1 build (`1b3f6a50`) remains the rollback target; the PR body carries the rung-4 proof that the PR 1 reader loads a live state and an undo snapshot holding every new terminal value. Only terminal states change; the writer golden is byte-identical.
 
+### 1.5 Writer policy for PR 4a (OPT-980)
+
+PR 4a reads versions 1 and 2 and writes version 1. `toPersistedGameState` (`game-state-schema.ts`) is the writer side of the hook; `SessionRepository.save` applies it to the live state and to every undo snapshot.
+
+* A state with no End Phase frame is returned unchanged (the same object), so the writer golden stays byte-identical.
+* A frame at `LEGACY_SCHEDULED_ACTIONS` is written stage-less. That is the same meaning in version 1 (§4), so a converted legacy session that the PR 4a engine re-saves, or re-parks, is written with the base writer's bytes and the base build (`6e6347de`) still loads it (PR body, rung 4).
+* A state holding any other stage can exist in a PR 4a process only after it loaded a version 2 save, that is, after a rollback from the PR 4b writer. Version 1 cannot express the stage, so that object is written with `schemaVersion: 2` and reloads with the meaning it was read with. No state the PR 4a engine creates from version 1 input is written as version 2.
+
 ---
 
 ## 2. Frame-kind contract
@@ -70,7 +78,7 @@ The reader in PR 1 understands these kinds. The values are the v1 contract; late
 | `TRIGGER_ORDER` | A prompt asking one player to order 2+ simultaneous triggers. | `phase === "AWAITING_TRIGGER_ORDER_SELECTION"`. | `triggerOrderingGroup.resolvedTriggerIds` ⊆ the group's `orderingId`s (also enforced on every other kind that carries a group, since a chosen trigger's nested prompt frame retains it) |
 | `TRIGGER_DRAIN` | A frame interrupted so queued triggers can resolve before it continues. | `phase === "INTERRUPTED_BY_TRIGGERS"` with no `phaseBoundaryContinuation`. | none beyond strict validation |
 | `BATCH_RESUME` | A multi-target action paused between targets so each target's triggers resolve first (rule 6-2, OPT-172). | `phase === "AWAITING_BATCH_RESUME"`. | `batchResumeMarker` present |
-| `PHASE_BOUNDARY` | End Phase work parked below a scheduled effect's prompt frame. | `phaseBoundaryContinuation` present (takes precedence over `phase`). | `phase === "INTERRUPTED_BY_TRIGGERS"`; no `batchResumeMarker`, no `triggerOrderingGroup`, empty `costs` (as `parkEndPhaseBelowPrompt` builds it); `phaseBoundaryContinuation.kind === "END_PHASE"`; `turn.phase === "END"`; `endingPlayerIndex === turn.activePlayerIndex` |
+| `PHASE_BOUNDARY` | End Phase work parked below every frame its current stage pushed (from PR 4b; in version 1, below a scheduled effect's prompt frame). | `phaseBoundaryContinuation` present (takes precedence over `phase`). | `phase === "INTERRUPTED_BY_TRIGGERS"`; no `batchResumeMarker`, no `triggerOrderingGroup`, empty `costs` (as `parkEndPhaseBelowPrompt` builds it); `phaseBoundaryContinuation.kind === "END_PHASE"`; `turn.phase === "END"`; `endingPlayerIndex === turn.activePlayerIndex`; from PR 4a, the stage rules of §6.2 |
 
 Invariants were chosen by reading every site that builds each frame (`effect-resolver/cost/orchestrator.ts`, `trigger-ordering.ts`, `phases.ts`, `effect-resolver/resume/batch.ts`). An invariant the engine does not guarantee for a frame it writes is not enforced, because a reader that rejects a real save is worse than one that accepts a loose one.
 
@@ -92,7 +100,7 @@ A prompt or frame may point at a frame by id. From PR 1 the reader resolves ever
 | `pendingPrompt.resumeContext` as a string naming a `PHASE_BOUNDARY` frame | Never valid: the phase-boundary frame is always parked **below** its prompt frame. | The referenced frame's kind is `PHASE_BOUNDARY`. |
 | `effectStack[*].id` | Unique within the stack. | Two frames share an id. |
 | `effectStack[i].triggerOrderingGroup.resolvedTriggerIds[*]` | An `orderingId` of a trigger in `triggerOrderingGroup.triggers`. | Any id not in the group. |
-| `effectStack[i].phaseBoundaryContinuation` | `turn.phase === "END"` and `endingPlayerIndex === turn.activePlayerIndex`. | Either disagrees. Evidence that no engine path writes otherwise: the only writer is `parkEndPhaseBelowPrompt` (`phases.ts:259-290`), reached from `runEndPhase` right after `phase` is set to `END` (`phases.ts:162-164`) with `pi = getActivePlayerIndex(state)` taken at `phases.ts:55`; `activePlayerIndex` changes only in `completeTurnHandoff`, which runs after the parked frame is drained. Rung 3 walk plus the full-suite probe in the PR body (0 rejections of pipeline-produced states). |
+| `effectStack[i].phaseBoundaryContinuation` | `turn.phase === "END"` and `endingPlayerIndex === turn.activePlayerIndex`; from PR 4a, a stage whose entries and fields agree with §6.2. | Either disagrees, or a §6.2 stage rule fails (the error names the stage and the entry index). Evidence that no engine path writes otherwise: the only writer is `parkEndPhaseBelowPrompt` (`phases.ts:259-290`), reached from `runEndPhase` right after `phase` is set to `END` (`phases.ts:162-164`) with `pi = getActivePlayerIndex(state)` taken at `phases.ts:55`; `activePlayerIndex` changes only in `completeTurnHandoff`, which runs after the parked frame is drained. Rung 3 walk plus the full-suite probe in the PR body (0 rejections of pipeline-produced states). |
 
 Battle-record coherence is **classified, not rejected**. Review finding A on PR #746 showed (rung 4, `opt-940-synthetic-states.ts` `bothTriggerWindows`) that the engine writes `turn.pendingTriggerFromEffect` and `turn.battle.pendingTriggerLifeCard` together: damage-time auto effects resolve before the coordinator surfaces the battle Trigger, and one of them can deal effect damage that parks a second Trigger. A reader that rejects a real save is worse than one that accepts a loose one, so every check in this family is a logged `session.legacy_shape` and the state loads unchanged:
 
@@ -108,7 +116,7 @@ The error names the reference (`pendingPrompt.resumeContext`, `effectStack[2].tr
 
 ## 3. Support window
 
-**Supported input versions in this build: `{1}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1.
+**Supported input versions in this build: `{1, 2}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980).
 
 Policy, not a date:
 
@@ -121,6 +129,7 @@ History:
 | Date | Change | Supported set |
 |---|---|---|
 | 2026-10-12 (PR 1) | Version 1 defined; assigned to all legacy saves. | `{1}` |
+| 2026-10-12 (PR 4a, OPT-980) | Version 2 reader and v1 → v2 converter; writer still writes 1 (§1.5). | `{1, 2}` |
 
 ---
 
@@ -130,7 +139,7 @@ History:
 
 | Shape | How the reader recognizes it | Disposition in PR 1 | Owner of the next change | Fixture |
 |---|---|---|---|---|
-| **Stage-less `PhaseBoundaryContinuation`** (End Phase parked below a prompt; may hold a currently suspended scheduled action plus a nonempty `remainingScheduledActions`). | Frame with `phaseBoundaryContinuation.kind === "END_PHASE"` and no `stage` field. | **Lossless conversion, legacy semantics preserved.** v1 has no stage. Its meaning is fixed: *end-of-turn expiry has already run, the normal end-turn effect waves never ran, the scheduled-action list is partially drained, hand-off has not happened.* The reader validates `endingPlayerIndex === turn.activePlayerIndex` and `turn.phase === "END"`, then loads it unchanged; `resumePhaseBoundary` continues the remaining scheduled actions and hands off exactly as the base build does. Nothing is replayed, no wave is started, no expiry is invented. | OPT-924 (PR 4, OPT-962) adds `stage`. Its converter must map a stage-less frame to a dedicated legacy stage (name it `LEGACY_SCHEDULED_ACTIONS` or equivalent) that resumes at "continue remaining scheduled actions, then hand off" and never to the first stage of the new End Phase. If OPT-924's new order needs information the v1 frame erased (which wave an action belonged to), the legacy stage keeps the v1 order for that frame only. | `opt-940-legacy-shapes.test.ts` (synthetic, produced by the real engine at base) |
+| **Stage-less `PhaseBoundaryContinuation`** (End Phase parked below a prompt; may hold a currently suspended scheduled action plus a nonempty `remainingScheduledActions`). | A version 1 frame with `phaseBoundaryContinuation.kind === "END_PHASE"` and no `stage` field; after conversion, `stage === "LEGACY_SCHEDULED_ACTIONS"`. | **Lossless conversion, legacy semantics preserved.** v1 has no stage. Its meaning is fixed: *end-of-turn expiry has already run, the normal end-turn effect waves never ran, the scheduled-action list is partially drained, hand-off has not happened.* From PR 4a the v1 → v2 converter gives the frame `stage: "LEGACY_SCHEDULED_ACTIONS"` and changes nothing else (live and every undo snapshot, same hook). The reader validates `endingPlayerIndex === turn.activePlayerIndex`, `turn.phase === "END"`, and the §6.2 legacy rules; `resumePhaseBoundary` continues the remaining scheduled actions and hands off exactly as the base build does (rung 4, PR 4a body). Nothing is replayed, no wave is started, no expiry is invented. Classified `legacy.stage_less_phase_boundary`. | OPT-924 (PR 4b) keeps the legacy stage's resume path as the version 1 resume path. | `opt-940-legacy-shapes.test.ts`, `opt-980-end-phase-stage-reader.test.ts` (synthetic) |
 | **Structural `ResumeContext`** (object with `effectSourceInstanceId`, `remainingActions`, `resultRefs`, `validTargets` on `pendingPrompt.resumeContext`, with an empty effect stack). | `isResumeContext` shape; `hasValidPrompt` already checks its fields. | **Supported as-is.** `resumeEffectChain` still executes it. The reader validates it (actions known, refs well-formed) and classifies it `legacy.structural_resume_context`. | OPT-943 (PR 7, OPT-965) legacy retirement sweep. Retirement requires a captured-session inventory showing none in flight, or a converter to a frame. | `opt-940-legacy-shapes.test.ts` |
 | **Legacy cost-transaction frame** (`isLegacyCostTransactionFrame`: `costTransactionState` absent while `currentCostIndex > 0`, or `accumulatedEvents` nonempty, or any `costResultRefs` count > 0). | Same predicate as `resume/cost.ts`. | **Supported as-is.** Earlier costs were committed to the root before OPT-614 and cannot be reconstructed; abandon publishes retained events instead of rolling back. The reader classifies it `legacy.cost_transaction_frame` and loads it unchanged. | OPT-943 (PR 7). | `opt-940-legacy-shapes.test.ts` |
 | **Orphan or incompatible frame references** (string `resumeContext` naming no frame on the stack or a `PHASE_BOUNDARY` frame; duplicate frame ids; `resolvedTriggerIds` outside the group; explicit `kind` that disagrees with content; a parked End Phase whose `endingPlayerIndex` or `turn.phase` disagrees with the turn). A string naming any existing non-boundary frame is accepted, top or not (§2.4). | §2.4 table. | **Rejected.** The base build accepted any string; this build rejects with the reference name. The game is not loadable and the operator follows the runbook (§5). | None; this is the permanent policy. | `opt-940-reference-integrity.test.ts` |
@@ -194,16 +203,45 @@ A failed load surfaces as `SessionLoadError` from `SessionRepository.load()`. Th
 
 ---
 
-## 6. End Phase stage: compatibility plan written before the stage exists
+## 6. End Phase stage (OPT-962: PR 4a OPT-980 reader, PR 4b OPT-924 writer)
 
-OPT-924 (PR 4) will add `stage` to `PhaseBoundaryContinuation` and bump the schema version to 2. This section is the plan that PR must implement; it is written now so the reader side of that PR is not designed under pressure.
+OPT-924 adds `stage` to `PhaseBoundaryContinuation` and bumps the schema version to 2. The plan below was written before the stage existed (PR 1); §6.1 to §6.4 record the final contract, shipped by PR 4a (reader) before PR 4b (writer).
 
-* **v1 → v2 converter:** a stage-less frame becomes `stage: "LEGACY_SCHEDULED_ACTIONS"` (final name chosen by OPT-924, meaning fixed here). Semantics: expiry done, waves skipped, resume = drain `remainingScheduledActions` then hand off. The converter does not add a wave, does not re-run expiry, does not reorder actions.
+* **v1 → v2 converter:** a stage-less frame becomes `stage: "LEGACY_SCHEDULED_ACTIONS"`. Semantics: expiry done, waves skipped, resume = drain `remainingScheduledActions` then hand off. The converter does not add a wave, does not re-run expiry, does not reorder or tag actions.
 * **Reader for v2 ships in a PR that does not write v2.** That PR is verified live. Only then does the writer PR flip `GAME_STATE_SCHEMA_VERSION` to 2 and start emitting `schemaVersion: 2` and `stage`.
-* **Mixed undo:** a v2 live state with a v1 undo snapshot (and the reverse during rollback within the supported set) loads; `opt-940-reader.test.ts` already covers mixed `[absent, 1]` today and OPT-924 extends it to `[1, 2]`.
+* **Mixed undo:** a v2 live state with a v1 undo snapshot (and the reverse during rollback within the supported set) loads; `opt-980-end-phase-stage-reader.test.ts` covers `[1, 2]` and `[2, 1]`, and `opt-940-reader.test.ts` keeps `[absent, 1]`.
 * **The v1 reader keeps its current meaning for a stage-less frame forever** (§1.1). A later build that drops v1 support follows §3.
 
----
+### 6.1 Persisted fields (version 2)
+
+| Field | Values | Written by PR 4b when |
+|---|---|---|
+| `phaseBoundaryContinuation.stage` | `END_OF_YOUR_TURN_WAVE`, `END_OF_OPPONENT_TURN_WAVE`, `TURN_PLAYER_END_OF_TURN`, `NON_TURN_PLAYER_END_OF_TURN`, `LEGACY_SCHEDULED_ACTIONS` | Always, on every End Phase frame. The four rule stages are where a prompt can park the End Phase: rule 6-6-1-1 (the ending player's [End of Your Turn] wave), 6-6-1-1-2 (the non-turn player's [End of Your Opponent's Turn] wave), 6-6-1-2 step 1 and step 2. `LEGACY_SCHEDULED_ACTIONS` is the converter's stage, and the stage a converted frame keeps if its legacy resume re-parks. 6-6-1-3 and 6-6-1-4 never park, so they have no stage. |
+| `phaseBoundaryContinuation.activatedWaveEffects` | string array of `sourceCardInstanceId:effectBlockId` | On every frame with a rule stage (possibly empty); never on a legacy frame. The [End of Your Turn] / [End of Your Opponent's Turn] effects already activated in this End Phase (6-6-1-1-1: each activates once), so a resumed wave collects only newly fulfilled effects. |
+| `remainingScheduledActions[i].step` | `TURN_PLAYER` (6-6-1-2 step 1), `NON_TURN_PLAYER` (step 2) | On every entry of a frame with a rule stage; never on a legacy entry. The rules have no "scheduled action": a `SCHEDULE_ACTION` with timing `END_OF_THIS_TURN` is "at the end of this turn" processing of its controller, so its step is the controller's seat relative to the ending player. PR 4b collects each step's entries when the step starts. |
+
+Every other part of a version 2 state is the version 1 shape. The frames above a parked End Phase frame are existing kinds; a wave trigger's `triggeringEvent` is `{ type: "TURN_ENDED", playerIndex, payload: {} }`, a version 1 event. The fixtures are `opt-962-v2-states.json`, produced from the PR 4b prototype's real engine (`producedAtCommit` in the file).
+
+### 6.2 Stage rules the reader enforces
+
+Applied after strict validation, with the frame's index and id in the error (`game-state-schema.ts` `endPhaseStageViolation`):
+
+* `LEGACY_SCHEDULED_ACTIONS`: no `activatedWaveEffects`; no entry has `step`.
+* Every rule stage: `activatedWaveEffects` present; every entry has `step`.
+* `END_OF_YOUR_TURN_WAVE`, `END_OF_OPPONENT_TURN_WAVE`: `remainingScheduledActions` is empty (obligations are collected only after both waves).
+* `TURN_PLAYER_END_OF_TURN`: every entry is step `TURN_PLAYER` and its controller is `endingPlayerIndex`.
+* `NON_TURN_PLAYER_END_OF_TURN`: every entry is step `NON_TURN_PLAYER` and its controller is the other player.
+* All stages: `turn.phase === "END"` and `endingPlayerIndex === turn.activePlayerIndex` (§2.4).
+* An unknown stage or step is rejected by the strict schema. A version 1 object (no `schemaVersion` or `1`) that carries `stage`, `activatedWaveEffects` or an entry `step` is rejected by the converter: no version 1 writer wrote it.
+
+### 6.3 Writers
+
+* PR 4a writes version 1 (§1.5).
+* PR 4b writes `schemaVersion: 2` on every live state and undo snapshot, with the §6.1 fields. Rollback target after PR 4b deploys: the PR 4a merge commit, the oldest build that reads version 2.
+
+### 6.4 Rolling back from PR 4b to PR 4a
+
+A PR 4b save loads on PR 4a (rung 4, `opt-980-end-phase-stage-reader.test.ts`). The PR 4a engine is the version 1 engine, so a game parked at a rule stage resumes with version 1 semantics: it drains `remainingScheduledActions` and hands off. For a game parked mid-wave, the rest of that End Phase's waves run after the hand-off from `TURN_ENDED` (the version 1 behavior, including effects the wave already activated), and that turn's expiry runs at the next End Phase instead (every due entry still expires there, because expiry compares turn slots with `>=`). This is a degraded but loadable resume, limited to games paused inside an End Phase at the moment of rollback.
 
 ## 7. Unmet rollout gate: captured sessions
 
