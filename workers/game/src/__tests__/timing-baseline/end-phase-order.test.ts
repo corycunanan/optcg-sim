@@ -268,6 +268,9 @@ function untilEndOfOpponentsTurnPlus1000(b: Built, target: CardInstance): Runtim
   };
 }
 
+/** p1's "during this turn" carrier, distinctly named so observation 2 can see it and only it. */
+const DURING_THIS_TURN_CARD: CardData = { ...CARDS.VANILLA, id: "SYN-DURING-THIS-TURN", name: "SYN-DURING-THIS-TURN" };
+
 describe("F14 Three expiry stages per player (rules 6-6-1-2 line 617, 6-6-1-3 line 622; Decision 9; FAQ qa_op10.md:14-16)", () => {
   // Observation 1 (stage 1 before stage 2): p0's scheduled action reads p1's c1a, whose
   // "until end of your opponent's turn" +1000 must still be live (p1's expiry is stage 2).
@@ -278,10 +281,10 @@ describe("F14 Three expiry stages per player (rules 6-6-1-2 line 617, 6-6-1-3 li
   // a mutant that runs all expiry before any scheduled action fails observation 1 (c1a at 4000).
   // Engine today: all expiry first, so no draw at all. Rules 6-6-1-2 / 6-6-1-3 and Decision 9.
   it.fails("F14 p0 scheduled draw sees p1's until-end modifier; p1 scheduled draw sees p0's modifier gone and p1's during-this-turn modifier live; both before TURN_ENDED:p0 (ratchet OPT-962)", () => {
-    const b = base([]);
+    const b = base([DURING_THIS_TURN_CARD]);
     const c0 = placeChar(b, inst(CARDS.VANILLA.id, 0, "CHARACTER"));
     const c1a = placeChar(b, inst(CARDS.VANILLA.id, 1, "CHARACTER"));
-    const c1b = placeChar(b, inst(CARDS.VANILLA.id, 1, "CHARACTER"));
+    const c1b = placeChar(b, inst(DURING_THIS_TURN_CARD.id, 1, "CHARACTER"));
     fillDecks(b);
     const m0 = thisTurnPlus1000(b, c0); // p0's "until end of turn" (stage 1 expiry)
     const m1a = untilEndOfOpponentsTurnPlus1000(b, c1a); // p1's "until end of your opponent's turn" (stage 2 expiry)
@@ -305,8 +308,9 @@ describe("F14 Three expiry stages per player (rules 6-6-1-2 line 617, 6-6-1-3 li
           all_of: [
             // "self" is p0's c0: its "until end of turn" +1000 must already have expired.
             { type: "SELF_POWER", operator: "<=", value: 4000 },
-            // and a p1 Character at 5000+ must still exist (c1b's "during this turn" +1000).
-            { type: "CARD_ON_FIELD", controller: "SELF", filter: { power_min: 5000 } },
+            // and c1b specifically must still be at 5000+ (its "during this turn" +1000); the name
+            // filter keeps c1a (until-end modifier) and the Leader from satisfying this clause.
+            { type: "CARD_ON_FIELD", controller: "SELF", filter: { name: DURING_THIS_TURN_CARD.name, power_min: 5000 } },
           ],
         },
       },
