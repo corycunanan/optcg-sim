@@ -2,7 +2,7 @@
 
 > Written before the reader code for OPT-940 (PR 1 of the Game Engine Consolidation, parent OPT-959). This is the contract every later consolidation PR writes through. Code of record: `workers/game/src/session/game-state-schema.ts` (version dispatch and conversion), `workers/game/src/session/persisted-game-state.ts` (strict shape), `workers/game/src/session/persistence.ts` (storage boundary).
 
-**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6) and the writer still writes version 1 (§1.5).
+**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6); from PR 4b (OPT-924) the writer writes version 2 (§1.6).
 
 **Related:** [Rev 4 proposal snapshot §7, §10](./audits/consolidation-2026-10/proposal-rev4-snapshot.md) · [Handoff doc](../project/handoffs/game-engine-consolidation.md) · [Doc 08](./08-ENGINE-ARCHITECTURE.md)
 
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | `SESSION_STORAGE_FORMAT_VERSION` (`persistence.ts`, currently `2`) | `session.formatVersion` | How the Durable Object splits one session across storage keys (`session`, `session:card-db`, `session:undo-history`) and which envelope fields exist. Says nothing about the shape of a game state. | Storage layout changes only. |
 | `executionContext.version` (`execution-context.ts`, currently `1`) | `state.executionContext.version` | The RNG, id-allocation, clock and budget algorithm. Replays are byte-equivalent only under the same context version. | RNG or id-allocation algorithm changes only. |
-| **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1; the writer's version. PR 4a adds `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2`, the reader's) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
+| **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1, **`2`** from PR 4b; the writer's version. PR 4a adds `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2`, the reader's) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
 
 The three are independent. A game-state bump never implies a session-format bump and vice versa.
 
@@ -56,6 +56,10 @@ PR 4a reads versions 1 and 2 and writes version 1. `toPersistedGameState` (`game
 * A state with no End Phase frame is returned unchanged (the same object), so the writer golden stays byte-identical.
 * A frame at `LEGACY_SCHEDULED_ACTIONS` is written stage-less. That is the same meaning in version 1 (§4), so a converted legacy session that the PR 4a engine re-saves, or re-parks, is written with the base writer's bytes and the base build (`6e6347de`) still loads it (PR body, rung 4).
 * A state holding any other stage can exist in a PR 4a process only after it loaded a version 2 save, that is, after a rollback from the PR 4b writer. Version 1 cannot express the stage, so that object is written with `schemaVersion: 2` and reloads with the meaning it was read with. No state the PR 4a engine creates from version 1 input is written as version 2.
+
+### 1.6 Writer policy for PR 4b (OPT-924)
+
+PR 4b writes version 2. `toPersistedGameState` puts `schemaVersion: 2` first on the live state and on every undo snapshot and keeps every End Phase frame's stage. A runtime frame without a stage can only be a version 1 frame; it is written with `LEGACY_SCHEDULED_ACTIONS`, its version 1 meaning, because the PR 4a reader rejects a version 2 frame without a stage. The writer golden is `opt-962-writer-golden.synthetic.json`; it equals the frozen version 1 golden plus the version key on every game-state object, except `end-phase-parked`, whose state the new engine builds with a staged frame (`opt-940-writer-golden.test.ts` pins both facts). The version 1 golden stays as base-writer reader input. A drift test (`opt-962-v2-shapes.test.ts`) fails if the engine writes an End Phase shape that the PR 4a reader's fixtures do not cover.
 
 ---
 
@@ -130,6 +134,7 @@ History:
 |---|---|---|
 | 2026-10-12 (PR 1) | Version 1 defined; assigned to all legacy saves. | `{1}` |
 | 2026-10-12 (PR 4a, OPT-980) | Version 2 reader and v1 → v2 converter; writer still writes 1 (§1.5). | `{1, 2}` |
+| 2026-10-12 (PR 4b, OPT-924) | Writer emits version 2 (§1.6). | `{1, 2}` |
 
 ---
 
@@ -237,11 +242,18 @@ Applied after strict validation, with the frame's index and id in the error (`ga
 ### 6.3 Writers
 
 * PR 4a writes version 1 (§1.5).
-* PR 4b writes `schemaVersion: 2` on every live state and undo snapshot, with the §6.1 fields. Rollback target after PR 4b deploys: the PR 4a merge commit, the oldest build that reads version 2.
+* PR 4b writes `schemaVersion: 2` on every live state and undo snapshot, with the §6.1 fields (§1.6). Rollback target after PR 4b deploys: the PR 4a merge commit `9da8ba17c29fb73c767c6a4918952f6a4a84c082`, the oldest build that reads version 2. The base build `6e6347de` and the PR 2 build are no longer rollback targets (§5.1).
 
 ### 6.4 Rolling back from PR 4b to PR 4a
 
-A PR 4b save loads on PR 4a (rung 4, `opt-980-end-phase-stage-reader.test.ts`). The PR 4a engine is the version 1 engine, so a game parked at a rule stage resumes with version 1 semantics: it drains `remainingScheduledActions` and hands off. For a game parked mid-wave, the rest of that End Phase's waves run after the hand-off from `TURN_ENDED` (the version 1 behavior, including effects the wave already activated), and that turn's expiry runs at the next End Phase instead (every due entry still expires there, because expiry compares turn slots with `>=`). This is a degraded but loadable resume, limited to games paused inside an End Phase at the moment of rollback.
+A PR 4b save loads on PR 4a (`9da8ba17`): every stage, live and as an undo snapshot, plus the Refresh Phase prompt and terminal End Phase states (rung 4, PR 4b body, run against a `git archive` of `9da8ba17`). The PR 4a engine is the version 1 engine, so a game parked at a rule stage resumes with version 1 semantics. The PR 4b body records one run per stage of the full five-stage scenario on the `9da8ba17` engine (rung 4). What that run showed:
+
+* Every resumed game reaches the hand-off with no prompt left and an empty stack.
+* [End of Your Opponent's Turn] effects fire again after the hand-off from `TURN_ENDED`, including one that already resolved in wave 2 of the same End Phase.
+* Obligations the PR 4b End Phase had not collected yet stay in `scheduledActions`; obligations already collected into the parked frame run before the hand-off.
+* That turn's expiry does not run before the hand-off: a "during this turn" effect was still present afterwards. Unproven: that it expires at the next End Phase (the version 1 `shouldExpire` compares turn slots with `>=`).
+
+This is a degraded but loadable resume, limited to games paused inside an End Phase at the moment of rollback.
 
 ## 7. Unmet rollout gate: captured sessions
 

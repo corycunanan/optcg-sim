@@ -3,12 +3,12 @@
  * vitest re-registers suites in every importer of a `*.test.ts`, so helpers
  * shared across files live here.
  *
+ * No vitest import: scripts run it under tsx (PR body proofs).
  * Drives the real pipeline (`runPipeline`) for actions and the real prompt
  * lifecycle (`resumePromptLifecycle`) for prompt replies, as the timing
  * baseline README §1 requires.
  */
 
-import { expect } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState, LifeCard } from "../types.js";
 import type { EffectSchema, RuntimeScheduledAction } from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
@@ -93,7 +93,7 @@ export function endPhaseRig(opts: { handSize?: number; deckSize?: number } = {})
     },
     put(id, owner, zone, data = {}, don = 0) {
       const schema = getEffectSchema(id);
-      expect(schema, `${id} authored`).toBeDefined();
+      if (!schema) throw new Error(`${id} is not authored`);
       const cardData: CardData = {
         ...(zone === "LEADER" ? CARDS.LEADER : CARDS.VANILLA),
         id,
@@ -123,11 +123,11 @@ export function endPhaseRig(opts: { handSize?: number; deckSize?: number } = {})
           drainPregame: (s) => s,
           advanceStartOfTurn: (s) => s,
         });
-        expect(r.responseRejected, JSON.stringify({ action, prompt: state.pendingPrompt?.options })).toBe(false);
+        if (r.responseRejected) throw new Error(`reply rejected: ${JSON.stringify({ action, prompt: state.pendingPrompt?.options })}`);
         state = r.state;
       } else {
         const r = runPipeline(state, action, db, player);
-        expect(r.valid, r.error).toBe(true);
+        if (!r.valid) throw new Error(`${action.type} rejected: ${r.error}`);
         state = r.state;
       }
     },

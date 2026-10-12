@@ -231,7 +231,9 @@ describe("OPT-735 phase-boundary prompts", () => {
     ).toMatchObject({
       kind: "END_PHASE",
       endingPlayerIndex: 0,
-      remainingScheduledActions: [{ controller: 0 }],
+      // OPT-924: parked in 6-6-1-2 step 1, the remaining entry tagged with its step.
+      stage: "TURN_PLAYER_END_OF_TURN",
+      remainingScheduledActions: [{ controller: 0, step: "TURN_PLAYER" }],
     });
 
     const firstChoice = resumePromptLifecycle(
