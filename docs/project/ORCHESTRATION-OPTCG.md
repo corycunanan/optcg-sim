@@ -29,6 +29,7 @@ For each changed behavior, cover a normal execution, its closest illegal/negativ
 | Continuous effects and duration | Which printed/effective values apply? When are effects recomputed or expired? What happens when the source leaves, changes controller, or is invalidated? |
 | Damage and battle | When does processing pause for Life/Trigger choices? How do affected keywords, battle-zone changes and defeat checks interact? |
 | Protocol and visibility | Can duplicated, late, wrong-player or superseded prompt responses mutate state? Does disconnect/reconnect preserve the continuation? Can either player's payload reveal hidden card data? |
+| Persisted state shapes | Does a reader for the new shape exist and deploy before any writer? Do live state and every undo snapshot convert through the same hook? What does an orphan reference, an unsupported version, or a stage-less legacy frame produce: lossless conversion, a recorded repair, or a clear rejection? Merging to `main` auto-deploys the game worker, so merge order is rollout order: confirm the reader's deploy before merging its writer. |
 
 Do not assert a universal answer from this question table. Derive each expected outcome from the exact supported rules and card text.
 
@@ -38,6 +39,7 @@ Do not assert a universal answer from this question table. Derive each expected 
 - Session/protocol changes: exercise `GameSession` message/action handling for identity, authorization, ordering and reconnect behavior. A pure resolver test cannot prove the WebSocket boundary.
 - Board/prompt changes: inspect the live app for legal choices, decline/zero-selection states, keyboard/focus, stale prompts, and both players' visible information. For layout changes re-run visual verification after fixes; class-string assertions cannot establish geometry. Apply current branding tokens and scaled-board legibility rules from AGENTS.md and the branding guidelines.
 - Pure schema/data changes: lint/parity checks plus execution of affected semantics. Do not count an action-type allowlist or inventory entry as proof that a particular card works.
+- Saved-state compatibility changes: round-trip sanitized captured sessions (live plus undo) in addition to synthetic fixtures. Implementers and reviewers have no Cloudflare access, so the coordinator pulls and sanitizes the captures before dispatch; a missing capture is recorded as an unmet rollout gate, not skipped.
 
 Use the smallest reproducible state. Show red-before-green for a bug fix and retain the regression. For a decisive guard, temporarily disable it in isolated scratch work and verify the claimed test detects the fault; restore and verify tracked contents afterward. Do not derive expected results with the same helper under test.
 

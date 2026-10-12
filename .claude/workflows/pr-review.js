@@ -1,21 +1,22 @@
 export const meta = {
   name: 'pr-review',
-  description: 'Multi-model lens review: GPT-5.6 Codex lenses + cross-family Claude verification',
+  description: 'Multi-model lens review: GPT-6 Codex lenses + cross-family Claude verification',
   whenToUse: 'Adversarial multi-lens review of a PR (args: {pr: 123}) or the current branch vs main (no args) before merge',
   phases: [
     { title: 'Scope', detail: 'classify diff areas, select lenses' },
-    { title: 'Review', detail: 'GPT-5.6 lens agents over the diff (Codex usage, not Claude); spec-fidelity lens reads the Linear ticket' },
+    { title: 'Review', detail: 'GPT-6 lens agents over the diff (Codex usage, not Claude); spec-fidelity lens reads the Linear ticket' },
     { title: 'Verify', detail: 'cross-family refutation: Claude tries to kill each Codex finding' },
   ],
 }
 
 // ---- Model routing ----------------------------------------------------------
-// Codex (GPT-5.6 family) does the heavy reading/judgment — generous usage plan.
+// Codex (GPT-6 family, catalog 2026-10-12) does the heavy reading/judgment — generous usage plan.
+// Advisory only under docs/project/ORCHESTRATION-CHARTER.md §5; it does not replace the charter's gates.
 // Claude appears only as: haiku shims (relay Codex output), haiku scope pass,
 // and sonnet refuters (cross-family verification, small focused contexts).
-const SOL = 'gpt-5.6-sol'      // frontier tier: deep-judgment lenses
-const LUNA = 'gpt-5.6-luna'    // mid tier: test/boundary lenses
-const TERRA = 'gpt-5.6-terra'  // fast/high-usage tier: mechanical sweeps
+const FRONTIER = 'gpt-6-astra'   // frontier tier: deep-judgment lenses
+const FAST = 'gpt-6-luna'        // fast tier: test/boundary lenses
+const WORKHORSE = 'gpt-6.1-sol'  // workhorse tier: mechanical sweeps, spec fidelity
 
 // args may arrive as a JSON string depending on how the workflow is invoked
 const A = typeof args === 'string' ? (() => { try { return JSON.parse(args) } catch { return {} } })() : (args || {})
@@ -111,7 +112,7 @@ const LENSES = [
   {
     key: 'spec-fidelity',
     when: 'ticket', // runs only when the originating Linear ticket was fetched
-    model: TERRA,
+    model: WORKHORSE,
     effort: 'low',
     sandbox: 'read-only',
     prompt: `You are checking a diff against the ticket that requested it — spec fidelity, not code quality and not bugs. Read the ticket with \`cat ${TICKET_FILE}\` and the diff with \`${DIFF_CMD}\`. Report two kinds of finding only: (a) MISSING — an acceptance criterion, listed file, named behavior, or explicit constraint in the ticket that the diff does not satisfy (severity major; minor if the ticket marks it optional); (b) UNASKED — behavior, files, or API surface the diff adds or changes that the ticket neither requests nor implies (severity minor, major if it touches shared engine handlers, shared UI primitives, or data contracts). Quote the ticket sentence and the diff hunk for every finding. Past failure classes in this repo: a schema encoding that flipped the controller (player/opponent), dropped an "if" gate from the card text, or defaulted a feasibility flag the ticket specified. If the ticket and diff agree, return zero findings.`,
@@ -119,7 +120,7 @@ const LENSES = [
   {
     key: 'adversarial',
     when: 'always',
-    model: SOL,
+    model: FRONTIER,
     effort: 'high',
     sandbox: 'read-only',
     prompt: `You are an adversarial code reviewer. Review the diff produced by \`${DIFF_CMD}\` in this repository (a One Piece TCG simulator; game engine in workers/game, Next.js app in src/). Your goal is to BREAK this change: find real correctness bugs an approving reviewer would miss. Read the surrounding code, not just the diff hunks. Ignore style. Only report findings you can defend with a concrete failure scenario.`,
@@ -127,7 +128,7 @@ const LENSES = [
   {
     key: 'rules-fidelity',
     when: ['engine'],
-    model: SOL,
+    model: FRONTIER,
     effort: 'high',
     sandbox: 'read-only',
     prompt: `You are a One Piece TCG rules judge reviewing an engine change for fidelity to the OFFICIAL game rules — not internal code consistency. Steps: (1) run \`${DIFF_CMD}\` and identify which cards/mechanics the change affects; (2) read the official Comprehensive Rules in docs/rules/ and the exact card text/FAQ rulings in docs/cards/ for every affected card; (3) report every place the implemented behavior diverges from the official text — wrong condition, wrong timing window, missing "you may", wrong target constraint, trigger firing when the printed condition is not met. Quote the exact rule/card text as evidence in each finding's detail. Do not report code-quality issues.`,
@@ -135,7 +136,7 @@ const LENSES = [
   {
     key: 'ordering',
     when: ['engine', 'api'],
-    model: SOL,
+    model: FRONTIER,
     effort: 'high',
     sandbox: 'read-only',
     prompt: `You are reviewing a change to a WebSocket-driven game engine (Cloudflare Durable Object, workers/game/) for sequencing bugs. Run \`${DIFF_CMD}\`, then attack every touched code path with these assumptions: client responses arrive out of order or duplicated; a prompt response arrives after the prompting effect was cancelled or a new prompt superseded it (stale prompt state); a player disconnects and reconnects mid-prompt; two effects queue prompts back-to-back and the client answers the first one late. Known past bug classes in this repo: out-of-order cost-prompt responses (OPT-371), stale SELECT_TARGET modal state. Report only concrete sequences of events that produce wrong state, each as a numbered event sequence in the finding detail.`,
@@ -143,7 +144,7 @@ const LENSES = [
   {
     key: 'blast-radius',
     when: ['engine'],
-    model: TERRA,
+    model: WORKHORSE,
     effort: 'medium',
     sandbox: 'read-only',
     informational: true, // behavior reports, not defect claims — never send to verify
@@ -152,7 +153,7 @@ const LENSES = [
   {
     key: 'test-adequacy',
     when: ['engine', 'api', 'ui', 'pipeline'],
-    model: LUNA,
+    model: FAST,
     effort: 'medium',
     sandbox: 'workspace-write',
     prompt: `You are auditing test adequacy for a diff. Run \`${DIFF_CMD}\`. For each behavior change, answer: would the new/changed tests FAIL if the fix were reverted? Mentally revert each functional hunk and check whether some assertion breaks; where cheap, verify by actually running a targeted test (\`npx vitest run <file>\` in workers/game or repo root). Then list nearby untested inputs: boundary values, the negative case of every new condition, interactions with adjacent effects. For engine changes, also check that at least one test exercises the PRODUCTION entry path (GameSession.handleAction / the engine action pipeline), not only helper functions — helper-only coverage has previously hidden real integration bugs (PR #255). Report each gap as a finding (severity minor unless the change's core behavior is unpinned — then major).`,
@@ -160,7 +161,7 @@ const LENSES = [
   {
     key: 'api-boundary',
     when: ['api'],
-    model: LUNA,
+    model: FAST,
     effort: 'medium',
     sandbox: 'read-only',
     prompt: `You are reviewing trust-boundary handling in a diff touching Next.js API routes (src/app/api/) or WebSocket message handling (workers/game/). Run \`${DIFF_CMD}\`. For every client-supplied value: is it validated against the Zod schemas in src/lib/validators/ (or the worker's message validation) before use? Is authorization checked — session via auth(), lobby/game membership, player-owns-this-card — before acting? Can a crafted payload act on another player's resources or skip a game-legality check the UI would enforce? Report only exploitable or state-corrupting gaps, with the crafted payload described in the detail.`,
@@ -236,7 +237,7 @@ if (docsOnly && !ticket?.found) {
 const selected = LENSES.filter(l => docsOnly
   ? l.when === 'ticket'
   : (l.when === 'always' || (l.when === 'ticket' ? !!ticket?.found : l.when.some(a => areas.includes(a)))))
-log(`Areas: ${areas.join(', ')} → lenses: ${selected.map(l => `${l.key}(${l.model.replace('gpt-5.6-', '')})`).join(', ')}`)
+log(`Areas: ${areas.join(', ')} → lenses: ${selected.map(l => `${l.key}(${l.model.replace(/^gpt-6(\.1)?-/, '')})`).join(', ')}`)
 
 // ---- Phase 2: Review (barrier — dedup needs all findings before verify) -----
 phase('Review')
@@ -290,7 +291,7 @@ const candidates = deduped.filter(f => !LENS_BY_KEY[f.lens]?.informational)
 
 const stage1 = await parallel(candidates.map(f => () =>
   agent(codexShim({
-    model: LENS_BY_KEY[f.lens]?.model === LUNA ? SOL : LUNA, // refute with the model that didn't find it
+    model: LENS_BY_KEY[f.lens]?.model === FAST ? FRONTIER : FAST, // refute with the model that didn't find it
     effort: 'high',
     sandbox: 'read-only',
     schema: VERDICT_SCHEMA,
