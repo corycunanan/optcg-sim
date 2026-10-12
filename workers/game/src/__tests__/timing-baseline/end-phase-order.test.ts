@@ -250,35 +250,143 @@ describe("F13 ST13-002 with Kalgara: an effect newly fulfilled in the End of You
 
 // ─── F14 ─────────────────────────────────────────────────────────────────────
 
-describe("F14 Three expiry stages per player: each player's scheduled end-of-turn action runs before that player's modifier expires (rules 6-6-1-2 line 617, 6-6-1-3 line 622; Decision 9; FAQ qa_op10.md OP10-003)", () => {
-  // Engine: PHASE_CHANGED -> TURN_ENDED:p0 -> TURN_STARTED:p1; neither scheduled draw resolves (modifiers expire first).
-  // Rules 6-6-1-2 (line 617) / 6-6-1-3 (line 622): each player's scheduled action runs before that player's modifier expires.
-  it.fails("F14 p0 scheduled draw, then p1 scheduled draw, both before TURN_ENDED:p0; both THIS_TURN modifiers gone after (ratchet OPT-962)", () => {
+/**
+ * p1's "until end of your opponent's turn" +1000 on `target`: created on p1's
+ * turn, it expires in p0's End Phase (wave END_OF_END_PHASE, rule 6-6-1-2
+ * step 2). Modelling gap (README §3.1): the engine has no distinct "until end
+ * of turn" versus "during this turn" duration; UNTIL_END_OF_OPPONENT_NEXT_END_PHASE
+ * and THIS_TURN stand in for the two rule phrases until OPT-924/OPT-962 tag
+ * each obligation with its stage.
+ */
+function untilEndOfOpponentsTurnPlus1000(b: Built, target: CardInstance): RuntimeActiveEffect {
+  return {
+    ...thisTurnPlus1000(b, target),
+    id: `syn-until-end-${target.instanceId}`,
+    duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
+    expiresAt: { wave: "END_OF_END_PHASE", turn: b.state.turn.number, player: 0 },
+    controller: 1,
+  };
+}
+
+describe("F14 Three expiry stages per player (rules 6-6-1-2 line 617, 6-6-1-3 line 622; Decision 9; FAQ qa_op10.md:14-16)", () => {
+  // Observation 1 (stage 1 before stage 2): p0's scheduled action reads p1's c1a, whose
+  // "until end of your opponent's turn" +1000 must still be live (p1's expiry is stage 2).
+  // Observation 2 (stage 1 expiry before stage 2, and stage 2 before stage 3): p1's scheduled
+  // action reads p0's c0, whose "until end of turn" +1000 must already be GONE, and needs some
+  // p1 Character still at 5000+ (c1b's "during this turn" +1000 expires only at stage 3).
+  // A mutant that runs all expiry after both scheduled actions fails observation 2 (c0 still 5000);
+  // a mutant that runs all expiry before any scheduled action fails observation 1 (c1a at 4000).
+  // Engine today: all expiry first, so no draw at all. Rules 6-6-1-2 / 6-6-1-3 and Decision 9.
+  it.fails("F14 p0 scheduled draw sees p1's until-end modifier; p1 scheduled draw sees p0's modifier gone and p1's during-this-turn modifier live; both before TURN_ENDED:p0 (ratchet OPT-962)", () => {
     const b = base([]);
     const c0 = placeChar(b, inst(CARDS.VANILLA.id, 0, "CHARACTER"));
-    const c1 = placeChar(b, inst(CARDS.VANILLA.id, 1, "CHARACTER"));
+    const c1a = placeChar(b, inst(CARDS.VANILLA.id, 1, "CHARACTER"));
+    const c1b = placeChar(b, inst(CARDS.VANILLA.id, 1, "CHARACTER"));
     fillDecks(b);
-    const m0 = thisTurnPlus1000(b, c0);
-    const m1: RuntimeActiveEffect = { ...thisTurnPlus1000(b, c1), controller: 1 };
-    const sched = (c: CardInstance, controller: 0 | 1): RuntimeScheduledAction => ({
-      id: `syn-scheduled-draw-${controller}`,
+    const m0 = thisTurnPlus1000(b, c0); // p0's "until end of turn" (stage 1 expiry)
+    const m1a = untilEndOfOpponentsTurnPlus1000(b, c1a); // p1's "until end of your opponent's turn" (stage 2 expiry)
+    const m1b: RuntimeActiveEffect = { ...thisTurnPlus1000(b, c1b), id: `syn-during-${c1b.instanceId}`, controller: 1 }; // p1's "during this turn" (stage 3 expiry)
+    const p0Action: RuntimeScheduledAction = {
+      id: "syn-scheduled-draw-0",
       timing: "END_OF_THIS_TURN",
+      // "self" is the scheduled entry's source: p1's c1a. Draw only while its +1000 is live.
       action: { type: "DRAW", params: { amount: 1 }, conditions: POWER_5000 },
       boundToInstanceId: null,
-      sourceEffectId: c.instanceId,
-      controller,
-    });
-    b.state = { ...b.state, activeEffects: [m0, m1], scheduledActions: [sched(c0, 0), sched(c1, 1)] };
+      sourceEffectId: c1a.instanceId,
+      controller: 0,
+    };
+    const p1Action: RuntimeScheduledAction = {
+      id: "syn-scheduled-draw-1",
+      timing: "END_OF_THIS_TURN",
+      action: {
+        type: "DRAW",
+        params: { amount: 1 },
+        conditions: {
+          all_of: [
+            // "self" is p0's c0: its "until end of turn" +1000 must already have expired.
+            { type: "SELF_POWER", operator: "<=", value: 4000 },
+            // and a p1 Character at 5000+ must still exist (c1b's "during this turn" +1000).
+            { type: "CARD_ON_FIELD", controller: "SELF", filter: { power_min: 5000 } },
+          ],
+        },
+      },
+      boundToInstanceId: null,
+      sourceEffectId: c0.instanceId,
+      controller: 1,
+    };
+    b.state = { ...b.state, activeEffects: [m0, m1a, m1b], scheduledActions: [p0Action, p1Action] };
 
     run(b, { type: "ADVANCE_PHASE" });
 
     const log = b.state.eventLog.map((e) => `${e.type}:p${e.playerIndex}`);
     const endedAt = log.indexOf("TURN_ENDED:p0");
     expect(endedAt).toBeGreaterThanOrEqual(0);
-    expect(log).toContain("CARD_DRAWN:p0");
-    expect(log).toContain("CARD_DRAWN:p1");
+    expect(log, "observation 1: p0 draws while p1's until-end modifier is live").toContain("CARD_DRAWN:p0");
+    expect(log, "observation 2: p1 draws after p0's modifier expired and while p1's during-this-turn modifier is live").toContain("CARD_DRAWN:p1");
     expect(log.indexOf("CARD_DRAWN:p0")).toBeLessThan(log.indexOf("CARD_DRAWN:p1"));
     expect(log.indexOf("CARD_DRAWN:p1")).toBeLessThan(endedAt);
-    expect(b.state.activeEffects.some((e) => e.id === m0.id || e.id === m1.id)).toBe(false);
+    expect(b.state.activeEffects.some((e) => [m0.id, m1a.id, m1b.id].includes(e.id))).toBe(false);
+  });
+});
+
+// ─── F13 loop budget ─────────────────────────────────────────────────────────
+
+describe("F13 loop budget: an End of Your Turn wave that re-fulfils itself ends in the engine-limit outcome (rev4 §7, Decision 5; MAX_RESOLUTION_ACTIONS 1000 at engine-limits.ts:9, DEFAULT_ACTION_BUDGET 1000 at execution-context.ts:3, MAX_EFFECT_STACK_DEPTH 100 at engine-limits.ts:8)", () => {
+  const ACE_LEADER = "ST13-002";
+  const LOOPER = "SYN-LIFE-LOOPER"; // when a card is removed from your Life: add 1 from deck to Life face-up, then trash 1 Life card
+
+  function setupLoop(): Built {
+    const b = base([
+      synCard(ACE_LEADER, ST13_002_PORTGAS_D_ACE, { ...CARDS.LEADER, id: ACE_LEADER, effectSchema: ST13_002_PORTGAS_D_ACE }),
+      synCard(LOOPER, schema(LOOPER, "Character", [
+        {
+          id: "looper",
+          category: "auto",
+          trigger: { event: "CARD_REMOVED_FROM_LIFE", filter: { controller: "SELF" } },
+          actions: [
+            { type: "ADD_TO_LIFE_FROM_DECK", params: { amount: 1, face: "UP", position: "TOP" } },
+            { type: "TRASH_FROM_LIFE", params: { amount: 1, position: "TOP" }, chain: "THEN" },
+          ],
+        },
+      ])),
+    ]);
+    const leader: CardInstance = { ...b.state.players[0].leader, cardId: ACE_LEADER };
+    const players = [...b.state.players] as [PlayerState, PlayerState];
+    players[0] = {
+      ...players[0],
+      leader,
+      life: [{ instanceId: "p0-face-up-life", cardId: CARDS.BANISH.id, face: "UP" }],
+      deck: Array.from({ length: 1200 }, () => inst(CARDS.VANILLA.id, 0, "DECK")),
+    };
+    b.state = registerTriggersForCard({ ...b.state, players }, leader, b.cardDb.get(ACE_LEADER)!);
+    placeChar(b, inst(LOOPER, 0, "CHARACTER"));
+    return b;
+  }
+
+  it("F13 loop guard: the wave terminates within the engine budget with a terminal state and no prompt afterwards", () => {
+    const b = setupLoop();
+    const limit = b.state.executionContext.actionBudget.limit;
+
+    run(b, { type: "ADVANCE_PHASE" });
+
+    expect(b.state.status).toBe("FINISHED");
+    expect(b.state.pendingPrompt).toBeNull();
+    expect(b.state.effectStack).toEqual([]);
+    expect(b.state.engineOutcome?.diagnostic.kind).toMatch(/^(ACTION_BUDGET|STACK_DEPTH)$/);
+    expect(b.state.executionContext.actionBudget.consumed).toBeLessThanOrEqual(limit + 1);
+    expect(b.state.eventLog.filter((e) => e.type === "GAME_OVER")).toHaveLength(1);
+  });
+
+  // Engine: the loop ends as engineOutcome.type "INFINITE_LOOP_DRAW" with the draw reason, which is the
+  // rule 11-1-1-1 outcome. Decision 5 (rev4 §10): budget exhaustion is an engine-limit outcome distinct
+  // from a rules draw; OPT-949 (OPT-960) introduces that outcome.
+  it.fails("F13 loop ratchet: the outcome is an engine limit, not a rules draw (ratchet OPT-960, Decision 5)", () => {
+    const b = setupLoop();
+
+    run(b, { type: "ADVANCE_PHASE" });
+
+    expect(b.state.status).toBe("FINISHED");
+    expect(b.state.engineOutcome?.type).not.toBe("INFINITE_LOOP_DRAW");
+    expect(b.state.winReason ?? "").not.toMatch(/draw/i);
   });
 });
