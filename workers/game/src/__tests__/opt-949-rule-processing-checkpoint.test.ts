@@ -36,6 +36,7 @@ import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
 import { payCostsWithSelection } from "../engine/effect-resolver/cost/orchestrator.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import type { EffectStackFrame } from "../types.js";
+import { visibleStateForPlayer, visibleStateForSpectator } from "../session/visibility.js";
 import { GameSession } from "../GameSession.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { expectTerminal, rig, synSchema } from "./opt-960-rig.js";
@@ -351,6 +352,14 @@ describe("terminal writer inventory: every writer goes through terminateGame wit
     expectTerminal(result.state, { winner: null, reason: ENGINE_LIMIT_REASON });
     expect(result.state.engineOutcome).toMatchObject({ type: "ENGINE_LIMIT", diagnostic: { kind: "ACTION_BUDGET" } });
     expect(result.state.winReason).not.toMatch(/draw/i);
+  });
+
+  it("player and spectator views forward the ENGINE_LIMIT outcome, so the client can tell it from a rules draw", () => {
+    const r = rig();
+    const actions = Array.from({ length: MAX_RESOLUTION_ACTIONS + 1 }, () => ({ type: "DRAW", params: { amount: 0 } }) as Action);
+    const ended = executeActionChain(r.state, actions, r.state.players[0].leader.instanceId, 0, r.db).state;
+    expect(visibleStateForPlayer(ended, r.db, 1).engineOutcome?.type).toBe("ENGINE_LIMIT");
+    expect(visibleStateForSpectator(ended, r.db).engineOutcome?.type).toBe("ENGINE_LIMIT");
   });
 
   it("engine contract: an unhandled action type is ENGINE_ERROR_DRAW", () => {

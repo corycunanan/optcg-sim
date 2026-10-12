@@ -449,3 +449,29 @@ describe("useGameSession multi-instance composition", () => {
     expect(spectator.navigation.fallbackConcedeAvailable).toBe(false);
   });
 });
+
+describe("end title for winnerless endings (OPT-960)", () => {
+  const engineLimitReason = "Engine resolution limit reached — the game ended with no winner";
+
+  it("labels an engine-limit ending MATCH ENDED, not DRAW", () => {
+    const state = createGameState(["user-a", "opponent-b"], "FINISHED");
+    state.winner = null;
+    state.winReason = engineLimitReason;
+    state.engineOutcome = {
+      type: "ENGINE_LIMIT",
+      diagnostic: { kind: "ACTION_BUDGET", limit: 1000, observed: 1001, actionType: "DRAW", sourceCardInstanceId: "src" },
+    };
+    mocks.wsReturns = [createWsReturn({ gameState: state, gameOver: { winner: null, reason: engineLimitReason } })];
+    const result = useRenderedSession();
+    expect(result.endState.endTitle).toBe("MATCH ENDED");
+    expect(result.endState.endReason).toBe(engineLimitReason);
+  });
+
+  it("keeps DRAW for a rules draw (no engine outcome)", () => {
+    const state = createGameState(["user-a", "opponent-b"], "FINISHED");
+    state.winner = null;
+    state.winReason = "Player 1 decked out; Player 2 decked out — draw";
+    mocks.wsReturns = [createWsReturn({ gameState: state, gameOver: { winner: null, reason: state.winReason } })];
+    expect(useRenderedSession().endState.endTitle).toBe("DRAW");
+  });
+});
