@@ -36,6 +36,7 @@ import {
   SessionLoadError,
   convertToCurrentShape,
   logLegacyShapes,
+  toPersistedGameState,
   validateContinuationReferences,
 } from "./game-state-schema.js";
 
@@ -166,7 +167,7 @@ export class SessionRepository {
     );
     const stored: PersistedSession = {
       formatVersion: SESSION_STORAGE_FORMAT_VERSION,
-      state: compacted.state,
+      state: toPersistedGameState(compacted.state),
       mode: snapshot.mode,
       pregameMode: snapshot.pregameMode,
       testPriorityRolls: snapshot.testPriorityRolls,
@@ -174,7 +175,8 @@ export class SessionRepository {
     };
     const sessionBytes = serializedByteLength(stored);
     assertWithinValueLimit("session", sessionBytes);
-    const undoHistoryBytes = serializedByteLength(compacted.undoHistory);
+    const persistedUndoHistory = compacted.undoHistory.map(toPersistedGameState);
+    const undoHistoryBytes = serializedByteLength(persistedUndoHistory);
     assertWithinValueLimit("undoHistory", undoHistoryBytes);
 
     const needsCardDb = this.persistedGameId !== compacted.state.id;
@@ -193,7 +195,7 @@ export class SessionRepository {
           }
         : {}),
       [SESSION_STORAGE_KEY]: stored,
-      [SESSION_UNDO_HISTORY_STORAGE_KEY]: compacted.undoHistory,
+      [SESSION_UNDO_HISTORY_STORAGE_KEY]: persistedUndoHistory,
     });
 
     this.historySummary = compacted.historySummary;
@@ -468,6 +470,8 @@ function hasValidSimultaneousGroup(value: unknown): boolean {
 function hasValidPhaseBoundaryContinuation(value: unknown): boolean {
   if (value === undefined) return true;
   if (!isRecord(value)) return false;
+  // Shape of stage, step and activatedWaveEffects is checked by the strict
+  // schema; stage semantics by validateContinuationReferences.
   return (
     value.kind === "END_PHASE" &&
     (value.endingPlayerIndex === 0 || value.endingPlayerIndex === 1) &&

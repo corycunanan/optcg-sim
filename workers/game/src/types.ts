@@ -137,14 +137,60 @@ export interface ReturnToDeckArrangement {
   remainingOwners: Array<0 | 1>;
 }
 
+/**
+ * Where a parked End Phase resumes (OPT-924, rule 6-6-1). Persisted from game
+ * state schema version 2; SAVED-STATE-COMPATIBILITY.md §6 is the contract.
+ *
+ * - `END_OF_YOUR_TURN_WAVE`: 6-6-1-1, the ending player's [End of Your Turn] wave.
+ * - `END_OF_OPPONENT_TURN_WAVE`: 6-6-1-1-2, the non-turn player's [End of Your Opponent's Turn] wave.
+ * - `TURN_PLAYER_END_OF_TURN`: 6-6-1-2 step 1, the turn player's "at the end of this turn" obligations.
+ * - `NON_TURN_PLAYER_END_OF_TURN`: 6-6-1-2 step 2, the non-turn player's.
+ * - `LEGACY_SCHEDULED_ACTIONS`: a version 1 (stage-less) frame. Expiry already
+ *   ran, the waves are skipped; resume drains `remainingScheduledActions` and
+ *   hands off exactly as the version 1 engine did.
+ *
+ * 6-6-1-3 ("during this turn" expiry) and the 6-6-1-4 hand-off never park, so
+ * they have no stage.
+ */
+export const END_PHASE_STAGES = [
+  "END_OF_YOUR_TURN_WAVE",
+  "END_OF_OPPONENT_TURN_WAVE",
+  "TURN_PLAYER_END_OF_TURN",
+  "NON_TURN_PLAYER_END_OF_TURN",
+  "LEGACY_SCHEDULED_ACTIONS",
+] as const;
+export type EndPhaseStage = (typeof END_PHASE_STAGES)[number];
+
+/**
+ * The rule 6-6-1-2 step a collected scheduled obligation belongs to: step 1
+ * (`TURN_PLAYER`) for the turn player's, step 2 (`NON_TURN_PLAYER`) for the
+ * non-turn player's. The rules have no "scheduled action"; the engine maps a
+ * `SCHEDULE_ACTION` with timing `END_OF_THIS_TURN` to "at the end of this
+ * turn" processing of its controller.
+ */
+export const END_PHASE_STEPS = ["TURN_PLAYER", "NON_TURN_PLAYER"] as const;
+export type EndPhaseStep = (typeof END_PHASE_STEPS)[number];
+
+export interface EndPhaseScheduledAction {
+  action: import("./engine/effect-types.js").Action;
+  controller: 0 | 1;
+  sourceEffectId: string;
+  /** Present on every entry of a staged frame; absent on legacy entries. */
+  step?: EndPhaseStep;
+}
+
 export interface PhaseBoundaryContinuation {
   kind: "END_PHASE";
   endingPlayerIndex: 0 | 1;
-  remainingScheduledActions: Array<{
-    action: import("./engine/effect-types.js").Action;
-    controller: 0 | 1;
-    sourceEffectId: string;
-  }>;
+  /** Absent only on a version 1 object before conversion; absent means `LEGACY_SCHEDULED_ACTIONS`. */
+  stage?: EndPhaseStage;
+  remainingScheduledActions: EndPhaseScheduledAction[];
+  /**
+   * `sourceCardInstanceId:effectBlockId` of every [End of Your Turn] /
+   * [End of Your Opponent's Turn] effect already activated in this End Phase
+   * (6-6-1-1-1: each activates once). Present on every staged frame.
+   */
+  activatedWaveEffects?: string[];
 }
 
 export interface ResumeContext {

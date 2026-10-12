@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { GameEventType } from "../types.js";
+import { END_PHASE_STAGES, END_PHASE_STEPS, type GameEventType } from "../types.js";
 import { EFFECT_STACK_FRAME_KINDS } from "./game-state-schema.js";
 
 const PlayerIndex = z.union([z.literal(0), z.literal(1)]);
@@ -312,16 +312,25 @@ const ReturnToDeckArrangement = z.strictObject({
   remainingOwners: z.array(PlayerIndex),
 });
 
+/**
+ * The runtime (version 2) shape. A version 1 frame has no `stage`; the
+ * converter gives it `LEGACY_SCHEDULED_ACTIONS` before this schema runs, so
+ * `stage` is required here. Stage semantics are checked in
+ * game-state-schema.ts (`frameInvariantViolation`).
+ */
 const PhaseBoundaryContinuation = z.strictObject({
   kind: z.literal("END_PHASE"),
   endingPlayerIndex: PlayerIndex,
+  stage: z.enum(END_PHASE_STAGES),
   remainingScheduledActions: z.array(
     z.strictObject({
       action: z.unknown(),
       controller: PlayerIndex,
       sourceEffectId: z.string(),
+      step: z.enum(END_PHASE_STEPS).optional(),
     })
   ),
+  activatedWaveEffects: StringArray.optional(),
 });
 
 const StackFrameCore = z.strictObject({

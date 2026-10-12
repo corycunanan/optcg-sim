@@ -23,6 +23,7 @@ import {
   SessionLoadError,
   readGameStateSchemaVersion,
 } from "../session/game-state-schema.js";
+import type { GameState } from "../types.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { getSyntheticStates, loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 
@@ -62,11 +63,25 @@ function undoValue(storage: MemorySessionStorage): Record<string, unknown>[] {
   return storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Record<string, unknown>[];
 }
 
+/** The OPT-980 v1 → v2 conversion of a stage-less End Phase frame, applied to an expected runtime state. */
+function withLegacyStage(state: GameState): GameState {
+  if (!state.effectStack.some((frame) => frame.phaseBoundaryContinuation)) return state;
+  return {
+    ...state,
+    effectStack: state.effectStack.map((frame) =>
+      frame.phaseBoundaryContinuation
+        ? { ...frame, phaseBoundaryContinuation: { ...frame.phaseBoundaryContinuation, stage: "LEGACY_SCHEDULED_ACTIONS" } }
+        : frame
+    ),
+  };
+}
+
 describe("OPT-940 game-state schema version", () => {
   it("defines version 1 and assigns it to a persisted object without the key", () => {
+    // OPT-980: this build reads 1 and 2 and still writes 1.
     expect(GAME_STATE_SCHEMA_VERSION).toBe(1);
     expect(LEGACY_GAME_STATE_SCHEMA_VERSION).toBe(1);
-    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1]);
+    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2]);
     expect(readGameStateSchemaVersion({}, "state")).toBe(1);
     expect(readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 1 }, "state")).toBe(1);
   });
@@ -86,8 +101,9 @@ describe("OPT-940 game-state schema version", () => {
   });
 
   it("rejects a newer version and tells the operator to roll forward", () => {
-    expect(() => readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 2 }, "state")).toThrow(
-      "Stored session state has unsupported game-state schema version 2 (written by a newer build; roll forward to a build that reads it); this build supports 1"
+    expect(readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 2 }, "state")).toBe(2);
+    expect(() => readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3 }, "state")).toThrow(
+      "Stored session state has unsupported game-state schema version 3 (written by a newer build; roll forward to a build that reads it); this build supports 1, 2"
     );
   });
 });
@@ -101,8 +117,9 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
 
     const loaded = await repository(goldenStorage(name)).load();
     expect(loaded).not.toBeNull();
-    expect(loaded!.state).toEqual(saved.state);
-    expect(loaded!.undoHistory).toEqual(saved.undoHistory);
+    // OPT-980: the only conversion is the legacy stage on a stage-less End Phase frame.
+    expect(loaded!.state).toEqual(withLegacyStage(saved.state));
+    expect(loaded!.undoHistory).toEqual(saved.undoHistory.map(withLegacyStage));
     expect(loaded!.cardDb).toEqual(saved.cardDb);
     expect(loaded!.state).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
   });
@@ -141,14 +158,14 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
 describe("OPT-940 reader: controlled failure", () => {
   it("rejects an unsupported version on the live state without touching storage", async () => {
     const storage = goldenStorage("fresh-setup");
-    sessionValue(storage).state[GAME_STATE_SCHEMA_VERSION_KEY] = 2;
+    sessionValue(storage).state[GAME_STATE_SCHEMA_VERSION_KEY] = 3;
     const before = storedBytes(storage);
     const repo = repository(storage);
 
     await expect(repo.load()).rejects.toMatchObject({
       name: "SessionLoadError",
       location: "state",
-      message: expect.stringContaining("unsupported game-state schema version 2"),
+      message: expect.stringContaining("unsupported game-state schema version 3"),
     });
     expect(storedBytes(storage)).toEqual(before);
     expect(storage.writes).toEqual([]);
@@ -185,7 +202,7 @@ describe("OPT-940 reader: controlled failure", () => {
     expect(repo.getHistorySummary()).toEqual(summaryBefore);
   });
 
-  it("never discards an unknown field to make parsing succeed (a future End Phase stage is rejected, not dropped)", () => {
+  it("never reinterprets a version 2 field on a version 1 object (a stage is rejected, not dropped or trusted)", () => {
     const stored = JSON.parse(loadGoldenFixture().cases["end-phase-parked"].sessionJson) as StoredSessionValue;
     const frames = stored.state.effectStack as Array<Record<string, unknown>>;
     const phaseFrame = frames.find((frame) => frame.phaseBoundaryContinuation) as {
@@ -194,7 +211,7 @@ describe("OPT-940 reader: controlled failure", () => {
     phaseFrame.phaseBoundaryContinuation.stage = "LEGACY_SCHEDULED_ACTIONS";
 
     expect(() => convertPersistedGameState(stored.state, "state")).toThrow(
-      /Stored session state has an invalid core shape at effectStack\.\d+\.phaseBoundaryContinuation: Unrecognized key: "stage"/
+      /Stored session state effectStack\[\d+\]\.phaseBoundaryContinuation carries stage, which no version 1 writer wrote/
     );
   });
 
