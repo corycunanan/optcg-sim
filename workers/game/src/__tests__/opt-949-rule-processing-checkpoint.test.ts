@@ -32,6 +32,10 @@ import { runRuleProcessing } from "../engine/defeat.js";
 import { executeActionChain, executeEffectAction } from "../engine/effect-resolver/resolver.js";
 import { MAX_RESOLUTION_ACTIONS } from "../engine/engine-limits.js";
 import { ENGINE_CONTRACT_REASON, ENGINE_LIMIT_REASON, terminateGame } from "../engine/terminal.js";
+import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
+import { payCostsWithSelection } from "../engine/effect-resolver/cost/orchestrator.js";
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
+import type { EffectStackFrame } from "../types.js";
 import { GameSession } from "../GameSession.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { expectTerminal, rig, synSchema } from "./opt-960-rig.js";
@@ -381,3 +385,66 @@ describe("terminal writer inventory: every writer goes through terminateGame wit
     expectTerminal(terminateGame(loaded, { kind: "CONCESSION", concedingPlayer: 0 }), { winner: 1, reason: "Player 1 conceded" });
   });
 });
+
+describe("terminal writer guards (OPT-960 review round 1, finding G)", () => {
+  it("first outcome stands: a second terminateGame call cannot change the winner or reason or log a second GAME_OVER", () => {
+    const r = rig();
+    const first = terminateGame(r.state, { kind: "CONCESSION", concedingPlayer: 1 });
+    const second = terminateGame(first, { kind: "WIN_GAME", winner: 1 });
+    expect(second).toBe(first);
+    expectTerminal(second, { winner: 0, reason: "Player 2 conceded" });
+    const third = terminateGame(first, { kind: "ENGINE_LIMIT", diagnostic: { kind: "ACTION_BUDGET", limit: 1, observed: 2, actionType: "DRAW", sourceCardInstanceId: "x" } });
+    expect(third.engineOutcome ?? null).toBeNull();
+    expect(third.eventLog.filter((e) => e.type === "GAME_OVER")).toHaveLength(1);
+  });
+
+  // Decision: an engine-limit end during payment keeps the payments already
+  // made. The board is final either way; rolling the zones back would make
+  // the final board disagree with the committed cost events, and the base
+  // rollback restored only zones (never status), so base already ended on a
+  // hybrid board. Rules-wise the guard is not a rule, so no rule text is
+  // being preserved by the rollback.
+  it("cost-frame engine limit: a stack-depth end at a selection cost keeps the earlier auto-paid MILL (no rollback)", () => {
+    const r = rig();
+    r.deck(0, 3);
+    r.put(CARDS.VANILLA.id, 0, "HAND");
+    const source = r.put("SYN-COST-SRC", 0, "CHARACTER");
+    const filler: EffectStackFrame[] = Array.from({ length: MAX_EFFECT_STACK_DEPTH }, (_, i) => ({
+      id: `filler-${i}`,
+      sourceCardInstanceId: source.instanceId,
+      controller: 0,
+      effectBlock: { id: "filler", category: "auto" },
+      phase: "AWAITING_TARGET_SELECTION",
+      pausedAction: null,
+      remainingActions: [],
+      resultRefs: [],
+      validTargets: [],
+      costs: [],
+      currentCostIndex: 0,
+      costsPaid: true,
+      oncePerTurnMarked: true,
+      costResultRefs: [],
+      pendingTriggers: [],
+      simultaneousTriggers: [],
+      accumulatedEvents: [],
+    }) as EffectStackFrame);
+    const state = { ...r.state, effectStack: filler };
+    const result = payCostsWithSelection(
+      state,
+      [{ type: "MILL", amount: 1 }, { type: "TRASH_FROM_HAND", amount: 1 }] as never,
+      0,
+      0,
+      r.db,
+      source.instanceId,
+      { id: "blk", category: "activate", actions: [] } as never,
+      resolverExecutionServices,
+    );
+    expect(result.cannotPay).toBeUndefined();
+    expect(result.pendingPrompt).toBeUndefined();
+    expectTerminal(result.state, { winner: null, reason: ENGINE_LIMIT_REASON });
+    expect(result.state.engineOutcome).toMatchObject({ type: "ENGINE_LIMIT", diagnostic: { kind: "EFFECT_STACK_DEPTH" } });
+    expect(result.state.players[0].deck).toHaveLength(2);
+    expect(result.state.players[0].hand).toHaveLength(1);
+  });
+});
+
