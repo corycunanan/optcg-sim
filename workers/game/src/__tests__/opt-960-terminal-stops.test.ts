@@ -20,6 +20,7 @@
  * | Brook delayed loss + p0's [End of Your Turn] "opponent trashes 1" emptying p1's 1-card deck | Brook's flag already set; ADVANCE_PHASE | none | none | the end-of-turn window opens only at action end (base placement) | winner 0 (see the test comment) | "end-of-turn window …" |
  */
 import { describe, expect, it } from "vitest";
+import type { Action } from "../engine/effect-types.js";
 import type { CardData } from "../types.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { expectTerminal, rig, synSchema, type Rig } from "./opt-960-rig.js";
@@ -154,5 +155,37 @@ describe("a resumed deck move runs rule processing before the remaining chain (r
     r.act({ type: "ARRANGE_TOP_CARDS", keptCardInstanceIds: [last], orderedInstanceIds: [] } as never);
     expect(r.state.players[0].deck).toHaveLength(0);
     expectTerminal(r.state, { winner: 1, reason: "Player 1 decked out" });
+  });
+});
+
+describe("end-of-turn window opens only at action end (base placement; OPT-962 may move it)", () => {
+  // Base (1b3f6a50) gave a joint draw here: the [End of Your Turn] MILL ran,
+  // nothing checked p1's empty deck until action end, and Brook's window
+  // opened at the same checkpoint. Head checks the MILL when it happens
+  // (9-1-2), so p1 decks out first and p0 wins; Brook's own loss is "at the
+  // end of the turn" (OP-15.md:158), which comes after End Phase processing
+  // (6-6-1-4). Head must NOT open Brook's window before the [End of Your
+  // Turn] effect resolves (that would make p1 the winner, which no reading
+  // supports). This pins the head result as a guard; OPT-962 owns where the
+  // window sits inside the End Phase.
+  it("end-of-turn window: p0's [End of Your Turn] empties p1's deck before Brook's delayed loss is collected", () => {
+    const r = rig();
+    r.leader(0, "OP15-022");
+    r.deck(0, 0);
+    r.deck(1, 1);
+    r.state.turn.deckHitZeroThisTurn = [true, false];
+    r.put("SYN-EOYT-OPP-MILL", 0, "CHARACTER", {
+      schema: synSchema("SYN-EOYT-OPP-MILL", [
+        {
+          id: "eoyt",
+          category: "auto",
+          trigger: { keyword: "END_OF_YOUR_TURN" },
+          actions: [{ type: "OPPONENT_ACTION", params: { action: { type: "MILL", params: { amount: 1 } } } } as Action],
+        } as never,
+      ]),
+    });
+    r.act({ type: "ADVANCE_PHASE" });
+    expect(r.state.players[1].deck).toHaveLength(0);
+    expectTerminal(r.state, { winner: 0, reason: "Player 2 decked out" });
   });
 });

@@ -507,17 +507,25 @@ function recalculateModifiers(
 
 /**
  * Checkpoint facts carried by one execution result (OPT-949): its lethal
- * damage determination, and the end-of-turn window when the action crossed
- * MAIN → END (an ADVANCE_PHASE emits TURN_ENDED as part of the same action),
- * so delayed-loss Leaders (OP15-022 Brook) collect their deferred loss. The
- * end-of-turn placement itself is unchanged from the base engine; moving it
- * inside the End Phase is OPT-962's work.
+ * damage determination. Used at every pipeline checkpoint.
  */
 function executionRuleContext(execResult: ExecuteResult | undefined): RuleProcessingContext {
+  return execResult?.lethalDamagePlayerIndex !== undefined
+    ? { lethalDamage: [execResult.lethalDamagePlayerIndex] }
+    : {};
+}
+
+/**
+ * Action-end facts: the lethal determination plus the end-of-turn window
+ * when the action crossed MAIN → END (an ADVANCE_PHASE emits TURN_ENDED as
+ * part of the same action), so delayed-loss Leaders (OP15-022 Brook) collect
+ * their deferred loss. The window opens only at action end, after the
+ * action's auto effects resolved, exactly where the base engine opened it;
+ * moving it inside the End Phase is OPT-962's work.
+ */
+function actionEndRuleContext(execResult: ExecuteResult | undefined): RuleProcessingContext {
   return {
-    ...(execResult?.lethalDamagePlayerIndex !== undefined
-      ? { lethalDamage: [execResult.lethalDamagePlayerIndex] }
-      : {}),
+    ...executionRuleContext(execResult),
     ...(execResult?.events.some((e) => e.type === "TURN_ENDED") ? { endOfTurn: true } : {}),
   };
 }
@@ -549,7 +557,7 @@ function finishPipeline(
   execResult?: ExecuteResult,
 ): PipelineResult {
   // Action-end checkpoint: always runs, whatever changed.
-  state = runRuleProcessing(state, executionRuleContext(execResult), cardDb, actingPlayerIndex);
+  state = runRuleProcessing(state, actionEndRuleContext(execResult), cardDb, actingPlayerIndex);
 
   // Every terminal writer (rule processing, WIN_GAME, concession, engine
   // limit) has already written the final state; report it.
