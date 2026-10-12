@@ -23,7 +23,7 @@
  * | 9-2-1, 1-2-1, Decision 3 | instruction 1 empties p0's deck; instruction 2 would empty p1's deck or open a prompt | none | none | stop after 1 | winner 1, p1 deck intact, no prompt | "sequential …" |
  * | 9-2-1-1 | Life reaches 0 through a move or nonlethal damage; a later deck-changing checkpoint | none | none | play continues | IN_PROGRESS | "zero Life …" |
  * | 1-3-1 (WIN_GAME) | WIN_GAME mid-chain, also after a prompt reply | none | none | stop at WIN_GAME | winner = controller, later DRAW never runs, no prompt/stack; reload has no continuation; stale reply rejected | "WIN_GAME …" |
- * | concession, abandonment, external result, engine limit, engine contract, rules defeat, joint draw, Brook delayed loss | each writer | none | none | terminal | distinct winReason/engineOutcome, terminal contract | "terminal writer …" |
+ * | concession, abandonment, external result, engine limit, engine contract, rules defeat, joint draw (Brook delayed loss: opt-862 file) | each writer | none | none | terminal | distinct winReason/engineOutcome, terminal contract | "terminal writer …" |
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Action } from "../engine/effect-types.js";
@@ -363,7 +363,7 @@ describe("terminal writer inventory: every writer goes through terminateGame wit
     expect(result.state.engineOutcome).toMatchObject({ type: "ENGINE_ERROR_DRAW", diagnostic: { kind: "ENGINE_CONTRACT" } });
   });
 
-  it("the writer clears a parked effect Trigger and a paused battle continuation", () => {
+  it("the writer clears a parked effect-damage Trigger window", () => {
     const { state } = liveDecisionState();
     const loaded: GameState = {
       ...state,
