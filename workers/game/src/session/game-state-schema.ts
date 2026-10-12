@@ -105,7 +105,8 @@ type Converter = (raw: Record<string, unknown>, location: string) => Record<stri
  */
 const convertFromV1: Converter = (raw) => {
   if (!(GAME_STATE_SCHEMA_VERSION_KEY in raw)) return raw;
-  const { [GAME_STATE_SCHEMA_VERSION_KEY]: _version, ...rest } = raw;
+  const rest: Record<string, unknown> = { ...raw };
+  delete rest[GAME_STATE_SCHEMA_VERSION_KEY];
   return rest;
 };
 
