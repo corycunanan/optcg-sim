@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { GameEventType } from "../types.js";
+import { EFFECT_STACK_FRAME_KINDS } from "./game-state-schema.js";
 
 const PlayerIndex = z.union([z.literal(0), z.literal(1)]);
 const FiniteNumber = z.number().finite();
@@ -324,6 +325,8 @@ const PhaseBoundaryContinuation = z.strictObject({
 });
 
 const StackFrameCore = z.strictObject({
+  /** OPT-940 frame-kind contract; optional in v1, validated against content. */
+  kind: z.enum(EFFECT_STACK_FRAME_KINDS).optional(),
   id: z.string(),
   sourceCardInstanceId: z.string(),
   controller: PlayerIndex,

@@ -32,6 +32,12 @@ import {
   migrateLegacyCardData,
   migrateLegacyTriggerRegistry,
 } from "./legacy-trigger-migration.js";
+import {
+  SessionLoadError,
+  convertToCurrentShape,
+  logLegacyShapes,
+  validateContinuationReferences,
+} from "./game-state-schema.js";
 
 export const SESSION_STORAGE_KEY = "session";
 export const SESSION_CARD_DB_STORAGE_KEY = "session:card-db";
@@ -651,22 +657,27 @@ function hasValidResultRefEntries(value: unknown): boolean {
   );
 }
 
-function parseStoredGameState(raw: unknown): GameState {
-  if (!isRecord(raw)) throw new Error("Stored session state must be an object");
+/**
+ * Strict validation of a game-state object already converted to the current
+ * runtime shape. Rejects unknown keys and unknown action, event, effect-block
+ * and frame variants. Internal code only receives this refined type.
+ */
+function parseStoredGameState(raw: unknown, location: string): GameState {
+  if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
   const coreError = validatePersistedGameStateCore(raw);
   if (coreError) {
-    throw new Error(`Stored session state has an invalid core shape at ${coreError}`);
+    throw new SessionLoadError(location, `has an invalid core shape at ${coreError}`);
   }
   if (!hasValidPrompt(raw.pendingPrompt ?? null)) {
-    throw new Error("Stored session state has an invalid prompt continuation");
+    throw new SessionLoadError(location, "has an invalid prompt continuation");
   }
   if (raw.pendingEventActivationEvents !== undefined &&
       (!Array.isArray(raw.pendingEventActivationEvents) ||
        !raw.pendingEventActivationEvents.every(isKnownPendingEvent))) {
-    throw new Error("Stored session contains an invalid pending Event activation");
+    throw new SessionLoadError(location, "contains an invalid pending Event activation");
   }
   if (!Array.isArray(raw.eventLog) || !raw.eventLog.every(isKnownEvent)) {
-    throw new Error("Stored session contains an unknown event variant");
+    throw new SessionLoadError(location, "contains an unknown event variant");
   }
   if (
     !Array.isArray(raw.scheduledActions) ||
@@ -674,17 +685,13 @@ function parseStoredGameState(raw: unknown): GameState {
       (entry) => isRecord(entry) && isKnownAction(entry.action)
     )
   ) {
-    throw new Error(
-      "Stored session contains an unknown scheduled action variant"
-    );
+    throw new SessionLoadError(location, "contains an unknown scheduled action variant");
   }
   if (
     !Array.isArray(raw.effectStack) ||
     !raw.effectStack.every(hasValidStackFrame)
   ) {
-    throw new Error(
-      "Stored session contains an invalid effect-stack action or event"
-    );
+    throw new SessionLoadError(location, "contains an invalid effect-stack action or event");
   }
   if (
     !Array.isArray(raw.triggerRegistry) ||
@@ -692,7 +699,7 @@ function parseStoredGameState(raw: unknown): GameState {
       (entry) => isRecord(entry) && hasValidEffectBlock(entry.effectBlock)
     )
   ) {
-    throw new Error("Stored session contains an invalid registered trigger");
+    throw new SessionLoadError(location, "contains an invalid registered trigger");
   }
   if (
     !Array.isArray(raw.activeEffects) ||
@@ -702,13 +709,29 @@ function parseStoredGameState(raw: unknown): GameState {
     !Array.isArray(raw.prohibitions) ||
     !raw.prohibitions.every(hasValidProhibition)
   ) {
-    throw new Error(
-      "Stored session contains an invalid runtime effect variant"
-    );
+    throw new SessionLoadError(location, "contains an invalid runtime effect variant");
   }
   // The durable snapshot root, event discriminants, and every persisted action
   // carrier have now been checked. Internal code only receives this refined type.
   return raw as unknown as GameState;
+}
+
+/**
+ * OPT-940: the one conversion entry point from a persisted game-state object
+ * to a runtime GameState. The live state and every undo snapshot pass through
+ * here, in this order: version dispatch and conversion, strict validation,
+ * continuation-reference integrity, load-time content migrations, legacy
+ * shape classification. Any failure throws SessionLoadError naming
+ * `location`; nothing is written and nothing is partially applied.
+ * Contract: docs/game-engine/SAVED-STATE-COMPATIBILITY.md.
+ */
+export function convertPersistedGameState(raw: unknown, location: string): GameState {
+  const converted = convertToCurrentShape(raw, location);
+  const validated = parseStoredGameState(converted, location);
+  validateContinuationReferences(validated, location);
+  const migrated = migrateLegacyTriggerRegistry(validated);
+  logLegacyShapes(migrated, location);
+  return migrated;
 }
 
 export function parseStoredSession(
@@ -762,13 +785,13 @@ export function parseStoredSession(
     throw new Error("Stored session undoHistory is invalid");
   return {
     formatVersion,
-    state: migrateLegacyTriggerRegistry(parseStoredGameState(raw.state)),
+    state: convertPersistedGameState(raw.state, "state"),
     cardDb,
     mode,
     pregameMode,
     testPriorityRolls,
-    undoHistory: undoHistoryRaw.map((snapshot) =>
-      migrateLegacyTriggerRegistry(parseStoredGameState(snapshot))
+    undoHistory: undoHistoryRaw.map((snapshot, index) =>
+      convertPersistedGameState(snapshot, `undoHistory[${index}]`)
     ),
     historySummary: parseEventHistorySummary(raw.historySummary),
   };

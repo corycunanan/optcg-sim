@@ -4,6 +4,8 @@
 
 **Related docs:** [Schema Overview](./01-SCHEMA-OVERVIEW.md) · [Actions](./04-ACTIONS.md) · [Triggers](./02-TRIGGERS.md) · [Prohibitions & Replacements](./06-PROHIBITIONS-AND-REPLACEMENTS.md)
 
+**Known stale claims:** This document corrects four claims in place, each in a block that separates intended design from current behavior: replacement interception, the seven-step guarantee, End Phase ordering, and the custom `END_OF_YOUR_TURN` event. Every other stale claim found by the October 2026 audit is tracked in [OPT-956](https://linear.app/optcg-sim/issue/OPT-956); read those passages as intended design until that ticket lands.
+
 ---
 
 ## Architectural Principles
@@ -11,6 +13,11 @@
 1. **Snapshot-oriented, copy-on-write transitions.** Engine transition APIs treat their input `GameState` as read-only and return a new state value. Deep-frozen regressions cover trigger scanning and resume propagation, but production snapshots are not recursively frozen at runtime. This contract supports the bounded undo checkpoint, failed-persistence rollback, network resync, and byte-equivalent replay under the same recorded execution context.
 
 2. **Single action pipeline.** Every game mutation — player actions, rule processing, effect resolution — flows through the same seven-step pipeline. There is no backdoor. This guarantees that prohibitions, replacements, triggers, and modifiers are always evaluated, regardless of what initiated the change.
+
+| | Principle 2 |
+|---|---|
+| **Intended design** | Every mutation traverses all seven steps, and step 3 intercepts replacements. |
+| **Current behavior (base 03071b69)** | Effect actions run through the effect resolver, not through step 1 of the pipeline. Step 3 is a stub: `checkReplacements` returns `replaced: false` (`workers/game/src/engine/replacements.ts:159-168`). Replacements run at consequence sites instead. See [Action Pipeline](#action-pipeline) and [Replacement Interceptor](#replacement-interceptor). |
 
 3. **Modifier layer system.** Power, cost, and keyword state are never stored as mutated values on the card. Instead, the engine recalculates them from the base printed value through an ordered layer stack on every read. This eliminates stale-modifier bugs and makes duration expiry trivial.
 
@@ -112,7 +119,7 @@ graph TB
 | **Target Resolver** | Evaluates target specifications against the current game state, applying filters, count constraints, and aggregate constraints. |
 | **Modifier Layer System** | Computes effective power and cost for any card by applying ordered modifier layers to the base printed value. |
 | **Prohibition Registry** | Flat collection of active "cannot X" restrictions, scanned at pipeline step 2. |
-| **Replacement Interceptor** | Scans for active replacement effects at pipeline step 3, substituting original actions when a match is found. |
+| **Replacement Interceptor** | Intended design: scans for active replacement effects at pipeline step 3, substituting original actions when a match is found. Current behavior: step 3 is not operative, and consequence-site checks (`checkReplacementForKO`, `checkReplacementForRemoval`) do the work. See [Replacement Interceptor](#replacement-interceptor). |
 | **Duration Tracker** | Tracks active continuous effects and their expiry conditions. Processes expiry waves at phase boundaries. |
 | **Scheduled Action Queue** | Priority queue of deferred actions (end-of-turn obligations, future-phase triggers) processed at their designated timing. |
 | **Event Bus** | Typed event dispatcher. Actions emit events; the trigger system and other observers subscribe. |
@@ -268,6 +275,11 @@ interface RegisteredTrigger {
 
 Every game mutation flows through this seven-step pipeline. No exceptions. Player actions, rule-based actions, effect-generated actions, and scheduled actions all enter at step 1.
 
+| | Seven-step guarantee |
+|---|---|
+| **Intended design** | The seven steps below run for every mutation, including effect-generated actions. |
+| **Current behavior (base 03071b69)** | Player actions run all seven steps, with three gaps. First, `processTriggerQueuePipeline` calls `resolveEffect` directly (`workers/game/src/engine/pipeline.ts:326`), so effect action chains execute inside the effect resolver and do not re-enter `runPipeline` at step 1. Cost payment runs through `workers/game/src/engine/effect-resolver/cost/orchestrator.ts`, not the pipeline. Second, step 3 is a stub (`pipeline.ts:85` calls `checkReplacements`, which never replaces). Third, step 7 does not K.O. zero-power cards: `pipeline.ts:181` holds only a comment, and `finishPipeline` runs `checkDefeat` and the deck-hit-zero flag (`pipeline.ts:532-554`). |
+
 ```mermaid
 flowchart TD
   input["Incoming Action"]
@@ -318,7 +330,12 @@ Scan the prohibition registry for any active prohibition that matches this actio
 
 ### Step 3 — Check Replacements
 
-Scan for active replacement effects that intercept this action.
+| | Step 3 |
+|---|---|
+| **Intended design** | The pipeline scans active replacement effects and substitutes the action, as described below. |
+| **Current behavior (base 03071b69)** | `checkReplacements` returns `{ replaced: false }` for every action (`workers/game/src/engine/replacements.ts:159-168`), and `pipeline.ts:85` calls it. The step-3 interceptor is not operative. Consequence-site replacement is the current mechanism: `battle.ts:1325` calls `checkReplacementForKO`, and `effect-resolver/resume/cost.ts` and `effect-resolver/cost/orchestrator.ts:644` call `checkReplacementForRemoval` and `checkReplacementForKO`. |
+
+Intended design: scan for active replacement effects that intercept this action.
 
 - Iterate all `replacement` category EffectBlocks in the active effects registry.
 - Match the `replaces.event` against the action being performed.
@@ -459,7 +476,7 @@ Every completed action (step 4) emits one or more typed events. Events are the s
 |-------|-------------|
 | `PHASE_CHANGED` | The game transitions to a new phase. Carries `from` and `to`. |
 | `TURN_STARTED` | A new turn begins (triggers "at the start of your turn" effects). |
-| `TURN_ENDED` | A turn completes (after End Phase processing). |
+| `TURN_ENDED` | Intended design: a turn completes after End Phase processing, and `[End of Your Turn]` watchers fire for the ending player. Current behavior (base 03071b69): `completeTurnHandoff` emits it at hand-off, after `turn.activePlayerIndex` has switched (`workers/game/src/engine/phases.ts:309-346`). OPT-924 owns the fix. |
 | `DECK_SHUFFLED` | A deck is shuffled. |
 | `CARDS_REVEALED` | Cards from a player's hand are revealed (source `HAND`). |
 | `GAME_OVER` | A player wins, loses, or the game draws. |
@@ -491,6 +508,8 @@ When a `GameEvent` is emitted at pipeline step 5, the engine scans all `Register
 6. **Zone validity.** Is the source card still in a zone where the effect is valid? (Per rules 8-1-3-1-3, if the card moved before the trigger fires, the effect cannot activate.)
 7. **Once Per Turn.** Has this effect already been used this turn on this card instance?
 8. **Compound triggers.** For `CompoundTrigger`, evaluate each `any_of` entry independently. Fire if any one matches. Do not fire multiple times for a single event.
+
+The custom event form of `END_OF_YOUR_TURN` (`workers/game/src/engine/effect-types.ts:195`) has no emitting `GameEvent` at base 03071b69: it appears in neither `CUSTOM_EVENT_TO_GAME_EVENT` nor the bespoke set in `triggers.ts`. OPT-878 (PR #740) handles that cleanup, and this document does not duplicate it. The keyword form maps to `TURN_ENDED` (`triggers.ts:748`).
 
 ### Ordering
 
@@ -639,6 +658,11 @@ One-time modifiers (the "next time you play X, cost reduced by N" pattern from [
 
 Replacement effects are checked at step 3 of the pipeline, after prohibition checks (step 2) but before execution (step 4). They substitute a different outcome for the action about to occur.
 
+| | Replacement Interceptor |
+|---|---|
+| **Intended design** | Step 3 of the pipeline checks replacements before execution. |
+| **Current behavior (base 03071b69)** | The step-3 interceptor is not operative (`workers/game/src/engine/replacements.ts:159-168`). Consequence-site replacement is the current mechanism: `checkReplacementForKO` and `checkReplacementForRemoval` run where a K.O. or removal would complete (`battle.ts:1325`, `effect-resolver/resume/cost.ts:860-1307`, `effect-resolver/cost/orchestrator.ts:644`). The sections below describe the intended design. |
+
 ### Matching
 
 For each pending action, the interceptor:
@@ -782,7 +806,12 @@ The engine processes duration expiry in three ordered waves, per rules 6-6-1-2 a
 |--------------|-------------|
 | `THIS_TURN` | End of the current turn |
 
-Exact processing order within the End Phase (per rules 6-6):
+| | End Phase order |
+|---|---|
+| **Intended design (rule 6-6-1, Decision 9 in `docs/game-engine/audits/consolidation-2026-10/proposal-rev4-snapshot.md` §10)** | The ordered list below. |
+| **Current behavior (base 03071b69)** | `runEndPhase` holds only a comment for steps 1 and 2, so the two `[End of ...Turn]` waves do not run there (`workers/game/src/engine/phases.ts:176-197`). It calls `expireEndOfTurnEffects` before `processScheduledActions`, which reverses steps 3 and 4-7. `completeTurnHandoff` then emits `TURN_ENDED` after `turn.activePlayerIndex` has switched (`phases.ts:323`), and `triggers.ts:748-749` maps both end-of-turn keywords to `TURN_ENDED`. These watchers therefore fire after the active player changed. OPT-924 (PR 4) owns the fix. |
+
+Exact processing order within the End Phase, intended design (per rules 6-6):
 1. Turn player's `[End of Your Turn]` effects activate and resolve.
 2. Non-turn player's `[End of Your Opponent's Turn]` effects activate and resolve.
 3. Process scheduled actions with timing `END_OF_THIS_TURN`.
@@ -825,7 +854,7 @@ interface ScheduledActionEntry {
 ```
 
 Processing:
-- `END_OF_THIS_TURN`: processed during End Phase step 3 (after end-of-turn triggers, before duration expiry).
+- `END_OF_THIS_TURN`: intended design is End Phase step 3 (after end-of-turn triggers, before duration expiry). Current behavior (base 03071b69): `runEndPhase` calls `expireEndOfTurnEffects` first, then `processScheduledActions` (`workers/game/src/engine/phases.ts:187-190`). OPT-924 owns the fix.
 - `END_OF_THIS_BATTLE`: processed during the End of Battle step, before battle-scoped duration expiry.
 - `START_OF_NEXT_MAIN_PHASE` / `START_OF_OPPONENT_NEXT_MAIN_PHASE`: processed at the start of the specified Main Phase.
 
@@ -919,4 +948,4 @@ Per rules 11-1:
 
 ---
 
-_Last updated: 2026-03-19_
+_Last updated: 2026-10-12_
