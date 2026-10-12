@@ -46,22 +46,99 @@ export function expireBattleEffects(state: GameState, battleId: string): GameSta
 }
 
 /**
- * Expire THIS_TURN / UNTIL_END_OF_*_TURN effects at End Phase.
- * Order: turn player first, then non-turn player (§6-6-1-3).
+ * Every End Phase expiry at once, in rule order (6-6-1-2 steps 1 and 2, then
+ * 6-6-1-3). The End Phase itself interleaves these with scheduled obligations
+ * (phases.ts); this composite is for callers that model "after the turn".
  */
 export function expireEndOfTurnEffects(state: GameState): GameState {
+  let nextState = expireUntilEndOfTurn(state, "TURN_PLAYER");
+  nextState = expireUntilEndOfTurn(nextState, "NON_TURN_PLAYER");
+  return expireDuringThisTurn(nextState);
+}
+
+/**
+ * Which End Phase expiry clause a turn-bound duration ends under (OPT-924).
+ *
+ * Card text uses "during this turn" (THIS_TURN), which rule 6-6-1-3 (line
+ * 622) invalidates after all of 6-6-1-2. The "until the end of ... turn" and
+ * "until the end of ... End Phase" durations are the 6-6-1-2 class (line 617):
+ * they end in the step of their controller, after that controller's "at the
+ * end of this turn" obligations. Any other or legacy duration that is due at
+ * an End Phase wave is treated as "during this turn", the later and more
+ * conservative clause.
+ */
+export type EndPhaseExpiryClause = "UNTIL_END_OF_TURN" | "DURING_THIS_TURN";
+
+export function endPhaseExpiryClause(duration: { type: string } | undefined): EndPhaseExpiryClause {
+  switch (duration?.type) {
+    case "UNTIL_END_OF_OPPONENT_NEXT_TURN":
+    case "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE":
+    case "UNTIL_END_OF_YOUR_NEXT_TURN":
+      return "UNTIL_END_OF_TURN";
+    default:
+      return "DURING_THIS_TURN";
+  }
+}
+
+/** True when an End Phase wave of this turn ends the given expiry. */
+function dueThisEndPhase(expiry: ExpiryTiming, context: ExpiryContext): boolean {
+  return shouldExpire(expiry, "END_OF_TURN", context) || shouldExpire(expiry, "END_OF_END_PHASE", context);
+}
+
+/**
+ * Invalidate one player's due End Phase effects and prohibitions of one
+ * clause. `seat` is relative to the turn player (rule 6-6-1-2 step 1 is the
+ * turn player's, step 2 the non-turn player's; 6-6-1-3 runs turn player then
+ * non-turn player).
+ */
+function expireEndPhaseClause(
+  state: GameState,
+  clause: EndPhaseExpiryClause,
+  seat: "TURN_PLAYER" | "NON_TURN_PLAYER",
+): GameState {
   const context = currentTurnContext(state);
-  let nextState = expireEffects(state, "END_OF_TURN", context);
-  nextState = expireProhibitions(nextState, "END_OF_TURN", context);
-  // END_OF_END_PHASE carries UNTIL_END_OF_OPPONENT_NEXT_TURN /
-  // UNTIL_END_OF_OPPONENT_NEXT_END_PHASE — fires in the same End Phase,
-  // after the END_OF_TURN wave.
-  nextState = expireEffects(nextState, "END_OF_END_PHASE", context);
-  nextState = expireProhibitions(nextState, "END_OF_END_PHASE", context);
-  // Clean up consumed and THIS_TURN one-time modifiers
+  const controller: 0 | 1 = seat === "TURN_PLAYER"
+    ? state.turn.activePlayerIndex
+    : state.turn.activePlayerIndex === 0 ? 1 : 0;
+  const ends = (owner: 0 | 1, duration: { type: string } | undefined, expiry: ExpiryTiming): boolean =>
+    owner === controller && endPhaseExpiryClause(duration) === clause && dueThisEndPhase(expiry, context);
+
+  const effects = state.activeEffects.filter((e) => !ends(e.controller, e.duration, e.expiresAt));
+  const prohibitions = state.prohibitions.filter(
+    (p) => !ends(p.controller, p.duration, p.expiresAt ?? legacyProhibitionExpiry(p.duration, state)),
+  );
+  const effectsChanged = effects.length !== state.activeEffects.length;
+  const prohibitionsChanged = prohibitions.length !== state.prohibitions.length;
+  if (!effectsChanged && !prohibitionsChanged) return state;
+  return {
+    ...state,
+    activeEffects: effectsChanged ? effects : state.activeEffects,
+    prohibitions: prohibitionsChanged ? prohibitions : state.prohibitions,
+  };
+}
+
+/**
+ * Rule 6-6-1-2 (line 617), the invalidation half of step 1 (`TURN_PLAYER`) or
+ * step 2 (`NON_TURN_PLAYER`): that player's "until the end of the turn" and
+ * "until the end of the End Phase" effects become invalid.
+ */
+export function expireUntilEndOfTurn(
+  state: GameState,
+  seat: "TURN_PLAYER" | "NON_TURN_PLAYER",
+): GameState {
+  return expireEndPhaseClause(state, "UNTIL_END_OF_TURN", seat);
+}
+
+/**
+ * Rule 6-6-1-3 (line 622): the turn player's "during this turn" effects
+ * become invalid, then the non-turn player's. One-time modifiers scoped to
+ * this turn end here too.
+ */
+export function expireDuringThisTurn(state: GameState): GameState {
+  let nextState = expireEndPhaseClause(state, "DURING_THIS_TURN", "TURN_PLAYER");
+  nextState = expireEndPhaseClause(nextState, "DURING_THIS_TURN", "NON_TURN_PLAYER");
   nextState = cleanupConsumedOneTimeModifiers(nextState);
-  nextState = expireOneTimeModifiers(nextState);
-  return nextState;
+  return expireOneTimeModifiers(nextState);
 }
 
 /**
@@ -234,6 +311,34 @@ export function processScheduledActions(
     state: { ...state, scheduledActions: remaining },
     actionsToRun: toRun,
   };
+}
+
+/**
+ * Collect one player's "at the end of this turn" obligations for rule 6-6-1-2
+ * (OPT-924). Entries are removed from `state.scheduledActions` in stored
+ * order; an entry bound to a card that has left the field is discarded, as
+ * `processScheduledActions` does. Each collected entry is tagged with `step`.
+ */
+export function collectEndOfTurnObligations(
+  state: GameState,
+  controller: 0 | 1,
+  step: "TURN_PLAYER" | "NON_TURN_PLAYER",
+): {
+  state: GameState;
+  entries: Array<{ action: Action; controller: 0 | 1; sourceEffectId: string; step: "TURN_PLAYER" | "NON_TURN_PLAYER" }>;
+} {
+  const entries: Array<{ action: Action; controller: 0 | 1; sourceEffectId: string; step: "TURN_PLAYER" | "NON_TURN_PLAYER" }> = [];
+  const remaining: typeof state.scheduledActions = [];
+  for (const entry of state.scheduledActions) {
+    if (entry.timing !== "END_OF_THIS_TURN" || entry.controller !== controller) {
+      remaining.push(entry);
+      continue;
+    }
+    if (entry.boundToInstanceId && !findCardOnField(state, entry.boundToInstanceId)) continue;
+    entries.push({ action: entry.action, controller: entry.controller, sourceEffectId: entry.sourceEffectId, step });
+  }
+  if (remaining.length === state.scheduledActions.length) return { state, entries };
+  return { state: { ...state, scheduledActions: remaining }, entries };
 }
 
 /**

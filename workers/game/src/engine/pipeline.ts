@@ -323,6 +323,22 @@ export function continuePipelineFromExecution(
 }
 
 /**
+ * Publish End Phase events and resolve the auto effects they fulfil with the
+ * pipeline's own Step 5 policy (OPT-924): turn player's group first, nested
+ * triggers LIFO. The End Phase calls this after each stage action so its
+ * triggered work finishes before the next rule step, while the ending player
+ * is still the turn player. A prompt is left on `state.pendingPrompt`.
+ */
+export function fireEndPhaseEvents(
+  state: GameState,
+  events: ExecuteResult["events"],
+  cardDb: Map<string, CardData>,
+): GameState {
+  if (events.length === 0) return state;
+  return fireEventsAndTriggers(state, { state, events }, { type: "ADVANCE_PHASE" }, cardDb, undefined, false);
+}
+
+/**
  * Process a queue of triggers with LIFO semantics.
  * When a resolved trigger emits events that match new triggers,
  * those new triggers are inserted at the FRONT of the queue (LIFO).
@@ -516,18 +532,13 @@ function executionRuleContext(execResult: ExecuteResult | undefined): RuleProces
 }
 
 /**
- * Action-end facts: the lethal determination plus the end-of-turn window
- * when the action crossed MAIN → END (an ADVANCE_PHASE emits TURN_ENDED as
- * part of the same action), so delayed-loss Leaders (OP15-022 Brook) collect
- * their deferred loss. The window opens only at action end, after the
- * action's auto effects resolved, exactly where the base engine opened it;
- * moving it inside the End Phase is OPT-962's work.
+ * Action-end facts: the lethal damage determination. The end-of-turn window
+ * (OP15-022 Brook's delayed loss) is no longer opened here: since OPT-924 the
+ * End Phase opens it once, at the 6-6-1-4 boundary before the hand-off
+ * (`phases.ts`), so it is evaluated inside the End Phase and never twice.
  */
 function actionEndRuleContext(execResult: ExecuteResult | undefined): RuleProcessingContext {
-  return {
-    ...executionRuleContext(execResult),
-    ...(execResult?.events.some((e) => e.type === "TURN_ENDED") ? { endOfTurn: true } : {}),
-  };
+  return executionRuleContext(execResult);
 }
 
 /**
@@ -582,7 +593,7 @@ function finishPipeline(
  * If 0–1 triggers, resolve directly. If 2+, prompt the player to pick order.
  * `afterTriggers` are the other player's triggers, stored as pendingTriggers.
  */
-function processPlayerTriggerGroup(
+export function processPlayerTriggerGroup(
   state: GameState,
   triggers: QueuedTrigger[],
   afterTriggers: QueuedTrigger[],
