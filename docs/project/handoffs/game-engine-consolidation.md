@@ -18,7 +18,7 @@ Tickets in execution order, grouped into the eleven PRs the project owner chose 
 
 | PR | Parent | Milestone | Tickets | Depends on | Status | PR link | Notes |
 |----|--------|-----------|---------|------------|--------|---------|-------|
-| 1 | OPT-959 | 0A | OPT-940, OPT-939 | — | In Review | PR_LINK_PLACEHOLDER | Readers and fixtures only. Reader-capable rollback baseline; its deploy must be verified before any writer PR merges. |
+| 1 | OPT-959 | 0A | OPT-940, OPT-939 | — | In Review | [#746](https://github.com/corycunanan/optcg-sim/pull/746) | Readers and fixtures only. Reader-capable rollback baseline; its deploy must be verified before any writer PR merges. |
 | 2 | OPT-960 | 0B | OPT-949, OPT-925, OPT-862 | PR 1 deploy | Backlog | — | Joint rule-processing checkpoint and one terminal writer (Decisions 3, 5). `engineOutcome` type is a new persisted shape. |
 | 3 | OPT-961 | 0B | OPT-864, OPT-922 | PR 1 deploy | Backlog | — | Sequential availability, prohibitions as feasibility input, local batch recheck (Decisions 10, 11). Parallel with PR 2. Needs the hot-path scale test. |
 | 4 | OPT-962 | 0B | OPT-924 | PR 2, PR 1 deploy | Todo | — | Three-step End Phase (Decision 9). Kept alone: the phase continuation stage is a persisted field. Last in 0B. |
@@ -71,7 +71,7 @@ Copy this block when writing a new handoff:
 -->
 
 ### OPT-959 → OPT-960 / OPT-961
-**From:** session on 2026-10-12 · **Commit:** `HEAD_SHA_PLACEHOLDER` · **PR:** #PR_NUMBER_PLACEHOLDER
+**From:** session on 2026-10-12 · **Commit:** `a385c214` · **PR:** #746
 
 - **Primer:** Every persisted game state (live and each undo snapshot) now loads through one conversion entry point, `convertPersistedGameState` in `workers/game/src/session/persistence.ts`: version dispatch (`schemaVersion`, absent = 1) → convert → strict validation → continuation-reference integrity → content migrations → legacy-shape classification. Writers are byte-identical to base `03071b69` (golden test). The frame `kind` contract (`EFFECT`, `COST`, `TRIGGER_ORDER`, `TRIGGER_DRAIN`, `BATCH_RESUME`, `PHASE_BOUNDARY`) is readable and validated but not yet written. 23 timing fixtures under `workers/game/src/__tests__/timing-baseline/` pin the rules order; 18 are `it.fails` ratchets linked to their owner PRs (17 with an owner PR, F12d without a ticket) and 5 are regression guards.
 - **Read first:** `docs/game-engine/SAVED-STATE-COMPATIBILITY.md` (the contract: §1 versions, §2 kinds and references, §3 support window, §4 dispositions, §5 runbook, §6 the End Phase stage plan), `workers/game/src/session/game-state-schema.ts`, `workers/game/src/session/persistence.ts` (`convertPersistedGameState`), `workers/game/src/__tests__/timing-baseline/README.md` (every expected order with rule/FAQ line and the status table).
