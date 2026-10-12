@@ -7,6 +7,7 @@ import { getPlayEntryState } from "./play-entry-state.js";
  */
 
 import { meetsAttachedDonRequirement } from "./attached-don.js";
+import { terminateGame } from "./terminal.js";
 import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import type { CardData, GameAction, GameState, PendingEvent, ExecuteResult } from "../types.js";
 import {
@@ -200,28 +201,11 @@ function executeAttachDon(
 // ─── Concede ──────────────────────────────────────────────────────────────────
 
 function executeConcede(state: GameState, concedingPlayer: 0 | 1): ExecuteResult {
-  const winner: 0 | 1 = concedingPlayer === 0 ? 1 : 0;
-  // OPT-366: clear any pendingPrompt — without this the pipeline's
-  // post-execute pendingPrompt early-return (pipeline.ts step-5 boundary)
-  // would skip finishPipeline and never surface `gameOver`. The game is
-  // ending; no UI prompt is meaningful anymore.
-  const nextState: GameState = {
-    ...state,
-    status: "FINISHED",
-    winner,
-    winReason: `Player ${concedingPlayer + 1} conceded`,
-    pendingPrompt: null,
-    pendingEventActivationEvents: undefined,
-    // OPT-872: a paused battle never resumes after a concession.
-    turn: { ...state.turn, pendingBattleDamageContinuation: null },
-  };
+  // The common terminal writer clears the prompt (OPT-366), the stack and a
+  // paused battle (OPT-872) and logs the one GAME_OVER event.
   return {
-    state: nextState,
-    events: [{
-      type: "GAME_OVER",
-      playerIndex: concedingPlayer,
-      payload: { winner, reason: "concede" },
-    }],
+    state: terminateGame(state, { kind: "CONCESSION", concedingPlayer }, concedingPlayer),
+    events: [],
   };
 }
 

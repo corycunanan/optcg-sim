@@ -381,10 +381,10 @@ describe("F13 loop budget: an End of Your Turn wave that re-fulfils itself ends 
     expect(b.state.eventLog.filter((e) => e.type === "GAME_OVER")).toHaveLength(1);
   });
 
-  // Engine: the loop ends as engineOutcome.type "INFINITE_LOOP_DRAW" with the draw reason, which is the
+  // Base engine: the loop ended as engineOutcome.type "INFINITE_LOOP_DRAW" with the draw reason, which is the
   // rule 11-1-1-1 outcome. Decision 5 (rev4 §10): budget exhaustion is an engine-limit outcome distinct
-  // from a rules draw; OPT-949 (OPT-960) introduces that outcome.
-  it.fails("F13 loop ratchet: the outcome is an engine limit, not a rules draw (ratchet OPT-960, Decision 5)", () => {
+  // from a rules draw; OPT-949 (OPT-960) introduced "ENGINE_LIMIT" and flipped this ratchet.
+  it("F13 loop ratchet: the outcome is an engine limit, not a rules draw (OPT-960, Decision 5)", () => {
     const b = setupLoop();
 
     run(b, { type: "ADVANCE_PHASE" });

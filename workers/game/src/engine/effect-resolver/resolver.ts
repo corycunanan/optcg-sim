@@ -1,4 +1,6 @@
 import { getBattleOpponentInstanceId } from "../events.js";
+import { isGameTerminated } from "../terminal.js";
+import { runRuleProcessingAfterMove } from "../defeat.js";
 import { releaseMovedDonEffects } from "../don-area-effects.js";
 import { finishReplacedLifeCost } from "./cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect, TRIGGERING_HAND_TRASH_REF } from "../hand-trash.js";
@@ -85,7 +87,6 @@ import {
 import { log } from "../../lib/log.js";
 import {
   consumeResolutionAction,
-  isEngineTerminated,
   terminateForEngineContract,
 } from "../engine-limits.js";
 
@@ -358,6 +359,9 @@ export function resolveEffect(
     controller,
   };
 
+  // OPT-960: nothing activates or resolves after a terminal outcome.
+  if (isGameTerminated(state)) return { state, events, resolved: false };
+
   // Guard: reject once-per-turn effects already used this turn
   if (isOncePerTurnBlock(block)) {
     const usedSet = state.turn.oncePerTurnUsed[block.id];
@@ -437,7 +441,7 @@ export function resolveEffect(
       accumulatedEvents: [],
     };
     state = pushFrame(state, frame);
-    if (isEngineTerminated(state)) {
+    if (isGameTerminated(state)) {
       return { state, events, resolved: false };
     }
 
@@ -493,6 +497,8 @@ export function resolveEffect(
     completeHandTrashCostSources(costPayResult.events, state, sourceCardInstanceId, controller, new Map(sourceSnapshotRef));
     events.push(...costPayResult.events);
     costResult = costPayResult.costResult;
+    // OPT-862: a cost that ended the game leaves no action to run.
+    if (isGameTerminated(state)) return { state, events, resolved: true };
 
     if (costPayResult.pendingPrompt) {
       // Seed the newly-created cost continuation with the pre-payment source.
@@ -714,7 +720,7 @@ function promptForSimultaneousSelection(
     simultaneousGroup: plan,
   };
   const nextState = pushFrame(frameId.state, frame);
-  if (isEngineTerminated(nextState)) return { state: nextState, events: [] };
+  if (isGameTerminated(nextState)) return { state: nextState, events: [] };
 
   let prompt = { ...promptResult.pendingPrompt, resumeContext: frame.id };
   if (plan.effectDescription && prompt.options) {
@@ -812,7 +818,7 @@ export function continueSimultaneousGroup(
       );
     nextState = result.state;
     events.push(...result.events);
-    if (isEngineTerminated(nextState)) return { state: nextState, events };
+    if (isGameTerminated(nextState)) return { state: nextState, events };
     if (result.pendingPrompt || result.pendingBatchTriggers) {
       nextState = terminateForEngineContract(nextState, {
         kind: "ENGINE_CONTRACT",
@@ -863,6 +869,8 @@ export function executeActionChain(
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
   let lastActionSucceeded = priorActionSucceeded ?? true;
+  // OPT-960: a terminal checkpoint earlier in this resolution ends play.
+  if (isGameTerminated(state)) return { state, events };
 
   for (let i = 0; i < actions.length; i++) {
     const action = actions[i];
@@ -1008,7 +1016,7 @@ export function executeActionChain(
     state = result.state;
     events.push(...result.events);
     lastActionSucceeded = result.succeeded;
-    if (isEngineTerminated(state)) return { state, events };
+    if (isGameTerminated(state)) return { state, events };
 
     if (result.pendingPrompt && result.nestedEventActivation) {
       return {
@@ -1116,13 +1124,13 @@ export function executeActionChain(
           accumulatedEvents: events,
         };
         const continuationState = pushFrame(frameId.state, continuationFrame);
-        if (isEngineTerminated(continuationState))
+        if (isGameTerminated(continuationState))
           return { state: continuationState, events };
         const restoredPromptState = pushFrame(
           continuationState,
           nestedPromptFrame
         );
-        return isEngineTerminated(restoredPromptState)
+        return isGameTerminated(restoredPromptState)
           ? { state: restoredPromptState, events }
           : {
               state: restoredPromptState,
@@ -1163,7 +1171,7 @@ export function executeActionChain(
           accumulatedEvents: events,
         };
         const continuationState = pushFrame(frameId.state, continuationFrame);
-        return isEngineTerminated(continuationState)
+        return isGameTerminated(continuationState)
           ? { state: continuationState, events }
           : {
               state: continuationState,
@@ -1209,7 +1217,7 @@ export function executeActionChain(
         stateDistributionForPlay: ctx.stateDistributionForPlay,
       };
       const updatedState = pushFrame(frameId.state, frame);
-      if (isEngineTerminated(updatedState))
+      if (isGameTerminated(updatedState))
         return { state: updatedState, events };
       // Override with block-specific description so prompts show the triggered
       // effect text rather than the full card text
@@ -1238,7 +1246,7 @@ export function executeActionChain(
         resultRefs,
         effectDescription
       );
-      if (isEngineTerminated(stateWithFrame))
+      if (isGameTerminated(stateWithFrame))
         return { state: stateWithFrame, events };
       const drain = processRemainingTriggers(
         stateWithFrame,
@@ -1304,7 +1312,7 @@ function pauseForOptionalAction(
     accumulatedEvents: events,
   };
   const nextState = pushFrame(frameId.state, frame);
-  if (isEngineTerminated(nextState)) return { state: nextState, events };
+  if (isGameTerminated(nextState)) return { state: nextState, events };
   const sourceCard = findCardInstance(nextState, sourceCardInstanceId);
   log("effect.prompt", {
     sourceInstanceId: sourceCardInstanceId,
@@ -1380,6 +1388,48 @@ function costResultToRefs(
 
 // ─── Single Action Dispatcher ─────────────────────────────────────────────────
 
+/**
+ * Rule-processing checkpoint after one effect action (OPT-949 acceptance 3,
+ * OPT-862, OPT-925). Runs when the action changed a deck or Life count or
+ * made a lethal damage determination. A multi-card draw or mill moves one
+ * player's cards from one deck, so that deck can reach 0 only on its last
+ * moved card (rule 3-2-3): checking after the move is the between-cards check.
+ * When the checkpoint ends the game the terminal writer has cleared every
+ * continuation, and the result drops any prompt or batch continuation the
+ * handler returned so no caller can resurrect it.
+ */
+function ruleProcessingAfterAction(
+  before: GameState,
+  result: ActionResult,
+  cardDb: Map<string, CardData>,
+): ActionResult {
+  if (isGameTerminated(result.state)) return withoutContinuation(result, result.state);
+  const lethal = result.lethalDamagePlayerIndex;
+  const checked = runRuleProcessingAfterMove(
+    before,
+    result.state,
+    lethal !== undefined ? { lethalDamage: [lethal] } : {},
+    cardDb,
+  );
+  if (!isGameTerminated(checked)) {
+    return checked === result.state ? result : { ...result, state: checked };
+  }
+  return withoutContinuation(result, checked);
+}
+
+/** A terminal action result: no prompt, batch continuation or nested Event boundary survives. */
+function withoutContinuation(result: ActionResult, state: GameState): ActionResult {
+  return {
+    state,
+    events: result.events,
+    succeeded: result.succeeded,
+    ...(result.result ? { result: result.result } : {}),
+    ...(result.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: result.lethalDamagePlayerIndex }
+      : {}),
+  };
+}
+
 export function executeEffectAction<K extends ActionType>(
   state: GameState,
   action: ActionOf<K>,
@@ -1391,7 +1441,7 @@ export function executeEffectAction<K extends ActionType>(
   services: EffectResolverServices = resolverExecutionServices
 ): ActionResult {
   state = consumeResolutionAction(state, action.type, sourceCardInstanceId);
-  if (isEngineTerminated(state)) {
+  if (isGameTerminated(state)) {
     return { state, events: [], succeeded: false };
   }
   const handler = getActionHandler(action);
@@ -1408,7 +1458,8 @@ export function executeEffectAction<K extends ActionType>(
     );
     // Rule 3-1-6-1: a DON!! this action moved sheds its effects.
     const released = releaseMovedDonEffects(state, result.state);
-    return released === result.state ? result : { ...result, state: released };
+    const settled = released === result.state ? result : { ...result, state: released };
+    return ruleProcessingAfterAction(state, settled, cardDb);
   }
   // Boot validation makes this unreachable for authored schemas. Treat any
   // untrusted/runtime drift as a rules-visible terminal engine contract fault.

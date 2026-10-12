@@ -245,6 +245,9 @@ function runKoProgressReplacement(
     cardInstance(CARDS.VANILLA.id, "progress-draw-1", 1, "DECK"),
     cardInstance(CARDS.BLOCKER.id, "progress-draw-2", 1, "DECK"),
     cardInstance(CARDS.VANILLA.id, "progress-draw-3", 1, "DECK"),
+    // Keeps p1's deck non-empty after the three draws: an emptied deck ends
+    // the game mid-resolution (rules 9-1-2, 9-2-1-2; OPT-862).
+    cardInstance(CARDS.VANILLA.id, "progress-draw-4", 1, "DECK"),
   ];
   const replacement: RuntimeActiveEffect = {
     id: "progress-replacement",

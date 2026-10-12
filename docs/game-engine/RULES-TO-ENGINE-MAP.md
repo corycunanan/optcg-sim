@@ -26,7 +26,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | First/second selection | **IMPL** | [`opt-366-pregame-flow.test.ts`](../../workers/game/src/__tests__/opt-366-pregame-flow.test.ts) — winner chooses either seat and first-turn rules follow the selected player | None in the engine pregame flow |
 | Player-selected Character overflow | **IMPL** | [`opt-171-rule-3-7-6-1.test.ts`](../../workers/game/src/__tests__/opt-171-rule-3-7-6-1.test.ts) and [`opt-114-mid-batch-overflow.test.ts`](../../workers/game/src/__tests__/opt-114-mid-batch-overflow.test.ts) — single and batched effect plays pause for the controller's choice and rule-trash without K.O. triggers | None for direct or effect-driven Character play |
 | Mid-battle combatant removal | **IMPL** | [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) — attacker/target removal aborts before damage and still emits end-of-battle cleanup | None for Attack, Block, or Counter removal before Damage Step |
-| Loop handling | **PARTIAL** | [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) — action-budget or stack-depth exhaustion ends atomically in a replay-visible draw | Repeated-state recognition and player-declared counts for stoppable loops (§11-1-1-2/3) are not modeled |
+| Loop handling | **PARTIAL** | [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) — action-budget or stack-depth exhaustion ends atomically with the replay-visible engine-limit outcome (`engineOutcome.type: "ENGINE_LIMIT"`, Decision 5), not a rules draw | Repeated-state recognition, the rule 11-1-1-1 draw, and player-declared counts for stoppable loops (§11-1-1-2/3, OPT-952) are not modeled |
 | Start-of-game effects | **IMPL** | [`opt-476-start-of-game-effects.test.ts`](../../workers/game/src/__tests__/opt-476-start-of-game-effects.test.ts) — both Leaders resolve in first-player order across play, decline, zero-match, shuffle, persistence, and resume paths | Only authored `START_OF_GAME_EFFECT` rule modifications execute; new mechanics still require schemas |
 | Hidden-zone confidentiality | **PARTIAL** | [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) — events, prompts, continuation data, faces, and instance IDs are redacted per viewer | Generic secret-to-secret reveal/order enforcement (§3-1-8, §11-2) is not universal |
 
@@ -42,7 +42,8 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | `triggers.ts` | Step 5 — trigger registration, matching, and ordering |
 | `trigger-ordering.ts` | Per-player trigger ordering per rule §8-6 |
 | `modifiers.ts` | Step 6 — layered power/cost computation (3 layers) |
-| `defeat.ts` | Step 7 — win/loss condition checks |
+| `defeat.ts` | Rule processing: `runRuleProcessing` checkpoint (both players, once) — after each deck/Life move, damage determination, before a prompt, and at action end |
+| `terminal.ts` | The one terminal writer `terminateGame` (rules defeat, WIN_GAME, concession, abandonment, external result, engine limit, engine contract) |
 | `phases.ts` | Phase transitions: REFRESH → DRAW → DON → MAIN → END |
 | `battle.ts` | Attack → Block → Counter → Damage → End of Battle |
 | `setup.ts` | Game initialization, mulligan |
@@ -78,15 +79,15 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **1-2-1.** Game ends when a player loses | **IMPL** | `defeat.ts → checkDefeat()` + `pipeline.ts:66–81` | Pipeline step 7 checks defeat after every action |
-| **1-2-1-1-1.** Defeat: 0 life + leader takes damage | **IMPL** | `defeat.ts:31–34` | `p0LifeOut` / `p1LifeOut` checks require `damagedPlayerIndex` context |
+| **1-2-1.** Game ends when a player loses | **IMPL** | `defeat.ts → runRuleProcessing()` → `terminal.ts → terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | Every checkpoint writes the result once through the common terminal writer (OPT-949) |
+| **1-2-1-1-1.** Defeat: 0 life + leader takes damage | **IMPL** | `defeat.ts → checkDefeat()` | Life-out requires a qualifying lethal determination in `RuleProcessingContext.lethalDamage`; the Life count alone never defeats |
 | **1-2-1-1-2.** Defeat: 0 cards in deck | **IMPL** | `defeat.ts:26–27` | `p0DeckOut` / `p1DeckOut` |
-| **1-2-2.** Defeat processed at next rule processing | **IMPL** | `pipeline.ts:61–81` | Step 7 runs after every action |
+| **1-2-2.** Defeat processed at next rule processing | **IMPL** | `defeat.ts → runRuleProcessing()` | Checkpoints run mid-resolution and at action end (see 9-1-2) |
 | **1-2-2-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts:31–34`, `battle.ts:306–309` | Battle checks life-out before moving life cards |
 | **1-2-2-2.** 0 deck cards = defeat | **IMPL** | `defeat.ts:26–27` | Checked every pipeline run |
 | **1-2-3.** Concession at any time | **IMPL** | `execute.ts → executeConcede()`, `validation.ts:52` | Always legal, immediate game end |
 | **1-2-4.** Concession unaffected by cards | **IMPL** | `executeConcede()` bypasses all effect logic | No card effect can block concession |
-| **1-2-5.** Card effects that cause win/loss | **PARTIAL** | `defeat.ts` | No card in the current OPTCG card pool uses a "you win/lose" effect; infrastructure exists but untested |
+| **1-2-5.** Card effects that cause win/loss | **PARTIAL** | `effect-resolver/actions/effects.ts → executeWinGame()` → `terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | WIN_GAME ends play mid-chain (OPT-949). LOSS_CONDITION_MOD `DELAYED_LOSS` (OP15-022) and `WIN_INSTEAD` (OP03-040, P-117; [`opt-949-win-instead.test.ts`](../../workers/game/src/__tests__/opt-949-win-instead.test.ts)) are evaluated at the checkpoint; a negated Nami Leader loses on deck-out (qa_op09.md:204-206). Joint Nami checkpoints follow an assumed literal reading |
 
 ### 1-3. Fundamental Principles
 
@@ -442,12 +443,12 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **9-1-1.** Rule processing = automatic processing on specific events | **IMPL** | `pipeline.ts` step 7 calls `checkDefeat()` | |
-| **9-1-2.** Rule processing is immediate, even during other actions | **PARTIAL** | Runs after every pipeline call, but not mid-execution (e.g., not between individual damage points). A Leader damaged at 0 Life ends the game even when an auto effect from the same action suspends for input (`pipeline.ts → defeatAtSuspension()`, OPT-886) | |
-| **9-2-1.** Defeat judgment processing | **IMPL** | `defeat.ts → checkDefeat()` | |
-| **9-2-1-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts:31–34` | |
-| **9-2-1-2.** 0 deck = defeat | **IMPL** | `defeat.ts:26–27` | |
-| Simultaneous defeat → draw | **IMPL** | `defeat.ts:39–41` | Both players lose → `winner: null` |
+| **9-1-1.** Rule processing = automatic processing on specific events | **IMPL** | `defeat.ts → runRuleProcessing()` | |
+| **9-1-2.** Rule processing is immediate, even during other actions | **IMPL** | `runRuleProcessing` after each effect action that changes a deck or Life count or determines lethal damage (`resolver.ts → ruleProcessingAfterAction()`), after each committed cost payment (`cost/orchestrator.ts`), after a resumed card move before the remaining chain (`resume-core.ts → resumeEffectChain()`), after an executed game action and before a prompt surfaces (`pipeline.ts`, `prompt-lifecycle.ts`), and at action end; a battle or effect-damage [Trigger] and an End Phase scheduled action stop on a terminal result (`battle.ts`, `phases.ts`); [`opt-960-terminal-stops.test.ts`](../../workers/game/src/__tests__/opt-960-terminal-stops.test.ts), [`opt-862-mid-resolution-deck-out.test.ts`](../../workers/game/src/__tests__/opt-862-mid-resolution-deck-out.test.ts), [`opt-925-effect-damage-defeat.test.ts`](../../workers/game/src/__tests__/opt-925-effect-damage-defeat.test.ts) | After a terminal checkpoint no instruction, cost, prompt or trigger drain runs (OPT-862, OPT-925, OPT-949) |
+| **9-2-1.** Defeat judgment processing | **IMPL** | `defeat.ts → checkDefeat()` | Both players evaluated at one checkpoint; a later instruction never runs to manufacture a draw (Decision 3) |
+| **9-2-1-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts → checkDefeat()`; battle `battle.ts → dealOneLeaderDamage()`; effect damage `effect-damage.ts → continueEffectDamageSequence()`, `battle-actions.ts → executeSelfTakeDamage()` | Lethal when dealt at 0 Life, determined once per damage instruction (OPT-925; multi-damage reading assumed) |
+| **9-2-1-2.** 0 deck = defeat | **IMPL** | `defeat.ts → checkDefeat()` | Checked mid-cost and mid-action (OPT-862); OP15-022 delayed loss deferred to the end-of-turn window |
+| Simultaneous defeat → draw | **IMPL** | `defeat.ts → checkDefeat()` | Both players lose at the same checkpoint → `winner: null` |
 
 ---
 
@@ -497,7 +498,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **11-1-1.** Infinite loop detection | **PARTIAL** | `engine-limits.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Effect-stack depth and a persisted per-resolution action budget bound nested and sequential loops. State-hash recognition of player-stoppable loops remains future work. |
-| **11-1-1-1.** Unstoppable loop → draw | **IMPL** | `engine-limits.ts`; `effect-stack.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Exhaustion atomically clears prompts/continuations, records deterministic diagnostics in `GAME_OVER`, and finishes with no winner. |
+| **11-1-1-1.** Unstoppable loop → draw | **GAP** | `engine-limits.ts`; `effect-stack.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Budget or stack exhaustion is the engine-limit outcome (`ENGINE_LIMIT`, Decision 5), not this rule's draw: it atomically clears prompts/continuations, records deterministic diagnostics in `GAME_OVER`, and finishes with no winner. `INFINITE_LOOP_DRAW` is reserved for this rule (OPT-952). |
 | **11-1-1-2/3.** Player can declare loop count | **GAP** | — | Need: prompt for loop count |
 | **11-2-1.** Cards moved secret→secret must be revealed | **GAP** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Viewer-specific redaction is enforced, but there is no generic zone-transition rule that publishes required reveals |
 | **11-2-2.** Revealed cards become unrevealed after effect resolves | **PARTIAL** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Reveal visibility is event-scoped rather than stored on cards; current prompts/events do not leak after resolution, but no generic reveal lifecycle exists |

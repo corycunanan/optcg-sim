@@ -18,7 +18,7 @@ import {
   registerCardEnteredField,
 } from "./triggers.js";
 import { pushFrame, generateFrameId } from "./effect-stack.js";
-import { isEngineTerminated } from "./engine-limits.js";
+import { isGameTerminated } from "./terminal.js";
 import { findCardInstance } from "./state.js";
 import { extractEffectDescription } from "./effect-resolver/action-utils.js";
 import { withTriggerScanned } from "./events.js";
@@ -174,7 +174,7 @@ export function buildTriggerSelectionPrompt(
   };
 
   const nextState = pushFrame(frameId.state, frame);
-  if (isEngineTerminated(nextState)) return { state: nextState };
+  if (isGameTerminated(nextState)) return { state: nextState };
 
   const pendingPrompt: PendingPromptState = {
     options: {

@@ -111,7 +111,8 @@ export function executeDealDamage(
     opp,
     amount,
     sourceCardInstanceId,
-    controller
+    controller,
+    true
   );
 
   const dealtSoFar = Math.max(
@@ -122,8 +123,14 @@ export function executeDealDamage(
   return {
     state: cont.state,
     events: cont.events,
-    succeeded: dealtSoFar > 0 || !!cont.state.turn.pendingTriggerFromEffect,
+    succeeded:
+      dealtSoFar > 0 ||
+      !!cont.state.turn.pendingTriggerFromEffect ||
+      cont.lethalDamagePlayerIndex !== undefined,
     result: { targetInstanceIds: [], count: dealtSoFar },
+    ...(cont.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex }
+      : {}),
   };
 }
 
@@ -146,6 +153,20 @@ export function executeSelfTakeDamage(
     controller,
     cardDb
   );
+
+  // OPT-925 / 9-2-1-1: taking damage while at 0 Life is lethal (OP14-115
+  // Rindo: "you take 1 damage" after declining the Life add,
+  // qa_op14_eb04.md:339-341). Determined once, as the instruction deals the
+  // damage; a later point that finds 0 Life is not a new determination.
+  if (amount > 0 && state.players[controller].life.length === 0) {
+    return {
+      state,
+      events,
+      succeeded: true,
+      result: { targetInstanceIds: [], count: 0 },
+      lethalDamagePlayerIndex: controller,
+    };
+  }
 
   let nextState = state;
   let dealt = 0;

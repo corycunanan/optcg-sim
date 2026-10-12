@@ -60,9 +60,10 @@ describe("F16a synthetic checkpoint: both decks empty when rule processing runs 
 describe("F16b sequential defeat stops at the first terminal checkpoint (rules 9-2-1 line 880, 1-2-1 line 35; Decision 3)", () => {
   const MILLER = "SYN-OPP-MILLER"; // [Activate: Main] opponent trashes 1 from deck, THEN you trash 1 from deck
 
-  // Engine: CARD_TRASHED:p1 -> CARD_TRASHED:p0 -> GAME_OVER:p0; the second MILL ran, so both decks are empty and winner is null (draw).
+  // Base engine (03071b69/1b3f6a50): CARD_TRASHED:p1 -> CARD_TRASHED:p0 -> GAME_OVER; the second MILL ran and manufactured a draw.
   // Decision 3 / rule 9-2-1 (line 880): p1 is already defeated after instruction 1; instruction 2 must not run.
-  it.fails("F16b p1 deck-out ends the game before the second MILL: winner 0, p0 deck still holds its card (ratchet OPT-960)", () => {
+  // Flipped by OPT-960: the checkpoint after the OPPONENT_ACTION MILL ends play.
+  it("F16b p1 deck-out ends the game before the second MILL: winner 0, p0 deck still holds its card (OPT-960)", () => {
     const schema: EffectSchema = {
       card_id: MILLER,
       card_name: MILLER,

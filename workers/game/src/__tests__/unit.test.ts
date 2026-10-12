@@ -251,7 +251,7 @@ describe("checkDefeat", () => {
     newPlayers[1] = { ...newPlayers[1], life: [] };
     state = { ...state, players: newPlayers };
 
-    const result = checkDefeat(state, { damagedPlayerIndex: 1 });
+    const result = checkDefeat(state, { lethalDamage: [1] });
     expect(result).toBeTruthy();
     expect(result!.winner).toBe(0);
   });

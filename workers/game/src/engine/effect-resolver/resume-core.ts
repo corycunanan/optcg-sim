@@ -65,7 +65,8 @@ import {
 } from "./resume/choice.js";
 import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { promptTypeToPhase } from "./cost-handler.js";
-import { isEngineTerminated } from "../engine-limits.js";
+import { isGameTerminated } from "../terminal.js";
+import { runRuleProcessingAfterMove } from "../defeat.js";
 import { replacePendingEventReferences } from "../events.js";
 import {
   pendingPropagationEvents,
@@ -333,6 +334,12 @@ export function resumeEffectChain(
     }
   }
 
+  // OPT-960: the resume handlers above move cards directly (search, scry,
+  // Life reorder, field-to-Life), outside executeEffectAction's checkpoint.
+  // Run rule processing on that move before the remaining chain (9-1-2).
+  nextState = runRuleProcessingAfterMove(state, nextState, {}, cardDb);
+  if (isGameTerminated(nextState)) return { state: nextState, events, resolved: true };
+
   // ── Tail: execute remainingActions (also handles OPTIONAL_EFFECT resume
   //         where pausedAction is null) ────────────────────────────────────
   if (remainingActions.length > 0) {
@@ -449,7 +456,7 @@ export function resumeFromStack(
     return {
       state: nextState,
       events,
-      resolved: !result.pendingPrompt && !isEngineTerminated(nextState),
+      resolved: !result.pendingPrompt && !isGameTerminated(nextState),
       ...(result.pendingPrompt ? { pendingPrompt: result.pendingPrompt } : {}),
     };
   }
@@ -517,7 +524,7 @@ export function resumeFromStack(
       );
       nextState = result.state;
       events.push(...result.events);
-      if (isEngineTerminated(nextState)) {
+      if (isGameTerminated(nextState)) {
         return { state: nextState, events, resolved: false };
       }
 
@@ -525,7 +532,7 @@ export function resumeFromStack(
         nextState.effectStack.length > stackDepthAfterPop;
       if (result.rejected) {
         nextState = pushFrame(nextState, topFrame);
-        if (isEngineTerminated(nextState)) {
+        if (isGameTerminated(nextState)) {
           return { state: nextState, events, resolved: false };
         }
         if (!result.pendingPrompt) {
@@ -555,7 +562,7 @@ export function resumeFromStack(
             accumulatedEvents: [...events],
           };
           nextState = pushFrame(nextState, continuationFrame);
-          if (isEngineTerminated(nextState)) {
+          if (isGameTerminated(nextState)) {
             return { state: nextState, events, resolved: false };
           }
         } else if (!replacementFrameWasPushed) {
@@ -580,7 +587,7 @@ export function resumeFromStack(
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,
           };
           nextState = pushFrame(nextState, replacementFrame);
-          if (isEngineTerminated(nextState)) {
+          if (isGameTerminated(nextState)) {
             return { state: nextState, events, resolved: false };
           }
           pendingPrompt = {

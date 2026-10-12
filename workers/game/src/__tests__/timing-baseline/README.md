@@ -157,7 +157,7 @@ Stand-in: p0 `c0` (base 4000) with a `THIS_TURN` +1000 standing in for "until en
 |---|---|---|---|---|---|---|
 | Rev4 §7 (ST13-002 row): "An End of Your Turn effect newly fulfilled within a wave resolves in that wave before advancing; use ST13-002 … and the loop budget." Decision 5 (rev4 §10): "Budget exhaustion is an engine-limit outcome, distinct from a rule 11-1-1-1 draw." Rule 11-1-1-1 (`rule_comprehensive.md`, §11-1): a draw applies only when neither player can stop the loop. | Ace's wave trashes the face-up Life card; `SYN-LIFE-LOOPER` ("when a card is removed from your Life: add 1 from deck to Life face-up, then trash 1 Life card") re-fulfils itself on every removal. | none | none | The engine budget ends the wave. Constants: `MAX_RESOLUTION_ACTIONS = 1_000` (`engine-limits.ts:9`), `DEFAULT_ACTION_BUDGET = 1_000` (`execution-context.ts:3`), `MAX_EFFECT_STACK_DEPTH = 100` (`engine-limits.ts:8`). | **Guard (F13b-guard):** terminal state, `pendingPrompt` null, empty stack, `engineOutcome.diagnostic.kind` is `ACTION_BUDGET` or `STACK_DEPTH`, `actionBudget.consumed ≤ limit + 1`, exactly one `GAME_OVER`. **Ratchet (F13b-ratchet, OPT-960, Decision 5):** `engineOutcome.type` is an engine-limit outcome, not `INFINITE_LOOP_DRAW`, and `winReason` is not a draw. | `end-phase-order.test.ts` "F13 loop guard" / "F13 loop ratchet" |
 
-Deck of 1,200 cards so the deck never ends the loop. Owner of the ratchet: OPT-960 (PR 2, OPT-949, Decision 5).
+Deck of 1,200 cards so the deck never ends the loop. Owner of the ratchet: OPT-960 (PR 2, OPT-949, Decision 5); flipped to a guard there.
 
 ### F15 — OP06-116 with a nested prompt inside the accepted Trigger, then a reload before the nested reply
 
@@ -216,10 +216,10 @@ Stand-in: p1 Leader `SYN-TAKE-DAMAGE` (custom trigger `DAMAGE_TAKEN`, no filter,
 | F13 | ratchet (OPT-962) | `TURN_ENDED` p0 → `TURN_STARTED` p1 → `PHASE_CHANGED` p1 → `CARD_TRASHED` p0 / `CARD_REMOVED_FROM_LIFE` p0; no p0 draw. Ace's wave effect runs after hand-off, so Kalgara's [Your Turn] no longer applies. |
 | F14 | ratchet (OPT-962) | No draw for either player: all expiry ran before any scheduled action (fails observation 1). The collapsed mutant (all expiry after both scheduled actions) and the stage-3-into-stage-1 mutant (every `THIS_TURN` modifier dropped right after p0's action) both fail observation 2, which observes `c1b` by name; see PR body M8a/M8b/M8c. |
 | F13b guard | guard | Loop terminated in 48 ms at `ACTION_BUDGET` limit 1000 / observed 1001 (`TRASH_FROM_LIFE` from `looper`), 500 Life removals, 700 deck cards left, `FINISHED`, no prompt, empty stack, one `GAME_OVER`. |
-| F13b ratchet | ratchet (OPT-960) | Outcome is `INFINITE_LOOP_DRAW` with winReason "Unstoppable loop detected — game ends in a draw": a rules draw, not the engine-limit outcome Decision 5 requires. |
+| F13b ratchet | guard (flipped by OPT-960) | Base: outcome was `INFINITE_LOOP_DRAW` with winReason "Unstoppable loop detected — game ends in a draw", a rules draw. OPT-960 writes `engineOutcome.type: "ENGINE_LIMIT"` with winReason "Engine resolution limit reached — the game ended with no winner". |
 | F15 | ratchet (OPT-963) | The battle `REVEAL_TRIGGER` and the nested `SELECT_TARGET` both surface for p1, but p0 Life is already 1 while the nested prompt is pending. |
 | F16a | guard (synthetic checkpoint) | Both decks empty at rule processing → `FINISHED`, winner `null`. |
-| F16b | ratchet (OPT-960) | `CARD_TRASHED` p1 → `CARD_TRASHED` p0 → `GAME_OVER` with winner `null`: the second MILL ran after p1 had already met the defeat condition, manufacturing a draw. |
+| F16b | guard (flipped by OPT-960) | Base: `CARD_TRASHED` p1 → `CARD_TRASHED` p0 → `GAME_OVER` with winner `null`; the second MILL ran after p1 had already met the defeat condition, manufacturing a draw. OPT-960: the checkpoint after the `OPPONENT_ACTION` MILL ends play; winner 0, p0's deck keeps its card. |
 | F17 | ratchet (OPT-963) | `DAMAGE_DEALT` ×2 → `END_OF_BATTLE` with **no** p1 draw at all. The same Leader with a single-damage attacker draws once after the battle, so Double Attack loses the defender's taking-damage effect entirely (see §3.1 and the PR's Follow-ups). |
 
 No fixture carries an "assumed" status. Decision 7's replacement-precedence fixture (rule 8-1-3-4-2, assumed literal reading) belongs to OPT-968 and is not in this baseline.

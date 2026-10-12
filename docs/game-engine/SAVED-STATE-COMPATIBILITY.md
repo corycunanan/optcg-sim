@@ -45,6 +45,10 @@ A failure at any step throws `SessionLoadError` carrying `location` and `reason`
 
 Writers do not change. Persisted output for every state the current engine can produce is byte-identical before and after PR 1, proven by a golden test (`opt-940-writer-golden.test.ts`) against a fixture captured through the pre-change writer at the base commit. The `schemaVersion` key is **not** written in PR 1. The first writer that emits it is the first PR that bumps the version to 2.
 
+### 1.4 Values PR 2 writes without a version bump (OPT-960)
+
+PR 2 (OPT-949/OPT-925/OPT-862) writes new values into existing v1 fields only: `engineOutcome.type: "ENGINE_LIMIT"` (the v1 schema parses `engineOutcome` as `z.unknown().nullable().optional()`), new `winReason` strings (a free string), and terminal states whose `turn.battle`/`battleSubPhase` are `null` and whose `pendingTriggerFromEffect`/`pendingBattleDamageContinuation` are absent (all optional or nullable in v1). The `GAME_OVER` payload keeps its strict v1 keys (`winner`, `reason`, `diagnostic`). No new key, frame kind, or field is written, so the version stays 1 and the PR 1 build (`1b3f6a50`) remains the rollback target; the PR body carries the rung-4 proof that the PR 1 reader loads a live state and an undo snapshot holding every new terminal value. Only terminal states change; the writer golden is byte-identical.
+
 ---
 
 ## 2. Frame-kind contract

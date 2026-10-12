@@ -138,19 +138,40 @@ export function canOfferTrigger(
   );
 }
 
+/**
+ * Deal effect damage one point at a time (4-6-2). `damageTaken` is true when
+ * this call starts the damage instruction and false when it resumes the
+ * remaining points after a [Trigger] window.
+ *
+ * Lethal determination (OPT-925): rule 9-2-1-1 defeats a player whose Leader
+ * "takes damage when that player has 0 Life cards", and 4-6-2 says the Leader
+ * takes the damage first and then repeats the Life-to-hand procedure per
+ * point. So the damage is lethal exactly when the player has 0 Life as the
+ * instruction deals it (the first point). A later point of the same
+ * instruction that finds 0 Life only repeats the empty procedure; it is not
+ * a new determination. Reported in `lethalDamagePlayerIndex` for the
+ * rule-processing checkpoint.
+ */
 export function continueEffectDamageSequence(
   state: GameState,
   cardDb: Map<string, CardData>,
   damagedPlayerIndex: 0 | 1,
   remainingDamages: number,
   sourceCardInstanceId: string,
-  controllerIndex: 0 | 1
+  controllerIndex: 0 | 1,
+  damageTaken = false
 ): ExecuteResult {
   const events: PendingEvent[] = [];
   let nextState = state;
   for (let i = 0; i < remainingDamages; i++) {
     const popResult = popLifeForDamage(nextState, damagedPlayerIndex);
-    if (popResult.lethal || !popResult.lifeCard) break;
+    if (popResult.lethal) {
+      if (damageTaken && i === 0) {
+        return { state: nextState, events, lethalDamagePlayerIndex: damagedPlayerIndex };
+      }
+      break;
+    }
+    if (!popResult.lifeCard) break;
     nextState = popResult.state;
     events.push(...popResult.events);
     const lifeCard = popResult.lifeCard;
@@ -192,7 +213,7 @@ export function continueEffectDamageSequence(
         playerIndex: damagedPlayerIndex,
         payload: { cardId: lifeCard.cardId },
       });
-      return { state: nextState, events, damagedPlayerIndex };
+      return { state: nextState, events };
     }
     const handResult = moveLifeCardToHand(
       nextState,
@@ -202,5 +223,5 @@ export function continueEffectDamageSequence(
     nextState = handResult.state;
     events.push(...handResult.events);
   }
-  return { state: nextState, events, damagedPlayerIndex };
+  return { state: nextState, events };
 }

@@ -119,7 +119,12 @@ export type PendingEvent = PendingGameEvent;
 export interface ExecuteResult {
   state: GameState;
   events: PendingEvent[];
-  damagedPlayerIndex?: 0 | 1; // set when a leader takes damage (for defeat check)
+  /**
+   * Set only when the rules determined that a Leader took damage while its
+   * player had 0 Life (9-2-1-1; battle: 7-1-4-1-1-1). Rule processing reads
+   * this as qualifying lethal damage. Nonlethal damage never sets it.
+   */
+  lethalDamagePlayerIndex?: 0 | 1;
   pendingPrompt?: PendingPromptState;
 }
 

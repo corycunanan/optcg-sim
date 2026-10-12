@@ -14,6 +14,7 @@ import type {
 } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
+import { terminateGame } from "../../terminal.js";
 import {
   resolveAmount,
   computeExpiry,
@@ -244,12 +245,11 @@ export function executeWinGame(
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
 ): ActionResult {
-  const events: PendingEvent[] = [];
-  events.push({ type: "GAME_OVER", playerIndex: controller, payload: { reason: "card_effect" } });
-
+  // Card text over rules (1-3-1): the controller wins now. The common
+  // terminal writer ends play, so no later instruction runs.
   return {
-    state: { ...state, status: "FINISHED", winner: controller },
-    events,
+    state: terminateGame(state, { kind: "WIN_GAME", winner: controller }, controller),
+    events: [],
     succeeded: true,
   };
 }
