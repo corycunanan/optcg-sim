@@ -48,7 +48,13 @@ export type LegacyShape =
   | "legacy.stage_less_phase_boundary"
   | "legacy.structural_resume_context"
   | "legacy.cost_transaction_frame"
-  | "legacy.stuck_damage_step";
+  | "legacy.stuck_damage_step"
+  /** Battle and effect Trigger windows both parked; the coordinator serves the battle one first. */
+  | "legacy.two_trigger_windows"
+  /** pendingBattleDamageContinuation with no battle, another battle, or outside DAMAGE_STEP; resumeBattleDamageContinuation drops it (battle.ts). */
+  | "legacy.orphan_battle_continuation"
+  /** battle.pendingTriggerLifeCard outside DAMAGE_STEP. */
+  | "legacy.trigger_window_outside_damage_step";
 
 /**
  * A session failed to load. `location` is `state` or `undoHistory[i]`;
@@ -196,9 +202,12 @@ function frameInvariantViolation(
 }
 
 /**
- * Validate every prompt/frame reference and the semantic invariants of the
+ * Validate every prompt/frame reference and the frame invariants of the
  * converted state (SAVED-STATE-COMPATIBILITY.md §2.3, §2.4). Throws
- * SessionLoadError naming the reference; never mutates.
+ * SessionLoadError naming the reference; never mutates. Battle-record
+ * coherence is classified by `classifyLegacyShapes`, not rejected: the engine
+ * writes two open Trigger windows (review finding A) and tolerates an orphan
+ * continuation (`resumeBattleDamageContinuation` drops it).
  */
 export function validateContinuationReferences(
   state: GameState,
@@ -262,40 +271,6 @@ export function validateContinuationReferences(
     }
   }
 
-  const { turn } = state;
-  const continuation = turn.pendingBattleDamageContinuation;
-  if (continuation) {
-    if (!turn.battle) {
-      throw new SessionLoadError(
-        location,
-        `turn.pendingBattleDamageContinuation refers to battle ${JSON.stringify(continuation.battleId)} but turn.battle is null`
-      );
-    }
-    if (turn.battle.battleId !== continuation.battleId) {
-      throw new SessionLoadError(
-        location,
-        `turn.pendingBattleDamageContinuation refers to battle ${JSON.stringify(continuation.battleId)} but turn.battle is ${JSON.stringify(turn.battle.battleId)}`
-      );
-    }
-    if (turn.battleSubPhase !== "DAMAGE_STEP") {
-      throw new SessionLoadError(
-        location,
-        `turn.pendingBattleDamageContinuation exists while turn.battleSubPhase is ${String(turn.battleSubPhase)}; expected DAMAGE_STEP`
-      );
-    }
-  }
-  if (turn.battle?.pendingTriggerLifeCard && turn.battleSubPhase !== "DAMAGE_STEP") {
-    throw new SessionLoadError(
-      location,
-      `turn.battle.pendingTriggerLifeCard exists while turn.battleSubPhase is ${String(turn.battleSubPhase)}; expected DAMAGE_STEP`
-    );
-  }
-  if (turn.pendingTriggerFromEffect && turn.battle?.pendingTriggerLifeCard) {
-    throw new SessionLoadError(
-      location,
-      "turn.pendingTriggerFromEffect and turn.battle.pendingTriggerLifeCard are both set; only one Trigger window can be open"
-    );
-  }
 }
 
 /** Same predicate as effect-resolver/resume/cost.ts isLegacyCostTransactionFrame. */
@@ -361,6 +336,22 @@ export function classifyLegacyShapes(state: GameState): LegacyShapeReport[] {
   }
   if (isStuckDamageStep(state)) {
     reports.push({ shape: "legacy.stuck_damage_step" });
+  }
+  const { turn } = state;
+  if (turn.pendingTriggerFromEffect && turn.battle?.pendingTriggerLifeCard) {
+    reports.push({ shape: "legacy.two_trigger_windows" });
+  }
+  const continuation = turn.pendingBattleDamageContinuation;
+  if (
+    continuation &&
+    (!turn.battle ||
+      turn.battle.battleId !== continuation.battleId ||
+      turn.battleSubPhase !== "DAMAGE_STEP")
+  ) {
+    reports.push({ shape: "legacy.orphan_battle_continuation" });
+  }
+  if (turn.battle?.pendingTriggerLifeCard && turn.battleSubPhase !== "DAMAGE_STEP") {
+    reports.push({ shape: "legacy.trigger_window_outside_damage_step" });
   }
   return reports;
 }

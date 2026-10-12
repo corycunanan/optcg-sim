@@ -8,7 +8,13 @@
  * (a game-state schema version bump). opt-940-writer-golden.test.ts fails
  * whenever the current writer's bytes differ from this file, which is the
  * "writers are unchanged" proof for reader-only PRs. The fixture header
- * records the commit it was captured at.
+ * records the commit whose writer produced the bytes.
+ *
+ * To add a case in a reader-only PR without moving that commit: materialize
+ * the writer files of the recorded commit over the working tree (`git show
+ * <commit>:workers/game/src/session/persistence.ts > src/session/persistence.ts`,
+ * same for persisted-game-state.ts and types.ts), run with
+ * `GOLDEN_WRITER_COMMIT=<commit>`, then restore HEAD's files.
  */
 
 import { execSync } from "node:child_process";
@@ -31,7 +37,9 @@ const outputPath = resolve(
 );
 
 async function main(): Promise<void> {
-  const capturedAt = execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
+  const capturedAt =
+    process.env.GOLDEN_WRITER_COMMIT ??
+    execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
   const cases: Record<
     string,
     { shape: string; sessionJson: string; cardDbJson: string; undoHistoryJson: string }

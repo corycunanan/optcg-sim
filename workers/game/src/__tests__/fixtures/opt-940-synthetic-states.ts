@@ -32,6 +32,8 @@ import type { SessionSnapshot, SessionStorage } from "../../session/persistence.
 import { runPipeline } from "../../engine/pipeline.js";
 import { startPregame } from "../../engine/pregame.js";
 import { SessionCoordinator } from "../../session/coordinator.js";
+import { resumePromptLifecycle } from "../../session/prompt-lifecycle.js";
+import { registerTriggersForCard } from "../../engine/triggers.js";
 import {
   CARDS,
   createBattleReadyState,
@@ -246,6 +248,135 @@ function endPhaseParked(cardDb: Map<string, CardData>): GameState {
   return result.state;
 }
 
+
+/**
+ * Both Trigger windows open at once, produced by the real engine (finding A
+ * of the PR #746 review): p0's Leader "when this attack deals damage" K.O.s a
+ * p1 Character whose [On K.O.] deals 1 effect damage back to p0 while p1's
+ * own battle Trigger is still parked. Both top Life cards carry [Trigger].
+ * The coordinator serves the battle Trigger first (surfaceRevealTrigger).
+ */
+function bothTriggerWindows(cardDb: Map<string, CardData>): GameState {
+  const noKeywords = { ...CARDS.VANILLA.keywords };
+  const leader: CardData = {
+    ...CARDS.LEADER,
+    id: "SYN-LEADER-DAMAGE-KO",
+    name: "SYN-LEADER-DAMAGE-KO",
+    effectSchema: {
+      card_id: "SYN-LEADER-DAMAGE-KO",
+      card_name: "SYN-LEADER-DAMAGE-KO",
+      card_type: "Leader",
+      effects: [
+        {
+          id: "syn-leader-damage-ko",
+          category: "auto",
+          trigger: { event: "ATTACK_DEALS_DAMAGE", filter: { attacker: "SELF" } },
+          actions: [
+            {
+              type: "KO",
+              target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } },
+            },
+          ],
+        },
+      ],
+    },
+  };
+  const robin: CardData = {
+    ...CARDS.VANILLA,
+    id: "SYN-ROBIN-ON-KO-DAMAGE",
+    name: "SYN-ROBIN-ON-KO-DAMAGE",
+    keywords: noKeywords,
+    effectSchema: {
+      card_id: "SYN-ROBIN-ON-KO-DAMAGE",
+      card_name: "SYN-ROBIN-ON-KO-DAMAGE",
+      card_type: "Character",
+      effects: [
+        {
+          id: "syn-robin-on-ko-damage",
+          category: "auto",
+          trigger: { keyword: "ON_KO" },
+          actions: [
+            { type: "DEAL_DAMAGE", target: { type: "PLAYER", controller: "OPPONENT" }, params: { amount: 1 } },
+          ],
+        },
+      ],
+    },
+  };
+  cardDb.set(leader.id, leader);
+  cardDb.set(robin.id, robin);
+
+  let state = createBattleReadyState(cardDb);
+  const p0Leader = { ...state.players[0].leader, cardId: leader.id };
+  const robinInstance = {
+    instanceId: "robin-golden",
+    cardId: robin.id,
+    zone: "CHARACTER" as const,
+    state: "ACTIVE" as const,
+    attachedDon: [],
+    turnPlayed: 1,
+    controller: 1 as const,
+    owner: 1 as const,
+  };
+  state = {
+    ...state,
+    players: [
+      {
+        ...state.players[0],
+        leader: p0Leader,
+        life: [
+          { instanceId: "life-golden-p0-trigger", cardId: CARDS.TRIGGER.id, face: "DOWN" },
+          { instanceId: "life-golden-p0-vanilla", cardId: CARDS.VANILLA.id, face: "DOWN" },
+        ],
+      },
+      {
+        ...state.players[1],
+        characters: padChars([robinInstance]) as GameState["players"][1]["characters"],
+        life: [
+          { instanceId: "life-golden-p1-trigger", cardId: CARDS.TRIGGER.id, face: "DOWN" },
+          { instanceId: "life-golden-p1-vanilla", cardId: CARDS.VANILLA.id, face: "DOWN" },
+        ],
+      },
+    ],
+  };
+  state = registerTriggersForCard(state, p0Leader, leader);
+  state = registerTriggersForCard(state, robinInstance, robin);
+
+  const coordinator = new SessionCoordinator();
+  const step = (playerIndex: 0 | 1, action: Parameters<SessionCoordinator["executeAction"]>[3]) => {
+    const result = coordinator.executeAction(state, [], playerIndex, action, cardDb);
+    if (result.kind !== "applied") {
+      throw new Error(`golden: ${action.type} by p${playerIndex} was ${result.kind}: ${"reason" in result ? result.reason : ""}`);
+    }
+    state = result.state;
+  };
+  step(0, {
+    type: "DECLARE_ATTACK",
+    attackerInstanceId: p0Leader.instanceId,
+    targetInstanceId: state.players[1].leader.instanceId,
+  });
+  step(1, { type: "PASS" });
+  step(1, { type: "PASS" });
+  const koPrompt = state.pendingPrompt;
+  if (koPrompt?.options.promptType !== "SELECT_TARGET" || koPrompt.respondingPlayer !== 0) {
+    throw new Error("golden: expected p0's K.O. SELECT_TARGET after the damage");
+  }
+  const resumed = resumePromptLifecycle(
+    state,
+    { type: "SELECT_TARGET", selectedInstanceIds: [robinInstance.instanceId], promptId: koPrompt.promptId },
+    cardDb,
+    { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }
+  );
+  if (resumed.responseRejected) throw new Error("golden: K.O. selection was rejected");
+  state = coordinator.surfaceRevealTrigger(resumed.state, cardDb);
+  if (!state.turn.battle?.pendingTriggerLifeCard || !state.turn.pendingTriggerFromEffect) {
+    throw new Error("golden: expected both Trigger windows to be open");
+  }
+  if (state.pendingPrompt?.options.promptType !== "REVEAL_TRIGGER" || state.effectStack.length !== 0) {
+    throw new Error("golden: expected the battle REVEAL_TRIGGER prompt on an empty stack");
+  }
+  return state;
+}
+
 export function buildSyntheticSessionStates(): SyntheticSessionState[] {
   const cardDb = createTestCardDb();
   const { state: fresh } = setupGame();
@@ -415,6 +546,11 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
       name: "battle-trigger-window",
       shape: "DAMAGE_STEP paused on battle.pendingTriggerLifeCard with the surfaced REVEAL_TRIGGER prompt (real engine)",
       snapshot: snapshot(battleTriggerWindow(cardDb), cardDb),
+    },
+    {
+      name: "both-trigger-windows",
+      shape: "DAMAGE_STEP with battle.pendingTriggerLifeCard and turn.pendingTriggerFromEffect both set, battle REVEAL_TRIGGER prompt pending, empty stack (real engine; review finding A)",
+      snapshot: snapshot(bothTriggerWindows(cardDb), cardDb),
     },
     {
       name: "effect-damage-trigger-window",

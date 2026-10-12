@@ -186,6 +186,19 @@ describe("OPT-940 stuck DAMAGE_STEP (OPT-884): loaded as-is and classified", () 
   });
 });
 
+describe("OPT-940 both Trigger windows open (review finding A): loaded as-is and classified", () => {
+  it("loads the real-engine state live and as undo with the battle prompt intact", async () => {
+    for (const state of [loadLive("both-trigger-windows"), await loadAsUndo("both-trigger-windows")]) {
+      expect(state.turn.battleSubPhase).toBe("DAMAGE_STEP");
+      expect(state.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
+      expect(state.turn.pendingTriggerFromEffect).toBeTruthy();
+      expect(state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+      expect(state.effectStack).toEqual([]);
+      expect(classifyLegacyShapes(state)).toEqual([{ shape: "legacy.two_trigger_windows" }]);
+    }
+  });
+});
+
 describe("OPT-940 Phase 1 records: supported as-is under version 1", () => {
   it.each([
     "battle-trigger-window",

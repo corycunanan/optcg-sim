@@ -11,6 +11,7 @@ import type { GameState } from "../types.js";
 import { convertPersistedGameState } from "../session/persistence.js";
 import {
   EFFECT_STACK_FRAME_KINDS,
+  classifyLegacyShapes,
   frameKindOf,
   type EffectStackFrameKind,
 } from "../session/game-state-schema.js";
@@ -150,42 +151,42 @@ describe("OPT-940 reference integrity: phase boundary", () => {
   });
 });
 
-describe("OPT-940 reference integrity: battle damage records", () => {
-  it("rejects a damage continuation with no battle", () => {
+describe("OPT-940 battle damage records: classified, never rejected (review finding A)", () => {
+  function loadAndClassify(raw: RawState) {
+    const state = convertPersistedGameState(raw, "state");
+    return classifyLegacyShapes(state).map((report) => report.shape);
+  }
+
+  it("loads both Trigger windows open at once, as the real engine writes them", () => {
+    const raw = rawState("both-trigger-windows");
+    expect(raw.turn.pendingTriggerFromEffect).toBeTruthy();
+    expect((raw.turn.battle as { pendingTriggerLifeCard?: unknown }).pendingTriggerLifeCard).toBeTruthy();
+    expect(loadAndClassify(raw)).toEqual(["legacy.two_trigger_windows"]);
+  });
+
+  it("loads a damage continuation with no battle and classifies it", () => {
     const raw = rawState("stuck-damage-step");
     raw.turn.battle = null;
-    expectRejected(
-      raw,
-      'Stored session state turn.pendingBattleDamageContinuation refers to battle "golden-stuck-battle" but turn.battle is null'
-    );
+    // Still stuck (target gone, no prompt, empty stack) and now orphaned too.
+    expect(loadAndClassify(raw)).toEqual(["legacy.stuck_damage_step", "legacy.orphan_battle_continuation"]);
   });
 
-  it("rejects a damage continuation whose battle id differs from the battle", () => {
+  it("loads a damage continuation whose battle id differs from the battle and classifies it", () => {
     const raw = rawState("stuck-damage-step");
     (raw.turn.battle as { battleId: string }).battleId = "other-battle";
-    expectRejected(
-      raw,
-      'refers to battle "golden-stuck-battle" but turn.battle is "other-battle"'
-    );
+    expect(loadAndClassify(raw)).toEqual(["legacy.stuck_damage_step", "legacy.orphan_battle_continuation"]);
   });
 
-  it("rejects a damage continuation outside the Damage Step", () => {
+  it("loads a damage continuation outside the Damage Step and classifies it", () => {
     const raw = rawState("stuck-damage-step");
     raw.turn.battleSubPhase = "COUNTER_STEP";
-    expectRejected(raw, /turn\.pendingBattleDamageContinuation exists while turn\.battleSubPhase is COUNTER_STEP; expected DAMAGE_STEP/);
+    expect(loadAndClassify(raw)).toEqual(["legacy.orphan_battle_continuation"]);
   });
 
-  it("rejects a battle Trigger window outside the Damage Step", () => {
+  it("loads a battle Trigger window outside the Damage Step and classifies it", () => {
     const raw = rawState("battle-trigger-window");
     raw.turn.battleSubPhase = "COUNTER_STEP";
-    expectRejected(raw, /turn\.battle\.pendingTriggerLifeCard exists while turn\.battleSubPhase is COUNTER_STEP/);
-  });
-
-  it("rejects two open Trigger windows", () => {
-    const raw = rawState("battle-trigger-window");
-    const effect = rawState("effect-damage-trigger-window");
-    raw.turn.pendingTriggerFromEffect = effect.turn.pendingTriggerFromEffect;
-    expectRejected(raw, "turn.pendingTriggerFromEffect and turn.battle.pendingTriggerLifeCard are both set; only one Trigger window can be open");
+    expect(loadAndClassify(raw)).toEqual(["legacy.trigger_window_outside_damage_step"]);
   });
 
   it("rejects a COST frame with no costs and a BATCH_RESUME frame with no marker", () => {
