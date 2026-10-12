@@ -277,8 +277,8 @@ if (!deduped.length) {
 
 // ---- Phase 3: Verify --------------------------------------------------------
 // Two gates, cheapest first:
-//   Stage 1 (Codex plan, ~free): cross-MODEL refute — Sol findings refuted by
-//   Luna and vice versa, refute-by-default. Kills most false positives before
+//   Stage 1 (Codex plan, ~free): cross-MODEL refute — frontier findings refuted by
+//   the fast model and vice versa, refute-by-default. Kills most false positives before
 //   Claude spends anything.
 //   Stage 2 (Claude sonnet — the cost center): cross-FAMILY final gate, majors
 //   only, batched one agent per FILE so repo reading is shared across findings.
