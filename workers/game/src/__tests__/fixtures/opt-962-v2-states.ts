@@ -128,7 +128,7 @@ function waveOneSelectTarget(): Table {
   return t;
 }
 
-function scheduledKo(controller: 0 | 1): RuntimeScheduledAction["action"] {
+function scheduledKo(): RuntimeScheduledAction["action"] {
   return { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } };
 }
 
@@ -160,14 +160,14 @@ export function buildV2EndPhaseStates(): V2EndPhaseState[] {
 
   const s1 = new Table();
   s1.authored("OP03-015", 1, { cost: 3 });
-  s1.state = { ...s1.state, scheduledActions: [scheduled("s1-ko", 0, scheduledKo(0)), scheduled("s1-draw", 0, DRAW_1)] };
+  s1.state = { ...s1.state, scheduledActions: [scheduled("s1-ko", 0, scheduledKo()), scheduled("s1-draw", 0, DRAW_1)] };
   s1.act({ type: "ADVANCE_PHASE" });
   s1.parked();
   out.push({ name: "step1-scheduled-prompt", shape: "TURN_PLAYER_END_OF_TURN; p0's scheduled K.O. SELECT_TARGET, one TURN_PLAYER entry remaining", state: s1.state });
 
   const s2 = new Table();
   s2.authored("OP03-015", 0, { cost: 3 });
-  s2.state = { ...s2.state, scheduledActions: [scheduled("s2-ko", 1, scheduledKo(1)), scheduled("s2-draw", 1, DRAW_1)] };
+  s2.state = { ...s2.state, scheduledActions: [scheduled("s2-ko", 1, scheduledKo()), scheduled("s2-draw", 1, DRAW_1)] };
   s2.act({ type: "ADVANCE_PHASE" });
   s2.parked();
   out.push({ name: "step2-scheduled-prompt", shape: "NON_TURN_PLAYER_END_OF_TURN; p1's scheduled K.O. SELECT_TARGET, one NON_TURN_PLAYER entry remaining", state: s2.state });
@@ -177,7 +177,7 @@ export function buildV2EndPhaseStates(): V2EndPhaseState[] {
   const legacy = new Table();
   legacy.authored("OP03-015", 1, { cost: 3 });
   legacy.authored("OP03-015", 1, { cost: 3 });
-  legacy.state = { ...legacy.state, scheduledActions: [scheduled("lg-ko", 0, scheduledKo(0))] };
+  legacy.state = { ...legacy.state, scheduledActions: [scheduled("lg-ko", 0, scheduledKo())] };
   legacy.act({ type: "ADVANCE_PHASE" });
   const frame = legacy.parked();
   legacy.state = {
@@ -190,7 +190,7 @@ export function buildV2EndPhaseStates(): V2EndPhaseState[] {
             endingPlayerIndex: 0,
             stage: "LEGACY_SCHEDULED_ACTIONS",
             remainingScheduledActions: [
-              { action: scheduledKo(0), controller: 0, sourceEffectId: "src-lg-ko-2" },
+              { action: scheduledKo(), controller: 0, sourceEffectId: "src-lg-ko-2" },
               { action: DRAW_1, controller: 0, sourceEffectId: "src-lg-draw" },
             ],
           },
