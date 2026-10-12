@@ -23,7 +23,7 @@ import {
 } from "../session/game-state-schema.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
-import { loadGoldenFixture } from "./opt-940-writer-golden.test.js";
+import { loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 
 function golden(name: string) {
   const entry = loadGoldenFixture().cases[name];

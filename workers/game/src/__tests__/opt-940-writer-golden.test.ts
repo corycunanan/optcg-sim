@@ -11,8 +11,6 @@
  * (a game-state schema version bump).
  */
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   SESSION_CARD_DB_STORAGE_KEY,
@@ -21,33 +19,11 @@ import {
   SessionRepository,
 } from "../session/persistence.js";
 import { GAME_STATE_SCHEMA_VERSION_KEY } from "../session/game-state-schema.js";
-import {
-  MemorySessionStorage,
-  buildSyntheticSessionStates,
-} from "./fixtures/opt-940-synthetic-states.js";
-
-const BASE_COMMIT = "03071b6914c36349d0e81930a6f80bb530c713d9";
-
-interface GoldenFixture {
-  provenance: string;
-  capturedAtCommit: string;
-  cases: Record<
-    string,
-    { shape: string; sessionJson: string; cardDbJson: string; undoHistoryJson: string }
-  >;
-}
-
-export function loadGoldenFixture(): GoldenFixture {
-  return JSON.parse(
-    readFileSync(
-      resolve(__dirname, "fixtures/opt-940-writer-golden.synthetic.json"),
-      "utf8"
-    )
-  ) as GoldenFixture;
-}
+import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
+import { GOLDEN_BASE_COMMIT, getSyntheticStates, loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 
 async function writeThroughCurrentWriter(name: string) {
-  const entry = buildSyntheticSessionStates().find((state) => state.name === name);
+  const entry = getSyntheticStates().find((state) => state.name === name);
   if (!entry) throw new Error(`no synthetic state named ${name}`);
   const storage = new MemorySessionStorage();
   const repository = new SessionRepository(storage, {
@@ -67,10 +43,10 @@ describe("OPT-940 writer golden: persisted bytes are unchanged by the reader PR"
   const fixture = loadGoldenFixture();
 
   it("was captured through the writer at the base commit and is labelled synthetic", () => {
-    expect(fixture.capturedAtCommit).toBe(BASE_COMMIT);
+    expect(fixture.capturedAtCommit).toBe(GOLDEN_BASE_COMMIT);
     expect(fixture.provenance).toBe("synthetic");
     expect(Object.keys(fixture.cases).sort()).toEqual(
-      buildSyntheticSessionStates().map((state) => state.name).sort()
+      getSyntheticStates().map((state) => state.name).sort()
     );
   });
 

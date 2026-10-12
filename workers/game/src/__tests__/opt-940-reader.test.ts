@@ -23,11 +23,8 @@ import {
   SessionLoadError,
   readGameStateSchemaVersion,
 } from "../session/game-state-schema.js";
-import {
-  MemorySessionStorage,
-  buildSyntheticSessionStates,
-} from "./fixtures/opt-940-synthetic-states.js";
-import { loadGoldenFixture } from "./opt-940-writer-golden.test.js";
+import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
+import { getSyntheticStates, loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 
 type StoredSessionValue = Record<string, unknown> & { state: Record<string, unknown> };
 
@@ -96,10 +93,10 @@ describe("OPT-940 game-state schema version", () => {
 });
 
 describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
-  const names = buildSyntheticSessionStates().map((state) => state.name);
+  const names = getSyntheticStates().map((state) => state.name);
 
   it.each(names)("%s: bytes written at the base commit load to the state the writer saved", async (name) => {
-    const entry = buildSyntheticSessionStates().find((state) => state.name === name)!;
+    const entry = getSyntheticStates().find((state) => state.name === name)!;
     const saved = await repository(new MemorySessionStorage()).save(entry.snapshot);
 
     const loaded = await repository(goldenStorage(name)).load();

@@ -15,7 +15,7 @@ import {
   frameKindOf,
   type EffectStackFrameKind,
 } from "../session/game-state-schema.js";
-import { loadGoldenFixture } from "./opt-940-writer-golden.test.js";
+import { loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 
 type RawState = Record<string, unknown> & {
   effectStack: Array<Record<string, unknown>>;
