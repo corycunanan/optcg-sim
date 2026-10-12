@@ -15,8 +15,12 @@
  *   possible; the effect after the colon does not resolve.
  * - 8-3-1-7: a replaced activation cost is not "paid as described in the
  *   text", so the effect after the colon is not processed.
- * - 10-2-13-5: a [Once Per Turn] effect that started paying and could not
- *   finish cannot be activated again that turn.
+ * - 10-2-13-5: a [Once Per Turn] effect whose activation cost the player
+ *   became "unable to pay" cannot be activated again that turn. This case is
+ *   a replaced cost (8-3-1-7), not an inability to pay, so applying
+ *   10-2-13-5 here is an ASSUMED reading: no rule or ruling says whether a
+ *   replaced cost consumes the use. (OPT-822 consumes it on the Life-cost
+ *   replacement path.)
  *
  * Fixture (reachability: SYNTHETIC). OP17-043 Ganzui's authored replacement
  * (docs/cards/OP-17.md:313, "If this Character would be removed from the
@@ -29,7 +33,7 @@
  * Clause table
  * | Card / rule clause | Condition, evaluation time | Cost / payer | Target / chooser | Timing / continuation | Observable result | Test |
  * |---|---|---|---|---|---|---|
- * | 8-3-1-7 + 10-2-13-5, Ganzui replacement accepted | REST_DON 1 staged, then TRASH_SELF would remove Ganzui | REST_DON 1 then TRASH_SELF / P0; substitute: trash 2 from hand / P0 | P0 accepts and picks 2 hand cards | effect after the colon is not processed | retained: DON!! back to active, use not consumed, substitute stands, no draw. Rule-literal: DON!! stays rested, use consumed, substitute stands, no draw | "replaced after payment starts" |
+ * | 8-3-1-7 + 10-2-13-5, Ganzui replacement accepted | REST_DON 1 staged, then TRASH_SELF would remove Ganzui | REST_DON 1 then TRASH_SELF / P0; substitute: trash 2 from hand / P0 | P0 accepts and picks 2 hand cards | effect after the colon is not processed | retained: DON!! back to active, use not consumed, substitute stands, no draw. Rule-literal: DON!! stays rested, substitute stands, no draw; use consumed (assumed reading of 10-2-13-5) | "replaced after payment starts" |
  * | 8-1-3-4-1, replacement declined | same | REST_DON 1 then TRASH_SELF / P0 | P0 declines | printed cost paid; DRAW resolves | 1 DON!! rested, Ganzui trashed, 1 draw, use consumed | "declined" |
  * | 8-3-1-3, initial infeasibility | no active DON!! when offered | REST_DON 1 unpayable | n/a | not offered, not activated | availability blocked (COST), validation rejects, nothing moves | "initial infeasibility" |
  *
@@ -100,7 +104,9 @@ describe("OPT-864 Decision 10 — retained rollback after a replaced cost (KNOWN
     // rested, so restedDon would be 1.
     expect(restedDon(r)).toBe(0);
     // RETAINED (deviation): the [Once Per Turn] use is not consumed, so the
-    // player may retry. Rule-literal (10-2-13-5): the use is consumed.
+    // player may retry. Rule-literal, ASSUMED reading: the use is consumed
+    // (10-2-13-5 speaks of being "unable to pay"; this is a replaced cost
+    // under 8-3-1-7, which says nothing about the use).
     expect(used(r, ganzui)).toBe(false);
     expect(validate(
       r.state,
