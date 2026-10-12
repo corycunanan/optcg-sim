@@ -2,20 +2,23 @@
  * OPT-961 scale harness. Each scenario runs in a child process with a 256 MB
  * heap cap and a 20 s timeout (see opt-961-scale-scenarios.ts). The test fails
  * naming the scenario and path when a child times out, dies at the heap cap,
- * or breaks a threshold: median <= 50 ms, max <= 250 ms, heap delta <= 128 MB.
+ * or breaks its thresholds (FAST_LIMITS or SEARCH_LIMITS in
+ * opt-961-scale-scenarios.ts).
  *
- * Out of scope (follow-up): a 20-of-28 selection followed by an unpayable
- * suffix. The lazy search enumerates all C(28,20) combinations there by design.
+ * Residual (follow-up): when a large selection is followed by a suffix that
+ * fails for a reason the sequence prune does not read (a filter or a
+ * prohibition), the lazy search still enumerates every combination. S3b pins
+ * the 2-of-28 case; no authored card selects more than 2 before a later cost.
  */
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { PATHS, SCENARIOS } from "./opt-961-scale-scenarios.js";
+import { FAST_LIMITS, PATHS, SCENARIOS } from "./opt-961-scale-scenarios.js";
 
 const MODULE = fileURLToPath(new URL("./opt-961-scale-scenarios.ts", import.meta.url));
 const CWD = path.resolve(path.dirname(MODULE), "../..");
-const LIMITS = { medianMs: 50, maxMs: 250, heapDeltaMB: 128, timeoutMs: 20_000 };
+const TIMEOUT_MS = 20_000;
 
 interface Row { medianMs: number; maxMs: number; heapDeltaMB: number }
 interface Child { id: string; loadMs?: number; results?: Record<string, Row>; error?: string }
@@ -28,7 +31,7 @@ describe("OPT-961 cost-sequence feasibility scale harness", () => {
       const run = spawnSync(
         process.execPath,
         ["--expose-gc", "--max-old-space-size=256", "--import", "tsx", MODULE, s.id],
-        { cwd: CWD, timeout: LIMITS.timeoutMs, encoding: "utf8", env: process.env, killSignal: "SIGKILL" },
+        { cwd: CWD, timeout: TIMEOUT_MS, encoding: "utf8", env: process.env, killSignal: "SIGKILL" },
       );
       if (run.error || run.status !== 0) {
         const why = run.error ? `timed out or failed to run (${run.error.message})` : `exited ${run.status} signal ${run.signal} (heap cap or crash)`;
@@ -41,6 +44,7 @@ describe("OPT-961 cost-sequence feasibility scale harness", () => {
       if (!line) { failures.push(`${s.id}: no result line\n${String(run.stderr).slice(-600)}`); continue; }
       const out = JSON.parse(line.slice("OPT961_RESULT ".length)) as Child;
       if (out.error || !out.results) { failures.push(`${s.id}: ${out.error ?? "no results"}`); continue; }
+      const LIMITS = s.limits ?? FAST_LIMITS;
       for (const p of PATHS) {
         const r = out.results[p];
         table.push(`${s.id} ${p}: median ${r.medianMs.toFixed(2)} ms, max ${r.maxMs.toFixed(2)} ms, heap ${r.heapDeltaMB.toFixed(1)} MB, load ${out.loadMs?.toFixed(1)} ms`);

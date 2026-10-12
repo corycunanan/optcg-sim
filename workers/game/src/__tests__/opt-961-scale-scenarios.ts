@@ -20,12 +20,23 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { SessionRepository, type SessionStorage } from "../session/persistence.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
+export interface Limits { medianMs: number; maxMs: number; heapDeltaMB: number }
+
+/**
+ * OPT-961 round 1: thresholds are a small multiple of the measured head
+ * values (fast scenarios measure ≤ 0.12 ms median, ≤ 1 ms max, ≤ 4 MB; S3b
+ * measures about 12 ms median, 15 ms max, 50 MB), so a 10× regression fails.
+ */
+export const FAST_LIMITS: Limits = { medianMs: 1, maxMs: 25, heapDeltaMB: 16 };
+export const SEARCH_LIMITS: Limits = { medianMs: 40, maxMs: 100, heapDeltaMB: 128 };
+
 export interface ScenarioDef {
   id: string;
   costs: Cost[];
   trash: number;
   sourceState: "ACTIVE" | "RESTED";
   payable: boolean;
+  limits?: Limits;
 }
 
 export const SCENARIOS: ScenarioDef[] = [
@@ -35,6 +46,15 @@ export const SCENARIOS: ScenarioDef[] = [
   { id: "S3", costs: [{ type: "PLACE_HAND_TO_DECK", amount: 2 }, { type: "REST_SELF" }], trash: 30, sourceState: "RESTED", payable: false },
   { id: "S4", costs: [{ type: "TRASH_FROM_HAND", amount: 20 }, { type: "PLACE_FROM_TRASH_TO_DECK", amount: 20 }], trash: 30, sourceState: "ACTIVE", payable: true },
   { id: "S5", costs: [{ type: "TRASH_FROM_HAND", amount: 1 }, { type: "PLACE_FROM_TRASH_TO_DECK", amount: 1 }], trash: 0, sourceState: "ACTIVE", payable: true },
+  // OPT-961 round 1: a failed 2-of-28 selection the prune cannot see (the
+  // filtered trash matches no hand card), so the lazy search enumerates all
+  // C(28,2)=378 payments. Guards the residual search cost.
+  { id: "S3b", costs: [{ type: "PLACE_HAND_TO_DECK", amount: 2 }, { type: "TRASH_FROM_HAND", amount: 1, filter: { name: "OPT961-NO-SUCH-CARD" } }], trash: 30, sourceState: "ACTIVE", payable: false, limits: SEARCH_LIMITS },
+  // OPT-961 round 1, review shapes (pruned before branching).
+  { id: "X0", costs: [{ type: "REST_DON", amount: 1 }, { type: "TRASH_FROM_HAND", amount: 8 }, { type: "REST_SELF" }], trash: 30, sourceState: "RESTED", payable: false },
+  { id: "X1", costs: [{ type: "PLACE_HAND_TO_DECK", amount: 3 }, { type: "REST_SELF" }], trash: 30, sourceState: "RESTED", payable: false },
+  { id: "X2", costs: [{ type: "PLACE_HAND_TO_DECK", amount: 4 }, { type: "REST_SELF" }], trash: 30, sourceState: "RESTED", payable: false },
+  { id: "X3", costs: [{ type: "TRASH_FROM_HAND", amount: 2 }, { type: "TRASH_FROM_HAND", amount: 2 }, { type: "REST_SELF" }], trash: 30, sourceState: "RESTED", payable: false },
 ];
 
 export const PATHS = ["availability", "validate", "resolveEffect", "canOfferTrigger"] as const;
