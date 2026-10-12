@@ -104,3 +104,28 @@ describe("battle [Trigger] that ends the game stops the battle (rules 9-1-2 line
     expect(r.state.eventLog.map((e) => e.type).at(-1)).toBe("GAME_OVER");
   });
 });
+
+describe("End Phase stops after a scheduled action ends the game (rules 9-1-2 line 876, 6-6-1-4 line 624)", () => {
+  it("scheduled action: an END_OF_THIS_TURN MILL empties the ending player's deck; no hand-off follows", () => {
+    const r = rig();
+    r.deck(0, 1);
+    r.state.scheduledActions = [
+      {
+        id: "sched-mill",
+        sourceEffectId: r.state.players[0].leader.instanceId,
+        controller: 0,
+        timing: "END_OF_THIS_TURN",
+        boundToInstanceId: null,
+        action: { type: "MILL", params: { amount: 1 } },
+      } as never,
+    ];
+    r.act({ type: "ADVANCE_PHASE" });
+    expectTerminal(r.state, { winner: 1, reason: "Player 1 decked out" });
+    expect(r.state.turn.activePlayerIndex).toBe(0);
+    expect(r.state.turn.deckHitZeroThisTurn?.[0]).toBe(true);
+    const log = r.state.eventLog.map((e) => e.type);
+    expect(log).not.toContain("TURN_STARTED");
+    expect(log).not.toContain("TURN_ENDED");
+    expect(log.at(-1)).toBe("GAME_OVER");
+  });
+});

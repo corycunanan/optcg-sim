@@ -5,6 +5,7 @@
  * and turn handoff. Extracted from execute.ts for clarity.
  */
 
+import { isGameTerminated } from "./terminal.js";
 import { releaseMovedDonEffects } from "./don-area-effects.js";
 import type {
   CardData,
@@ -239,6 +240,10 @@ function continueEndPhase(
     );
     state = result.state;
     events.push(...result.events);
+    // OPT-960: a scheduled action that ended the game (a MILL emptying the
+    // deck) is final. No later scheduled action and no hand-off run; the
+    // End Phase order itself is unchanged (OPT-962 owns it).
+    if (isGameTerminated(state)) return { state, events };
     if (result.pendingPrompt) {
       state = publishPhaseBoundaryEvents(
         state,
@@ -260,6 +265,7 @@ function continueEndPhase(
     }
   }
 
+  if (isGameTerminated(state)) return { state, events };
   return completeTurnHandoff(state, continuation.endingPlayerIndex, events);
 }
 
