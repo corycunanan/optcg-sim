@@ -246,6 +246,14 @@ export type BatchResumeMarker =
 // ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
 
 export interface EffectStackFrame {
+  /**
+   * OPT-940 frame-kind contract (docs/game-engine/SAVED-STATE-COMPATIBILITY.md
+   * §2). Names the family of paused work; `phase` still names what the frame
+   * waits for. Optional in game-state schema version 1: the reader derives it
+   * with `frameKindOf` when absent and rejects a stored value that disagrees.
+   * No writer sets it in version 1.
+   */
+  kind?: import("./session/game-state-schema.js").EffectStackFrameKind;
   /** Notify activation watchers only after the nested Event Main finishes. */
   eventActivationCompletion?: PendingEvent;
   id: string;
