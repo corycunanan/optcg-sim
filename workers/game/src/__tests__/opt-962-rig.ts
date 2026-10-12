@@ -10,7 +10,7 @@
 
 import { expect } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState, LifeCard } from "../types.js";
-import type { EffectSchema } from "../engine/effect-types.js";
+import type { EffectSchema, RuntimeScheduledAction } from "../engine/effect-types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
@@ -32,9 +32,9 @@ export interface EndPhaseRig {
   log(): string[];
 }
 
-let serial = 0;
-
 export function endPhaseRig(opts: { handSize?: number; deckSize?: number } = {}): EndPhaseRig {
+  // Per rig, so two rigs built the same way have identical instance ids.
+  let serial = 0;
   const db = createTestCardDb();
   let state = createBattleReadyState(db);
   const handSize = opts.handSize ?? 2;
@@ -154,3 +154,60 @@ export function endPhaseRig(opts: { handSize?: number; deckSize?: number } = {})
 export function synSchema(id: string, type: "Character" | "Leader", effects: EffectSchema["effects"], extra: Partial<EffectSchema> = {}): EffectSchema {
   return { card_id: id, card_name: id, card_type: type, effects, ...extra };
 }
+
+/**
+ * Every stage in one End Phase (opt-962-end-phase-persistence.test.ts table):
+ * OP04-034 + Lim (wave 1, nested), an optional [End of Your Opponent's Turn]
+ * draw (wave 2), and a scheduled K.O. then draw for each player (steps 1, 2).
+ */
+export function fullEndPhaseScenario(): EndPhaseRig {
+  const r = endPhaseRig();
+  r.put("OP04-034", 0, "CHARACTER");
+  const lim = r.put("OP03-015", 1, "CHARACTER", { cost: 3 });
+  r.state.players[1].characters = r.state.players[1].characters.map((c) =>
+    c?.instanceId === lim.instanceId ? { ...c, state: "RESTED" } : c
+  ) as GameState["players"][1]["characters"];
+  r.putSyn("SYN-P1-TARGET", null, 1, "CHARACTER");
+  r.putSyn("SYN-EOOT-OPT", synSchema("SYN-EOOT-OPT", "Character", [{
+    id: "eoot-optional-draw",
+    category: "auto",
+    trigger: { keyword: "END_OF_OPPONENT_TURN" },
+    flags: { optional: true },
+    actions: [{ type: "DRAW", params: { amount: 1 } }],
+  }]), 1, "CHARACTER");
+  const ko = (id: string, controller: 0 | 1): RuntimeScheduledAction => ({
+    id,
+    timing: "END_OF_THIS_TURN",
+    action: { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } },
+    boundToInstanceId: null,
+    sourceEffectId: `src-${id}`,
+    controller,
+  });
+  const draw = (id: string, controller: 0 | 1): RuntimeScheduledAction => ({
+    id, timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } }, boundToInstanceId: null, sourceEffectId: `src-${id}`, controller,
+  });
+  r.state = { ...r.state, scheduledActions: [ko("p0-ko", 0), draw("p0-draw", 0), ko("p1-ko", 1), draw("p1-draw", 1)] };
+  return r;
+}
+
+export const EXPECTED_STAGES = [
+  "END_OF_YOUR_TURN_WAVE",
+  "END_OF_YOUR_TURN_WAVE",
+  "END_OF_OPPONENT_TURN_WAVE",
+  "TURN_PLAYER_END_OF_TURN",
+  "NON_TURN_PLAYER_END_OF_TURN",
+];
+
+/** The fixed reply for the n-th prompt. */
+export function fullEndPhaseReply(r: EndPhaseRig, n: number): { action: GameAction; player: 0 | 1 } {
+  const lim = r.state.players[1].characters.find((c) => c?.cardId === "OP03-015");
+  switch (n) {
+    case 0: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [lim!.instanceId] }, player: 0 };
+    case 1: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [r.state.players[0].leader.instanceId] }, player: 1 };
+    case 2: return { action: { type: "PLAYER_CHOICE", choiceId: "accept" }, player: 1 };
+    case 3: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [] }, player: 0 };
+    case 4: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [] }, player: 1 };
+    default: throw new Error(`unexpected prompt ${n}: ${r.state.pendingPrompt?.options.promptType}`);
+  }
+}
+
