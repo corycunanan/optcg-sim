@@ -1,0 +1,106 @@
+/**
+ * OPT-960 review round 1 — terminal stops in paths outside the resolver loop,
+ * and the end-of-turn window placement.
+ *
+ * Rules v1.2.0, `docs/rules/rule_comprehensive.md`: 9-1-2 (line 876) rule
+ * processing is immediate; 9-2-1-2 (line 884) 0 cards in deck; 10-1-5-3
+ * (line 914) the [Trigger] card is trashed after its effect; 7-1-4-1-1-3
+ * (line 672) Double Attack repeats the Life step per damage; 6-6-1-4 (line
+ * 624) the turn ends only after all End Phase processing. OP15-022 Brook
+ * (`docs/cards/OP-15.md:158`): "You lose at the end of the turn in which your
+ * deck becomes 0 cards."
+ *
+ * | Clause | Condition / evaluation time | Cost/payer | Target/chooser | Timing/continuation | Observable result | Test |
+ * |---|---|---|---|---|---|---|
+ * | 10-1-5 + 9-1-2: a battle [Trigger] "trash 5 from your deck" empties the defender's deck | defender accepts the Trigger | none | defender | game ends inside the Trigger; the battle never continues | FINISHED winner 0, `battle` null, no END_OF_BATTLE, `GAME_OVER` last | "battle Trigger …" |
+ * | same with [Double Attack] (7-1-4-1-1-3) | point 1's Trigger ends the game | none | defender | point 2 is never dealt | defender Life stays 1 | "Double Attack …" |
+ * | effect-damage Trigger (OPT-259) "trash 5 from your deck" | defender accepts | none | defender | the remaining effect never continues | FINISHED winner 0 | "effect-damage Trigger …" |
+ * | scheduled END_OF_THIS_TURN MILL empties the ending player's deck | in the End Phase | none | none | no hand-off | FINISHED winner 1, active player still 0, no TURN_STARTED, sticky flag kept | "scheduled action …" |
+ * | SEARCH_DECK picks the last deck card, THEN WIN_GAME (reload before the reply) | at the resumed move | none | p0 | the remaining chain never runs | FINISHED winner 1 "Player 1 decked out" | "resumed search …" |
+ * | Brook delayed loss + p0's [End of Your Turn] "opponent trashes 1" emptying p1's 1-card deck | Brook's flag already set; ADVANCE_PHASE | none | none | the end-of-turn window opens only at action end (base placement) | winner 0 (see the test comment) | "end-of-turn window …" |
+ */
+import { describe, expect, it } from "vitest";
+import type { CardData } from "../types.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { expectTerminal, rig, synSchema, type Rig } from "./opt-960-rig.js";
+import { CARDS } from "./helpers.js";
+
+const MILL5_TRIGGER = "SYN-TRIGGER-MILL5";
+
+/** A [Trigger] Life card whose Trigger trashes 5 cards from its owner's deck. */
+function trashFiveTrigger(): { data: Partial<CardData>; schema: ReturnType<typeof synSchema> } {
+  return {
+    data: { ...CARDS.TRIGGER, id: MILL5_TRIGGER, name: MILL5_TRIGGER, triggerText: "[Trigger] Trash 5 cards from the top of your deck." },
+    schema: synSchema(MILL5_TRIGGER, [
+      { id: "mill5", category: "auto", trigger: { keyword: "TRIGGER" }, actions: [{ type: "MILL", params: { amount: 5 } }] } as never,
+    ]),
+  };
+}
+
+function attackAndReveal(r: Rig, attackerId: string) {
+  r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attackerId, targetInstanceId: r.state.players[1].leader.instanceId });
+  r.act({ type: "PASS" });
+  r.act({ type: "PASS" });
+  expect(r.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(MILL5_TRIGGER);
+  const result = runPipeline(r.state, { type: "REVEAL_TRIGGER", reveal: true }, r.db, 1);
+  expect(result.valid, result.error).toBe(true);
+  r.state = result.state;
+}
+
+describe("battle [Trigger] that ends the game stops the battle (rules 9-1-2 line 876, 10-1-5-3 line 914)", () => {
+  it("battle Trigger: the Trigger empties the defender's deck; the battle never continues after GAME_OVER", () => {
+    const r = rig();
+    r.life(1, 1);
+    r.put(MILL5_TRIGGER, 1, "LIFE", trashFiveTrigger());
+    r.deck(1, 2);
+    const attacker = r.put("SYN-ATTACKER-9000", 0, "CHARACTER", { data: { power: 9000 } });
+    attackAndReveal(r, attacker.instanceId);
+    expectTerminal(r.state, { winner: 0, reason: "Player 2 decked out" });
+    expect(r.state.turn.battleSubPhase ?? null).toBeNull();
+    const log = r.state.eventLog.map((e) => e.type);
+    expect(log.at(-1)).toBe("GAME_OVER");
+    expect(log).not.toContain("END_OF_BATTLE");
+    expect(log).not.toContain("BATTLE_RESOLVED");
+  });
+
+  it("Double Attack: the Trigger on point 1 ends the game, so point 2 never takes a Life card", () => {
+    const r = rig();
+    r.life(1, 1);
+    r.put(MILL5_TRIGGER, 1, "LIFE", trashFiveTrigger());
+    r.deck(1, 2);
+    const hand = r.state.players[1].hand.length;
+    const attacker = r.put("SYN-DA-9000", 0, "CHARACTER", {
+      data: { ...CARDS.DOUBLE_ATK, id: "SYN-DA-9000", power: 9000 },
+    });
+    attackAndReveal(r, attacker.instanceId);
+    expectTerminal(r.state, { winner: 0, reason: "Player 2 decked out" });
+    expect(r.state.players[1].life).toHaveLength(1);
+    expect(r.state.players[1].hand).toHaveLength(hand);
+    expect(r.state.eventLog.map((e) => e.type).at(-1)).toBe("GAME_OVER");
+  });
+
+  it("effect-damage Trigger: the Trigger empties the defender's deck and the damage sequence stops", () => {
+    const r = rig();
+    r.life(1, 1);
+    r.put(MILL5_TRIGGER, 1, "LIFE", trashFiveTrigger());
+    r.deck(1, 2);
+    const dealer = r.put("SYN-DMG-2", 0, "CHARACTER", {
+      schema: synSchema("SYN-DMG-2", [
+        {
+          id: "dmg",
+          category: "activate",
+          trigger: { keyword: "ACTIVATE_MAIN" },
+          actions: [{ type: "DEAL_DAMAGE", target: { type: "PLAYER", controller: "OPPONENT" }, params: { amount: 2 } }],
+        } as never,
+      ]),
+    });
+    r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: dealer.instanceId, effectId: "dmg" });
+    expect(r.state.turn.pendingTriggerFromEffect?.lifeCard.cardId).toBe(MILL5_TRIGGER);
+    const result = runPipeline(r.state, { type: "REVEAL_TRIGGER", reveal: true }, r.db, 1);
+    expect(result.valid, result.error).toBe(true);
+    r.state = result.state;
+    expectTerminal(r.state, { winner: 0, reason: "Player 2 decked out" });
+    expect(r.state.players[1].life).toHaveLength(1);
+    expect(r.state.eventLog.map((e) => e.type).at(-1)).toBe("GAME_OVER");
+  });
+});

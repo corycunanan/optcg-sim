@@ -5,6 +5,7 @@
  * All battle-related execution logic, extracted from execute.ts.
  */
 
+import { isGameTerminated } from "./terminal.js";
 import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import type {
   CardData,
@@ -403,6 +404,8 @@ export function executeUseCounterEvent(
     const result = resolveEffect(nextState, counterBlock, moved.fact.newInstanceId, inactiveIdx, cardDb);
     nextState = result.state;
     events.push(...result.events);
+    // OPT-960: a [Counter] effect that ended the game leaves nothing to continue.
+    if (isGameTerminated(nextState)) return { state: nextState, events };
     if (result.pendingPrompt)
       return { state: nextState, events, pendingPrompt: result.pendingPrompt };
   }
@@ -489,6 +492,16 @@ export function executeRevealTrigger(
         nextState = effectResult.state;
         events.push(...effectResult.events);
         nextState = restoreTriggerStaging(nextState, stagingBaseline);
+        // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
+        // that already happened, then stop: no further damage, no endBattle.
+        if (isGameTerminated(nextState)) {
+          events.push({
+            type: "CARD_REMOVED_FROM_LIFE",
+            playerIndex: inactiveIdx,
+            payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
+          });
+          return { state: nextState, events };
+        }
         // OPT-441: a prompt pauses the Trigger effect, not the damage sequence.
         // Publish the Life removal now and queue its auto effects behind the
         // current effect frame. Once that stack fully unwinds, GameSession
@@ -690,6 +703,16 @@ function executeRevealEffectDamageTrigger(
         nextState = effectResult.state;
         events.push(...effectResult.events);
         nextState = restoreTriggerStaging(nextState, stagingBaseline);
+        // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
+        // that already happened, then stop: no further damage, no endBattle.
+        if (isGameTerminated(nextState)) {
+          events.push({
+            type: "CARD_REMOVED_FROM_LIFE",
+            playerIndex: damagedPlayerIndex,
+            payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
+          });
+          return { state: nextState, events };
+        }
         if (effectResult.pendingPrompt) {
           // Trigger effect itself needs input — abandon remaining damages
           // (parity with battle path at executeRevealTrigger's endBattle).
