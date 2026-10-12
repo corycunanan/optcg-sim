@@ -53,7 +53,7 @@ import {
   resolveAmount,
   sourceTextForBlock,
 } from "./action-utils.js";
-import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
+import { isCostSequencePayable, payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import {
   pushBatchResumeFrame,
   processRemainingTriggers,
@@ -409,6 +409,19 @@ export function resolveEffect(
 
   // Step 2: Check optional flag — prompt the player before paying costs
   if (block.flags?.optional) {
+    // OPT-864: rule 8-3-1-3 — an activation cost that cannot be paid in full
+    // (in printed order, 8-3-1-1) cannot be paid at all, so the effect is not
+    // activated. Skip before offering the prompt: accepting would pay nothing
+    // and run nothing (OP07-079 Lucci, EB04-042 Alpha with a short deck).
+    // Same evaluator and same state as the payment's own upfront check.
+    if (
+      block.costs?.length &&
+      !isCostSequencePayable(state, block.costs, controller, cardDb, sourceCardInstanceId)
+    ) {
+      log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
+      return { state, events, resolved: false, effectNotActivated: true };
+    }
+
     const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
     const frameId = generateFrameId(state);
     state = frameId.state;

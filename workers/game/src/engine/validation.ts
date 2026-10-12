@@ -15,7 +15,7 @@ import {
 } from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader, hasEffectiveKeyword } from "./keywords.js";
-import { isCostPayable } from "./effect-resolver/cost-handler.js";
+import { isCostSequencePayable } from "./effect-resolver/cost-handler.js";
 import type { Cost } from "./effect-types.js";
 import { evaluateCondition } from "./conditions.js";
 
@@ -351,6 +351,20 @@ export function getActivateEffectTimingError(state: GameState): string | null {
   return null;
 }
 
+/**
+ * OPT-864: may the activation cost be paid in full, in printed order?
+ *
+ * Rule 8-3-1-1 pays the costs top to bottom, and rule 8-3-1-3 makes the cost
+ * all-or-nothing, so a later cost is judged on the state after the earlier
+ * ones. Checking each cost alone against the pre-cost state falsely rejects a
+ * sequence in which an earlier cost enables a later one (for example, a hand
+ * trash that fills the trash a later trash-to-deck cost needs).
+ *
+ * No `isCostPayable` pre-filter runs here. The sequential evaluator already
+ * rejects on its first unpayable step, and a per-cost check on the initial
+ * state is sound only for index 0. Errors propagate (see
+ * `isCostSequencePayable`).
+ */
 export function areEffectCostsPayable(
   state: GameState,
   costs: readonly Cost[],
@@ -358,9 +372,7 @@ export function areEffectCostsPayable(
   cardDb: Map<string, CardData>,
   sourceCardInstanceId: string,
 ): boolean {
-  return costs.every((cost) =>
-    isCostPayable(state, cost, controller, cardDb, sourceCardInstanceId),
-  );
+  return isCostSequencePayable(state, costs, controller, cardDb, sourceCardInstanceId);
 }
 
 function validateActivateEffect(

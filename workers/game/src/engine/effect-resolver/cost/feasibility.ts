@@ -127,10 +127,20 @@ function anyState(states: Iterable<GameState>, predicate: (state: GameState) => 
 /**
  * Explore costs in order, advancing each hypothetical state before testing the
  * next cost. Selection and choice costs branch over every valid payment.
+ *
+ * OPT-864: this is the one payability contract for availability,
+ * validation, the optional-effect prompt, the Life Trigger gate and payment
+ * (rules 8-3-1-1, 8-3-1-3). It is pure: every payment runs on a copied
+ * state, so the caller's state, RNG and ID counters never change.
+ * Hypothetical payment is replacement-unaware (OPT-948 owns that).
+ *
+ * Failure policy: expected infeasibility returns false. An engine error
+ * (an unknown cost type, a broken identity assertion) is not infeasibility,
+ * so it propagates to the caller instead of reading as "cannot pay".
  */
 export function isCostSequencePayable(
   state: GameState,
-  costs: Cost[],
+  costs: readonly Cost[],
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   sourceCardInstanceId: string,

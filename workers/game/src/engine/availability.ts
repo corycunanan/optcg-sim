@@ -235,6 +235,7 @@ function availabilityForBlock(
     return { effectId: block.id, status: "blocked", reason: "CONDITION" };
   }
 
+  // OPT-864: sequential feasibility (rules 8-3-1-1, 8-3-1-3).
   if (
     block.costs?.length &&
     !areEffectCostsPayable(
