@@ -2,7 +2,7 @@ import type {
   EngineLimitDiagnostic,
   GameState,
 } from "../types.js";
-import { isGameTerminated, terminateGame } from "./terminal.js";
+import { terminateGame } from "./terminal.js";
 import { ensureExecutionContext } from "./execution-context.js";
 
 export const MAX_EFFECT_STACK_DEPTH = 100;

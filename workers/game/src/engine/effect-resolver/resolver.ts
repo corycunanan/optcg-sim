@@ -1403,10 +1403,7 @@ function ruleProcessingAfterAction(
   result: ActionResult,
   cardDb: Map<string, CardData>,
 ): ActionResult {
-  if (isGameTerminated(result.state)) {
-    const { pendingPrompt: _p, pendingBatchTriggers: _b, nestedEventActivation: _n, ...rest } = result;
-    return rest;
-  }
+  if (isGameTerminated(result.state)) return withoutContinuation(result, result.state);
   const lethal = result.lethalDamagePlayerIndex;
   const checked = runRuleProcessingAfterMove(
     before,
@@ -1417,8 +1414,20 @@ function ruleProcessingAfterAction(
   if (!isGameTerminated(checked)) {
     return checked === result.state ? result : { ...result, state: checked };
   }
-  const { pendingPrompt: _p, pendingBatchTriggers: _b, nestedEventActivation: _n, ...rest } = result;
-  return { ...rest, state: checked };
+  return withoutContinuation(result, checked);
+}
+
+/** A terminal action result: no prompt, batch continuation or nested Event boundary survives. */
+function withoutContinuation(result: ActionResult, state: GameState): ActionResult {
+  return {
+    state,
+    events: result.events,
+    succeeded: result.succeeded,
+    ...(result.result ? { result: result.result } : {}),
+    ...(result.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: result.lethalDamagePlayerIndex }
+      : {}),
+  };
 }
 
 export function executeEffectAction<K extends ActionType>(
