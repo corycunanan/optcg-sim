@@ -146,6 +146,47 @@ describe("zero Life without qualifying lethal damage stays playable (rule 9-2-1-
   });
 });
 
+describe("lethal battle damage ends play at the determination (rules 7-1-4-1-1-1 line 668, 9-1-2 line 876)", () => {
+  /** p0 attacks p1's Leader with a 6000 Character; p1 holds a "when you take damage, draw 1" watcher. */
+  function attackIntoWatcher(lifeCount: number) {
+    const r = rig();
+    r.life(1, lifeCount);
+    r.deck(1, 5);
+    r.put("SYN-TAKE-DAMAGE-DRAW", 1, "CHARACTER", {
+      schema: synSchema("SYN-TAKE-DAMAGE-DRAW", [
+        {
+          id: "watch",
+          category: "auto",
+          trigger: { event: "DAMAGE_TAKEN" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        } as never,
+      ]),
+    });
+    const attacker = r.put("SYN-ATTACKER-6000", 0, "CHARACTER", { data: { power: 6000 } });
+    const hand = r.state.players[1].hand.length;
+    r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: r.state.players[1].leader.instanceId });
+    r.act({ type: "PASS" });
+    r.act({ type: "PASS" });
+    return { r, hand };
+  }
+
+  it("an auto effect fulfilled by the lethal damage never resolves: the game ends at the determination", () => {
+    const { r, hand } = attackIntoWatcher(0);
+    expectTerminal(r.state, { winner: 0, reason: "Player 2's life reached 0" });
+    expect(r.state.players[1].hand).toHaveLength(hand);
+    // The lethal DAMAGE_DEALT is still in the log, before the one GAME_OVER.
+    const log = r.state.eventLog.map((e) => e.type);
+    expect(log.lastIndexOf("DAMAGE_DEALT")).toBeLessThan(log.indexOf("GAME_OVER"));
+    expect(log.at(-1)).toBe("GAME_OVER");
+  });
+
+  it("positive control: the same watcher draws on a nonlethal hit at 2 Life", () => {
+    const { r, hand } = attackIntoWatcher(2);
+    expect(r.state.status).toBe("IN_PROGRESS");
+    expect(r.state.players[1].hand.length).toBeGreaterThanOrEqual(hand + 2);
+  });
+});
+
 describe("WIN_GAME through the common terminal writer (rule 1-3-1 line 57)", () => {
   it("WIN_GAME mid-chain stops the later instructions and clears every decision", async () => {
     const r = rig();
