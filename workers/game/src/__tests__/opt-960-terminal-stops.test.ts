@@ -129,3 +129,30 @@ describe("End Phase stops after a scheduled action ends the game (rules 9-1-2 li
     expect(log.at(-1)).toBe("GAME_OVER");
   });
 });
+
+describe("a resumed deck move runs rule processing before the remaining chain (rules 9-1-2 line 876, 9-2-1-2 line 884)", () => {
+  it("resumed search: picking the last deck card after a reload ends the game before THEN WIN_GAME", async () => {
+    const r = rig();
+    r.deck(0, 1);
+    const card = r.put("SYN-SEARCH-WIN", 0, "CHARACTER", {
+      schema: synSchema("SYN-SEARCH-WIN", [
+        {
+          id: "search",
+          category: "activate",
+          trigger: { keyword: "ACTIVATE_MAIN" },
+          actions: [
+            { type: "SEARCH_DECK", params: { look_at: 1, filter: {}, pick_count: 1 } },
+            { type: "WIN_GAME", chain: "THEN" },
+          ],
+        } as never,
+      ]),
+    });
+    r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: card.instanceId, effectId: "search" });
+    expect(r.promptType()).toBe("ARRANGE_TOP_CARDS");
+    await r.reload();
+    const last = r.state.players[0].deck[0].instanceId;
+    r.act({ type: "ARRANGE_TOP_CARDS", keptCardInstanceIds: [last], orderedInstanceIds: [] } as never);
+    expect(r.state.players[0].deck).toHaveLength(0);
+    expectTerminal(r.state, { winner: 1, reason: "Player 1 decked out" });
+  });
+});

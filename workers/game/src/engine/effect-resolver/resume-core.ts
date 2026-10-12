@@ -66,6 +66,7 @@ import {
 import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { promptTypeToPhase } from "./cost-handler.js";
 import { isGameTerminated } from "../terminal.js";
+import { runRuleProcessingAfterMove } from "../defeat.js";
 import { replacePendingEventReferences } from "../events.js";
 import {
   pendingPropagationEvents,
@@ -332,6 +333,12 @@ export function resumeEffectChain(
       pausedActionSucceeded = selectTarget.succeeded;
     }
   }
+
+  // OPT-960: the resume handlers above move cards directly (search, scry,
+  // Life reorder, field-to-Life), outside executeEffectAction's checkpoint.
+  // Run rule processing on that move before the remaining chain (9-1-2).
+  nextState = runRuleProcessingAfterMove(state, nextState, {}, cardDb);
+  if (isGameTerminated(nextState)) return { state: nextState, events, resolved: true };
 
   // ── Tail: execute remainingActions (also handles OPTIONAL_EFFECT resume
   //         where pausedAction is null) ────────────────────────────────────
