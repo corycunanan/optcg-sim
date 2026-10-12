@@ -298,7 +298,14 @@ export type EngineLimitDiagnostic =
     };
 
 export interface EngineTerminalOutcome {
-  type: "INFINITE_LOOP_DRAW" | "ENGINE_ERROR_DRAW";
+  /**
+   * ENGINE_LIMIT: a bounded engine guard (effect stack depth or action budget)
+   * stopped resolution. It is not a rules draw (Decision 5).
+   * INFINITE_LOOP_DRAW: reserved for rule 11-1-1-1 (neither player can stop a
+   * loop); no writer emits it until the declared-count protocol (OPT-952).
+   * ENGINE_ERROR_DRAW: an engine contract failure.
+   */
+  type: "ENGINE_LIMIT" | "INFINITE_LOOP_DRAW" | "ENGINE_ERROR_DRAW";
   diagnostic: EngineLimitDiagnostic;
 }
 
@@ -657,7 +664,7 @@ export interface GameState {
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
   winner: 0 | 1 | null;
   winReason: string | null;
-  /** Present when a bounded engine guard terminates resolution under Rule 11-1-1-1. */
+  /** Present when the engine, not a rule, ended the game (engine limit or contract failure). */
   engineOutcome?: EngineTerminalOutcome | null;
   /** Actions executed in the current resolver sequence, persisted across prompts. */
   engineActionCount?: number;

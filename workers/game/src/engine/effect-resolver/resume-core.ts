@@ -65,7 +65,7 @@ import {
 } from "./resume/choice.js";
 import { handleAwaitingCostSelection } from "./resume/cost.js";
 import { promptTypeToPhase } from "./cost-handler.js";
-import { isEngineTerminated } from "../engine-limits.js";
+import { isGameTerminated } from "../terminal.js";
 import { replacePendingEventReferences } from "../events.js";
 import {
   pendingPropagationEvents,
@@ -449,7 +449,7 @@ export function resumeFromStack(
     return {
       state: nextState,
       events,
-      resolved: !result.pendingPrompt && !isEngineTerminated(nextState),
+      resolved: !result.pendingPrompt && !isGameTerminated(nextState),
       ...(result.pendingPrompt ? { pendingPrompt: result.pendingPrompt } : {}),
     };
   }
@@ -517,7 +517,7 @@ export function resumeFromStack(
       );
       nextState = result.state;
       events.push(...result.events);
-      if (isEngineTerminated(nextState)) {
+      if (isGameTerminated(nextState)) {
         return { state: nextState, events, resolved: false };
       }
 
@@ -525,7 +525,7 @@ export function resumeFromStack(
         nextState.effectStack.length > stackDepthAfterPop;
       if (result.rejected) {
         nextState = pushFrame(nextState, topFrame);
-        if (isEngineTerminated(nextState)) {
+        if (isGameTerminated(nextState)) {
           return { state: nextState, events, resolved: false };
         }
         if (!result.pendingPrompt) {
@@ -555,7 +555,7 @@ export function resumeFromStack(
             accumulatedEvents: [...events],
           };
           nextState = pushFrame(nextState, continuationFrame);
-          if (isEngineTerminated(nextState)) {
+          if (isGameTerminated(nextState)) {
             return { state: nextState, events, resolved: false };
           }
         } else if (!replacementFrameWasPushed) {
@@ -580,7 +580,7 @@ export function resumeFromStack(
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,
           };
           nextState = pushFrame(nextState, replacementFrame);
-          if (isEngineTerminated(nextState)) {
+          if (isGameTerminated(nextState)) {
             return { state: nextState, events, resolved: false };
           }
           pendingPrompt = {

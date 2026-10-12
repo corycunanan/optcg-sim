@@ -6,6 +6,7 @@ import { updateEffectContinuation } from "../event-activation.js";
  * frame on top of the stack (OPT-172).
  */
 
+import { isGameTerminated } from "../../terminal.js";
 import type {
   CardData,
   GameState,
@@ -30,6 +31,8 @@ export function processRemainingTriggers(
   priorEvents: PendingEvent[] = [],
   triggerOrderingGroup?: import("../../../types.js").EffectStackFrame["triggerOrderingGroup"]
 ): EffectResolverResult {
+  // OPT-960: no trigger drains after a terminal outcome (rule 9-1-2).
+  if (isGameTerminated(state)) return { state, events: priorEvents, resolved: true };
   // This is a publication boundary reached after a child accepts its action
   // or finishes/abandons its cost. Earlier committed effects publish first;
   // staged cost frames are not interrupted frames and remain untouched.

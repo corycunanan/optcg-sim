@@ -31,6 +31,7 @@ import {
 import { isDeclineResponse } from "./coordinator.js";
 import { releaseMovedDonEffects } from "../engine/don-area-effects.js";
 import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
+import { isGameTerminated, publishBeforeGameOver } from "../engine/terminal.js";
 
 export interface PromptLifecycleServices {
   drainPregame(state: GameState): GameState;
@@ -283,8 +284,9 @@ function resumePromptLifecycleUnreleased(
     const resumedFrame = state.effectStack.at(-1)!;
     const resumed = resumeFromStack(state, action, cardDb);
     state = resumed.state;
-    if (state.engineOutcome) {
-      gameOver = terminalEngineOutcome(state);
+    if (isGameTerminated(state)) {
+      state = publishBeforeGameOver(state, resumed.events, respondingPlayer);
+      gameOver = terminalOutcome(state);
     } else if (resumed.pendingPrompt) {
       if (resumedFrame.replacementBatchContinuation) {
         state = attachReplacementBatchContinuation(
@@ -334,8 +336,9 @@ function resumePromptLifecycleUnreleased(
     }
     const resumed = resumeEffectChain(state, resumeContext, action, cardDb);
     state = resumed.state;
-    if (state.engineOutcome) {
-      gameOver = terminalEngineOutcome(state);
+    if (isGameTerminated(state)) {
+      state = publishBeforeGameOver(state, resumed.events, respondingPlayer);
+      gameOver = terminalOutcome(state);
     } else if (resumed.rejected) {
       // The reply must not consume this prompt: keep it exactly as persisted.
       state = stateBeforeResume;
@@ -350,9 +353,12 @@ function resumePromptLifecycleUnreleased(
     }
   }
 
-  if (state.engineOutcome) {
+  // Any terminal outcome written during the resume (rules defeat, WIN_GAME,
+  // engine limit, …) is final: the terminal writer already cleared the prompt
+  // and the stack, and no later branch may re-attach a continuation.
+  if (isGameTerminated(state)) {
     state = { ...state, pendingPrompt: null, effectStack: [] };
-    gameOver = terminalEngineOutcome(state);
+    gameOver = terminalOutcome(state);
   }
 
   if (state.status !== "IN_PROGRESS" || gameOver) {
@@ -434,12 +440,9 @@ function withPendingPrompt(
   return pendingPrompt ? { ...state, pendingPrompt } : state;
 }
 
-function terminalEngineOutcome(state: GameState) {
-  return {
-    winner: null,
-    reason:
-      state.winReason ?? "Unstoppable loop detected — game ends in a draw",
-  } as const;
+/** The result every terminal writer recorded (winner may be a player or null). */
+function terminalOutcome(state: GameState): { winner: 0 | 1 | null; reason: string } {
+  return { winner: state.winner, reason: state.winReason ?? "Game over" };
 }
 
 function recordReplacementContinuationResult(

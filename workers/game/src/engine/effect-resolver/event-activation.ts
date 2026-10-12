@@ -11,7 +11,7 @@ import {
   pushFrame,
   popFrame,
 } from "../effect-stack.js";
-import { isEngineTerminated } from "../engine-limits.js";
+import { isGameTerminated } from "../terminal.js";
 import type { ActionResult, EffectResolverServices } from "./types.js";
 
 /** A notification is future work, not a committed accumulator: nested costs and
@@ -46,7 +46,7 @@ export function resolveActivatedEvent(
     accumulatedEvents: [],
     eventActivationCompletion: notification,
   });
-  if (isEngineTerminated(withCompletion))
+  if (isGameTerminated(withCompletion))
     return { state: withCompletion, events: [], succeeded: false };
   const resolved = services.resolveEffect(
     withCompletion,
@@ -70,7 +70,7 @@ export function resolveActivatedEvent(
       pendingPrompt: resolved.pendingPrompt,
       nestedEventActivation: true,
     };
-  if (isEngineTerminated(resolved.state))
+  if (isGameTerminated(resolved.state))
     return { state: resolved.state, events: resolved.events, succeeded: false };
   return {
     state: popFrame(resolved.state),
@@ -149,7 +149,7 @@ export function retainEventParent(
     simultaneousTriggers: [],
     accumulatedEvents: [],
   });
-  if (isEngineTerminated(pushed)) return pushed;
+  if (isGameTerminated(pushed)) return pushed;
   const parent = pushed.effectStack.at(-1)!;
   const childEvents = new Set(
     state.effectStack

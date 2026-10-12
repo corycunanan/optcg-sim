@@ -5,7 +5,7 @@ import {
   withdrawUnactivatedTrashMain,
 } from "../event-activation.js";
 import { pendingPropagationEvents, retainEventsOnFrame } from "./events.js";
-import { isEngineTerminated } from "../../engine-limits.js";
+import { isGameTerminated } from "../../terminal.js";
 import { log } from "../../../lib/log.js";
 /**
  * PLAYER_CHOICE resume handlers.
@@ -796,7 +796,7 @@ export function handleAwaitingOptionalActionResponse(
     );
     nextState = chainResult.state;
     events.push(...chainResult.events);
-    if (isEngineTerminated(nextState)) {
+    if (isGameTerminated(nextState)) {
       return { state: nextState, events, resolved: false };
     }
 

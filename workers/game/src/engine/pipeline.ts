@@ -13,12 +13,13 @@ import { updateEffectContinuation } from "./effect-resolver/event-activation.js"
  * 7. Rule Processing     (defeat checks)
  */
 
+import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
 import type { CardData, GameAction, GameEvent, GameState, ExecuteResult, PendingPromptState } from "../types.js";
 import { validate } from "./validation.js";
 import { execute } from "./execute.js";
 import { recalculateBattlePowers } from "./battle.js";
-import { emitEvent, emitPendingEvent, getEventCardInstanceId } from "./events.js";
-import { checkDefeat } from "./defeat.js";
+import { emitPendingEvent, getEventCardInstanceId } from "./events.js";
+import { runRuleProcessing, runRuleProcessingAfterMove, type RuleProcessingContext } from "./defeat.js";
 import { checkProhibitions } from "./prohibitions.js";
 import { checkReplacements } from "./replacements.js";
 import {
@@ -35,7 +36,7 @@ import {
   evaluateWhileConditions,
 } from "./duration-tracker.js";
 import { log } from "../lib/log.js";
-import { beginEngineResolution, isEngineTerminated } from "./engine-limits.js";
+import { beginEngineResolution } from "./engine-limits.js";
 import { takeEngineTimestamp } from "./execution-context.js";
 import { releaseMovedDonEffects } from "./don-area-effects.js";
 
@@ -56,6 +57,7 @@ export function runPipeline(
   if (state.status === "IN_PROGRESS" && !state.pendingPrompt && state.effectStack.length === 0) {
     state = beginEngineResolution(state);
   }
+  const stateAtEntry = state;
   const logCtx = {
     gameId: state.id,
     turn: state.turn.number,
@@ -116,7 +118,13 @@ export function runPipeline(
   // shed their effects. Effect actions and cost payments release per step.
   nextState = releaseMovedDonEffects(stateBeforeExecute, execResult.state);
 
-  if (isEngineTerminated(nextState)) {
+  // Rule processing checkpoint after the executed move (9-1-2): a deck-out or
+  // a lethal damage determination ends play before any trigger or prompt.
+  nextState = runRuleProcessingAfterMove(stateAtEntry, nextState, executionRuleContext(execResult), cardDb, actingPlayerIndex);
+
+  if (isGameTerminated(nextState)) {
+    // Steps 5-7 do not run; the executed move's events still reach the log.
+    nextState = publishBeforeGameOver(nextState, execResult.events, nextState.turn.activePlayerIndex);
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
   }
 
@@ -149,13 +157,13 @@ export function runPipeline(
   log("pipeline.step", { ...logCtx, step: "triggers" });
   nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb, actedCard);
 
-  if (isEngineTerminated(nextState)) {
+  if (isGameTerminated(nextState)) {
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
   }
 
   // If triggers paused for player input, skip steps 6-7 and surface the prompt
   if (nextState.pendingPrompt) {
-    const defeated = defeatAtSuspension(nextState, actingPlayerIndex, cardDb, execResult);
+    const defeated = ruleProcessingBeforePrompt(stateAtEntry, nextState, actingPlayerIndex, cardDb, execResult);
     if (defeated) {
       log("pipeline.end", {
         ...logCtx,
@@ -253,7 +261,7 @@ function fireEventsAndTriggers(
 
     const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb);
     state = result.state;
-    if (isEngineTerminated(state)) return state;
+    if (isGameTerminated(state)) return state;
 
     if (result.pendingPrompt) {
       state = recalculateBattlePowers(state, cardDb);
@@ -283,6 +291,14 @@ export function continuePipelineFromExecution(
   actingPlayerIndex: 0 | 1,
 ): PipelineResult {
   const continuationAction: GameAction = { type: "REVEAL_TRIGGER", reveal: true };
+  // Checkpoint for the resumed execution's lethal damage determination
+  // (9-1-2). Its deck and Life moves were checked where they happened.
+  const stateAtEntry = state;
+  state = runRuleProcessingAfterMove(state, state, executionRuleContext(execResult), cardDb, actingPlayerIndex);
+  if (isGameTerminated(state)) {
+    state = publishBeforeGameOver(state, execResult.events, state.turn.activePlayerIndex);
+    return finishPipeline(state, actingPlayerIndex, cardDb, execResult);
+  }
   let nextState = fireEventsAndTriggers(
     state,
     execResult,
@@ -292,12 +308,12 @@ export function continuePipelineFromExecution(
     false,
   );
 
-  if (isEngineTerminated(nextState)) {
+  if (isGameTerminated(nextState)) {
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
   }
 
   if (nextState.pendingPrompt) {
-    const defeated = defeatAtSuspension(nextState, actingPlayerIndex, cardDb, execResult);
+    const defeated = ruleProcessingBeforePrompt(stateAtEntry, nextState, actingPlayerIndex, cardDb, execResult);
     if (defeated) return defeated;
     return { state: nextState, valid: true, pendingPrompt: nextState.pendingPrompt };
   }
@@ -334,7 +350,9 @@ function processTriggerQueuePipeline(
       next.triggeringEvent,
     );
     nextState = result.state;
-    if (isEngineTerminated(nextState)) return { state: nextState };
+    if (isGameTerminated(nextState)) {
+      return { state: publishBeforeGameOver(nextState, result.events, next.controller) };
+    }
 
     if (result.pendingPrompt) {
       nextState = updateEffectContinuation(nextState, stackDepth, frame => ({
@@ -487,46 +505,41 @@ function recalculateModifiers(
 
 // ─── Step 7: Rule Processing ──────────────────────────────────────────────────
 
-function updateDeckHitZeroFlag(state: GameState): GameState {
-  const [p0, p1] = state.players;
-  const flag: [boolean, boolean] = state.turn.deckHitZeroThisTurn ?? [false, false];
-  const next0 = flag[0] || p0.deck.length === 0;
-  const next1 = flag[1] || p1.deck.length === 0;
-  if (next0 === flag[0] && next1 === flag[1] && state.turn.deckHitZeroThisTurn) {
-    return state;
-  }
+/**
+ * Checkpoint facts carried by one execution result (OPT-949): its lethal
+ * damage determination, and the end-of-turn window when the action crossed
+ * MAIN → END (an ADVANCE_PHASE emits TURN_ENDED as part of the same action),
+ * so delayed-loss Leaders (OP15-022 Brook) collect their deferred loss. The
+ * end-of-turn placement itself is unchanged from the base engine; moving it
+ * inside the End Phase is OPT-962's work.
+ */
+function executionRuleContext(execResult: ExecuteResult | undefined): RuleProcessingContext {
   return {
-    ...state,
-    turn: { ...state.turn, deckHitZeroThisTurn: [next0, next1] },
+    ...(execResult?.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamage: [execResult.lethalDamagePlayerIndex] }
+      : {}),
+    ...(execResult?.events.some((e) => e.type === "TURN_ENDED") ? { endOfTurn: true } : {}),
   };
 }
 
 /**
- * OPT-886: a Leader damaged at 0 Life has fulfilled 9-2-1-1, and rule
- * processing "is immediately resolved when the corresponding event occurs,
- * even if other actions are in the process of being carried out" (9-1-2).
- * The damage context lives only on this execution result, so when an auto
- * effect from the same action suspends for input, run the defeat check now
- * instead of losing it to the prompt: the game ends and the prompt is
- * discarded. Returns null when no damage at 0 Life was dealt.
+ * Checkpoint before a prompt surfaces (OPT-949 acceptance 3; OPT-886 for the
+ * damage case). Rule processing "is immediately resolved when the
+ * corresponding event occurs, even if other actions are in the process of
+ * being carried out" (9-1-2), so a defeat condition met by this action ends
+ * the game and the prompt is discarded by the terminal writer. Returns null
+ * when play continues.
  */
-function defeatAtSuspension(
+function ruleProcessingBeforePrompt(
+  stateAtEntry: GameState,
   state: GameState,
   actingPlayerIndex: 0 | 1,
   cardDb: Map<string, CardData>,
   execResult: ExecuteResult,
 ): PipelineResult | null {
-  const damaged = execResult.damagedPlayerIndex;
-  if (damaged === undefined || state.players[damaged].life.length > 0) return null;
-  const suspended: GameState = {
-    ...state,
-    pendingPrompt: null,
-    effectStack: [],
-    pendingEventActivationEvents: undefined,
-    turn: { ...state.turn, pendingBattleDamageContinuation: null },
-  };
-  const result = finishPipeline(suspended, actingPlayerIndex, cardDb, execResult);
-  return result.gameOver ? result : null;
+  const checked = runRuleProcessingAfterMove(stateAtEntry, state, executionRuleContext(execResult), cardDb, actingPlayerIndex);
+  if (!isGameTerminated(checked)) return null;
+  return finishPipeline(checked, actingPlayerIndex, cardDb, execResult);
 }
 
 function finishPipeline(
@@ -535,44 +548,11 @@ function finishPipeline(
   cardDb: Map<string, CardData>,
   execResult?: ExecuteResult,
 ): PipelineResult {
-  // Mark the sticky "deck hit zero this turn" flag the first time either
-  // player's deck transitions to 0. Reset on turn change by phases.ts.
-  // Must fire before checkDefeat so end-of-turn evaluation sees the flag.
-  state = updateDeckHitZeroFlag(state);
+  // Action-end checkpoint: always runs, whatever changed.
+  state = runRuleProcessing(state, executionRuleContext(execResult), cardDb, actingPlayerIndex);
 
-  // An ADVANCE_PHASE that crosses MAIN → END emits TURN_ENDED as part of the
-  // same action. Treat that boundary as the end-of-turn defeat window so
-  // delayed-loss leaders (Brook) collect their deferred loss.
-  const isEndOfTurn = !!execResult?.events.some((e) => e.type === "TURN_ENDED");
-
-  const defeatCtx: { damagedPlayerIndex?: 0 | 1; endOfTurn?: boolean } = {};
-  if (execResult?.damagedPlayerIndex !== undefined) {
-    defeatCtx.damagedPlayerIndex = execResult.damagedPlayerIndex;
-  }
-  if (isEndOfTurn) defeatCtx.endOfTurn = true;
-
-  const defeat = checkDefeat(state, defeatCtx, cardDb);
-
-  if (defeat) {
-    state = {
-      ...state,
-      status: "FINISHED",
-      pendingEventActivationEvents: undefined,
-      winner: defeat.winner,
-      winReason: defeat.reason,
-    };
-    state = emitEvent(state, "GAME_OVER", actingPlayerIndex, {
-      winner: defeat.winner,
-      reason: defeat.reason,
-    });
-    return {
-      state,
-      valid: true,
-      gameOver: { winner: defeat.winner, reason: defeat.reason },
-    };
-  }
-
-  // CONCEDE (and any action that sets FINISHED without going through defeat checks)
+  // Every terminal writer (rule processing, WIN_GAME, concession, engine
+  // limit) has already written the final state; report it.
   if (state.status === "FINISHED" || state.status === "ABANDONED") {
     return {
       state,

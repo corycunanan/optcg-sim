@@ -2,77 +2,29 @@ import type {
   EngineLimitDiagnostic,
   GameState,
 } from "../types.js";
-import { emitEvent } from "./events.js";
+import { isGameTerminated, terminateGame } from "./terminal.js";
 import { ensureExecutionContext } from "./execution-context.js";
 
 export const MAX_EFFECT_STACK_DEPTH = 100;
 export const MAX_RESOLUTION_ACTIONS = 1_000;
 
-const INFINITE_LOOP_REASON = "Unstoppable loop detected — game ends in a draw";
-const ENGINE_CONTRACT_REASON = "Engine contract failure — game ends in a draw";
-
+/**
+ * A bounded engine guard stopped resolution (effect stack depth or action
+ * budget). Decision 5: this is an engine-limit outcome, distinct from the rule
+ * 11-1-1-1 draw, so it is written as `engineOutcome.type: "ENGINE_LIMIT"`.
+ */
 export function terminateForEngineLimit(
   state: GameState,
-  diagnostic: EngineLimitDiagnostic,
+  diagnostic: Extract<EngineLimitDiagnostic, { kind: "EFFECT_STACK_DEPTH" | "ACTION_BUDGET" }>,
 ): GameState {
-  if (state.engineOutcome?.type === "INFINITE_LOOP_DRAW") return state;
-
-  const terminal: GameState = {
-    ...state,
-    status: "FINISHED",
-    winner: null,
-    winReason: INFINITE_LOOP_REASON,
-    engineOutcome: { type: "INFINITE_LOOP_DRAW", diagnostic },
-    pendingPrompt: null,
-    effectStack: [],
-    pendingEventActivationEvents: undefined,
-    turn: {
-      ...state.turn,
-      battle: null,
-      battleSubPhase: null,
-      pendingTriggerFromEffect: undefined,
-      pendingBattleDamageContinuation: undefined,
-    },
-  };
-
-  return emitEvent(
-    terminal,
-    "GAME_OVER",
-    state.turn.activePlayerIndex,
-    { winner: null, reason: INFINITE_LOOP_REASON, diagnostic },
-  );
+  return terminateGame(state, { kind: "ENGINE_LIMIT", diagnostic });
 }
 
 export function terminateForEngineContract(
   state: GameState,
   diagnostic: Extract<EngineLimitDiagnostic, { kind: "ENGINE_CONTRACT" }>,
 ): GameState {
-  if (state.engineOutcome) return state;
-
-  const terminal: GameState = {
-    ...state,
-    status: "FINISHED",
-    winner: null,
-    winReason: ENGINE_CONTRACT_REASON,
-    engineOutcome: { type: "ENGINE_ERROR_DRAW", diagnostic },
-    pendingPrompt: null,
-    effectStack: [],
-    pendingEventActivationEvents: undefined,
-    turn: {
-      ...state.turn,
-      battle: null,
-      battleSubPhase: null,
-      pendingTriggerFromEffect: undefined,
-      pendingBattleDamageContinuation: undefined,
-    },
-  };
-
-  return emitEvent(
-    terminal,
-    "GAME_OVER",
-    state.turn.activePlayerIndex,
-    { winner: null, reason: ENGINE_CONTRACT_REASON, diagnostic },
-  );
+  return terminateGame(state, { kind: "ENGINE_CONTRACT", diagnostic });
 }
 
 export function consumeResolutionAction(
@@ -119,6 +71,4 @@ export function beginEngineResolution(state: GameState): GameState {
   };
 }
 
-export function isEngineTerminated(state: GameState): boolean {
-  return state.status === "FINISHED" && state.engineOutcome != null;
-}
+

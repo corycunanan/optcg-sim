@@ -210,12 +210,15 @@ describe("OPT-473 effects action handlers", () => {
       0,
       cardDb
     );
+    // OPT-960: WIN_GAME writes through the common terminal writer, which logs
+    // the one GAME_OVER event directly instead of returning a pending event.
     expect(result.state).toMatchObject({ status: "FINISHED", winner: 0 });
-    expect(result.events).toContainEqual({
-      type: "GAME_OVER",
-      playerIndex: 0,
-      payload: { reason: "card_effect" },
-    });
+    expect(result.state.eventLog.filter((e) => e.type === "GAME_OVER")).toEqual([
+      expect.objectContaining({
+        playerIndex: 0,
+        payload: { winner: 0, reason: "Player 1 won by a card effect" },
+      }),
+    ]);
   });
 
   it("registers trigger-type negation against the affected controller", () => {

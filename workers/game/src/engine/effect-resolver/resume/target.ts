@@ -44,7 +44,7 @@ import type {
   EffectResolverServices,
 } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
-import { isEngineTerminated } from "../../engine-limits.js";
+import { isGameTerminated } from "../../terminal.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { CONTINUATION_EFFECT_BLOCK } from "../../effect-stack.js";
 import { withChainDescription } from "../resolver.js";
@@ -311,7 +311,7 @@ export function handleSelectTargetRuleTrashForPlay(
       );
   nextState = actionResult.state;
   events.push(...actionResult.events);
-  if (isEngineTerminated(nextState)) {
+  if (isGameTerminated(nextState)) {
     return {
       kind: "terminal",
       result: { state: nextState, events, resolved: false },
@@ -513,7 +513,7 @@ export function handleSelectTarget(
   );
   nextState = actionResult.state;
   events.push(...actionResult.events);
-  if (isEngineTerminated(nextState)) {
+  if (isGameTerminated(nextState)) {
     return {
       kind: "terminal",
       result: { state: nextState, events, resolved: false },
@@ -566,7 +566,7 @@ export function handleSelectTarget(
       resultRefs,
       effectDescription,
     );
-    if (isEngineTerminated(nextState)) {
+    if (isGameTerminated(nextState)) {
       return {
         kind: "terminal",
         result: { state: nextState, events, resolved: false },

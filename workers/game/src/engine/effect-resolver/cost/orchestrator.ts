@@ -2,7 +2,7 @@
 import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
 import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPromptState } from "../../../types.js";
 import { generateFrameId, pushFrame } from "../../effect-stack.js";
-import { isEngineTerminated } from "../../engine-limits.js";
+import { isGameTerminated } from "../../terminal.js";
 import { checkReplacementForRemoval } from "../../replacements.js";
 import type { CostSelectionResult } from "../types.js";
 import { costResultToEntries } from "../types.js";
@@ -171,7 +171,7 @@ export function payCostsWithSelection(
         costTransactionState: captureCostTransactionState(nextState),
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) {
+      if (isGameTerminated(nextState)) {
         return cannotPay();
       }
 
@@ -244,7 +244,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) return cannotPay();
+      if (isGameTerminated(nextState)) return cannotPay();
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -308,7 +308,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) return cannotPay();
+      if (isGameTerminated(nextState)) return cannotPay();
 
       const pendingPrompt: PendingPromptState = {
         options: {
@@ -365,7 +365,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         return suspend({
             options: {
               promptType: "PLAYER_CHOICE",
@@ -408,7 +408,7 @@ export function payCostsWithSelection(
           costArrangeStage: true,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         return suspend(buildTrashToDeckArrangePrompt(
             nextState, validTargets, controller, frame.id,
             cost.position === "TOP" ? "TOP" : "BOTTOM",
@@ -467,7 +467,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         const pendingPrompt: PendingPromptState = {
           options: {
             promptType: "SELECT_TARGET",
@@ -511,7 +511,7 @@ export function payCostsWithSelection(
           costArrangeStage: true,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         return suspend(buildTrashToDeckArrangePrompt(
             nextState, group, controller, frame.id,
             cost.position === "TOP" ? "TOP" : "BOTTOM",
@@ -557,7 +557,7 @@ export function payCostsWithSelection(
           accumulatedEvents: events,
         };
         pushCostFrame(frame);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
 
         const pendingPrompt: PendingPromptState = {
           options: {
@@ -608,7 +608,7 @@ export function payCostsWithSelection(
         accumulatedEvents: events,
       };
       pushCostFrame(frame);
-      if (isEngineTerminated(nextState)) return cannotPay();
+      if (isGameTerminated(nextState)) return cannotPay();
 
       const costLabel = getCostLabel(cost);
       const pendingPrompt: PendingPromptState = {
@@ -664,7 +664,7 @@ export function payCostsWithSelection(
           costReplacementChecked: true,
         };
         pushCostFrame(frame, stagedBeforeReplacement);
-        if (isEngineTerminated(nextState)) return cannotPay();
+        if (isGameTerminated(nextState)) return cannotPay();
         return suspend(replacement.pendingPrompt);
       }
       if (replacement.replaced) {

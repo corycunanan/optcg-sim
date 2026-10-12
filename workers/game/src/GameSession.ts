@@ -21,6 +21,7 @@ import type {
 import { prepareDecksAndLeaders } from "./engine/setup.js";
 import { advancePregame, startPregame } from "./engine/pregame.js";
 import { createProductionExecutionContext } from "./engine/execution-context.js";
+import { terminateGame } from "./engine/terminal.js";
 import {
   readDiscriminant,
   validateGameInitPayload,
@@ -253,14 +254,11 @@ export class GameSession implements DurableObject {
       });
     }
 
-    this.gameState = {
-      ...this.gameState!,
-      status: "FINISHED",
+    this.gameState = terminateGame(this.gameState!, {
+      kind: "EXTERNAL_RESULT",
       winner: winnerIndex as 0 | 1,
-      winReason: reason,
-      pendingPrompt: null,
-      effectStack: [],
-    };
+      reason,
+    });
     await this.persist();
 
     this.filteredState.broadcastState();
@@ -619,14 +617,12 @@ export class GameSession implements DurableObject {
       }
     }
 
-    this.gameState = {
-      ...this.gameState,
+    this.gameState = terminateGame(this.gameState, {
+      kind: "ABANDONMENT",
       status,
       winner,
-      winReason: reason,
-      pendingPrompt: null,
-      effectStack: [],
-    };
+      reason,
+    });
 
     await this.persist();
     await this.writeResultToDb();
@@ -969,14 +965,13 @@ export class GameSession implements DurableObject {
     if (!this.gameState) return;
     const winner: 0 | 1 = playerIndex === 0 ? 1 : 0;
     const reason = `Player ${playerIndex + 1} left during pre-game`;
-    this.gameState = {
-      ...this.gameState,
+    this.gameState = terminateGame(this.gameState, {
+      kind: "ABANDONMENT",
       status: "FINISHED",
       winner,
-      winReason: reason,
-      pendingPrompt: null,
-      pregame: null,
-    };
+      reason,
+      clearPregame: true,
+    });
     this.undoHistory = [];
     await this.persist();
     await this.writeResultToDb();

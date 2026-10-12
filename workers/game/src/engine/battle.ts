@@ -275,7 +275,7 @@ export function executePass(
     return {
       state: nextState,
       events,
-      damagedPlayerIndex: dmgResult.damagedPlayerIndex,
+      lethalDamagePlayerIndex: dmgResult.lethalDamagePlayerIndex,
       ...(dmgResult.pendingPrompt && {
         pendingPrompt: dmgResult.pendingPrompt,
       }),
@@ -601,7 +601,7 @@ export function executeRevealTrigger(
   return {
     state: cont.state,
     events,
-    damagedPlayerIndex: cont.damagedPlayerIndex,
+    lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex,
   };
 }
 
@@ -853,7 +853,7 @@ function dealOneLeaderDamage(
   state: GameState;
   events: PendingEvent[];
   paused: boolean;
-  damagedPlayerIndex?: 0 | 1;
+  lethalDamagePlayerIndex?: 0 | 1;
   lethal?: boolean;
 } {
   const events: PendingEvent[] = [];
@@ -887,7 +887,7 @@ function dealOneLeaderDamage(
       state: popResult.state,
       events,
       paused: false,
-      damagedPlayerIndex: inactiveIdx,
+      lethalDamagePlayerIndex: inactiveIdx,
       lethal: true,
     };
   }
@@ -981,10 +981,10 @@ function continueLeaderDamageSequence(
   state: GameState,
   cardDb: Map<string, CardData>,
   enteringDamageStep = false
-): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
+): ExecuteResult & { lethalDamagePlayerIndex?: 0 | 1 } {
   const events: PendingEvent[] = [];
   let nextState = state;
-  let damagedPlayerIndex: 0 | 1 | undefined;
+  let lethalDamagePlayerIndex: 0 | 1 | undefined;
   // OPT-796: only the Damage Step entry deals the attack's first damage; every
   // resume (after a [Trigger] window or a paused Life removal) continues an
   // attack that has already dealt one. "When ... deals damage" watchers fire
@@ -1042,13 +1042,13 @@ function continueLeaderDamageSequence(
     firstDamageOfAttack = false;
     nextState = one.state;
     events.push(...one.events);
-    if (one.damagedPlayerIndex !== undefined)
-      damagedPlayerIndex = one.damagedPlayerIndex;
+    if (one.lethalDamagePlayerIndex !== undefined)
+      lethalDamagePlayerIndex = one.lethalDamagePlayerIndex;
 
     if (one.paused) {
       // Pending Trigger: defender will send REVEAL_TRIGGER which re-enters
       // this function via executeRevealTrigger after resolution.
-      return { state: nextState, events, damagedPlayerIndex };
+      return { state: nextState, events, lethalDamagePlayerIndex };
     }
 
     // Damage completed (or lethal) — decrement remaining.
@@ -1069,7 +1069,7 @@ function continueLeaderDamageSequence(
   }
 
   nextState = endBattle(nextState, events);
-  return { state: nextState, events, damagedPlayerIndex };
+  return { state: nextState, events, lethalDamagePlayerIndex };
 }
 
 /**
@@ -1223,7 +1223,7 @@ function isOnField(
 function executeDamageStep(
   state: GameState,
   cardDb: Map<string, CardData>
-): ExecuteResult & { damagedPlayerIndex?: 0 | 1 } {
+): ExecuteResult & { lethalDamagePlayerIndex?: 0 | 1 } {
   const events: PendingEvent[] = [];
   const pi = getActivePlayerIndex(state);
 
@@ -1266,7 +1266,7 @@ function executeDamageStep(
   // Recalculate powers to reflect all modifiers (triggers, counters, effects)
   let nextState = recalculateBattlePowers(state, cardDb);
   const battle = nextState.turn.battle!;
-  let damagedPlayerIndex: 0 | 1 | undefined;
+  let lethalDamagePlayerIndex: 0 | 1 | undefined;
 
   const { attackerPower, defenderPower, targetInstanceId } = battle;
 
@@ -1315,7 +1315,7 @@ function executeDamageStep(
         return {
           state: cont.state,
           events,
-          damagedPlayerIndex: cont.damagedPlayerIndex ?? damagedPlayerIndex,
+          lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex ?? lethalDamagePlayerIndex,
         };
       } else if (targetFound.card.zone === "CHARACTER") {
         // Emit COMBAT_VICTORY — attacker won against a character
@@ -1369,7 +1369,7 @@ function executeDamageStep(
               },
             },
             events: [],
-            damagedPlayerIndex,
+            lethalDamagePlayerIndex,
             pendingPrompt: replacement.pendingPrompt,
           };
         }
@@ -1394,7 +1394,7 @@ function executeDamageStep(
   // End of Battle
   nextState = endBattle(nextState, events);
 
-  return { state: nextState, events, damagedPlayerIndex };
+  return { state: nextState, events, lethalDamagePlayerIndex };
 }
 
 /** COMBAT_VICTORY for an attacker that beat a Character in battle. */

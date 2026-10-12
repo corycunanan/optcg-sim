@@ -192,7 +192,7 @@ export function continueEffectDamageSequence(
         playerIndex: damagedPlayerIndex,
         payload: { cardId: lifeCard.cardId },
       });
-      return { state: nextState, events, damagedPlayerIndex };
+      return { state: nextState, events };
     }
     const handResult = moveLifeCardToHand(
       nextState,
@@ -202,5 +202,5 @@ export function continueEffectDamageSequence(
     nextState = handResult.state;
     events.push(...handResult.events);
   }
-  return { state: nextState, events, damagedPlayerIndex };
+  return { state: nextState, events };
 }

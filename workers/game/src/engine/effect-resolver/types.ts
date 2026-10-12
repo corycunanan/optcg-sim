@@ -127,6 +127,12 @@ export interface ActionResult {
   succeeded: boolean;
   result?: EffectResult;
   pendingPrompt?: PendingPromptState;
+  /**
+   * OPT-925: the player whose Leader took damage that the rules determined
+   * lethal (taken while at 0 Life, 9-2-1-1). `executeEffectAction` hands it
+   * to the rule-processing checkpoint. Nonlethal damage never sets it.
+   */
+  lethalDamagePlayerIndex?: 0 | 1;
   // OPT-172: multi-target handlers set this when a frame's events queue
   // triggers that must resolve before the next frame (rule 6-2). The handler
   // bails out of its loop and returns the scanned triggers + a resume marker
