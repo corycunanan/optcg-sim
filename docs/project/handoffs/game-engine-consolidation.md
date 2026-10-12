@@ -53,13 +53,13 @@ Outside the milestones, not dispatched by this project: OPT-952 (declared-count 
 
 ## Orchestration notes for this project
 
-Read before kickoff. These are the places where the generic `/orchestrate` pipeline is not enough.
+Read before kickoff. These are the places where `docs/project/ORCHESTRATION-CHARTER.md` and `ORCHESTRATION-OPTCG.md` need project-specific input.
 
 1. **Merge order is rollout order.** Merging to `main` auto-deploys the game worker (`.github/workflows/deploy-workers.yml`). OPT-940 and every later ticket that adds a persisted shape ship a reader first and a writer later. Do not merge a writer PR until the reader's deploy is confirmed live (`gh api repos/<owner>/<repo>/commits/<sha>/status`). The original strict-reader binary is not a rollback target once new shapes are written.
 2. **Captured sessions are an orchestrator deliverable.** OPT-940 and OPT-939 need sanitized real paused sessions from the Durable Object as fixtures. Codex has no network and no Cloudflare access. Pull them before dispatch, or record the missing fixture as an unmet rollout gate as the ticket requires.
 3. **Prerequisites live in a `## Prerequisites` section**, not only in `blockedBy`. Only OPT-951 has a Linear relation. Read the section before building waves.
-4. **No ticket carries `Ready for agent`.** Every ticket needs the readiness pass in `/orchestrate` §0 before dispatch. The audit's Decision table and Revision 4 §§4–8 are the source for determinate acceptance.
-5. **Every ticket is an engine ticket.** Run the saved lens workflow (`.claude/workflows/pr-review.js`) for each PR, not only the generic adversarial review. The rules-fidelity lens reads `docs/rules/` and `docs/FAQs/`.
+4. **No ticket carries `Ready for agent`.** Under charter §1 a missing label does not block a fully specified issue, but every ticket's acceptance must be verified against current code at dispatch. Revision 4 §§4–8 and the audit's decision table are the source for what "fully specified" means here.
+5. **Every ticket is Large tier** (charter §3: shared engine mechanics, continuations, `GameSession` protocol). That means the coordinator reads every hunk, a Claude reviewer plus the Codex lens run on each PR, `pnpm verify` runs locally, and each ticket starts with the OPTCG rules packet. The FAQ corpus under `docs/FAQs/` is part of that packet; the audit's leg reports name the rulings per ticket.
 6. **Known-wrong tests are explicit.** Revision 4 §8 lists the ratchets. Two green tests the audit first called wrong are correct (Double Attack into 1 Life, Koby OP11-001); keep them. The mid-payment rollback fixture is a labeled deviation, not a bug.
 7. **Combine OPT-925 and OPT-949.** They rewrite the same terminal path. One PR with both IDs in the title avoids a merge conflict between two Codex clones.
 
