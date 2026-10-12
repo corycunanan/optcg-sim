@@ -3,7 +3,7 @@ import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
-import { computeCostTargets, costSelectionCount, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, isFixedCostMovementProhibited, resolveAmount } from "./targets.js";
 
 /** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -79,6 +79,10 @@ export function isCostPayable(
     const opts = cost.options ?? [];
     return opts.some((o) => isCostPayable(state, o, controller, cardDb, sourceCardInstanceId));
   }
+
+  // OPT-961: a fixed movement an activation-time prohibition forbids makes
+  // the cost unpayable (rules 1-3-3, 8-3-1-3).
+  if (isFixedCostMovementProhibited(state, cost, controller, cardDb, sourceCardInstanceId)) return false;
 
   // OPT-431: the self half of the compound cost is fixed to the source card —
   // payable only when the source is on the field AND enough matching trash

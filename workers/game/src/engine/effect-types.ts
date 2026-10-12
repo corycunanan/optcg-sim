@@ -1589,19 +1589,29 @@ export type ProhibitionType =
   | "CANNOT_BE_RETURNED_TO_DECK";
 
 /**
- * OPT-864 (Decision 11, rule 1-3-3): when each prohibition gates feasibility.
+ * OPT-864 / OPT-961 (Decision 11, rule 1-3-3): which prohibitions gate
+ * feasibility before an action or cost is offered.
  *
- * - ACTIVATION: the prohibited thing is a player's declaration (play,
- *   activate, attack, block, counter, give DON!!) or the payment of a cost.
- *   Availability and validation consult it before offering the action, and
- *   cost feasibility consults it before offering the cost.
- * - RESOLUTION: the prohibition restricts what happens while an effect or
- *   rule process resolves. Rule 1-3-2 then skips only the impossible part, so
- *   it never vetoes activation (for example, CANNOT_DRAW stops the draw after
+ * - ACTIVATION: the prohibition vetoes a player's declaration (play,
+ *   activate, attack, block, counter, give DON!!) or makes a cost unpayable
+ *   because paying it would do the prohibited thing (8-3-1-3: a cost that
+ *   cannot be paid in full cannot be paid at all). Readers:
+ *   `activationProhibitionVeto` (availability, ACTIVATE_EFFECT validation),
+ *   `isCostMovementProhibited` (field-exit cost targets and fixed field-exit
+ *   costs) and `isLifeToHandCostProhibited` (LIFE_TO_HAND costs), all in
+ *   prohibitions.ts. CANNOT_BE_RESTED and CANNOT_ATTACH_DON are also read by
+ *   their own cost checks (payability.ts, payment.ts, cost/targets.ts) and
+ *   by pipeline step 2, independent of this table; named-play.ts reads
+ *   CANNOT_BE_PLAYED_BY_EFFECTS directly.
+ * - RESOLUTION: the prohibition only restricts what happens while an effect
+ *   or rule process resolves. Rule 1-3-2 skips the impossible part, so it
+ *   never vetoes an activation or a cost (CANNOT_DRAW stops the draw after
  *   the colon, not the activation).
  *
- * `activationProhibitionVeto` (prohibitions.ts) reads this table. Entries
- * marked "assumed" have no ruling in docs/rules or docs/FAQs.
+ * Every prohibition still applies when the prohibited thing would happen at
+ * resolution. `opt-961-prohibition-timing-contract.test.ts` checks each
+ * entry against the engine's matchers. Entries marked "assumed" have no
+ * ruling in docs/rules or docs/FAQs.
  */
 export type ProhibitionFeasibilityTiming = "ACTIVATION" | "RESOLUTION";
 
@@ -1625,32 +1635,37 @@ export const PROHIBITION_FEASIBILITY_TIMING: Readonly<
   // 6-5-5 (manual give) and the GIVE_DON cost (OPT-869 cost targets).
   CANNOT_ATTACH_DON: "ACTIVATION",
   // docs/FAQs/qa_rules.md:268-278: "cannot be rested" Characters cannot
-  // attack, activate rest-cost effects, or activate [Blocker]. Cost
-  // feasibility reads it for REST_SELF / REST_CARDS (OPT-250).
+  // attack, activate rest-cost effects, or activate [Blocker].
   CANNOT_BE_RESTED: "ACTIVATION",
-  // 7-1-2 runs the Block Step for the defender; whether an attack can be
-  // blocked is decided there, not when the attack is declared.
+  // 1-3-3 + 8-3-1-3: a K.O. / removal / return cost cannot be paid with a
+  // card protected against that movement (cost cause; see
+  // isCostMovementProhibited for the scope reading).
+  CANNOT_BE_KO: "ACTIVATION",
+  CANNOT_BE_REMOVED_FROM_FIELD: "ACTIVATION",
+  CANNOT_LEAVE_FIELD: "ACTIVATION",
+  CANNOT_BE_RETURNED_TO_HAND: "ACTIVATION",
+  CANNOT_BE_RETURNED_TO_DECK: "ACTIVATION",
+  // docs/FAQs/qa_op02.md:24-26, :82-84: a "Life card to hand" cost cannot be
+  // paid under this prohibition. (Effect-path enforcement: see the OPT-961
+  // PR Follow-ups.)
+  CANNOT_ADD_LIFE_TO_HAND: "ACTIVATION",
+  // 7-1-2: whether an attack can be blocked is decided in the Block Step.
   CANNOT_BE_BLOCKED: "RESOLUTION",
   // Stops the [On Play] auto effect when it would activate; the play itself
   // (6-5-3) stays legal. Assumed: no ruling names this prohibition.
   CANNOT_ACTIVATE_ON_PLAY: "RESOLUTION",
-  // 4-5 + 1-3-2: the draw instruction is skipped; activation is not vetoed.
+  // 4-5 + 1-3-2: the draw is skipped; activation is not vetoed.
   CANNOT_DRAW: "RESOLUTION",
-  // 1-3-2: the Life addition or Life-to-hand move is skipped at resolution.
+  // 1-3-2: the Life addition is skipped at resolution. No cost adds Life
+  // from the deck.
   CANNOT_ADD_LIFE: "RESOLUTION",
-  CANNOT_ADD_LIFE_TO_HAND: "RESOLUTION",
-  // 1-3-2: the K.O. / removal / return is skipped at resolution. Assumed for
-  // field-exit costs (KO_OWN_CHARACTER etc.): no ruling found; see the
-  // OPT-961 PR Follow-ups.
-  CANNOT_BE_KO: "RESOLUTION",
-  CANNOT_BE_REMOVED_FROM_FIELD: "RESOLUTION",
-  CANNOT_LEAVE_FIELD: "RESOLUTION",
-  CANNOT_BE_RETURNED_TO_HAND: "RESOLUTION",
-  CANNOT_BE_RETURNED_TO_DECK: "RESOLUTION",
-  // 1-3-2: the effect-play instruction is skipped for that card.
-  CANNOT_BE_PLAYED_BY_EFFECTS: "RESOLUTION",
+  // 1-3-3 + 8-3-1-3: a PLAY_NAMED_CARD_FROM_HAND cost cannot play a card
+  // that cannot be played by effects (named-play.ts reads it directly).
+  // Assumed: no ruling found for the cost case.
+  CANNOT_BE_PLAYED_BY_EFFECTS: "ACTIVATION",
   // 6-2-4 Refresh Phase and set-active instructions: the state change is
-  // skipped when it would happen. Assumed: no ruling found.
+  // skipped when it would happen. Assumed: no ruling found. No cost sets
+  // cards active.
   CANNOT_SET_DON_ACTIVE: "RESOLUTION",
   CANNOT_REFRESH: "RESOLUTION",
 };
