@@ -404,8 +404,6 @@ export function executeUseCounterEvent(
     const result = resolveEffect(nextState, counterBlock, moved.fact.newInstanceId, inactiveIdx, cardDb);
     nextState = result.state;
     events.push(...result.events);
-    // OPT-960: a [Counter] effect that ended the game leaves nothing to continue.
-    if (isGameTerminated(nextState)) return { state: nextState, events };
     if (result.pendingPrompt)
       return { state: nextState, events, pendingPrompt: result.pendingPrompt };
   }

@@ -265,7 +265,6 @@ function continueEndPhase(
     }
   }
 
-  if (isGameTerminated(state)) return { state, events };
   return completeTurnHandoff(state, continuation.endingPlayerIndex, events);
 }
 
