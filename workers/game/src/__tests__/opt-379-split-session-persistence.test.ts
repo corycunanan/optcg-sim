@@ -19,6 +19,7 @@ import {
   type SessionStorage,
 } from "../session/persistence.js";
 import { startPregame } from "../engine/pregame.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { setupGame } from "./factories.js";
 
 class MemoryStorage implements SessionStorage {
@@ -213,8 +214,9 @@ describe("OPT-379 split session persistence", () => {
     expect(storage.data.get(SESSION_CARD_DB_STORAGE_KEY)).toEqual(
       Object.fromEntries(cardDb)
     );
+    // OPT-924: undo snapshots are written as version 2 (schemaVersion key first).
     expect(storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY)).toEqual(
-      saved.undoHistory
+      saved.undoHistory.map(toPersistedGameState)
     );
     await expect(repository(storage).load()).resolves.toEqual(saved);
 
@@ -269,8 +271,9 @@ describe("OPT-379 split session persistence", () => {
       cardDb: Object.fromEntries(cardDb),
       undoHistory: [],
     });
+    // OPT-924: undo snapshots are written as version 2 (schemaVersion key first).
     expect(storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY)).toEqual(
-      saved.undoHistory
+      saved.undoHistory.map(toPersistedGameState)
     );
   });
 
@@ -310,7 +313,7 @@ describe("OPT-379 split session persistence", () => {
       Object.fromEntries(cardDb)
     );
     expect(storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY)).toEqual(
-      session.undoHistory
+      session.undoHistory.map(toPersistedGameState)
     );
     await expect(repository(storage).load()).resolves.toEqual({
       state,
@@ -345,7 +348,7 @@ describe("OPT-379 split session persistence", () => {
       "undoHistory"
     );
     expect(storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY)).toEqual(
-      undoHistory
+      undoHistory.map(toPersistedGameState)
     );
     expect(storage.writes).toEqual([
       [SESSION_STORAGE_KEY, SESSION_UNDO_HISTORY_STORAGE_KEY],
