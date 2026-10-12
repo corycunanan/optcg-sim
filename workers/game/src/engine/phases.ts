@@ -48,9 +48,9 @@ import { takeEngineTimestamp } from "./execution-context.js";
 import { matchTriggersForEvent, orderMatchedTriggers } from "./triggers.js";
 import { hasDelayedDeckOutLoss, runRuleProcessing } from "./defeat.js";
 import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
-// Cycle by design: the End Phase resolves its waves and obligations with the
-// pipeline's own Step 5 trigger policy (no third policy, OPT-924).
-import { fireEndPhaseEvents, processPlayerTriggerGroup } from "./pipeline.js";
+// The End Phase resolves its waves and obligations with the pipeline's own
+// Step 5 trigger policy (no third policy, OPT-924).
+import { fireEndPhaseEvents, processPlayerTriggerGroup } from "./trigger-queue.js";
 
 /**
  * Returns true if the current phase should be auto-advanced without player input.
