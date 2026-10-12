@@ -4,7 +4,7 @@
 
 **Related docs:** [Schema Overview](./01-SCHEMA-OVERVIEW.md) · [Actions](./04-ACTIONS.md) · [Triggers](./02-TRIGGERS.md) · [Prohibitions & Replacements](./06-PROHIBITIONS-AND-REPLACEMENTS.md)
 
-**Known stale claims:** This document corrects four claims in place, each in a block that separates intended design from current behavior: replacement interception, the seven-step guarantee, End Phase ordering, and the custom `END_OF_YOUR_TURN` event. OPT-956 tracks the other stale claims from the leg-5 audit: zero-power K.O., defeat checker after every action, infinite-loop hashing, nested-trigger order prose, "events are the sole interface", cost path, scheduled-action discard, and modifier layers. Read those as intended design until that ticket lands.
+**Known stale claims:** This document corrects four claims in place, each in a block that separates intended design from current behavior: replacement interception, the seven-step guarantee, End Phase ordering, and the custom `END_OF_YOUR_TURN` event. Every other stale claim found by the October 2026 audit is tracked in [OPT-956](https://linear.app/optcg-sim/issue/OPT-956); read those passages as intended design until that ticket lands.
 
 ---
 
