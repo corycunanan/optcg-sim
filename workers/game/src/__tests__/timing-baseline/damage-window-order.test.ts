@@ -11,7 +11,6 @@
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameEvent, GameState, LifeCard, PlayerState } from "../../types.js";
 import type { EffectBlock } from "../../engine/effect-types.js";
-import { runPipeline } from "../../engine/pipeline.js";
 import { registerTriggersForCard } from "../../engine/triggers.js";
 import { SessionCoordinator } from "../../session/coordinator.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "../helpers.js";
@@ -158,7 +157,6 @@ const idx = (log: readonly GameEvent[], type: string, player?: number) =>
 /** Index of a Trigger that was actually activated (the engine also logs an offer event without `activated`). */
 const activatedIdx = (log: readonly GameEvent[]) =>
   log.findIndex((e) => e.type === "TRIGGER_ACTIVATED" && (e.payload as { activated?: boolean }).activated === true);
-const types = (rig: Rig, from: number) => rig.state.eventLog.slice(from).map((e) => `${e.type}:${(e as { playerIndex?: number }).playerIndex ?? "-"}`);
 
 function baseRig(): { rig: Rig; db: Map<string, CardData> } {
   const db = new Map(createTestCardDb());
@@ -304,7 +302,7 @@ describe("F7 [OP05-098 text, Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; FAQ qa_o
 
 describe("F8 [Rule 7-1-4-1-1-3 line 672, 8-6-2-1 line 864, 7-1-4-1-1-1 line 668; FAQ qa_op03.md OP03-118, qa_rules.md:156-158] Double Attack: Trigger on point 1 changes Life before point 2", () => {
   function setup(lifeCards: LifeCard[]) {
-    const { rig, db } = baseRig();
+    const { rig } = baseRig();
     const da = withDoubleAttacker(vanillaDeck(withLife(rig.state, 1, lifeCards)));
     rig.state = da.state;
     return { rig, attackerId: da.attackerId };
@@ -325,7 +323,6 @@ describe("F8 [Rule 7-1-4-1-1-3 line 672, 8-6-2-1 line 864, 7-1-4-1-1-1 line 668;
 
   it("F8b Life [Trigger]: point 2 takes the added card; final Life 0, game still IN_PROGRESS, no GAME_OVER", () => {
     const { rig, attackerId } = setup([life("life-trig", SYN_TRIGGER_LIFE.id)]);
-    const handBefore = rig.state.players[1].hand.length;
     attackLeader(rig, attackerId);
     expect(rig.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
     reveal(rig, true);

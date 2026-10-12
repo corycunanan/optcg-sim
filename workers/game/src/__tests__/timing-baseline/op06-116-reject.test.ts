@@ -10,7 +10,6 @@
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameEvent, GameState, LifeCard, PlayerState } from "../../types.js";
 import { OP06_116_REJECT } from "../../engine/schemas/op06.js";
-import { runPipeline } from "../../engine/pipeline.js";
 import { SessionCoordinator } from "../../session/coordinator.js";
 import { resumePromptLifecycle } from "../../session/prompt-lifecycle.js";
 import { SessionRepository, type SessionStorage } from "../../session/persistence.js";
