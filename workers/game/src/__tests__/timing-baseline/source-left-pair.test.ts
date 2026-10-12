@@ -100,6 +100,32 @@ describe("F9 Sugar: a pending auto effect whose source left the field does not a
   });
 });
 
+describe("F9 control: Sugar stays and draws when nothing K.O.s it (rule 8-1-3-1-3 line 710; FAQ qa_op04.md:107-109)", () => {
+  const SUGAR = "SYN-SUGAR";
+
+  it("F9 control: p0 plays a plain vanilla Character; Sugar stays on the field and CARD_DRAWN:p1 is present", () => {
+    const b = base([
+      synCard(SUGAR, schema(SUGAR, [
+        {
+          id: "sugar-opp-turn",
+          category: "auto",
+          trigger: { event: "CHARACTER_PLAYED", filter: { controller: "OPPONENT" }, turn_restriction: "OPPONENT_TURN" },
+          actions: [{ type: "DRAW", params: { amount: 1 } }],
+        },
+      ])),
+    ]);
+    const sugar = place(b, inst(SUGAR, 1, "CHARACTER"));
+    const vanilla = place(b, inst(CARDS.VANILLA.id, 0, "HAND"));
+    b.state.players[1].deck.push(inst(CARDS.VANILLA.id, 1, "DECK"), inst(CARDS.VANILLA.id, 1, "DECK"));
+
+    run(b, { type: "PLAY_CARD", cardInstanceId: vanilla.instanceId });
+
+    const types = b.state.eventLog.map((e) => `${e.type}:p${e.playerIndex}`);
+    expect(b.state.players[1].characters.some((c) => c?.instanceId === sugar.instanceId)).toBe(true);
+    expect(types).toContain("CARD_DRAWN:p1");
+  });
+});
+
 // ─── F10 ─────────────────────────────────────────────────────────────────────
 
 describe("F10 Senor Pink: an effect already activated still resolves after its source leaves (rule 8-2-3 line 774; FAQ qa_op04.md:113-115)", () => {

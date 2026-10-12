@@ -291,10 +291,9 @@ describe("F7 [OP05-098 text, Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; FAQ qa_o
     const damages = log.filter((e) => e.type === "DAMAGE_DEALT");
     expect(damages.length).toBe(2);
     const lastDamage = log.map((e) => e.type).lastIndexOf("DAMAGE_DEALT");
-    const endBattle = idx(log, "END_OF_BATTLE");
-    expect(endBattle).toBeGreaterThan(lastDamage);
     expect(log.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 1).length).toBe(1);
-    expect(idx(log, "CARD_DRAWN", 1)).toBeGreaterThan(endBattle);
+    expect(idx(log, "CARD_DRAWN", 1)).toBeGreaterThan(lastDamage);
+    expect(rig.state.turn.battle).toBeNull();
     expect(rig.state.players[1].life.length).toBe(1);
     expect(rig.state.status).toBe("IN_PROGRESS");
   });
@@ -329,5 +328,39 @@ describe("F8 [Rule 7-1-4-1-1-3 line 672, 8-6-2-1 line 864, 7-1-4-1-1-1 line 668;
     expect(rig.state.players[1].life.length).toBe(0);
     expect(rig.state.status).toBe("IN_PROGRESS");
     expect(rig.state.eventLog.some((e) => e.type === "GAME_OVER")).toBe(false);
+  });
+});
+
+describe("F17 [Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; Decision 2; FAQ qa_op05.md:237-239, qa_op03.md:111-113] Double Attack: the defender's taking-damage effect resolves once, after the last damage point", () => {
+  // Stands in for a no-filter DAMAGE_TAKEN watcher (README §3.1: the SELF filter never matches battle damage).
+  const SYN_TAKE_DAMAGE = synCard(
+    "SYN-TAKE-DAMAGE",
+    { type: "Leader", cost: null, power: 5000, life: 5 },
+    {
+      id: "syn_take_damage",
+      category: "auto",
+      trigger: { event: "DAMAGE_TAKEN" },
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    },
+  );
+
+  // Engine: DAMAGE_DEALT, DAMAGE_DEALT, END_OF_BATTLE with NO p1 CARD_DRAWN at all (a single-hit attack does draw, after END_OF_BATTLE).
+  // Rule 8-6-2 (line 862) / Decision 2: the effect resolves once, after the last damage point.
+  it.fails("F17 exactly one p1 CARD_DRAWN, after the second DAMAGE_DEALT; p1 Life 0, IN_PROGRESS (ratchet OPT-963)", () => {
+    const { rig, db } = baseRig();
+    let s = withLeader(rig.state, db, 1, SYN_TAKE_DAMAGE);
+    s = withLife(s, 1, [life("life-a", CARDS.VANILLA.id), life("life-b", CARDS.VANILLA.id)]);
+    const da = withDoubleAttacker(vanillaDeck(s));
+    rig.state = da.state;
+    const start = rig.state.eventLog.length;
+    attackLeader(rig, da.attackerId);
+    const log = rig.state.eventLog.slice(start);
+    const damageIdx = log.map((e, i) => (e.type === "DAMAGE_DEALT" ? i : -1)).filter((i) => i >= 0);
+    expect(damageIdx.length).toBe(2);
+    const drawIdx = log.map((e, i) => (e.type === "CARD_DRAWN" && e.playerIndex === 1 ? i : -1)).filter((i) => i >= 0);
+    expect(drawIdx.length).toBe(1);
+    expect(drawIdx[0]).toBeGreaterThan(damageIdx[1]);
+    expect(rig.state.players[1].life.length).toBe(0);
+    expect(rig.state.status).toBe("IN_PROGRESS");
   });
 });

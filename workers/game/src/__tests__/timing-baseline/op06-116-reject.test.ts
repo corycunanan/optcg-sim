@@ -6,6 +6,7 @@
  * OP06-116 Reject, option 2: "If your opponent has 1 Life card, deal 1 damage to your
  * opponent. Then, add 1 card from the top of your Life cards to your hand."
  * FAQ qa_op06.md:367-371 (F12d: option 2 while the opponent did not have 1 Life: cannot add from Life).
+ * F15: rule 8-6-2-1 line 864; Decision 2; the Trigger effect's own prompt completes before the next instruction.
  */
 import { describe, it, expect } from "vitest";
 import type { CardData, CardInstance, GameEvent, GameState, LifeCard, PlayerState } from "../../types.js";
@@ -53,6 +54,26 @@ const SYN_TRIGGER_LIFE: CardData = {
     ],
   },
 };
+/** Stands in for any [Trigger] Life card whose accepted effect opens its own prompt (K.O. up to 1 opposing Character). */
+const SYN_TRIGGER_KO: CardData = {
+  ...CARDS.TRIGGER,
+  id: "SYN-TRIGGER-KO",
+  name: "SYN-TRIGGER-KO",
+  triggerText: "[Trigger] K.O. up to 1 of your opponent's Characters.",
+  effectSchema: {
+    card_id: "SYN-TRIGGER-KO",
+    card_name: "SYN-TRIGGER-KO",
+    card_type: "Character",
+    effects: [
+      {
+        id: "syn_trigger_ko",
+        category: "auto",
+        trigger: { keyword: "TRIGGER" },
+        actions: [{ type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }],
+      },
+    ],
+  },
+};
 const P0_LIFE_CARD = CARDS.BANISH.id; // unique cardId so p0's Life card is identifiable in any zone
 
 class MemoryStorage implements SessionStorage {
@@ -85,6 +106,7 @@ interface Rig {
 function setup(p1Life: LifeCard[]): Rig {
   const db = new Map(createTestCardDb());
   db.set(SYN_TRIGGER_LIFE.id, SYN_TRIGGER_LIFE);
+  db.set(SYN_TRIGGER_KO.id, SYN_TRIGGER_KO);
   db.set(REJECT.id, REJECT);
   let state = createBattleReadyState(db);
   const reject: CardInstance = {
@@ -217,7 +239,7 @@ describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:
 
   // Engine: the DEAL_DAMAGE condition is false, yet the chained LIFE_TO_HAND still moves p0's top Life
   // to hand (p0 Life 2 -> 1). FAQ qa_op06.md:367-371: "No, you cannot" add from your Life.
-  it.fails("F12d option 2 while the opponent has 2 Life: no damage, no add from Life (confirmed FAQ failure, no ticket yet)", () => {
+  it.fails("F12d option 2 while the opponent has 2 Life: no damage, no add from Life (ratchet OPT-970)", () => {
     const rig = setup([life("p1-a", CARDS.VANILLA.id), life("p1-b", CARDS.VANILLA.id)]);
     const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
     playOptionTwo(rig);
@@ -226,5 +248,68 @@ describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:
     expect(rig.state.players[0].life.length).toBe(2);
     expect(idx(log, "CARD_ADDED_TO_HAND_FROM_LIFE")).toBe(-1);
     expect(count(rig.state.players[0].hand, P0_LIFE_CARD)).toBe(hand0);
+  });
+
+  // Positive control for F12d: with exactly 1 Life (non-Trigger) the damage and the add both happen.
+  it("F12d control: option 2 while the opponent has exactly 1 Life: damage and add both happen", () => {
+    const rig = setup([life("p1-a", CARDS.VANILLA.id)]);
+    const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
+    playOptionTwo(rig);
+    expect(rig.state.pendingPrompt).toBeNull();
+    expect(rig.state.players[1].life.length).toBe(0);
+    expect(rig.state.players[0].life.length).toBe(1);
+    expect(count(rig.state.players[0].hand, P0_LIFE_CARD)).toBe(hand0 + 1);
+  });
+});
+
+describe("F15 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text] nested prompt inside the accepted Trigger, reload before the nested reply", () => {
+  // Engine: the nested SELECT_TARGET for p1 surfaces, but p0 Life is already 1 (LIFE_TO_HAND ran before the Trigger window).
+  // Rule 8-6-2-1 (line 864) / Decision 2: the Trigger's own prompt completes before p0's Life-to-hand.
+  it.fails("F15 accept, nested SELECT_TARGET, reload, reply: p0 Life stays 2 until the reply, then the K.O. and the Life-to-hand (ratchet OPT-963)", async () => {
+    const rig = setup([life("p1-life-ko", SYN_TRIGGER_KO.id)]);
+    const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
+    expect(rig.state.players[0].characters.some(Boolean)).toBe(true);
+    playOptionTwo(rig);
+    replyReveal(rig, true);
+    expect(rig.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(rig.state.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(rig.state.players[0].life.length).toBe(2);
+
+    const storage = new MemoryStorage();
+    const repo = new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" });
+    await repo.save({
+      state: rig.state,
+      cardDb: rig.db,
+      mode: "PVP",
+      pregameMode: "PRIORITY_ROLL",
+      testPriorityRolls: null,
+      undoHistory: [],
+    });
+    const loaded = await repo.load();
+    expect(loaded).not.toBeNull();
+    rig.state = loaded!.state;
+    rig.db = loaded!.cardDb;
+    expect(rig.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(rig.state.players[0].life.length).toBe(2);
+
+    const prompt = rig.state.pendingPrompt!;
+    const ids = (prompt.options as unknown as { validTargets: string[] }).validTargets;
+    expect(ids.length).toBeGreaterThan(0);
+    const victim = ids[0];
+    const victimCardId = rig.state.players[0].characters.find((c) => c?.instanceId === victim)?.cardId;
+    expect(victimCardId).toBeDefined();
+    const trash0 = count(rig.state.players[0].trash, victimCardId!);
+    const resumed = resumePromptLifecycle(
+      structuredClone(rig.state),
+      { type: "SELECT_TARGET", selectedInstanceIds: [victim], promptId: prompt.promptId } as never,
+      rig.db,
+      { drainPregame: (s) => s, advanceStartOfTurn: (s) => s },
+    );
+    expect(resumed.responseRejected).toBe(false);
+    rig.state = resumed.state;
+    expect(count(rig.state.players[0].trash, victimCardId!)).toBe(trash0 + 1);
+    expect(rig.state.players[0].life.length).toBe(1);
+    expect(count(rig.state.players[0].hand, P0_LIFE_CARD)).toBe(hand0 + 1);
+    expect(count(rig.state.players[1].hand, P0_LIFE_CARD)).toBe(0);
   });
 });
