@@ -20,15 +20,19 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { SessionRepository, type SessionStorage } from "../session/persistence.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
-export interface Limits { medianMs: number; maxMs: number; heapDeltaMB: number }
+export interface Limits { medianMs: number; maxMs: number; heapDeltaMB: number; medianRatio?: number }
 
 /**
  * OPT-961 round 1: thresholds are a small multiple of the measured head
- * values (fast scenarios measure ≤ 0.12 ms median, ≤ 1 ms max, ≤ 4 MB; S3b
- * measures about 12 ms median, 15 ms max, 50 MB), so a 10× regression fails.
+ * values. Fast scenarios measure ≤ 0.12 ms median and ≤ 1 ms max alone
+ * (≤ 0.3 ms / 1.3 ms under the full coverage run). S3b measures about 12 ms
+ * median alone and 34-36 ms under the full run, so its absolute limits are
+ * only a backstop. Its regression gate is the ratio of its median to a
+ * calibration workload timed in the same child: about 10 alone, about 15
+ * under the full run. A limit of 40 fails a 10× regression (ratio about 100).
  */
 export const FAST_LIMITS: Limits = { medianMs: 1, maxMs: 25, heapDeltaMB: 16 };
-export const SEARCH_LIMITS: Limits = { medianMs: 40, maxMs: 100, heapDeltaMB: 128 };
+export const SEARCH_LIMITS: Limits = { medianMs: 250, maxMs: 1000, heapDeltaMB: 128, medianRatio: 40 };
 
 export interface ScenarioDef {
   id: string;
@@ -186,6 +190,22 @@ async function main() {
     if (!ok) differs.push(`${id}/${path}: got ${JSON.stringify(got)}, expected ${def.payable ? "payable" : "unpayable"}`);
   };
 
+  // OPT-961 round 1: a calibration workload timed in the same process, so a
+  // search scenario's cost can be judged as a ratio that survives CPU
+  // contention from the rest of the suite. 20 JSON round trips of the
+  // loaded state approximate the per-payment state copying the search does.
+  const calibrate = () => {
+    for (let i = 0; i < 20; i++) JSON.parse(JSON.stringify(state));
+  };
+  for (let i = 0; i < 3; i++) calibrate();
+  const calibrationTimes: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const t0 = performance.now();
+    calibrate();
+    calibrationTimes.push(performance.now() - t0);
+  }
+  const calibrationMs = median(calibrationTimes);
+
   const results: Record<string, { medianMs: number; maxMs: number; heapDeltaMB: number }> = {};
   for (const path of PATHS) {
     const fn = calls[path];
@@ -211,7 +231,7 @@ async function main() {
     process.stdout.write(`OPT961_RESULT ${JSON.stringify({ id, error: `correctness: ${differs.join("; ")}` })}\n`);
     return;
   }
-  process.stdout.write(`OPT961_RESULT ${JSON.stringify({ id, loadMs: median(loadTimes), results, differs })}\n`);
+  process.stdout.write(`OPT961_RESULT ${JSON.stringify({ id, loadMs: median(loadTimes), calibrationMs, results, differs })}\n`);
 }
 
 const isEntry = process.argv[1]?.endsWith("opt-961-scale-scenarios.ts");

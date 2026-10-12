@@ -21,7 +21,7 @@ const CWD = path.resolve(path.dirname(MODULE), "../..");
 const TIMEOUT_MS = 20_000;
 
 interface Row { medianMs: number; maxMs: number; heapDeltaMB: number }
-interface Child { id: string; loadMs?: number; results?: Record<string, Row>; error?: string }
+interface Child { id: string; loadMs?: number; calibrationMs?: number; results?: Record<string, Row>; error?: string }
 
 describe("OPT-961 cost-sequence feasibility scale harness", () => {
   it("every scenario and path stays within time and heap limits", () => {
@@ -47,7 +47,11 @@ describe("OPT-961 cost-sequence feasibility scale harness", () => {
       const LIMITS = s.limits ?? FAST_LIMITS;
       for (const p of PATHS) {
         const r = out.results[p];
-        table.push(`${s.id} ${p}: median ${r.medianMs.toFixed(2)} ms, max ${r.maxMs.toFixed(2)} ms, heap ${r.heapDeltaMB.toFixed(1)} MB, load ${out.loadMs?.toFixed(1)} ms`);
+        const ratio = r.medianMs / (out.calibrationMs ?? Number.NaN);
+        table.push(`${s.id} ${p}: median ${r.medianMs.toFixed(2)} ms, max ${r.maxMs.toFixed(2)} ms, heap ${r.heapDeltaMB.toFixed(1)} MB, load ${out.loadMs?.toFixed(1)} ms, calibration ${out.calibrationMs?.toFixed(2)} ms, ratio ${ratio.toFixed(2)}`);
+        if (LIMITS.medianRatio !== undefined && !(ratio <= LIMITS.medianRatio)) {
+          failures.push(`${s.id} ${p}: median/calibration ${ratio.toFixed(2)} > ${LIMITS.medianRatio}`);
+        }
         if (r.medianMs > LIMITS.medianMs) failures.push(`${s.id} ${p}: median ${r.medianMs.toFixed(1)} ms > ${LIMITS.medianMs} ms`);
         if (r.maxMs > LIMITS.maxMs) failures.push(`${s.id} ${p}: max ${r.maxMs.toFixed(1)} ms > ${LIMITS.maxMs} ms`);
         if (r.heapDeltaMB > LIMITS.heapDeltaMB) failures.push(`${s.id} ${p}: heap delta ${r.heapDeltaMB.toFixed(1)} MB > ${LIMITS.heapDeltaMB} MB`);
