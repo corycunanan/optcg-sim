@@ -249,6 +249,10 @@ export function sequenceFailsNecessaryCondition(
  * Failure policy: expected infeasibility returns false. An engine error
  * (an unknown cost type, a broken identity assertion) is not infeasibility,
  * so it propagates to the caller instead of reading as "cannot pay".
+ * Callers split on it (OPT-961): validation, the optional-prompt gate, the
+ * Life Trigger gate and payment let it propagate; availability
+ * (`computeEffectAvailability`) is presentation only, so it catches it per
+ * block, logs `[EFFECT_AVAILABILITY]`, and reports that block blocked.
  */
 export function isCostSequencePayable(
   state: GameState,

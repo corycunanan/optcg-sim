@@ -284,23 +284,52 @@ describe("OPT-864 a feasibility query leaves the authoritative state unchanged",
     expect(skipped.state).toEqual(beforeSkip);
   });
 
-  it("an engine error inside a hypothetical payment propagates instead of reading as 'cannot pay'", () => {
+  it("an engine error propagates from validation, and availability contains it per block (OPT-961)", () => {
     const r = rig();
     const corrupt = {
       ...ENABLED_ACTIVATE,
       id: "opt864_corrupt",
       costs: [{ type: "NOT_A_COST_TYPE" } as unknown as Cost],
     };
+    const healthy = { ...ENABLED_ACTIVATE, id: "opt864_healthy", costs: [{ type: "REST_DON", amount: 1 } as Cost] };
     const source = r.put("OPT864-CORRUPT", P0, "CHARACTER", {
-      schema: synSchema("OPT864-CORRUPT", [corrupt]),
+      schema: synSchema("OPT864-CORRUPT", [corrupt, healthy]),
     });
-    expect(() => computeEffectAvailability(r.state, r.db)).toThrow(/Unhandled cost type/);
+    // Validation and payment never read an engine error as "cannot pay".
     expect(() => validate(
       r.state,
       { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: corrupt.id },
       r.db,
       P0,
     )).toThrow(/Unhandled cost type/);
+    // Availability is presentation: it logs, blocks that block, and keeps going.
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const entries = computeEffectAvailability(r.state, r.db)[source.instanceId];
+      expect(entries).toEqual([
+        { effectId: corrupt.id, status: "blocked", reason: "COST" },
+        { effectId: healthy.id, status: "usable" },
+      ]);
+      expect(errors).toHaveBeenCalledTimes(1);
+      expect(String(errors.mock.calls[0][0])).toMatch(/^\[EFFECT_AVAILABILITY\]/);
+      expect(String(errors.mock.calls[0][2])).toMatch(/Unhandled cost type/);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("availability keeps reporting COST before CONDITION when both fail (order unchanged)", () => {
+    const r = rig();
+    const both: EffectBlock = {
+      id: "opt961_both_fail",
+      category: "activate",
+      trigger: { keyword: "ACTIVATE_MAIN" },
+      conditions: { type: "LIFE_COUNT", controller: "SELF", operator: ">=", value: 99 },
+      costs: [{ type: "MILL", amount: 99 }],
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    };
+    const source = r.put("OPT961-BOTH", P0, "CHARACTER", { schema: synSchema("OPT961-BOTH", [both]) });
+    expect(availabilityOf(r, source, both.id)).toEqual({ effectId: both.id, status: "blocked", reason: "COST" });
   });
 
   it("a hypothetical MILL of the whole deck reads payable and does not end the game", () => {

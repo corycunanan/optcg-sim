@@ -280,6 +280,34 @@ function availabilityForBlock(
   return { effectId: block.id, status: "usable" };
 }
 
+/**
+ * OPT-961: availability is presentation, computed for every card on every
+ * state broadcast (session/filtered-state.ts). An engine error inside one
+ * block's hypothetical payment must not throw out of state filtering for both
+ * players, so this boundary logs it with a stable prefix, marks that block
+ * blocked, and keeps building the rest. Validation and payment keep
+ * propagating the same error (see the failure policy in
+ * effect-resolver/cost/feasibility.ts), so an engine error never becomes a
+ * legal or illegal move silently.
+ */
+function containedAvailabilityForBlock(
+  state: GameState,
+  block: EffectBlock,
+  card: CardInstance,
+  cardDb: Map<string, CardData>
+): EffectAvailability | null {
+  try {
+    return availabilityForBlock(state, block, card, cardDb);
+  } catch (error) {
+    console.error(
+      "[EFFECT_AVAILABILITY] availability failed; block marked blocked:",
+      { gameId: state.id, cardId: card.cardId, instanceId: card.instanceId, effectId: block.id },
+      error
+    );
+    return { effectId: block.id, status: "blocked", reason: "COST" };
+  }
+}
+
 /** Compute public effect presentation state for leaders, Characters, and Stages. */
 export function computeEffectAvailability(
   state: GameState,
@@ -292,7 +320,7 @@ export function computeEffectAvailability(
     if (!schema) continue;
 
     const entries = schema.effects
-      .map((block) => availabilityForBlock(state, block, card, cardDb))
+      .map((block) => containedAvailabilityForBlock(state, block, card, cardDb))
       .filter((entry): entry is EffectAvailability => entry !== null);
     if (entries.length > 0) availability[card.instanceId] = entries;
   }
