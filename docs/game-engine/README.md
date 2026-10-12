@@ -39,6 +39,7 @@
 
 | File | Description | Lines |
 |------|-------------|-------|
+| [CONSOLIDATION-PROPOSAL-AUDIT-2026-10.md](./CONSOLIDATION-PROPOSAL-AUDIT-2026-10.md) | Rules, FAQ, and scalability audit of the Game Engine Consolidation proposal; eleven decisions resolved 2026-10-09; leg reports plus Rev 3 (audited) and Rev 4 (current contract) snapshots under `audits/consolidation-2026-10/` | — |
 | [GAME-ENGINE-AUDIT-2026-07.md](./GAME-ENGINE-AUDIT-2026-07.md) | Consolidated Luna Max + Terra Max audit, independent verification, and sequenced Linear hardening plan | — |
 | [ZONE-TRANSITION-CONTRACT.md](./ZONE-TRANSITION-CONTRACT.md) | Authoritative cross-zone identity, cleanup, event, atomicity, and ordering contract | — |
 | [GAME-ENGINE-REQUIREMENTS.md](./GAME-ENGINE-REQUIREMENTS.md) | Complete rules-to-engine mapping from Comprehensive Rules v1.2.0 | 1,079 |
