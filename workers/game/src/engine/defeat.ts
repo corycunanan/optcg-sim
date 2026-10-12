@@ -11,6 +11,7 @@
 
 import type { CardData, GameState } from "../types.js";
 import { terminateGame } from "./terminal.js";
+import { isCardNegated } from "./modifiers.js";
 
 /**
  * Facts a checkpoint needs that the board alone does not show.
@@ -85,8 +86,14 @@ export function checkDefeat(
   const p0DeckOutEot = !!context.endOfTurn && sticky[0] && p0HasDelayed;
   const p1DeckOutEot = !!context.endOfTurn && sticky[1] && p1HasDelayed;
 
-  const p0DeckOut = p0DeckOutNow || p0DeckOutEot;
-  const p1DeckOut = p1DeckOutNow || p1DeckOutEot;
+  // WIN_INSTEAD (OP03-040 / P-117 Nami): "when your deck is reduced to 0, you
+  // win the game instead of losing" replaces that player's deck-out loss
+  // with a win, unless the Leader's effects are negated (qa_op09.md:204-206).
+  const p0WinInstead = (p0DeckOutNow || p0DeckOutEot) && hasDeckOutWinInstead(state, 0, cardDb);
+  const p1WinInstead = (p1DeckOutNow || p1DeckOutEot) && hasDeckOutWinInstead(state, 1, cardDb);
+
+  const p0DeckOut = (p0DeckOutNow || p0DeckOutEot) && !p0WinInstead;
+  const p1DeckOut = (p1DeckOutNow || p1DeckOutEot) && !p1WinInstead;
 
   // Life-out defeat (9-2-1-1): only a damage determination made while the
   // player had 0 Life qualifies. The Life count now is not consulted, so
@@ -95,38 +102,59 @@ export function checkDefeat(
   const p0LifeOut = lethal.includes(0);
   const p1LifeOut = lethal.includes(1);
 
-  const p0Loses = p0DeckOut || p0LifeOut;
-  const p1Loses = p1DeckOut || p1LifeOut;
+  // A player loses when they meet an unreplaced defeat condition, or when
+  // the opponent wins by WIN_INSTEAD at this checkpoint. Joint checkpoints
+  // (assumed, no official ruling; literal reading of the printed text): the
+  // clause replaces only the deck-out loss, so a Nami player who also takes
+  // lethal damage at the same checkpoint still loses by 9-2-1-1 while the
+  // win makes the opponent lose: both lose, a draw (9-2-1). A Nami deck-out
+  // together with any opponent defeat is a Nami win.
+  const p0Loses = p0DeckOut || p0LifeOut || p1WinInstead;
+  const p1Loses = p1DeckOut || p1LifeOut || p0WinInstead;
+  if (!p0Loses && !p1Loses) return null;
 
-  if (p0Loses && p1Loses) {
-    const reason = buildReason(p0DeckOut, p0LifeOut, p1DeckOut, p1LifeOut, true);
-    return { gameOver: true, winner: null, reason };
-  }
-  if (p0Loses) {
-    const reason = p0DeckOut ? "Player 1 decked out" : "Player 1's life reached 0";
-    return { gameOver: true, winner: 1, reason };
-  }
-  if (p1Loses) {
-    const reason = p1DeckOut ? "Player 2 decked out" : "Player 2's life reached 0";
-    return { gameOver: true, winner: 0, reason };
-  }
+  const reasons: string[] = [];
+  if (p0WinInstead) reasons.push("Player 1's deck reached 0 — Player 1 wins instead of losing");
+  if (p0DeckOut) reasons.push("Player 1 decked out");
+  if (p0LifeOut) reasons.push("Player 1's life reached 0");
+  if (p1WinInstead) reasons.push("Player 2's deck reached 0 — Player 2 wins instead of losing");
+  if (p1DeckOut) reasons.push("Player 2 decked out");
+  if (p1LifeOut) reasons.push("Player 2's life reached 0");
+  const reason = reasons.join("; ");
 
-  return null;
+  if (p0Loses && p1Loses) return { gameOver: true, winner: null, reason: `${reason} — draw` };
+  return { gameOver: true, winner: p0Loses ? 1 : 0, reason };
 }
 
-function buildReason(
-  p0Deck: boolean,
-  p0Life: boolean,
-  p1Deck: boolean,
-  p1Life: boolean,
-  _draw: boolean,
-): string {
-  const reasons: string[] = [];
-  if (p0Deck) reasons.push("Player 1 decked out");
-  if (p0Life) reasons.push("Player 1's life reached 0");
-  if (p1Deck) reasons.push("Player 2 decked out");
-  if (p1Life) reasons.push("Player 2's life reached 0");
-  return reasons.join("; ") + " — draw";
+/**
+ * True when the player's Leader carries an unnegated LOSS_CONDITION_MOD /
+ * WIN_INSTEAD rule modification for the DECK_OUT event (OP03-040, P-117
+ * Nami). Read from both `rule_modifications` and `rule_modification` effect
+ * blocks, where the Nami schemas author it. A negated Leader loses on
+ * deck-out (qa_op09.md:204-206, qa_op10.md:207).
+ */
+export function hasDeckOutWinInstead(
+  state: GameState,
+  playerIndex: 0 | 1,
+  cardDb: Map<string, CardData> | undefined,
+): boolean {
+  if (!cardDb) return false;
+  const leader = state.players[playerIndex].leader;
+  const schema = cardDb.get(leader.cardId)?.effectSchema;
+  if (!schema) return false;
+  const rules = [
+    ...(schema.rule_modifications ?? []),
+    ...(schema.effects ?? []).flatMap((block) =>
+      block.category === "rule_modification" && block.rule ? [block.rule] : [],
+    ),
+  ];
+  const winInstead = rules.some(
+    (m) =>
+      m.rule_type === "LOSS_CONDITION_MOD" &&
+      m.trigger_event === "DECK_OUT" &&
+      m.modification === "WIN_INSTEAD",
+  );
+  return winInstead && !isCardNegated(leader, state, cardDb);
 }
 
 /**

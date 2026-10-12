@@ -87,7 +87,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **1-2-2-2.** 0 deck cards = defeat | **IMPL** | `defeat.ts:26–27` | Checked every pipeline run |
 | **1-2-3.** Concession at any time | **IMPL** | `execute.ts → executeConcede()`, `validation.ts:52` | Always legal, immediate game end |
 | **1-2-4.** Concession unaffected by cards | **IMPL** | `executeConcede()` bypasses all effect logic | No card effect can block concession |
-| **1-2-5.** Card effects that cause win/loss | **PARTIAL** | `effect-resolver/actions/effects.ts → executeWinGame()` → `terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | WIN_GAME ends play mid-chain (OPT-949). LOSS_CONDITION_MOD `DELAYED_LOSS` (OP15-022) is honored; `WIN_INSTEAD` (OP03-040, P-117) is not implemented |
+| **1-2-5.** Card effects that cause win/loss | **PARTIAL** | `effect-resolver/actions/effects.ts → executeWinGame()` → `terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | WIN_GAME ends play mid-chain (OPT-949). LOSS_CONDITION_MOD `DELAYED_LOSS` (OP15-022) and `WIN_INSTEAD` (OP03-040, P-117; [`opt-949-win-instead.test.ts`](../../workers/game/src/__tests__/opt-949-win-instead.test.ts)) are evaluated at the checkpoint; a negated Nami Leader loses on deck-out (qa_op09.md:204-206). Joint Nami checkpoints follow an assumed literal reading |
 
 ### 1-3. Fundamental Principles
 
