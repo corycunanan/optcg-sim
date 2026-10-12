@@ -113,6 +113,41 @@ describe("OPT-940 stage-less PhaseBoundaryContinuation: lossless, legacy semanti
   });
 });
 
+describe("OPT-962 legacy stage keeps the version 1 resume on the version 2 engine", () => {
+  it("drains and hands off without running the staged End Phase: no wave, no expiry, the v1 event order", () => {
+    const raw = structuredClone(golden("end-phase-parked").session.state) as Record<string, unknown> & { activeEffects: unknown[]; turn: { number: number } };
+    // A "during this turn" effect still present at the v1 boundary. v1 already ran
+    // its End Phase expiry before parking, so the legacy resume must not expire it;
+    // a staged End Phase (6-6-1-3) would.
+    raw.activeEffects = [{
+      id: "opt962-legacy-during",
+      sourceCardInstanceId: "golden-when-attacking",
+      sourceEffectBlockId: "syn",
+      category: "auto",
+      modifiers: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 } }],
+      duration: { type: "THIS_TURN" },
+      expiresAt: { wave: "END_OF_TURN", turn: raw.turn.number, player: 0 },
+      controller: 0,
+      appliesTo: [],
+      timestamp: 1,
+    }];
+    const state = convertPersistedGameState(raw, "state");
+    expect(state.effectStack.find((f) => f.phaseBoundaryContinuation)?.phaseBoundaryContinuation?.stage).toBe("LEGACY_SCHEDULED_ACTIONS");
+    const cardDb = new Map(Object.entries(golden("end-phase-parked").cardDb) as Array<[string, never]>);
+    const from = state.eventLog.length;
+    const result = resumePromptLifecycle(
+      state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [], promptId: state.pendingPrompt!.promptId },
+      cardDb,
+      lifecycleServices
+    );
+    expect(result.state.eventLog.slice(from).map((e) => e.type)).toEqual([
+      "CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "TURN_ENDED", "TURN_STARTED", "PHASE_CHANGED",
+    ]);
+    expect(result.state.activeEffects.map((e) => e.id)).toEqual(["opt962-legacy-during"]);
+  });
+});
+
 describe("OPT-940 structural ResumeContext: supported as-is", () => {
   it("loads live and as undo, classified, and still resumes through resumeEffectChain", async () => {
     for (const state of [loadLive("structural-resume-context"), await loadAsUndo("structural-resume-context")]) {

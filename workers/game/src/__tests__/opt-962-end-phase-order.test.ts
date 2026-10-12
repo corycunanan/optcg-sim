@@ -48,13 +48,13 @@ describe("OPT-962 [End of Your Turn] effects resolve while the ending player is 
     r.act({ type: "ADVANCE_PHASE" });
 
     const log = r.log();
+    // Decisive: Bonney never draws (base drew 2 and trashed 1 after the hand-off).
+    expect(log).not.toContain("CARD_DRAWN:p1");
+    expect(r.state.players[1].hand).toHaveLength(p1Hand);
     const endedAt = log.indexOf("TURN_ENDED:p0");
     expect(endedAt).toBeGreaterThanOrEqual(0);
     expect(log.indexOf("CARD_REMOVED_FROM_LIFE:p0")).toBeGreaterThanOrEqual(0);
     expect(log.indexOf("CARD_REMOVED_FROM_LIFE:p0")).toBeLessThan(endedAt);
-    // Decisive: Bonney never draws (base drew 2 and trashed 1 after the hand-off).
-    expect(log).not.toContain("CARD_DRAWN:p1");
-    expect(r.state.players[1].hand).toHaveLength(p1Hand);
     expect(r.state.players[0].life).toHaveLength(3);
     expect(r.state.players[0].trash).toHaveLength(p0Trash + 1);
   });
@@ -94,7 +94,10 @@ describe("OPT-962 [End of Your Turn] effects resolve while the ending player is 
     expect(r.state.activeEffects.some((e) => e.controller === 1 && e.duration.type === "THIS_TURN")).toBe(false);
   });
 
-  it("a Character played during the wave fires its own [End of Your Turn] in the same wave (8-6-1-1, Decision 9)", () => {
+  it.each([
+    ["prompted (up to 1, the player picks it)", { up_to: 1 }],
+    ["continuous (exactly 1 candidate, no prompt)", { exact: 1 }],
+  ] as const)("a Character played during the wave fires its own [End of Your Turn] in the same wave (8-6-1-1, Decision 9): %s", (_label, count) => {
     const r = endPhaseRig();
     const PLAYER = "SYN-EOYT-PLAYER";
     const LATE = "SYN-EOYT-LATE";
@@ -104,7 +107,7 @@ describe("OPT-962 [End of Your Turn] effects resolve while the ending player is 
       trigger: { keyword: "END_OF_YOUR_TURN" },
       actions: [{
         type: "PLAY_CARD",
-        target: { type: "CHARACTER_CARD", source_zone: "HAND", count: { up_to: 1 }, filter: { name: LATE } },
+        target: { type: "CHARACTER_CARD", source_zone: "HAND", count, filter: { name: LATE } },
         params: { source_zone: "HAND", cost_override: "FREE" },
       }],
     }]), 0, "CHARACTER");
@@ -192,6 +195,42 @@ describe("OPT-962 expiry steps (6-6-1-2, 6-6-1-3)", () => {
     expect(log).toContain("CARD_DRAWN:p1");
     expect(log.indexOf("CARD_DRAWN:p1")).toBeLessThan(log.indexOf("TURN_ENDED:p0"));
     expect(r.state.activeEffects.some((e) => e.id === untilEnd.id || e.id === during.id)).toBe(false);
+  });
+});
+
+describe("OPT-962 each player's step runs its obligations before its own expiry (6-6-1-2 steps 1 and 2)", () => {
+  it("p1's step-2 obligation still sees p1's own 'until the end of your opponent's turn' modifier", () => {
+    const r = endPhaseRig();
+    const c1 = r.putSyn("SYN-C1", null, 1, "CHARACTER", { power: 4000 });
+    // p1's "until the end of your opponent's next End Phase" +1000, due in p0's End Phase: step 2's expiry.
+    const untilEnd: RuntimeActiveEffect = {
+      id: "syn-p1-until-end",
+      sourceCardInstanceId: c1.instanceId,
+      sourceEffectBlockId: "syn",
+      category: "auto",
+      modifiers: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 } }],
+      duration: { type: "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE" },
+      expiresAt: { wave: "END_OF_END_PHASE", turn: r.state.turn.number, player: 0 },
+      controller: 1,
+      appliesTo: [c1.instanceId],
+      timestamp: 1,
+    };
+    const p1Obligation: RuntimeScheduledAction = {
+      id: "syn-p1-own",
+      timing: "END_OF_THIS_TURN",
+      action: { type: "DRAW", params: { amount: 1 }, conditions: { type: "SELF_POWER", operator: ">=", value: 5000 } },
+      boundToInstanceId: null,
+      sourceEffectId: c1.instanceId,
+      controller: 1,
+    };
+    r.state = { ...r.state, activeEffects: [untilEnd], scheduledActions: [p1Obligation] };
+
+    r.act({ type: "ADVANCE_PHASE" });
+
+    const log = r.log();
+    expect(log).toContain("CARD_DRAWN:p1");
+    expect(log.indexOf("CARD_DRAWN:p1")).toBeLessThan(log.indexOf("TURN_ENDED:p0"));
+    expect(r.state.activeEffects.some((e) => e.id === untilEnd.id)).toBe(false);
   });
 });
 
