@@ -588,6 +588,9 @@ export function handleAwaitingOptionalResponse(
 
     nextState = costResult.state;
     events.push(...costResult.events);
+    // OPT-862: a cost that ended the game (EB01-051 MILL 2 on a 2-card deck)
+    // leaves no action, prompt or trigger drain to run.
+    if (isGameTerminated(nextState)) return { state: nextState, events, resolved: true };
 
     if (costResult.costResult) {
       costRefs = costResultRefsFromEntries(

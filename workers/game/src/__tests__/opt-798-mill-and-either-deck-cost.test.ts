@@ -202,10 +202,9 @@ describe.each(["EB01-051", "EB04-049"])("OPT-798 %s — MILL is an activation co
   // OPT-798 review: rule 9-1-2 (rule processing is immediate) + 9-2-1-2 (a
   // player with 0 cards in deck loses). Paying the cost with exactly N cards
   // empties the deck, so the game must end before the post-colon K.O. prompt.
-  // Pre-existing shared defect (the MILL action behaves the same way): defeat
-  // is only checked at the pipeline boundary. Tracked as a follow-up; this
-  // ratchet fails loudly once immediate deck-out processing lands.
-  it.fails("an exactly-2-card deck pays, then loses immediately before any K.O. prompt (rule 9-1-2)", () => {
+  // Formerly an it.fails ratchet; OPT-862 (OPT-960) checks rule processing
+  // after each committed cost payment.
+  it("an exactly-2-card deck pays, then loses immediately before any K.O. prompt (rule 9-1-2)", () => {
     const f = fixture();
     f.deck(0, 2);
     f.put("victim", 1, "CHARACTER", { cost: 2 });
@@ -364,9 +363,9 @@ describe("OPT-798 EB04-042 Alpha [On Play] MILL cost", () => {
     expect(f.millEvents()[0].payload).toMatchObject({ count: 3 });
   });
 
-  // Same rule 9-1-2 ratchet as the Event case: emptying the deck with the
-  // cost must end the game before the −1 cost target prompt.
-  it.fails("an exactly-3-card deck pays, then loses immediately before the −1 cost prompt (rule 9-1-2)", () => {
+  // Same rule 9-1-2 case as the Event: emptying the deck with the cost ends
+  // the game before the −1 cost target prompt (formerly a ratchet, OPT-862).
+  it("an exactly-3-card deck pays, then loses immediately before the −1 cost prompt (rule 9-1-2)", () => {
     const f = fixture();
     f.deck(0, 3);
     f.put("target", 1, "CHARACTER", { cost: 3 });

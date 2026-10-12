@@ -1,4 +1,6 @@
 import { finishReplacedLifeCost } from "../cost/replaced.js";
+import { isGameTerminated } from "../../terminal.js";
+import { runRuleProcessing, runRuleProcessingAfterMove } from "../../defeat.js";
 import { completeHandTrashCostSources, handTrashEvent, isHandTrashByEffect } from "../../hand-trash.js";
 import {
   updateEffectContinuation,
@@ -190,6 +192,15 @@ function finishCostsAndRunActions(
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
 ): EffectResolverResult {
+  // OPT-862: rule-processing checkpoint once the costs are paid, before any
+  // post-colon action, prompt or trigger drain. A cost that empties the deck
+  // ends the game here (9-1-2, 9-2-1-2); the paid cost stands.
+  // Compared against the staged state captured before the selection; a
+  // legacy frame without one is always checked.
+  state = topFrame.costTransactionState
+    ? runRuleProcessingAfterMove(topFrame.costTransactionState, state, {}, cardDb)
+    : runRuleProcessing(state, {}, cardDb);
+  if (isGameTerminated(state)) return { state, events, resolved: true };
   const block = topFrame.effectBlock;
   if (isOncePerTurnBlock(block) && !topFrame.oncePerTurnMarked) {
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);

@@ -3,6 +3,7 @@ import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
 import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPromptState } from "../../../types.js";
 import { generateFrameId, pushFrame } from "../../effect-stack.js";
 import { isGameTerminated } from "../../terminal.js";
+import { runRuleProcessingAfterMove } from "../../defeat.js";
 import { checkReplacementForRemoval } from "../../replacements.js";
 import type { CostSelectionResult } from "../types.js";
 import { costResultToEntries } from "../types.js";
@@ -63,11 +64,23 @@ export function payCostsWithSelection(
   const events: PendingEvent[] = [...priorEvents];
   let nextState = state;
   const baseline = transactionBaseline ?? captureCostTransactionState(state);
-  const cannotPay = (): CostSelectionResult => ({
-    state: applyCostTransactionState(nextState, baseline),
-    events: [],
-    cannotPay: true,
-  });
+  // OPT-862: a terminal checkpoint during payment ends the game with the
+  // paid costs standing. Never roll back to the IN_PROGRESS baseline: the
+  // rollback would restore the deck that decided the defeat.
+  const terminated = (): CostSelectionResult => ({ state: nextState, events, costResult });
+  const cannotPay = (): CostSelectionResult => {
+    if (isGameTerminated(nextState)) return terminated();
+    return {
+      state: applyCostTransactionState(nextState, baseline),
+      events: [],
+      cannotPay: true,
+    };
+  };
+  /** Rule-processing checkpoint after a committed payment (9-1-2). */
+  const ruleProcessingAfterPayment = (before: Pick<GameState, "players">): boolean => {
+    nextState = runRuleProcessingAfterMove(before, nextState, {}, cardDb);
+    return isGameTerminated(nextState);
+  };
   const pushCostFrame = (
     frame: EffectStackFrame,
     stagedState: GameState = nextState,
@@ -79,11 +92,14 @@ export function payCostsWithSelection(
       costTransactionState: captureCostTransactionState(stagedState),
     });
   };
-  const suspend = (pendingPrompt: PendingPromptState): CostSelectionResult => ({
-    state: applyCostTransactionState(nextState, baseline),
-    events: [],
-    pendingPrompt,
-  });
+  const suspend = (pendingPrompt: PendingPromptState): CostSelectionResult => {
+    if (isGameTerminated(nextState)) return terminated();
+    return {
+      state: applyCostTransactionState(nextState, baseline),
+      events: [],
+      pendingPrompt,
+    };
+  };
   const costResult: CostResult = {
     donRestedCount: 0,
     cardsTrashedCount: 0,
@@ -102,6 +118,9 @@ export function payCostsWithSelection(
   // the whole suffix before prompting for the first selection so a player is
   // never asked to pick a payment that must then be rolled back (e.g.
   // OP04-055: an [Ice Oni] in hand but no cost ≤4 Character on either field).
+  // A selection resumed into this call may already have emptied a deck.
+  if (ruleProcessingAfterPayment(baseline)) return terminated();
+
   if (!isCostSequencePayable(
     state,
     costs.slice(startIndex),
@@ -519,10 +538,12 @@ export function payCostsWithSelection(
       }
 
       // Block shuffles afterward — order is moot, pay in default order.
+      const beforePayment = nextState;
       const applied = applyCostSelection(nextState, cost, group, controller, cardDb);
       nextState = applied.state;
       events.push(...applied.events);
       costResult.cardsPlacedToDeckCount += group.length;
+      if (ruleProcessingAfterPayment(beforePayment)) return terminated();
       continue;
     }
 
@@ -674,6 +695,7 @@ export function payCostsWithSelection(
     }
 
     // Auto-payable cost — use existing payCosts for this single cost
+    const beforePayment = nextState;
     const singleResult = payCosts(nextState, [cost], controller, cardDb, sourceCardInstanceId);
     if (!singleResult) {
       return cannotPay();
@@ -693,6 +715,9 @@ export function payCostsWithSelection(
     costResult.charactersKoInstanceIds.push(...singleResult.costResult.charactersKoInstanceIds);
     costResult.donGivenCount += singleResult.costResult.donGivenCount;
     costResult.donGivenInstanceIds.push(...singleResult.costResult.donGivenInstanceIds);
+    // OPT-862: a MILL (or any deck-emptying) cost ends play before the next
+    // cost is paid, so no later cost, action or prompt runs.
+    if (ruleProcessingAfterPayment(beforePayment)) return terminated();
   }
 
   return { state: nextState, events, costResult };

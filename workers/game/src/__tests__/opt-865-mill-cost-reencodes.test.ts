@@ -201,9 +201,9 @@ describe("OPT-865 OP11-098 Blue Hole — [Main] MILL 3 is an activation cost", (
 
   // Rules 9-1-2 (rule processing is immediate) + 9-2-1-2 (a player with 0
   // cards in deck loses): paying with exactly 3 cards empties the deck, so the
-  // game must end before the K.O. prompt. Known engine gap (OPT-862); this
-  // ratchet fails loudly once immediate deck-out processing lands.
-  it.fails("an exactly-3-card deck pays, then loses immediately before the K.O. prompt (rule 9-1-2)", () => {
+  // game must end before the K.O. prompt. Formerly an it.fails ratchet;
+  // OPT-862 (OPT-960) runs rule processing after each committed cost.
+  it("an exactly-3-card deck pays, then loses immediately before the K.O. prompt (rule 9-1-2)", () => {
     const f = fixture();
     f.deck(0, 3);
     f.put("victim", 1, "CHARACTER", { cost: 2 });
@@ -293,9 +293,9 @@ describe("OPT-865 OP12-090 Belo Betty — [When Attacking] MILL 2 is an activati
     expect(f.millEvents()).toHaveLength(1);
   });
 
-  // Same rule 9-1-2 / 9-2-1-2 gap (OPT-862): an exactly-2-card deck empties
-  // when the cost is paid, so the game must end before the -2 cost prompt.
-  it.fails("an exactly-2-card deck pays, then loses immediately before the -2 cost prompt (rule 9-1-2)", () => {
+  // Same rule 9-1-2 / 9-2-1-2 case (OPT-862): an exactly-2-card deck empties
+  // when the cost is paid, so the game ends before the -2 cost prompt.
+  it("an exactly-2-card deck pays, then loses immediately before the -2 cost prompt (rule 9-1-2)", () => {
     const f = fixture();
     f.deck(0, 2);
     f.put("target", 1, "CHARACTER", { cost: 3 });

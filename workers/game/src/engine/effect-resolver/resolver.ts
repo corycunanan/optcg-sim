@@ -497,6 +497,8 @@ export function resolveEffect(
     completeHandTrashCostSources(costPayResult.events, state, sourceCardInstanceId, controller, new Map(sourceSnapshotRef));
     events.push(...costPayResult.events);
     costResult = costPayResult.costResult;
+    // OPT-862: a cost that ended the game leaves no action to run.
+    if (isGameTerminated(state)) return { state, events, resolved: true };
 
     if (costPayResult.pendingPrompt) {
       // Seed the newly-created cost continuation with the pre-payment source.

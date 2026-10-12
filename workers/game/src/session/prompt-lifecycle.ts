@@ -32,6 +32,7 @@ import { isDeclineResponse } from "./coordinator.js";
 import { releaseMovedDonEffects } from "../engine/don-area-effects.js";
 import { translateBlindHandSelection } from "../engine/effect-resolver/blind-hand-slots.js";
 import { isGameTerminated, publishBeforeGameOver } from "../engine/terminal.js";
+import { runRuleProcessingAfterMove } from "../engine/defeat.js";
 
 export interface PromptLifecycleServices {
   drainPregame(state: GameState): GameState;
@@ -359,6 +360,10 @@ function resumePromptLifecycleUnreleased(
   if (isGameTerminated(state)) {
     state = { ...state, pendingPrompt: null, effectStack: [] };
     gameOver = terminalOutcome(state);
+  } else if (state.pendingPrompt) {
+    // Checkpoint before the next prompt surfaces (OPT-949 acceptance 3).
+    state = runRuleProcessingAfterMove(stateBeforeResume, state, {}, cardDb, respondingPlayer);
+    if (isGameTerminated(state)) gameOver = terminalOutcome(state);
   }
 
   if (state.status !== "IN_PROGRESS" || gameOver) {
