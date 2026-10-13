@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState } from "../types.js";
 import {
   SESSION_STORAGE_KEY,
+  SESSION_UNDO_HISTORY_STORAGE_KEY,
   SessionRepository,
 } from "../session/persistence.js";
 import { GAME_STATE_SCHEMA_VERSION_KEY } from "../session/game-state-schema.js";
@@ -99,6 +100,7 @@ describe("OPT-962 End Phase: continuous, reloaded and undo paths agree", () => {
   it("saving and reloading at every prompt gives identical events, stages and zones", async () => {
     const continuous = await endTurn(scenario());
     const reloaded = await endTurn(scenario(), roundTrip);
+    expect(reloaded.stages).toEqual(EXPECTED_STAGES);
     expect(reloaded.stages).toEqual(continuous.stages);
     expect(normalizeIds(reloaded.events)).toEqual(normalizeIds(continuous.events));
     expect(normalizeIds(zones(reloaded.final))).toEqual(normalizeIds(zones(continuous.final)));
@@ -116,6 +118,12 @@ describe("OPT-962 End Phase: continuous, reloaded and undo paths agree", () => {
     const storage = new MemorySessionStorage();
     const repo = new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" });
     await repo.save({ state: attached.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: attached.undoHistory });
+    // Both persisted objects are version 2 (the OPT-924 writer), not v1 bytes.
+    const stored = storage.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
+    expect(stored.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(2);
+    const storedUndo = storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Array<Record<string, unknown>>;
+    expect(storedUndo).toHaveLength(1);
+    expect(storedUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(2);
     const loaded = (await new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" }).load())!;
     expect(loaded.undoHistory).toHaveLength(1);
     const undone = coordinator.executeAction(loaded.state, loaded.undoHistory, 0, { type: "UNDO" }, r.db);
@@ -123,6 +131,8 @@ describe("OPT-962 End Phase: continuous, reloaded and undo paths agree", () => {
     r.state = undone.state;
 
     const replay = await endTurn(r);
+    // The replay must be the staged End Phase itself, not just equal to another run.
+    expect(replay.stages).toEqual(EXPECTED_STAGES);
     expect(replay.stages).toEqual(continuous.stages);
     expect(normalizeIds(replay.events)).toEqual(normalizeIds(continuous.events));
     expect(normalizeIds(zones(replay.final))).toEqual(normalizeIds(zones(continuous.final)));
