@@ -29,10 +29,11 @@ export interface Limits { medianMs: number; maxMs: number; heapDeltaMB: number; 
  * and 34-45 ms under the full run, so its absolute limits are only a
  * backstop. Its regression gate is the median of per-sample ratios, each
  * sample divided by the mean of calibrations taken just before and after it
- * (about 9 alone). A limit of 40 fails a 10× regression.
+ * (about 9 alone; reviewers measured up to 39.9 under suite load). A limit
+ * of 60 still fails a 10× regression (92-106).
  */
 export const FAST_LIMITS: Limits = { medianMs: 1, maxMs: 25, heapDeltaMB: 16 };
-export const SEARCH_LIMITS: Limits = { medianMs: 250, maxMs: 1000, heapDeltaMB: 128, medianRatio: 40 };
+export const SEARCH_LIMITS: Limits = { medianMs: 250, maxMs: 1000, heapDeltaMB: 128, medianRatio: 60 };
 
 export interface ScenarioDef {
   id: string;
