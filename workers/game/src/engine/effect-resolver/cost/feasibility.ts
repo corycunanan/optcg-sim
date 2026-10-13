@@ -278,6 +278,27 @@ export function isCostSequencePayableWithoutPrune(
   return searchCostSequence(state, costs, controller, cardDb, sourceCardInstanceId, false);
 }
 
+/**
+ * OPT-961: PLACE_SELF_AND_TRASH_TO_DECK needs the source Character on the
+ * field; PLACE_SELF_AND_HAND_TO_DECK needs the source to be the Stage
+ * (the same checks as `isCostPayable`, payability.ts OPT-431).
+ */
+function isCompoundSelfSourceInPlace(
+  state: GameState,
+  cost: Cost,
+  controller: 0 | 1,
+  sourceCardInstanceId: string,
+): boolean {
+  const player = state.players[controller];
+  if (cost.type === "PLACE_SELF_AND_TRASH_TO_DECK") {
+    return player.characters.some((c) => c?.instanceId === sourceCardInstanceId);
+  }
+  if (cost.type === "PLACE_SELF_AND_HAND_TO_DECK") {
+    return player.stage?.instanceId === sourceCardInstanceId;
+  }
+  return true;
+}
+
 function searchCostSequence(
   state: GameState,
   costs: readonly Cost[],
@@ -293,6 +314,11 @@ function searchCostSequence(
       sequenceFailsNecessaryCondition(state, costs, controller, sourceCardInstanceId)) {
     return false;
   }
+  // OPT-961 (OPT-431 source checks): the self half of a compound cost is
+  // fixed to the source, so it is payable only while the source is where the
+  // cost moves it from. The terminal fast path below counts only the
+  // selectable half, so check it here, on every path, before any branching.
+  if (!isCompoundSelfSourceInPlace(state, costs[0], controller, sourceCardInstanceId)) return false;
   const [cost, ...suffix] = costs;
   const isCostSequencePayable = (
     nextState: GameState,
