@@ -22,6 +22,7 @@ import {
   isStuckDamageStep,
 } from "../session/game-state-schema.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 
@@ -110,6 +111,102 @@ describe("OPT-940 stage-less PhaseBoundaryContinuation: lossless, legacy semanti
     expect(types.indexOf("CARD_DRAWN")).toBeLessThan(types.indexOf("TURN_ENDED"));
     expect(result.state.turn.activePlayerIndex).toBe(1);
     expect(result.state.turn.phase).toBe("REFRESH");
+  });
+});
+
+describe("OPT-962 legacy stage keeps the version 1 resume on the version 2 engine", () => {
+  it("drains and hands off without running the staged End Phase: no wave, no expiry, the v1 event order", () => {
+    const raw = structuredClone(golden("end-phase-parked").session.state) as Record<string, unknown> & { activeEffects: unknown[]; turn: { number: number } };
+    // A "during this turn" effect still present at the v1 boundary. v1 already ran
+    // its End Phase expiry before parking, so the legacy resume must not expire it;
+    // a staged End Phase (6-6-1-3) would.
+    raw.activeEffects = [{
+      id: "opt962-legacy-during",
+      sourceCardInstanceId: "golden-when-attacking",
+      sourceEffectBlockId: "syn",
+      category: "auto",
+      modifiers: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 } }],
+      duration: { type: "THIS_TURN" },
+      expiresAt: { wave: "END_OF_TURN", turn: raw.turn.number, player: 0 },
+      controller: 0,
+      appliesTo: [],
+      timestamp: 1,
+    }];
+    const state = convertPersistedGameState(raw, "state");
+    expect(state.effectStack.find((f) => f.phaseBoundaryContinuation)?.phaseBoundaryContinuation?.stage).toBe("LEGACY_SCHEDULED_ACTIONS");
+    const cardDb = new Map(Object.entries(golden("end-phase-parked").cardDb) as Array<[string, never]>);
+    const from = state.eventLog.length;
+    const result = resumePromptLifecycle(
+      state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [], promptId: state.pendingPrompt!.promptId },
+      cardDb,
+      lifecycleServices
+    );
+    expect(result.state.eventLog.slice(from).map((e) => e.type)).toEqual([
+      "CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "TURN_ENDED", "TURN_STARTED", "PHASE_CHANGED",
+    ]);
+    expect(result.state.activeEffects.map((e) => e.id)).toEqual(["opt962-legacy-during"]);
+  });
+});
+
+describe("OPT-962 legacy stage: a terminal remaining action keeps its events before GAME_OVER", () => {
+  it("the legacy resume publishes the draw that emptied the deck before the one GAME_OVER", () => {
+    const raw = structuredClone(golden("end-phase-parked").session.state) as Record<string, unknown> & {
+      players: Array<{ deck: unknown[] }>;
+      effectStack: Array<{ phaseBoundaryContinuation?: { remainingScheduledActions: Array<{ action: unknown }> } }>;
+    };
+    raw.players[0].deck = raw.players[0].deck.slice(0, 1);
+    raw.effectStack.find((f) => f.phaseBoundaryContinuation)!.phaseBoundaryContinuation!.remainingScheduledActions[0].action =
+      { type: "DRAW", params: { amount: 2 } };
+    const state = convertPersistedGameState(raw, "state");
+    const cardDb = new Map(Object.entries(golden("end-phase-parked").cardDb) as Array<[string, never]>);
+    const from = state.eventLog.length;
+    const result = resumePromptLifecycle(
+      state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [], promptId: state.pendingPrompt!.promptId },
+      cardDb,
+      lifecycleServices
+    );
+    const types = result.state.eventLog.slice(from).map((e) => e.type);
+    expect(result.state.status).toBe("FINISHED");
+    expect(types).toContain("CARD_DRAWN");
+    expect(types.at(-1)).toBe("GAME_OVER");
+    expect(types.filter((t) => t === "GAME_OVER")).toHaveLength(1);
+    expect(types).not.toContain("TURN_ENDED");
+  });
+});
+
+describe("OPT-962 legacy stage with a pending OP15-022 Brook delayed loss (the one scoped difference from base)", () => {
+  // OP15-022 (docs/cards/OP-15.md:158): "You lose at the end of the turn in which
+  // your deck becomes 0 cards." Base opened this window only after the hand-off,
+  // where the reset deck-zero flag hid it, so base handed off. OPT-962 opens it at
+  // the 6-6-1-4 boundary on the legacy path too: the game ends before the hand-off.
+  it("a converted legacy frame resumes, then Brook's loss lands before the hand-off even with a refilled deck", () => {
+    const raw = structuredClone(golden("end-phase-parked").session.state) as Record<string, unknown> & {
+      players: Array<{ leader: { cardId: string }; deck: unknown[] }>;
+      turn: { deckHitZeroThisTurn: [boolean, boolean] };
+    };
+    raw.players[0].leader.cardId = "OP15-022";
+    raw.turn.deckHitZeroThisTurn = [true, false];
+    expect(raw.players[0].deck.length).toBeGreaterThan(1);
+    const state = convertPersistedGameState(raw, "state");
+    const cardDb = new Map(Object.entries(golden("end-phase-parked").cardDb) as Array<[string, never]>);
+    const brook = getEffectSchema("OP15-022")!;
+    cardDb.set("OP15-022", { ...(cardDb.values().next().value as unknown as object), id: "OP15-022", name: "Brook", type: "Leader", effectSchema: brook } as never);
+    const from = state.eventLog.length;
+    const result = resumePromptLifecycle(
+      state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [], promptId: state.pendingPrompt!.promptId },
+      cardDb,
+      lifecycleServices
+    );
+    const types = result.state.eventLog.slice(from).map((e) => e.type);
+    expect(result.state.status).toBe("FINISHED");
+    expect(result.state.winner).toBe(1);
+    expect(types).toContain("CARD_DRAWN");
+    expect(types.at(-1)).toBe("GAME_OVER");
+    expect(types).not.toContain("TURN_ENDED");
+    expect(result.state.turn.activePlayerIndex).toBe(0);
   });
 });
 

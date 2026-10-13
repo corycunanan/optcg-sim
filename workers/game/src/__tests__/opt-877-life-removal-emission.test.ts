@@ -559,13 +559,10 @@ describe("OPT-877 — authored users against printed watcher text", () => {
     expect(f.state.players[0].life.every((l) => l.face === "DOWN")).toBe(true);
   });
 
-  // Known gap, not OPT-877's: [End of Your Turn] effects fire off TURN_ENDED,
-  // which completeTurnHandoff (phases.ts) emits after the turn has already
-  // passed to the opponent. Ace's trash therefore resolves in the opponent's
-  // Refresh Phase and Kalgara's [Your Turn] watcher correctly declines it.
-  // Printed timing (rule 6-6-1-1) resolves it inside your End Phase, where
-  // Kalgara should draw 1. Tracked as an OPT-877 PR follow-up.
-  it.fails("ST13-002 Ace's end-of-turn trash resolves during your turn, so Kalgara draws 1 (end-of-turn timing gap)", () => {
+  // OPT-962 (OPT-924) flipped this: [End of Your Turn] effects now resolve in
+  // the ending player's End Phase wave (rule 6-6-1-1), before the hand-off,
+  // so Kalgara's [Your Turn] watcher sees your turn and draws 1.
+  it("ST13-002 Ace's end-of-turn trash resolves during your turn, so Kalgara draws 1 (OPT-962)", () => {
     const { f, handBefore } = endAceTurn();
     expect(f.state.players[0].hand).toHaveLength(handBefore + 1);
   });

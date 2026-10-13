@@ -78,8 +78,8 @@ function withLegacyStage(state: GameState): GameState {
 
 describe("OPT-940 game-state schema version", () => {
   it("defines version 1 and assigns it to a persisted object without the key", () => {
-    // OPT-980: this build reads 1 and 2 and still writes 1.
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(1);
+    // OPT-980 reads 1 and 2; OPT-924 (PR 4b) writes 2.
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(2);
     expect(LEGACY_GAME_STATE_SCHEMA_VERSION).toBe(1);
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2]);
     expect(readGameStateSchemaVersion({}, "state")).toBe(1);
@@ -111,7 +111,11 @@ describe("OPT-940 game-state schema version", () => {
 describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
   const names = getSyntheticStates().map((state) => state.name);
 
-  it.each(names)("%s: bytes written at the base commit load to the state the writer saved", async (name) => {
+  // end-phase-parked: the base bytes hold a stage-less frame; the OPT-924
+  // engine now builds a staged End Phase from the same input, so the two are
+  // compared in opt-980-end-phase-stage-reader.test.ts and the writer golden
+  // instead of here.
+  it.each(names.filter((name) => name !== "end-phase-parked"))("%s: bytes written at the base commit load to the state the writer saved", async (name) => {
     const entry = getSyntheticStates().find((state) => state.name === name)!;
     const saved = await repository(new MemorySessionStorage()).save(entry.snapshot);
 

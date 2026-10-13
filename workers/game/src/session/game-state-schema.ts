@@ -18,16 +18,15 @@
  *
  * Version 2 (OPT-980, PR 4a of OPT-962) adds the End Phase `stage` on
  * `PhaseBoundaryContinuation`, the per-obligation `step` tag and
- * `activatedWaveEffects`. This build reads 1 and 2 and still writes 1 for
- * everything its engine produces; PR 4b (OPT-924) flips the writer to 2 after
- * this reader is deployed and verified (SAVED-STATE-COMPATIBILITY.md §6).
+ * `activatedWaveEffects`. PR 4a (OPT-980) shipped the reader; PR 4b
+ * (OPT-924) flips the writer to 2 (SAVED-STATE-COMPATIBILITY.md §1.6, §6).
  */
 
 import type { EffectStackFrame, GameState, PhaseBoundaryContinuation } from "../types.js";
 import { log } from "../lib/log.js";
 
 /** The version this build's writer emits for state its own engine produces. */
-export const GAME_STATE_SCHEMA_VERSION = 1;
+export const GAME_STATE_SCHEMA_VERSION = 2;
 /** The newest version this build can read (the runtime shape). */
 export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
@@ -197,34 +196,25 @@ export function convertToCurrentShape(
 }
 
 /**
- * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.5). This build
- * writes version 1. A frame at `LEGACY_SCHEDULED_ACTIONS` is written
- * stage-less, which is the same meaning in version 1, so every state this
- * engine produces from version 1 input is byte-identical to the base writer
- * and loadable by the base reader (`6e6347de`). A state holding a staged
- * frame can only come from loading a version 2 save (a rollback from the
- * PR 4b writer); version 1 cannot express it, so it is written with
- * `schemaVersion: 2` and reloads with the meaning it was read with. Returns
- * the same object when no End Phase frame is present.
+ * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6). From PR 4b
+ * (OPT-924) every live state and undo snapshot is written as version 2:
+ * `schemaVersion: 2` first, every End Phase frame with its stage. A runtime
+ * frame without a stage can only be a version 1 frame, so it is written with
+ * the legacy stage, which is its version 1 meaning; the PR 4a reader
+ * (`9da8ba17`) rejects a version 2 frame without a stage.
  */
 export function toPersistedGameState(state: GameState): GameState {
-  if (!state.effectStack.some((frame) => frame.phaseBoundaryContinuation)) return state;
-  const staged = state.effectStack.some((frame) => {
-    const stage = frame.phaseBoundaryContinuation?.stage;
-    return stage !== undefined && stage !== LEGACY_END_PHASE_STAGE;
-  });
-  if (staged) {
-    return { [GAME_STATE_SCHEMA_VERSION_KEY]: 2, ...state } as GameState;
-  }
-  return {
-    ...state,
-    effectStack: state.effectStack.map((frame) => {
-      const continuation = frame.phaseBoundaryContinuation;
-      if (!continuation || continuation.stage === undefined) return frame;
-      const { stage: _legacy, ...stageLess } = continuation;
-      return { ...frame, phaseBoundaryContinuation: stageLess };
-    }),
-  };
+  const unstaged = state.effectStack.some(
+    (frame) => frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined
+  );
+  const effectStack = unstaged
+    ? state.effectStack.map((frame) =>
+        frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined
+          ? { ...frame, phaseBoundaryContinuation: { ...frame.phaseBoundaryContinuation, stage: LEGACY_END_PHASE_STAGE } }
+          : frame
+      )
+    : state.effectStack;
+  return { [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION, ...state, effectStack } as GameState;
 }
 
 /**

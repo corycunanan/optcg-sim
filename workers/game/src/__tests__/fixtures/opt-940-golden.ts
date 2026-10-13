@@ -40,6 +40,20 @@ export function loadGoldenFixture(): GoldenFixture {
   return goldenFixture;
 }
 
+let v2WriterGolden: GoldenFixture | undefined;
+
+/**
+ * The current writer's golden (OPT-924, schema version 2), captured by
+ * scripts/capture-writer-golden.ts from the same synthetic states. The
+ * version 1 golden above stays frozen as base-writer reader input.
+ */
+export function loadWriterGolden(): GoldenFixture {
+  v2WriterGolden ??= JSON.parse(
+    readFileSync(resolve(__dirname, "opt-962-writer-golden.synthetic.json"), "utf8")
+  ) as GoldenFixture;
+  return v2WriterGolden;
+}
+
 /** The synthetic states, built on first use. Callers must not mutate them. */
 export function getSyntheticStates(): SyntheticSessionState[] {
   syntheticStates ??= buildSyntheticSessionStates();
