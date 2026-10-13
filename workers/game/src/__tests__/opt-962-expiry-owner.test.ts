@@ -82,7 +82,11 @@ describe("OPT-962 End Phase expiry runs in the effect owner's step", () => {
     }
     r.state = {
       ...r.state,
-      prohibitions: r.state.prohibitions.map(({ ownerController: _owner, ...legacy }) => legacy),
+      prohibitions: r.state.prohibitions.map((p) => {
+        const legacy = { ...p };
+        delete legacy.ownerController;
+        return legacy;
+      }),
     };
     const negation = (s: GameState) => s.prohibitions.some((p) => p.scope?.triggerType === "ON_PLAY");
     toP1Main(r);
