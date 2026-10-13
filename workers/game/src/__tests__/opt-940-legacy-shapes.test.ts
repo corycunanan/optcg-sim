@@ -22,6 +22,7 @@ import {
   isStuckDamageStep,
 } from "../session/game-state-schema.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 
@@ -172,6 +173,40 @@ describe("OPT-962 legacy stage: a terminal remaining action keeps its events bef
     expect(types.at(-1)).toBe("GAME_OVER");
     expect(types.filter((t) => t === "GAME_OVER")).toHaveLength(1);
     expect(types).not.toContain("TURN_ENDED");
+  });
+});
+
+describe("OPT-962 legacy stage with a pending OP15-022 Brook delayed loss (the one scoped difference from base)", () => {
+  // OP15-022 (docs/cards/OP-15.md:158): "You lose at the end of the turn in which
+  // your deck becomes 0 cards." Base opened this window only after the hand-off,
+  // where the reset deck-zero flag hid it, so base handed off. OPT-962 opens it at
+  // the 6-6-1-4 boundary on the legacy path too: the game ends before the hand-off.
+  it("a converted legacy frame resumes, then Brook's loss lands before the hand-off even with a refilled deck", () => {
+    const raw = structuredClone(golden("end-phase-parked").session.state) as Record<string, unknown> & {
+      players: Array<{ leader: { cardId: string }; deck: unknown[] }>;
+      turn: { deckHitZeroThisTurn: [boolean, boolean] };
+    };
+    raw.players[0].leader.cardId = "OP15-022";
+    raw.turn.deckHitZeroThisTurn = [true, false];
+    expect(raw.players[0].deck.length).toBeGreaterThan(1);
+    const state = convertPersistedGameState(raw, "state");
+    const cardDb = new Map(Object.entries(golden("end-phase-parked").cardDb) as Array<[string, never]>);
+    const brook = getEffectSchema("OP15-022")!;
+    cardDb.set("OP15-022", { ...(cardDb.values().next().value as unknown as object), id: "OP15-022", name: "Brook", type: "Leader", effectSchema: brook } as never);
+    const from = state.eventLog.length;
+    const result = resumePromptLifecycle(
+      state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [], promptId: state.pendingPrompt!.promptId },
+      cardDb,
+      lifecycleServices
+    );
+    const types = result.state.eventLog.slice(from).map((e) => e.type);
+    expect(result.state.status).toBe("FINISHED");
+    expect(result.state.winner).toBe(1);
+    expect(types).toContain("CARD_DRAWN");
+    expect(types.at(-1)).toBe("GAME_OVER");
+    expect(types).not.toContain("TURN_ENDED");
+    expect(result.state.turn.activePlayerIndex).toBe(0);
   });
 });
 
