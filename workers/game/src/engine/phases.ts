@@ -5,15 +5,20 @@
  * and turn handoff. Extracted from execute.ts for clarity.
  */
 
-import { isGameTerminated } from "./terminal.js";
+import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
 import { releaseMovedDonEffects } from "./don-area-effects.js";
 import type {
   CardData,
   EffectStackFrame,
+  EndPhaseStage,
+  EndPhaseStep,
   ExecuteResult,
+  GameEvent,
   GameState,
   PendingEvent,
+  PendingPromptState,
   PhaseBoundaryContinuation,
+  QueuedTrigger,
 } from "../types.js";
 import {
   getActivePlayerIndex,
@@ -22,12 +27,13 @@ import {
   placeDonFromDeck,
 } from "./state.js";
 import {
-  expireEndOfTurnEffects,
+  collectEndOfTurnObligations,
+  expireDuringThisTurn,
   expireRefreshPhaseEffects,
-  processScheduledActions,
+  expireUntilEndOfTurn,
 } from "./duration-tracker.js";
 import { resolveEffect } from "./effect-resolver/index.js";
-import { emitPendingEvent } from "./events.js";
+import { emitPendingEvent, withEventLogEmitted, withTriggerScanned } from "./events.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
   generateFrameId,
@@ -38,6 +44,13 @@ import {
 import { applyRefreshProhibitions } from "./prohibitions.js";
 import { transitionCard } from "./zone-transition.js";
 import { evaluateCondition } from "./conditions.js";
+import { takeEngineTimestamp } from "./execution-context.js";
+import { matchTriggersForEvent, orderMatchedTriggers } from "./triggers.js";
+import { hasDelayedDeckOutLoss, runRuleProcessing } from "./defeat.js";
+import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
+// The End Phase resolves its waves and obligations with the pipeline's own
+// Step 5 trigger policy (no third policy, OPT-924).
+import { fireEndPhaseEvents, processPlayerTriggerGroup } from "./trigger-queue.js";
 
 /**
  * Returns true if the current phase should be auto-advanced without player input.
@@ -174,33 +187,41 @@ export function executeAdvancePhase(state: GameState, cardDb: Map<string, CardDa
   return { state: nextState, events };
 }
 
+/**
+ * Rule 6-6-1, in order (OPT-924):
+ *   6-6-1-1   the ending player's [End of Your Turn] wave, then (6-6-1-1-2)
+ *             the non-turn player's [End of Your Opponent's Turn] wave. Each
+ *             wave repeats while an effect newly fulfilled inside it remains
+ *             (8-6-1-1, Decision 9), bounded by the engine budget.
+ *   6-6-1-2   step 1: the turn player's "at the end of this turn" obligations,
+ *             then the turn player's "until the end of the turn" expiry;
+ *             step 2: the same for the non-turn player.
+ *   6-6-1-3   "during this turn" expiry, turn player then non-turn player.
+ *   6-6-1-4   the end-of-turn rule checkpoint (OP15-022 Brook), then hand-off.
+ * The ending player stays the turn player until the hand-off, so every
+ * [Your Turn] / [Opponent's Turn] check inside the End Phase sees them.
+ */
 function runEndPhase(
   state: GameState,
   pi: 0 | 1,
   cardDb: Map<string, CardData>,
   events: PendingEvent[] = []
 ): ExecuteResult {
-  // Steps 1 & 2: [End of Your Turn] / [End of Your Opponent's Turn] effects (M4)
-
-  // Steps 3-6: Expire THIS_TURN / UNTIL_END_OF_*_TURN effects and
-  // prohibitions before the turn transition (both end-phase waves).
-  state = expireEndOfTurnEffects(state);
-
-  // Process end-of-turn scheduled actions
-  const scheduled = processScheduledActions(state, "END_OF_THIS_TURN");
   return continueEndPhase(
-    scheduled.state,
+    state,
     {
       kind: "END_PHASE",
       endingPlayerIndex: pi,
-      remainingScheduledActions: scheduled.actionsToRun,
+      stage: "END_OF_YOUR_TURN_WAVE",
+      remainingScheduledActions: [],
+      activatedWaveEffects: [],
     },
     cardDb,
     events
   );
 }
 
-/** Resume end-phase work parked below a scheduled effect's prompt frame. */
+/** Resume end-phase work parked below a prompt frame. */
 export function resumePhaseBoundary(
   state: GameState,
   cardDb: Map<string, CardData>
@@ -215,7 +236,269 @@ export function resumePhaseBoundary(
   );
 }
 
+/** Stage order of a staged End Phase. `LEGACY_SCHEDULED_ACTIONS` is not in it. */
+const STAGED_END_PHASE: readonly EndPhaseStage[] = [
+  "END_OF_YOUR_TURN_WAVE",
+  "END_OF_OPPONENT_TURN_WAVE",
+  "TURN_PLAYER_END_OF_TURN",
+  "NON_TURN_PLAYER_END_OF_TURN",
+];
+
+interface StageOutcome {
+  state: GameState;
+  continuation: PhaseBoundaryContinuation;
+  /** Set when the stage parked below a prompt; the End Phase stops here. */
+  pendingPrompt?: PendingPromptState;
+}
+
 function continueEndPhase(
+  initialState: GameState,
+  continuation: PhaseBoundaryContinuation,
+  cardDb: Map<string, CardData>,
+  events: PendingEvent[]
+): ExecuteResult {
+  const stage = continuation.stage ?? "LEGACY_SCHEDULED_ACTIONS";
+  if (stage === "LEGACY_SCHEDULED_ACTIONS") {
+    return continueLegacyScheduledActions(initialState, continuation, cardDb, events);
+  }
+
+  const pi = continuation.endingPlayerIndex;
+  // Frames pushed by a stage sit above this depth; a parked End Phase frame
+  // goes here, below all of them.
+  const parkDepth = initialState.effectStack.length;
+  let state = initialState;
+
+  // Events handed in (the MAIN → END phase change, or a parked frame's
+  // accumulator) publish and fire before any End Phase work.
+  if (events.length > 0) {
+    state = fireEndPhaseEvents(state, events, cardDb);
+    events = events.map((event) => withTriggerScanned(withEventLogEmitted(event)));
+    if (isGameTerminated(state)) return { state, events };
+    if (state.pendingPrompt) {
+      return parkStage(state, { ...continuation, stage }, parkDepth, events);
+    }
+  }
+
+  let current: PhaseBoundaryContinuation = { ...continuation, stage };
+  // 6-6-1-2 processes "any remaining effects" of this turn: an obligation
+  // created after its owner's step (by the other player's step) sends the
+  // End Phase back through step 1 and step 2. Each pass resolves at least one
+  // obligation, which consumes the engine budget, so the loop is bounded.
+  for (let index = STAGED_END_PHASE.indexOf(stage); ; index = STAGED_END_PHASE.indexOf("TURN_PLAYER_END_OF_TURN")) {
+    const outcome = runStagesFrom(state, current, index, cardDb, parkDepth);
+    state = outcome.state;
+    current = outcome.continuation;
+    if (isGameTerminated(state)) return { state, events };
+    if (outcome.pendingPrompt) return { state, events: [], pendingPrompt: outcome.pendingPrompt };
+    if (!state.scheduledActions.some((entry) => entry.timing === "END_OF_THIS_TURN")) break;
+  }
+
+  // 6-6-1-3: "during this turn" expiry, turn player then non-turn player.
+  state = expireDuringThisTurn(state);
+
+  state = closeEndOfTurnWindow(state, pi, cardDb);
+  if (isGameTerminated(state)) return { state, events };
+
+  return completeTurnHandoff(state, pi, events, { endOfTurnWindowsRan: true });
+}
+
+/** Run the staged End Phase from `startIndex` through 6-6-1-2 step 2. */
+function runStagesFrom(
+  initialState: GameState,
+  continuation: PhaseBoundaryContinuation,
+  startIndex: number,
+  cardDb: Map<string, CardData>,
+  parkDepth: number
+): StageOutcome {
+  let state = initialState;
+  let current = continuation;
+  for (let index = startIndex; index < STAGED_END_PHASE.length; index += 1) {
+    current = { ...current, stage: STAGED_END_PHASE[index] };
+    const outcome = current.stage === "END_OF_YOUR_TURN_WAVE" || current.stage === "END_OF_OPPONENT_TURN_WAVE"
+      ? runWave(state, current, cardDb, parkDepth)
+      : runEndOfTurnStep(state, current, cardDb, parkDepth);
+    state = outcome.state;
+    current = outcome.continuation;
+    // OPT-960 / OPT-962: nothing after a terminal outcome. No later stage,
+    // no expiry, no hand-off.
+    if (isGameTerminated(state)) return { state, continuation: current };
+    if (outcome.pendingPrompt) return { state, continuation: current, pendingPrompt: outcome.pendingPrompt };
+    if (current.stage === "TURN_PLAYER_END_OF_TURN") state = expireUntilEndOfTurn(state, "TURN_PLAYER");
+    if (current.stage === "NON_TURN_PLAYER_END_OF_TURN") state = expireUntilEndOfTurn(state, "NON_TURN_PLAYER");
+  }
+  return { state, continuation: current };
+}
+
+/**
+ * 6-6-1-4 boundary: the end-of-turn rule checkpoint (PR 2's
+ * `runRuleProcessing` with `endOfTurn`), opened once per End Phase, before the
+ * hand-off, for the delayed deck-out loss (OP15-022 Brook: "You lose at the
+ * end of the turn in which your deck becomes 0 cards"). Every other defeat
+ * condition was already processed at the move that met it (9-1-2), so the
+ * window opens only when a Leader carries that modification.
+ */
+function closeEndOfTurnWindow(
+  state: GameState,
+  pi: 0 | 1,
+  cardDb: Map<string, CardData>
+): GameState {
+  if (!hasDelayedDeckOutLoss(state, 0, cardDb) && !hasDelayedDeckOutLoss(state, 1, cardDb)) {
+    return state;
+  }
+  return runRuleProcessing(state, { endOfTurn: true }, cardDb, pi);
+}
+
+/**
+ * One 6-6-1-1 wave. Collect the wave owner's [End of Your Turn] (ending
+ * player) or [End of Your Opponent's Turn] (non-turn player) effects that
+ * have not activated in this End Phase, resolve them as one group through the
+ * pipeline's trigger policy (the owner orders 2+, nested triggers resolve
+ * before the next), and repeat until no new effect is fulfilled. Each pass
+ * activates at least one new effect, and every resolution consumes the
+ * engine budget, so the loop ends in an ENGINE_LIMIT outcome rather than
+ * running forever.
+ */
+function runWave(
+  initialState: GameState,
+  continuation: PhaseBoundaryContinuation,
+  cardDb: Map<string, CardData>,
+  parkDepth: number
+): StageOutcome {
+  let state = initialState;
+  const pi = continuation.endingPlayerIndex;
+  const endingPlayersWave = continuation.stage === "END_OF_YOUR_TURN_WAVE";
+  let activated = [...(continuation.activatedWaveEffects ?? [])];
+
+  for (;;) {
+    const collected = collectWaveTriggers(state, pi, endingPlayersWave, activated, cardDb);
+    state = collected.state;
+    if (collected.triggers.length === 0) {
+      return { state, continuation: { ...continuation, activatedWaveEffects: activated } };
+    }
+    activated = [...activated, ...collected.triggers.map(waveEffectKey)];
+    const result = processPlayerTriggerGroup(state, collected.triggers, [], cardDb);
+    state = result.state;
+    const next = { ...continuation, activatedWaveEffects: activated };
+    if (isGameTerminated(state)) return { state, continuation: next };
+    if (result.pendingPrompt) {
+      return parkStage({ ...state, pendingPrompt: result.pendingPrompt }, next, parkDepth);
+    }
+  }
+}
+
+function waveEffectKey(trigger: QueuedTrigger): string {
+  return `${trigger.sourceCardInstanceId}:${trigger.effectBlock.id}`;
+}
+
+/**
+ * The wave's effects, matched exactly as the pipeline matches a TURN_ENDED
+ * event for the ending player (keyword mapping, negation, once-per-turn,
+ * turn restriction), but without logging that event: TURN_ENDED is logged
+ * only at the hand-off, after the End Phase finishes.
+ */
+function collectWaveTriggers(
+  initialState: GameState,
+  pi: 0 | 1,
+  endingPlayersWave: boolean,
+  activated: readonly string[],
+  cardDb: Map<string, CardData>
+): { state: GameState; triggers: QueuedTrigger[] } {
+  const timed = takeEngineTimestamp(initialState);
+  const pending: PendingEvent = { type: "TURN_ENDED", playerIndex: pi, payload: {} };
+  const event = { ...pending, timestamp: timed.timestamp } as GameEvent;
+  const matched = orderMatchedTriggers(matchTriggersForEvent(timed.state, event, cardDb), pi);
+  const done = new Set(activated);
+  const triggers: QueuedTrigger[] = [];
+  for (const match of matched) {
+    const controller = match.trigger.controller;
+    if ((controller === pi) !== endingPlayersWave) continue;
+    const trigger: QueuedTrigger = {
+      sourceCardInstanceId: match.trigger.sourceCardInstanceId,
+      controller,
+      effectBlock: match.effectBlock,
+      triggeringEvent: pending,
+    };
+    const key = waveEffectKey(trigger);
+    if (done.has(key)) continue;
+    done.add(key);
+    triggers.push(trigger);
+  }
+  return { state: timed.state, triggers };
+}
+
+/**
+ * One 6-6-1-2 step: the step owner's "at the end of this turn" obligations,
+ * each followed by the auto effects it fulfils. Obligations collected here
+ * are tagged with the step. The step re-collects until none remain, so one
+ * created during the step for the same player still runs in it. The caller
+ * runs the step's "until the end of the turn" expiry afterwards.
+ */
+function runEndOfTurnStep(
+  initialState: GameState,
+  continuation: PhaseBoundaryContinuation,
+  cardDb: Map<string, CardData>,
+  parkDepth: number
+): StageOutcome {
+  let state = initialState;
+  const pi = continuation.endingPlayerIndex;
+  const step: EndPhaseStep = continuation.stage === "TURN_PLAYER_END_OF_TURN" ? "TURN_PLAYER" : "NON_TURN_PLAYER";
+  const owner: 0 | 1 = step === "TURN_PLAYER" ? pi : pi === 0 ? 1 : 0;
+  const queue = [...continuation.remainingScheduledActions];
+
+  for (;;) {
+    if (queue.length === 0) {
+      const collected = collectEndOfTurnObligations(state, owner, step);
+      state = collected.state;
+      if (collected.entries.length === 0) {
+        return { state, continuation: { ...continuation, remainingScheduledActions: [] } };
+      }
+      queue.push(...collected.entries);
+    }
+    const entry = queue.shift()!;
+    const result = resolveEffect(
+      state,
+      { id: "scheduled_" + entry.sourceEffectId, category: "auto", actions: [entry.action] },
+      entry.sourceEffectId,
+      entry.controller,
+      cardDb
+    );
+    state = result.state;
+    const next = { ...continuation, remainingScheduledActions: [...queue] };
+    // OPT-960 invariant: the events that led to the terminal checkpoint are
+    // logged before the one GAME_OVER.
+    if (isGameTerminated(state)) {
+      return { state: publishBeforeGameOver(state, result.events, entry.controller), continuation: next };
+    }
+    if (result.pendingPrompt) {
+      state = publishPhaseBoundaryEvents(state, result.events, pi);
+      return parkStage({ ...state, pendingPrompt: result.pendingPrompt }, next, parkDepth);
+    }
+    state = fireEndPhaseEvents(state, result.events, cardDb);
+    if (isGameTerminated(state)) return { state, continuation: next };
+    if (state.pendingPrompt) return parkStage(state, next, parkDepth);
+  }
+}
+
+/**
+ * Park the End Phase below every frame its current stage pushed, and lift
+ * the prompt off the state so the caller surfaces it.
+ */
+function parkStage(
+  state: GameState,
+  continuation: PhaseBoundaryContinuation,
+  parkDepth: number,
+  events: PendingEvent[] = []
+): StageOutcome & ExecuteResult {
+  const pendingPrompt = state.pendingPrompt!;
+  const parked = parkEndPhaseAt({ ...state, pendingPrompt: null }, continuation, parkDepth);
+  // Parking can hit the stack-depth limit and end the game (ENGINE_LIMIT);
+  // a finished game carries no prompt.
+  if (isGameTerminated(parked)) return { state: parked, continuation, events };
+  return { state: parked, continuation, events, pendingPrompt };
+}
+
+/** The version 1 End Phase resume, unchanged: drain the list, then hand off. */
+function continueLegacyScheduledActions(
   initialState: GameState,
   continuation: PhaseBoundaryContinuation,
   cardDb: Map<string, CardData>,
@@ -241,8 +524,7 @@ function continueEndPhase(
     state = result.state;
     events.push(...result.events);
     // OPT-960: a scheduled action that ended the game (a MILL emptying the
-    // deck) is final. No later scheduled action and no hand-off run; the
-    // End Phase order itself is unchanged (OPT-962 owns it).
+    // deck) is final. No later scheduled action and no hand-off run.
     if (isGameTerminated(state)) return { state, events };
     if (result.pendingPrompt) {
       state = publishPhaseBoundaryEvents(
@@ -250,12 +532,15 @@ function continueEndPhase(
         events,
         continuation.endingPlayerIndex
       );
-      state = parkEndPhaseBelowPrompt(
-        state,
+      state = parkEndPhaseAt(
+        popFrame(state),
         {
           ...continuation,
+          stage: "LEGACY_SCHEDULED_ACTIONS",
           remainingScheduledActions: scheduledActions.slice(index + 1),
-        }
+        },
+        state.effectStack.length - 1,
+        peekFrame(state)
       );
       return {
         state,
@@ -265,20 +550,38 @@ function continueEndPhase(
     }
   }
 
-  return completeTurnHandoff(state, continuation.endingPlayerIndex, events);
+  // The version 1 End Phase opened the end-of-turn window only after the
+  // hand-off, where the reset deck-zero flag hid it; OPT-962 opens it here.
+  state = closeEndOfTurnWindow(state, continuation.endingPlayerIndex, cardDb);
+  if (isGameTerminated(state)) return { state, events };
+  return completeTurnHandoff(state, continuation.endingPlayerIndex, events, { endOfTurnWindowsRan: false });
 }
 
-function parkEndPhaseBelowPrompt(
+/**
+ * Insert the End Phase frame at `depth`, below every frame pushed above it.
+ * `reinsertTop`, when given, is pushed back on top (the legacy path pops the
+ * prompt frame first, as the version 1 engine did).
+ */
+function parkEndPhaseAt(
   state: GameState,
-  continuation: PhaseBoundaryContinuation
+  continuation: PhaseBoundaryContinuation,
+  depth: number,
+  reinsertTop?: EffectStackFrame | null
 ): GameState {
-  const promptFrame = peekFrame(state);
-  if (!promptFrame) return state;
-
-  const frameId = generateFrameId(popFrame(state));
+  const anchor = reinsertTop ?? state.effectStack[depth];
+  if (!anchor) return state;
+  if (state.effectStack.length >= MAX_EFFECT_STACK_DEPTH) {
+    return terminateForEngineLimit(state, {
+      kind: "EFFECT_STACK_DEPTH",
+      limit: MAX_EFFECT_STACK_DEPTH,
+      observed: state.effectStack.length + 1,
+      attemptedFrameId: "end-phase",
+    });
+  }
+  const frameId = generateFrameId(state);
   const phaseFrame: EffectStackFrame = {
     id: frameId.id,
-    sourceCardInstanceId: promptFrame.sourceCardInstanceId,
+    sourceCardInstanceId: anchor.sourceCardInstanceId,
     controller: continuation.endingPlayerIndex,
     effectBlock: CONTINUATION_EFFECT_BLOCK,
     phase: "INTERRUPTED_BY_TRIGGERS",
@@ -296,7 +599,12 @@ function parkEndPhaseBelowPrompt(
     simultaneousTriggers: [],
     accumulatedEvents: [],
   };
-  return pushFrame(pushFrame(frameId.state, phaseFrame), promptFrame);
+  if (reinsertTop) return pushFrame(pushFrame(frameId.state, phaseFrame), reinsertTop);
+  const stack = frameId.state.effectStack;
+  return {
+    ...frameId.state,
+    effectStack: [...stack.slice(0, depth), phaseFrame, ...stack.slice(depth)],
+  };
 }
 
 function publishPhaseBoundaryEvents(
@@ -314,7 +622,8 @@ function publishPhaseBoundaryEvents(
 function completeTurnHandoff(
   state: GameState,
   pi: 0 | 1,
-  events: PendingEvent[]
+  events: PendingEvent[],
+  options: { endOfTurnWindowsRan: boolean }
 ): ExecuteResult {
   // Turn passes to opponent. Round-counter (state.turn.number) increments only
   // when control returns to the first player (OPT-366 — previously this was
@@ -325,7 +634,12 @@ function completeTurnHandoff(
     ? state.turn.number + 1
     : state.turn.number;
 
-  events.push({ type: "TURN_ENDED", playerIndex: pi });
+  // The End Phase waves already activated every [End of Your Turn] /
+  // [End of Your Opponent's Turn] effect (6-6-1-1), so the logged TURN_ENDED
+  // opens no trigger window. A legacy frame's waves never ran; its TURN_ENDED
+  // keeps the version 1 behaviour and is scanned after the hand-off.
+  const turnEnded: PendingEvent = { type: "TURN_ENDED", playerIndex: pi };
+  events.push(options.endOfTurnWindowsRan ? withTriggerScanned(turnEnded) : turnEnded);
 
   const nextState: GameState = {
     ...state,

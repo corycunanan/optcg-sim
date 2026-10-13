@@ -1878,6 +1878,14 @@ export interface RuntimeProhibition {
    */
   expiresAt?: ExpiryTiming;
   controller: 0 | 1;
+  /**
+   * OPT-924: the player who controls the effect that created this
+   * prohibition, when it differs from `controller`. Only NEGATE_TRIGGER_TYPE
+   * writes it: it stores the affected player in `controller` (the trigger
+   * negation check reads it), while the End Phase expiry step belongs to the
+   * owner (rule 6-6-1-2). Read through `prohibitionOwner` (duration-tracker.ts).
+   */
+  ownerController?: 0 | 1;
   appliesTo: string[];  // CardInstance.instanceIds or player indices
   /**
    * OPT-826: attacker binding of a Blocker prohibition authored with

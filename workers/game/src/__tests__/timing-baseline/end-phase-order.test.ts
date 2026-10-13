@@ -93,7 +93,7 @@ describe("F3 End Phase: two waves, then expiry (rules 6-6-1-1 line 607, 6-6-1-1-
 
   // Engine: runEndPhase has no waves, so neither END_OF_*_TURN draw resolves before TURN_ENDED.
   // Rule 6-6-1-1: all [End of Your Turn] effects, then all [End of Your Opponent's Turn] effects, then hand-off.
-  it.fails("F3a wave 1 (ending player) resolves before wave 2, both before TURN_ENDED (ratchet OPT-962)", () => {
+  it("F3a wave 1 (ending player) resolves before wave 2, both before TURN_ENDED (ratchet OPT-962)", () => {
     const b = base([
       synCard(EOYT, schema(EOYT, "Character", [
         {
@@ -129,7 +129,7 @@ describe("F3 End Phase: two waves, then expiry (rules 6-6-1-1 line 607, 6-6-1-1-
 
   // Engine: runEndPhase expires THIS_TURN effects before processScheduledActions, so the conditional draw sees 4000 power.
   // Rules 6-6-1-2 / 6-6-1-3: scheduled end-of-turn effects resolve before "during this turn" modifiers expire.
-  it.fails("F3b scheduled END_OF_THIS_TURN draw resolves before the THIS_TURN modifier expires (ratchet OPT-962)", () => {
+  it("F3b scheduled END_OF_THIS_TURN draw resolves before the THIS_TURN modifier expires (ratchet OPT-962)", () => {
     const b = base([]);
     const subject = placeChar(b, inst(CARDS.VANILLA.id, 0, "CHARACTER"));
     fillDecks(b);
@@ -165,7 +165,7 @@ describe("F4 Brook delayed deck-out loses at the end-of-turn boundary (OP15-022 
 
   // Engine: TURN_ENDED:p0 -> TURN_STARTED:p1 -> PHASE_CHANGED:p1 -> GAME_OVER:p0, so the loss is written after hand-off.
   // OP15-022 text (docs/cards/OP-15.md:158) and rule 6-6-1-4 (line 624): the loss lands inside End Phase, before the turn ends.
-  it.fails("F4 the effect that empties the deck finishes, then the loss is written at End Phase before p1's turn starts (ratchet OPT-962)", () => {
+  it("F4 the effect that empties the deck finishes, then the loss is written at End Phase before p1's turn starts (ratchet OPT-962)", () => {
     const b = base([
       synCard("BROOK-LEADER", BROOK_SCHEMA, { ...CARDS.LEADER, id: "BROOK-LEADER", effectSchema: BROOK_SCHEMA }),
       synCard(MILLER, schema(MILLER, "Character", [
@@ -198,7 +198,12 @@ describe("F4 Brook delayed deck-out loses at the end-of-turn boundary (OP15-022 
     const types = b.state.eventLog.map((e) => `${e.type}:p${e.playerIndex}`);
     const over = types.findIndex((t) => t.startsWith("GAME_OVER"));
     expect(over).toBeGreaterThanOrEqual(0);
-    expect(over).toBeLessThan(types.indexOf("TURN_ENDED:p0"));
+    // OPT-962: the loss is written inside p0's End Phase, so the turn never
+    // ends (6-6-1-4 is not reached once the game is over; terminal.ts logs
+    // nothing after GAME_OVER). The base assertion `over < indexOf("TURN_ENDED:p0")`
+    // required a TURN_ENDED after GAME_OVER; absence is the stronger form of
+    // "GAME_OVER precedes TURN_ENDED p0".
+    expect(types).not.toContain("TURN_ENDED:p0");
     expect(types).not.toContain("TURN_STARTED:p1");
   });
 });
@@ -229,7 +234,7 @@ describe("F13 ST13-002 with Kalgara: an effect newly fulfilled in the End of You
 
   // Engine: PHASE_CHANGED -> TURN_ENDED:p0 -> TURN_STARTED:p1 -> PHASE_CHANGED:p1 -> CARD_TRASHED:p0 -> CARD_REMOVED_FROM_LIFE:p0; no wave, no p0 draw.
   // Rule 6-6-1-1 (line 607) / 8-6-1 (line 858): Ace's trash and Kalgara's draw resolve in p0's wave, before TURN_ENDED.
-  it.fails("F13 face-up Life card is trashed, then Kalgara draws once, both before TURN_ENDED:p0 (ratchet OPT-962)", () => {
+  it("F13 face-up Life card is trashed, then Kalgara draws once, both before TURN_ENDED:p0 (ratchet OPT-962)", () => {
     const { b, faceUp } = setupF13();
 
     run(b, { type: "ADVANCE_PHASE" });
@@ -280,13 +285,18 @@ describe("F14 Three expiry stages per player (rules 6-6-1-2 line 617, 6-6-1-3 li
   // A mutant that runs all expiry after both scheduled actions fails observation 2 (c0 still 5000);
   // a mutant that runs all expiry before any scheduled action fails observation 1 (c1a at 4000).
   // Engine today: all expiry first, so no draw at all. Rules 6-6-1-2 / 6-6-1-3 and Decision 9.
-  it.fails("F14 p0 scheduled draw sees p1's until-end modifier; p1 scheduled draw sees p0's modifier gone and p1's during-this-turn modifier live; both before TURN_ENDED:p0 (ratchet OPT-962)", () => {
+  it("F14 p0 scheduled draw sees p1's until-end modifier; p1 scheduled draw sees p0's modifier gone and p1's during-this-turn modifier live; both before TURN_ENDED:p0 (ratchet OPT-962)", () => {
     const b = base([DURING_THIS_TURN_CARD]);
     const c0 = placeChar(b, inst(CARDS.VANILLA.id, 0, "CHARACTER"));
     const c1a = placeChar(b, inst(CARDS.VANILLA.id, 1, "CHARACTER"));
     const c1b = placeChar(b, inst(DURING_THIS_TURN_CARD.id, 1, "CHARACTER"));
     fillDecks(b);
-    const m0 = thisTurnPlus1000(b, c0); // p0's "until end of turn" (stage 1 expiry)
+    // p0's "until end of turn" (stage 1 expiry). OPT-962: the engine now tells the
+    // two rule phrases apart (duration-tracker.ts endPhaseExpiryClause): THIS_TURN is
+    // "during this turn" (6-6-1-3, line 622), so the stand-in for "until the end of
+    // the turn" (6-6-1-2, line 617) is UNTIL_END_OF_YOUR_NEXT_TURN due this turn.
+    // Same expiresAt as before; assertions unchanged.
+    const m0: RuntimeActiveEffect = { ...thisTurnPlus1000(b, c0), duration: { type: "UNTIL_END_OF_YOUR_NEXT_TURN" } };
     const m1a = untilEndOfOpponentsTurnPlus1000(b, c1a); // p1's "until end of your opponent's turn" (stage 2 expiry)
     const m1b: RuntimeActiveEffect = { ...thisTurnPlus1000(b, c1b), id: `syn-during-${c1b.instanceId}`, controller: 1 }; // p1's "during this turn" (stage 3 expiry)
     const p0Action: RuntimeScheduledAction = {
