@@ -234,6 +234,71 @@ describe("OPT-962 each player's step runs its obligations before its own expiry 
   });
 });
 
+describe("OPT-962 obligations created after their owner's step still run this End Phase (6-6-1-2 'any remaining effects')", () => {
+  it("p1's step-2 K.O. fires p0's On K.O. that schedules a p0 'at the end of this turn' draw: it runs before the hand-off", () => {
+    const r = endPhaseRig();
+    const SCHED = "SYN-ONKO-SCHEDULER";
+    const victim = r.putSyn(SCHED, synSchema(SCHED, "Character", [{
+      id: "onko-schedule-draw",
+      category: "auto",
+      trigger: { keyword: "ON_KO" },
+      actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }],
+    }]), 0, "CHARACTER");
+    const p1Ko: RuntimeScheduledAction = {
+      id: "syn-p1-ko",
+      timing: "END_OF_THIS_TURN",
+      action: { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } } },
+      boundToInstanceId: null,
+      sourceEffectId: r.state.players[1].leader.instanceId,
+      controller: 1,
+    };
+    r.state = { ...r.state, scheduledActions: [p1Ko] };
+
+    r.act({ type: "ADVANCE_PHASE" });
+
+    const log = r.log();
+    const endedAt = log.indexOf("TURN_ENDED:p0");
+    expect(r.state.players[0].trash.some((c) => c.cardId === victim.cardId)).toBe(true);
+    expect(log, "p0's new obligation ran this End Phase").toContain("CARD_DRAWN:p0");
+    expect(log.indexOf("CARD_DRAWN:p0")).toBeLessThan(endedAt);
+    expect(r.state.scheduledActions).toEqual([]);
+  });
+
+  it("obligations that keep re-creating each other across the two steps end at the engine budget, not in a hang", () => {
+    const r = endPhaseRig({ deckSize: 1200 });
+    // Each player's watcher answers the other player's draw outside the Draw
+    // Phase with a new "at the end of this turn" draw for itself.
+    const echo = (id: string, owner: 0 | 1) => r.putSyn(id, synSchema(id, "Character", [{
+      id: `${id}-echo`,
+      category: "auto",
+      trigger: { event: "DRAW_OUTSIDE_DRAW_PHASE", filter: { controller: "OPPONENT" } },
+      actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }],
+    }]), owner, "CHARACTER");
+    echo("SYN-ECHO-0", 0);
+    echo("SYN-ECHO-1", 1);
+    const first: RuntimeScheduledAction = {
+      id: "syn-first",
+      timing: "END_OF_THIS_TURN",
+      action: { type: "DRAW", params: { amount: 1 } },
+      boundToInstanceId: null,
+      sourceEffectId: r.state.players[0].leader.instanceId,
+      controller: 0,
+    };
+    r.state = { ...r.state, scheduledActions: [first] };
+    const limit = r.state.executionContext.actionBudget.limit;
+
+    r.act({ type: "ADVANCE_PHASE" });
+
+    const log = r.log();
+    expect(log.filter((e) => e === "CARD_DRAWN:p1").length, "the loop crossed steps").toBeGreaterThan(1);
+    expect(r.state.status).toBe("FINISHED");
+    expect((r.state.engineOutcome as { type?: string } | undefined)?.type).toBe("ENGINE_LIMIT");
+    expect(r.state.executionContext.actionBudget.consumed).toBeLessThanOrEqual(limit + 1);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(log).not.toContain("TURN_ENDED:p0");
+  });
+});
+
 describe("OPT-962 termination inside the End Phase", () => {
   it("a wave draw that empties the deck ends the game: no wave 2, no hand-off", () => {
     const r = endPhaseRig({ deckSize: 1 });

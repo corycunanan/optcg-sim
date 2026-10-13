@@ -280,19 +280,17 @@ function continueEndPhase(
   }
 
   let current: PhaseBoundaryContinuation = { ...continuation, stage };
-  for (let index = STAGED_END_PHASE.indexOf(stage); index < STAGED_END_PHASE.length; index += 1) {
-    current = { ...current, stage: STAGED_END_PHASE[index] };
-    const outcome = current.stage === "END_OF_YOUR_TURN_WAVE" || current.stage === "END_OF_OPPONENT_TURN_WAVE"
-      ? runWave(state, current, cardDb, parkDepth)
-      : runEndOfTurnStep(state, current, cardDb, parkDepth);
+  // 6-6-1-2 processes "any remaining effects" of this turn: an obligation
+  // created after its owner's step (by the other player's step) sends the
+  // End Phase back through step 1 and step 2. Each pass resolves at least one
+  // obligation, which consumes the engine budget, so the loop is bounded.
+  for (let index = STAGED_END_PHASE.indexOf(stage); ; index = STAGED_END_PHASE.indexOf("TURN_PLAYER_END_OF_TURN")) {
+    const outcome = runStagesFrom(state, current, index, cardDb, parkDepth);
     state = outcome.state;
     current = outcome.continuation;
-    // OPT-960 / OPT-962: nothing after a terminal outcome. No later stage,
-    // no expiry, no hand-off.
     if (isGameTerminated(state)) return { state, events };
     if (outcome.pendingPrompt) return { state, events: [], pendingPrompt: outcome.pendingPrompt };
-    if (current.stage === "TURN_PLAYER_END_OF_TURN") state = expireUntilEndOfTurn(state, "TURN_PLAYER");
-    if (current.stage === "NON_TURN_PLAYER_END_OF_TURN") state = expireUntilEndOfTurn(state, "NON_TURN_PLAYER");
+    if (!state.scheduledActions.some((entry) => entry.timing === "END_OF_THIS_TURN")) break;
   }
 
   // 6-6-1-3: "during this turn" expiry, turn player then non-turn player.
@@ -302,6 +300,33 @@ function continueEndPhase(
   if (isGameTerminated(state)) return { state, events };
 
   return completeTurnHandoff(state, pi, events, { endOfTurnWindowsRan: true });
+}
+
+/** Run the staged End Phase from `startIndex` through 6-6-1-2 step 2. */
+function runStagesFrom(
+  initialState: GameState,
+  continuation: PhaseBoundaryContinuation,
+  startIndex: number,
+  cardDb: Map<string, CardData>,
+  parkDepth: number
+): StageOutcome {
+  let state = initialState;
+  let current = continuation;
+  for (let index = startIndex; index < STAGED_END_PHASE.length; index += 1) {
+    current = { ...current, stage: STAGED_END_PHASE[index] };
+    const outcome = current.stage === "END_OF_YOUR_TURN_WAVE" || current.stage === "END_OF_OPPONENT_TURN_WAVE"
+      ? runWave(state, current, cardDb, parkDepth)
+      : runEndOfTurnStep(state, current, cardDb, parkDepth);
+    state = outcome.state;
+    current = outcome.continuation;
+    // OPT-960 / OPT-962: nothing after a terminal outcome. No later stage,
+    // no expiry, no hand-off.
+    if (isGameTerminated(state)) return { state, continuation: current };
+    if (outcome.pendingPrompt) return { state, continuation: current, pendingPrompt: outcome.pendingPrompt };
+    if (current.stage === "TURN_PLAYER_END_OF_TURN") state = expireUntilEndOfTurn(state, "TURN_PLAYER");
+    if (current.stage === "NON_TURN_PLAYER_END_OF_TURN") state = expireUntilEndOfTurn(state, "NON_TURN_PLAYER");
+  }
+  return { state, continuation: current };
 }
 
 /**
