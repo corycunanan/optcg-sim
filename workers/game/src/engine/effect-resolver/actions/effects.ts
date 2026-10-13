@@ -295,6 +295,9 @@ export function executeNegateTriggerType(
     // affected player stored in `controller`.
     expiresAt: computeProhibitionExpiry(duration, state, controller),
     controller: targetController,
+    // OPT-924: the caster owns the effect; its End Phase expiry runs in the
+    // caster's 6-6-1-2 step, not the affected player's.
+    ownerController: controller,
     appliesTo: [],
     usesRemaining: null,
   };

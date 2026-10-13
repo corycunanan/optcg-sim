@@ -80,6 +80,21 @@ export function endPhaseExpiryClause(duration: { type: string } | undefined): En
   }
 }
 
+/**
+ * The player who controls the effect behind a prohibition, whose 6-6-1-2 step
+ * ends it (OPT-924). Every writer stores that player in `controller` except
+ * NEGATE_TRIGGER_TYPE, which stores the affected player there and the owner
+ * in `ownerController`. Deterministic fallback for a prohibition saved before
+ * `ownerController` existed: a row carrying `scope.triggerType` was written
+ * only by NEGATE_TRIGGER_TYPE, and its one authored use (OP09-081) negates
+ * the opponent's effects, so its owner is the other player.
+ */
+export function prohibitionOwner(p: Pick<RuntimeProhibition, "controller" | "ownerController" | "scope">): 0 | 1 {
+  if (p.ownerController !== undefined) return p.ownerController;
+  if (p.scope?.triggerType !== undefined) return p.controller === 0 ? 1 : 0;
+  return p.controller;
+}
+
 /** True when an End Phase wave of this turn ends the given expiry. */
 function dueThisEndPhase(expiry: ExpiryTiming, context: ExpiryContext): boolean {
   return shouldExpire(expiry, "END_OF_TURN", context) || shouldExpire(expiry, "END_OF_END_PHASE", context);
@@ -105,7 +120,7 @@ function expireEndPhaseClause(
 
   const effects = state.activeEffects.filter((e) => !ends(e.controller, e.duration, e.expiresAt));
   const prohibitions = state.prohibitions.filter(
-    (p) => !ends(p.controller, p.duration, p.expiresAt ?? legacyProhibitionExpiry(p.duration, state)),
+    (p) => !ends(prohibitionOwner(p), p.duration, p.expiresAt ?? legacyProhibitionExpiry(p.duration, state)),
   );
   const effectsChanged = effects.length !== state.activeEffects.length;
   const prohibitionsChanged = prohibitions.length !== state.prohibitions.length;
