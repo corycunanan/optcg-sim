@@ -1,6 +1,6 @@
 /**
  * OPT-961 scale harness. Each scenario runs in a child process with a 256 MB
- * heap cap and a 20 s timeout (see opt-961-scale-scenarios.ts). The test fails
+ * heap cap and a 30 s timeout (see opt-961-scale-scenarios.ts). The test fails
  * naming the scenario and path when a child times out, dies at the heap cap,
  * or breaks its thresholds (FAST_LIMITS or SEARCH_LIMITS in
  * opt-961-scale-scenarios.ts).
@@ -18,9 +18,9 @@ import { FAST_LIMITS, PATHS, SCENARIOS } from "./opt-961-scale-scenarios.js";
 
 const MODULE = fileURLToPath(new URL("./opt-961-scale-scenarios.ts", import.meta.url));
 const CWD = path.resolve(path.dirname(MODULE), "../..");
-const TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = 30_000;
 
-interface Row { medianMs: number; maxMs: number; heapDeltaMB: number }
+interface Row { medianMs: number; maxMs: number; heapDeltaMB: number; medianRatio: number }
 interface Child { id: string; loadMs?: number; calibrationMs?: number; results?: Record<string, Row>; error?: string }
 
 describe("OPT-961 cost-sequence feasibility scale harness", () => {
@@ -47,10 +47,10 @@ describe("OPT-961 cost-sequence feasibility scale harness", () => {
       const LIMITS = s.limits ?? FAST_LIMITS;
       for (const p of PATHS) {
         const r = out.results[p];
-        const ratio = r.medianMs / (out.calibrationMs ?? Number.NaN);
+        const ratio = r.medianRatio;
         table.push(`${s.id} ${p}: median ${r.medianMs.toFixed(2)} ms, max ${r.maxMs.toFixed(2)} ms, heap ${r.heapDeltaMB.toFixed(1)} MB, load ${out.loadMs?.toFixed(1)} ms, calibration ${out.calibrationMs?.toFixed(2)} ms, ratio ${ratio.toFixed(2)}`);
         if (LIMITS.medianRatio !== undefined && !(ratio <= LIMITS.medianRatio)) {
-          failures.push(`${s.id} ${p}: median/calibration ${ratio.toFixed(2)} > ${LIMITS.medianRatio}`);
+          failures.push(`${s.id} ${p}: median of paired sample/calibration ratios ${ratio.toFixed(2)} > ${LIMITS.medianRatio}`);
         }
         if (r.medianMs > LIMITS.medianMs) failures.push(`${s.id} ${p}: median ${r.medianMs.toFixed(1)} ms > ${LIMITS.medianMs} ms`);
         if (r.maxMs > LIMITS.maxMs) failures.push(`${s.id} ${p}: max ${r.maxMs.toFixed(1)} ms > ${LIMITS.maxMs} ms`);

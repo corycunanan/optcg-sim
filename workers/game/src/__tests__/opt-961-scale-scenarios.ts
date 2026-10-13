@@ -23,13 +23,13 @@ import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./hel
 export interface Limits { medianMs: number; maxMs: number; heapDeltaMB: number; medianRatio?: number }
 
 /**
- * OPT-961 round 1: thresholds are a small multiple of the measured head
- * values. Fast scenarios measure ≤ 0.12 ms median and ≤ 1 ms max alone
- * (≤ 0.3 ms / 1.3 ms under the full coverage run). S3b measures about 12 ms
- * median alone and 34-36 ms under the full run, so its absolute limits are
- * only a backstop. Its regression gate is the ratio of its median to a
- * calibration workload timed in the same child: about 10 alone, about 15
- * under the full run. A limit of 40 fails a 10× regression (ratio about 100).
+ * OPT-961: thresholds are a small multiple of the measured head values.
+ * Fast scenarios measure ≤ 0.12 ms median and ≤ 1 ms max alone (≤ 0.3 ms /
+ * 1.3 ms under the full coverage run). S3b measures about 12 ms median alone
+ * and 34-45 ms under the full run, so its absolute limits are only a
+ * backstop. Its regression gate is the median of per-sample ratios, each
+ * sample divided by the mean of calibrations taken just before and after it
+ * (about 9 alone). A limit of 40 fails a 10× regression.
  */
 export const FAST_LIMITS: Limits = { medianMs: 1, maxMs: 25, heapDeltaMB: 16 };
 export const SEARCH_LIMITS: Limits = { medianMs: 250, maxMs: 1000, heapDeltaMB: 128, medianRatio: 40 };
@@ -190,23 +190,25 @@ async function main() {
     if (!ok) differs.push(`${id}/${path}: got ${JSON.stringify(got)}, expected ${def.payable ? "payable" : "unpayable"}`);
   };
 
-  // OPT-961 round 1: a calibration workload timed in the same process, so a
-  // search scenario's cost can be judged as a ratio that survives CPU
-  // contention from the rest of the suite. 20 JSON round trips of the
-  // loaded state approximate the per-payment state copying the search does.
+  // OPT-961: a calibration workload timed in the same process, so a search
+  // scenario's cost can be judged as a ratio that survives CPU contention
+  // from the rest of the suite. 20 JSON round trips of the loaded state
+  // approximate the per-payment state copying the search does. Round 2: each
+  // sample is paired with calibrations taken immediately before and after
+  // it, so numerator and denominator see the same contention; the gate reads
+  // the median of the per-sample ratios.
   const calibrate = () => {
     for (let i = 0; i < 20; i++) JSON.parse(JSON.stringify(state));
   };
-  for (let i = 0; i < 3; i++) calibrate();
-  const calibrationTimes: number[] = [];
-  for (let i = 0; i < 20; i++) {
+  const timed = (work: () => unknown): number => {
     const t0 = performance.now();
-    calibrate();
-    calibrationTimes.push(performance.now() - t0);
-  }
-  const calibrationMs = median(calibrationTimes);
+    work();
+    return performance.now() - t0;
+  };
+  for (let i = 0; i < 3; i++) calibrate();
+  const calibrationMs = median(Array.from({ length: 20 }, () => timed(calibrate)));
 
-  const results: Record<string, { medianMs: number; maxMs: number; heapDeltaMB: number }> = {};
+  const results: Record<string, { medianMs: number; maxMs: number; heapDeltaMB: number; medianRatio: number }> = {};
   for (const path of PATHS) {
     const fn = calls[path];
     for (let i = 0; i < 3; i++) fn();
@@ -221,10 +223,20 @@ async function main() {
       times.push(performance.now() - t0);
       peak = Math.max(peak, process.memoryUsage().heapUsed);
     }
+    // Paired pass (after the heap pass, so calibration garbage never counts
+    // toward the heap delta): calibrate, sample, calibrate.
+    const ratios: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const before = timed(calibrate);
+      const sample = timed(fn);
+      const after = timed(calibrate);
+      ratios.push(sample / ((before + after) / 2));
+    }
     results[path] = {
       medianMs: median(times),
       maxMs: Math.max(...times),
       heapDeltaMB: (peak - baseline) / (1024 * 1024),
+      medianRatio: median(ratios),
     };
   }
   if (!skip && differs.length > 0) {
