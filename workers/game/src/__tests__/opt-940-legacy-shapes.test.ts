@@ -148,6 +148,33 @@ describe("OPT-962 legacy stage keeps the version 1 resume on the version 2 engin
   });
 });
 
+describe("OPT-962 legacy stage: a terminal remaining action keeps its events before GAME_OVER", () => {
+  it("the legacy resume publishes the draw that emptied the deck before the one GAME_OVER", () => {
+    const raw = structuredClone(golden("end-phase-parked").session.state) as Record<string, unknown> & {
+      players: Array<{ deck: unknown[] }>;
+      effectStack: Array<{ phaseBoundaryContinuation?: { remainingScheduledActions: Array<{ action: unknown }> } }>;
+    };
+    raw.players[0].deck = raw.players[0].deck.slice(0, 1);
+    raw.effectStack.find((f) => f.phaseBoundaryContinuation)!.phaseBoundaryContinuation!.remainingScheduledActions[0].action =
+      { type: "DRAW", params: { amount: 2 } };
+    const state = convertPersistedGameState(raw, "state");
+    const cardDb = new Map(Object.entries(golden("end-phase-parked").cardDb) as Array<[string, never]>);
+    const from = state.eventLog.length;
+    const result = resumePromptLifecycle(
+      state,
+      { type: "SELECT_TARGET", selectedInstanceIds: [], promptId: state.pendingPrompt!.promptId },
+      cardDb,
+      lifecycleServices
+    );
+    const types = result.state.eventLog.slice(from).map((e) => e.type);
+    expect(result.state.status).toBe("FINISHED");
+    expect(types).toContain("CARD_DRAWN");
+    expect(types.at(-1)).toBe("GAME_OVER");
+    expect(types.filter((t) => t === "GAME_OVER")).toHaveLength(1);
+    expect(types).not.toContain("TURN_ENDED");
+  });
+});
+
 describe("OPT-940 structural ResumeContext: supported as-is", () => {
   it("loads live and as undo, classified, and still resumes through resumeEffectChain", async () => {
     for (const state of [loadLive("structural-resume-context"), await loadAsUndo("structural-resume-context")]) {

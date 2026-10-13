@@ -5,7 +5,7 @@
  * and turn handoff. Extracted from execute.ts for clarity.
  */
 
-import { isGameTerminated } from "./terminal.js";
+import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
 import { releaseMovedDonEffects } from "./don-area-effects.js";
 import type {
   CardData,
@@ -439,7 +439,11 @@ function runEndOfTurnStep(
     );
     state = result.state;
     const next = { ...continuation, remainingScheduledActions: [...queue] };
-    if (isGameTerminated(state)) return { state, continuation: next };
+    // OPT-960 invariant: the events that led to the terminal checkpoint are
+    // logged before the one GAME_OVER.
+    if (isGameTerminated(state)) {
+      return { state: publishBeforeGameOver(state, result.events, entry.controller), continuation: next };
+    }
     if (result.pendingPrompt) {
       state = publishPhaseBoundaryEvents(state, result.events, pi);
       return parkStage({ ...state, pendingPrompt: result.pendingPrompt }, next, parkDepth);

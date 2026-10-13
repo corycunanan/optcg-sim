@@ -258,10 +258,42 @@ describe("OPT-962 termination inside the End Phase", () => {
     expect(r.state.winner).toBe(1);
     const log = r.log();
     expect(log.filter((e) => e.startsWith("GAME_OVER"))).toHaveLength(1);
+    // The wave draw that emptied the deck is logged before GAME_OVER (OPT-960 invariant).
+    expect(log).toContain("CARD_DRAWN:p0");
+    expect(log.indexOf("CARD_DRAWN:p0")).toBeLessThan(log.findIndex((e) => e.startsWith("GAME_OVER")));
+    expect(log.at(-1)).toMatch(/^GAME_OVER/);
     expect(log).not.toContain("CARD_DRAWN:p1");
     expect(log).not.toContain("TURN_ENDED:p0");
     expect(log).not.toContain("TURN_STARTED:p1");
     expect(r.state.turn.activePlayerIndex).toBe(0);
+  });
+
+  it.each([
+    ["DRAW 2 from a 1-card deck", { type: "DRAW", params: { amount: 2 } }, ["CARD_DRAWN:p0", "DRAW_OUTSIDE_DRAW_PHASE:p0"]],
+    ["MILL 1 of a 1-card deck", { type: "MILL", params: { amount: 1 } }, ["CARD_TRASHED:p0"]],
+  ] as const)("a step-1 obligation that ends the game keeps its events in the log before GAME_OVER (OPT-960 invariant): %s", (_label, action, logged) => {
+    const r = endPhaseRig({ deckSize: 1 });
+    const obligation: RuntimeScheduledAction = {
+      id: "syn-terminal-obligation",
+      timing: "END_OF_THIS_TURN",
+      action: action as RuntimeScheduledAction["action"],
+      boundToInstanceId: null,
+      sourceEffectId: r.state.players[0].leader.instanceId,
+      controller: 0,
+    };
+    r.state = { ...r.state, scheduledActions: [obligation] };
+
+    r.act({ type: "ADVANCE_PHASE" });
+
+    expect(r.state.status).toBe("FINISHED");
+    const log = r.log();
+    const over = log.findIndex((e) => e.startsWith("GAME_OVER"));
+    expect(over).toBe(log.length - 1);
+    for (const event of logged) {
+      expect(log, event).toContain(event);
+      expect(log.indexOf(event)).toBeLessThan(over);
+    }
+    expect(log).not.toContain("TURN_ENDED:p0");
   });
 
   it("Brook after a wave prompt: the delayed loss lands at the End Phase boundary, once, after the prompted effect finishes", () => {
