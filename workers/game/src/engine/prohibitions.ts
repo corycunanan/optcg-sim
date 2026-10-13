@@ -871,6 +871,11 @@ function causeMatches(
   context: { cause: "EFFECT" | "BATTLE" | "COST"; causingController: 0 | 1 },
   targetController: 0 | 1,
 ): boolean {
+  // OPT-961: a cost is neither an effect nor a battle. Only an unscoped
+  // (cause ANY) protection stops a cost; every other declared cause,
+  // including aliases this switch does not list (BY_EFFECT, IN_BATTLE), does
+  // not. EFFECT and BATTLE contexts keep their existing matching.
+  if (context.cause === "COST") return declaredCause === "ANY";
   switch (declaredCause) {
     case "ANY":
       return true;

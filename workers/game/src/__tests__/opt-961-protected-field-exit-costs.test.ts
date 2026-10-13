@@ -30,6 +30,7 @@ import type { EffectBlock, ProhibitionScope, ProhibitionType } from "../engine/e
 import { computeEffectAvailability } from "../engine/availability.js";
 import { validate } from "../engine/validation.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
 import { rig, synSchema, type Rig } from "./opt-960-rig.js";
 
 const P0 = 0 as const;
@@ -163,5 +164,76 @@ describe("OPT-961 field-exit costs respect protecting prohibitions (rules 1-3-3,
     const skipped = resolveEffect(r.state, optional, source.instanceId, P0, r.db);
     expect(skipped.pendingPrompt).toBeUndefined();
     expect(skipped.state.players[P0].life).toHaveLength(3);
+  });
+});
+
+// ─── Round 2 (G1): effect- and battle-scoped protections never gate a cost ──
+//
+// A cost matches only an unscoped / cause ANY protection. The authored
+// aliases BY_EFFECT (OP09-033 "cannot be K.O.'d by effects", op09.ts) and
+// IN_BATTLE (OP02-118 "cannot be K.O.'d during this battle", op02.ts) protect
+// against effects and battle, not against the player's own K.O. cost.
+describe("OPT-961 round 2: effect- and battle-scoped protections allow the player's own cost", () => {
+  /** Run the authored APPLY_PROHIBITION action (its real scope object). */
+  function applyAuthored(r: Rig, cardId: string, blockId: string, targetOverride?: EffectBlock["actions"]) {
+    const authored = getEffectSchema(cardId)!.effects.find((b) => b.id === blockId)!;
+    const action = authored.actions!.find((a) => a.type === "APPLY_PROHIBITION")!;
+    const block: EffectBlock = {
+      id: `opt961-r2-${cardId}`,
+      category: "auto",
+      actions: targetOverride ?? [action],
+    };
+    const result = resolveEffect(r.state, block, r.state.players[P0].leader.instanceId, P0, r.db);
+    expect(result.pendingPrompt).toBeFalsy();
+    r.state = result.state;
+    const created = r.state.prohibitions.at(-1)!;
+    expect(created.prohibitionType).toBe("CANNOT_BE_KO");
+    return { created, action };
+  }
+
+  function expectPayable(r: Rig, source: CardInstance) {
+    expect(availability(r, source, KO_COST.id)?.status).toBe("usable");
+    expect(activate(r, source, KO_COST.id)).toBeNull();
+    r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: KO_COST.id });
+    r.select([source.instanceId]);
+    expect(r.state.players[P0].characters.some((c) => c?.instanceId === source.instanceId)).toBe(false);
+    expect(r.state.players[P0].hand).toHaveLength(1);
+  }
+
+  it("OP09-033 (authored action, scope BY_EFFECT): the protected Straw Hat Character still pays a K.O. cost", () => {
+    const r = rig();
+    r.deck(P0, 5);
+    const source = r.put("OPT961-STRAW-HAT", P0, "CHARACTER", {
+      data: { types: ["Straw Hat Crew"] },
+      schema: synSchema("OPT961-STRAW-HAT", [KO_COST]),
+    });
+    const { created } = applyAuthored(r, "OP09-033", "on_play_ko_protection");
+    expect(created.scope).toEqual({ cause: "BY_EFFECT" });
+    expect(created.appliesTo).toContain(source.instanceId);
+    expectPayable(r, source);
+  });
+
+  it("OP02-118 (authored scope IN_BATTLE): the protected Character still pays a K.O. cost", () => {
+    const r = rig();
+    r.deck(P0, 5);
+    const source = r.put("OPT961-JEWEL-TARGET", P0, "CHARACTER", { schema: synSchema("OPT961-JEWEL-TARGET", [KO_COST]) });
+    const authored = getEffectSchema("OP02-118")!.effects.find((b) => b.id === "counter_protection")!;
+    const action = authored.actions!.find((a) => a.type === "APPLY_PROHIBITION")!;
+    // Same action and scope object; the "up to 1" choice is fixed to the source.
+    const fixedTarget = {
+      ...action,
+      target: { type: "CHARACTER", controller: "SELF", count: { all: true }, filter: { name: "OPT961-JEWEL-TARGET" } },
+    } as NonNullable<EffectBlock["actions"]>[number];
+    const { created } = applyAuthored(r, "OP02-118", "counter_protection", [fixedTarget]);
+    expect(created.scope).toEqual({ cause: "IN_BATTLE" });
+    expect(created.appliesTo).toContain(source.instanceId);
+    expectPayable(r, source);
+  });
+
+  it("control: an unscoped CANNOT_BE_KO still blocks the K.O. cost", () => {
+    const { r, source } = setup(KO_COST);
+    protect(r, "OPT961-PROTECTED", "CANNOT_BE_KO", {});
+    expect(availability(r, source, KO_COST.id)).toEqual({ effectId: KO_COST.id, status: "blocked", reason: "COST" });
+    expect(activate(r, source, KO_COST.id)).toBe("Cost cannot be paid");
   });
 });
