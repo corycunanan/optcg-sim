@@ -2,7 +2,14 @@
 import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
 import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
-import { isDonAttachProhibited, isProhibitedForCard, isRemovalProhibited } from "../../prohibitions.js";
+import {
+  isCostMovementProhibited,
+  isDonAttachProhibited,
+  isLifeToHandCostProhibited,
+  isProhibitedForCard,
+  isRemovalProhibited,
+  type RemovalAction,
+} from "../../prohibitions.js";
 import { namedPlayCandidates } from "./named-play.js";
 import { isPresent } from "../../type-guards.js";
 import { computeAllValidTargets } from "../target-resolver.js";
@@ -161,6 +168,82 @@ function getRestCostCandidates(player: PlayerState, filter?: TargetFilter): Card
   ];
 }
 
+/**
+ * OPT-961: the field movement each field-exit cost performs, in the removal
+ * taxonomy of `isRemovalProhibited` (prohibitions.ts).
+ */
+const COST_MOVEMENT: Partial<Record<Cost["type"], RemovalAction>> = {
+  KO_OWN_CHARACTER: "KO",
+  TRASH_OWN_CHARACTER: "TRASH",
+  RETURN_OWN_CHARACTER_TO_HAND: "RETURN_TO_HAND",
+  PLACE_OWN_CHARACTER_TO_DECK: "RETURN_TO_DECK",
+  ADD_OWN_CHARACTER_TO_LIFE: "TO_LIFE",
+  TRASH_NAMED_CARD_FROM_HAND_OR_STAGE: "TRASH",
+  TRASH_SELF: "TRASH",
+  PLACE_SELF_TO_DECK: "RETURN_TO_DECK",
+  PLACE_SELF_AND_TRASH_TO_DECK: "RETURN_TO_DECK",
+  PLACE_SELF_AND_HAND_TO_DECK: "RETURN_TO_DECK",
+  PLACE_STAGE_TO_DECK: "RETURN_TO_DECK",
+  TRASH_OWN_STAGE: "TRASH",
+};
+
+/**
+ * OPT-961 (rules 1-3-3, 8-3-1-3): true when a cost's fixed movement (the
+ * source card, the Stage, or a Life card to hand) is forbidden by an
+ * activation-time prohibition, so the cost cannot be paid at all.
+ * Player-selected field-exit costs drop protected candidates in
+ * `computeCostTargets` instead.
+ */
+export function isFixedCostMovementProhibited(
+  state: GameState,
+  cost: Cost,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): boolean {
+  if (cost.type === "LIFE_TO_HAND") return isLifeToHandCostProhibited(state, controller, cardDb);
+  const action = COST_MOVEMENT[cost.type];
+  if (!action) return false;
+  let fixedId: string | undefined;
+  switch (cost.type) {
+    case "TRASH_SELF":
+    case "PLACE_SELF_TO_DECK":
+    case "PLACE_SELF_AND_TRASH_TO_DECK":
+    case "PLACE_SELF_AND_HAND_TO_DECK":
+      fixedId = sourceCardInstanceId;
+      break;
+    case "PLACE_STAGE_TO_DECK":
+    case "TRASH_OWN_STAGE":
+      fixedId = state.players[controller].stage?.instanceId;
+      break;
+    default:
+      return false;
+  }
+  return fixedId !== undefined &&
+    isCostMovementProhibited(state, fixedId, action, controller, cardDb, sourceCardInstanceId);
+}
+
+/** OPT-961: drop own field cards a field-exit cost may not move. */
+function dropProtected(
+  state: GameState,
+  cost: Cost,
+  ids: string[],
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): string[] {
+  const action = COST_MOVEMENT[cost.type];
+  if (!action || state.prohibitions.length === 0) return ids;
+  const own = new Set([
+    ...state.players[controller].characters.flatMap((c) => (c ? [c.instanceId] : [])),
+    ...(state.players[controller].stage ? [state.players[controller].stage!.instanceId] : []),
+  ]);
+  return ids.filter((id) =>
+    !own.has(id) ||
+    !isCostMovementProhibited(state, id, action, controller, cardDb, sourceCardInstanceId),
+  );
+}
+
 /** Return instance IDs that can satisfy a player-selected cost. */
 export function computeCostTargets(
   state: GameState,
@@ -201,13 +284,14 @@ export function computeCostTargets(
           controller,
         );
       });
-      return dropSelf(candidates.map((card) => card.instanceId));
+      return dropProtected(state, cost, dropSelf(candidates.map((card) => card.instanceId)), controller, cardDb, sourceCardInstanceId);
     }
 
     case "TRASH_FROM_HAND":
     case "PLACE_HAND_TO_DECK":
     case "PLACE_SELF_AND_HAND_TO_DECK":
     case "REVEAL_FROM_HAND": {
+      if (isFixedCostMovementProhibited(state, cost, controller, cardDb, sourceCardInstanceId)) return [];
       let candidates = player.hand;
       if (cost.filter) {
         candidates = candidates.filter((c) =>
@@ -258,13 +342,14 @@ export function computeCostTargets(
           cardDb,
         ));
       }
-      return dropSelf(candidates.map((c) => c.instanceId));
+      return dropProtected(state, cost, dropSelf(candidates.map((c) => c.instanceId)), controller, cardDb, sourceCardInstanceId);
     }
 
     case "PLACE_FROM_TRASH_TO_DECK":
     // OPT-431: the selectable half of the compound cost is the trash side
     // only — the self half is fixed to the source card and never offered.
     case "PLACE_SELF_AND_TRASH_TO_DECK": {
+      if (isFixedCostMovementProhibited(state, cost, controller, cardDb, sourceCardInstanceId)) return [];
       let candidates = player.trash;
       if (cost.filter) {
         candidates = candidates.filter((c) =>

@@ -8,13 +8,14 @@
  * Characters with cost 2 or less", "Cannot be K.O.'d by effects"
  */
 
-import type {
-  ConditionalOverride,
-  Condition,
-  RuntimeProhibition,
-  ProhibitionType,
-  Target,
-  TargetFilter,
+import {
+  PROHIBITION_FEASIBILITY_TIMING,
+  type ConditionalOverride,
+  type Condition,
+  type RuntimeProhibition,
+  type ProhibitionType,
+  type Target,
+  type TargetFilter,
 } from "./effect-types.js";
 import type {
   CardData,
@@ -229,6 +230,84 @@ export function checkProhibitions(
   }
 
   return null;
+}
+
+/**
+ * OPT-864 (Decision 11, rule 1-3-3): the activation-time prohibition veto
+ * shared by availability and validation.
+ *
+ * It runs the same evaluation as pipeline step 2 (`checkProhibitions`), but
+ * only over prohibitions classified "ACTIVATION" in
+ * PROHIBITION_FEASIBILITY_TIMING. A resolution-time restriction never vetoes
+ * an offer here.
+ */
+/** OPT-961: prohibitions the table classifies as feasibility gates. */
+function activationTimeProhibitions(state: GameState): RuntimeProhibition[] {
+  return state.prohibitions.filter(
+    (p) => PROHIBITION_FEASIBILITY_TIMING[p.prohibitionType] === "ACTIVATION",
+  );
+}
+
+/**
+ * OPT-961 (rule 1-3-3, 8-3-1-3): may an activation cost move this field card
+ * this way? A cost that would K.O., return, trash, or otherwise remove a card
+ * that an activation-time prohibition protects cannot be paid with that card.
+ *
+ * Uses the removal taxonomy and scope semantics of `isRemovalProhibited`
+ * with cause "COST", over the activation-time prohibitions only. So
+ * "cannot be K.O.'d" (cause ANY) protects against a K.O. cost, while
+ * "cannot be removed by your opponent's effects" does not stop your own cost.
+ * Whether "cannot be K.O.'d by effects" covers a cost is not settled by a
+ * ruling; this reads it as not covering (assumed).
+ */
+export function isCostMovementProhibited(
+  state: GameState,
+  targetInstanceId: string,
+  action: RemovalAction,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): boolean {
+  const gating = activationTimeProhibitions(state);
+  if (gating.length === 0) return false;
+  return isRemovalProhibited(
+    { ...state, prohibitions: gating },
+    targetInstanceId,
+    { action, cause: "COST", causingController: controller, sourceCardInstanceId },
+    cardDb,
+  );
+}
+
+/**
+ * OPT-961: may `controller` pay a "Life card to hand" cost? A
+ * CANNOT_ADD_LIFE_TO_HAND prohibition on that player makes the cost
+ * unpayable (docs/FAQs/qa_op02.md:24-26 OP02-004, :82-84 OP02-023: "The
+ * effect cannot be activated because that activation cost cannot be paid").
+ */
+export function isLifeToHandCostProhibited(
+  state: GameState,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+): boolean {
+  for (const p of activationTimeProhibitions(state)) {
+    if (p.prohibitionType !== "CANNOT_ADD_LIFE_TO_HAND") continue;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
+    if (isProhibitionOverridden(p, state, cardDb)) continue;
+    if (matchesController(p.controller, controller, p.scope?.controller)) return true;
+  }
+  return false;
+}
+
+export function activationProhibitionVeto(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): string | null {
+  const gating = activationTimeProhibitions(state);
+  if (gating.length === 0) return null;
+  return checkProhibitions({ ...state, prohibitions: gating }, action, cardDb, actingPlayerIndex);
 }
 
 /**
@@ -595,8 +674,12 @@ export type RemovalAction = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "TRASH"
 export interface RemovalContext {
   /** Which removal action is being attempted. */
   action: RemovalAction;
-  /** Whether this removal stems from battle damage or an effect. */
-  cause: "BATTLE" | "EFFECT";
+  /**
+   * Whether this removal stems from battle damage, an effect, or (OPT-961)
+   * the payment of an activation cost. A cost never matches an "EFFECT" or
+   * "by your opponent's effects" cause scope; it matches "ANY".
+   */
+  cause: "BATTLE" | "EFFECT" | "COST";
   /** The player whose action/effect caused the removal. */
   causingController: 0 | 1;
   /**
@@ -788,6 +871,11 @@ function causeMatches(
   context: { cause: "EFFECT" | "BATTLE" | "COST"; causingController: 0 | 1 },
   targetController: 0 | 1,
 ): boolean {
+  // OPT-961: a cost is neither an effect nor a battle. Only an unscoped
+  // (cause ANY) protection stops a cost; every other declared cause,
+  // including aliases this switch does not list (BY_EFFECT, IN_BATTLE), does
+  // not. EFFECT and BATTLE contexts keep their existing matching.
+  if (context.cause === "COST") return declaredCause === "ANY";
   switch (declaredCause) {
     case "ANY":
       return true;

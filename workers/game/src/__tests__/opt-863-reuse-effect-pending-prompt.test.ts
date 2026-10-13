@@ -196,14 +196,13 @@ describe.each(["EB01-051", "EB04-049"])("OPT-863 %s Life [Trigger] reuses [Main]
     expectSettled(f, 1);
   });
 
-  it("unpayable cost (1-card deck): accepting pays and K.O.s nothing, then damage finishes", () => {
+  it("unpayable cost (1-card deck): no prompt, pays and K.O.s nothing, then damage finishes", () => {
     const f = fixture(id);
     const { victim } = f.setup(1);
     f.attackToTrigger();
-    // Same as playing the Event from hand: the optional prompt is offered,
-    // and accepting an unpayable cost resolves as "can't pay".
-    expect(f.promptType()).toBe("OPTIONAL_EFFECT");
-    f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+    // OPT-864: same as playing the Event from hand — the unpayable optional
+    // cost is skipped without a prompt.
+    expect(f.promptType()).not.toBe("OPTIONAL_EFFECT");
     expect(f.state.players[OWNER].deck).toHaveLength(1);
     expect(f.millEvents()).toHaveLength(0);
     expect(onField(f.state, victim.instanceId)).toBe(true);

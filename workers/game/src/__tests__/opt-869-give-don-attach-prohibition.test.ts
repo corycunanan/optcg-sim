@@ -32,6 +32,7 @@ import { isCostSequencePayable } from "../engine/effect-resolver/cost/feasibilit
 import { applyCostSelection } from "../engine/effect-resolver/cost/resume.js";
 import { isCostPayable } from "../engine/effect-resolver/cost/payability.js";
 import { isDonAttachProhibited } from "../engine/prohibitions.js";
+import { computeEffectAvailability } from "../engine/availability.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 const P0 = 0 as const;
@@ -376,9 +377,11 @@ describe("OPT-869 GIVE_DON cost honors CANNOT_ATTACH_DON", () => {
       prohibitByName(f, P1, "Silvers Rayleigh", "OPPONENT", scope as ProhibitionScope);
       expect(manualAttachValid(f, rayleigh.instanceId)).toBe(!blocked);
       f.act({ type: "PLAY_CARD", cardInstanceId: event.instanceId });
-      f.accept();
+      // OPT-864: an unpayable optional cost is skipped without a prompt.
+      if (!blocked) f.accept();
       if (blocked) {
-        // Nothing payable: no recipient prompt and no DON!! moved.
+        // Nothing payable: no optional prompt, no recipient prompt and no
+        // DON!! moved.
         expect(f.state.pendingPrompt).toBeNull();
         expect(activeCostDon(f)).toBe(3);
       } else {
@@ -491,13 +494,16 @@ describe("OPT-869 GIVE_DON cost honors CANNOT_ATTACH_DON", () => {
       expect(attached(f.state, leader.instanceId)).toBe(0);
     });
 
-    // Known gap, follow-up to PR #725 (no ticket yet): pipeline step 2
-    // (validation.ts areEffectCostsPayable) checks each cost independently
-    // against the pre-cost state, so it refuses an [Activate: Main] whose
-    // GIVE_DON is only payable after an earlier cost. No authored card has
-    // this shape today (no schema grants CANNOT_ATTACH_DON).
-    it.fails("allows ACTIVATE_EFFECT when an earlier cost ends the prohibition", () => {
+    // Formerly an it.fails ratchet (OPT-931 item 1): pipeline step 1
+    // (validation.ts areEffectCostsPayable) checked each cost independently
+    // against the pre-cost state, so it refused an [Activate: Main] whose
+    // GIVE_DON is only payable after an earlier cost. OPT-864 switched it to
+    // the sequential evaluator. No authored card has this shape today (no
+    // schema grants CANNOT_ATTACH_DON).
+    it("allows ACTIVATE_EFFECT when an earlier cost ends the prohibition", () => {
       const { f, ward } = auraSetup();
+      expect(computeEffectAvailability(f.state, f.db)[ward.instanceId]
+        ?.find((e) => e.effectId === TRASH_THEN_GIVE.id)?.status).toBe("usable");
       f.act({ type: "ACTIVATE_EFFECT", cardInstanceId: ward.instanceId, effectId: TRASH_THEN_GIVE.id });
     });
   });

@@ -259,7 +259,10 @@ function resumePromptLifecycleUnreleased(
     state = batch.state;
     if (batch.pendingPrompt) {
       if (state.effectStack.length > stateBeforeResume.effectStack.length) {
-        state = attachReplacementBatchContinuation(state, context);
+        state = attachReplacementBatchContinuation(
+          state,
+          batch.continuationContext ?? context
+        );
       }
       state = { ...state, pendingPrompt: batch.pendingPrompt };
     } else {

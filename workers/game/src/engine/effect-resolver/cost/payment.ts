@@ -11,7 +11,7 @@ import { applyFieldDonReturn } from "../actions/don.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
 import { matchesFilter } from "../../conditions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
-import { computeCostTargets, isOpponentLifePlacement } from "./targets.js";
+import { computeCostTargets, isFixedCostMovementProhibited, isOpponentLifePlacement } from "./targets.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { applyCostSelection } from "./resume.js";
 
@@ -61,6 +61,9 @@ function payCostsUnreleased(
   let nextState = state;
 
   for (const cost of costs) {
+    // OPT-961: a fixed movement an activation-time prohibition forbids makes
+    // the cost unpayable (rules 1-3-3, 8-3-1-3).
+    if (isFixedCostMovementProhibited(nextState, cost, controller, _cardDb, sourceCardInstanceId)) return null;
     switch (cost.type) {
       case "DON_MINUS": {
         const amount = typeof cost.amount === "number" ? cost.amount : 0;

@@ -170,7 +170,7 @@ describe("OPT-865 OP11-098 Blue Hole — [Main] MILL 3 is an activation cost", (
     f.deck(0, size);
     const victim = f.put("victim", 1, "CHARACTER", { cost: 2 });
     f.act({ type: "PLAY_CARD", cardInstanceId: putBlueHole(f).instanceId });
-    f.accept();
+    // OPT-864: the unpayable optional cost is skipped without a prompt.
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.state.effectStack).toHaveLength(0);
     expect(f.state.players[0].deck).toHaveLength(size);
@@ -253,7 +253,8 @@ describe("OPT-865 OP12-090 Belo Betty — [When Attacking] MILL 2 is an activati
     f.put("h2", 0, "HAND");
     const target = f.put("target", 1, "CHARACTER", { cost: 3 });
     bettyAttack(f);
-    f.accept();
+    // OPT-864: the unpayable optional cost is skipped without a prompt.
+    expect(f.state.pendingPrompt?.options.promptType).not.toBe("OPTIONAL_EFFECT");
     expect(f.state.players[0].deck).toHaveLength(size);
     expect(f.state.players[0].hand).toHaveLength(2);
     expect(f.millEvents()).toHaveLength(0);

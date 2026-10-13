@@ -439,13 +439,12 @@ describe("OPT-824 GIVE_DON cost — Silvers Rayleigh Events", () => {
   });
 
   for (const eventId of ["EB04-009", "OP12-016", "OP12-017", "OP12-019"]) {
-    // The engine offers an optional block before checking its cost (shared
-    // with OPT-798's MILL cost); accepting an unpayable cost pays and resolves
-    // nothing — no recipient prompt, no DON!! moved (8-3-1-3).
+    // OPT-864: an optional block whose cost cannot be paid is skipped
+    // before its prompt (8-3-1-3) — no optional prompt, no recipient prompt,
+    // no DON!! moved.
     it(`${eventId} is unavailable without a [Silvers Rayleigh] recipient`, () => {
       const { f, event } = setupRayleigh(eventId, { rayleigh: "NONE" });
       play(f, event);
-      f.accept();
       expect(f.state.pendingPrompt).toBeNull();
       expect(activeCostDon(f)).toBe(3);
       expect(donGivenEvents(f)).toHaveLength(0);
@@ -460,7 +459,6 @@ describe("OPT-824 GIVE_DON cost — Silvers Rayleigh Events", () => {
       p.donCostArea = [...p.donCostArea, ...p.donDeck.slice(0, 3).map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }))];
       p.donDeck = p.donDeck.slice(3);
       play(f, event);
-      f.accept();
       expect(f.state.pendingPrompt).toBeNull();
       expect(activeCostDon(f)).toBe(need - 1);
       expect(donGivenEvents(f)).toHaveLength(0);

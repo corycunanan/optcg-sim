@@ -999,6 +999,41 @@ export interface BatchResumeResult {
    */
   unprotectedIds: string[];
   pendingPrompt?: PendingPromptState;
+  /**
+   * OPT-922: the batch context with the current match narrowed to the cards
+   * the apply-time re-check kept. Set when an accepted substitute raised its
+   * own prompt, so the attached continuation protects only those cards.
+   */
+  continuationContext?: ReplacementBatchResumeContext;
+}
+
+/**
+ * OPT-922: the subset of `ids` the replacement can still save in `state`.
+ *
+ * `scanReplacementsForBatch` checks feasibility once, before the first
+ * prompt. An earlier accepted substitute can then spend the resource a later
+ * one needs (two "add 1 Life card to hand instead" replacements with one
+ * Life card). Rule 8-1-3-4-5: a replacement that cannot be carried out
+ * cannot be applied, so the batch re-runs the scan's own gates (once per
+ * turn, replacement cost, per-card substitute feasibility) against the
+ * current state before it offers and before it applies each match. A card
+ * this drops stays in the event and receives the original consequence.
+ * Local to the batch path; OPT-883 later shares the scan with battle K.O.
+ */
+function stillFeasibleBatchTargets(
+  state: GameState,
+  effectId: string,
+  ids: string[],
+  cardDb: Map<string, CardData>,
+): string[] {
+  const effect = state.activeEffects.find((e) => e.id === effectId);
+  const params = effect?.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
+  if (!effect || !isReplacementParams(params)) return [];
+  if (params.once_per_turn && hasUsedThisTurn(state, effect)) return [];
+  if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) return [];
+  return ids.filter((id) =>
+    canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, [id]),
+  );
 }
 
 /**
@@ -1020,11 +1055,23 @@ function stepBatch(
   const events: PendingEvent[] = [];
   const protectedIds = new Set<string>(ctx.protectedIds);
 
-  for (let i = startMatchIndex; i < ctx.pendingMatches.length; i++) {
-    const match = ctx.pendingMatches[i];
-    // Skip matches whose targets are all already protected by an earlier match
-    const applicable = match.matchedTargetIds.filter((id) => !protectedIds.has(id));
+  const pendingMatches = [...ctx.pendingMatches];
+  for (let i = startMatchIndex; i < pendingMatches.length; i++) {
+    const match = pendingMatches[i];
+    // Skip matches whose targets are all already protected by an earlier
+    // match, then (OPT-922) drop targets whose substitute is no longer
+    // feasible after earlier payments. Re-checked before the offer and
+    // before a non-optional match applies.
+    const applicable = stillFeasibleBatchTargets(
+      nextState,
+      match.effectId,
+      match.matchedTargetIds.filter((id) => !protectedIds.has(id)),
+      cardDb,
+    );
     if (applicable.length === 0) continue;
+    // Narrow the stored match so a resumed or substitute-continued batch
+    // protects only the cards that were still feasible here.
+    pendingMatches[i] = { ...match, matchedTargetIds: applicable };
 
     if (match.optional) {
       const prompt = buildBatchReplacementPrompt(
@@ -1033,6 +1080,7 @@ function stepBatch(
         ctx.event,
         {
           ...ctx,
+          pendingMatches,
           protectedIds: [...protectedIds],
           currentMatchIndex: i,
         },
@@ -1059,6 +1107,7 @@ function stepBatch(
       nextState = updateTopFrame(nextState, {
         replacementBatchContinuation: {
           ...ctx,
+          pendingMatches,
           protectedIds: [...protectedIds],
           currentMatchIndex: i,
         },
@@ -1177,16 +1226,28 @@ export function resumeReplacementBatch(
   const protectedIds = new Set<string>(ctx.protectedIds);
 
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
-  if (accepted && currentMatch) {
-    const applicable = currentMatch.matchedTargetIds.filter((id) => !protectedIds.has(id));
+  // OPT-922: re-check before applying an accepted offer. A card whose
+  // substitute is no longer feasible receives the original consequence, as
+  // if the replacement had been declined (rule 8-1-3-4-5).
+  const applicable = accepted && currentMatch
+    ? stillFeasibleBatchTargets(
+        nextState,
+        currentMatch.effectId,
+        currentMatch.matchedTargetIds.filter((id) => !protectedIds.has(id)),
+        cardDb,
+      )
+    : [];
+  if (applicable.length > 0) {
     const applied = applyBatchReplacement(nextState, currentMatch.effectId, cardDb, services, applicable);
     nextState = applied.state;
     events.push(...applied.events);
     if (applied.pendingPrompt) {
       // A substitute action raised its own target prompt — surface it and stop.
       // The outer resume system will chain: when this inner prompt resolves,
-      // the caller is responsible for re-entering the batch with the same
-      // ctx, which will continue from currentMatchIndex + 1.
+      // the caller is responsible for re-entering the batch with
+      // `continuationContext`, which will continue from currentMatchIndex + 1.
+      const pendingMatches = [...ctx.pendingMatches];
+      pendingMatches[ctx.currentMatchIndex] = { ...currentMatch, matchedTargetIds: applicable };
       return {
         state: nextState,
         events,
@@ -1194,6 +1255,7 @@ export function resumeReplacementBatch(
         finalizedIds: [],
         unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
         pendingPrompt: applied.pendingPrompt,
+        continuationContext: { ...ctx, pendingMatches },
       };
     }
     applicable.forEach((id) => protectedIds.add(id));

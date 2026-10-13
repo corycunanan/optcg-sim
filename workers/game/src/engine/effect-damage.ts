@@ -7,7 +7,7 @@ import type {
 } from "../types.js";
 import { removeTopLifeCard } from "./state.js";
 import { hasTrigger } from "./keywords.js";
-import { isCostPayable } from "./effect-resolver/cost-handler.js";
+import { isCostSequencePayable } from "./effect-resolver/cost-handler.js";
 import { lifeToHandDestination } from "./life-destination.js";
 import { transitionDetachedCard } from "./zone-transition.js";
 
@@ -133,8 +133,15 @@ export function canOfferTrigger(
   // nothing. Until its schema is authored, use the normal add-to-hand outcome.
   if (!block) return false;
   if (!block.costs?.length) return true;
-  return block.costs.every((cost) =>
-    isCostPayable(state, cost, ownerIndex, cardDb, sourceCardInstanceId)
+  // OPT-864: the whole cost in printed order (rules 8-3-1-1, 8-3-1-3), not
+  // each cost alone against the pre-cost state. Without a source id no
+  // source-bound cost (TRASH_SELF, REST_SELF) can match, as before.
+  return isCostSequencePayable(
+    state,
+    block.costs,
+    ownerIndex,
+    cardDb,
+    sourceCardInstanceId ?? ""
   );
 }
 
