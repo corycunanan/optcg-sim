@@ -466,6 +466,9 @@ function parkStage(
 ): StageOutcome & ExecuteResult {
   const pendingPrompt = state.pendingPrompt!;
   const parked = parkEndPhaseAt({ ...state, pendingPrompt: null }, continuation, parkDepth);
+  // Parking can hit the stack-depth limit and end the game (ENGINE_LIMIT);
+  // a finished game carries no prompt.
+  if (isGameTerminated(parked)) return { state: parked, continuation, events };
   return { state: parked, continuation, events, pendingPrompt };
 }
 
