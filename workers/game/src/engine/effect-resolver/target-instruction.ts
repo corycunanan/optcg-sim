@@ -589,25 +589,6 @@ export function collectTargetInstructionCoverage(
           );
       }
       walk(cardId, blockId, getNestedActions(action), `${actionPath}.nested`);
-      // Conditional prohibition overrides carry authored actions even though
-      // the shared runtime walker does not currently traverse payment actions.
-      // Inventory their copy without changing prohibition execution semantics.
-      const override =
-        action.type === "APPLY_PROHIBITION"
-          ? action.params?.conditional_override
-          : undefined;
-      if (
-        override &&
-        "action" in override &&
-        typeof override.action === "object"
-      ) {
-        walk(
-          cardId,
-          blockId,
-          [override.action],
-          `${actionPath}.conditional_override`
-        );
-      }
     });
   };
 
