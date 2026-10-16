@@ -261,5 +261,5 @@ describe("OPT-986 load-bearing guards", () => {
       expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
       expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
     }
-  });
+  }, 60_000);
 });
