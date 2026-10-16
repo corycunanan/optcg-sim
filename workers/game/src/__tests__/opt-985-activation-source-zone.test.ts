@@ -78,6 +78,33 @@ describe("OPT-985 activation source zones", () => {
     expect(result.pendingPrompt).toBeDefined();
   });
 
+  it.each([
+    ["EB01-039", "main_ko", "HAND"],
+    ["EB01-039", "main_ko", "TRASH"],
+    ["EB01-039", "main_ko", "LIFE"],
+    ["OP03-017", "main_counter_debuff", "HAND"],
+    ["ST12-016", "main_counter_rest", "HAND"],
+    ["P-059", "counter_bounce_and_power", "HAND"],
+  ] as const)("rejects Event %s / %s from %s without mutation", (id, effectId, zone) => {
+    const r = fixture();
+    const source = r.put(id, 0, zone, { data: { type: "Event" } });
+    const action = activation(source, effectId);
+    const error = "Only Activate: Main effects can be activated with this action";
+    const before = structuredClone(r.state);
+    // Check every boundary even when one assertion fails in the red run.
+    expect.soft(validate(r.state, action, r.db, 0)).toBe(error);
+    const pipeline = runPipeline(r.state, action, r.db, 0);
+    expect.soft(pipeline.valid).toBe(false);
+    expect.soft(pipeline.error).toBe(error);
+    expect.soft(pipeline.state).toEqual(before);
+    expect.soft(pipeline.pendingPrompt).toBeUndefined();
+    const result = new SessionCoordinator().executeAction(r.state, [], 0, action, r.db);
+    expect.soft(result.kind).toBe("reject");
+    expect.soft(result.state).toBe(r.state);
+    expect.soft(result.state).toEqual(before);
+    expect.soft(r.state).toEqual(before);
+  });
+
   it("keeps the opponent field ownership error unchanged", () => {
     const r = fixture();
     const source = r.put("OP01-013", 1, "CHARACTER");
