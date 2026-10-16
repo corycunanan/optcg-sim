@@ -871,13 +871,14 @@ function causeMatches(
   context: { cause: "EFFECT" | "BATTLE" | "COST"; causingController: 0 | 1 },
   targetController: 0 | 1,
 ): boolean {
-  // OPT-961: a cost is neither an effect nor a battle. Only an unscoped
-  // (cause ANY) protection stops a cost; aliases do not broaden that rule.
+  // OP02-118: "during this battle" is the THIS_BATTLE duration, not a
+  // cause restriction. Its IN_BATTLE scope blocks every KO, including costs.
+  if (declaredCause === "IN_BATTLE") declaredCause = "ANY";
+  // OPT-961: a cost is neither an effect nor a battle; only ANY stops it.
   if (context.cause === "COST") return declaredCause === "ANY";
   switch (declaredCause) {
     case "ANY":
       return true;
-    case "IN_BATTLE":
     case "BATTLE":
       return context.cause === "BATTLE";
     case "BY_EFFECT":

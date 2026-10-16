@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { rig, type Rig } from "./opt-960-rig.js";
 import { isRemovalProhibited } from "../engine/prohibitions.js";
-import { validateEffectSchema } from "../engine/schema-registry.js";
+import { executeEffectAction } from "../engine/effect-resolver/resolver.js";
+import { getEffectSchema, validateEffectSchema } from "../engine/schema-registry.js";
 
 function attack(r: Rig, attacker: string, target: string) {
   r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker, targetInstanceId: target });
@@ -13,9 +14,9 @@ function remains(r: Rig, id: string) {
 }
 
 describe("OPT-983 real-card removal cause aliases", () => {
-  it("OP02-118 prevents battle KO but permits opposing effect KO", () => {
+  it("OP02-118 prevents all KO during the battle and permits effect KO after expiry", () => {
     const r = rig();
-    const attacker = r.put("ST08-013", 0, "CHARACTER", { data: { power: 5000 } });
+    const attacker = r.put("TEST-983-ATTACKER", 0, "CHARACTER", { data: { power: 5000 } });
     r.act({ type: "ATTACH_DON", targetInstanceId: attacker.instanceId, count: 1 });
     const target = r.put("TEST-983-TARGET", 1, "CHARACTER", { state: "RESTED", data: { power: 1000 } });
     const counter = r.put("OP02-118", 1, "HAND", { data: { type: "Event", cost: 0, effectText: "[Counter] You may trash 1 card from your hand: Select up to 1 of your Characters. The selected Character cannot be K.O.'d during this battle." } });
@@ -26,24 +27,24 @@ describe("OPT-983 real-card removal cause aliases", () => {
     r.select([discard.instanceId]);
     r.select([target.instanceId]);
     expect(r.state.prohibitions.some((p) => p.scope?.cause === "IN_BATTLE")).toBe(true);
-    // Probe opposing effect resolution while the counter's protection is live.
-    // Main-phase dispatch is a fixture: ordinary Main events cannot be played
-    // in the Counter Step. Retain the granted protection without running battle cleanup.
-    const protectedBattle = structuredClone(r.state);
-    r.state.turn.phase = "MAIN";
-    r.state.turn.battle = null;
-    r.state.turn.battleSubPhase = null;
+    // Resolve an authored opposing KO directly while the battle stays live;
+    // Main events themselves cannot be played during the Counter Step.
     const removal = r.put("ST04-015", 0, "HAND", { data: { type: "Event", cost: 6, effectText: "[Main] K.O. up to 1 of your opponent's Characters with a cost of 6 or less." } });
+    const ko = getEffectSchema("ST04-015")!.effects[0]!.actions![0]!;
+    expect(ko.type).toBe("KO");
+    const result = executeEffectAction(r.state, ko, removal.instanceId, 0, r.db, new Map(), [target.instanceId]);
+    expect(result.succeeded).toBe(false);
+    r.state = result.state;
+    expect(r.state.turn.battle).not.toBeNull();
+    expect(remains(r, target.instanceId)).toBe(true);
+    r.act({ type: "PASS" }, 1);
+    expect(remains(r, target.instanceId)).toBe(true);
+    expect(r.state.turn.battle).toBeNull();
+    expect(r.state.prohibitions.some((p) => p.scope?.cause === "IN_BATTLE")).toBe(false);
     r.act({ type: "PLAY_CARD", cardInstanceId: removal.instanceId });
     r.select([target.instanceId]);
     expect(remains(r, target.instanceId)).toBe(false);
-    r.state = protectedBattle;
-    r.act({ type: "PASS" }, 1);
-    expect(remains(r, target.instanceId)).toBe(true);
-    expect(r.promptType()).toBe("OPTIONAL_EFFECT");
-    r.accept();
-    expect(remains(r, target.instanceId)).toBe(false);
-    expect(remains(r, attacker.instanceId)).toBe(false);
+
   });
 
   it("OP09-033 prevents opposing effect KO but permits battle KO", () => {
@@ -75,14 +76,14 @@ it.each(["ANY", "BATTLE", "EFFECT", "OPPONENT_EFFECT", "BY_OPPONENT_EFFECT", "BY
   r.state.prohibitions.push({ id: "matrix", sourceCardInstanceId: target.instanceId, sourceEffectBlockId: "matrix", prohibitionType: "CANNOT_BE_KO", scope: { cause: cause as never }, controller: 0, appliesTo: [target.instanceId], duration: { type: "THIS_TURN" }, usesRemaining: null });
   for (const context of ["BATTLE", "EFFECT", "COST"] as const) {
     for (const controller of [0, 1] as const) {
-      const expected = cause === "ANY" || (context === "BATTLE" && ["BATTLE", "IN_BATTLE"].includes(cause)) || (context === "EFFECT" && (["EFFECT", "BY_EFFECT"].includes(cause) || (controller === 1 && ["OPPONENT_EFFECT", "BY_OPPONENT_EFFECT"].includes(cause))));
+      const expected = ["ANY", "IN_BATTLE"].includes(cause) || (context === "BATTLE" && cause === "BATTLE") || (context === "EFFECT" && (["EFFECT", "BY_EFFECT"].includes(cause) || (controller === 1 && ["OPPONENT_EFFECT", "BY_OPPONENT_EFFECT"].includes(cause))));
       expect(isRemovalProhibited(r.state, target.instanceId, { action: "KO", cause: context, causingController: controller }, r.db), `${context}/${controller}`).toBe(expected);
     }
   }
 });
 
-it.each(["CANNOT_BE_KO", "APPLY_PROHIBITION"])("rejects unknown removal causes in %s", (type) => {
-  const prohibition = { type: "CANNOT_BE_KO", scope: { cause: "TYPO" } };
-  const schema = { effects: [{ id: "bad", category: "permanent", ...(type === "CANNOT_BE_KO" ? { prohibitions: [prohibition] } : { actions: [{ type, params: { prohibition_type: prohibition.type, scope: prohibition.scope } }] }) }] };
+it.each(["CANNOT_BE_KO", "CANNOT_BE_RESTED", "APPLY_PROHIBITION"])("rejects unknown removal causes in %s", (type) => {
+  const prohibition = { type: type === "CANNOT_BE_RESTED" ? type : "CANNOT_BE_KO", scope: { cause: "TYPO" } };
+  const schema = { effects: [{ id: "bad", category: "permanent", ...(type !== "APPLY_PROHIBITION" ? { prohibitions: [prohibition] } : { actions: [{ type, params: { prohibition_type: prohibition.type, scope: prohibition.scope } }] }) }] };
   expect(validateEffectSchema(schema).some((e) => e.includes("scope.cause"))).toBe(true);
 });
