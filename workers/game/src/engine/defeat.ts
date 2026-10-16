@@ -84,6 +84,9 @@ export function checkDefeat(
   // End-of-turn deck-out: sticky flag set earlier in the turn AND the player
   // carries the delayed-loss rule. Refill cannot cancel this obligation
   // (faq_op15-eb04.md:142-144); assumed to survive later negation as well.
+  // Negation persisting into this window is currently unreachable with authored
+  // cards: every authored Leader negation lasts THIS_TURN and expires at
+  // 6-6-1-3 (expireDuringThisTurn), before the end-of-turn window opens.
   const sticky = state.turn.deckHitZeroThisTurn ?? [false, false];
   const p0DeckOutEot = !!context.endOfTurn && sticky[0] && p0HasDelayed;
   const p1DeckOutEot = !!context.endOfTurn && sticky[1] && p1HasDelayed;

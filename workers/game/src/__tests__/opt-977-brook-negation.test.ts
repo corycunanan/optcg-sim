@@ -12,20 +12,21 @@ function brookRig() {
 
 // Same opponent-applied flag fixture as opt-949-win-instead.test.ts; this is
 // the runtime representation produced by NEGATE_EFFECTS (e.g. Black Hole).
-function negateLeader(r: Rig, expiresThisTurn = true) {
+function negateLeader(r: Rig, expiresThisTurn = true, owner: 0 | 1 = 0) {
+  const opponent = owner === 0 ? 1 : 0;
   r.state.activeEffects.push({
     id: "negate-brook",
-    sourceCardInstanceId: r.state.players[1].leader.instanceId,
+    sourceCardInstanceId: r.state.players[opponent].leader.instanceId,
     sourceEffectBlockId: "negate",
     category: "auto",
     modifiers: [{ type: "NEGATE_EFFECTS_FLAG", params: {} }],
     duration: { type: "THIS_TURN" },
     expiresAt: { wave: "END_OF_TURN", turn: r.state.turn.number + (expiresThisTurn ? 0 : 1) },
-    controller: 1,
-    appliesTo: [r.state.players[0].leader.instanceId],
+    controller: opponent,
+    appliesTo: [r.state.players[owner].leader.instanceId],
     timestamp: 0,
   } as RuntimeActiveEffect);
-  expect(isCardNegated(r.state.players[0].leader, r.state, r.db)).toBe(true);
+  expect(isCardNegated(r.state.players[owner].leader, r.state, r.db)).toBe(true);
 }
 
 function activate(r: Rig, actions: Action[]) {
@@ -52,6 +53,22 @@ describe("OPT-977 Brook delayed deck-out and Leader negation", () => {
     negateLeader(r);
     activate(r, [{ type: "MILL", params: { amount: 1 } }]);
     expectLoss(r, "MAIN", turn);
+  });
+
+  it("negated player-1 Brook loses immediately when its deck reaches zero during player 0's turn", () => {
+    const r = rig();
+    r.leader(1, "OP15-022");
+    r.deck(1, 1);
+    const turn = r.state.turn.number;
+    negateLeader(r, true, 1);
+    activate(r, [{
+      type: "DRAW",
+      target: { type: "PLAYER", controller: "OPPONENT" },
+      params: { amount: 1 },
+    }]);
+    expect(r.state.players[1].deck).toHaveLength(0);
+    expectTerminal(r.state, { winner: 0, reason: "Player 2 decked out" });
+    expect(r.state.turn).toMatchObject({ phase: "MAIN", number: turn, activePlayerIndex: 0 });
   });
 
   it("unnegated Brook records zero and loses at the end of the same turn", () => {
