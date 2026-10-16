@@ -36,8 +36,9 @@ export interface DefeatResult {
 /**
  * True when the player's Leader carries a LOSS_CONDITION_MOD / DELAYED_LOSS rule
  * modification for the DECK_OUT event (e.g., OP15-022 Brook). The immediate
- * deck-out loss is suppressed for such players; the loss is evaluated at the
- * end of the turn against the sticky `deckHitZeroThisTurn` flag.
+ * deck-out loss is suppressed only while that Leader is unnegated. This
+ * structural check also keeps an already-recorded delayed loss payable at
+ * end of turn against the sticky `deckHitZeroThisTurn` flag despite negation.
  */
 export function hasDelayedDeckOutLoss(
   state: GameState,
@@ -75,13 +76,14 @@ export function checkDefeat(
   const p0HasDelayed = hasDelayedDeckOutLoss(state, 0, cardDb);
   const p1HasDelayed = hasDelayedDeckOutLoss(state, 1, cardDb);
 
-  // Immediate deck-out: deck is currently 0 AND player has no delayed-loss rule.
-  // Delayed-loss players defer the deck-out check to end-of-turn.
-  const p0DeckOutNow = p0.deck.length === 0 && !p0HasDelayed;
-  const p1DeckOutNow = p1.deck.length === 0 && !p1HasDelayed;
+  // Assumed from Nami's negation FAQ (qa_op09.md:204-206): a negated
+  // Brook cannot suppress the ordinary empty-deck defeat condition.
+  const p0DeckOutNow = p0.deck.length === 0 && (!p0HasDelayed || isCardNegated(p0.leader, state, cardDb));
+  const p1DeckOutNow = p1.deck.length === 0 && (!p1HasDelayed || isCardNegated(p1.leader, state, cardDb));
 
   // End-of-turn deck-out: sticky flag set earlier in the turn AND the player
-  // still carries the delayed-loss rule (e.g., Brook wasn't removed/negated).
+  // carries the delayed-loss rule. Refill cannot cancel this obligation
+  // (faq_op15-eb04.md:142-144); assumed to survive later negation as well.
   const sticky = state.turn.deckHitZeroThisTurn ?? [false, false];
   const p0DeckOutEot = !!context.endOfTurn && sticky[0] && p0HasDelayed;
   const p1DeckOutEot = !!context.endOfTurn && sticky[1] && p1HasDelayed;
