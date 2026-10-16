@@ -333,6 +333,90 @@ const PhaseBoundaryContinuation = z.strictObject({
   activatedWaveEffects: StringArray.optional(),
 });
 
+const ReplacementEvent = z.enum([
+  "WOULD_BE_KO",
+  "WOULD_BE_REMOVED_FROM_FIELD",
+  "WOULD_LEAVE_FIELD",
+  "WOULD_BE_RESTED",
+  "WOULD_LOSE_GAME",
+  "LIFE_ADDED_TO_HAND",
+]);
+
+/** OPT-963 REPLACEMENT frame (version 3). */
+const ReplacementContinuation = z.strictObject({
+  effectId: z.string(),
+  targetInstanceId: z.string(),
+  event: ReplacementEvent,
+});
+
+/** OPT-963 REPLACEMENT_BATCH frame (version 3). */
+const ReplacementBatchContinuation = z.strictObject({
+  actionKind: z.enum(["KO", "RETURN_TO_HAND", "RETURN_TO_DECK", "SET_REST"]),
+  event: ReplacementEvent,
+  allTargetIds: StringArray,
+  protectedIds: StringArray,
+  pendingMatches: z.array(
+    z.strictObject({
+      effectId: z.string(),
+      matchedTargetIds: StringArray,
+      optional: z.boolean(),
+    })
+  ),
+  currentMatchIndex: NonNegativeInteger,
+  causingController: PlayerIndex,
+  causingSource: z.unknown().optional(),
+  returnToDeckPosition: z.enum(["TOP", "BOTTOM"]).optional(),
+});
+
+/** OPT-963 BATTLE_DAMAGE frame (version 3). */
+const BattleDamageContinuation = z.discriminatedUnion("stage", [
+  z.strictObject({
+    stage: z.literal("TRIGGER_WINDOW"),
+    battleId: z.string(),
+    damagedPlayerIndex: PlayerIndex,
+    lifeCard: LifeCard,
+  }),
+  z.strictObject({
+    stage: z.literal("TRIGGER_EFFECT"),
+    battleId: z.string(),
+    damagedPlayerIndex: PlayerIndex,
+    lifeCardInstanceId: z.string(),
+  }),
+  z.strictObject({
+    stage: z.literal("CHARACTER_KO_REPLACEMENT"),
+    battleId: z.string(),
+    targetInstanceId: z.string(),
+    replacementEffectId: z.string().optional(),
+    causingPlayerIndex: PlayerIndex,
+    attackerIsCharacter: z.boolean(),
+    resolution: z.enum(["REPLACED", "NOT_REPLACED"]).optional(),
+  }),
+]);
+
+/** OPT-963 EFFECT_DAMAGE frame (version 3). */
+const EffectDamageContinuation = z.discriminatedUnion("stage", [
+  z.strictObject({
+    stage: z.literal("TRIGGER_WINDOW"),
+    damagedPlayerIndex: PlayerIndex,
+    remainingDamages: NonNegativeInteger,
+    dealt: NonNegativeInteger,
+    sourceCardInstanceId: z.string(),
+    controllerIndex: PlayerIndex,
+    parentFrameId: z.string().optional(),
+    lifeCard: LifeCard,
+  }),
+  z.strictObject({
+    stage: z.literal("TRIGGER_EFFECT"),
+    damagedPlayerIndex: PlayerIndex,
+    remainingDamages: NonNegativeInteger,
+    dealt: NonNegativeInteger,
+    sourceCardInstanceId: z.string(),
+    controllerIndex: PlayerIndex,
+    parentFrameId: z.string().optional(),
+    lifeCardInstanceId: z.string(),
+  }),
+]);
+
 const StackFrameCore = z.strictObject({
   /** OPT-940 frame-kind contract; optional in v1, validated against content. */
   kind: z.enum(EFFECT_STACK_FRAME_KINDS).optional(),
@@ -351,6 +435,7 @@ const StackFrameCore = z.strictObject({
     "INTERRUPTED_BY_TRIGGERS",
     "AWAITING_TRIGGER_ORDER_SELECTION",
     "AWAITING_BATCH_RESUME",
+    "AWAITING_TRIGGER_REVEAL",
   ]),
   pausedAction: z.unknown().nullable(),
   remainingActions: z.array(z.unknown()),
@@ -365,6 +450,10 @@ const StackFrameCore = z.strictObject({
   simultaneousGroup: z.unknown().optional(),
   replacementBatchContinuation: z.unknown().optional(),
   phaseBoundaryContinuation: PhaseBoundaryContinuation.optional(),
+  replacement: ReplacementContinuation.optional(),
+  replacementBatch: ReplacementBatchContinuation.optional(),
+  battleDamage: BattleDamageContinuation.optional(),
+  effectDamage: EffectDamageContinuation.optional(),
   costs: z.array(z.unknown()),
   currentCostIndex: NonNegativeInteger,
   costsPaid: z.boolean(),
@@ -395,7 +484,7 @@ const StackFrameCore = z.strictObject({
   namedPlayCostTargetId: z.string().optional(),
 });
 
-const PersistedGameStateV2 = z.strictObject({
+const PersistedGameStateV3 = z.strictObject({
   id: z.string(),
   executionContext: ExecutionContext,
   players: z.tuple([PlayerState, PlayerState]),
@@ -629,7 +718,7 @@ const EventPayloadSchemas = {
 } satisfies Record<GameEventType, z.ZodType>;
 
 export function validatePersistedGameStateCore(raw: unknown): string | null {
-  const result = PersistedGameStateV2.safeParse(raw);
+  const result = PersistedGameStateV3.safeParse(raw);
   if (result.success) return null;
   const issue = result.error.issues[0];
   return `${issue.path.join(".") || "state"}: ${issue.message}`;

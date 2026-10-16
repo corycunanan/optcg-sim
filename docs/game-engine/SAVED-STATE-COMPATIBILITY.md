@@ -2,7 +2,7 @@
 
 > Written before the reader code for OPT-940 (PR 1 of the Game Engine Consolidation, parent OPT-959). This is the contract every later consolidation PR writes through. Code of record: `workers/game/src/session/game-state-schema.ts` (version dispatch and conversion), `workers/game/src/session/persisted-game-state.ts` (strict shape), `workers/game/src/session/persistence.ts` (storage boundary).
 
-**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6); from PR 4b (OPT-924) the writer writes version 2 (§1.6).
+**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6); from PR 4b (OPT-924) the writer writes version 2 (§1.6). From PR 5a (OPT-963) the reader also reads version 3 (typed replacement and damage continuation frames, §8) and lowers it to the version 2 runtime (§1.7); PR 5b raises the runtime and the writer to version 3 (§1.8).
 
 **Related:** [Rev 4 proposal snapshot §7, §10](./audits/consolidation-2026-10/proposal-rev4-snapshot.md) · [Handoff doc](../project/handoffs/game-engine-consolidation.md) · [Doc 08](./08-ENGINE-ARCHITECTURE.md)
 
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | `SESSION_STORAGE_FORMAT_VERSION` (`persistence.ts`, currently `2`) | `session.formatVersion` | How the Durable Object splits one session across storage keys (`session`, `session:card-db`, `session:undo-history`) and which envelope fields exist. Says nothing about the shape of a game state. | Storage layout changes only. |
 | `executionContext.version` (`execution-context.ts`, currently `1`) | `state.executionContext.version` | The RNG, id-allocation, clock and budget algorithm. Replays are byte-equivalent only under the same context version. | RNG or id-allocation algorithm changes only. |
-| **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1, **`2`** from PR 4b; the writer's version. PR 4a adds `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2`, the reader's) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
+| **`GAME_STATE_SCHEMA_VERSION`** (`game-state-schema.ts`, **`1`** from PR 1, **`2`** from PR 4b; the writer's version. PR 4a adds `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 2`, the reader's; PR 5a raises it to `3` and adds `RUNTIME_GAME_STATE_SCHEMA_VERSION = 2`, the shape the engine executes) | `schemaVersion` key on each persisted game-state object: the live `session.state` and every entry of `session:undo-history` | The shape and semantics of `GameState` itself: turn, battle, effect-stack frames, prompt continuations, phase boundaries, pending damage records. This is the version every consolidation ticket bumps when it adds or changes a persisted shape. | Any PR that adds a persisted field whose meaning a prior reader cannot understand. |
 
 The three are independent. A game-state bump never implies a session-format bump and vice versa.
 
@@ -61,6 +61,20 @@ PR 4a reads versions 1 and 2 and writes version 1. `toPersistedGameState` (`game
 
 PR 4b writes version 2. `toPersistedGameState` puts `schemaVersion: 2` first on the live state and on every undo snapshot and keeps every End Phase frame's stage. A runtime frame without a stage can only be a version 1 frame; it is written with `LEGACY_SCHEDULED_ACTIONS`, its version 1 meaning, because the PR 4a reader rejects a version 2 frame without a stage. The writer golden is `opt-962-writer-golden.synthetic.json`; it equals the frozen version 1 golden plus the version key on every game-state object, except `end-phase-parked`, whose state the new engine builds with a staged frame (`opt-940-writer-golden.test.ts` pins both facts). The version 1 golden stays as base-writer reader input. A drift test (`opt-962-v2-shapes.test.ts`) fails if the engine writes an End Phase shape that the PR 4a reader's fixtures do not cover. PR 4b also writes one optional key on prohibitions, `ownerController` (only NEGATE_TRIGGER_TYPE writes it: the player whose 6-6-1-2 step ends the negation, while `controller` keeps the affected player). The PR 4a reader parses `prohibitions` as `z.array(z.unknown())`, so it loads and keeps the key (rung 4 against `9da8ba17`, live and undo, PR 4b body); the drift test pins the prohibition key set. A prohibition saved without the key falls back deterministically (`prohibitionOwner`, `duration-tracker.ts`): a row with `scope.triggerType` (written only by NEGATE_TRIGGER_TYPE, whose one authored use, OP09-081, negates the opponent's effects) belongs to the other player; every other row belongs to `controller`.
 
+### 1.7 Reader policy for PR 5a (OPT-963)
+
+PR 5a reads versions 1, 2 and 3 and writes version 2. Version 3 (§8) moves the replacement and damage continuations into four new frame kinds and adds the `AWAITING_TRIGGER_REVEAL` phase. The PR 5a engine is the version 2 engine: it cannot resume a frame of a new kind. So that 5a is a real rollback target for in-flight games written by 5b, its reader does not lift version 2 into version 3; it goes the other way:
+
+1. `convertFromV2` rejects a version 2 object carrying a version 3 field or phase (no version 2 writer wrote it); `convertFromV3` strips the envelope key. A version 3 object is then strictly validated as written and every new reference is checked (§2.4).
+2. `lowerVersion3Frames` (`game-state-schema.ts`) lowers each version 3 frame to its version 2 record, the §8 table read right to left, for the live state and every undo snapshot. The engine then runs with version 2 semantics and the unchanged writer re-saves version 2 bytes. Lossless for every `REPLACEMENT` and `REPLACEMENT_BATCH` frame, for `CHARACTER_KO_REPLACEMENT`, and for `TRIGGER_EFFECT` (version 2 `LIFE_REMOVAL` while the retained Life removal is unscanned, else `DAMAGE`).
+3. Degraded, classified and logged as `session.legacy_shape` with a `lowered.*_dropped` shape: a damage frame's deferred `pendingTriggers` (version 2 had fired them before the Trigger window); the parent chain frame of an `EFFECT_DAMAGE` frame at `TRIGGER_WINDOW` (version 2 ran the chain on before the window, and its lifecycle would leave the frame as a zombie after a pipeline-routed `REVEAL_TRIGGER`; at `TRIGGER_EFFECT` the parent is kept because the version 2 lifecycle drains it after the Trigger); remaining effect damage at `TRIGGER_EFFECT` (version 2 abandons it, OPT-926); a second `EFFECT_DAMAGE` frame (version 2 has one slot; the inner window wins); a `BATTLE_DAMAGE` frame at `TRIGGER_WINDOW` naming a battle that is gone. Two nested Trigger windows lower to the two version 2 records with the battle window's responder on the prompt, the only two-window prompt version 2 ever wrote (`legacy.two_trigger_windows`, base behavior).
+
+Writer golden byte-identical (`opt-940-writer-golden.test.ts`); fixtures `opt-963-v3-reader.test.ts` with `fixtures/opt-963-v3-states.ts` (SYNTHETIC: golden version 2 engine states lifted to version 3 by `liftToVersion3`, the fixture-side statement of the PR 5b lifter, plus constructed degraded shapes). The 5b drift test holds the engine's version 3 output to those fixtures.
+
+### 1.8 Writer policy for PR 5b (OPT-963)
+
+Pending PR 5b: the runtime becomes version 3, `convertFromV2` lifts the version 2 records into frames (§8.3), `GAME_STATE_SCHEMA_VERSION` becomes 3, the writer golden is re-captured, and the rollback target is the PR 5a merge SHA (filled by the coordinator after 5a deploys).
+
 ---
 
 ## 2. Frame-kind contract
@@ -83,6 +97,10 @@ The reader in PR 1 understands these kinds. The values are the v1 contract; late
 | `TRIGGER_DRAIN` | A frame interrupted so queued triggers can resolve before it continues. | `phase === "INTERRUPTED_BY_TRIGGERS"` with no `phaseBoundaryContinuation`. | none beyond strict validation |
 | `BATCH_RESUME` | A multi-target action paused between targets so each target's triggers resolve first (rule 6-2, OPT-172). | `phase === "AWAITING_BATCH_RESUME"`. | `batchResumeMarker` present |
 | `PHASE_BOUNDARY` | End Phase work parked below every frame its current stage pushed (from PR 4b; in version 1, below a scheduled effect's prompt frame). | `phaseBoundaryContinuation` present (takes precedence over `phase`). | `phase === "INTERRUPTED_BY_TRIGGERS"`; no `batchResumeMarker`, no `triggerOrderingGroup`, empty `costs` (as `parkEndPhaseBelowPrompt` builds it); `phaseBoundaryContinuation.kind === "END_PHASE"`; `turn.phase === "END"`; `endingPlayerIndex === turn.activePlayerIndex`; from PR 4a, the stage rules of §6.2 |
+| `REPLACEMENT` (v3, §8) | One optional replacement offer, pending. | `replacement` present (the four version 3 fields take precedence over `phaseBoundaryContinuation` and `phase`; a frame carrying two of them is rejected). | `phase === "AWAITING_OPTIONAL_RESPONSE"`; it is the top frame and `pendingPrompt` names it (it is pushed together with its prompt and pops when answered) |
+| `REPLACEMENT_BATCH` (v3, §8) | The batch replacement state machine (OPT-219), offering a match or waiting for an accepted substitute in the frames above. | `replacementBatch` present. | `phase` is `AWAITING_OPTIONAL_RESPONSE` (offer pending; `pendingMatches[currentMatchIndex]` exists) or `INTERRUPTED_BY_TRIGGERS`; `currentMatchIndex ≤ pendingMatches.length` |
+| `BATTLE_DAMAGE` (v3, §8) | A battle's Damage Step paused: on the defender's Life [Trigger] choice, on the accepted Trigger's effect, or on the losing Character's K.O. replacement (OPT-872). | `battleDamage` present. | stage `TRIGGER_WINDOW` ⇔ `phase === "AWAITING_TRIGGER_REVEAL"`; the other stages ⇔ `INTERRUPTED_BY_TRIGGERS`. Battle coherence (`battleId`, sub-phase, target on field) is classified, not rejected (§2.4, OPT-884) |
+| `EFFECT_DAMAGE` (v3, §8) | A `DEAL_DAMAGE` instruction paused on a Life [Trigger] choice or on the accepted Trigger's effect, with its remaining points. | `effectDamage` present. | same stage ⇔ phase rule; `parentFrameId`, when present, names the frame directly below, a `TRIGGER_DRAIN` frame whose `pausedAction.type === "DEAL_DAMAGE"` |
 
 Invariants were chosen by reading every site that builds each frame (`effect-resolver/cost/orchestrator.ts`, `trigger-ordering.ts`, `phases.ts`, `effect-resolver/resume/batch.ts`). An invariant the engine does not guarantee for a frame it writes is not enforced, because a reader that rejects a real save is worse than one that accepts a loose one.
 
@@ -105,6 +123,9 @@ A prompt or frame may point at a frame by id. From PR 1 the reader resolves ever
 | `effectStack[*].id` | Unique within the stack. | Two frames share an id. |
 | `effectStack[i].triggerOrderingGroup.resolvedTriggerIds[*]` | An `orderingId` of a trigger in `triggerOrderingGroup.triggers`. | Any id not in the group. |
 | `effectStack[i].phaseBoundaryContinuation` | `turn.phase === "END"` and `endingPlayerIndex === turn.activePlayerIndex`; from PR 4a, a stage whose entries and fields agree with §6.2. | Either disagrees, or a §6.2 stage rule fails (the error names the stage and the entry index). Evidence that no engine path writes otherwise: the only writer is `parkEndPhaseBelowPrompt` (`phases.ts:259-290`), reached from `runEndPhase` right after `phase` is set to `END` (`phases.ts:162-164`) with `pi = getActivePlayerIndex(state)` taken at `phases.ts:55`; `activePlayerIndex` changes only in `completeTurnHandoff`, which runs after the parked frame is drained. Rung 3 walk plus the full-suite probe in the PR body (0 rejections of pipeline-produced states). |
+| `pendingPrompt.resumeContext` naming a version 3 frame (from PR 5a, §8) | A `REVEAL_TRIGGER` prompt names a `BATTLE_DAMAGE` or `EFFECT_DAMAGE` frame at `AWAITING_TRIGGER_REVEAL`; an `OPTIONAL_EFFECT` prompt naming a `REPLACEMENT` / `REPLACEMENT_BATCH` frame finds it at `AWAITING_OPTIONAL_RESPONSE`; a `REPLACEMENT` frame is the top frame. | Any other pairing (a `REVEAL_TRIGGER` naming a non-damage frame, a damage frame owning another prompt type or at another phase, a replacement frame owning a non-offer prompt, a `REPLACEMENT` frame below another frame, or one no prompt names). |
+| `effectStack[i].effectDamage.parentFrameId` (from PR 5a, §8) | `effectStack[i-1].id`, a `TRIGGER_DRAIN` frame with `pausedAction.type === "DEAL_DAMAGE"` (the chain the damage paused). | The id is not the frame directly below, or that frame is not a chain paused on `DEAL_DAMAGE`. |
+| `effectStack[i]` carrying two continuation families (from PR 5a) | Exactly one of `replacement`, `replacementBatch`, `battleDamage`, `effectDamage`, `phaseBoundaryContinuation`. | Two or more present. |
 
 Battle-record coherence is **classified, not rejected**. Review finding A on PR #746 showed (rung 4, `opt-940-synthetic-states.ts` `bothTriggerWindows`) that the engine writes `turn.pendingTriggerFromEffect` and `turn.battle.pendingTriggerLifeCard` together: damage-time auto effects resolve before the coordinator surfaces the battle Trigger, and one of them can deal effect damage that parks a second Trigger. A reader that rejects a real save is worse than one that accepts a loose one, so every check in this family is a logged `session.legacy_shape` and the state loads unchanged:
 
@@ -120,7 +141,7 @@ The error names the reference (`pendingPrompt.resumeContext`, `effectStack[2].tr
 
 ## 3. Support window
 
-**Supported input versions in this build: `{1, 2}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980).
+**Supported input versions in this build: `{1, 2, 3}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980). Version 3 adds the typed replacement and damage continuation frames (§8) and is read from PR 5a (OPT-963).
 
 Policy, not a date:
 
@@ -135,6 +156,7 @@ History:
 | 2026-10-12 (PR 1) | Version 1 defined; assigned to all legacy saves. | `{1}` |
 | 2026-10-12 (PR 4a, OPT-980) | Version 2 reader and v1 → v2 converter; writer still writes 1 (§1.5). | `{1, 2}` |
 | 2026-10-12 (PR 4b, OPT-924) | Writer emits version 2 (§1.6). | `{1, 2}` |
+| 2026-10-16 (PR 5a, OPT-963) | Version 3 reader (§8) lowering to the version 2 runtime (§1.7); writer still writes 2. | `{1, 2, 3}` |
 
 ---
 
@@ -258,3 +280,30 @@ This is a degraded but loadable resume, limited to games paused inside an End Ph
 ## 7. Unmet rollout gate: captured sessions
 
 OPT-940 requires sanitized real Durable Object sessions as fixtures. None are available: wrangler is logged out on the coordinator's machine, no Cloudflare token exists, and `GameSession` exposes no export route. Every fixture in PR 1 is **synthetic**: real game states produced by the engine and serialized through the base-commit writer, plus constructed malformed states. None is a capture. The gate stays open until a capture covers live + undo, paused costs, paused replacements, paused damage, and a mid-End-Phase session. The PR body and the handoff entry carry the same statement.
+
+## 8. Typed replacement and damage continuations (OPT-963: PR 5a reader, PR 5b writer)
+
+Version 3 gives the replacement and damage continuations one owner each: a frame on `effectStack` of one of four new kinds (§2.2). The design note in the PR 5a body records the rationale; this section is the shape contract.
+
+### 8.1 Persisted fields (version 3)
+
+| Frame field | Kind | Fields | Replaces (version 2) |
+|---|---|---|---|
+| `replacement` | `REPLACEMENT` | `effectId`, `targetInstanceId`, `event` | the object `REPLACEMENT` prompt context |
+| `replacementBatch` | `REPLACEMENT_BATCH` | `actionKind`, `event`, `allTargetIds`, `protectedIds`, `pendingMatches[]`, `currentMatchIndex`, `causingController`, `causingSource?`, `returnToDeckPosition?` | the object `REPLACEMENT_BATCH` prompt context and the frame rider `replacementBatchContinuation` |
+| `battleDamage` | `BATTLE_DAMAGE` | `stage` `TRIGGER_WINDOW { battleId, damagedPlayerIndex, lifeCard }`, `TRIGGER_EFFECT { battleId, damagedPlayerIndex, lifeCardInstanceId }`, `CHARACTER_KO_REPLACEMENT { battleId, targetInstanceId, replacementEffectId?, causingPlayerIndex, attackerIsCharacter, resolution? }` | `turn.battle.pendingTriggerLifeCard`; `turn.pendingBattleDamageContinuation` (`LIFE_REMOVAL` → `TRIGGER_EFFECT` with the Life removal retained unscanned on `accumulatedEvents`, `DAMAGE` → `TRIGGER_EFFECT` with it scanned, `CHARACTER_KO_REPLACEMENT` field for field) |
+| `effectDamage` | `EFFECT_DAMAGE` | `damagedPlayerIndex`, `remainingDamages`, `dealt`, `sourceCardInstanceId`, `controllerIndex`, `parentFrameId?`, and `stage` `TRIGGER_WINDOW { lifeCard }` or `TRIGGER_EFFECT { lifeCardInstanceId }` | `turn.pendingTriggerFromEffect` (which had no `dealt`, no parent and no `TRIGGER_EFFECT` stage: version 2 abandoned the remaining points, OPT-926) |
+
+`EffectStackPhase` gains `AWAITING_TRIGGER_REVEAL` (a damage frame waiting for the `REVEAL_TRIGGER` answer). `turn.battle.damagesRemaining` stays on the battle (the count locked at Damage Step entry, rule 7-1-4-1-1-3). The `REVEAL_TRIGGER` and replacement `OPTIONAL_EFFECT` prompts carry only player-facing options and `resumeContext` = the owning frame's id (§2.4).
+
+### 8.2 Stack positions the engine (PR 5b) guarantees
+
+* A `REPLACEMENT` frame is the top frame while its offer is pending and pops when answered; the caller it reports to is the frame directly below (a `BATTLE_DAMAGE` frame at `CHARACTER_KO_REPLACEMENT`, a `COST` frame with `costReplacementAction`, or the chain's `TRIGGER_DRAIN` continuation).
+* A `REPLACEMENT_BATCH` frame at `AWAITING_OPTIONAL_RESPONSE` is the top frame; at `INTERRUPTED_BY_TRIGGERS` an accepted substitute resolves in the frames above it.
+* A damage frame at `TRIGGER_WINDOW` may sit below the attacker's "when this attack deals damage" effect frames (those resolve before the Trigger choice, FAQ qa_op03.md:92-96) and gets its prompt once they unwind; at `TRIGGER_EFFECT` the accepted Trigger's frames sit above it. An `EFFECT_DAMAGE` frame sits directly above its parent chain frame.
+* Two Trigger windows are nested frames, never two records (the base coordinator deadlock, OPT-974).
+
+### 8.3 Converters
+
+* **PR 5a** (this build): version 3 is validated as written and lowered to version 2 (§1.7). `liftToVersion3` in `fixtures/opt-963-v3-states.ts` states the lift the 5b converter performs, so the 5a fixtures are the shape 5b writes.
+* **PR 5b**: `convertFromV2` lifts, live and undo: `pendingTriggerLifeCard` and `pendingBattleDamageContinuation` become one `BATTLE_DAMAGE` frame and `pendingTriggerFromEffect` an `EFFECT_DAMAGE` frame, inserted at the bottom of the stack in the order they opened (version 2 surfaced them only once the stack emptied); a replacement prompt context becomes a frame on top owning the prompt; a frame's `replacementBatchContinuation` becomes a `REPLACEMENT_BATCH` frame at `INTERRUPTED_BY_TRIGGERS` directly below it. With both windows open the prompt is re-pointed at the top (effect) frame's responder: `both-trigger-windows` is **recovered**, not rejected. `legacy.stuck_damage_step` and `legacy.orphan_battle_continuation` read the lifted frame (OPT-884's evidence kept); `legacy.two_trigger_windows` is retired by the lift.
