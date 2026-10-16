@@ -1,3 +1,4 @@
+import { log } from "../lib/log.js";
 import { meetsAttachedDonRequirement } from "./attached-don.js";
 import type { EffectAvailability } from "../../../../shared/game-types.js";
 import type { CardData, CardInstance, GameState } from "../types.js";
@@ -238,7 +239,6 @@ function availabilityForBlock(
 
   // OPT-864 (Decision 11, rule 1-3-3): the same activation-time veto that
   // validation applies, so availability never offers what execution rejects.
-  // The wire type has no prohibition reason; CONDITION is the closest.
   if (
     activationProhibitionVeto(
       state,
@@ -247,21 +247,31 @@ function availabilityForBlock(
       controller
     ) !== null
   ) {
-    return { effectId: block.id, status: "blocked", reason: "CONDITION" };
+    return { effectId: block.id, status: "blocked", reason: "PROHIBITED" };
   }
 
   // OPT-864: sequential feasibility (rules 8-3-1-1, 8-3-1-3).
-  if (
-    block.costs?.length &&
-    !areEffectCostsPayable(
-      state,
-      block.costs,
-      controller,
-      cardDb,
-      card.instanceId
-    )
-  ) {
-    return { effectId: block.id, status: "blocked", reason: "COST" };
+  const costs = block.costs;
+  if (costs?.length) {
+    let payable: boolean;
+    try {
+      payable = areEffectCostsPayable(
+        state,
+        costs,
+        controller,
+        cardDb,
+        card.instanceId
+      );
+    } catch {
+      log("[EFFECT_AVAILABILITY] evaluation failed", {
+        gameId: state.id,
+        stage: "cost",
+      });
+      return { effectId: block.id, status: "blocked", reason: "COST" };
+    }
+    if (!payable) {
+      return { effectId: block.id, status: "blocked", reason: "COST" };
+    }
   }
 
   if (
@@ -281,14 +291,11 @@ function availabilityForBlock(
 }
 
 /**
- * OPT-961: availability is presentation, computed for every card on every
- * state broadcast (session/filtered-state.ts). An engine error inside one
- * block's hypothetical payment must not throw out of state filtering for both
- * players, so this boundary logs it with a stable prefix, marks that block
- * blocked, and keeps building the rest. Validation and payment keep
- * propagating the same error (see the failure policy in
- * effect-resolver/cost/feasibility.ts), so an engine error never becomes a
- * legal or illegal move silently.
+ * Availability is presentation, computed on every state broadcast. Contain
+ * failures per block so other effects still reach both players. Only the
+ * cost-feasibility boundary above classifies errors as COST; other failures
+ * have an unknown cause and omit the optional reason. Never log raw errors
+ * or card data, which may contain hidden information.
  */
 function containedAvailabilityForBlock(
   state: GameState,
@@ -298,13 +305,12 @@ function containedAvailabilityForBlock(
 ): EffectAvailability | null {
   try {
     return availabilityForBlock(state, block, card, cardDb);
-  } catch (error) {
-    console.error(
-      "[EFFECT_AVAILABILITY] availability failed; block marked blocked:",
-      { gameId: state.id, cardId: card.cardId, instanceId: card.instanceId, effectId: block.id },
-      error
-    );
-    return { effectId: block.id, status: "blocked", reason: "COST" };
+  } catch {
+    log("[EFFECT_AVAILABILITY] evaluation failed", {
+      gameId: state.id,
+      stage: "availability",
+    });
+    return { effectId: block.id, status: "blocked" };
   }
 }
 
