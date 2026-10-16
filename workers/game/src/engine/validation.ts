@@ -393,11 +393,12 @@ function validateActivateEffect(
   const cardData = cardDb.get(found.card.cardId);
   const schema = cardData?.effectSchema;
   const block = schema?.effects.find((b) => b.id === effectId);
-  if (!block || block.category !== "activate") return null;
+  if (!block) return "Effect not found on this card";
 
   // Match executeActivateEffect: Main/Counter Events use separate paths
   // (rules 10-2-3/10-2-4), including Events with combined Main/Counter triggers.
   if (
+    block.category !== "activate" ||
     !block.trigger || !("keyword" in block.trigger) ||
     block.trigger.keyword !== "ACTIVATE_MAIN"
   ) {

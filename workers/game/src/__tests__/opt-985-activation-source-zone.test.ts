@@ -105,6 +105,27 @@ describe("OPT-985 activation source zones", () => {
     expect.soft(r.state).toEqual(before);
   });
 
+  it.each([
+    ["ST01-007", "unknown_effect", "Effect not found on this card"],
+    ["ST01-011", "on_play_give_don", "Only Activate: Main effects can be activated with this action"],
+  ])("rejects malformed activation %s / %s without mutation", (id, effectId, error) => {
+    const r = fixture();
+    const source = r.put(id, 0, "CHARACTER");
+    const action = activation(source, effectId);
+    const before = structuredClone(r.state);
+    expect.soft(validate(r.state, action, r.db, 0)).toBe(error);
+    const pipeline = runPipeline(r.state, action, r.db, 0);
+    expect.soft(pipeline.valid).toBe(false);
+    expect.soft(pipeline.error).toBe(error);
+    expect.soft(pipeline.state).toEqual(before);
+    expect.soft(pipeline.pendingPrompt).toBeUndefined();
+    const result = new SessionCoordinator().executeAction(r.state, [], 0, action, r.db);
+    expect.soft(result.kind).toBe("reject");
+    expect.soft(result.state).toBe(r.state);
+    expect.soft(result.state).toEqual(before);
+    expect.soft(r.state).toEqual(before);
+  });
+
   it("keeps the opponent field ownership error unchanged", () => {
     const r = fixture();
     const source = r.put("OP01-013", 1, "CHARACTER");
