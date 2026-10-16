@@ -262,10 +262,14 @@ function availabilityForBlock(
         cardDb,
         card.instanceId
       );
-    } catch {
+    } catch (error) {
       log("[EFFECT_AVAILABILITY] evaluation failed", {
         gameId: state.id,
+        cardId: card.cardId,
+        instanceId: card.instanceId,
+        effectId: block.id,
         stage: "cost",
+        error: error instanceof Error ? error.message : String(error),
       });
       return { effectId: block.id, status: "blocked", reason: "COST" };
     }
@@ -294,8 +298,8 @@ function availabilityForBlock(
  * Availability is presentation, computed on every state broadcast. Contain
  * failures per block so other effects still reach both players. Only the
  * cost-feasibility boundary above classifies errors as COST; other failures
- * have an unknown cause and omit the optional reason. Never log raw errors
- * or card data, which may contain hidden information.
+ * have an unknown cause and omit the optional reason. Logs identify the public
+ * field card and block with the error message, but omit raw errors and stacks.
  */
 function containedAvailabilityForBlock(
   state: GameState,
@@ -305,10 +309,14 @@ function containedAvailabilityForBlock(
 ): EffectAvailability | null {
   try {
     return availabilityForBlock(state, block, card, cardDb);
-  } catch {
+  } catch (error) {
     log("[EFFECT_AVAILABILITY] evaluation failed", {
       gameId: state.id,
+      cardId: card.cardId,
+      instanceId: card.instanceId,
+      effectId: block.id,
       stage: "availability",
+      error: error instanceof Error ? error.message : String(error),
     });
     return { effectId: block.id, status: "blocked" };
   }

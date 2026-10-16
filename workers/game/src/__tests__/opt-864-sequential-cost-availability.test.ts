@@ -312,7 +312,11 @@ describe("OPT-864 a feasibility query leaves the authoritative state unchanged",
     expect(logs()).toEqual([{
       event: "[EFFECT_AVAILABILITY] evaluation failed",
       gameId: r.state.id,
+      cardId: source.cardId,
+      instanceId: source.instanceId,
+      effectId: corrupt.id,
       stage: "cost",
+      error: 'Unhandled cost type: {"type":"NOT_A_COST_TYPE"}',
     }]);
   });
 
@@ -338,7 +342,11 @@ describe("OPT-864 a feasibility query leaves the authoritative state unchanged",
     expect(logs()).toEqual([{
       event: "[EFFECT_AVAILABILITY] evaluation failed",
       gameId: r.state.id,
+      cardId: source.cardId,
+      instanceId: source.instanceId,
+      effectId: corrupt.id,
       stage: "availability",
+      error: "sensitive engine context",
     }]);
   });
 
