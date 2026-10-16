@@ -247,6 +247,62 @@ describe("OPT-986 load-bearing guards", () => {
       { type: "TRASH_FROM_HAND", amount: 1, filter: { name: "Z" } }]);
   });
 
+  it.each([
+    // ANY_NUMBER still requires a positive payment: no match cannot fully pay.
+    { matches: 0, expected: false },
+    // One active matching card fully pays a one-card choice.
+    { matches: 1, expected: true },
+    // Two active matches allow a fully payable one- or two-card choice.
+    { matches: 2, expected: true },
+  ])("ANY_NUMBER rest with $matches matching field cards is $expected", ({ matches, expected }) => {
+    const r = rig();
+    const source = r.put("amount-source", 0, "CHARACTER");
+    r.put("prefix-card", 0, "HAND");
+    for (let i = 0; i < matches; i++) r.put("amount-match", 0, "CHARACTER", { data: { name: "match" } });
+    const costs: Cost[] = [
+      { type: "PLACE_HAND_TO_DECK", amount: 1 },
+      { type: "REST_CARDS", amount: "ANY_NUMBER", filter: { name: "match" } },
+    ];
+    const exhaustive = isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId);
+    expect(exhaustive).toBe(expected);
+    expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(exhaustive);
+    expect(sequenceFailsStableTargetCondition(r.state, costs, 0, r.db, source.instanceId)).toBe(!expected);
+  });
+
+  const handAmountCases: { label: string; matches: number; suffix: Cost; expected: boolean }[] = [
+    // The oracle defaults dynamic selection amounts to one; no match cannot fully pay.
+    { label: "dynamic amount without a match", matches: 0, expected: false, suffix: {
+      type: "TRASH_FROM_HAND", amount: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" }, filter: { name: "match" },
+    } },
+    // One match fully pays the oracle's one-card fallback, even with two cards left in hand.
+    { label: "dynamic amount with one match", matches: 1, expected: true, suffix: {
+      type: "TRASH_FROM_HAND", amount: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" }, filter: { name: "match" },
+    } },
+    // An omitted amount defaults to one; no matching card cannot fully pay it.
+    { label: "omitted amount without a match", matches: 0, expected: false, suffix: {
+      type: "TRASH_FROM_HAND", filter: { name: "match" },
+    } },
+    // One matching card fully pays the default one-card cost.
+    { label: "omitted amount with one match", matches: 1, expected: true, suffix: {
+      type: "TRASH_FROM_HAND", filter: { name: "match" },
+    } },
+    // Exactly two matching cards fully pay the numeric two-card cost.
+    { label: "numeric amount exactly equals the candidate count", matches: 2, expected: true, suffix: {
+      type: "TRASH_FROM_HAND", amount: 2, filter: { name: "match" },
+    } },
+  ];
+  it.each(handAmountCases)("$label is $expected", ({ matches, suffix, expected }) => {
+    const r = rig();
+    const source = r.put("amount-source", 0, "CHARACTER");
+    for (let i = 0; i < 2; i++) r.put("prefix-card", 0, "HAND");
+    for (let i = 0; i < matches; i++) r.put("amount-match", 0, "HAND", { data: { name: "match" } });
+    const costs: Cost[] = [{ type: "PLACE_HAND_TO_DECK", amount: 1, filter: { name: "prefix-card" } }, suffix];
+    const exhaustive = isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId);
+    expect(exhaustive).toBe(expected);
+    expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(exhaustive);
+    expect(sequenceFailsStableTargetCondition(r.state, costs, 0, r.db, source.instanceId)).toBe(!expected);
+  });
+
   it("samples nonempty candidate pools smaller than the required amount", () => {
     const rand = prng(98601);
     for (let i = 0; i < 100; i++) {
