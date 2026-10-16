@@ -17,6 +17,7 @@ import {
   isCostSequencePayable,
   isCostSequencePayableWithoutPrune,
   sequenceFailsNecessaryCondition,
+  sequenceFailsStableTargetCondition,
 } from "../engine/effect-resolver/cost/feasibility.js";
 import { rig, type Rig } from "./opt-960-rig.js";
 
@@ -123,4 +124,54 @@ describe("OPT-961 sequence prune", () => {
     it("X3: TRASH_FROM_HAND 2, TRASH_FROM_HAND 2, rested REST_SELF", () =>
       large([{ type: "TRASH_FROM_HAND", amount: 2 }, { type: "TRASH_FROM_HAND", amount: 2 }, { type: "REST_SELF" }]));
   });
+});
+
+describe("OPT-986 stable target prune", () => {
+  it("agrees with exhaustive search on 6500 seeded filter/prohibition sequences", () => {
+    const rand = prng(986);
+    let rejected = 0;
+    let payable = 0;
+    const r = rig();
+    r.deck(0, 0);
+    r.deck(1, 0);
+    r.life(0, 0);
+    r.life(1, 0);
+    const blank = structuredClone(r.state);
+    for (let i = 0; i < 6500; i++) {
+      r.state = structuredClone(blank);
+      const size = 2 + Math.floor(rand() * 5);
+      for (let j = 0; j < size; j++) r.put(`sample-hand-${j}`, 0, "HAND", { data: { name: rand() < 0.3 ? "match" : "other" } });
+      const source = r.put("sample-source", 0, "CHARACTER");
+      const amount = 1 + Math.floor(rand() * (size - 1));
+      const filterCase = i % 2 === 0;
+      if (!filterCase) {
+        const dynamic = rand() < 0.5;
+        r.state.prohibitions.push({
+          id: "hold", sourceCardInstanceId: rand() < 0.2 ? r.state.players[0].hand[0].instanceId : source.instanceId,
+          sourceEffectBlockId: "hold", prohibitionType: "CANNOT_BE_RESTED", scope: { cause: "ANY" },
+          duration: { type: "PERMANENT" }, controller: 0, appliesTo: [source.instanceId], usesRemaining: null,
+          ...(dynamic ? { conditions: { type: "HAND_COUNT" as const, controller: "SELF" as const, operator: ">=" as const, value: size } } : {}),
+        });
+      }
+      const costs: Cost[] = [
+        { type: rand() < 0.5 ? "TRASH_FROM_HAND" : "PLACE_HAND_TO_DECK", amount },
+        filterCase ? { type: "TRASH_FROM_HAND", amount: 1, filter: { name: rand() < 0.5 ? "missing" : "match" } }
+          : { type: "REST_CARDS", amount: 1 },
+      ];
+      // Also exercise a replenishing prefix that must disable the lookahead.
+      if (i % 7 === 0) costs.unshift({ type: "RETURN_OWN_CHARACTER_TO_HAND", amount: 1 });
+      const before = JSON.stringify(r.state);
+      const exhaustive = isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId);
+      expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId), `seed=986 case=${i}`).toBe(exhaustive);
+      if (sequenceFailsStableTargetCondition(r.state, costs, 0, r.db, source.instanceId)) {
+        expect(exhaustive).toBe(false);
+        rejected++;
+      }
+      if (exhaustive) payable++;
+      expect(JSON.stringify(r.state)).toBe(before);
+    }
+    process.stderr.write(`OPT986 seed=986 sequences=6500 rejected=${rejected} payable=${payable}\n`);
+    expect(rejected).toBeGreaterThan(1000);
+    expect(payable).toBeGreaterThan(1000);
+  }, 180_000);
 });
