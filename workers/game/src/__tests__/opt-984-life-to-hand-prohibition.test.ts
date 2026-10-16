@@ -127,6 +127,56 @@ describe("OPT-984 own effects cannot add Life to hand", () => {
     expect(r.state.players.map((p) => p.hand.length)).toEqual([2, 2]);
   });
 
+  it.each([true, false])("OP15-105 replacement requires a payable Life move (prohibited: %s)", (prohibited) => {
+    const r = prohibited ? grant("OP02-023") : rig();
+    if (!prohibited) {
+      r.life(0, 3);
+      r.life(1, 3);
+    }
+    r.put("OP15-105", 0, "CHARACTER", { data: { power: 5000 } });
+    const target = r.put("OPT984-SAVE-TARGET", 0, "CHARACTER", { data: { power: 5000 } });
+    const before = structuredClone(r.state.players);
+    r.state.turn.activePlayerIndex = 1;
+    activate(r, 1, [{ type: "KO", target: {
+      type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 },
+      filter: { name: "OPT984-SAVE-TARGET" },
+    } }]);
+    if (r.promptType() === "SELECT_TARGET") r.select([target.instanceId]);
+    if (prohibited) {
+      // Rules 8-1-3-4-5/7: the owner's substitute cannot be done, so it
+      // cannot replace the opponent's removal (even though Life is nonempty).
+      expect(r.state.pendingPrompt).toBeFalsy();
+      expect(r.state.players[0].characters.some((c) => c?.instanceId === target.instanceId)).toBe(false);
+      expect(r.state.players[0].trash.some((c) => c.cardId === target.cardId)).toBe(true);
+      expect(r.state.players[0].life).toEqual(before[0].life);
+      expect(r.state.players[0].hand).toEqual(before[0].hand);
+    } else {
+      expect(r.promptType()).toBe("OPTIONAL_EFFECT");
+      r.accept();
+      expect(r.state.players[0].characters.some((c) => c?.instanceId === target.instanceId)).toBe(true);
+      expect(r.state.players[0].trash).toEqual(before[0].trash);
+      expect(r.state.players[0].life).toEqual(before[0].life.slice(1));
+      expect(r.state.players[0].hand).toHaveLength(before[0].hand.length + 1);
+      expect(r.state.players[0].hand.at(-1)?.cardId).toBe(before[0].life[0].cardId);
+    }
+    expect(r.state.players[1].life).toEqual(before[1].life);
+    expect(r.state.players[1].hand).toEqual(before[1].hand);
+  });
+
+  it("OP12-081 delegates the Life move to P0 but remains P1's effect", () => {
+    const r = grant("OP02-023");
+    r.leader(1, "OP12-081");
+    const source = r.put("OPT984-COST8", 0, "HAND", { data: { cost: 8 } });
+    const before = structuredClone(r.state.players);
+    r.act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
+    expect(r.state.pendingPrompt).toBeFalsy();
+    expect(r.state.players[0].life).toEqual(before[0].life.slice(1));
+    expect(r.state.players[0].hand).toHaveLength(before[0].hand.length);
+    expect(r.state.players[0].hand.at(-1)?.cardId).toBe(before[0].life[0].cardId);
+    expect(r.state.players[1].life).toEqual(before[1].life);
+    expect(r.state.players[1].hand).toEqual(before[1].hand);
+  });
+
   it("expires at turn end; the next turn can add Life to hand", () => {
     const r = grant("OP02-023");
     r.act({ type: "ADVANCE_PHASE" });
