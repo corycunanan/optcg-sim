@@ -1670,8 +1670,14 @@ export const PROHIBITION_FEASIBILITY_TIMING: Readonly<
   CANNOT_REFRESH: "RESOLUTION",
 };
 
+export const REMOVAL_PROHIBITION_CAUSES = [
+  "ANY", "BATTLE", "IN_BATTLE", "EFFECT", "BY_EFFECT",
+  "OPPONENT_EFFECT", "BY_OPPONENT_EFFECT",
+] as const;
+export type RemovalProhibitionCause = (typeof REMOVAL_PROHIBITION_CAUSES)[number];
+
 export interface ProhibitionScope {
-  cause?: KOCause | EventCause;
+  cause?: RemovalProhibitionCause | EventCause;
   controller?: Controller;
   filter?: TargetFilter;
   source_filter?: TargetFilter;
