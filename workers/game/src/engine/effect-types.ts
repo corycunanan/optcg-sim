@@ -1598,7 +1598,7 @@ export type ProhibitionType =
  *   cannot be paid in full cannot be paid at all). Readers:
  *   `activationProhibitionVeto` (availability, ACTIVATE_EFFECT validation),
  *   `isCostMovementProhibited` (field-exit cost targets and fixed field-exit
- *   costs) and `isLifeToHandCostProhibited` (LIFE_TO_HAND costs), all in
+ *   costs) and `isLifeToHandProhibited` (LIFE_TO_HAND costs and effects), all in
  *   prohibitions.ts. CANNOT_BE_RESTED and CANNOT_ATTACH_DON are also read by
  *   their own cost checks (payability.ts, payment.ts, cost/targets.ts) and
  *   by pipeline step 2, independent of this table; named-play.ts reads
