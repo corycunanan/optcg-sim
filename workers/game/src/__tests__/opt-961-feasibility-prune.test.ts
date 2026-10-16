@@ -12,13 +12,14 @@
  */
 import { describe, expect, it } from "vitest";
 import type { CardInstance, GameState } from "../types.js";
-import type { Cost } from "../engine/effect-types.js";
+import type { Cost, RuntimeProhibition } from "../engine/effect-types.js";
 import {
   isCostSequencePayable,
   isCostSequencePayableWithoutPrune,
   sequenceFailsNecessaryCondition,
   sequenceFailsStableTargetCondition,
 } from "../engine/effect-resolver/cost/feasibility.js";
+import { computeCostTargets } from "../engine/effect-resolver/cost/targets.js";
 import { rig, type Rig } from "./opt-960-rig.js";
 
 const P0 = 0 as const;
@@ -174,4 +175,91 @@ describe("OPT-986 stable target prune", () => {
     expect(rejected).toBeGreaterThan(1000);
     expect(payable).toBeGreaterThan(1000);
   }, 180_000);
+});
+
+
+describe("OPT-986 load-bearing guards", () => {
+  function setup() {
+    const r = rig();
+    for (let i = 0; i < 3; i++) r.put(`guard-hand-${i}`, 0, "HAND");
+    const source = r.put("guard-source", 0, "CHARACTER");
+    const x = r.put("X", 0, "CHARACTER", { data: { name: "X", cost: 3 } });
+    const prohibition: RuntimeProhibition = {
+      id: "guard-hold", sourceCardInstanceId: source.instanceId, sourceEffectBlockId: "hold",
+      prohibitionType: "CANNOT_BE_RESTED", scope: { cause: "ANY" },
+      duration: { type: "PERMANENT" }, controller: 0, appliesTo: [x.instanceId], usesRemaining: null,
+    };
+    r.state.prohibitions.push(prohibition);
+    return { r, source, x, prohibition };
+  }
+
+  function payable(r: Rig, source: CardInstance, costs: Cost[]) {
+    const exhaustive = isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId);
+    expect(exhaustive).toBe(true);
+    expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(exhaustive);
+  }
+
+  it("C1 activeEffects guard: payment activates negation of the protection source", () => {
+    const { r, source } = setup();
+    const duration = { type: "WHILE_CONDITION" as const, condition: {
+      type: "HAND_COUNT" as const, controller: "SELF" as const, operator: "<=" as const, value: 1,
+    } };
+    r.state.activeEffects.push({
+      id: "conditional-negation", sourceCardInstanceId: source.instanceId, sourceEffectBlockId: "negation",
+      category: "auto", modifiers: [{ type: "NEGATE_EFFECTS_FLAG", duration }], duration,
+      expiresAt: { wave: "END_OF_TURN", turn: r.state.turn.number },
+      controller: 0, appliesTo: [source.instanceId], timestamp: 0,
+    });
+    payable(r, source, [{ type: "TRASH_FROM_HAND", amount: 2 }, { type: "REST_CARDS", amount: 1, filter: { name: "X" } }]);
+  });
+
+  it("C2 conditionalOverride guard: payment enables the KO exception", () => {
+    const { r, source, prohibition } = setup();
+    prohibition.prohibitionType = "CANNOT_BE_KO";
+    prohibition.conditionalOverride = { type: "HAND_COUNT", controller: "SELF", operator: "<=", value: 1 };
+    payable(r, source, [{ type: "TRASH_FROM_HAND", amount: 2 }, { type: "KO_OWN_CHARACTER", amount: 1, filter: { name: "X" } }]);
+  });
+
+  it("C5 duration guard: payment ends a WHILE_CONDITION protection", () => {
+    const { r, source, prohibition } = setup();
+    prohibition.duration = { type: "WHILE_CONDITION", condition: { type: "HAND_COUNT", controller: "SELF", operator: ">=", value: 3 } };
+    payable(r, source, [{ type: "PLACE_HAND_TO_DECK", amount: 1 }, { type: "REST_CARDS", amount: 1, filter: { name: "X" } }]);
+  });
+
+  it("C8 target guard: payment shrinks dynamic population coverage", () => {
+    const { r, source, prohibition } = setup();
+    prohibition.appliesTo = [];
+    prohibition.target = { type: "ALL_YOUR_CHARACTERS", filter: { cost_max: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } } };
+    payable(r, source, [{ type: "PLACE_HAND_TO_DECK", amount: 1 }, { type: "REST_CARDS", amount: 1, filter: { name: "X" } }]);
+  });
+
+  it("C9 scope.filter guard: payment shrinks dynamic scope coverage", () => {
+    const { r, source, prohibition } = setup();
+    prohibition.appliesTo = [];
+    prohibition.scope.filter = { cost_max: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } };
+    payable(r, source, [{ type: "PLACE_HAND_TO_DECK", amount: 1 }, { type: "REST_CARDS", amount: 1, filter: { name: "X" } }]);
+  });
+
+  it("C4 handCost guard: a field return supplies the named hand cost", () => {
+    const { r, source } = setup();
+    r.put("Z", 0, "CHARACTER", { data: { name: "Z" } });
+    payable(r, source, [{ type: "RETURN_OWN_CHARACTER_TO_HAND", amount: 1, filter: { name: "Z" } },
+      { type: "TRASH_FROM_HAND", amount: 1, filter: { name: "Z" } }]);
+  });
+
+  it("samples nonempty candidate pools smaller than the required amount", () => {
+    const rand = prng(98601);
+    for (let i = 0; i < 100; i++) {
+      const { r, source } = setup();
+      const matches = 1 + Math.floor(rand() * 3);
+      for (let j = 0; j < matches; j++) r.put("match", 0, "HAND", { data: { name: "match" } });
+      const suffix: Cost = { type: "TRASH_FROM_HAND", amount: matches + 1, filter: { name: "match" } };
+      const costs: Cost[] = [{ type: "PLACE_HAND_TO_DECK", amount: 1 }, suffix];
+      expect(computeCostTargets(r.state, suffix, 0, r.db, source.instanceId)).toHaveLength(matches);
+      expect(sequenceFailsNecessaryCondition(r.state, costs, 0, source.instanceId)).toBe(false);
+      expect(sequenceFailsStableTargetCondition(r.state, costs, 0, r.db, source.instanceId)).toBe(true);
+      expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
+      expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
+    }
+  });
 });

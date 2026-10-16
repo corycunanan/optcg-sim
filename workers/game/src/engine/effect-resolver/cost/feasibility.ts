@@ -251,7 +251,8 @@ export function sequenceFailsNecessaryCondition(
  *
  * Work is O(costs * (hand + field + prohibitions)), independent of C(n,k).
  * This is a necessary condition, not a search budget: unsupported prefixes,
- * filters and dynamic protections retain the complete search and exact answer.
+ * dynamic filters and unstable protections retain full enumeration with no
+ * bound. The complete search preserves the exact answer in those cases.
  */
 export function sequenceFailsStableTargetCondition(
   state: GameState,
@@ -298,6 +299,11 @@ export function sequenceFailsStableTargetCondition(
  * Failure policy: expected infeasibility returns false. An engine error
  * (an unknown cost type, a broken identity assertion) is not infeasibility,
  * so it propagates to the caller instead of reading as "cannot pay".
+ * A necessary-condition prune can reject before simulating payment and thus
+ * skip an integrity assertion the full search would hit on corrupt state.
+ * This also applies to the original resource prune. Engine states maintain
+ * the ID invariant; load repairs it via restoreIdCounterInvariant /
+ * reconcileExecutionContextIdCounter. Feasibility is not an integrity audit.
  * Callers split on it (OPT-961): validation, the optional-prompt gate, the
  * Life Trigger gate and payment let it propagate; availability
  * (`computeEffectAvailability`) is presentation only, so it catches it per

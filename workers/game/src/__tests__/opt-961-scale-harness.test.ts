@@ -104,6 +104,21 @@ it("OPT-986 bounds choose-8-of-20 filter and prohibition failures", () => {
   }
 }, 60_000);
 
+// Runtime payment defaults unknown amounts to one; a scale survey must not.
+function surveyedSelectionCount(cost: SimpleCost): number {
+  return typeof cost.amount === "number" ? costSelectionCount(cost) : Infinity;
+}
+
+it("OPT-986 survey fails closed on nonnumeric selection amounts", () => {
+  const costs: SimpleCost[] = [
+    { type: "TRASH_FROM_HAND", amount: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } },
+    { type: "TRASH_FROM_HAND" },
+    { type: "REST_CARDS", amount: "ANY_NUMBER" },
+  ];
+  for (const cost of costs) expect(surveyedSelectionCount(cost)).toBe(Infinity);
+  expect(surveyedSelectionCount({ type: "TRASH_FROM_HAND", amount: 3 })).toBe(3);
+});
+
 it("OPT-986 surveys authored selections before later costs", () => {
   const rows: string[] = [];
   let max = 0;
@@ -113,7 +128,7 @@ it("OPT-986 surveys authored selections before later costs", () => {
       if (cost.type === "CHOICE") cost.options.forEach(branch => inspect(id, [...branch, ...suffix]));
       else if (cost.type === "CHOOSE_ONE_COST") (cost.options ?? []).forEach(option => inspect(id, [option, ...suffix]));
       else if (suffix.length && costNeedsPlayerSelection(cost)) {
-        const amount = cost.amount === "ANY_NUMBER" ? Infinity : costSelectionCount(cost as SimpleCost);
+        const amount = surveyedSelectionCount(cost as SimpleCost);
         max = Math.max(max, amount);
         rows.push(`${id}:${cost.type}:${amount}`);
       }
@@ -128,6 +143,10 @@ it("OPT-986 surveys authored selections before later costs", () => {
     }
   };
   const schemas = getAllAuthoredSchemas();
+  // OP13-001's sole ANY_NUMBER cost has no suffix and is not a card selection.
+  // It remains outside this survey of card selections before later costs.
+  expect(schemas["OP13-001"].effects[0].costs).toEqual([{ type: "REST_DON", amount: "ANY_NUMBER" }]);
+  expect(costNeedsPlayerSelection(schemas["OP13-001"].effects[0].costs![0])).toBe(false);
   Object.entries(schemas).forEach(([id, schema]) => walk(id, schema));
   process.stderr.write(`OPT986 survey schemas=${Object.keys(schemas).length} selections=${rows.length} max=${max}: ${rows.join(", ")}\n`);
   expect(rows.filter(row => Number(row.split(":")[2]) > 2),
