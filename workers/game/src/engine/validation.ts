@@ -395,6 +395,18 @@ function validateActivateEffect(
   const block = schema?.effects.find((b) => b.id === effectId);
   if (!block || block.category !== "activate") return null;
 
+  // Rules 2-8-2 and 10-2-2: Activate: Main uses a source on the field.
+  // Main/Counter Events have separate activation paths (10-2-3/10-2-4).
+  if (
+    block.trigger && "keyword" in block.trigger &&
+    block.trigger.keyword === "ACTIVATE_MAIN" &&
+    found.card.zone !== "LEADER" &&
+    found.card.zone !== "CHARACTER" &&
+    found.card.zone !== "STAGE"
+  ) {
+    return "Card must be on the field to activate this effect";
+  }
+
   if (!meetsAttachedDonRequirement(found.card, block.trigger)) {
     return "Attached DON!! requirement is not met";
   }
