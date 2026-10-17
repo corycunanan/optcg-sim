@@ -36,7 +36,6 @@ import {
   SessionLoadError,
   convertToCurrentShape,
   logLegacyShapes,
-  lowerVersion3Frames,
   toPersistedGameState,
   validateContinuationReferences,
 } from "./game-state-schema.js";
@@ -734,13 +733,7 @@ export function convertPersistedGameState(raw: unknown, location: string): GameS
   const converted = convertToCurrentShape(raw, location);
   const validated = parseStoredGameState(converted, location);
   validateContinuationReferences(validated, location);
-  // OPT-963 PR 5a: version 3 frames are validated as written above, then
-  // lowered to the version 2 records this build's engine executes (§1.7).
-  const lowered = lowerVersion3Frames(validated);
-  for (const report of lowered.reports) {
-    log("session.legacy_shape", { gameId: validated.id, location, shape: report.shape, frameId: report.frameId });
-  }
-  const migrated = migrateLegacyTriggerRegistry(lowered.state);
+  const migrated = migrateLegacyTriggerRegistry(validated);
   logLegacyShapes(migrated, location);
   return migrated;
 }

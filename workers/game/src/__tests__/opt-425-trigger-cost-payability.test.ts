@@ -14,9 +14,11 @@ import { describe, it, expect } from "vitest";
 import type { CardData, GameState, PlayerState } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
-import { canOfferTrigger, continueEffectDamageSequence } from "../engine/battle.js";
+import { canOfferTrigger } from "../engine/battle.js";
+import { continueEffectDamageSequence } from "../engine/effect-damage.js";
 import { payCosts, isCostPayable } from "../engine/effect-resolver/cost-handler.js";
 import { OP04_094_TRUENO_BASTARDO } from "../engine/schemas/op04.js";
+import { effectTriggerWindow } from "./trigger-window-helpers.js";
 
 function withPlayer(state: GameState, idx: 0 | 1, patch: Partial<PlayerState>): GameState {
   const newPlayers = [...state.players] as [PlayerState, PlayerState];
@@ -131,7 +133,7 @@ describe("OPT-425: rest-your-Leader [Trigger] is offered iff the Leader can be r
 
     const result = continueEffectDamageSequence(state, cardDb, 0, 1, "damage-source", 1);
 
-    expect(result.state.turn.pendingTriggerFromEffect?.lifeCard.instanceId).toBe("life-op04-094");
+    expect(effectTriggerWindow(result.state)?.lifeCard.instanceId).toBe("life-op04-094");
     expect(result.state.players[0].hand.some((handCard) => handCard.instanceId === "life-op04-094")).toBe(false);
   });
 

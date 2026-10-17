@@ -25,6 +25,7 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { loadGoldenFixture } from "./fixtures/opt-940-golden.js";
+import { battleContinuation, battleTriggerLifeCard, effectTriggerWindow, patchBattleContinuation } from "./trigger-window-helpers.js";
 
 function golden(name: string) {
   const entry = loadGoldenFixture().cases[name];
@@ -261,7 +262,7 @@ describe("OPT-940 stuck DAMAGE_STEP (OPT-884): loaded as-is and classified", () 
   it("loads live and as undo with the continuation intact; the structural contradictions are rejected elsewhere", async () => {
     for (const state of [loadLive("stuck-damage-step"), await loadAsUndo("stuck-damage-step")]) {
       expect(isStuckDamageStep(state)).toBe(true);
-      expect(state.turn.pendingBattleDamageContinuation).toMatchObject({
+      expect(battleContinuation(state)).toMatchObject({
         stage: "CHARACTER_KO_REPLACEMENT",
         targetInstanceId: "char-1-gone",
       });
@@ -271,35 +272,33 @@ describe("OPT-940 stuck DAMAGE_STEP (OPT-884): loaded as-is and classified", () 
 
   it("is not stuck while the target is still on the field or a prompt is open", () => {
     const state = loadLive("stuck-damage-step");
-    const onField: GameState = {
-      ...state,
-      turn: {
-        ...state.turn,
-        pendingBattleDamageContinuation: {
-          ...state.turn.pendingBattleDamageContinuation!,
-          targetInstanceId: state.players[1].characters[0]!.instanceId,
-        } as GameState["turn"]["pendingBattleDamageContinuation"],
-      },
-    };
+    const onField = patchBattleContinuation(state, {
+      targetInstanceId: state.players[1].characters[0]!.instanceId,
+    });
     expect(isStuckDamageStep(onField)).toBe(false);
     expect(classifyLegacyShapes(onField)).toEqual([]);
   });
 });
 
-describe("OPT-940 both Trigger windows open (review finding A): loaded as-is and classified", () => {
-  it("loads the real-engine state live and as undo with the battle prompt intact", async () => {
+describe("OPT-963 both Trigger windows open (review finding A): recovered by the lift as nested frames", () => {
+  it("loads the real-engine state live and as undo as a battle frame below an effect frame, the prompt on the inner window", async () => {
     for (const state of [loadLive("both-trigger-windows"), await loadAsUndo("both-trigger-windows")]) {
       expect(state.turn.battleSubPhase).toBe("DAMAGE_STEP");
-      expect(state.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
-      expect(state.turn.pendingTriggerFromEffect).toBeTruthy();
+      expect(battleTriggerLifeCard(state)).toBeTruthy();
+      expect(effectTriggerWindow(state)).toBeTruthy();
+      expect(state.effectStack.map((frame) => (frame.battleDamage ? "BATTLE_DAMAGE" : "EFFECT_DAMAGE"))).toEqual([
+        "BATTLE_DAMAGE",
+        "EFFECT_DAMAGE",
+      ]);
       expect(state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
-      expect(state.effectStack).toEqual([]);
-      expect(classifyLegacyShapes(state)).toEqual([{ shape: "legacy.two_trigger_windows" }]);
+      expect(state.pendingPrompt?.resumeContext).toBe(state.effectStack[1].id);
+      expect(state.pendingPrompt?.respondingPlayer).toBe(effectTriggerWindow(state)!.damagedPlayerIndex);
+      expect(classifyLegacyShapes(state)).toEqual([]);
     }
   });
 });
 
-describe("OPT-940 Phase 1 records: supported as-is under version 1", () => {
+describe("OPT-963 Phase 1 records: lifted into version 3 frames by the reader", () => {
   it.each([
     "battle-trigger-window",
     "effect-damage-trigger-window",

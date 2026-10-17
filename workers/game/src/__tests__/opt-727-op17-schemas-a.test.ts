@@ -47,6 +47,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 type PromptResult = {
   state: GameState;
@@ -259,7 +260,7 @@ function driveToTrigger(
   expect(result.valid).toBe(true);
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
   expect(result.valid).toBe(true);
-  expect(result.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(
+  expect(battleTriggerLifeCard(result.state)?.cardId).toBe(
     card.id
   );
   return { state: result.state, cardDb };
@@ -634,12 +635,7 @@ describe("OPT-727 OP17 direct Trigger blocks", () => {
   it("OP17-019 activates from Life and grants the Leader +1000 power", () => {
     const card = cardData(OP17_019_I_DONT_HAVE_TIME_TO_CHAT, "Event");
     const { state, cardDb } = driveToTrigger(card);
-    const result = runPipeline(
-      state,
-      { type: "REVEAL_TRIGGER", reveal: true },
-      cardDb,
-      1
-    );
+    const result = revealTrigger(state, true, cardDb);
     expect(result.valid).toBe(true);
     const leader = result.state.players[1].leader;
     expect(
@@ -658,12 +654,7 @@ describe("OPT-727 OP17 direct Trigger blocks", () => {
     const handBefore = state.players[1].hand.length;
     const costAreaBefore = state.players[1].donCostArea.length;
     const donDeckBefore = state.players[1].donDeck.length;
-    const result = runPipeline(
-      state,
-      { type: "REVEAL_TRIGGER", reveal: true },
-      cardDb,
-      1
-    );
+    const result = revealTrigger(state, true, cardDb);
     expect(result.valid).toBe(true);
     expect(result.state.players[1].hand).toHaveLength(handBefore + 2);
     expect(result.state.players[1].donCostArea).toHaveLength(
@@ -693,12 +684,7 @@ describe("OPT-727 OP17 direct Trigger blocks", () => {
       currentCardDb.set(elbaph.id, elbaph);
       return withPlayer(current, 1, { trash: [trashCard] });
     });
-    const trigger = runPipeline(
-      state,
-      { type: "REVEAL_TRIGGER", reveal: true },
-      cardDb,
-      1
-    );
+    const trigger = revealTrigger(state, true, cardDb);
     expect(trigger.valid).toBe(true);
     let result: PromptResult = trigger;
     result = selectTargets(result, [trashCard.instanceId], cardDb);
@@ -719,12 +705,7 @@ describe("OPT-727 OP17 direct Trigger blocks", () => {
     const { state, cardDb } = driveToTrigger(card);
     const opponentHandBefore = state.players[0].hand.length;
     const ownerHandBefore = state.players[1].hand.length;
-    const trigger = runPipeline(
-      state,
-      { type: "REVEAL_TRIGGER", reveal: true },
-      cardDb,
-      1
-    );
+    const trigger = revealTrigger(state, true, cardDb);
     expect(trigger.valid).toBe(true);
     let result: PromptResult = trigger;
     expect(result.pendingPrompt?.respondingPlayer).toBe(0);

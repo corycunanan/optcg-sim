@@ -17,6 +17,7 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { SessionRepository, type SessionStorage } from "../session/persistence.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { battleContinuation, effectTriggerWindow } from "./trigger-window-helpers.js";
 
 class MemoryStorage implements SessionStorage {
   readonly data = new Map<string, unknown>();
@@ -212,8 +213,8 @@ export function expectTerminal(
   expect(state.effectStack).toEqual([]);
   expect(state.pendingEventActivationEvents ?? null).toBeNull();
   expect(state.turn.battle ?? null).toBeNull();
-  expect(state.turn.pendingTriggerFromEffect ?? null).toBeNull();
-  expect(state.turn.pendingBattleDamageContinuation ?? null).toBeNull();
+  expect(effectTriggerWindow(state) ?? null).toBeNull();
+  expect(battleContinuation(state) ?? null).toBeNull();
   const overs = state.eventLog.filter((e) => e.type === "GAME_OVER");
   expect(overs).toHaveLength(1);
   expect(overs[0].payload).toMatchObject({ winner: expected.winner, reason: state.winReason });

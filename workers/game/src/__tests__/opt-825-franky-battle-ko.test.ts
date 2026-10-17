@@ -29,6 +29,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 
 function fixture() {
   const db = createTestCardDb();
@@ -85,9 +86,7 @@ function fixture() {
   }
 
   function persist() {
-    state = parseStoredSession(
-      JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
-    ).state;
+    state = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" }))).state;
   }
 
   function respond(action: GameAction, rejected = false) {
@@ -217,8 +216,7 @@ describe("OP10-034 Franky — battle K.O. offers the replacement", () => {
 
     expect(f.promptType()).toBe("OPTIONAL_EFFECT");
     expect(f.state.pendingPrompt?.respondingPlayer).toBe(0);
-    expect(f.state.pendingPrompt?.resumeContext).toMatchObject({
-      type: "REPLACEMENT",
+    expect(f.state.effectStack.at(-1)?.replacement).toMatchObject({
       targetInstanceId: franky.instanceId,
       event: "WOULD_BE_KO",
     });
@@ -239,8 +237,7 @@ describe("OP10-034 Franky — battle K.O. offers the replacement", () => {
     f.battle(1, franky);
     expect(f.promptType()).toBe("OPTIONAL_EFFECT");
     f.persist();
-    expect(f.state.pendingPrompt?.resumeContext).toMatchObject({
-      type: "REPLACEMENT",
+    expect(f.state.effectStack.at(-1)?.replacement).toMatchObject({
       targetInstanceId: franky.instanceId,
     });
     f.accept();
@@ -388,9 +385,8 @@ describe("OP10-034 Franky — an effect K.O. does not offer the replacement", ()
     for (let i = 0; f.promptType() === "OPTIONAL_EFFECT" && i < 3; i++) {
       // The [When Attacking] DON!! −10 cost is optional; the Franky
       // replacement must never be the prompt offered here.
-      const ctx = f.state.pendingPrompt?.resumeContext;
-      const ctxType = typeof ctx === "object" && ctx && "type" in ctx ? String(ctx.type) : "";
-      expect(ctxType).not.toMatch(/^REPLACEMENT/);
+      const top = f.state.effectStack.at(-1);
+      expect(top?.replacement ?? top?.replacementBatch).toBeUndefined();
       f.accept();
     }
 

@@ -27,6 +27,7 @@ import type { Action, EffectResult, RuntimeActiveEffect } from "../engine/effect
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 import { OP15_009_KOBY } from "../engine/schemas/op15.js";
+import { answerBatchOffer, batchOfferOf } from "./trigger-window-helpers.js";
 
 // ─── Card data helpers ───────────────────────────────────────────────────────
 
@@ -139,8 +140,8 @@ describe("Tashigi — WOULD_BE_REMOVED_FROM_FIELD replacement prompts", () => {
     const promptResult = executeReturnToHand(state, action, "opponent-source", 1, cardDb, new Map<string, EffectResult>(), [ids.green], resolverExecutionServices);
     expect(promptResult.pendingPrompt).toBeDefined();
 
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     const tashigi = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.tashigi);
     const green = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.green);
@@ -158,8 +159,8 @@ describe("Tashigi — WOULD_BE_REMOVED_FROM_FIELD replacement prompts", () => {
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
     const promptResult = executeReturnToHand(state, action, "opponent-source", 1, cardDb, new Map<string, EffectResult>(), [ids.green], resolverExecutionServices);
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, false, cardDb);
 
     const tashigi = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.tashigi);
     expect(tashigi?.state).toBe("ACTIVE");
@@ -292,8 +293,8 @@ describe("Ivankov-style — TRASH_CARD self substitute on WOULD_BE_KO", () => {
     const promptResult = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally], resolverExecutionServices);
     expect(promptResult.pendingPrompt).toBeDefined();
 
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     const ivan = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ivankov);
     const ally = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ally);
@@ -416,7 +417,7 @@ describe("Koby-style — batch replacement with cost paid once", () => {
     );
 
     expect(result.pendingPrompt).toBeDefined();
-    const ctx = result.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const ctx = batchOfferOf(result);
     expect(ctx.type).toBe("REPLACEMENT_BATCH");
     expect(ctx.pendingMatches).toHaveLength(1);
     expect(ctx.pendingMatches[0].matchedTargetIds.sort()).toEqual([ids.navyA, ids.navyB].sort());
@@ -435,8 +436,8 @@ describe("Koby-style — batch replacement with cost paid once", () => {
       state, action, "kaido-source", 1, cardDb, new Map<string, EffectResult>(),
       [ids.navyA, ids.navyB, ids.nonNavy], resolverExecutionServices
     );
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     // Both Navy saved; non-Navy returned
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId).sort();
@@ -461,8 +462,8 @@ describe("Koby-style — batch replacement with cost paid once", () => {
       state, action, "kaido-source", 1, cardDb, new Map<string, EffectResult>(),
       [ids.navyA, ids.navyB, ids.nonNavy], resolverExecutionServices
     );
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, false, cardDb);
 
     // All three removed from field and now in hand
     expect(resumed.state.players[0].characters.filter(Boolean)).toHaveLength(0);
@@ -527,8 +528,8 @@ describe("Batch replacement — cost paid once no matter how many targets", () =
       state, action, "kaido-source", 1, cardDb, new Map<string, EffectResult>(),
       [navyA], resolverExecutionServices
     );
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     expect(resumed.state.players[0].leader?.state).toBe("RESTED");
     const effect = (resumed.state.activeEffects as RuntimeActiveEffect[]).find((e) => e.id === "repl-koby");
@@ -606,7 +607,7 @@ describe("Roronoa Zoro (PRB02-006) — WOULD_BE_RESTED replacement", () => {
 
     expect(result.pendingPrompt).toBeDefined();
     expect(result.pendingPrompt?.respondingPlayer).toBe(0);
-    const ctx = result.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const ctx = batchOfferOf(result);
     expect(ctx.type).toBe("REPLACEMENT_BATCH");
     expect(ctx.actionKind).toBe("SET_REST");
     expect(ctx.pendingMatches).toHaveLength(1);
@@ -622,8 +623,8 @@ describe("Roronoa Zoro (PRB02-006) — WOULD_BE_RESTED replacement", () => {
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
     const promptResult = executeSetRest(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.zoro], resolverExecutionServices);
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     const zoro = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.zoro);
     const ally = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ally);
@@ -640,8 +641,8 @@ describe("Roronoa Zoro (PRB02-006) — WOULD_BE_RESTED replacement", () => {
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
     const promptResult = executeSetRest(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.zoro], resolverExecutionServices);
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, false, cardDb);
 
     const zoro = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.zoro);
     const ally = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ally);
@@ -980,8 +981,8 @@ describe("Borsalino-style — TRASH_FROM_HAND substitute on WOULD_BE_REMOVED_FRO
     const promptResult = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.borsalino], resolverExecutionServices);
     expect(promptResult.pendingPrompt).toBeDefined();
 
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     // Borsalino survives on the field in its prior state.
     const bors = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.borsalino);
@@ -1016,8 +1017,8 @@ describe("Borsalino-style — TRASH_FROM_HAND substitute on WOULD_BE_REMOVED_FRO
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
     const promptResult = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.borsalino], resolverExecutionServices);
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, false, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, false, cardDb);
 
     // Borsalino left the field and entered the hand; trash untouched.
     const bors = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.borsalino);
@@ -1099,8 +1100,8 @@ describe("OPT-233 — spared targets emit no CARD_KO event", () => {
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
     const promptResult = executeKO(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [allyInst.instanceId], resolverExecutionServices);
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     const allEvents = [...promptResult.events, ...resumed.events];
     const koEvents = allEvents.filter((e) => e.type === "CARD_KO");
@@ -1209,8 +1210,8 @@ describe("Feasibility gate — flip-Life-instead-of-removal declines without fac
       target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } },
     };
     const promptResult = executeReturnToHand(state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally], resolverExecutionServices);
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     // Ally stayed on the field; Life[0] flipped face-up; remainder still face-down.
     const ally = resumed.state.players[0].characters.find((c) => c?.instanceId === ids.ally);
@@ -1386,7 +1387,7 @@ describe("OPT-231 — self-inclusion in batch replacement", () => {
     );
 
     expect(result.pendingPrompt).toBeDefined();
-    const ctx = result.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const ctx = batchOfferOf(result);
     expect(ctx.pendingMatches).toHaveLength(1);
     expect(ctx.pendingMatches[0].matchedTargetIds.sort()).toEqual(
       [ids.laboon, ids.allyA, ids.allyB].sort(),
@@ -1405,8 +1406,8 @@ describe("OPT-231 — self-inclusion in batch replacement", () => {
       state, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(),
       [ids.laboon, ids.allyA, ids.allyB], resolverExecutionServices
     );
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     // All three chars survive — Laboon was in the batch but the replacement
     // covered itself, so protectedIds contains the source.
@@ -1500,7 +1501,7 @@ describe("OPT-231 — back-to-back removal events trigger independently per even
       };
     }
     const ctx = promptResult.pendingPrompt.resumeContext as unknown as ReplacementBatchResumeContext;
-    return resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    return answerBatchOffer(promptResult, true, cardDb);
   }
 
   it("without once_per_turn: each event prompts and each acceptance rests the source again", () => {
@@ -1639,11 +1640,11 @@ describe("OPT-231 — real-schema round trip via registerReplacementsForCard", (
     );
 
     expect(promptResult.pendingPrompt).toBeDefined();
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const ctx = batchOfferOf(promptResult);
     expect(ctx.pendingMatches).toHaveLength(1);
     expect(ctx.pendingMatches[0].matchedTargetIds.sort()).toEqual([ids.koby, ids.ally].sort());
 
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
     expect(resumed.protectedIds.sort()).toEqual([ids.koby, ids.ally].sort());
     expect(resumed.finalizedIds).toEqual([]);
 

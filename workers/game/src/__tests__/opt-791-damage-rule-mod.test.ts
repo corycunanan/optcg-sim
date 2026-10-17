@@ -3,6 +3,7 @@ import type { CardData, GameState, LifeCard } from "../types.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { CARDS, createBattleReadyState, createTestCardDb } from "./helpers.js";
+import { battleTriggerLifeCard, effectTriggerWindow, revealTrigger } from "./trigger-window-helpers.js";
 
 // ST13 FAQ: face-up Life goes to deck bottom and cannot activate Trigger.
 // Rules 7-1-4-1-1-2/3: process each damage separately, preserving face-down choices.
@@ -122,8 +123,8 @@ function assertRedirect(
   expect(removals.map((event) => event.payload.newCardInstanceId)).toEqual(
     player.deck.slice(-count).map((card) => card.instanceId)
   );
-  expect(state.turn.pendingTriggerFromEffect ?? null).toBeNull();
-  expect(state.turn.battle?.pendingTriggerLifeCard ?? null).toBeNull();
+  expect(effectTriggerWindow(state) ?? null).toBeNull();
+  expect(battleTriggerLifeCard(state) ?? null).toBeNull();
 }
 
 describe("OPT-791 ST13-003 damage Life destination", () => {
@@ -149,15 +150,10 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
     (luffy) => {
       const { state, db } = setup([luffy ? "DOWN" : "UP"], 1, luffy);
       let r = battle(state, db);
-      expect(r.state.turn.battle?.pendingTriggerLifeCard?.instanceId).toBe(
+      expect(battleTriggerLifeCard(r.state)?.instanceId).toBe(
         "life-0"
       );
-      r = runPipeline(
-        r.state,
-        { type: "REVEAL_TRIGGER", reveal: false },
-        db,
-        1
-      );
+      r = revealTrigger(r.state, false, db);
       expect(r.valid).toBe(true);
       expect(r.state.players[1].hand).toHaveLength(
         state.players[1].hand.length + 1
@@ -183,10 +179,10 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
   it("rechecks the next Life face after a declined effect-damage Trigger", () => {
     const { state, db } = setup(["DOWN", "UP"]);
     let r = damage(state, db, "DEAL_DAMAGE", 2);
-    expect(r.state.turn.pendingTriggerFromEffect?.lifeCard.instanceId).toBe(
+    expect(effectTriggerWindow(r.state)?.lifeCard.instanceId).toBe(
       "life-0"
     );
-    r = runPipeline(r.state, { type: "REVEAL_TRIGGER", reveal: false }, db, 1);
+    r = revealTrigger(r.state, false, db);
     expect(r.valid).toBe(true);
     expect(r.state.players[1].hand).toHaveLength(
       state.players[1].hand.length + 1
@@ -194,7 +190,7 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
     expect(r.state.players[1].deck).toHaveLength(
       state.players[1].deck.length + 1
     );
-    expect(r.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(r.state) ?? null).toBeNull();
     expect(r.state.players[1].life).toHaveLength(0);
   });
   it.each([false, true])(
@@ -207,15 +203,10 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
         keywords: { ...attacker.keywords, doubleAttack: true },
       });
       let r = battle(state, db);
-      expect(r.state.turn.battle?.pendingTriggerLifeCard?.instanceId).toBe(
+      expect(battleTriggerLifeCard(r.state)?.instanceId).toBe(
         "life-0"
       );
-      r = runPipeline(
-        r.state,
-        { type: "REVEAL_TRIGGER", reveal: activate },
-        db,
-        1
-      );
+      r = revealTrigger(r.state, activate, db);
       expect(r.valid).toBe(true);
       expect(r.state.players[1].life).toHaveLength(0);
       expect(r.state.players[1].deck.at(-1)?.cardId).toBe(CARDS.TRIGGER.id);
@@ -259,6 +250,6 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
       state.players[0].hand.length + 1
     );
     expect(r.state.players[0].deck).toEqual(state.players[0].deck);
-    expect(r.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(r.state) ?? null).toBeNull();
   });
 });

@@ -196,9 +196,9 @@ Stand-in: p1 Leader `SYN-TAKE-DAMAGE` (custom trigger `DAMAGE_TAKEN`, no filter,
 | F3a | guard (flipped by OPT-962) | Base: `TURN_ENDED` p0 → `TURN_STARTED` p1 → one `CARD_DRAWN` p1 during p1's turn; no p0 draw. OPT-924 runs both waves inside the End Phase: `CARD_DRAWN` p0 → `CARD_DRAWN` p1 → `TURN_ENDED` p0. |
 | F3b | guard (flipped by OPT-962) | Base: no draw (expiry before obligations). OPT-924: step 1 draws, then 6-6-1-3 expires the `THIS_TURN` modifier. |
 | F4 | guard (flipped by OPT-962) | Base: the loss was written after hand-off. OPT-924 writes it at the 6-6-1-4 boundary inside p0's End Phase; the turn never ends, so no `TURN_ENDED:p0` and no `TURN_STARTED:p1`. The base assertion `GAME_OVER` before `TURN_ENDED:p0` required a `TURN_ENDED` logged after `GAME_OVER`; OPT-962 asserts its absence instead (rule 6-6-1-4 line 624 is not reached once the game is over; `terminal.ts` logs nothing after `GAME_OVER`). |
-| F5a | ratchet (OPT-963) | `DAMAGE_DEALT` → `TRIGGER_ACTIVATED` (offer) → `CARD_TRASHED` p0 (attacker effect, correct) → `CARD_DRAWN` p1 (defender effect, wrong) → `REVEAL_TRIGGER` prompt. Step 4 runs before step 3. |
-| F5b | ratchet (OPT-963) | Same early p1 draw before the decline. |
-| F6 | ratchet (OPT-963) | p1 `CARD_DRAWN` before the `REVEAL_TRIGGER` prompt exists. |
+| F5a | guard (flipped by OPT-963) | Base: `DAMAGE_DEALT` → `TRIGGER_ACTIVATED` (offer) → `CARD_TRASHED` p0 → `CARD_DRAWN` p1 (wrong) → `REVEAL_TRIGGER` prompt. OPT-963: the BATTLE_DAMAGE frame resolves the attacker's `ATTACK_DEALS_DAMAGE` class before the `REVEAL_TRIGGER` prompt and defers the defender's `DAMAGE_TAKEN` watcher until the sequence completes (rule 8-6-2): `DAMAGE_DEALT` → `CARD_TRASHED` p0 → prompt → `TRIGGER_ACTIVATED` → `CARD_DRAWN` p1. |
+| F5b | guard (flipped by OPT-963) | Base: same early p1 draw before the decline. OPT-963: decline → `CARD_ADDED_TO_HAND_FROM_LIFE` p1 → `CARD_DRAWN` p1. |
+| F6 | guard (flipped by OPT-963) | Base: p1 `CARD_DRAWN` before the `REVEAL_TRIGGER` prompt exists. OPT-963: the prompt first, Ace's draw after the Trigger. |
 | F7 | guard | `DAMAGE_DEALT` ×2 → `END_OF_BATTLE` → one p1 draw marker; final Life 1, `IN_PROGRESS`. |
 | F8a | guard | After the accepted Trigger, point 2 takes the card the Trigger added; final Life `[Vanilla]`, hand +1, no defeat. |
 | F8b | guard | Final Life 0, `IN_PROGRESS`, no `GAME_OVER`. |
@@ -206,9 +206,9 @@ Stand-in: p1 Leader `SYN-TAKE-DAMAGE` (custom trigger `DAMAGE_TAKEN`, no filter,
 | F10 | guard | Scheduled `SET_DON_ACTIVE` ran at End Phase after Pink was K.O.'d; the rested DON!! became active. |
 | F11a | ratchet (OPT-967) | `ATTACK_DECLARED` → `PHASE_CHANGED` (to BLOCK_STEP) → `CARD_KO`; battle stays in `BLOCK_STEP`, no `END_OF_BATTLE`. |
 | F11b | ratchet (OPT-967) | `BLOCK_DECLARED` → … → `CARD_KO`; battle enters `COUNTER_STEP`. |
-| F12a | ratchet (OPT-963) | The `REVEAL_TRIGGER` prompt surfaces, but p0 Life is already 1: `LIFE_TO_HAND` ran before the Trigger window. |
-| F12b | ratchet (OPT-963) | Same as F12a, decline path. |
-| F12c | ratchet (OPT-963) | Same as F12a across a reload. |
+| F12a | guard (flipped by OPT-963) | Base: the `REVEAL_TRIGGER` prompt surfaces with p0 Life already 1. OPT-963: `DEAL_DAMAGE` pauses on its EFFECT_DAMAGE frame with the chain parked below; p0 Life stays 2 until the window closes, then `LIFE_TO_HAND`. |
+| F12b | guard (flipped by OPT-963) | Base: same as F12a, decline path. OPT-963: as F12a. |
+| F12c | guard (flipped by OPT-963) | Base: same as F12a across a reload. OPT-963: the EFFECT_DAMAGE frame and its parent chain reload through the version 3 reader; as F12a. |
 | F12d | ratchet (OPT-970) | With p1 at 2 Life the `DEAL_DAMAGE` condition is false, yet the `THEN`-chained `LIFE_TO_HAND` still moved p0's top Life to hand. FAQ qa_op06.md:367-371 says it cannot. |
 
 | F12d control | guard | p1 at exactly 1 Life: damage and add both happen (p1 Life 0, p0 Life 1, p0 hand +1). |
@@ -217,10 +217,10 @@ Stand-in: p1 Leader `SYN-TAKE-DAMAGE` (custom trigger `DAMAGE_TAKEN`, no filter,
 | F14 | guard (flipped by OPT-962) | Base: no draw for either player. OPT-924: p0 draws (step 1), then p1 draws (step 2), both before `TURN_ENDED`. Stand-in change: `c0`'s modifier is now `UNTIL_END_OF_YOUR_NEXT_TURN` (see §3.1); assertions unchanged. |
 | F13b guard | guard | Loop terminated in 48 ms at `ACTION_BUDGET` limit 1000 / observed 1001 (`TRASH_FROM_LIFE` from `looper`), 500 Life removals, 700 deck cards left, `FINISHED`, no prompt, empty stack, one `GAME_OVER`. |
 | F13b ratchet | guard (flipped by OPT-960) | Base: outcome was `INFINITE_LOOP_DRAW` with winReason "Unstoppable loop detected — game ends in a draw", a rules draw. OPT-960 writes `engineOutcome.type: "ENGINE_LIMIT"` with winReason "Engine resolution limit reached — the game ended with no winner". |
-| F15 | ratchet (OPT-963) | The battle `REVEAL_TRIGGER` and the nested `SELECT_TARGET` both surface for p1, but p0 Life is already 1 while the nested prompt is pending. |
+| F15 | guard (flipped by OPT-963) | Base: p0 Life already 1 while the nested prompt is pending. OPT-963: the frame moves to `TRIGGER_EFFECT` below the Trigger's `SELECT_TARGET` frame; p0 Life stays 2 across the reload and the reply, then the K.O. and the Life-to-hand. |
 | F16a | guard (synthetic checkpoint) | Both decks empty at rule processing → `FINISHED`, winner `null`. |
 | F16b | guard (flipped by OPT-960) | Base: `CARD_TRASHED` p1 → `CARD_TRASHED` p0 → `GAME_OVER` with winner `null`; the second MILL ran after p1 had already met the defeat condition, manufacturing a draw. OPT-960: the checkpoint after the `OPPONENT_ACTION` MILL ends play; winner 0, p0's deck keeps its card. |
-| F17 | ratchet (OPT-963) | `DAMAGE_DEALT` ×2 → `END_OF_BATTLE` with **no** p1 draw at all. The same Leader with a single-damage attacker draws once after the battle, so Double Attack loses the defender's taking-damage effect entirely (see §3.1 and the PR's Follow-ups). |
+| F17 | ratchet (OPT-973) | `DAMAGE_DEALT` ×2 → `END_OF_BATTLE` with **no** p1 draw at all. OPT-963 measured the cause (rung 4): the defender's `DAMAGE_TAKEN` watcher matches once per `DAMAGE_DEALT`, so a Double Attack queues two activations and the engine parks a `PLAYER_CHOICE` ordering prompt between the two instances, which the fixture never answers. Collapsing them to one activation per attack is a trigger-matching policy (the defender-side analogue of OPT-796's `firstDamageOfAttack`), outside the OPT-963 fence; left to OPT-973. |
 
 No fixture carries an "assumed" status. Decision 7's replacement-precedence fixture (rule 8-1-3-4-2, assumed literal reading) belongs to OPT-968 and is not in this baseline.
 
@@ -233,7 +233,7 @@ No fixture carries an "assumed" status. Decision 7's replacement-precedence fixt
 * **F1a duplicate events.** On the continuous path the log holds `CARD_PLAYED` p0 and `POWER_MODIFIED` p0 twice; F1b/F1c log them once. The fixtures compare first occurrences so the duplicate cannot mask an ordering failure. Recorded in the PR's Follow-ups.
 * **`THIS_TURN` single-duration modelling gap (F14), closed by OPT-962.** OPT-924 maps durations to clauses (`duration-tracker.ts` `endPhaseExpiryClause`): `THIS_TURN` is "during this turn" (6-6-1-3, line 622); the "until the end of … turn / End Phase" durations are 6-6-1-2 (line 617), expiring in their controller's step. F14's `c0` stand-in for "until the end of the turn" therefore changed from `THIS_TURN` to `UNTIL_END_OF_YOUR_NEXT_TURN` with the same `expiresAt`; its assertions did not change. The original note follows.
 * **(Historical) `THIS_TURN` single-duration modelling gap (F14).** The engine has one duration, `THIS_TURN` (wave `END_OF_TURN`), for both rule phrases "until the end of the turn" (6-6-1-2) and "during this turn" (6-6-1-3), and `UNTIL_END_OF_OPPONENT_NEXT_END_PHASE` (wave `END_OF_END_PHASE`) for the non-turn player's turn-bound effects; `expireEndOfTurnEffects` (`duration-tracker.ts`) runs both waves for both players in one call. F14 uses those three durations as stand-ins for the three stages. Tagging each obligation and modifier with its rules stage is OPT-924 / OPT-962's work; until then the stand-ins are the only way to make the stages observable, and the fixture's expectation is rules-derived, not engine-derived.
-* **F17 Double Attack drops the defender's `DAMAGE_TAKEN` effect.** With two damage points the watcher fires zero times; with one point it fires once after the battle. The fixture asserts the rule (once, after the last point); the loss itself is recorded in the PR's Follow-ups for the OPT-963 owner.
+* **F17 Double Attack drops the defender's `DAMAGE_TAKEN` effect.** With two damage points the watcher fires zero times; with one point it fires once after the battle. The fixture asserts the rule (once, after the last point). OPT-963 found the mechanism: two activations of the same watcher wait on an unanswered ordering prompt (§3 F17 row); the once-per-attack policy is OPT-973's.
 * **F4 was a false guard in round 1.** It asserted only that no `TURN_STARTED` p1 followed `GAME_OVER`; the engine writes the loss after hand-off. It is now a ratchet asserting `GAME_OVER` before `TURN_ENDED` p0.
 * **F3a active-player check.** The active player at resolution time is not observable without instrumentation; F3a asserts draw order and the `TURN_ENDED` position only.
 

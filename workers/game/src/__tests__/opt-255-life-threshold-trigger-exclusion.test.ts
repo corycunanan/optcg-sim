@@ -26,6 +26,7 @@ import {
   createBattleReadyState,
   createTestCardDb,
 } from "./helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Test card factory ──────────────────────────────────────────────────────
 
@@ -138,11 +139,10 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const pendingLife = (paused.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard;
+    const pendingLife = battleTriggerLifeCard(paused);
     expect(pendingLife?.instanceId).toBe(top.instanceId);
 
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
 
     // Trigger condition satisfied → DRAW happened.
@@ -171,7 +171,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
 
     // Condition unsatisfied (2 life remain > 1) → no DRAW.
@@ -193,7 +193,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
 
     expect(after.state.players[1].hand.length).toBe(p1HandBefore + 1);
@@ -223,7 +223,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
 
     // OPP (p0) has 2 life → threshold satisfied → DRAW.
@@ -253,7 +253,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
 
     expect(after.state.players[1].hand.length).toBe(p1HandBefore + 1);
@@ -281,7 +281,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
 
     expect(after.state.players[1].hand.length).toBe(p1HandBefore);
@@ -340,7 +340,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
 
     // Remaining life = 2 → draw 2 cards (not 3).

@@ -193,108 +193,14 @@ function unionViewerField<Value>(
   return playerZeroValue ?? playerOneValue;
 }
 
-function redactLifeCardIdentity(card: LifeCard): LifeCard {
-  return {
-    ...card,
-    cardId: HIDDEN_IDENTITY,
-    instanceId: HIDDEN_IDENTITY,
-  };
-}
-
-function mergeSpectatorBattle(
-  playerZeroBattle: BattleContext | null,
-  playerOneBattle: BattleContext | null,
-): BattleContext | null {
-  if (!playerZeroBattle || !playerOneBattle) {
-    assertSameSpectatorField("turn.battle", playerZeroBattle, playerOneBattle);
-    return playerZeroBattle;
-  }
-
-  const {
-    pendingTriggerLifeCard: playerZeroPendingTrigger,
-    ...playerZeroPublicBattle
-  } = playerZeroBattle;
-  const {
-    pendingTriggerLifeCard: playerOnePendingTrigger,
-    ...playerOnePublicBattle
-  } = playerOneBattle;
-  assertSameSpectatorField(
-    "turn.battle (excluding pendingTriggerLifeCard)",
-    playerZeroPublicBattle,
-    playerOnePublicBattle,
-  );
-
-  const pendingTriggerLifeCard = unionViewerField(
-    "turn.battle.pendingTriggerLifeCard",
-    playerZeroPendingTrigger,
-    playerOnePendingTrigger,
-  );
-  return pendingTriggerLifeCard
-    ? {
-        ...playerZeroPublicBattle,
-        pendingTriggerLifeCard: redactLifeCardIdentity(pendingTriggerLifeCard),
-      }
-    : playerZeroPublicBattle;
-}
-
 function mergeSpectatorTurn(
   playerZeroTurn: TurnState,
   playerOneTurn: TurnState,
 ): TurnState {
-  const {
-    battle: playerZeroBattle,
-    pendingTriggerFromEffect: playerZeroPendingTriggerFromEffect,
-    pendingBattleDamageContinuation:
-      playerZeroPendingBattleDamageContinuation,
-    ...playerZeroInvariantTurn
-  } = playerZeroTurn;
-  const {
-    battle: playerOneBattle,
-    pendingTriggerFromEffect: playerOnePendingTriggerFromEffect,
-    pendingBattleDamageContinuation:
-      playerOnePendingBattleDamageContinuation,
-    ...playerOneInvariantTurn
-  } = playerOneTurn;
-
-  // Every remaining turn field is viewer-invariant. A newly filtered nested
-  // turn field changes this remainder and fails instead of selecting player 0.
-  assertSameSpectatorField(
-    "turn (excluding spectator-union fields)",
-    playerZeroInvariantTurn,
-    playerOneInvariantTurn,
-  );
-
-  const pendingTriggerFromEffect = unionViewerField(
-    "turn.pendingTriggerFromEffect",
-    playerZeroPendingTriggerFromEffect,
-    playerOnePendingTriggerFromEffect,
-  );
-  const pendingBattleDamageContinuation = unionViewerField(
-    "turn.pendingBattleDamageContinuation",
-    playerZeroPendingBattleDamageContinuation,
-    playerOnePendingBattleDamageContinuation,
-  );
-
-  return {
-    ...playerZeroInvariantTurn,
-    battle: mergeSpectatorBattle(playerZeroBattle, playerOneBattle),
-    pendingTriggerFromEffect: pendingTriggerFromEffect
-      ? {
-          ...pendingTriggerFromEffect,
-          lifeCard: redactLifeCardIdentity(pendingTriggerFromEffect.lifeCard),
-        }
-      : pendingTriggerFromEffect,
-    // A battle-K.O. replacement continuation (OPT-872) is public and has no
-    // Life card identity to hide.
-    pendingBattleDamageContinuation:
-      pendingBattleDamageContinuation &&
-      pendingBattleDamageContinuation.stage !== "CHARACTER_KO_REPLACEMENT"
-        ? {
-            ...pendingBattleDamageContinuation,
-            lifeCardInstanceId: HIDDEN_IDENTITY,
-          }
-        : pendingBattleDamageContinuation,
-  };
+  // Every damage and replacement continuation lives on the effect stack
+  // (OPT-963), so the turn is viewer-invariant: assert both views agree.
+  assertSameSpectatorField("turn", playerZeroTurn, playerOneTurn);
+  return playerZeroTurn;
 }
 
 /** Remove display-only active effects whose WHILE condition is not met. */

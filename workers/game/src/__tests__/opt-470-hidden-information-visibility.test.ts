@@ -11,6 +11,7 @@ import {
   PROMPT_VISIBILITY,
 } from "../engine/visibility.js";
 import { advanceToPhase, setupGame } from "./factories.js";
+import { battleContinuation, battleTriggerLifeCard, effectTriggerWindow, withBattleContinuation, withBattleTriggerWindow, withEffectTriggerWindow } from "./trigger-window-helpers.js";
 
 const timestamp = 1;
 
@@ -327,10 +328,10 @@ describe("OPT-470 hidden-information visibility contract", () => {
     expect(filterStateForPlayer(withInternalFrame, 1).effectStack).toEqual([]);
   });
 
-  it("redacts an opponent's in-flight battle Trigger Life card from turn state", () => {
-    const { state } = setupGame();
+  it("keeps the battle Trigger Life card off the wire: the frame is never sent, the prompt shows it to its owner only", () => {
+    const { state, cardDb } = setupGame();
     const lifeCard = state.players[1].life[0]!;
-    const withPendingTrigger: GameState = {
+    const paused: GameState = {
       ...state,
       turn: {
         ...state.turn,
@@ -344,53 +345,58 @@ describe("OPT-470 hidden-information visibility contract", () => {
           defenderPower: 5000,
           counterPowerAdded: 0,
           blockerActivated: false,
-          pendingTriggerLifeCard: lifeCard,
         },
       },
     };
+    const withPendingTrigger = withBattleTriggerWindow(paused, lifeCard, cardDb);
+    expect(battleTriggerLifeCard(withPendingTrigger)).toEqual(lifeCard);
 
     const ownerView = filterStateForPlayer(withPendingTrigger, 1);
     const opponentView = filterStateForPlayer(withPendingTrigger, 0);
 
-    expect(ownerView.turn.battle?.pendingTriggerLifeCard).toEqual(lifeCard);
-    expect(opponentView.turn.battle?.pendingTriggerLifeCard).toBeUndefined();
+    expect(ownerView.effectStack).toEqual([]);
+    expect(opponentView.effectStack).toEqual([]);
+    expect(ownerView.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(JSON.stringify(ownerView.pendingPrompt)).toContain(lifeCard.cardId);
     expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.cardId);
     expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.instanceId);
+    expect(JSON.stringify(opponentView.pendingPrompt)).not.toContain(lifeCard.cardId);
+    expect(JSON.stringify(opponentView.pendingPrompt)).not.toContain(lifeCard.instanceId);
   });
 
-  it("redacts an opponent's effect-damage Trigger Life card and continuation", () => {
-    const { state } = setupGame();
+  it("keeps an effect-damage Trigger Life card and a battle continuation off the wire", () => {
+    const { state, cardDb } = setupGame();
     const lifeCard = state.players[1].life[0]!;
-    const withPendingTrigger: GameState = {
-      ...state,
-      turn: {
-        ...state.turn,
-        pendingTriggerFromEffect: {
-          lifeCard,
-          damagedPlayerIndex: 1,
-          remainingDamages: 1,
-          sourceCardInstanceId: state.players[0].leader.instanceId,
-          controllerIndex: 0,
-        },
-        pendingBattleDamageContinuation: {
-          battleId: "battle-continuation",
-          lifeCardInstanceId: lifeCard.instanceId,
-          damagedPlayerIndex: 1,
-          stage: "LIFE_REMOVAL",
-        },
+    const withContinuation = withBattleContinuation(state, {
+      stage: "TRIGGER_EFFECT",
+      battleId: "battle-continuation",
+      damagedPlayerIndex: 1,
+      lifeCardInstanceId: lifeCard.instanceId,
+    });
+    const withPendingTrigger = withEffectTriggerWindow(
+      withContinuation,
+      {
+        lifeCard,
+        damagedPlayerIndex: 1,
+        remainingDamages: 1,
+        sourceCardInstanceId: state.players[0].leader.instanceId,
+        controllerIndex: 0,
       },
-    };
+      cardDb,
+    );
+    expect(effectTriggerWindow(withPendingTrigger)?.lifeCard).toEqual(lifeCard);
+    expect(battleContinuation(withPendingTrigger)).toMatchObject({ lifeCardInstanceId: lifeCard.instanceId });
 
     const ownerView = filterStateForPlayer(withPendingTrigger, 1);
     const opponentView = filterStateForPlayer(withPendingTrigger, 0);
 
-    expect(ownerView.turn.pendingTriggerFromEffect?.lifeCard).toEqual(lifeCard);
-    expect(ownerView.turn.pendingBattleDamageContinuation)
-      .toMatchObject({ lifeCardInstanceId: lifeCard.instanceId });
-    expect(opponentView.turn.pendingTriggerFromEffect).toBeNull();
-    expect(opponentView.turn.pendingBattleDamageContinuation).toBeNull();
+    expect(ownerView.effectStack).toEqual([]);
+    expect(opponentView.effectStack).toEqual([]);
+    expect(JSON.stringify(ownerView.pendingPrompt)).toContain(lifeCard.cardId);
     expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.cardId);
     expect(JSON.stringify(opponentView.turn)).not.toContain(lifeCard.instanceId);
+    expect(JSON.stringify(opponentView.pendingPrompt)).not.toContain(lifeCard.cardId);
+    expect(JSON.stringify(opponentView.pendingPrompt)).not.toContain(lifeCard.instanceId);
   });
 
   it("keeps deckList public for the opponent deck-preview feature", () => {

@@ -79,7 +79,6 @@ const BattleContext = z.strictObject({
   counterPowerAdded: FiniteNumber,
   blockerActivated: z.boolean(),
   damagesRemaining: NonNegativeInteger.optional(),
-  pendingTriggerLifeCard: LifeCard.optional(),
 });
 
 const PerformedAction = z.strictObject({
@@ -112,36 +111,6 @@ const TurnState = z.strictObject({
   oncePerTurnUsed: z.record(z.string(), StringArray),
   actionsPerformedThisTurn: z.array(PerformedAction),
   extraTurnsPending: NonNegativeInteger.optional(),
-  pendingTriggerFromEffect: z
-    .strictObject({
-      lifeCard: LifeCard,
-      damagedPlayerIndex: PlayerIndex,
-      remainingDamages: NonNegativeInteger,
-      sourceCardInstanceId: z.string(),
-      controllerIndex: PlayerIndex,
-    })
-    .nullable()
-    .optional(),
-  pendingBattleDamageContinuation: z
-    .union([
-      z.strictObject({
-        battleId: z.string(),
-        lifeCardInstanceId: z.string(),
-        damagedPlayerIndex: PlayerIndex,
-        stage: z.enum(["LIFE_REMOVAL", "DAMAGE"]),
-      }),
-      z.strictObject({
-        battleId: z.string(),
-        stage: z.literal("CHARACTER_KO_REPLACEMENT"),
-        targetInstanceId: z.string(),
-        replacementEffectId: z.string().optional(),
-        causingPlayerIndex: PlayerIndex,
-        attackerIsCharacter: z.boolean(),
-        resolution: z.enum(["REPLACED", "NOT_REPLACED"]).optional(),
-      }),
-    ])
-    .nullable()
-    .optional(),
   deckHitZeroThisTurn: z.tuple([z.boolean(), z.boolean()]),
   triggerStagingInstanceIds: StringArray.optional(),
 });
@@ -448,7 +417,6 @@ const StackFrameCore = z.strictObject({
     .optional(),
   priorActionSucceeded: z.boolean().optional(),
   simultaneousGroup: z.unknown().optional(),
-  replacementBatchContinuation: z.unknown().optional(),
   phaseBoundaryContinuation: PhaseBoundaryContinuation.optional(),
   replacement: ReplacementContinuation.optional(),
   replacementBatch: ReplacementBatchContinuation.optional(),

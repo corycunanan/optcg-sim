@@ -1,10 +1,10 @@
 /**
  * Capture the persistence writer's exact output for the OPT-940 synthetic
- * states into src/__tests__/fixtures/opt-962-writer-golden.synthetic.json
- * (the current, version 2 writer; OPT-924). Set GOLDEN_OUTPUT to write
- * elsewhere. opt-940-writer-golden.synthetic.json is frozen: it holds the
- * version 1 bytes the base writer (03071b69) wrote and is the version 1
- * reader input; never re-capture it with a version 2 writer.
+ * states into src/__tests__/fixtures/opt-963-writer-golden.synthetic.json
+ * (the current, version 3 writer; OPT-963). Set GOLDEN_OUTPUT to write
+ * elsewhere. opt-940-writer-golden.synthetic.json (version 1, base writer
+ * 03071b69) and opt-962-writer-golden.synthetic.json (version 2, OPT-924)
+ * are frozen reader inputs; never re-capture them with a newer writer.
  *
  * Run from workers/game:  node --import tsx scripts/capture-writer-golden.ts
  *
@@ -37,7 +37,7 @@ import {
 
 const outputPath = resolve(
   process.cwd(),
-  process.env.GOLDEN_OUTPUT ?? "src/__tests__/fixtures/opt-962-writer-golden.synthetic.json"
+  process.env.GOLDEN_OUTPUT ?? "src/__tests__/fixtures/opt-963-writer-golden.synthetic.json"
 );
 
 async function main(): Promise<void> {
