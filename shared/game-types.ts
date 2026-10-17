@@ -69,10 +69,9 @@ export interface BattleContext {
   // OPT-239: damage count locked at Damage Step entry. 2 for [Double Attack],
   // 1 otherwise. Decremented each time a damage is dealt to Leader life, so
   // the [Trigger] resume path knows whether another damage is still owed.
+  // (A revealed [Trigger] Life card pauses the battle on a BATTLE_DAMAGE
+  // effect-stack frame, OPT-963; it is no longer stored here.)
   damagesRemaining?: number;
-  // Battle damage that reveals a Life card with [Trigger] pauses the battle
-  // until the damaged player accepts or declines that trigger.
-  pendingTriggerLifeCard?: LifeCard;
 }
 
 export type BattleSubPhase =
@@ -123,38 +122,6 @@ export interface PerformedAction {
 }
 
 
-/** OPT-441: Leader damage paused by a battle-damage Life [Trigger] prompt. */
-export interface LeaderDamageContinuation {
-  battleId: string;
-  lifeCardInstanceId: string;
-  damagedPlayerIndex: 0 | 1;
-  stage: "LIFE_REMOVAL" | "DAMAGE";
-}
-
-/**
- * OPT-872: the Damage Step paused on an optional replacement for the losing
- * Character's K.O. (rules §7-1-4-1-2, §8-1-3-4-1). Everything here is public:
- * the target Character and the replacement source are both on the field.
- */
-export interface BattleKOReplacementContinuation {
-  battleId: string;
-  stage: "CHARACTER_KO_REPLACEMENT";
-  /** The Character that lost the battle. */
-  targetInstanceId: string;
-  /**
-   * The optional replacement whose OPTIONAL_EFFECT prompt paused the Damage
-   * Step. Absent when a mandatory replacement's substitute paused it instead
-   * (resolution is then already REPLACED).
-   */
-  replacementEffectId?: string;
-  /** Controller of the attacking card (the player causing the battle K.O.). */
-  causingPlayerIndex: 0 | 1;
-  /** Whether CHARACTER_BATTLES belongs in the resumed Damage Step batch. */
-  attackerIsCharacter: boolean;
-  /** Set when the prompt is answered; absent while it is pending. */
-  resolution?: "REPLACED" | "NOT_REPLACED";
-}
-
 export interface TurnState {
   number: number;
   activePlayerIndex: 0 | 1;
@@ -172,28 +139,10 @@ export interface TurnState {
   oncePerTurnUsed: Record<string, string[]>; // effectId → instanceIds used this turn
   actionsPerformedThisTurn: PerformedAction[];
   extraTurnsPending?: number;
-  // OPT-259 (F6): effect-sourced damage (DEAL_DAMAGE) reveals a Life card
-  // with [Trigger]. The damaged player must decide to activate or decline,
-  // after which the damage loop resumes for any remaining iterations.
-  // Battle damage uses `battle.pendingTriggerLifeCard` instead — effect damage
-  // is decoupled so it can happen outside the battle phase.
-  pendingTriggerFromEffect?: {
-    lifeCard: LifeCard;
-    damagedPlayerIndex: 0 | 1;
-    remainingDamages: number;  // damages still to deal AFTER the current one resolves
-    sourceCardInstanceId: string;
-    controllerIndex: 0 | 1;    // controller of the effect that dealt the damage
-  } | null;
-  // OPT-441: a battle-damage [Trigger] effect may pause on the effect stack.
-  // Keep the completed Life damage's battle identity until that stack (and any
-  // CARD_REMOVED_FROM_LIFE auto effects queued behind it) fully unwinds, then
-  // resume the remaining Double Attack damage through the normal pipeline.
-  // OPT-872: an optional replacement for the losing Character's battle K.O.
-  // pauses the Damage Step the same way; see BattleKOReplacementContinuation.
-  pendingBattleDamageContinuation?:
-    | LeaderDamageContinuation
-    | BattleKOReplacementContinuation
-    | null;
+  // Damage and replacement continuations (a revealed [Trigger] Life card, a
+  // paused Double Attack, a battle-K.O. replacement, a DEAL_DAMAGE paused on
+  // a Trigger window) are typed effect-stack frames since OPT-963 (game-state
+  // schema version 3); the turn carries none of them.
   // Per-turn sticky flag: set to true the first time a player's deck transitions
   // to 0 cards during the current turn. Consumed by the end-of-turn defeat check
   // for Leaders with LOSS_CONDITION_MOD/DELAYED_LOSS (e.g., OP15-022 Brook).

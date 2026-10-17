@@ -4,7 +4,7 @@ import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPrompt
 import { generateFrameId, pushFrame } from "../../effect-stack.js";
 import { isGameTerminated } from "../../terminal.js";
 import { runRuleProcessingAfterMove } from "../../defeat.js";
-import { checkReplacementForRemoval } from "../../replacements.js";
+import { checkReplacementForRemoval, materializeReplacementOffer, type ReplacementOffer } from "../../replacements.js";
 import type { CostSelectionResult } from "../types.js";
 import { costResultToEntries } from "../types.js";
 import type { EffectResolverServices } from "../services.js";
@@ -92,12 +92,19 @@ export function payCostsWithSelection(
       costTransactionState: captureCostTransactionState(stagedState),
     });
   };
-  const suspend = (pendingPrompt: PendingPromptState): CostSelectionResult => {
+  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer): CostSelectionResult => {
     if (isGameTerminated(nextState)) return terminated();
-    return {
-      state: applyCostTransactionState(nextState, baseline),
-      events: [],
+    // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
+    // frame on top of the cost frame pushed just before.
+    const offered = materializeReplacementOffer(
+      applyCostTransactionState(nextState, baseline),
       pendingPrompt,
+      offer,
+    );
+    return {
+      state: offered.state,
+      events: [],
+      pendingPrompt: offered.pendingPrompt,
     };
   };
   const costResult: CostResult = {
@@ -686,7 +693,7 @@ export function payCostsWithSelection(
         };
         pushCostFrame(frame, stagedBeforeReplacement);
         if (isGameTerminated(nextState)) return cannotPay();
-        return suspend(replacement.pendingPrompt);
+        return suspend(replacement.pendingPrompt, replacement.offer);
       }
       if (replacement.replaced) {
         return { state: nextState, events: replacement.events, cannotPay: true };

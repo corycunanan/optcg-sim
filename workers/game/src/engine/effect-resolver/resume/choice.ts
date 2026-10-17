@@ -809,9 +809,6 @@ export function handleAwaitingOptionalActionResponse(
         pendingTriggers: [...frame.pendingTriggers, ...topFrame.pendingTriggers],
         triggerOrderingGroup:
           topFrame.triggerOrderingGroup ?? frame.triggerOrderingGroup,
-        ...(topFrame.replacementBatchContinuation
-          ? { replacementBatchContinuation: topFrame.replacementBatchContinuation }
-          : {}),
       }));
       return {
         state: nextState,

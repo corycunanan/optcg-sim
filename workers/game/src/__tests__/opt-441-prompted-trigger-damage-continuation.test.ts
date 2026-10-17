@@ -6,9 +6,9 @@ import {
   continuePipelineFromExecution,
   runPipeline,
 } from "../engine/pipeline.js";
-import { resumeBattleDamageContinuation } from "../engine/battle.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { battleContinuation, battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 const OPTIONAL_TRIGGER_SCHEMA: EffectSchema = {
   effects: [
@@ -115,52 +115,27 @@ function reachOptionalTriggerPrompt(
   );
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
-  expect(result.state.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
+  expect(battleTriggerLifeCard(result.state)).toBeTruthy();
 
-  const revealed = runPipeline(
-    result.state,
-    { type: "REVEAL_TRIGGER", reveal: true },
-    cardDb,
-    1,
-  );
+  const revealed = revealTrigger(result.state, true, cardDb);
   expect(revealed.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
   return revealed;
 }
 
+/** Answer the Trigger effect's prompt through the real session boundary; the lifecycle continues the damage. */
 function finishPromptAndDamage(
   state: GameState,
   cardDb: Map<string, CardData>,
   action: { type: "PLAYER_CHOICE"; choiceId: string } | { type: "PASS" },
 ) {
-  const resumed = resumeFromStack(
-    { ...state, pendingPrompt: null },
-    action,
+  const resumed = resumePromptLifecycle(
+    state,
+    { ...action, promptId: state.pendingPrompt?.promptId } as never,
     cardDb,
+    { drainPregame: (s) => s, advanceStartOfTurn: (s) => s },
   );
-  expect(resumed.pendingPrompt).toBeUndefined();
-  expect(resumed.state.effectStack).toHaveLength(0);
-
-  let result = continuePipelineFromExecution(
-    resumed.state,
-    { state: resumed.state, events: [] },
-    cardDb,
-    1,
-  );
-  while (
-    !result.pendingPrompt
-    && !result.gameOver
-    && result.state.effectStack.length === 0
-    && result.state.turn.pendingBattleDamageContinuation
-  ) {
-    const continuation = resumeBattleDamageContinuation(result.state, cardDb);
-    result = continuePipelineFromExecution(
-      continuation.state,
-      continuation,
-      cardDb,
-      1,
-    );
-  }
-  return result;
+  expect(resumed.responseRejected).toBe(false);
+  return { state: resumed.state, gameOver: resumed.gameOver, pendingPrompt: resumed.state.pendingPrompt ?? undefined };
 }
 
 describe("OPT-441 — prompted Life Trigger preserves damage continuation", () => {
@@ -171,7 +146,7 @@ describe("OPT-441 — prompted Life Trigger preserves damage continuation", () =
 
     expect(revealed.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
     expect(revealed.state.turn.battle?.damagesRemaining).toBe(1);
-    expect(revealed.state.turn.pendingBattleDamageContinuation).toBeTruthy();
+    expect(battleContinuation(revealed.state)).toBeTruthy();
     expect(
       revealed.state.eventLog.filter((event) => event.type === "CARD_REMOVED_FROM_LIFE"),
     ).toHaveLength(1);
@@ -189,7 +164,7 @@ describe("OPT-441 — prompted Life Trigger preserves damage continuation", () =
     expect(final.state.players[0].hand).toHaveLength(watcherHandBefore + 2);
     expect(final.state.players[1].life).toHaveLength(0);
     expect(final.state.turn.battle).toBeNull();
-    expect(final.state.turn.pendingBattleDamageContinuation).toBeNull();
+    expect(battleContinuation(final.state)).toBeUndefined();
   });
 
   it("still deals the second damage when the optional Trigger effect is declined", () => {
@@ -210,7 +185,7 @@ describe("OPT-441 — prompted Life Trigger preserves damage continuation", () =
     expect(final.state.status).toBe("IN_PROGRESS");
     expect(final.state.players[1].life).toHaveLength(0);
     expect(final.state.turn.battle).toBeNull();
-    expect(final.state.turn.pendingBattleDamageContinuation).toBeNull();
+    expect(battleContinuation(final.state)).toBeUndefined();
   });
 
   it("still runs rule processing on the resumed path (the accepted Trigger draws the last card)", () => {

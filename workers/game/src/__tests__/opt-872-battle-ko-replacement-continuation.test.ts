@@ -27,7 +27,7 @@
 
 import { describe, expect, it } from "vitest";
 import type {
-  BattleKOReplacementContinuation,
+  BattleDamageContinuation,
   CardData,
   CardInstance,
   GameAction,
@@ -39,7 +39,8 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
-import { resumeBattleDamageContinuation } from "../engine/battle.js";
+import { continueBattleDamageFrame } from "../engine/battle.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import {
   SessionRepository,
   parseStoredSession,
@@ -52,6 +53,10 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { battleContinuation, patchBattleContinuation, withReplacementOffer } from "./trigger-window-helpers.js";
+
+/** OPT-963: the K.O. replacement stage of the BATTLE_DAMAGE frame (was `turn.pendingBattleDamageContinuation`). */
+type BattleKOReplacementContinuation = Extract<BattleDamageContinuation, { stage: "CHARACTER_KO_REPLACEMENT" }>;
 
 class MemoryStorage implements SessionStorage {
   readonly data = new Map<string, unknown>();
@@ -173,7 +178,7 @@ function fixture() {
     state.players[card.owner].trash.some((c) => c.cardId === card.cardId);
   const events = (type: string) => state.eventLog.filter((e) => e.type === type);
   const continuation = () =>
-    state.turn.pendingBattleDamageContinuation as BattleKOReplacementContinuation | null | undefined;
+    battleContinuation(state) as BattleKOReplacementContinuation | null | undefined;
 
   return {
     db,
@@ -400,13 +405,7 @@ describe("an answered continuation is never re-answered", () => {
     f.battle(target, f.attacker());
     pendingBattleId(f);
     const lifeBefore = f.state.players[0].life.length;
-    f.state = {
-      ...f.state,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...f.continuation()!, resolution: "REPLACED" },
-      },
-    };
+    f.state = patchBattleContinuation(f.state, { resolution: "REPLACED" });
     f.decline();
 
     expect(f.onField(target)).toBe(true);
@@ -663,24 +662,19 @@ describe("CHARACTER_KO_REPLACEMENT continuation — schema and visibility", () =
     return f;
   }
 
+  /** The real writer's object (schema version 3), then the real reader. */
   function parse(state: GameState, db: Map<string, CardData>) {
     return parseStoredSession(
-      JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
+      JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })),
     ).state;
   }
 
   it("round-trips through the persisted-state schema, with and without a resolution", () => {
     const f = pendingState();
     const cont = f.continuation()!;
-    expect(parse(f.state, f.db).turn.pendingBattleDamageContinuation).toEqual(cont);
-    const resolved = {
-      ...f.state,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...cont, resolution: "NOT_REPLACED" as const },
-      },
-    };
-    expect(parse(resolved, f.db).turn.pendingBattleDamageContinuation).toMatchObject({
+    expect(battleContinuation(parse(f.state, f.db))).toEqual(cont);
+    const resolved = patchBattleContinuation(f.state, { resolution: "NOT_REPLACED" });
+    expect(battleContinuation(parse(resolved, f.db))).toMatchObject({
       resolution: "NOT_REPLACED",
     });
   });
@@ -698,19 +692,27 @@ describe("CHARACTER_KO_REPLACEMENT continuation — schema and visibility", () =
       const f = pendingState();
       const bad = {
         ...f.state,
-        turn: { ...f.state.turn, pendingBattleDamageContinuation: mutate(f.continuation()!) },
+        effectStack: f.state.effectStack.map((frame) =>
+          frame.battleDamage ? { ...frame, battleDamage: mutate(f.continuation()!) } : frame,
+        ),
       } as unknown as GameState;
       expect(() => parse(bad, f.db)).toThrow();
     });
   }
 
-  it("is visible to both players and spectators, with no Life identity added", () => {
+  it("names only public field cards; both player views and the spectator view share one turn", () => {
     const f = pendingState();
     const cont = f.continuation()!;
     expect(cont.stage).toBe("CHARACTER_KO_REPLACEMENT");
-    expect(filterStateForPlayer(f.state, 0).turn.pendingBattleDamageContinuation).toEqual(cont);
-    expect(filterStateForPlayer(f.state, 1).turn.pendingBattleDamageContinuation).toEqual(cont);
-    expect(visibleStateForSpectator(f.state, f.db).turn.pendingBattleDamageContinuation).toEqual(cont);
+    // OPT-963: the continuation lives on the effect stack, which is never
+    // sent; what reaches the clients (the turn, the prompt) is identical for
+    // both players and the spectator, with no Life identity in it.
+    expect(cont).not.toHaveProperty("lifeCardInstanceId");
+    const zero = filterStateForPlayer(f.state, 0);
+    const one = filterStateForPlayer(f.state, 1);
+    expect(zero.effectStack).toEqual([]);
+    expect(one.turn).toEqual(zero.turn);
+    expect(visibleStateForSpectator(f.state, f.db).turn).toEqual(zero.turn);
   });
 });
 
@@ -816,13 +818,7 @@ describe("an unmatched or unanswered continuation never finishes the battle", ()
       f.battle(target, f.attacker());
       const battleId = pendingBattleId(f);
       const lifeBefore = f.state.players[0].life.length;
-      f.state = {
-        ...f.state,
-        turn: {
-          ...f.state.turn,
-          pendingBattleDamageContinuation: { ...f.continuation()!, ...patch },
-        },
-      };
+      f.state = patchBattleContinuation(f.state, patch);
       f.accept();
 
       // The replacement itself still resolves (Life → hand) …
@@ -845,14 +841,13 @@ describe("an unmatched or unanswered continuation never finishes the battle", ()
     const target = franky(f);
     f.battle(target, f.attacker());
     pendingBattleId(f);
-    f.state = {
-      ...f.state,
-      pendingPrompt: {
-        options: { promptType: "OPTIONAL_EFFECT", effectDescription: "x", cards: [] },
-        respondingPlayer: 0,
-        resumeContext: { type: "REPLACEMENT", effectId: "unrelated", targetInstanceId: "none", event: "WOULD_BE_KO" },
-      },
-    };
+    // OPT-963: the unrelated offer is a REPLACEMENT frame above the paused
+    // battle frame, replacing the offer the Damage Step raised.
+    f.state = withReplacementOffer(
+      { ...f.state, effectStack: f.state.effectStack.filter((frame) => frame.battleDamage) },
+      { effectId: "unrelated", targetInstanceId: "none", event: "WOULD_BE_KO" },
+      0,
+    );
     f.decline();
 
     expect(f.onField(target)).toBe(true);
@@ -907,7 +902,7 @@ describe("a finished game never resumes the battle", () => {
     expect(f.continuation() ?? null).toBeNull();
   });
 
-  it("resumeBattleDamageContinuation drops even an answered continuation on a finished game", () => {
+  it("continueBattleDamageFrame drops even an answered continuation on a finished game", () => {
     // Unit-level: the lifecycle loop already stops on a terminal state; this
     // pins the function's own guard for its direct caller in the REPLACEMENT
     // branch.
@@ -915,19 +910,17 @@ describe("a finished game never resumes the battle", () => {
     const target = franky(f);
     f.battle(target, f.attacker());
     pendingBattleId(f);
+    const answered = patchBattleContinuation(f.state, { resolution: "NOT_REPLACED" });
     const finished: GameState = {
-      ...f.state,
+      ...answered,
       status: "FINISHED",
       winner: 1,
       pendingPrompt: null,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...f.continuation()!, resolution: "NOT_REPLACED" },
-      },
+      effectStack: answered.effectStack.filter((frame) => frame.battleDamage),
     };
-    const result = resumeBattleDamageContinuation(finished, f.db);
+    const result = continueBattleDamageFrame(finished, f.db);
     expect(result.events).toEqual([]);
-    expect(result.state.turn.pendingBattleDamageContinuation).toBeNull();
+    expect(battleContinuation(result.state)).toBeUndefined();
     expect(result.state.turn.battle).toEqual(finished.turn.battle);
     expect(result.state.players).toEqual(finished.players);
   });

@@ -31,6 +31,7 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { parseStoredSession } from "../session/persistence.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { battleContinuation, battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 const SERVICES = { drainPregame: (s: GameState) => s, advanceStartOfTurn: (s: GameState) => s };
 
@@ -166,7 +167,7 @@ function attack(f: { state: GameState; cardDb: Map<string, CardData> }, attacker
   let persisted = 0;
   for (let guard = 0; guard < 30 && !gameOver && state.status === "IN_PROGRESS"; guard++) {
     const prompt = state.pendingPrompt;
-    const triggerPending = !!state.turn.battle?.pendingTriggerLifeCard;
+    const triggerPending = !!battleTriggerLifeCard(state);
     if ((prompt || triggerPending) && opts.persistAtPrompts) {
       ({ state, cardDb } = roundTrip(state, cardDb));
       persisted++;
@@ -193,7 +194,7 @@ function attack(f: { state: GameState; cardDb: Map<string, CardData> }, attacker
     }
     if (triggerPending) {
       prompts.push("REVEAL_TRIGGER");
-      const revealed = runPipeline(state, { type: "REVEAL_TRIGGER", reveal: opts.reveal ?? false }, cardDb, 1);
+      const revealed = revealTrigger(state, opts.reveal ?? false, cardDb);
       expect(revealed.valid).toBe(true);
       state = revealed.state;
       gameOver = revealed.gameOver;
@@ -214,7 +215,7 @@ function expectGameContinues(state: GameState, gameOver: unknown) {
   expect(state.winner ?? null).toBeNull();
   expect(state.pendingPrompt ?? null).toBeNull();
   expect(state.turn.battle).toBeNull();
-  expect(state.turn.pendingBattleDamageContinuation ?? null).toBeNull();
+  expect(battleContinuation(state) ?? null).toBeNull();
   expect(state.eventLog.some((e) => e.type === "GAME_OVER")).toBe(false);
 }
 
@@ -344,10 +345,10 @@ describe("OPT-886 the second damage is always dealt (qa_rules.md:152-154)", () =
     );
     result = runPipeline(result.state, { type: "PASS" }, f.cardDb, 0);
     result = runPipeline(result.state, { type: "PASS" }, f.cardDb, 0);
-    expect(result.state.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
+    expect(battleTriggerLifeCard(result.state)).toBeTruthy();
     // Strip the keyword while the first damage's [Trigger] window is open.
     f.cardDb.set(CARDS.DOUBLE_ATK.id, { ...CARDS.DOUBLE_ATK, keywords: { ...CARDS.DOUBLE_ATK.keywords, doubleAttack: false } });
-    const after = runPipeline(result.state, { type: "REVEAL_TRIGGER", reveal: false }, f.cardDb, 1);
+    const after = revealTrigger(result.state, false, f.cardDb);
     expect(after.valid).toBe(true);
     expectGameContinues(after.state, after.gameOver);
     expect(after.state.players[1].life).toHaveLength(1);

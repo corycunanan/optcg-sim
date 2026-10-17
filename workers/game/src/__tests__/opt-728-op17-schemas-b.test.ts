@@ -50,6 +50,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 type PromptResult = {
   state: GameState;
@@ -222,7 +223,7 @@ function driveToTrigger(card: CardData): {
   expect(result.valid).toBe(true);
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
   expect(result.valid).toBe(true);
-  expect(result.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(card.id);
+  expect(battleTriggerLifeCard(result.state)?.cardId).toBe(card.id);
   return { state: result.state, cardDb };
 }
 
@@ -387,7 +388,7 @@ describe("OPT-728 paid and post-cost effects", () => {
     expect(offered.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     const completed = resumeReplacement(
       offered.state,
-      offered.pendingPrompt!.resumeContext as ReplacementResumeContext,
+      { type: "REPLACEMENT", ...offered.offer! },
       true,
       sufficient.cardDb,
       resolverExecutionServices
@@ -567,12 +568,7 @@ describe("OPT-728 direct Character Trigger blocks", () => {
     const ownerHandBefore = state.players[1].hand.length;
     const opponentTrashBefore = state.players[0].trash.length;
     const target = state.players[0].characters[0]!;
-    let result: PromptResult = runPipeline(
-      state,
-      { type: "REVEAL_TRIGGER", reveal: true },
-      cardDb,
-      1
-    );
+    let result: PromptResult = revealTrigger(state, true, cardDb);
     result = acceptOptional(result, cardDb);
     if (result.pendingPrompt?.options.promptType !== "SELECT_TARGET") {
       throw new Error("Expected Trigger hand-cost selection");
@@ -602,12 +598,7 @@ describe("OPT-728 direct Character Trigger blocks", () => {
       const ownerFieldBefore = fieldCount(state, 1);
       const opponentFieldBefore = fieldCount(state, 0);
       const ownerHandBefore = state.players[1].hand.length;
-      let result: PromptResult = runPipeline(
-        state,
-        { type: "REVEAL_TRIGGER", reveal: true },
-        cardDb,
-        1
-      );
+      let result: PromptResult = revealTrigger(state, true, cardDb);
       if (result.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT") {
         result = declineOptional(result, cardDb);
       }

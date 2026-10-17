@@ -8,13 +8,23 @@
 import { isGameTerminated } from "./terminal.js";
 import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import type {
+  BattleDamageContinuation,
   CardData,
+  EffectStackFrame,
   GameState,
-  LifeCard,
   PendingEvent,
   ExecuteResult,
-  BattleKOReplacementContinuation,
+  QueuedTrigger,
 } from "../types.js";
+import {
+  continuationFrame,
+  insertFrameAt,
+  openBattleTriggerWindow,
+  updateFrameById,
+} from "./damage-frames.js";
+import { generateFrameId } from "./effect-stack.js";
+import { materializeReplacementOffer } from "./replacements.js";
+import { popFrame } from "./effect-stack.js";
 import {
   getActivePlayerIndex,
   getInactivePlayerIndex,
@@ -43,7 +53,6 @@ import { allocateEngineId, takeEngineTimestamp } from "./execution-context.js";
 import {
   redirectDamageLifeCard,
   canOfferTrigger as canOfferTriggerQuery,
-  continueEffectDamageSequence as continueEffectDamageSequenceQuery,
   moveLifeCardToHand as moveLifeCardToHandQuery,
   popLifeForDamage as popLifeForDamageQuery,
 } from "./effect-damage.js";
@@ -269,10 +278,10 @@ export function executePass(
       playerIndex: pi,
       payload: { from: "COUNTER_STEP", to: "DAMAGE_STEP" },
     });
-    // Run damage resolution immediately
-    const dmgResult = executeDamageStep(nextState, cardDb);
+    // Run damage resolution immediately. The Damage Step shares this
+    // accumulator: a Trigger window publishes it before prompting (OPT-963).
+    const dmgResult = executeDamageStep(nextState, cardDb, events);
     nextState = dmgResult.state;
-    events.push(...dmgResult.events);
     return {
       state: nextState,
       events,
@@ -410,28 +419,40 @@ export function executeUseCounterEvent(
   return { state: nextState, events };
 }
 
-// ─── Reveal Trigger ───────────────────────────────────────────────────────────
+// ─── Reveal Trigger (OPT-963: the BATTLE_DAMAGE frame's window) ─────────────
 
-export function executeRevealTrigger(
+/** A BATTLE_DAMAGE frame's continuation; `queuedTriggers` are the rule 8-6-2 deferred watchers released when the sequence completes. */
+export type BattleDamageResult = ExecuteResult & {
+  lethalDamagePlayerIndex?: 0 | 1;
+  queuedTriggers?: QueuedTrigger[];
+};
+
+/**
+ * Resume the top BATTLE_DAMAGE frame at its Trigger window with the defender's
+ * REVEAL_TRIGGER choice (rules §7-1-4-1-1-2, §10-1-5-3, 8-6-2-1). Accept
+ * trashes the card and resolves its [Trigger] block; when that block prompts,
+ * the frame moves to TRIGGER_EFFECT below the block's frames and the Life
+ * removal is published now and retained unscanned for the continuation
+ * (OPT-441). Decline adds the card to hand. Either way the remaining points
+ * continue from the same frame.
+ */
+export function resumeBattleDamageFrame(
   state: GameState,
   reveal: boolean,
   cardDb: Map<string, CardData>
-): ExecuteResult {
-  const battle = state.turn.battle;
-  // OPT-259 (F6): effect-sourced damage parks its pending Trigger on turn
-  // state rather than battle state. Route to the effect-damage resolver when
-  // no battle trigger is pending.
-  if (!battle?.pendingTriggerLifeCard && state.turn.pendingTriggerFromEffect) {
-    return executeRevealEffectDamageTrigger(state, reveal, cardDb);
-  }
-
+): BattleDamageResult {
   const events: PendingEvent[] = [];
-  const inactiveIdx = getInactivePlayerIndex(state);
+  const frame = state.effectStack.at(-1);
+  const window = frame?.battleDamage;
+  if (!frame || window?.stage !== "TRIGGER_WINDOW") return { state, events };
+  const battle = state.turn.battle;
+  if (!battle || battle.battleId !== window.battleId) {
+    // The battle this window belongs to is gone; nothing can answer it.
+    return { state: popFrame(state), events };
+  }
+  const inactiveIdx = window.damagedPlayerIndex;
+  const lifeCard = window.lifeCard;
   let nextState = state;
-
-  if (!battle?.pendingTriggerLifeCard) return { state, events };
-
-  const lifeCard = battle.pendingTriggerLifeCard;
   let destinationInstanceId: string | undefined;
 
   if (reveal) {
@@ -439,11 +460,11 @@ export function executeRevealTrigger(
     const moved = transitionDetachedCard(
       nextState,
       {
-      instanceId: lifeCard.instanceId,
-      cardId: lifeCard.cardId,
-      source: "LIFE",
-      owner: inactiveIdx,
-      lifeFace: lifeCard.face,
+        instanceId: lifeCard.instanceId,
+        cardId: lifeCard.cardId,
+        source: "LIFE",
+        owner: inactiveIdx,
+        lifeFace: lifeCard.face,
       },
       "TRASH",
       { position: "TOP" }
@@ -464,7 +485,6 @@ export function executeRevealTrigger(
       payload: { cardId: lifeCard.cardId, activated: true },
     });
 
-    // If the trigger card has an effectSchema with a TRIGGER block, resolve it
     const triggerCardData = cardDb.get(lifeCard.cardId);
     if (triggerCardData?.type === "Event") {
       events.push({
@@ -474,81 +494,62 @@ export function executeRevealTrigger(
       });
     }
     const schema = triggerCardData?.effectSchema;
-    if (schema?.effects) {
-      const triggerBlock = schema.effects.find(
-        (b) =>
-          b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
+    const triggerBlock = schema?.effects?.find(
+      (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
+    );
+    if (triggerBlock) {
+      const effectResult = resolveEffect(
+        nextState,
+        triggerBlock,
+        triggerInstanceId,
+        inactiveIdx,
+        cardDb
       );
-      if (triggerBlock) {
-        const effectResult = resolveEffect(
-          nextState,
-          triggerBlock,
-          triggerInstanceId,
-          inactiveIdx,
-          cardDb
-        );
-        nextState = effectResult.state;
-        events.push(...effectResult.events);
-        nextState = restoreTriggerStaging(nextState, stagingBaseline);
-        // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
-        // that already happened, then stop: no further damage, no endBattle.
-        if (isGameTerminated(nextState)) {
-          events.push({
-            type: "CARD_REMOVED_FROM_LIFE",
-            playerIndex: inactiveIdx,
-            payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
-          });
-          return { state: nextState, events };
-        }
-        // OPT-441: a prompt pauses the Trigger effect, not the damage sequence.
-        // Publish the Life removal now and queue its auto effects behind the
-        // current effect frame. Once that stack fully unwinds, GameSession
-        // resumes any remaining Double Attack damage through the pipeline.
-        if (effectResult.pendingPrompt) {
-          const removedEvent: PendingEvent = {
-            type: "CARD_REMOVED_FROM_LIFE",
-            playerIndex: inactiveIdx,
-            payload: {
-              cardInstanceId: lifeCard.instanceId,
-              newCardInstanceId: triggerInstanceId,
-            },
-            propagation: { eventLogEmitted: true },
-          };
-          nextState = emitPendingEvent(nextState, removedEvent, inactiveIdx);
-
-          const pausedBattle = nextState.turn.battle;
-          if (!pausedBattle) {
-            return {
-              state: nextState,
-              events,
-              pendingPrompt: effectResult.pendingPrompt,
-            };
-          }
-          const cleanedBattle = { ...pausedBattle };
-          delete cleanedBattle.pendingTriggerLifeCard;
-          const remainingBefore = cleanedBattle.damagesRemaining ?? 1;
-          cleanedBattle.damagesRemaining = Math.max(0, remainingBefore - 1);
-          nextState = {
-            ...nextState,
-            turn: {
-              ...nextState.turn,
-              battle: cleanedBattle,
-              pendingBattleDamageContinuation: {
-                battleId: cleanedBattle.battleId,
-                lifeCardInstanceId: lifeCard.instanceId,
-                damagedPlayerIndex: inactiveIdx,
-                stage: "LIFE_REMOVAL",
-              },
-            },
-          };
-          return {
-            state: nextState,
-            events,
-            pendingPrompt: effectResult.pendingPrompt,
-          };
-        }
-      } else {
-        nextState = restoreTriggerStaging(nextState, stagingBaseline);
+      nextState = effectResult.state;
+      events.push(...effectResult.events);
+      nextState = restoreTriggerStaging(nextState, stagingBaseline);
+      // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
+      // that already happened, then stop: no further damage, no endBattle.
+      if (isGameTerminated(nextState)) {
+        events.push({
+          type: "CARD_REMOVED_FROM_LIFE",
+          playerIndex: inactiveIdx,
+          payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
+        });
+        return { state: nextState, events };
+      }
+      // OPT-441: a prompt pauses the Trigger effect, not the damage sequence.
+      // Publish the Life removal now and retain it on the frame, unscanned,
+      // so its auto effects fire when the Trigger's frames unwind and the
+      // frame continues the remaining damage.
+      if (effectResult.pendingPrompt) {
+        const removedEvent: PendingEvent = {
+          type: "CARD_REMOVED_FROM_LIFE",
+          playerIndex: inactiveIdx,
+          payload: {
+            cardInstanceId: lifeCard.instanceId,
+            newCardInstanceId: triggerInstanceId,
+          },
+          propagation: { eventLogEmitted: true },
+        };
+        nextState = emitPendingEvent(nextState, removedEvent, inactiveIdx);
+        nextState = decrementDamagesRemaining(nextState);
+        nextState = updateFrameById(nextState, frame.id, (current) => ({
+          ...current,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          battleDamage: {
+            stage: "TRIGGER_EFFECT",
+            battleId: window.battleId,
+            damagedPlayerIndex: inactiveIdx,
+            lifeCardInstanceId: lifeCard.instanceId,
+          },
+          accumulatedEvents: [removedEvent],
+        }));
+        return {
+          state: nextState,
+          events,
+          pendingPrompt: effectResult.pendingPrompt,
+        };
       }
     } else {
       nextState = restoreTriggerStaging(nextState, stagingBaseline);
@@ -558,11 +559,11 @@ export function executeRevealTrigger(
     const moved = transitionDetachedCard(
       nextState,
       {
-      instanceId: lifeCard.instanceId,
-      cardId: lifeCard.cardId,
-      source: "LIFE",
-      owner: inactiveIdx,
-      lifeFace: lifeCard.face,
+        instanceId: lifeCard.instanceId,
+        cardId: lifeCard.cardId,
+        source: "LIFE",
+        owner: inactiveIdx,
+        lifeFace: lifeCard.face,
       },
       "HAND"
     );
@@ -594,268 +595,31 @@ export function executeRevealTrigger(
     },
   });
 
-  // Clear the pending trigger marker. The damage that opened this window is
-  // now complete — decrement damagesRemaining and continue the DA sequence
-  // (OPT-239 / qa_rules.md:229-231). If the Character was not DA, or we just
-  // dealt the final damage, the continuation will exit via endBattle.
-  const cleanedBattle = { ...battle };
-  delete cleanedBattle.pendingTriggerLifeCard;
-  const remainingBefore = cleanedBattle.damagesRemaining ?? 1;
-  cleanedBattle.damagesRemaining = Math.max(0, remainingBefore - 1);
-  nextState = {
-    ...nextState,
-    turn: { ...nextState.turn, battle: cleanedBattle },
-  };
-
-  const cont = continueLeaderDamageSequence(nextState, cardDb);
-  events.push(...cont.events);
-  return {
-    state: cont.state,
-    events,
-    lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex,
-  };
+  // The damage that opened this window is now complete — decrement
+  // damagesRemaining and continue the DA sequence (OPT-239 /
+  // qa_rules.md:229-231) from the same frame.
+  nextState = decrementDamagesRemaining(nextState);
+  return continueLeaderDamageSequence(nextState, cardDb, false, frame.id, events);
 }
 
-// ─── Effect-damage Trigger resolver (OPT-259 / F6) ───────────────────────────
-
-/**
- * Resume the damage loop after the defender accepts or declines a [Trigger]
- * window that was opened by effect-sourced damage (DEAL_DAMAGE). Mirrors the
- * battle-damage `executeRevealTrigger` accept/decline/resolve pattern but
- * consumes `turn.pendingTriggerFromEffect` instead of `battle.pendingTriggerLifeCard`.
- *
- * If the trigger effect itself pauses for player input, we end the damage
- * loop here (same policy the battle path uses at the `endBattle` branch) —
- * any remaining damages on a multi-damage effect are not dealt, matching
- * the precedent that trigger-effect resolution supersedes further damage.
- */
-function executeRevealEffectDamageTrigger(
-  state: GameState,
-  reveal: boolean,
-  cardDb: Map<string, CardData>
-): ExecuteResult {
-  const events: PendingEvent[] = [];
-  const pending = state.turn.pendingTriggerFromEffect;
-  if (!pending) return { state, events };
-
-  const { lifeCard, damagedPlayerIndex, remainingDamages, controllerIndex } =
-    pending;
-  let nextState: GameState = {
+function decrementDamagesRemaining(state: GameState): GameState {
+  const battle = state.turn.battle;
+  if (!battle) return state;
+  const remainingBefore = battle.damagesRemaining ?? 1;
+  return {
     ...state,
-    turn: { ...state.turn, pendingTriggerFromEffect: null },
-  };
-  let destinationInstanceId: string | undefined;
-
-  if (reveal) {
-    // Trash the revealed Life card (rules §10-1-5-3) before resolving the
-    // trigger block. The trigger block runs from the trash.
-    const moved = transitionDetachedCard(
-      nextState,
-      {
-      instanceId: lifeCard.instanceId,
-      cardId: lifeCard.cardId,
-      owner: damagedPlayerIndex,
-      source: "LIFE",
-      lifeFace: lifeCard.face,
-      },
-      "TRASH",
-      { position: "TOP" }
-    );
-    if (!moved) return { state: nextState, events };
-    nextState = moved.state;
-    const triggerInstanceId = moved.fact.newInstanceId;
-    destinationInstanceId = triggerInstanceId;
-    // OPT-257 (F4): see executeRevealTrigger above — staging marker keeps the
-    // just-trashed Life card invisible to trash-targeting effects during the
-    // Trigger's effect resolution.
-    const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
-    nextState = pushTriggerStaging(nextState, triggerInstanceId);
-    events.push({
-      type: "TRIGGER_ACTIVATED",
-      playerIndex: damagedPlayerIndex,
-      payload: { cardId: lifeCard.cardId, activated: true },
-    });
-
-    const triggerCardData = cardDb.get(lifeCard.cardId);
-    if (triggerCardData?.type === "Event") {
-      events.push({
-        type: "EVENT_TRIGGER_RESOLVED",
-        playerIndex: damagedPlayerIndex,
-        payload: { cardId: lifeCard.cardId, cardInstanceId: triggerInstanceId },
-      });
-    }
-    const schema = triggerCardData?.effectSchema;
-    if (schema?.effects) {
-      const triggerBlock = schema.effects.find(
-        (b) =>
-          b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
-      );
-      if (triggerBlock) {
-        const effectResult = resolveEffect(
-          nextState,
-          triggerBlock,
-          triggerInstanceId,
-          damagedPlayerIndex,
-          cardDb
-        );
-        nextState = effectResult.state;
-        events.push(...effectResult.events);
-        nextState = restoreTriggerStaging(nextState, stagingBaseline);
-        // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
-        // that already happened, then stop: no further damage, no endBattle.
-        if (isGameTerminated(nextState)) {
-          events.push({
-            type: "CARD_REMOVED_FROM_LIFE",
-            playerIndex: damagedPlayerIndex,
-            payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
-          });
-          return { state: nextState, events };
-        }
-        if (effectResult.pendingPrompt) {
-          // Trigger effect itself needs input — abandon remaining damages
-          // (parity with battle path at executeRevealTrigger's endBattle).
-          events.push({
-            type: "CARD_REMOVED_FROM_LIFE",
-            playerIndex: damagedPlayerIndex,
-            payload: {
-              cardInstanceId: lifeCard.instanceId,
-              newCardInstanceId: triggerInstanceId,
-            },
-          });
-          return {
-            state: nextState,
-            events,
-            pendingPrompt: effectResult.pendingPrompt,
-          };
-        }
-      } else {
-        nextState = restoreTriggerStaging(nextState, stagingBaseline);
-      }
-    } else {
-      nextState = restoreTriggerStaging(nextState, stagingBaseline);
-    }
-  } else {
-    const handResult = moveLifeCardToHand(
-      nextState,
-      lifeCard,
-      damagedPlayerIndex
-    );
-    nextState = handResult.state;
-    events.push(...handResult.events);
-    // Decline emits the REMOVED event inside moveLifeCardToHand — we do NOT
-    // want to emit it again below, so return after resuming remaining damage.
-    const cont = continueEffectDamageSequence(
-      nextState,
-      cardDb,
-      damagedPlayerIndex,
-      remainingDamages,
-      pending.sourceCardInstanceId,
-      controllerIndex
-    );
-    return {
-      state: cont.state,
-      events: [...events, ...cont.events],
-      ...(cont.pendingPrompt && { pendingPrompt: cont.pendingPrompt }),
-    };
-  }
-
-  // Accept path: emit REMOVED_FROM_LIFE after the trigger block resolves, per
-  // OPT-240. Then resume the remaining damages.
-  events.push({
-    type: "CARD_REMOVED_FROM_LIFE",
-    playerIndex: damagedPlayerIndex,
-    payload: {
-      cardInstanceId: lifeCard.instanceId,
-      ...(destinationInstanceId
-        ? { newCardInstanceId: destinationInstanceId }
-        : {}),
+    turn: {
+      ...state.turn,
+      battle: { ...battle, damagesRemaining: Math.max(0, remainingBefore - 1) },
     },
-  });
-
-  const cont = continueEffectDamageSequence(
-    nextState,
-    cardDb,
-    damagedPlayerIndex,
-    remainingDamages,
-    pending.sourceCardInstanceId,
-    controllerIndex
-  );
-  return {
-    state: cont.state,
-    events: [...events, ...cont.events],
-    ...(cont.pendingPrompt && { pendingPrompt: cont.pendingPrompt }),
   };
-}
-
-/**
- * Deal `remainingDamages` more damages to `damagedPlayerIndex` as the
- * continuation of an effect-sourced damage loop (DEAL_DAMAGE). Pops Life
- * cards one at a time; on a [Trigger] reveal, parks state in
- * `turn.pendingTriggerFromEffect` and returns — the REVEAL_TRIGGER handler
- * will re-enter here. Lethal (life already 0) stops the loop.
- *
- * This is the shared continuation used by both the initial call from
- * `executeDealDamage` and the resume after `executeRevealEffectDamageTrigger`.
- */
-export function continueEffectDamageSequence(
-  state: GameState,
-  cardDb: Map<string, CardData>,
-  damagedPlayerIndex: 0 | 1,
-  remainingDamages: number,
-  sourceCardInstanceId: string,
-  controllerIndex: 0 | 1
-): ExecuteResult {
-  return continueEffectDamageSequenceQuery(
-    state,
-    cardDb,
-            damagedPlayerIndex,
-    remainingDamages,
-            sourceCardInstanceId,
-    controllerIndex
-  );
 }
 
 // ─── Leader-damage helpers (OPT-239) ────────────────────────────────────────
 
-/**
- * Pop the top Life card for a damage resolution. Shared by battle damage
- * (`dealOneLeaderDamage`) and effect-sourced damage (`executeDealDamage`) so
- * both paths agree on the §7-1-4-1-1 ordering: lethal check first, then pop,
- * then emit LIFE_COUNT_BECOMES_ZERO if this damage drained the Life zone.
- *
- * OPT-255 (F2): popping here — before any Trigger window or caller-specific
- * resolution — ensures life-threshold conditions inside a `[Trigger]` block
- * evaluate against the post-pop life array.
- *
- * Does NOT emit `DAMAGE_DEALT` (payload shape differs between battle/effect
- * damage) and does NOT open the Trigger window — callers own both.
- */
-export function popLifeForDamage(
-  state: GameState,
-  damagedPlayerIndex: 0 | 1
-): {
-  state: GameState;
-  lifeCard: LifeCard | null;
-  lethal: boolean;
-  events: PendingEvent[];
-} {
-  return popLifeForDamageQuery(state, damagedPlayerIndex);
-}
-
-/**
- * Move a revealed Life card into the damaged player's hand and emit the
- * standard pair of events in the OPT-240 order (ADDED_TO_HAND before
- * REMOVED_FROM_LIFE). Used by both battle damage's no-[Trigger] path and by
- * effect damage whenever the revealed card lacks [Trigger] or the defender
- * declines to activate.
- */
-export function moveLifeCardToHand(
-  state: GameState,
-  lifeCard: LifeCard,
-  damagedPlayerIndex: 0 | 1
-): { state: GameState; events: PendingEvent[] } {
-  return moveLifeCardToHandQuery(state, lifeCard, damagedPlayerIndex);
-}
+export { popLifeForDamage, moveLifeCardToHand } from "./effect-damage.js";
+const popLifeForDamage = popLifeForDamageQuery;
+const moveLifeCardToHand = moveLifeCardToHandQuery;
 
 /**
  * Deal one damage to the defending Leader. Returns `paused: true` when the
@@ -874,6 +638,8 @@ function dealOneLeaderDamage(
   state: GameState;
   events: PendingEvent[];
   paused: boolean;
+  /** The revealed [Trigger] Life card when paused. */
+  lifeCard?: import("../types.js").LifeCard;
   lethalDamagePlayerIndex?: 0 | 1;
   lethal?: boolean;
 } {
@@ -965,18 +731,12 @@ function dealOneLeaderDamage(
       lifeCard.instanceId
     )
   ) {
-    const curBattle = nextState.turn.battle!;
-    const updatedBattle = { ...curBattle, pendingTriggerLifeCard: lifeCard };
-    nextState = {
-      ...nextState,
-      turn: { ...nextState.turn, battle: updatedBattle as typeof curBattle },
-    };
     events.push({
       type: "TRIGGER_ACTIVATED",
       playerIndex: inactiveIdx,
       payload: { cardId: lifeCard.cardId },
     });
-    return { state: nextState, events, paused: true };
+    return { state: nextState, events, paused: true, lifeCard };
   }
 
   const handResult = moveLifeCardToHand(nextState, lifeCard, inactiveIdx);
@@ -1001,9 +761,10 @@ function dealOneLeaderDamage(
 function continueLeaderDamageSequence(
   state: GameState,
   cardDb: Map<string, CardData>,
-  enteringDamageStep = false
-): ExecuteResult & { lethalDamagePlayerIndex?: 0 | 1 } {
-  const events: PendingEvent[] = [];
+  enteringDamageStep = false,
+  frameId?: string,
+  events: PendingEvent[] = []
+): BattleDamageResult {
   let nextState = state;
   let lethalDamagePlayerIndex: 0 | 1 | undefined;
   // OPT-796: only the Damage Step entry deals the attack's first damage; every
@@ -1067,9 +828,17 @@ function continueLeaderDamageSequence(
       lethalDamagePlayerIndex = one.lethalDamagePlayerIndex;
 
     if (one.paused) {
-      // Pending Trigger: defender will send REVEAL_TRIGGER which re-enters
-      // this function via executeRevealTrigger after resolution.
-      return { state: nextState, events, lethalDamagePlayerIndex };
+      // Pending Trigger (rule 8-6-2-1): the BATTLE_DAMAGE frame owns the
+      // window; the defender's REVEAL_TRIGGER resumes it through the prompt
+      // lifecycle (resumeBattleDamageFrame). The accumulator is published
+      // inside, so the caller returns it already marked.
+      const opened = openBattleTriggerWindow(nextState, one.lifeCard!, events, cardDb, frameId);
+      return {
+        state: opened.state,
+        events,
+        lethalDamagePlayerIndex,
+        ...(opened.pendingPrompt ? { pendingPrompt: opened.pendingPrompt } : {}),
+      };
     }
 
     // Damage completed (or lethal) — decrement remaining.
@@ -1090,79 +859,72 @@ function continueLeaderDamageSequence(
   }
 
   nextState = endBattle(nextState, events);
-  return { state: nextState, events, lethalDamagePlayerIndex };
+  // The sequence's frame (if any) completes with the battle; the ordinary
+  // triggers it deferred (rule 8-6-2) are released to the caller.
+  let queuedTriggers: QueuedTrigger[] | undefined;
+  if (frameId !== undefined) {
+    const frame = nextState.effectStack.find((candidate) => candidate.id === frameId);
+    if (frame) {
+      queuedTriggers = frame.pendingTriggers;
+      nextState = { ...nextState, effectStack: nextState.effectStack.filter((candidate) => candidate.id !== frameId) };
+    }
+  }
+  return {
+    state: nextState,
+    events,
+    lethalDamagePlayerIndex,
+    ...(queuedTriggers?.length ? { queuedTriggers } : {}),
+  };
 }
 
 /**
- * Re-enter a battle damage loop that was paused while a Life [Trigger] effect
- * awaited player input. The caller must feed the returned ExecuteResult back
- * through the action pipeline so its events, auto effects, and lethal checks
- * receive the same processing as an ordinary REVEAL_TRIGGER action.
+ * Continue the top BATTLE_DAMAGE frame once the work above it has unwound:
+ * at TRIGGER_EFFECT the accepted Trigger's frames are gone, so the retained
+ * Life removal is released for scanning and the remaining points are dealt;
+ * at CHARACTER_KO_REPLACEMENT with a recorded resolution the Damage Step
+ * finishes (OPT-872). The caller feeds the result through the action pipeline
+ * so its events, auto effects, deferred watchers and lethal checks receive
+ * the same processing as an ordinary action. An unanswered K.O. replacement
+ * (no prompt can deliver its answer any more) is discarded, as is a frame
+ * whose battle is gone (OPT-884 owns the recovery policy).
  */
-export function resumeBattleDamageContinuation(
+export function continueBattleDamageFrame(
   state: GameState,
   cardDb: Map<string, CardData>,
   replacementEvents: PendingEvent[] = []
-): ExecuteResult {
-  const pending = state.turn.pendingBattleDamageContinuation;
-  if (!pending || state.pendingPrompt || state.effectStack.length > 0) {
-    return { state, events: [] };
-  }
-  // A finished game never resumes a battle; drop the continuation.
-  if (state.status !== "IN_PROGRESS") {
-    return {
-      state: { ...state, turn: { ...state.turn, pendingBattleDamageContinuation: null } },
-      events: [],
-    };
-  }
+): BattleDamageResult {
+  const frame = state.effectStack.at(-1);
+  const pending = frame?.battleDamage;
+  if (!frame || !pending || state.pendingPrompt) return { state, events: [] };
+  // A finished game never resumes a battle; drop the frame.
+  if (state.status !== "IN_PROGRESS") return { state: popFrame(state), events: [] };
 
   const battle = state.turn.battle;
-  const clearedState: GameState = {
-    ...state,
-    turn: { ...state.turn, pendingBattleDamageContinuation: null },
-  };
   if (!battle || battle.battleId !== pending.battleId) {
-    return { state: clearedState, events: [] };
+    return { state: popFrame(state), events: [] };
   }
 
   if (pending.stage === "CHARACTER_KO_REPLACEMENT") {
     // Only an answered continuation finishes the battle. An unanswered one
-    // reaching here has lost its prompt (no prompt is pending and the stack is
-    // empty), so nothing can answer it any more; discard it rather than
-    // guess a decline and K.O. the Character (OPT-872 review).
+    // reaching here has lost its prompt (no prompt is pending), so nothing
+    // can answer it any more; discard it rather than guess a decline and
+    // K.O. the Character (OPT-872 review).
     if (pending.resolution === undefined) {
-      return { state: clearedState, events: [] };
+      return { state: popFrame(state), events: [] };
     }
-    return finishCharacterBattleResult(
-      clearedState,
-      pending,
-      replacementEvents,
-      cardDb
-    );
+    return finishCharacterBattleResult(popFrame(state), pending, replacementEvents, cardDb);
   }
 
-  if (pending.stage === "LIFE_REMOVAL") {
-    const removalState: GameState = {
-      ...state,
-      turn: {
-        ...state.turn,
-        pendingBattleDamageContinuation: { ...pending, stage: "DAMAGE" },
-      },
-    };
-    return {
-      state: removalState,
-      events: [
-        {
-        type: "CARD_REMOVED_FROM_LIFE",
-        playerIndex: pending.damagedPlayerIndex,
-        payload: { cardInstanceId: pending.lifeCardInstanceId },
-        propagation: { eventLogEmitted: true },
-        },
-      ],
-    };
+  if (pending.stage === "TRIGGER_WINDOW") {
+    // Still waiting for the defender; the lifecycle surfaces the prompt.
+    return { state, events: [] };
   }
 
-  return continueLeaderDamageSequence(clearedState, cardDb);
+  // TRIGGER_EFFECT: the retained Life removal (published, unscanned) heads
+  // the continuation's events so its watchers fire with the rest.
+  const retained = frame.accumulatedEvents;
+  const cleared = updateFrameById(state, frame.id, (current) => ({ ...current, accumulatedEvents: [] }));
+  return continueLeaderDamageSequence(cleared, cardDb, false, frame.id, [...retained]);
 }
 
 // ─── Recalculate Battle Powers ───────────────────────────────────────────────
@@ -1243,9 +1005,9 @@ function isOnField(
 
 function executeDamageStep(
   state: GameState,
-  cardDb: Map<string, CardData>
-): ExecuteResult & { lethalDamagePlayerIndex?: 0 | 1 } {
-  const events: PendingEvent[] = [];
+  cardDb: Map<string, CardData>,
+  events: PendingEvent[]
+): BattleDamageResult {
   const pi = getActivePlayerIndex(state);
 
   // OPT-243: guard against mid-step removal before we recalc powers or emit
@@ -1331,18 +1093,19 @@ function executeDamageStep(
           },
         };
 
-        const cont = continueLeaderDamageSequence(nextState, cardDb, true);
-        events.push(...cont.events);
+        const cont = continueLeaderDamageSequence(nextState, cardDb, true, undefined, events);
         return {
           state: cont.state,
           events,
           lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex ?? lethalDamagePlayerIndex,
+          ...(cont.pendingPrompt ? { pendingPrompt: cont.pendingPrompt } : {}),
         };
       } else if (targetFound.card.zone === "CHARACTER") {
         // Emit COMBAT_VICTORY — attacker won against a character
         events.push(combatVictoryEvent(pi as 0 | 1, battle));
 
         // Check for replacement effects before KO
+        const depthBefore = nextState.effectStack.length;
         const replacement = checkReplacementForKO(
           nextState,
           targetInstanceId,
@@ -1353,45 +1116,44 @@ function executeDamageStep(
         );
         if (replacement.pendingPrompt) {
           // OPT-872: the prompt pauses the Damage Step. Either the player is
-          // offered an optional replacement (resolution recorded when they
-          // answer), or a mandatory replacement's substitute awaits input
-          // (already REPLACED). The pipeline drops a prompting execution's
-          // events, so the resumed step rebuilds PHASE_CHANGED /
-          // CHARACTER_BATTLES / COMBAT_VICTORY and publishes them with the
-          // K.O. and END_OF_BATTLE. When the substitute itself prompts, its
-          // events are published first (when its frame resolves), so that
-          // order differs from the synchronous path.
-          const resumeContext = replacement.pendingPrompt.resumeContext;
-          const optionalEffectId =
-            !replacement.replaced &&
-            typeof resumeContext === "object" &&
-            resumeContext !== null &&
-            "type" in resumeContext &&
-            resumeContext.type === "REPLACEMENT"
-              ? resumeContext.effectId
-              : undefined;
+          // offered an optional replacement (its REPLACEMENT frame on top,
+          // resolution recorded when they answer), or a mandatory
+          // replacement's substitute awaits input in its own frames (already
+          // REPLACED). The BATTLE_DAMAGE frame sits below them (OPT-963).
+          // The pipeline drops a prompting execution's events, so the resumed
+          // step rebuilds PHASE_CHANGED / CHARACTER_BATTLES / COMBAT_VICTORY
+          // and publishes them with the K.O. and END_OF_BATTLE. When the
+          // substitute itself prompts, its events are published first (when
+          // its frame resolves), so that order differs from the synchronous path.
+          const optionalEffectId = !replacement.replaced ? replacement.offer?.effectId : undefined;
+          const offered = materializeReplacementOffer(replacement.state, replacement.pendingPrompt, replacement.offer);
+          const frameId = generateFrameId(offered.state);
+          const paused: BattleDamageContinuation = {
+            stage: "CHARACTER_KO_REPLACEMENT",
+            battleId: battle.battleId,
+            targetInstanceId,
+            causingPlayerIndex: pi as 0 | 1,
+            attackerIsCharacter: attackerCheck.found!.card.zone === "CHARACTER",
+            ...(replacement.replaced && { resolution: "REPLACED" as const }),
+            ...(optionalEffectId !== undefined && { replacementEffectId: optionalEffectId }),
+          };
+          const withFrame = insertFrameAt(
+            frameId.state,
+            depthBefore,
+            continuationFrame({
+              id: frameId.id,
+              sourceCardInstanceId: battle.attackerInstanceId,
+              controller: pi as 0 | 1,
+              phase: "INTERRUPTED_BY_TRIGGERS",
+              battleDamage: paused,
+            })
+          );
+          if (isGameTerminated(withFrame)) return { state: withFrame, events: [] };
           return {
-            state: {
-              ...replacement.state,
-              turn: {
-                ...replacement.state.turn,
-                pendingBattleDamageContinuation: {
-                  battleId: battle.battleId,
-                  stage: "CHARACTER_KO_REPLACEMENT",
-                  targetInstanceId,
-                  causingPlayerIndex: pi as 0 | 1,
-                  attackerIsCharacter:
-                    attackerCheck.found!.card.zone === "CHARACTER",
-                  ...(replacement.replaced && { resolution: "REPLACED" as const }),
-                  ...(optionalEffectId !== undefined && {
-                    replacementEffectId: optionalEffectId,
-                  }),
-                },
-              },
-            },
+            state: withFrame,
             events: [],
             lethalDamagePlayerIndex,
-            pendingPrompt: replacement.pendingPrompt,
+            pendingPrompt: offered.pendingPrompt,
           };
         }
         if (replacement.replaced) {
@@ -1498,11 +1260,11 @@ function koBattleLoser(
  * (§8-1-3-4-1), then End of the Battle (§7-1-5). That matches the synchronous
  * order only when the substitute resolved without a prompt; a prompted
  * substitute's events were already published by its own frame. The caller
- * clears the continuation and checks its battleId.
+ * pops the BATTLE_DAMAGE frame and checks its battleId.
  */
-function finishCharacterBattleResult(
+export function finishCharacterBattleResult(
   state: GameState,
-  pending: BattleKOReplacementContinuation,
+  pending: Extract<BattleDamageContinuation, { stage: "CHARACTER_KO_REPLACEMENT" }>,
   replacementEvents: PendingEvent[],
   cardDb: Map<string, CardData>
 ): ExecuteResult {

@@ -102,10 +102,10 @@ function describe(outcome: TerminalOutcome): {
 }
 
 /**
- * Write a terminal outcome once. Clears the prompt, the effect stack, the
- * event-activation barrier, the battle, both damage Trigger windows and the
- * paused battle-damage continuation, so no continuation can run afterwards
- * (live, after a stale reply, or after a reload).
+ * Write a terminal outcome once. Clears the prompt, the effect stack (which
+ * since OPT-963 holds every damage and replacement continuation), the
+ * event-activation barrier and the battle, so no continuation can run
+ * afterwards (live, after a stale reply, or after a reload).
  */
 export function terminateGame(
   state: GameState,
@@ -128,8 +128,6 @@ export function terminateGame(
       ...state.turn,
       battle: null,
       battleSubPhase: null,
-      pendingTriggerFromEffect: undefined,
-      pendingBattleDamageContinuation: undefined,
     },
   };
   return emitEvent(terminal, "GAME_OVER", actorIndex, {

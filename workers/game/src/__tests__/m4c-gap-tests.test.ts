@@ -40,6 +40,7 @@ import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
 import { computeAllValidTargets, validateTargetConstraints, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../engine/effect-resolver/target-resolver.js";
 import type { EffectResult } from "../engine/effect-types.js";
 import { executeReorderAllLife } from "../engine/effect-resolver/actions/life.js";
+import { revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
 
@@ -2055,10 +2056,7 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
     expect((result.state.turn.battle as any).pendingTriggerLifeCard).toBeTruthy();
 
     // Now send REVEAL_TRIGGER to decline (add to hand)
-    const revealResult = runPipeline(result.state, {
-      type: "REVEAL_TRIGGER",
-      reveal: false,
-    }, cardDb, 1); // P1 (defender) sends this action
+    const revealResult = revealTrigger(result.state, false, cardDb); // P1 (defender) sends this action
 
     expect(revealResult.valid).toBe(true);
 

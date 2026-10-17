@@ -152,19 +152,20 @@ function playOptionTwo(rig: Rig): void {
   rig.state = rig.coord.surfaceRevealTrigger(resumed.state, rig.db);
 }
 
+/** Answer the Trigger window as GameSession does: the coordinator routes it, the prompt lifecycle resumes it. */
 function replyReveal(rig: Rig, reveal: boolean): void {
   const prompt = rig.state.pendingPrompt;
   expect(prompt?.options.promptType).toBe("REVEAL_TRIGGER");
   expect(prompt?.respondingPlayer).toBe(1);
-  const r = rig.coord.executeAction(
-    rig.state,
-    [],
-    1,
-    { type: "REVEAL_TRIGGER", reveal, promptId: prompt?.promptId } as never,
-    rig.db,
-  );
-  expect(r.kind, "reason" in r ? r.reason : "").toBe("applied");
-  rig.state = r.state;
+  const action = { type: "REVEAL_TRIGGER", reveal, promptId: prompt?.promptId } as never;
+  const r = rig.coord.executeAction(rig.state, [], 1, action, rig.db);
+  expect(r.kind, "reason" in r ? r.reason : "").toBe("resume");
+  const resumed = resumePromptLifecycle(structuredClone(r.state), action, rig.db, {
+    drainPregame: (s) => s,
+    advanceStartOfTurn: (s) => s,
+  });
+  expect(resumed.responseRejected).toBe(false);
+  rig.state = rig.coord.surfaceRevealTrigger(resumed.state, rig.db);
 }
 
 function expectWindowOpenBeforeLifeToHand(rig: Rig): void {
@@ -178,9 +179,9 @@ function expectWindowOpenBeforeLifeToHand(rig: Rig): void {
 describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:367-371] Reject: defender's Trigger window completes before the activator's Life-to-hand", () => {
   const oneTrigger = () => [life("p1-life-trig", SYN_TRIGGER_LIFE.id)];
 
-  // Engine: executeDealDamage parks the Trigger and the resolver continues; p0's Life is already 1
-  // when the prompt surfaces. Decision 2 / rule 8-6-2-1: Trigger window first, then LIFE_TO_HAND.
-  it.fails("F12a accept: Trigger window, then p0 adds from p0's own Life (ratchet OPT-963)", () => {
+  // OPT-963: DEAL_DAMAGE pauses on its EFFECT_DAMAGE frame with the chain parked below it, so
+  // the Trigger window completes before LIFE_TO_HAND (Decision 2 / rule 8-6-2-1).
+  it("F12a accept: Trigger window, then p0 adds from p0's own Life (flipped by OPT-963)", () => {
     const rig = setup(oneTrigger());
     const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
     playOptionTwo(rig);
@@ -194,7 +195,7 @@ describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:
     expect(count(rig.state.players[1].hand, P0_LIFE_CARD)).toBe(0);
   });
 
-  it.fails("F12b decline: Trigger declined, then p0 adds from p0's own Life (ratchet OPT-963)", () => {
+  it("F12b decline: Trigger declined, then p0 adds from p0's own Life (flipped by OPT-963)", () => {
     const rig = setup(oneTrigger());
     const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
     playOptionTwo(rig);
@@ -209,7 +210,7 @@ describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:
     expect(count(rig.state.players[1].hand, P0_LIFE_CARD)).toBe(0);
   });
 
-  it.fails("F12c accept after a reload between the choice and the Trigger reply (ratchet OPT-963)", async () => {
+  it("F12c accept after a reload between the choice and the Trigger reply (flipped by OPT-963)", async () => {
     const rig = setup(oneTrigger());
     const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
     playOptionTwo(rig);
@@ -263,9 +264,9 @@ describe("F12 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text; FAQ qa_op06.md:
 });
 
 describe("F15 [Rule 8-6-2-1 line 864; Decision 2; OP06-116 text] nested prompt inside the accepted Trigger, reload before the nested reply", () => {
-  // Engine: the nested SELECT_TARGET for p1 surfaces, but p0 Life is already 1 (LIFE_TO_HAND ran before the Trigger window).
-  // Rule 8-6-2-1 (line 864) / Decision 2: the Trigger's own prompt completes before p0's Life-to-hand.
-  it.fails("F15 accept, nested SELECT_TARGET, reload, reply: p0 Life stays 2 until the reply, then the K.O. and the Life-to-hand (ratchet OPT-963)", async () => {
+  // OPT-963: the EFFECT_DAMAGE frame moves to TRIGGER_EFFECT below the Trigger's own prompt frame and
+  // the chain stays parked below both; rule 8-6-2-1 (line 864) / Decision 2.
+  it("F15 accept, nested SELECT_TARGET, reload, reply: p0 Life stays 2 until the reply, then the K.O. and the Life-to-hand (flipped by OPT-963)", async () => {
     const rig = setup([life("p1-life-ko", SYN_TRIGGER_KO.id)]);
     const hand0 = count(rig.state.players[0].hand, P0_LIFE_CARD);
     expect(rig.state.players[0].characters.some(Boolean)).toBe(true);

@@ -24,7 +24,6 @@ import {
   executePass,
   executeUseCounter,
   executeUseCounterEvent,
-  executeRevealTrigger,
 } from "./battle.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { isOncePerTurnBlock } from "./effect-types.js";
@@ -51,8 +50,6 @@ export function execute(
       return executeUseCounter(state, action.cardInstanceId, action.counterTargetInstanceId, cardDb);
     case "USE_COUNTER_EVENT":
       return executeUseCounterEvent(state, action.cardInstanceId, cardDb);
-    case "REVEAL_TRIGGER":
-      return executeRevealTrigger(state, action.reveal, cardDb);
     case "PASS":
       return executePass(state, cardDb);
     case "CONCEDE":
@@ -62,6 +59,7 @@ export function execute(
     case "ACTIVATE_EFFECT":
       return executeActivateEffect(state, action.cardInstanceId, action.effectId, cardDb, actingPlayerIndex);
     // Prompt responses and UNDO — handled by GameSession before reaching the pipeline
+    case "REVEAL_TRIGGER":
     case "SELECT_TARGET":
     case "REDISTRIBUTE_DON":
     case "PLAYER_CHOICE":

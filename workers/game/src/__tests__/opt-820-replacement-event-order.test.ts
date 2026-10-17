@@ -134,10 +134,9 @@ describe("OPT-820 replacement continuation chronology", () => {
     expect(first.pendingPrompt?.options).toMatchObject({
       effectDescription: replacementDescription,
     });
-    expect(first.state.effectStack).toHaveLength(2);
-    expect(
-      first.state.effectStack.at(-1)?.replacementBatchContinuation
-    ).toBeDefined();
+    // OPT-963: the chain continuation, the REPLACEMENT_BATCH frame, then the substitute's prompt frame.
+    expect(first.state.effectStack).toHaveLength(3);
+    expect(first.state.effectStack.at(-2)?.replacementBatch).toBeDefined();
     expect(
       findCardInstance(first.state, protectedTarget.instanceId)?.zone
     ).toBe("CHARACTER");

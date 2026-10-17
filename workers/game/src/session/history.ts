@@ -183,7 +183,6 @@ function collectEventAnchorIds(state: GameState): Set<string> {
     }
   }
   addSourceInstanceId(ids, state.pendingPrompt?.resumeContext);
-  addSourceInstanceId(ids, state.turn.pendingTriggerFromEffect);
   for (const collection of [
     state.activeEffects,
     state.prohibitions,

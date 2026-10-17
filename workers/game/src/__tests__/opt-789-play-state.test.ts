@@ -16,6 +16,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { revealTrigger } from "./trigger-window-helpers.js";
 
 function card(
   id: string,
@@ -340,12 +341,7 @@ it("plays a revealed Life Trigger rested under its controller's Lim", () => {
     result = runPipeline(result.state, { type: "PASS" }, db, 0);
     expect(result.valid).toBe(true);
   }
-  result = runPipeline(
-    result.state,
-    { type: "REVEAL_TRIGGER", reveal: true },
-    db,
-    1
-  );
+  result = revealTrigger(result.state, true, db);
   expect(result.valid).toBe(true);
   expect(result.state.players[1].characters[0]).toMatchObject({
     cardId: "self-trigger",

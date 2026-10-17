@@ -108,7 +108,6 @@ function emptyState(): GameState {
       oncePerTurnUsed: {},
       actionsPerformedThisTurn: [],
       deckHitZeroThisTurn: [false, false],
-      pendingTriggerFromEffect: null,
     },
     activeEffects: [],
     prohibitions: [],

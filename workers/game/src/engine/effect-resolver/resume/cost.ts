@@ -94,6 +94,8 @@ import type { EffectResolverResult, EffectResolverServices } from "../types.js";
 import {
   checkReplacementForKO,
   checkReplacementForRemoval,
+  materializeReplacementOffer,
+  type ReplacementOffer,
 } from "../../replacements.js";
 import { getEventCardInstanceId, replacePendingEventReferences } from "../../events.js";
 import { transitionCards } from "../../zone-transition.js";
@@ -440,16 +442,24 @@ export function handleAwaitingCostSelection(
     stagedEvents: PendingEvent[],
     pendingPrompt: NonNullable<EffectResolverResult["pendingPrompt"]>,
     stagedState: GameState = stateWithFrame,
+    offer?: ReplacementOffer,
   ): EffectResolverResult => {
     const withTransaction = updateTopFrame(stateWithFrame, {
       accumulatedEvents: [...stagedEvents],
       costTransactionState: captureCostTransactionState(stagedState),
     });
+    // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
+    // frame on top of this cost frame once the frame's bookkeeping is done.
+    const offered = materializeReplacementOffer(
+      applyCostTransactionState(withTransaction, transactionBaseline),
+      pendingPrompt,
+      offer,
+    );
     return {
-      state: applyCostTransactionState(withTransaction, transactionBaseline),
+      state: offered.state,
       events: [],
       resolved: false,
-      pendingPrompt,
+      pendingPrompt: offered.pendingPrompt,
     };
   };
 
@@ -890,6 +900,7 @@ export function handleAwaitingCostSelection(
           events,
           replacement.pendingPrompt,
           stagedBeforeReplacement,
+          replacement.offer,
         );
       }
       if (replacement.replaced)
@@ -963,6 +974,7 @@ export function handleAwaitingCostSelection(
           events,
           replacement.pendingPrompt,
           stagedBeforeReplacement,
+          replacement.offer,
         );
       }
       if (replacement.replaced)
@@ -1115,7 +1127,7 @@ export function handleAwaitingCostSelection(
           costReplacementAction: action,
           costReplacementChecked: true,
         });
-        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement);
+        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer);
       }
       if (replacement.replaced) {
         return abortReplacedCost(nextState, topFrame, replacement.events, cardDb, services);
@@ -1338,6 +1350,7 @@ export function handleAwaitingCostSelection(
           events,
           replacement.pendingPrompt,
           stagedBeforeReplacement,
+          replacement.offer,
         );
       }
       if (replacement.replaced) {

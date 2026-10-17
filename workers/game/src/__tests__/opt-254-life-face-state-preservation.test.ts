@@ -40,6 +40,7 @@ import {
 import { executeReorderAllLife, executeAddToLifeFromDeck, executeAddToLifeFromHand, executeAddToLifeFromField, executeLifeCardToDeck } from "../engine/effect-resolver/actions/life.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Minimal state builder ──────────────────────────────────────────────────
 
@@ -453,7 +454,7 @@ describe("OPT-254 — Face-up Life still opens the [Trigger] window on damage (F
       ?.pendingTriggerLifeCard?.instanceId).toBe(triggerLife.instanceId);
 
     const p1HandBefore = r.state.players[1].hand.length;
-    const after = runPipeline(r.state, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const after = revealTrigger(r.state, false, cardDb);
     expect(after.valid).toBe(true);
     // The revealed-and-declined Life card goes to hand (normal damage path).
     expect(after.state.players[1].hand.length).toBe(p1HandBefore + 1);

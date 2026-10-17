@@ -20,28 +20,22 @@
  * `PhaseBoundaryContinuation`, the per-obligation `step` tag and
  * `activatedWaveEffects`. PR 4a (OPT-980) shipped the reader; PR 4b
  * (OPT-924) flips the writer to 2 (SAVED-STATE-COMPATIBILITY.md §1.6, §6).
+ *
+ * Version 3 (OPT-963) moves the replacement and damage continuations into
+ * four typed frame kinds (§8). PR 5a read it by lowering to the version 2
+ * runtime; PR 5b raises the runtime to version 3, lifts version 2 records
+ * into frames (`convertFromV2`) and writes version 3 (§1.8).
  */
 
-import type {
-  EffectStackFrame,
-  GameState,
-  PhaseBoundaryContinuation,
-  PromptResumeContext,
-  TurnState,
-} from "../types.js";
+import type { EffectStackFrame, GameState, PhaseBoundaryContinuation } from "../types.js";
 import { log } from "../lib/log.js";
 
 /** The version this build's writer emits for state its own engine produces. */
-export const GAME_STATE_SCHEMA_VERSION = 2;
-/**
- * The newest version this build can read. Version 3 (OPT-963, PR 5a) is read
- * and validated as written, then lowered to the version 2 runtime shape this
- * build's engine executes (`lowerVersion3Frames`,
- * SAVED-STATE-COMPATIBILITY.md §1.7).
- */
+export const GAME_STATE_SCHEMA_VERSION = 3;
+/** The newest version this build can read (the runtime shape). */
 export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 3;
 /** The version of the runtime shape this build's engine executes. */
-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 2;
+export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 3;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
 export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3];
@@ -88,24 +82,10 @@ export type LegacyShape =
   | "legacy.structural_resume_context"
   | "legacy.cost_transaction_frame"
   | "legacy.stuck_damage_step"
-  /** Battle and effect Trigger windows both parked; the coordinator serves the battle one first. */
-  | "legacy.two_trigger_windows"
-  /** pendingBattleDamageContinuation with no battle, another battle, or outside DAMAGE_STEP; resumeBattleDamageContinuation drops it (battle.ts). */
+  /** A BATTLE_DAMAGE frame with no battle, another battle, or outside DAMAGE_STEP; continueBattleDamageFrame drops it (battle.ts, OPT-884). */
   | "legacy.orphan_battle_continuation"
-  /** battle.pendingTriggerLifeCard outside DAMAGE_STEP. */
-  | "legacy.trigger_window_outside_damage_step"
-  /** OPT-963 PR 5a: a version 3 frame lowered losslessly to its version 2 record (§1.7). */
-  | "lowered.replacement"
-  | "lowered.replacement_batch"
-  | "lowered.battle_damage"
-  | "lowered.effect_damage"
-  /** OPT-963 PR 5a degraded lowerings: version 2 cannot hold the dropped part (§1.7). */
-  | "lowered.deferred_triggers_dropped"
-  | "lowered.effect_damage_parent_dropped"
-  | "lowered.effect_damage_remaining_dropped"
-  | "lowered.second_effect_damage_dropped"
-  | "lowered.orphan_battle_damage_dropped"
-  | "lowered.replacement_batch_dropped";
+  /** A BATTLE_DAMAGE frame at its Trigger window outside DAMAGE_STEP. */
+  | "legacy.trigger_window_outside_damage_step";
 
 /**
  * A session failed to load. `location` is `state` or `undoHistory[i]`;
@@ -200,20 +180,78 @@ const convertFromV1: Converter = (raw, location) => {
   return changed ? { ...rest, effectStack } : rest;
 };
 
+// ─── Version 2 → version 3: lift the records into frames (§8.3) ──────────────
+
+interface V2LifeCard { instanceId: string; cardId: string; face: "UP" | "DOWN" }
+interface V2EffectWindow {
+  lifeCard: V2LifeCard;
+  damagedPlayerIndex: 0 | 1;
+  remainingDamages: number;
+  sourceCardInstanceId: string;
+  controllerIndex: 0 | 1;
+}
+type V2BattleContinuation =
+  | { battleId: string; lifeCardInstanceId: string; damagedPlayerIndex: 0 | 1; stage: "LIFE_REMOVAL" | "DAMAGE" }
+  | {
+      battleId: string;
+      stage: "CHARACTER_KO_REPLACEMENT";
+      targetInstanceId: string;
+      replacementEffectId?: string;
+      causingPlayerIndex: 0 | 1;
+      attackerIsCharacter: boolean;
+      resolution?: "REPLACED" | "NOT_REPLACED";
+    };
+
+const LIFTED_FRAME_ID = {
+  battleDamage: "v2-lift:battle-damage",
+  effectDamage: "v2-lift:effect-damage",
+  replacement: "v2-lift:replacement",
+  replacementBatch: "v2-lift:replacement-batch",
+} as const;
+
+function liftedFrame(fields: Record<string, unknown>): Record<string, unknown> {
+  return {
+    effectBlock: { id: "__engine_continuation__", category: "auto" },
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: [],
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+    ...fields,
+  };
+}
+
 /**
- * Version 2 → version 3. Version 3 adds the four typed continuation frame
- * fields and the `AWAITING_TRIGGER_REVEAL` phase; a version 2 object carrying
- * any of them was not written by a version 2 writer and is rejected. Nothing
- * else changes: the version 2 records (`pendingTriggerFromEffect`,
- * `pendingBattleDamageContinuation`, `battle.pendingTriggerLifeCard`, frame
- * `replacementBatchContinuation`, object prompt contexts) are still the shape
- * this build's engine executes (§1.7); PR 5b lifts them into frames.
+ * Version 2 → version 3 (OPT-963 PR 5b, SAVED-STATE-COMPATIBILITY.md §8.3).
+ * Every version 2 record of paused replacement or damage work becomes a
+ * typed frame, live and undo, through this one hook:
+ *   - `battle.pendingTriggerLifeCard` and `pendingBattleDamageContinuation`
+ *     become one BATTLE_DAMAGE frame and `pendingTriggerFromEffect` an
+ *     EFFECT_DAMAGE frame, inserted at the bottom of the stack in the order
+ *     they opened (version 2 surfaced them only once the stack emptied, so
+ *     bottom-most is the version 2 resume order);
+ *   - a REPLACEMENT / REPLACEMENT_BATCH prompt context becomes a frame on top
+ *     that owns the prompt;
+ *   - a frame's `replacementBatchContinuation` rider becomes a
+ *     REPLACEMENT_BATCH frame at INTERRUPTED_BY_TRIGGERS directly below it.
+ * With both Trigger windows open the prompt is re-pointed at the top (effect)
+ * frame's responder: the base coordinator deadlock (OPT-974) is recovered as
+ * nesting. A version 2 object already carrying a version 3 field or phase was
+ * not written by a version 2 writer and is rejected. The converter never
+ * drops an unknown field; strict validation rejects those.
  */
 const convertFromV2: Converter = (raw, location) => {
   const rest: Record<string, unknown> = { ...raw };
   delete rest[GAME_STATE_SCHEMA_VERSION_KEY];
-  if (!Array.isArray(rest.effectStack)) return rest;
-  rest.effectStack.forEach((frame: unknown, index: number) => {
+  const stack: unknown[] = Array.isArray(rest.effectStack) ? rest.effectStack : [];
+  stack.forEach((frame: unknown, index: number) => {
     if (!isRecord(frame)) return;
     for (const key of VERSION_3_CONTINUATION_FIELDS) {
       if (key in frame) {
@@ -224,7 +262,170 @@ const convertFromV2: Converter = (raw, location) => {
       throw new SessionLoadError(location, `effectStack[${index}] has phase AWAITING_TRIGGER_REVEAL, which no version 2 writer wrote; a typed continuation frame must be stored as schemaVersion 3`);
     }
   });
-  return rest;
+  if (!isRecord(rest.turn)) return rest;
+  const turn: Record<string, unknown> = { ...rest.turn };
+  const battle = isRecord(turn.battle) ? { ...turn.battle } : null;
+  let prompt = isRecord(rest.pendingPrompt) ? { ...rest.pendingPrompt } : null;
+  const promptOptions = prompt && isRecord(prompt.options) ? prompt.options : null;
+  const activePlayerIndex = turn.activePlayerIndex === 1 ? 1 : 0;
+  const bottom: Record<string, unknown>[] = [];
+  let changed = false;
+
+  const pointWindowPrompt = (frameId: string, responder: 0 | 1) => {
+    if (prompt && promptOptions?.promptType === "REVEAL_TRIGGER") {
+      prompt = { ...prompt, respondingPlayer: responder, resumeContext: frameId };
+    }
+  };
+
+  if (battle && battle.pendingTriggerLifeCard !== undefined) {
+    const lifeCard = battle.pendingTriggerLifeCard as V2LifeCard;
+    delete battle.pendingTriggerLifeCard;
+    const damagedPlayerIndex: 0 | 1 = activePlayerIndex === 0 ? 1 : 0;
+    bottom.push(
+      liftedFrame({
+        id: LIFTED_FRAME_ID.battleDamage,
+        sourceCardInstanceId: battle.attackerInstanceId,
+        controller: activePlayerIndex,
+        phase: "AWAITING_TRIGGER_REVEAL",
+        battleDamage: { stage: "TRIGGER_WINDOW", battleId: battle.battleId, damagedPlayerIndex, lifeCard },
+      })
+    );
+    pointWindowPrompt(LIFTED_FRAME_ID.battleDamage, damagedPlayerIndex);
+    changed = true;
+  }
+  if (turn.pendingBattleDamageContinuation !== undefined) {
+    const continuation = turn.pendingBattleDamageContinuation as V2BattleContinuation | null;
+    delete turn.pendingBattleDamageContinuation;
+    if (continuation) {
+      const battleDamage =
+        continuation.stage === "CHARACTER_KO_REPLACEMENT"
+          ? {
+              stage: "CHARACTER_KO_REPLACEMENT",
+              battleId: continuation.battleId,
+              targetInstanceId: continuation.targetInstanceId,
+              ...(continuation.replacementEffectId !== undefined ? { replacementEffectId: continuation.replacementEffectId } : {}),
+              causingPlayerIndex: continuation.causingPlayerIndex,
+              attackerIsCharacter: continuation.attackerIsCharacter,
+              ...(continuation.resolution !== undefined ? { resolution: continuation.resolution } : {}),
+            }
+          : {
+              stage: "TRIGGER_EFFECT",
+              battleId: continuation.battleId,
+              damagedPlayerIndex: continuation.damagedPlayerIndex,
+              lifeCardInstanceId: continuation.lifeCardInstanceId,
+            };
+      bottom.push(
+        liftedFrame({
+          id: LIFTED_FRAME_ID.battleDamage,
+          sourceCardInstanceId: battle?.attackerInstanceId ?? "",
+          controller: activePlayerIndex,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          battleDamage,
+          accumulatedEvents:
+            continuation.stage === "LIFE_REMOVAL"
+              ? [
+                  {
+                    type: "CARD_REMOVED_FROM_LIFE",
+                    playerIndex: continuation.damagedPlayerIndex,
+                    payload: { cardInstanceId: continuation.lifeCardInstanceId },
+                    propagation: { eventLogEmitted: true },
+                  },
+                ]
+              : [],
+        })
+      );
+      changed = true;
+    }
+  }
+  if (turn.pendingTriggerFromEffect !== undefined) {
+    const window = turn.pendingTriggerFromEffect as V2EffectWindow | null;
+    delete turn.pendingTriggerFromEffect;
+    if (window) {
+      bottom.push(
+        liftedFrame({
+          id: LIFTED_FRAME_ID.effectDamage,
+          sourceCardInstanceId: window.sourceCardInstanceId,
+          controller: window.controllerIndex,
+          phase: "AWAITING_TRIGGER_REVEAL",
+          effectDamage: {
+            stage: "TRIGGER_WINDOW",
+            damagedPlayerIndex: window.damagedPlayerIndex,
+            remainingDamages: window.remainingDamages,
+            dealt: 0,
+            sourceCardInstanceId: window.sourceCardInstanceId,
+            controllerIndex: window.controllerIndex,
+            lifeCard: window.lifeCard,
+          },
+        })
+      );
+      pointWindowPrompt(LIFTED_FRAME_ID.effectDamage, window.damagedPlayerIndex);
+      changed = true;
+    }
+  }
+
+  const middle: unknown[] = [];
+  for (const frame of stack) {
+    if (isRecord(frame) && isRecord(frame.replacementBatchContinuation)) {
+      const { type: _type, ...replacementBatch } = frame.replacementBatchContinuation;
+      middle.push(
+        liftedFrame({
+          id: LIFTED_FRAME_ID.replacementBatch,
+          sourceCardInstanceId: frame.sourceCardInstanceId,
+          controller: replacementBatch.causingController,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          replacementBatch,
+        })
+      );
+      const { replacementBatchContinuation: _rider, ...kept } = frame;
+      middle.push(kept);
+      changed = true;
+    } else {
+      middle.push(frame);
+    }
+  }
+
+  const top: Record<string, unknown>[] = [];
+  const context = prompt?.resumeContext;
+  if (prompt && isRecord(context) && context.type === "REPLACEMENT") {
+    const effects = Array.isArray(rest.activeEffects) ? rest.activeEffects : [];
+    const effect = effects.find((candidate) => isRecord(candidate) && candidate.id === context.effectId) as Record<string, unknown> | undefined;
+    top.push(
+      liftedFrame({
+        id: LIFTED_FRAME_ID.replacement,
+        sourceCardInstanceId: effect?.sourceCardInstanceId ?? context.targetInstanceId,
+        controller: prompt.respondingPlayer,
+        phase: "AWAITING_OPTIONAL_RESPONSE",
+        ...(promptOptions && typeof promptOptions.effectDescription === "string"
+          ? { effectDescription: promptOptions.effectDescription }
+          : {}),
+        replacement: { effectId: context.effectId, targetInstanceId: context.targetInstanceId, event: context.event },
+      })
+    );
+    prompt = { ...prompt, resumeContext: LIFTED_FRAME_ID.replacement };
+    changed = true;
+  } else if (prompt && isRecord(context) && context.type === "REPLACEMENT_BATCH") {
+    const { type: _type, ...replacementBatch } = context;
+    const allTargetIds = Array.isArray(replacementBatch.allTargetIds) ? replacementBatch.allTargetIds : [];
+    top.push(
+      liftedFrame({
+        id: LIFTED_FRAME_ID.replacementBatch,
+        sourceCardInstanceId: allTargetIds[0] ?? "",
+        controller: prompt.respondingPlayer,
+        phase: "AWAITING_OPTIONAL_RESPONSE",
+        replacementBatch,
+      })
+    );
+    prompt = { ...prompt, resumeContext: LIFTED_FRAME_ID.replacementBatch };
+    changed = true;
+  }
+
+  if (!changed) return rest;
+  return {
+    ...rest,
+    turn: { ...turn, battle },
+    effectStack: [...bottom, ...middle, ...top],
+    pendingPrompt: prompt,
+  };
 };
 
 /** Version 3 is validated as written; the converter only removes the envelope key. */
@@ -270,12 +471,12 @@ export function convertToCurrentShape(
 }
 
 /**
- * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6). From PR 4b
- * (OPT-924) every live state and undo snapshot is written as version 2:
- * `schemaVersion: 2` first, every End Phase frame with its stage. A runtime
- * frame without a stage can only be a version 1 frame, so it is written with
- * the legacy stage, which is its version 1 meaning; the PR 4a reader
- * (`9da8ba17`) rejects a version 2 frame without a stage.
+ * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
+ * PR 5b (OPT-963) every live state and undo snapshot is written as version 3:
+ * `schemaVersion: 3` first, the typed continuation frames as they are, every
+ * End Phase frame with its stage. A runtime frame without a stage can only be
+ * a version 1 frame, so it is written with the legacy stage, which is its
+ * version 1 meaning.
  */
 export function toPersistedGameState(state: GameState): GameState {
   const unstaged = state.effectStack.some(
@@ -517,6 +718,13 @@ export function validateContinuationReferences(
   });
 
   const prompt = state.pendingPrompt;
+  const context = prompt?.resumeContext as { type?: unknown } | null | undefined;
+  if (context && typeof context === "object" && (context.type === "REPLACEMENT" || context.type === "REPLACEMENT_BATCH")) {
+    throw new SessionLoadError(
+      location,
+      `pendingPrompt.resumeContext is an executable ${String(context.type)} context; from version 3 a replacement prompt names its frame`
+    );
+  }
   if (prompt && typeof prompt.resumeContext === "string") {
     const ref = "pendingPrompt.resumeContext";
     const target = frameIds.get(prompt.resumeContext);
@@ -579,174 +787,6 @@ export function validateContinuationReferences(
   }
 }
 
-// ─── OPT-963 PR 5a: lowering version 3 frames to the version 2 runtime ───────
-
-export interface LoweringReport {
-  shape: LegacyShape;
-  frameId: string;
-}
-
-/**
- * Lower every version 3 continuation frame of a validated state to the
- * version 2 record this build's engine executes (SAVED-STATE-COMPATIBILITY.md
- * §1.7, the §8 table read right to left). Pure: returns the lowered state and
- * one report per lowered frame; the caller logs them. Lossless for every
- * replacement frame, for CHARACTER_KO_REPLACEMENT and for TRIGGER_EFFECT;
- * degraded where version 2 has no place for the dropped part:
- *   - a damage frame's deferred `pendingTriggers` (version 2 fired them
- *     before the Trigger window);
- *   - the parent chain frame of an EFFECT_DAMAGE frame at TRIGGER_WINDOW
- *     (version 2 ran the chain on before the window; its lifecycle would
- *     leave the frame as a zombie after the pipeline-routed REVEAL_TRIGGER);
- *   - remaining effect damage at TRIGGER_EFFECT (version 2 abandoned it, OPT-926);
- *   - a second EFFECT_DAMAGE frame (version 2 has one slot; the inner one wins);
- *   - a BATTLE_DAMAGE frame at TRIGGER_WINDOW whose battle is gone.
- */
-export function lowerVersion3Frames(state: GameState): { state: GameState; reports: LoweringReport[] } {
-  const frames = state.effectStack;
-  if (!frames.some((frame) => VERSION_3_FRAME_KINDS.has(frameKindOf(frame)))) {
-    return { state, reports: [] };
-  }
-  const reports: LoweringReport[] = [];
-  const report = (shape: LegacyShape, frame: EffectStackFrame) => reports.push({ shape, frameId: frame.id });
-  const prompt = state.pendingPrompt;
-  const promptNames = (frame: EffectStackFrame) => prompt?.resumeContext === frame.id;
-
-  const droppedParents = new Set(
-    frames
-      .filter((frame) => frame.effectDamage?.stage === "TRIGGER_WINDOW" && frame.effectDamage.parentFrameId)
-      .map((frame) => frame.effectDamage!.parentFrameId!)
-  );
-
-  let battle = state.turn.battle;
-  let pendingTriggerFromEffect: TurnState["pendingTriggerFromEffect"] = state.turn.pendingTriggerFromEffect;
-  let pendingBattleDamageContinuation: TurnState["pendingBattleDamageContinuation"] =
-    state.turn.pendingBattleDamageContinuation;
-  let promptContext: PromptResumeContext | undefined;
-  let promptResponder: 0 | 1 | undefined;
-  let attachToNext: import("../engine/replacements.js").ReplacementBatchResumeContext | undefined;
-  const kept: EffectStackFrame[] = [];
-
-  for (const frame of frames) {
-    if (droppedParents.has(frame.id)) {
-      report("lowered.effect_damage_parent_dropped", frame);
-      continue;
-    }
-    const kind = frameKindOf(frame);
-    if (!VERSION_3_FRAME_KINDS.has(kind)) {
-      kept.push(attachToNext ? { ...frame, replacementBatchContinuation: attachToNext } : frame);
-      attachToNext = undefined;
-      continue;
-    }
-    if (frame.pendingTriggers.length > 0) report("lowered.deferred_triggers_dropped", frame);
-    switch (kind) {
-      case "REPLACEMENT": {
-        const { effectId, targetInstanceId, event } = frame.replacement!;
-        if (promptNames(frame)) promptContext = { type: "REPLACEMENT", effectId, targetInstanceId, event };
-        report("lowered.replacement", frame);
-        break;
-      }
-      case "REPLACEMENT_BATCH": {
-        const context = { type: "REPLACEMENT_BATCH" as const, ...frame.replacementBatch! };
-        if (promptNames(frame)) promptContext = context;
-        else attachToNext = context;
-        report("lowered.replacement_batch", frame);
-        break;
-      }
-      case "BATTLE_DAMAGE": {
-        const damage = frame.battleDamage!;
-        if (damage.stage === "TRIGGER_WINDOW") {
-          if (!battle || battle.battleId !== damage.battleId) {
-            report("lowered.orphan_battle_damage_dropped", frame);
-          } else {
-            battle = { ...battle, pendingTriggerLifeCard: damage.lifeCard };
-            report("lowered.battle_damage", frame);
-            // The version 2 coordinator served the battle window first, so a
-            // surfaced REVEAL_TRIGGER prompt beside this record is always the
-            // defender's (the only two-window prompt version 2 ever wrote).
-            if (prompt?.options.promptType === "REVEAL_TRIGGER") {
-              promptContext = null;
-              promptResponder = damage.damagedPlayerIndex;
-            }
-          }
-          if (promptNames(frame)) promptContext = null;
-        } else if (damage.stage === "TRIGGER_EFFECT") {
-          const unscannedRemoval = frame.accumulatedEvents.some(
-            (event) =>
-              event.type === "CARD_REMOVED_FROM_LIFE" &&
-              (event.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId === damage.lifeCardInstanceId &&
-              !event.propagation?.triggerScanned
-          );
-          pendingBattleDamageContinuation = {
-            battleId: damage.battleId,
-            lifeCardInstanceId: damage.lifeCardInstanceId,
-            damagedPlayerIndex: damage.damagedPlayerIndex,
-            stage: unscannedRemoval ? "LIFE_REMOVAL" : "DAMAGE",
-          };
-          report("lowered.battle_damage", frame);
-        } else {
-          pendingBattleDamageContinuation = {
-            battleId: damage.battleId,
-            stage: "CHARACTER_KO_REPLACEMENT",
-            targetInstanceId: damage.targetInstanceId,
-            ...(damage.replacementEffectId !== undefined ? { replacementEffectId: damage.replacementEffectId } : {}),
-            causingPlayerIndex: damage.causingPlayerIndex,
-            attackerIsCharacter: damage.attackerIsCharacter,
-            ...(damage.resolution !== undefined ? { resolution: damage.resolution } : {}),
-          };
-          report("lowered.battle_damage", frame);
-        }
-        break;
-      }
-      case "EFFECT_DAMAGE": {
-        const damage = frame.effectDamage!;
-        if (damage.stage === "TRIGGER_WINDOW") {
-          if (pendingTriggerFromEffect) report("lowered.second_effect_damage_dropped", frame);
-          pendingTriggerFromEffect = {
-            lifeCard: damage.lifeCard,
-            damagedPlayerIndex: damage.damagedPlayerIndex,
-            remainingDamages: damage.remainingDamages,
-            sourceCardInstanceId: damage.sourceCardInstanceId,
-            controllerIndex: damage.controllerIndex,
-          };
-          if (promptNames(frame)) promptContext = null;
-          report("lowered.effect_damage", frame);
-        } else {
-          // The Trigger's effect resolves in the frames above and its parent
-          // chain (if any) stays below: the version 2 lifecycle drains both.
-          // Only the remaining points have no version 2 home.
-          if (damage.remainingDamages > 0) report("lowered.effect_damage_remaining_dropped", frame);
-          report("lowered.effect_damage", frame);
-        }
-        break;
-      }
-      default:
-        kept.push(frame);
-    }
-  }
-  if (attachToNext) {
-    // Only a transient state (substitute finished, batch not yet continued)
-    // leaves a batch frame on top; nothing above it can carry the rider.
-    report("lowered.replacement_batch_dropped", [...frames].reverse().find((frame) => frame.replacementBatch)!);
-  }
-
-  const turn: TurnState = {
-    ...state.turn,
-    battle,
-    ...(pendingTriggerFromEffect !== undefined ? { pendingTriggerFromEffect } : {}),
-    ...(pendingBattleDamageContinuation !== undefined ? { pendingBattleDamageContinuation } : {}),
-  };
-  const pendingPrompt =
-    prompt && promptContext !== undefined
-      ? {
-          ...prompt,
-          resumeContext: promptContext,
-          ...(promptResponder !== undefined ? { respondingPlayer: promptResponder } : {}),
-        }
-      : prompt;
-  return { state: { ...state, turn, effectStack: kept, pendingPrompt }, reports };
-}
-
 /** Same predicate as effect-resolver/resume/cost.ts isLegacyCostTransactionFrame. */
 export function isLegacyCostTransactionFrame(frame: EffectStackFrame): boolean {
   return (
@@ -766,15 +806,25 @@ function isOnField(state: GameState, instanceId: string): boolean {
   );
 }
 
-/** OPT-884: a Damage Step waiting on a K.O. replacement answer that nothing can deliver. */
+/** The one BATTLE_DAMAGE frame of a state, if any (one battle at a time). */
+export function battleDamageFrameOf(state: GameState): EffectStackFrame | undefined {
+  return state.effectStack.find((frame) => frame.battleDamage !== undefined);
+}
+
+/**
+ * OPT-884: a Damage Step waiting on a K.O. replacement answer that nothing
+ * can deliver: the BATTLE_DAMAGE frame is alone on the stack, unanswered, no
+ * prompt is open, and the target has left the field.
+ */
 export function isStuckDamageStep(state: GameState): boolean {
-  const continuation = state.turn.pendingBattleDamageContinuation;
+  const frame = battleDamageFrameOf(state);
+  const continuation = frame?.battleDamage;
   return (
     state.turn.battleSubPhase === "DAMAGE_STEP" &&
     continuation?.stage === "CHARACTER_KO_REPLACEMENT" &&
     continuation.resolution === undefined &&
     state.pendingPrompt === null &&
-    state.effectStack.length === 0 &&
+    state.effectStack.length === 1 &&
     !isOnField(state, continuation.targetInstanceId)
   );
 }
@@ -812,20 +862,20 @@ export function classifyLegacyShapes(state: GameState): LegacyShapeReport[] {
     reports.push({ shape: "legacy.stuck_damage_step" });
   }
   const { turn } = state;
-  if (turn.pendingTriggerFromEffect && turn.battle?.pendingTriggerLifeCard) {
-    reports.push({ shape: "legacy.two_trigger_windows" });
-  }
-  const continuation = turn.pendingBattleDamageContinuation;
+  const battleFrame = battleDamageFrameOf(state);
+  const continuation = battleFrame?.battleDamage;
   if (
+    battleFrame &&
     continuation &&
+    continuation.stage !== "TRIGGER_WINDOW" &&
     (!turn.battle ||
       turn.battle.battleId !== continuation.battleId ||
       turn.battleSubPhase !== "DAMAGE_STEP")
   ) {
-    reports.push({ shape: "legacy.orphan_battle_continuation" });
+    reports.push({ shape: "legacy.orphan_battle_continuation", frameId: battleFrame.id });
   }
-  if (turn.battle?.pendingTriggerLifeCard && turn.battleSubPhase !== "DAMAGE_STEP") {
-    reports.push({ shape: "legacy.trigger_window_outside_damage_step" });
+  if (battleFrame && continuation?.stage === "TRIGGER_WINDOW" && turn.battleSubPhase !== "DAMAGE_STEP") {
+    reports.push({ shape: "legacy.trigger_window_outside_damage_step", frameId: battleFrame.id });
   }
   return reports;
 }

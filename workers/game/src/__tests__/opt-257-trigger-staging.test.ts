@@ -42,6 +42,7 @@ import {
 } from "./helpers.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { isInTriggerStaging } from "../engine/state.js";
+import { revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Card fixtures ───────────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ describe("OPT-257 F4 — staging hides the source from PLAY_CARD source_zone TRA
     const paused = driveToTriggerPrompt(state, attackerId, targetId, cardDb);
 
     // Activate the trigger.
-    const r = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const r = revealTrigger(paused, true, cardDb);
     expect(r.valid).toBe(true);
 
     // No SELECT_TARGET prompt should be raised — staging hid the only candidate.
@@ -257,7 +258,7 @@ describe("OPT-257 F4 — staging hides the source from PLAY_CARD source_zone TRA
     const { state, attackerId, targetId } = setupBattleReveal(cardDb, triggerLife, [otherChar]);
     const paused = driveToTriggerPrompt(state, attackerId, targetId, cardDb);
 
-    const r = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const r = revealTrigger(paused, true, cardDb);
     expect(r.valid).toBe(true);
 
     // up_to:1 with exactly one eligible candidate — the engine prompts so
@@ -289,7 +290,7 @@ describe("OPT-257 F4 — PLAY_SELF resolves against the staging card", () => {
     const { state, attackerId, targetId } = setupBattleReveal(cardDb, triggerLife);
     const paused = driveToTriggerPrompt(state, attackerId, targetId, cardDb);
 
-    const r = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const r = revealTrigger(paused, true, cardDb);
     expect(r.valid).toBe(true);
 
     // Card should now be on p1's field, not in their trash.
@@ -318,7 +319,7 @@ describe("OPT-257 F4 — staging is popped after the Trigger resolves", () => {
     // Mid-pause: staging hasn't been pushed yet (the player hasn't accepted).
     expect(paused.turn.triggerStagingInstanceIds ?? []).toEqual([]);
 
-    const r = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const r = revealTrigger(paused, true, cardDb);
     expect(r.valid).toBe(true);
 
     // Card landed in trash, staging is cleared.
@@ -340,7 +341,7 @@ describe("OPT-257 F4 — declining a Trigger never enters staging", () => {
     const { state, attackerId, targetId } = setupBattleReveal(cardDb, triggerLife);
     const paused = driveToTriggerPrompt(state, attackerId, targetId, cardDb);
 
-    const r = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const r = revealTrigger(paused, false, cardDb);
     expect(r.valid).toBe(true);
 
     const p1 = r.state.players[1];
