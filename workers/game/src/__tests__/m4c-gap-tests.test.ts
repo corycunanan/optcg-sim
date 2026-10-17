@@ -40,7 +40,8 @@ import { resolveAmount } from "../engine/effect-resolver/action-utils.js";
 import { computeAllValidTargets, validateTargetConstraints, needsPlayerTargetSelection, buildSelectTargetPrompt } from "../engine/effect-resolver/target-resolver.js";
 import type { EffectResult } from "../engine/effect-types.js";
 import { executeReorderAllLife } from "../engine/effect-resolver/actions/life.js";
-import { revealTrigger } from "./trigger-window-helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
 
@@ -1949,87 +1950,72 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
     return { state, enelLeader, attacker, triggerLifeCard };
   }
 
-  it("Enel trigger fires and TRASH_FROM_HAND prompt surfaces during damage step", () => {
+  // FAQ qa_op05.md:237-239 (OP05-098): "After you have taken 2 damage and the
+  // Damage Step has ended, you can then use this [Opponent's Turn] effect."
+  // Rule 8-6-2: an effect fulfilled during damage processing activates after
+  // all damage processing. OPT-963: the BATTLE_DAMAGE frame defers Enel's
+  // LIFE_COUNT_BECOMES_ZERO watcher until the sequence completes; the Trigger
+  // window (8-6-2-1) comes first.
+  it("Enel's effect waits for the Damage Step to end: the Trigger window surfaces first (qa_op05.md:237-239)", () => {
     const cardDb = createTestCardDb();
     const { state } = buildEnelScenario(cardDb);
 
-    // Declare attack → pass block → pass counter (triggers damage step)
     let result = runPipeline(state, {
       type: "DECLARE_ATTACK",
       attackerInstanceId: "atk-ryuma",
       targetInstanceId: "leader-1",
     }, cardDb, 0);
     expect(result.valid).toBe(true);
-
-    // Pass block
+    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    expect(result.valid).toBe(true);
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
     expect(result.valid).toBe(true);
 
-    // Pass counter → damage step fires → Enel's trigger fires
-    result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
-    expect(result.valid).toBe(true);
-
-    // The pipeline should pause with a SELECT_TARGET prompt for TRASH_FROM_HAND
-    expect(result.pendingPrompt).toBeTruthy();
-    expect(result.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
-    expect(result.pendingPrompt!.respondingPlayer).toBe(1);
-
-    // Enel's ADD_TO_LIFE_FROM_DECK should have already executed
-    expect(result.state.players[1].life.length).toBe(1);
-
-    // The battle should still be active with pendingTriggerLifeCard
+    // The defender's Trigger choice is the pending prompt; Enel has not run yet.
+    expect(result.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(result.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(result.state.players[1].life).toHaveLength(0);
     expect(result.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
-    expect(result.state.turn.battle).toBeTruthy();
-    expect((result.state.turn.battle as any).pendingTriggerLifeCard).toBeTruthy();
+    expect(battleTriggerLifeCard(result.state)).toBeTruthy();
   });
 
-  it("after TRASH_FROM_HAND resolves, battle still has pendingTriggerLifeCard for REVEAL_TRIGGER", () => {
+  it("after the Trigger is declined and the Damage Step ends, Enel adds a Life card and asks for the hand trash", () => {
     const cardDb = createTestCardDb();
     const { state } = buildEnelScenario(cardDb);
 
-    // Full attack flow → get TRASH_FROM_HAND prompt
     let result = runPipeline(state, {
       type: "DECLARE_ATTACK",
       attackerInstanceId: "atk-ryuma",
       targetInstanceId: "leader-1",
     }, cardDb, 0);
-
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    const revealed = revealTrigger(result.state, false, cardDb);
+    expect(revealed.valid).toBe(true);
 
-    // Should have TRASH_FROM_HAND prompt
-    expect(result.pendingPrompt).toBeTruthy();
-    expect(result.pendingPrompt!.options.promptType).toBe("SELECT_TARGET");
+    // The battle has ended; Enel's effect now resolves: Life +1, then the hand trash prompt.
+    expect(revealed.state.turn.battle).toBeNull();
+    expect(revealed.state.players[1].life).toHaveLength(1);
+    expect(revealed.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(revealed.pendingPrompt?.respondingPlayer).toBe(1);
 
-    // Resolve the prompt: select the first hand card to trash
-    const resumeResult = resumeFromStack(
-      { ...result.state, pendingPrompt: null },
-      { type: "SELECT_TARGET", selectedInstanceIds: ["hand-1-0"] },
+    const resumed = resumePromptLifecycle(
+      revealed.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["hand-1-0"], promptId: revealed.pendingPrompt?.promptId },
       cardDb,
+      { drainPregame: (s) => s, advanceStartOfTurn: (s) => s },
     );
-
-    // Effect should be resolved
-    expect(resumeResult.resolved).toBe(true);
-
-    // The battle should STILL be active with pendingTriggerLifeCard
-    expect(resumeResult.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
-    expect(resumeResult.state.turn.battle).toBeTruthy();
-    expect((resumeResult.state.turn.battle as any).pendingTriggerLifeCard).toBeTruthy();
-
-    // Effect stack should be empty
-    expect(resumeResult.state.effectStack.length).toBe(0);
-
-    // The trashed card should be in trash
-    expect(resumeResult.state.players[1].hand.length).toBe(2);
-    expect(resumeResult.state.players[1].trash.some(c => c.instanceId === "hand-1-0")).toBe(false);
+    expect(resumed.responseRejected).toBe(false);
+    expect(resumed.state.pendingPrompt).toBeNull();
+    expect(resumed.state.effectStack).toHaveLength(0);
+    // 3 cards, plus the declined Life card, minus the one Enel trashed.
+    expect(resumed.state.players[1].hand).toHaveLength(3);
+    expect(resumed.state.players[1].hand.some((c) => c.instanceId === "hand-1-0")).toBe(false);
   });
 
-  it("REVEAL_TRIGGER action resolves correctly and ends the battle", () => {
+  it("with one hand card Enel's trash auto-selects after the battle ends", () => {
     const cardDb = createTestCardDb();
     const { state } = buildEnelScenario(cardDb);
-
-    // Full attack → damage step → Enel trigger → auto-select (1 hand card)
-    // For this test, give P1 exactly 1 hand card so TRASH auto-selects
     const oneHandState = {
       ...state,
       players: [
@@ -2046,23 +2032,27 @@ describe("OP05-098 Enel: LIFE_COUNT_BECOMES_ZERO during damage step", () => {
       attackerInstanceId: "atk-ryuma",
       targetInstanceId: "leader-1",
     }, cardDb, 0);
-
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
+    expect(result.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
 
-    // With 1 hand card, TRASH_FROM_HAND auto-selects (no prompt needed)
-    // But there should be a pending trigger life card
-    expect(result.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
-    expect((result.state.turn.battle as any).pendingTriggerLifeCard).toBeTruthy();
-
-    // Now send REVEAL_TRIGGER to decline (add to hand)
-    const revealResult = revealTrigger(result.state, false, cardDb); // P1 (defender) sends this action
-
+    const revealResult = revealTrigger(result.state, false, cardDb);
     expect(revealResult.valid).toBe(true);
-
-    // Battle should now be ended
     expect(revealResult.state.turn.battle).toBeNull();
     expect(revealResult.state.turn.battleSubPhase).toBeNull();
+    expect(revealResult.state.players[1].life).toHaveLength(1);
+    // The declined Life card joined the hand, so Enel's trash has two
+    // candidates and asks; after the choice one card remains.
+    expect(revealResult.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    const resumed = resumePromptLifecycle(
+      revealResult.state,
+      { type: "SELECT_TARGET", selectedInstanceIds: ["hand-1-only"], promptId: revealResult.pendingPrompt?.promptId },
+      cardDb,
+      { drainPregame: (s) => s, advanceStartOfTurn: (s) => s },
+    );
+    expect(resumed.responseRejected).toBe(false);
+    expect(resumed.state.pendingPrompt).toBeNull();
+    expect(resumed.state.players[1].hand).toHaveLength(1);
   });
 });
 

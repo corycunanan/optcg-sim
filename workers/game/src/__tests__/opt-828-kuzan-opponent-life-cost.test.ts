@@ -13,6 +13,7 @@ import { isCostSequencePayable } from "../engine/effect-resolver/cost/feasibilit
 import { getEffectiveCost } from "../engine/modifiers.js";
 import { transitionCard } from "../engine/zone-transition.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 
 // Printed text (docs/cards/OP-09.md:692) — OP09-101 Kuzan:
 //   "[On Play] Place 1 of your opponent's Characters with a cost of 3 or less
@@ -95,9 +96,7 @@ function fixture() {
     choose: (choiceId: string, rejected = false) =>
       respond({ type: "PLAYER_CHOICE", choiceId }, rejected),
     persist() {
-      state = parseStoredSession(
-        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
-      ).state;
+      state = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" }))).state;
     },
     get state() {
       return state;

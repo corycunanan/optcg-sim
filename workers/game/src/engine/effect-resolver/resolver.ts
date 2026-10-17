@@ -39,7 +39,7 @@ import {
 } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
 import { insertFrameAt } from "../damage-frames.js";
-import { frameKindOf } from "../../session/game-state-schema.js";
+import { frameKindOf } from "../frame-kinds.js";
 import type {
   EffectResolverResult,
   ActionResult,

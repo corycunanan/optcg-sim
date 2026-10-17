@@ -166,7 +166,7 @@ describe("OPT-820 replacement continuation chronology", () => {
       testPriorityRolls: null,
     });
     const restored = await new SessionRepository(storage, config).load();
-    expect(restored!.state.effectStack).toHaveLength(2);
+    expect(restored!.state.effectStack).toHaveLength(3);
     const rejected = new SessionCoordinator().routePromptResponse(
       restored!.state,
       1,

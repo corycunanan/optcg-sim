@@ -35,7 +35,7 @@ import { takeEngineTimestamp } from "./execution-context.js";
 import { matchTriggersForEvent, orderMatchedTriggers } from "./triggers.js";
 import { processPlayerTriggerGroup } from "./trigger-queue.js";
 import { isGameTerminated } from "./terminal.js";
-import { frameKindOf } from "../session/game-state-schema.js";
+import { frameKindOf } from "./frame-kinds.js";
 
 export const REVEAL_TRIGGER_TIMEOUT_MS = 30_000;
 

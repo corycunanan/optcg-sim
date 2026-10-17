@@ -14,6 +14,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { revealTrigger } from "./trigger-window-helpers.js";
 
 // Canonical OP-13/OP-14 card text; OP14/EB04 FAQ (2026-09-09), Law and Issho rulings.
 // All effect behavior comes from the production registry, never a test-authored effect.
@@ -64,6 +65,13 @@ function fixture() {
     return card;
   }
   function act(action: GameAction, player = state.turn.activePlayerIndex) {
+    if (action.type === "REVEAL_TRIGGER") {
+      // OPT-963: the Trigger window is a damage frame; its reply is a prompt response.
+      const revealed = revealTrigger(state, action.reveal, db);
+      expect(revealed.valid, revealed.error).toBe(true);
+      state = revealed.state;
+      return;
+    }
     const result = runPipeline(state, action, db, player);
     expect(result.valid, result.error).toBe(true);
     state = result.state;

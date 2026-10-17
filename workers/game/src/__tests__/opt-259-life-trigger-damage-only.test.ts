@@ -41,7 +41,7 @@ import {
 } from "../engine/effect-resolver/actions/life.js";
 import { executeDealDamage, executeSelfTakeDamage } from "../engine/effect-resolver/actions/battle-actions.js";
 import { runPipeline } from "../engine/pipeline.js";
-import { effectTriggerWindow, revealTrigger } from "./trigger-window-helpers.js";
+import { battleTriggerLifeCard, effectTriggerWindow, revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -169,8 +169,7 @@ describe("OPT-259 F6 — battle damage correctly opens the Trigger window", () =
     const { state, attackerId, targetId } = setupBattleWithDefenderLife(cardDb, [top]);
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
 
-    const pending = (paused.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard;
+    const pending = battleTriggerLifeCard(paused);
     expect(pending?.instanceId).toBe(top.instanceId);
     // Life→hand has NOT yet happened — the card is suspended awaiting decision.
     expect(paused.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
@@ -185,8 +184,7 @@ describe("OPT-259 F6 — battle damage correctly opens the Trigger window", () =
     const p1HandBefore = state.players[1].hand.length;
     const after = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
 
-    expect((after.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard ?? null).toBeNull();
+    expect(battleTriggerLifeCard(after) ?? null).toBeNull();
     // Went straight to hand.
     expect(after.players[1].hand.length).toBe(p1HandBefore + 1);
     expect(after.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);

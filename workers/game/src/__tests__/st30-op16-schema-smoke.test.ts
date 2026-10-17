@@ -13,6 +13,7 @@ import { ST30_009_LITTLEOARS_JR } from "../engine/schemas/st30.js";
 import { registerReplacementsForCard } from "../engine/triggers.js";
 import type { CardData, CardInstance, GameState, KeywordSet, PlayerState } from "../types.js";
 import { createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { answerBatchOffer, batchOfferOf } from "./trigger-window-helpers.js";
 
 function noKeywords(): KeywordSet {
   return {
@@ -93,8 +94,8 @@ describe("ST30 / OP16 first-pass schema smoke", () => {
     );
 
     expect(promptResult.pendingPrompt).toBeDefined();
-    const ctx = promptResult.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
-    const resumed = resumeReplacementBatch(promptResult.state, ctx, true, cardDb, resolverExecutionServices);
+    const ctx = batchOfferOf(promptResult);
+    const resumed = answerBatchOffer(promptResult, true, cardDb);
 
     const remainingIds = resumed.state.players[0].characters.filter(Boolean).map((c) => c!.instanceId);
     expect(remainingIds).toEqual([allyInst.instanceId]);

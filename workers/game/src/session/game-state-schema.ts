@@ -28,6 +28,7 @@
  */
 
 import type { EffectStackFrame, GameState, PhaseBoundaryContinuation } from "../types.js";
+import { EFFECT_STACK_FRAME_KINDS, VERSION_3_CONTINUATION_FIELDS, VERSION_3_FRAME_KINDS, frameKindOf, type EffectStackFrameKind } from "../engine/frame-kinds.js";
 import { log } from "../lib/log.js";
 
 /** The version this build's writer emits for state its own engine produces. */
@@ -42,36 +43,13 @@ export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3]
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
 
-export const EFFECT_STACK_FRAME_KINDS = [
-  "EFFECT",
-  "COST",
-  "TRIGGER_ORDER",
-  "TRIGGER_DRAIN",
-  "BATCH_RESUME",
-  "PHASE_BOUNDARY",
-  // OPT-963 (version 3): typed replacement and damage continuations (§8).
-  "REPLACEMENT",
-  "REPLACEMENT_BATCH",
-  "BATTLE_DAMAGE",
-  "EFFECT_DAMAGE",
-] as const;
-
-/** Frame kinds that exist only from version 3 (every frame of these kinds carries one of the fields below). */
-export const VERSION_3_FRAME_KINDS: ReadonlySet<EffectStackFrameKind> = new Set([
-  "REPLACEMENT",
-  "REPLACEMENT_BATCH",
-  "BATTLE_DAMAGE",
-  "EFFECT_DAMAGE",
-] as const);
-
-/** The one field per version 3 kind; a frame carries at most one (§2.2). */
-export const VERSION_3_CONTINUATION_FIELDS = [
-  "replacement",
-  "replacementBatch",
-  "battleDamage",
-  "effectDamage",
-] as const;
-export type EffectStackFrameKind = (typeof EFFECT_STACK_FRAME_KINDS)[number];
+export {
+  EFFECT_STACK_FRAME_KINDS,
+  VERSION_3_CONTINUATION_FIELDS,
+  VERSION_3_FRAME_KINDS,
+  frameKindOf,
+  type EffectStackFrameKind,
+} from "../engine/frame-kinds.js";
 
 /**
  * Legacy shapes the reader loads unchanged and reports. Each has a recorded
@@ -490,35 +468,6 @@ export function toPersistedGameState(state: GameState): GameState {
       )
     : state.effectStack;
   return { [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION, ...state, effectStack } as GameState;
-}
-
-/**
- * The single definition of a frame's kind, derived from its content. A
- * persisted `kind` must agree with this projection.
- */
-export function frameKindOf(
-  frame: Pick<
-    EffectStackFrame,
-    "phase" | "phaseBoundaryContinuation" | "replacement" | "replacementBatch" | "battleDamage" | "effectDamage"
-  >
-): EffectStackFrameKind {
-  if (frame.replacement) return "REPLACEMENT";
-  if (frame.replacementBatch) return "REPLACEMENT_BATCH";
-  if (frame.battleDamage) return "BATTLE_DAMAGE";
-  if (frame.effectDamage) return "EFFECT_DAMAGE";
-  if (frame.phaseBoundaryContinuation) return "PHASE_BOUNDARY";
-  switch (frame.phase) {
-    case "AWAITING_COST_SELECTION":
-      return "COST";
-    case "AWAITING_TRIGGER_ORDER_SELECTION":
-      return "TRIGGER_ORDER";
-    case "AWAITING_BATCH_RESUME":
-      return "BATCH_RESUME";
-    case "INTERRUPTED_BY_TRIGGERS":
-      return "TRIGGER_DRAIN";
-    default:
-      return "EFFECT";
-  }
 }
 
 function frameInvariantViolation(

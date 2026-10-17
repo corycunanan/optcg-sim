@@ -24,6 +24,8 @@ import type {
 import { continuationFrame, revealTriggerPromptFor, surfaceDamageFramePrompt, triggerWindowOf } from "../engine/damage-frames.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { SessionCoordinator } from "../session/coordinator.js";
+import { batchContextOf, resumeReplacementBatch, type BatchResumeResult, type ReplacementBatchResumeContext } from "../engine/replacements.js";
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 
 export interface RevealResult {
   state: GameState;
@@ -229,4 +231,35 @@ export function withReplacementOffer(
       resumeContext: frame.id,
     },
   };
+}
+
+// ─── Replacement batch offers ────────────────────────────────────────────────
+
+/** A state, or a handler/resolver result that carries the prompt beside its state. */
+type Prompted = GameState | { state: GameState; pendingPrompt?: PendingPromptState | null };
+
+function promptedState(input: Prompted): { state: GameState; prompt: PendingPromptState | null } {
+  if ("effectStack" in input) return { state: input, prompt: input.pendingPrompt };
+  return { state: input.state, prompt: input.pendingPrompt ?? input.state.pendingPrompt ?? null };
+}
+
+/** The batch state machine of the REPLACEMENT_BATCH frame the pending prompt names. */
+export function batchOfferOf(input: Prompted): ReplacementBatchResumeContext {
+  const { state, prompt } = promptedState(input);
+  const id = prompt?.resumeContext;
+  const frame = state.effectStack.find((candidate) => candidate.id === id && candidate.replacementBatch);
+  if (!frame) throw new Error("no REPLACEMENT_BATCH frame owns the pending prompt");
+  return batchContextOf(frame);
+}
+
+/**
+ * Answer the pending batch offer with the batch functions directly (unit
+ * level): the offer frame is popped and the batch stepped from it, as the
+ * prompt lifecycle does. Returns the batch result.
+ */
+export function answerBatchOffer(input: Prompted, accepted: boolean, cardDb: Map<string, CardData>): BatchResumeResult {
+  const { state, prompt } = promptedState(input);
+  const context = batchOfferOf(input);
+  const withoutOffer = { ...state, effectStack: state.effectStack.filter((frame) => frame.id !== prompt?.resumeContext), pendingPrompt: null };
+  return resumeReplacementBatch(withoutOffer, context, accepted, cardDb, resolverExecutionServices);
 }

@@ -31,7 +31,7 @@ import {
   pushFrame,
 } from "../effect-stack.js";
 import { insertFrameAt } from "../damage-frames.js";
-import { frameKindOf } from "../../session/game-state-schema.js";
+import { frameKindOf } from "../frame-kinds.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
 import type { EffectResolverResult, EffectResolverServices } from "./types.js";
 import {

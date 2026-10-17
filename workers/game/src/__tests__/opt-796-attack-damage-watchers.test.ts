@@ -27,6 +27,7 @@ import { parseStoredSession, SessionRepository, type SessionStorage } from "../s
 import { readFileSync } from "node:fs";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 
 const printedText: Record<string, string> = {
   "OP03-040": "When your deck is reduced to 0, you win the game instead of losing, according to the rules.\n[DON!! x1] When this Leader's attack deals damage to your opponent's Life, you may trash 1 card from the top of your deck.",
@@ -133,6 +134,15 @@ function attack(f: Pick<Fixture, "state" | "cardDb">, attackerId: string, answer
   const steps: Step[] = [];
   for (let guard = 0; guard < 20 && !gameOver && state.status === "IN_PROGRESS"; guard++) {
     const prompt = state.pendingPrompt;
+    if (prompt?.options.promptType === "REVEAL_TRIGGER" || (!prompt && battleTriggerLifeCard(state))) {
+      // OPT-963: the window's own prompt (the frame surfaces it).
+      steps.push({ kind: "REVEAL" });
+      const revealed = revealTrigger(state, false, f.cardDb);
+      expect(revealed.valid).toBe(true);
+      state = revealed.state;
+      gameOver = revealed.gameOver;
+      continue;
+    }
     if (prompt) {
       expect(prompt.options.promptType).toBe("OPTIONAL_EFFECT");
       if (prompt.options.promptType !== "OPTIONAL_EFFECT") break;
@@ -146,14 +156,6 @@ function attack(f: Pick<Fixture, "state" | "cardDb">, attackerId: string, answer
       expect(resumed.responseRejected).toBe(false);
       state = resumed.state;
       gameOver = resumed.gameOver;
-      continue;
-    }
-    if (battleTriggerLifeCard(state)) {
-      steps.push({ kind: "REVEAL" });
-      const revealed = revealTrigger(state, false, f.cardDb);
-      expect(revealed.valid).toBe(true);
-      state = revealed.state;
-      gameOver = revealed.gameOver;
       continue;
     }
     break;
@@ -389,7 +391,7 @@ describe("OPT-796 Leaders OP03-040 / P-117 — this Leader's attack", () => {
 
 describe("OPT-796 persisted sessions and the #692 damage continuation", () => {
   const roundTrip = (state: GameState, cardDb: Map<string, CardData>) => {
-    const stored = parseStoredSession(JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(cardDb), mode: "PVP" })));
+    const stored = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(cardDb), mode: "PVP" })));
     return { state: stored.state, cardDb: new Map(Object.entries(stored.cardDb)) };
   };
 
@@ -427,8 +429,9 @@ describe("OPT-796 persisted sessions and the #692 damage continuation", () => {
     const restored = roundTrip(declined.state, f.cardDb);
     const revealed = revealTrigger(restored.state, false, restored.cardDb);
     expect(revealed.valid).toBe(true);
-    // The second damage reveals another [Trigger]; Gaimon stays silent.
-    expect(revealed.state.pendingPrompt).toBeFalsy();
+    // The second damage reveals another [Trigger] (its own REVEAL_TRIGGER
+    // prompt, OPT-963); Gaimon stays silent.
+    expect(revealed.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
     expect(battleTriggerLifeCard(revealed.state)).toBeTruthy();
     const finished = revealTrigger(revealed.state, false, restored.cardDb);
     expect(finished.state.pendingPrompt).toBeFalsy();

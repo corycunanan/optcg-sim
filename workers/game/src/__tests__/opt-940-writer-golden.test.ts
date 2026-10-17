@@ -10,11 +10,13 @@
  * Re-capture the fixture only in a PR that deliberately changes the writer
  * (a game-state schema version bump).
  *
- * OPT-924 (PR 4b of OPT-962) is that PR: the writer emits version 2. The
- * version 1 golden stays frozen as base-writer reader input; this test now
- * compares against opt-962-writer-golden.synthetic.json, and pins how the two
- * differ: the `schemaVersion: 2` key on the live state and every undo
- * snapshot, plus the End Phase frame the new engine builds.
+ * OPT-924 (PR 4b of OPT-962) raised the writer to version 2; OPT-963 (PR 5b)
+ * raises it to version 3: the replacement and damage continuations are typed
+ * frames. The version 1 and version 2 goldens stay frozen as reader input;
+ * this test compares against opt-963-writer-golden.synthetic.json and pins
+ * how it differs from the version 2 golden: the `schemaVersion: 3` key on the
+ * live state and every undo snapshot, plus the six cases whose records are
+ * now frames.
  */
 
 import { describe, expect, it } from "vitest";
@@ -26,7 +28,7 @@ import {
 } from "../session/persistence.js";
 import { GAME_STATE_SCHEMA_VERSION_KEY } from "../session/game-state-schema.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
-import { getSyntheticStates, loadGoldenFixture, loadWriterGolden } from "./fixtures/opt-940-golden.js";
+import { getSyntheticStates, loadGoldenFixture, loadV2WriterGolden, loadWriterGolden } from "./fixtures/opt-940-golden.js";
 
 async function writeThroughCurrentWriter(name: string) {
   const entry = getSyntheticStates().find((state) => state.name === name);
@@ -45,9 +47,10 @@ async function writeThroughCurrentWriter(name: string) {
   };
 }
 
-describe("OPT-940 writer golden: persisted bytes match the current (version 2) writer golden", () => {
+describe("OPT-940 writer golden: persisted bytes match the current (version 3) writer golden", () => {
   const fixture = loadWriterGolden();
   const v1 = loadGoldenFixture();
+  const v2 = loadV2WriterGolden();
 
   it("was captured from the same synthetic states and is labelled synthetic", () => {
     expect(fixture.provenance).toBe("synthetic");
@@ -68,29 +71,48 @@ describe("OPT-940 writer golden: persisted bytes match the current (version 2) w
     }
   );
 
-  it("writes schemaVersion 2 first on the live state and every undo snapshot", async () => {
+  it("writes schemaVersion 3 first on the live state and every undo snapshot", async () => {
     for (const name of Object.keys(fixture.cases)) {
       const current = await writeThroughCurrentWriter(name);
-      expect(current.sessionJson, name).toContain(`"state":{"${GAME_STATE_SCHEMA_VERSION_KEY}":2,`);
+      expect(current.sessionJson, name).toContain(`"state":{"${GAME_STATE_SCHEMA_VERSION_KEY}":3,`);
       const undo = JSON.parse(current.undoHistoryJson) as Array<Record<string, unknown>>;
       for (const snapshot of undo) expect(Object.keys(snapshot)[0], name).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
-      for (const snapshot of undo) expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(2);
+      for (const snapshot of undo) expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(3);
     }
   });
 
-  // Every diff line between the version 1 and version 2 goldens: the version
-  // key on each persisted game-state object. The only other difference is
-  // end-phase-parked, whose state the new engine builds (a staged End Phase
-  // frame instead of a stage-less one; PR body "Persisted shape").
-  it.each(Object.keys(fixture.cases).filter((name) => name !== "end-phase-parked"))(
-    "%s: the version 2 bytes are the version 1 bytes plus the version key",
+  /** Cases whose version 2 records are version 3 frames (OPT-963 §8). */
+  const FRAME_CASES = new Set([
+    "battle-trigger-window",
+    "both-trigger-windows",
+    "effect-damage-trigger-window",
+    "replacement-prompt",
+    "replacement-batch-prompt",
+    "stuck-damage-step",
+  ]);
+
+  // Every diff line between the version 2 and version 3 goldens: the version
+  // key on each persisted game-state object, and the six frame cases.
+  it.each(Object.keys(fixture.cases).filter((name) => !FRAME_CASES.has(name)))(
+    "%s: the version 3 bytes are the version 2 bytes plus the version key",
     (name) => {
-      const keyed = (state: Record<string, unknown>) => ({ [GAME_STATE_SCHEMA_VERSION_KEY]: 2, ...state });
-      const v1Session = JSON.parse(v1.cases[name].sessionJson) as Record<string, unknown> & { state: Record<string, unknown> };
-      const v1Undo = JSON.parse(v1.cases[name].undoHistoryJson) as Array<Record<string, unknown>>;
-      expect(fixture.cases[name].sessionJson).toBe(JSON.stringify({ ...v1Session, state: keyed(v1Session.state) }));
-      expect(fixture.cases[name].cardDbJson).toBe(v1.cases[name].cardDbJson);
-      expect(fixture.cases[name].undoHistoryJson).toBe(JSON.stringify(v1Undo.map(keyed)));
+      const rekey = (state: Record<string, unknown>) => {
+        const rest = { ...state };
+        delete rest[GAME_STATE_SCHEMA_VERSION_KEY];
+        return { [GAME_STATE_SCHEMA_VERSION_KEY]: 3, ...rest };
+      };
+      const v2Session = JSON.parse(v2.cases[name].sessionJson) as Record<string, unknown> & { state: Record<string, unknown> };
+      const v2Undo = JSON.parse(v2.cases[name].undoHistoryJson) as Array<Record<string, unknown>>;
+      expect(fixture.cases[name].sessionJson).toBe(JSON.stringify({ ...v2Session, state: rekey(v2Session.state) }));
+      expect(fixture.cases[name].cardDbJson).toBe(v2.cases[name].cardDbJson);
+      expect(fixture.cases[name].undoHistoryJson).toBe(JSON.stringify(v2Undo.map(rekey)));
     }
   );
+
+  it.each([...FRAME_CASES])("%s: the version 3 object holds frames and none of the version 2 records", (name) => {
+    const state = (JSON.parse(fixture.cases[name].sessionJson) as { state: Record<string, unknown> }).state;
+    const frames = state.effectStack as Array<Record<string, unknown>>;
+    expect(frames.some((frame) => frame.battleDamage || frame.effectDamage || frame.replacement || frame.replacementBatch)).toBe(true);
+    expect(JSON.stringify(state)).not.toMatch(/pendingTriggerLifeCard|pendingTriggerFromEffect|pendingBattleDamageContinuation|replacementBatchContinuation/);
+  });
 });

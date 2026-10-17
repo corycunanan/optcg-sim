@@ -14,6 +14,7 @@ import { validateCost } from "../engine/schema-registry.js";
 import { transitionCard } from "../engine/zone-transition.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 
 // Printed costs (canonical docs/cards text):
 // - OP13-007 (OP-13.md:51): "[Activate: Main] You may give 1 of your active
@@ -120,9 +121,7 @@ function fixture() {
     decline,
     select,
     persist() {
-      state = parseStoredSession(
-        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
-      ).state;
+      state = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" }))).state;
     },
     get state() {
       return state;

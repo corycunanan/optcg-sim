@@ -32,6 +32,7 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { parseStoredSession } from "../session/persistence.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 import { battleContinuation, battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 
 const SERVICES = { drainPregame: (s: GameState) => s, advanceStartOfTurn: (s: GameState) => s };
 
@@ -129,7 +130,7 @@ function fixture(lifeTop: string[]) {
 }
 
 const roundTrip = (state: GameState, cardDb: Map<string, CardData>) => {
-  const stored = parseStoredSession(JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(cardDb), mode: "PVP" })));
+  const stored = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(cardDb), mode: "PVP" })));
   return { state: stored.state, cardDb: new Map(Object.entries(stored.cardDb)) };
 };
 
@@ -172,6 +173,14 @@ function attack(f: { state: GameState; cardDb: Map<string, CardData> }, attacker
       ({ state, cardDb } = roundTrip(state, cardDb));
       persisted++;
     }
+    if (prompt?.options.promptType === "REVEAL_TRIGGER" || (!prompt && triggerPending)) {
+      prompts.push("REVEAL_TRIGGER");
+      const revealed = revealTrigger(state, opts.reveal ?? false, cardDb);
+      expect(revealed.valid).toBe(true);
+      state = revealed.state;
+      gameOver = revealed.gameOver;
+      continue;
+    }
     if (prompt) {
       const options = prompt.options;
       prompts.push(options.promptType);
@@ -190,14 +199,6 @@ function attack(f: { state: GameState; cardDb: Map<string, CardData> }, attacker
       expect(resumed.responseRejected).toBe(false);
       state = resumed.state;
       gameOver = resumed.gameOver;
-      continue;
-    }
-    if (triggerPending) {
-      prompts.push("REVEAL_TRIGGER");
-      const revealed = revealTrigger(state, opts.reveal ?? false, cardDb);
-      expect(revealed.valid).toBe(true);
-      state = revealed.state;
-      gameOver = revealed.gameOver;
       continue;
     }
     break;

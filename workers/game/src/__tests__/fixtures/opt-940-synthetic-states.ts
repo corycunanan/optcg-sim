@@ -373,11 +373,18 @@ function bothTriggerWindows(cardDb: Map<string, CardData>): GameState {
   );
   if (resumed.responseRejected) throw new Error("golden: K.O. selection was rejected");
   state = coordinator.surfaceRevealTrigger(resumed.state, cardDb);
-  // OPT-963: both windows are nested frames (battle below, effect above) and
-  // the prompt belongs to the inner (effect) window, p0's.
-  const kinds = state.effectStack.map((frame) => (frame.battleDamage ? "BATTLE_DAMAGE" : frame.effectDamage ? "EFFECT_DAMAGE" : "OTHER"));
-  if (kinds.join(",") !== "BATTLE_DAMAGE,EFFECT_DAMAGE") {
-    throw new Error(`golden: expected nested Trigger window frames, got ${kinds.join(",")}`);
+  // OPT-963: both windows are nested frames. The battle window sits at the
+  // bottom; the K.O. effect paused mid-batch (rule 6-2) to drain Robin's
+  // [On K.O.], whose DEAL_DAMAGE opened the effect window on top, above its
+  // chain continuation. The prompt belongs to the inner (effect) window, p0's.
+  const bottom = state.effectStack[0];
+  const top = state.effectStack.at(-1);
+  if (!bottom?.battleDamage || !top?.effectDamage) {
+    throw new Error(
+      `golden: expected a battle window below an effect window, got ${state.effectStack
+        .map((frame) => frame.battleDamage ? "BATTLE_DAMAGE" : frame.effectDamage ? "EFFECT_DAMAGE" : frame.phase)
+        .join(",")}`
+    );
   }
   if (state.pendingPrompt?.options.promptType !== "REVEAL_TRIGGER" || state.pendingPrompt.respondingPlayer !== 0) {
     throw new Error("golden: expected p0's REVEAL_TRIGGER prompt on the effect window");

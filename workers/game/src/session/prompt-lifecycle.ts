@@ -503,21 +503,26 @@ function answerReplacementOffer(
     return applyDamageResult(state, continued, cardDb, actingPlayer);
   }
 
-  if (caller?.costReplacementAction && callerKind === "COST") {
+  // A cost-exit replacement (OPT-864): the COST frame that parked its
+  // validated selection is the top frame unless the substitute pushed its
+  // own prompt frames above it, in which case the substitute's prompt is
+  // answered first and the cost frame stays parked beneath it.
+  const topAfter = state.effectStack.at(-1);
+  if (topAfter?.costReplacementAction && frameKindOf(topAfter) === "COST") {
     if (replacement.replaced) {
-      const aborted = abortReplacedCost(state, caller, replacement.events, cardDb, resolverExecutionServices);
-      return { state: withPendingPrompt(aborted.state, aborted.pendingPrompt) };
+      const aborted = abortReplacedCost(state, topAfter, replacement.events, cardDb, resolverExecutionServices);
+      state = withPendingPrompt(aborted.state, aborted.pendingPrompt);
+    } else {
+      const resumed = resumeFromStack(state, { ...topAfter.costReplacementAction }, cardDb);
+      state = withPendingPrompt(resumed.state, resumed.pendingPrompt);
     }
-    const resumed = resumeFromStack(state, { ...caller.costReplacementAction }, cardDb);
-    return { state: withPendingPrompt(resumed.state, resumed.pendingPrompt) };
-  }
-
-  if (caller && callerKind === "TRIGGER_DRAIN") {
+  } else if (caller && callerKind === "TRIGGER_DRAIN") {
     state = recordReplacementContinuationResult(state, caller.id, !replacement.replaced, []);
   }
   if (replacement.pendingPrompt) {
-    return { state: withPendingPrompt(state, replacement.pendingPrompt), gameOver };
+    return { state: { ...state, pendingPrompt: replacement.pendingPrompt }, gameOver };
   }
+  if (state.pendingPrompt) return { state, gameOver };
   if (replacement.events.length > 0) {
     const pipeline = continuePipelineFromExecution(
       state,

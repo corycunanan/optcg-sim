@@ -40,7 +40,7 @@ import {
 import { executeReorderAllLife, executeAddToLifeFromDeck, executeAddToLifeFromHand, executeAddToLifeFromField, executeLifeCardToDeck } from "../engine/effect-resolver/actions/life.js";
 import { resumeEffectChain } from "../engine/effect-resolver/resume.js";
 import { runPipeline } from "../engine/pipeline.js";
-import { revealTrigger } from "./trigger-window-helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Minimal state builder ──────────────────────────────────────────────────
 
@@ -420,8 +420,7 @@ describe("OPT-254 — Face-up Life still opens the [Trigger] window on damage (F
 
     // The face-up Life was still popped and its Trigger queued on battle —
     // face state does not gate eligibility.
-    const pending = (r.state.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard;
+    const pending = battleTriggerLifeCard(r.state);
     expect(pending?.instanceId).toBe(triggerLife.instanceId);
     expect(pending?.cardId).toBe(CARDS.TRIGGER.id);
   });
@@ -450,8 +449,7 @@ describe("OPT-254 — Face-up Life still opens the [Trigger] window on damage (F
     r = runPipeline(r.state, { type: "PASS" }, cardDb, 0);
     r = runPipeline(r.state, { type: "PASS" }, cardDb, 0);
     // Confirm the battle paused with the face-up card queued for Trigger.
-    expect((r.state.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard?.instanceId).toBe(triggerLife.instanceId);
+    expect(battleTriggerLifeCard(r.state)?.instanceId).toBe(triggerLife.instanceId);
 
     const p1HandBefore = r.state.players[1].hand.length;
     const after = revealTrigger(r.state, false, cardDb);

@@ -26,7 +26,7 @@ import {
   createBattleReadyState,
   createTestCardDb,
 } from "./helpers.js";
-import { revealTrigger } from "./trigger-window-helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Test card factory ──────────────────────────────────────────────────────
 
@@ -139,8 +139,7 @@ describe("OPT-255 F2 — Life-threshold [Trigger] excludes the triggering card f
 
     const p1HandBefore = state.players[1].hand.length;
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
-    const pendingLife = (paused.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard;
+    const pendingLife = battleTriggerLifeCard(paused);
     expect(pendingLife?.instanceId).toBe(top.instanceId);
 
     const after = revealTrigger(paused, true, cardDb);
