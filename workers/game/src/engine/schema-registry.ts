@@ -19,6 +19,7 @@ import {
   ALL_TARGET_TYPES,
   DON_POOL_FILTER_KEYS,
   MIXED_POOL_TYPES,
+  REMOVAL_PROHIBITION_CAUSES,
   getNestedActions,
   type EffectSchema,
   type EffectBlock,
@@ -239,6 +240,26 @@ const TARGET_CONTROLLER_MODES = {
 
 const CAUSE_FILTER_BY_VALUES = new Set<string>(ALL_CAUSE_FILTER_BY);
 
+// Walk nested action params as well as permanent prohibition entries. Other
+// prohibition families (draw, refresh) have their own cause vocabulary.
+function validateRemovalCauses(value: unknown, path: string): string[] {
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const type = record.prohibition_type ?? record.type;
+  const scope = record.scope as Record<string, unknown> | undefined;
+  const errors: string[] = [];
+  if (["CANNOT_BE_KO", "CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_BE_RETURNED_TO_HAND",
+    "CANNOT_BE_RETURNED_TO_DECK", "CANNOT_LEAVE_FIELD", "CANNOT_BE_RESTED"].includes(type as string)
+    && scope?.cause !== undefined
+    && !(REMOVAL_PROHIBITION_CAUSES as readonly unknown[]).includes(scope.cause)) {
+    errors.push(`${path}: unsupported removal scope.cause ${JSON.stringify(scope.cause)}`);
+  }
+  for (const [key, child] of Object.entries(record)) {
+    errors.push(...validateRemovalCauses(child, `${path}.${key}`));
+  }
+  return errors;
+}
+
 /**
  * Validate an effect schema and return a list of error messages.
  * Returns an empty array if the schema is valid.
@@ -250,6 +271,7 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
     return [`${prefix} Schema must be an object`];
   }
+  errors.push(...validateRemovalCauses(schema, prefix));
   const candidate = schema as Partial<EffectSchema>;
 
   if (!candidate.effects || !Array.isArray(candidate.effects)) {
