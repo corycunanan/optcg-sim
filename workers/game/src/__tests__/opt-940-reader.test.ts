@@ -78,10 +78,10 @@ function withLegacyStage(state: GameState): GameState {
 
 describe("OPT-940 game-state schema version", () => {
   it("defines version 1 and assigns it to a persisted object without the key", () => {
-    // OPT-980 reads 1 and 2; OPT-924 (PR 4b) writes 2.
+    // OPT-980 reads 1 and 2; OPT-924 (PR 4b) writes 2; OPT-963 (PR 5a) reads 3.
     expect(GAME_STATE_SCHEMA_VERSION).toBe(2);
     expect(LEGACY_GAME_STATE_SCHEMA_VERSION).toBe(1);
-    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2]);
+    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3]);
     expect(readGameStateSchemaVersion({}, "state")).toBe(1);
     expect(readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 1 }, "state")).toBe(1);
   });
@@ -101,9 +101,9 @@ describe("OPT-940 game-state schema version", () => {
   });
 
   it("rejects a newer version and tells the operator to roll forward", () => {
-    expect(readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 2 }, "state")).toBe(2);
-    expect(() => readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3 }, "state")).toThrow(
-      "Stored session state has unsupported game-state schema version 3 (written by a newer build; roll forward to a build that reads it); this build supports 1, 2"
+    expect(readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3 }, "state")).toBe(3);
+    expect(() => readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 4 }, "state")).toThrow(
+      "Stored session state has unsupported game-state schema version 4 (written by a newer build; roll forward to a build that reads it); this build supports 1, 2, 3"
     );
   });
 });
@@ -162,14 +162,14 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
 describe("OPT-940 reader: controlled failure", () => {
   it("rejects an unsupported version on the live state without touching storage", async () => {
     const storage = goldenStorage("fresh-setup");
-    sessionValue(storage).state[GAME_STATE_SCHEMA_VERSION_KEY] = 3;
+    sessionValue(storage).state[GAME_STATE_SCHEMA_VERSION_KEY] = 4;
     const before = storedBytes(storage);
     const repo = repository(storage);
 
     await expect(repo.load()).rejects.toMatchObject({
       name: "SessionLoadError",
       location: "state",
-      message: expect.stringContaining("unsupported game-state schema version 3"),
+      message: expect.stringContaining("unsupported game-state schema version 4"),
     });
     expect(storedBytes(storage)).toEqual(before);
     expect(storage.writes).toEqual([]);
