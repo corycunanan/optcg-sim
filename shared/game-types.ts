@@ -482,8 +482,6 @@ export interface EffectStackFrame {
   validTargets: string[];
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;
-  /** Outer replacement batch to continue after a nested substitute prompt. */
-  replacementBatchContinuation?: unknown;
   /**
    * OPT-963 typed continuations (game-state schema version 3), one per frame
    * kind; typed in the worker, opaque here. Never sent to clients (frames are
