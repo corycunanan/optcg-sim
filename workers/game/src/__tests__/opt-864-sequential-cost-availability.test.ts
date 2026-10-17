@@ -303,19 +303,51 @@ describe("OPT-864 a feasibility query leaves the authoritative state unchanged",
       P0,
     )).toThrow(/Unhandled cost type/);
     // Availability is presentation: it logs, blocks that block, and keeps going.
-    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    try {
-      const entries = computeEffectAvailability(r.state, r.db)[source.instanceId];
-      expect(entries).toEqual([
-        { effectId: corrupt.id, status: "blocked", reason: "COST" },
-        { effectId: healthy.id, status: "usable" },
-      ]);
-      expect(errors).toHaveBeenCalledTimes(1);
-      expect(String(errors.mock.calls[0][0])).toMatch(/^\[EFFECT_AVAILABILITY\]/);
-      expect(String(errors.mock.calls[0][2])).toMatch(/Unhandled cost type/);
-    } finally {
-      errors.mockRestore();
-    }
+    const logs = captureLogs();
+    const entries = computeEffectAvailability(r.state, r.db)[source.instanceId];
+    expect(entries).toEqual([
+      { effectId: corrupt.id, status: "blocked", reason: "COST" },
+      { effectId: healthy.id, status: "usable" },
+    ]);
+    expect(logs()).toEqual([{
+      event: "[EFFECT_AVAILABILITY] evaluation failed",
+      gameId: r.state.id,
+      cardId: source.cardId,
+      instanceId: source.instanceId,
+      effectId: corrupt.id,
+      stage: "cost",
+      error: 'Unhandled cost type: {"type":"NOT_A_COST_TYPE"}',
+    }]);
+  });
+
+  it("contains a non-cost failure without misreporting COST and continues other blocks", () => {
+    const r = rig();
+    const corrupt: EffectBlock = {
+      ...ENABLED_ACTIVATE,
+      id: "opt987_condition_error",
+      costs: [],
+      get conditions(): EffectBlock["conditions"] {
+        throw new Error("sensitive engine context");
+      },
+    };
+    const healthy = { ...ENABLED_ACTIVATE, id: "opt987_healthy", costs: [] };
+    const source = r.put("OPT987-ERROR", P0, "CHARACTER", {
+      schema: synSchema("OPT987-ERROR", [corrupt, healthy]),
+    });
+    const logs = captureLogs();
+    expect(computeEffectAvailability(r.state, r.db)[source.instanceId]).toEqual([
+      { effectId: corrupt.id, status: "blocked" },
+      { effectId: healthy.id, status: "usable" },
+    ]);
+    expect(logs()).toEqual([{
+      event: "[EFFECT_AVAILABILITY] evaluation failed",
+      gameId: r.state.id,
+      cardId: source.cardId,
+      instanceId: source.instanceId,
+      effectId: corrupt.id,
+      stage: "availability",
+      error: "sensitive engine context",
+    }]);
   });
 
   it("availability keeps reporting COST before CONDITION when both fail (order unchanged)", () => {
