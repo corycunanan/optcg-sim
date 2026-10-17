@@ -79,7 +79,7 @@ describe("OPT-864 activation-time prohibitions gate availability and validation 
     expect(availabilityOf(r, source, PAYABLE_ACTIVATE.id)).toEqual({
       effectId: PAYABLE_ACTIVATE.id,
       status: "blocked",
-      reason: "CONDITION",
+      reason: "PROHIBITED",
     });
     const action = { type: "ACTIVATE_EFFECT" as const, cardInstanceId: source.instanceId, effectId: PAYABLE_ACTIVATE.id };
     expect(validate(r.state, action, r.db, P0)).toMatch(/prohibited/);
@@ -93,6 +93,32 @@ describe("OPT-864 activation-time prohibitions gate availability and validation 
     expect(result.state.effectStack).toEqual([]);
     expect(result.state.pendingPrompt).toBeNull();
     expect(r.state.players[P0].donCostArea.every((d) => d.state === "ACTIVE")).toBe(true);
+  });
+
+  it("preserves PHASE, used, DON requirement, prohibition, cost and condition precedence", () => {
+    const { r, source } = setup();
+    const block: EffectBlock = {
+      ...PAYABLE_ACTIVATE,
+      flags: { once_per_turn: true },
+      trigger: { keyword: "ACTIVATE_MAIN", don_requirement: 1 },
+      costs: [{ type: "MILL", amount: 99 }],
+      conditions: { type: "LIFE_COUNT", controller: "SELF", operator: ">=", value: 99 },
+    };
+    r.db.get(source.cardId)!.effectSchema = synSchema(source.cardId, [block]);
+    prohibit(r, "CANNOT_ACTIVATE_EFFECT", { controller: "OPPONENT" });
+    r.state.turn.activePlayerIndex = P1;
+    r.state.turn.oncePerTurnUsed[block.id] = [source.instanceId];
+    expect(availabilityOf(r, source, block.id)?.reason).toBe("PHASE");
+    r.state.turn.activePlayerIndex = P0;
+    expect(availabilityOf(r, source, block.id)?.status).toBe("used");
+    r.state.turn.oncePerTurnUsed[block.id] = [];
+    expect(availabilityOf(r, source, block.id)?.reason).toBe("CONDITION");
+    block.trigger = { keyword: "ACTIVATE_MAIN" };
+    expect(availabilityOf(r, source, block.id)?.reason).toBe("PROHIBITED");
+    r.state.prohibitions = [];
+    expect(availabilityOf(r, source, block.id)?.reason).toBe("COST");
+    block.costs = [];
+    expect(availabilityOf(r, source, block.id)?.reason).toBe("CONDITION");
   });
 
   it("a resolution-time prohibition (CANNOT_DRAW) does not veto activation", () => {
