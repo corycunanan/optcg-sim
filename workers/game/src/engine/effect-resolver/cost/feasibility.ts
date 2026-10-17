@@ -237,6 +237,56 @@ export function sequenceFailsNecessaryCondition(
 }
 
 /**
+ * OPT-986: before paying a prefix of hand removals, current hand/field candidates
+ * are an upper bound for the candidates at the next payment. Hand removals
+ * cannot add a hand/field card or change its printed name/type. Only these
+ * static filters are admitted; dynamic filters deliberately use full search.
+ *
+ * Field protections are stable only without active modifiers, conditional or
+ * population protections, or registrations touching a moving hand identity.
+ * This also excludes hand-attached DON!! and a hand source: zone transitions
+ * could otherwise release effects or change source provenance. Under these
+ * guards computeCostTargets reads unchanged field state/protections, or a
+ * shrinking hand. Rejecting too few candidates is therefore sound.
+ *
+ * Work is O(costs * (hand + field + prohibitions)), independent of C(n,k).
+ * This is a necessary condition, not a search budget: unsupported prefixes,
+ * dynamic filters and unstable protections retain full enumeration with no
+ * bound. The complete search preserves the exact answer in those cases.
+ */
+export function sequenceFailsStableTargetCondition(
+  state: GameState,
+  costs: readonly Cost[],
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+): boolean {
+  const hand = state.players[controller].hand;
+  const handIds = new Set(hand.map(card => card.instanceId));
+  if (hand.some(card => card.attachedDon.length > 0)) return false;
+  const stableField = !handIds.has(sourceCardInstanceId) && state.activeEffects.length === 0 &&
+    state.prohibitions.every(p => !p.conditions && !p.conditionalOverride && !p.target &&
+      !p.scope.filter && !p.scope.source_filter && p.duration.type !== "WHILE_CONDITION" &&
+      !handIds.has(p.sourceCardInstanceId) && !p.appliesTo.some(id => handIds.has(id)));
+  for (const cost of costs) {
+    if (cost.type === "CHOICE" || cost.type === "CHOOSE_ONE_COST") return false;
+    const handCost = cost.type === "TRASH_FROM_HAND" || cost.type === "PLACE_HAND_TO_DECK";
+    const fieldCost = cost.type === "REST_CARDS" || cost.type === "REST_NAMED_CARD" ||
+      cost.type === "KO_OWN_CHARACTER" || cost.type === "TRASH_OWN_CHARACTER" ||
+      cost.type === "RETURN_OWN_CHARACTER_TO_HAND" || cost.type === "PLACE_OWN_CHARACTER_TO_DECK" ||
+      cost.type === "ADD_OWN_CHARACTER_TO_LIFE";
+    const staticFilter = Object.keys(cost.filter ?? {}).every(key =>
+      ["name", "name_any_of", "name_includes", "exclude_name", "exclude_self", "card_type"].includes(key));
+    if (staticFilter && (handCost || (fieldCost && stableField))) {
+      const count = computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).length;
+      if (!selectionAmounts(cost, count).some(amount => count >= amount)) return true;
+    }
+    if (!handCost) return false;
+  }
+  return false;
+}
+
+/**
  * Explore costs in order, advancing each hypothetical state before testing the
  * next cost. Selection and choice costs branch over every valid payment.
  *
@@ -249,6 +299,11 @@ export function sequenceFailsNecessaryCondition(
  * Failure policy: expected infeasibility returns false. An engine error
  * (an unknown cost type, a broken identity assertion) is not infeasibility,
  * so it propagates to the caller instead of reading as "cannot pay".
+ * A necessary-condition prune can reject before simulating payment and thus
+ * skip an integrity assertion the full search would hit on corrupt state.
+ * This also applies to the original resource prune. Engine states maintain
+ * the ID invariant; load repairs it via restoreIdCounterInvariant /
+ * reconcileExecutionContextIdCounter. Feasibility is not an integrity audit.
  * Callers split on it (OPT-961): validation, the optional-prompt gate, the
  * Life Trigger gate and payment let it propagate; availability
  * (`computeEffectAvailability`) is presentation only, so it catches it per
@@ -265,7 +320,7 @@ export function isCostSequencePayable(
 }
 
 /**
- * Test oracle only: the same search without `sequenceFailsNecessaryCondition`,
+ * Test oracle only: the same search without either necessary-condition prune,
  * used to prove the prune never rejects a payable sequence.
  */
 export function isCostSequencePayableWithoutPrune(
@@ -308,10 +363,11 @@ function searchCostSequence(
   prune: boolean,
 ): boolean {
   if (costs.length === 0) return true;
-  // OPT-961: reject before branching when a necessary condition already
-  // fails (see sequenceFailsNecessaryCondition for the soundness argument).
+  // OPT-961/986: reject before branching when a necessary condition fails;
+  // each predicate documents its soundness argument above.
   if (prune && costs.length > 1 &&
-      sequenceFailsNecessaryCondition(state, costs, controller, sourceCardInstanceId)) {
+      (sequenceFailsNecessaryCondition(state, costs, controller, sourceCardInstanceId) ||
+       sequenceFailsStableTargetCondition(state, costs, controller, cardDb, sourceCardInstanceId))) {
     return false;
   }
   // OPT-961 (OPT-431 source checks): the self half of a compound cost is
