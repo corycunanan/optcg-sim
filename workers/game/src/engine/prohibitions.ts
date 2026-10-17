@@ -872,23 +872,26 @@ function causeMatches(
   context: { cause: "EFFECT" | "BATTLE" | "COST"; causingController: 0 | 1 },
   targetController: 0 | 1,
 ): boolean {
-  // OPT-961: a cost is neither an effect nor a battle. Only an unscoped
-  // (cause ANY) protection stops a cost; every other declared cause,
-  // including aliases this switch does not list (BY_EFFECT, IN_BATTLE), does
-  // not. EFFECT and BATTLE contexts keep their existing matching.
+  // OP02-118: "during this battle" is the THIS_BATTLE duration, not a
+  // cause restriction. Its IN_BATTLE scope blocks every KO, including costs.
+  if (declaredCause === "IN_BATTLE") declaredCause = "ANY";
+  // OPT-961: a cost is neither an effect nor a battle; only ANY stops it.
   if (context.cause === "COST") return declaredCause === "ANY";
   switch (declaredCause) {
     case "ANY":
       return true;
     case "BATTLE":
       return context.cause === "BATTLE";
+    case "BY_EFFECT":
     case "EFFECT":
       return context.cause === "EFFECT";
     case "OPPONENT_EFFECT":
     case "BY_OPPONENT_EFFECT":
       return context.cause === "EFFECT" && context.causingController !== targetController;
     default:
-      return true;
+      // Schema validation rejects unknown causes before a game starts.
+      // Runtime drift must not silently grant unconditional protection.
+      return false;
   }
 }
 
