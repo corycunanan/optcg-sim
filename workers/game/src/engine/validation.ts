@@ -391,7 +391,26 @@ function validateActivateEffect(
   const cardData = cardDb.get(found.card.cardId);
   const schema = cardData?.effectSchema;
   const block = schema?.effects.find((b) => b.id === effectId);
-  if (!block || block.category !== "activate") return null;
+  if (!block) return "Effect not found on this card";
+
+  // Match executeActivateEffect: Main/Counter Events use separate paths
+  // (rules 10-2-3/10-2-4), including Events with combined Main/Counter triggers.
+  if (
+    block.category !== "activate" ||
+    !block.trigger || !("keyword" in block.trigger) ||
+    block.trigger.keyword !== "ACTIVATE_MAIN"
+  ) {
+    return "Only Activate: Main effects can be activated with this action";
+  }
+
+  // Rules 2-8-2 and 10-2-2: Activate: Main uses a source on the field.
+  if (
+    found.card.zone !== "LEADER" &&
+    found.card.zone !== "CHARACTER" &&
+    found.card.zone !== "STAGE"
+  ) {
+    return "Card must be on the field to activate this effect";
+  }
 
   if (!meetsAttachedDonRequirement(found.card, block.trigger)) {
     return "Attached DON!! requirement is not met";
