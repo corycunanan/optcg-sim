@@ -643,7 +643,7 @@ export interface EngineExecutionContext {
 // ─── Game State ───────────────────────────────────────────────────────────────
 
 export type EffectAvailabilityStatus = "active" | "usable" | "used" | "blocked";
-export type EffectBlockedReason = "COST" | "CONDITION" | "PHASE" | "ONCE_PER_TURN" | "NO_TARGET";
+export type EffectBlockedReason = "COST" | "CONDITION" | "PHASE" | "ONCE_PER_TURN" | "NO_TARGET" | "PROHIBITED";
 export interface EffectAvailability {
   effectId: string;
   status: EffectAvailabilityStatus;
