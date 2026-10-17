@@ -12,13 +12,13 @@
  * Clause table
  * | Card / rule clause | Condition, evaluation time | Cost / payer | Target / chooser | Timing / continuation | Observable result | Test |
  * |---|---|---|---|---|---|---|
- * | OP10-026, 8-3-1-3 | source still in hand at validation | PLACE_SELF_AND_TRASH_TO_DECK 1 / P0 | n/a | not activated | "Cost cannot be paid" | "OP10-026 in hand" |
+ * | OP10-026, 8-3-1-3 | source still in hand at validation | PLACE_SELF_AND_TRASH_TO_DECK 1 / P0 | n/a | not activated | "Card must be on the field to activate this effect" | "OP10-026 in hand" |
  * | same, control | source on the field, a 0-power Kin'emon in trash | same | P0 | activatable | null | "OP10-026 on the field" |
- * | EB01-030, 8-3-1-3 | source still in hand at validation | PLACE_SELF_AND_HAND_TO_DECK / P0 | n/a | not activated | "Cost cannot be paid" | "EB01-030 in hand" |
+ * | EB01-030, 8-3-1-3 | source still in hand at validation | PLACE_SELF_AND_HAND_TO_DECK / P0 | n/a | not activated | "Card must be on the field to activate this effect" | "EB01-030 in hand" |
  * | same, control | source is the Stage, 1 other hand card | same | P0 | activatable | null | "EB01-030 as the Stage" |
  *
  * The validation call is direct: a crafted or stale ACTIVATE_EFFECT naming a
- * card in hand reaches `validateActivateEffect`, which has no zone check.
+ * card in hand is rejected by the OPT-985 zone check before cost feasibility.
  */
 import { describe, expect, it } from "vitest";
 import type { CardInstance } from "../types.js";
@@ -43,7 +43,7 @@ describe("OPT-961 compound self costs need the source in place", () => {
 
   it("OP10-026 in hand: validation rejects", () => {
     const { r, source } = kinemon("HAND");
-    expect(check(r, source, "activate_place_and_play")).toBe("Cost cannot be paid");
+    expect(check(r, source, "activate_place_and_play")).toBe("Card must be on the field to activate this effect");
   });
 
   it("OP10-026 on the field: validation accepts", () => {
@@ -69,7 +69,7 @@ describe("OPT-961 compound self costs need the source in place", () => {
 
   it("EB01-030 in hand: validation rejects", () => {
     const { r, source } = loguetown(false);
-    expect(check(r, source, "activate_draw")).toBe("Cost cannot be paid");
+    expect(check(r, source, "activate_draw")).toBe("Card must be on the field to activate this effect");
   });
 
   it("EB01-030 as the Stage: validation accepts", () => {
