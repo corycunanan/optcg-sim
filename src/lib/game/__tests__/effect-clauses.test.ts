@@ -1,3 +1,4 @@
+import { GameServerMessageSchema } from "@/lib/validators/realtime";
 import { describe, expect, it } from "vitest";
 import {
   BLOCKED_REASON_COPY,
@@ -412,12 +413,35 @@ describe("segmentEffectText", () => {
   });
 });
 
-it("exports copy for all five blocked reasons", () => {
+it("exports copy for all six blocked reasons", () => {
   expect(Object.keys(BLOCKED_REASON_COPY)).toEqual([
     "COST",
     "CONDITION",
     "PHASE",
     "ONCE_PER_TURN",
     "NO_TARGET",
+    "PROHIBITED",
   ]);
 });
+
+it("describes a prohibited activation plainly", () => {
+  expect(BLOCKED_REASON_COPY.PROHIBITED).toBe("activation prohibited");
+});
+
+it.each(["game:state", "game:update"])(
+  "preserves PROHIBITED availability through the %s wire validator",
+  (type) => {
+    const message = {
+      type,
+      state: {
+        status: "IN_PROGRESS",
+        players: [],
+        effectAvailability: {
+          source: [{ effectId: "activate", status: "blocked", reason: "PROHIBITED" }],
+        },
+      },
+    };
+    expect(GameServerMessageSchema.parse(JSON.parse(JSON.stringify(message))))
+      .toEqual(message);
+  }
+);
