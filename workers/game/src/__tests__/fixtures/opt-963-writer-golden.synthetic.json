@@ -1,7 +1,7 @@
 {
   "provenance": "synthetic",
   "note": "Real engine states and constructed shapes serialized through the persistence writer. Not a captured Durable Object session.",
-  "capturedAtCommit": "573cee51f45ce708b3dd9ed924aad5c66cfbbabe",
+  "capturedAtCommit": "6ed2bbec3bc86ecfa28cea17daafc78f397f12c2",
   "cases": {
     "fresh-setup": {
       "shape": "initial state before pregame, no undo",
