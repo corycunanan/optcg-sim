@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameState, LifeCard, PlayerState } from "../types.js";
 import type { EffectSchema } from "../engine/effect-types.js";
-import { resumeFromStack } from "../engine/effect-resolver/index.js";
-import {
-  continuePipelineFromExecution,
-  runPipeline,
-} from "../engine/pipeline.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 import { battleContinuation, battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";

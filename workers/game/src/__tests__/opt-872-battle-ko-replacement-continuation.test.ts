@@ -378,13 +378,7 @@ describe("OP10-034 Franky — the Damage Step resumes after the replacement prom
 
     f.battle(target, attacker);
     const battleId = pendingBattleId(f);
-    f.state = {
-      ...f.state,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...f.continuation()!, battleId: "stale-battle" },
-      },
-    };
+    f.state = patchBattleContinuation(f.state, { battleId: "stale-battle" });
     f.decline();
 
     expect(f.continuation() ?? null).toBeNull();

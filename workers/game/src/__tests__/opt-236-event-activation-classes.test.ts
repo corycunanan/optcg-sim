@@ -31,6 +31,7 @@ import type {
   PlayerState,
 } from "../types.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { revealTrigger, withBattleTriggerWindow } from "./trigger-window-helpers.js";
 
 // ─── Card / state helpers ───────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ describe("OPT-236 — event class emission", () => {
       [evtInstance.instanceId], resolverExecutionServices
     );
 
-    const emitted = result.state.eventLog.slice(withLife.eventLog.length).map((e) => e.type);
+    const emitted = result.events.map((e) => e.type);
     expect(emitted).toContain("EVENT_MAIN_RESOLVED_FROM_TRASH");
     expect(emitted).not.toContain("EVENT_ACTIVATED_FROM_HAND");
     expect(emitted).not.toContain("EVENT_TRIGGER_RESOLVED");
