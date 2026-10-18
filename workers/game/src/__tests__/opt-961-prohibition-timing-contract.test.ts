@@ -10,9 +10,11 @@
  * to hand reading). A type classified ACTIVATION must be enforced by at least
  * one probe; a type classified RESOLUTION must veto none of them. The
  * consumers that read the table (`activationProhibitionVeto`,
- * `isCostMovementProhibited`, `isLifeToHandCostProhibited`) are covered by
+ * `isCostMovementProhibited`, `isLifeToHandProhibited`) are covered by
  * opt-864-activation-prohibitions.test.ts and
- * opt-961-protected-field-exit-costs.test.ts.
+ * opt-961-protected-field-exit-costs.test.ts. Life-to-hand cost and effect-action
+ * gating, including replacement feasibility, share isLifeToHandProhibited;
+ * opt-984-life-to-hand-prohibition.test.ts covers resolution and replacements.
  */
 import { describe, expect, it } from "vitest";
 import type { GameAction } from "../types.js";

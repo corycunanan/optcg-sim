@@ -5,7 +5,7 @@ import { matchesFilter } from "../../conditions.js";
 import {
   isCostMovementProhibited,
   isDonAttachProhibited,
-  isLifeToHandCostProhibited,
+  isLifeToHandProhibited,
   isProhibitedForCard,
   isRemovalProhibited,
   type RemovalAction,
@@ -201,7 +201,7 @@ export function isFixedCostMovementProhibited(
   cardDb: Map<string, CardData>,
   sourceCardInstanceId?: string,
 ): boolean {
-  if (cost.type === "LIFE_TO_HAND") return isLifeToHandCostProhibited(state, controller, cardDb);
+  if (cost.type === "LIFE_TO_HAND") return isLifeToHandProhibited(state, controller, controller, cardDb);
   const action = COST_MOVEMENT[cost.type];
   if (!action) return false;
   let fixedId: string | undefined;

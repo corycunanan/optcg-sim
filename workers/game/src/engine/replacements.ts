@@ -39,7 +39,7 @@ import { CONTINUATION_EFFECT_BLOCK, generateFrameId, pushFrame } from "./effect-
 import { insertFrameAt } from "./damage-frames.js";
 import { matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
-import { isProhibitedForCard } from "./prohibitions.js";
+import { isLifeToHandProhibited, isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
@@ -642,6 +642,9 @@ function canLifeToHandSucceed(
   const owner = action.target?.type === "OPPONENT_LIFE" || action.target?.controller === "OPPONENT"
     ? opponent
     : controller;
+  // Rules 8-1-3-4-5/7: the substitute is the owner's effect, and an
+  // impossible Life move cannot replace removal for free.
+  if (isLifeToHandProhibited(state, owner, controller, cardDb)) return false;
   const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
   return amount > 0 && state.players[owner].life.length >= amount;
 }

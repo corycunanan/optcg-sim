@@ -22,7 +22,7 @@ import {
   needsPlayerTargetSelection,
 } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
-import { isRemovalProhibited } from "../../prohibitions.js";
+import { isLifeToHandProhibited, isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import type { ZoneTransitionResult } from "../../zone-transition.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
@@ -262,6 +262,10 @@ export function executeLifeToHand(
         ? 1
         : 0
       : controller;
+  const causingController = effectSourceController(state, _sourceCardInstanceId, controller, _resultRefs);
+  if (isLifeToHandProhibited(state, targetController, causingController, _cardDb)) {
+    return { state, events, succeeded: false, result: { targetInstanceIds: [], count: 0 } };
+  }
   const p = state.players[targetController];
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
