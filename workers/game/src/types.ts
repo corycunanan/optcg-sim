@@ -30,6 +30,7 @@ import type {
   CardData as SharedCardData,
   GameAction,
   GameState as SharedGameState,
+  LifeCard,
   PendingGameEvent,
   PendingPromptState as SharedPendingPromptState,
 } from "../../../shared/game-types.js";
@@ -193,6 +194,94 @@ export interface PhaseBoundaryContinuation {
   activatedWaveEffects?: string[];
 }
 
+// ─── OPT-963 typed continuations (game-state schema version 3) ───────────────
+//
+// Each kind below is one family of paused work owned by one EffectStackFrame
+// (SAVED-STATE-COMPATIBILITY.md §2, §8). The frame's base fields are reused:
+// `accumulatedEvents` holds events raised while the frame is open and not yet
+// published or scanned, `pendingTriggers` holds the ordinary triggers rule
+// 8-6-2 defers until the damage processing completes.
+
+/** A single optional replacement offer (REPLACEMENT frame); pops when answered. */
+export interface ReplacementContinuation {
+  effectId: string;
+  targetInstanceId: string;
+  event: import("./engine/replacements.js").ReplacementEvent;
+}
+
+/** The replacement batch state machine (REPLACEMENT_BATCH frame, OPT-219). */
+export interface ReplacementBatchContinuation {
+  actionKind: import("./engine/replacements.js").BatchActionKind;
+  event: import("./engine/replacements.js").ReplacementEvent;
+  /** Every target the caller originally queued for this event. */
+  allTargetIds: string[];
+  /** Targets already saved by earlier replacements. */
+  protectedIds: string[];
+  /** Pending matches to resolve, in registration order. */
+  pendingMatches: import("./engine/replacements.js").ReplacementBatchMatch[];
+  /** Index into pendingMatches of the match being offered or applied. */
+  currentMatchIndex: number;
+  /** Controller of the action that produced the event. */
+  causingController: 0 | 1;
+  causingSource?: import("../../../shared/game-types.js").EffectSourceIdentity;
+  /** Only used when actionKind === "RETURN_TO_DECK". */
+  returnToDeckPosition?: "TOP" | "BOTTOM";
+}
+
+/**
+ * The Damage Step of a battle paused (BATTLE_DAMAGE frame). The remaining
+ * damage count stays on `turn.battle.damagesRemaining`, locked at Damage Step
+ * entry (rule 7-1-4-1-1-3); the frame names the battle by `battleId`.
+ */
+export type BattleDamageContinuation =
+  | {
+      stage: "TRIGGER_WINDOW";
+      battleId: string;
+      damagedPlayerIndex: 0 | 1;
+      /** The revealed Life card awaiting the defender's choice (8-6-2-1). */
+      lifeCard: LifeCard;
+    }
+  | {
+      stage: "TRIGGER_EFFECT";
+      battleId: string;
+      damagedPlayerIndex: 0 | 1;
+      /** The Life card whose accepted [Trigger] effect resolves in the frames above. */
+      lifeCardInstanceId: string;
+    }
+  | {
+      /** OPT-872: the losing Character's K.O. waits on a replacement (rules §7-1-4-1-2, §8-1-3-4-1). */
+      stage: "CHARACTER_KO_REPLACEMENT";
+      battleId: string;
+      targetInstanceId: string;
+      /** The optional replacement whose offer paused the step; absent for a mandatory one. */
+      replacementEffectId?: string;
+      causingPlayerIndex: 0 | 1;
+      attackerIsCharacter: boolean;
+      /** Set when the offer is answered; absent while it is pending. */
+      resolution?: "REPLACED" | "NOT_REPLACED";
+    };
+
+/**
+ * A DEAL_DAMAGE instruction paused (EFFECT_DAMAGE frame). `parentFrameId`
+ * names the chain continuation directly below it (an INTERRUPTED_BY_TRIGGERS
+ * frame paused on the DEAL_DAMAGE); absent when the chain already ran on
+ * (a lifted version 2 record).
+ */
+export type EffectDamageContinuation = {
+  damagedPlayerIndex: 0 | 1;
+  /** Points still to deal after the current one resolves. */
+  remainingDamages: number;
+  /** Points dealt so far by this instruction (its result count). */
+  dealt: number;
+  sourceCardInstanceId: string;
+  /** Controller of the effect that dealt the damage. */
+  controllerIndex: 0 | 1;
+  parentFrameId?: string;
+} & (
+  | { stage: "TRIGGER_WINDOW"; lifeCard: LifeCard }
+  | { stage: "TRIGGER_EFFECT"; lifeCardInstanceId: string }
+);
+
 export interface ResumeContext {
   effectSourceInstanceId: string;
   controller: 0 | 1;
@@ -341,6 +430,14 @@ export interface EffectStackFrame {
   replacementBatchContinuation?: import("./engine/replacements.js").ReplacementBatchResumeContext;
   /** End-phase work parked below a scheduled effect's prompt frame. */
   phaseBoundaryContinuation?: PhaseBoundaryContinuation;
+  /** OPT-963 REPLACEMENT frame: the pending optional replacement offer. */
+  replacement?: ReplacementContinuation;
+  /** OPT-963 REPLACEMENT_BATCH frame: the batch state machine. */
+  replacementBatch?: ReplacementBatchContinuation;
+  /** OPT-963 BATTLE_DAMAGE frame: the paused Damage Step. */
+  battleDamage?: BattleDamageContinuation;
+  /** OPT-963 EFFECT_DAMAGE frame: the paused DEAL_DAMAGE instruction. */
+  effectDamage?: EffectDamageContinuation;
 
   // Cost tracking
   costs: import("./engine/effect-types.js").Cost[];
