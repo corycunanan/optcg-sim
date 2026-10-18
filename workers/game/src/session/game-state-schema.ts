@@ -270,9 +270,15 @@ const convertFromV2: Converter = (raw, location) => {
     prompt = { ...prompt, respondingPlayer: responder, resumeContext: frameId, options };
   };
 
-  if (battle && battle.pendingTriggerLifeCard !== undefined) {
-    const lifeCard = battle.pendingTriggerLifeCard as V2LifeCard;
+  // Every retired record is removed by PRESENCE: the version 2 terminal writer
+  // stored the keys with the value undefined, which Durable Object storage
+  // preserves (structured clone), and the strict schema rejects the key. An
+  // undefined or null value is dropped; a record is lifted (PR #758 round 3).
+  if (battle && "pendingTriggerLifeCard" in battle) {
+    const lifeCard = (battle.pendingTriggerLifeCard ?? null) as V2LifeCard | null;
     delete battle.pendingTriggerLifeCard;
+    changed = true;
+    if (lifeCard) {
     const damagedPlayerIndex: 0 | 1 = activePlayerIndex === 0 ? 1 : 0;
     bottom.push(
       liftedFrame({
@@ -284,11 +290,12 @@ const convertFromV2: Converter = (raw, location) => {
       })
     );
     pointWindowPrompt(LIFTED_FRAME_ID.battleDamage, damagedPlayerIndex, lifeCard);
-    changed = true;
+    }
   }
-  if (turn.pendingBattleDamageContinuation !== undefined) {
-    const continuation = turn.pendingBattleDamageContinuation as V2BattleContinuation | null;
+  if ("pendingBattleDamageContinuation" in turn) {
+    const continuation = (turn.pendingBattleDamageContinuation ?? null) as V2BattleContinuation | null;
     delete turn.pendingBattleDamageContinuation;
+    changed = true;
     if (continuation) {
       const battleDamage =
         continuation.stage === "CHARACTER_KO_REPLACEMENT"
@@ -330,9 +337,10 @@ const convertFromV2: Converter = (raw, location) => {
       changed = true;
     }
   }
-  if (turn.pendingTriggerFromEffect !== undefined) {
-    const window = turn.pendingTriggerFromEffect as V2EffectWindow | null;
+  if ("pendingTriggerFromEffect" in turn) {
+    const window = (turn.pendingTriggerFromEffect ?? null) as V2EffectWindow | null;
     delete turn.pendingTriggerFromEffect;
+    changed = true;
     if (window) {
       bottom.push(
         liftedFrame({
@@ -358,7 +366,12 @@ const convertFromV2: Converter = (raw, location) => {
 
   const middle: unknown[] = [];
   for (const frame of stack) {
-    if (isRecord(frame) && isRecord(frame.replacementBatchContinuation)) {
+    if (isRecord(frame) && "replacementBatchContinuation" in frame && !isRecord(frame.replacementBatchContinuation)) {
+      // The key with no rider (undefined / null): dropped, nothing to lift.
+      const { replacementBatchContinuation: _none, ...kept } = frame;
+      middle.push(kept);
+      changed = true;
+    } else if (isRecord(frame) && isRecord(frame.replacementBatchContinuation)) {
       const { type: _type, ...replacementBatch } = frame.replacementBatchContinuation;
       middle.push(
         liftedFrame({
@@ -441,16 +454,29 @@ const convertFromV3: Converter = (raw, location) => {
       `is schemaVersion 3 but carries ${field}, a version 2 record the version 3 writer lifts into a frame`
     );
   };
-  const turn = isRecord(rest.turn) ? rest.turn : undefined;
-  if (turn) {
+  // A retired key present with the value undefined/null is dropped (the
+  // runtime type no longer has these fields, so this writer never emits them;
+  // the strict schema would otherwise reject the key); a record is rejected.
+  if (isRecord(rest.turn)) {
+    const turn: Record<string, unknown> = { ...rest.turn };
     for (const key of VERSION_2_RECORDS_RETIRED_BY_V3) {
+      if (!(key in turn)) continue;
       if (turn[key] !== undefined && turn[key] !== null) reject(`turn.${key}`);
+      delete turn[key];
     }
-    if (isRecord(turn.battle) && turn.battle.pendingTriggerLifeCard !== undefined) reject("turn.battle.pendingTriggerLifeCard");
+    if (isRecord(turn.battle) && "pendingTriggerLifeCard" in turn.battle) {
+      if (turn.battle.pendingTriggerLifeCard !== undefined && turn.battle.pendingTriggerLifeCard !== null) reject("turn.battle.pendingTriggerLifeCard");
+      const { pendingTriggerLifeCard: _none, ...battle } = turn.battle;
+      turn.battle = battle;
+    }
+    rest.turn = turn;
   }
   if (Array.isArray(rest.effectStack)) {
-    rest.effectStack.forEach((frame: unknown, index: number) => {
-      if (isRecord(frame) && frame.replacementBatchContinuation !== undefined) reject(`effectStack[${index}].replacementBatchContinuation`);
+    rest.effectStack = rest.effectStack.map((frame: unknown, index: number) => {
+      if (!isRecord(frame) || !("replacementBatchContinuation" in frame)) return frame;
+      if (frame.replacementBatchContinuation !== undefined && frame.replacementBatchContinuation !== null) reject(`effectStack[${index}].replacementBatchContinuation`);
+      const { replacementBatchContinuation: _none, ...kept } = frame;
+      return kept;
     });
   }
   return rest;

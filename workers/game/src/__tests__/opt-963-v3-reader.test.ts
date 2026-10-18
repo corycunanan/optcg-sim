@@ -550,3 +550,84 @@ describe("PR #758 L5: a lifted Trigger-window prompt shows the responder their o
     expect(classifyLegacyShapes(loaded)).toEqual([]);
   });
 });
+
+// ─── PR #758 fix round 3: retired keys stored with the value undefined ─────────
+
+describe("PR #758 round 3: a version 2 object whose retired keys are present with the value undefined loads (structured clone keeps such keys; JSON drops them)", () => {
+  /** The keys the version 2 terminal writer stored as explicit undefined, plus the other retired records, all undefined. */
+  function withUndefinedRetiredKeys(v2: Record<string, unknown>): Record<string, unknown> {
+    const turn = v2.turn as Record<string, unknown>;
+    const battle = turn.battle as Record<string, unknown> | null;
+    const stack = v2.effectStack as Array<Record<string, unknown>>;
+    return {
+      ...v2,
+      turn: {
+        ...turn,
+        pendingTriggerFromEffect: undefined,
+        pendingBattleDamageContinuation: undefined,
+        ...(battle ? { battle: { ...battle, pendingTriggerLifeCard: undefined } } : {}),
+      },
+      effectStack: stack.map((frame) => ({ ...frame, replacementBatchContinuation: undefined })),
+    };
+  }
+  const hasRetiredKey = (state: GameState) =>
+    "pendingTriggerFromEffect" in state.turn ||
+    "pendingBattleDamageContinuation" in state.turn ||
+    (state.turn.battle !== null && "pendingTriggerLifeCard" in state.turn.battle) ||
+    state.effectStack.some((frame) => "replacementBatchContinuation" in frame);
+
+  it.each(["fresh-setup", "battle-ready-with-undo", "effect-frame-prompt"])("(a) %s: through SessionRepository.load, live and as an undo snapshot, the keys are gone and nothing is classified", async (name) => {
+    const v2 = structuredClone(withUndefinedRetiredKeys(goldenV2Raw(name)));
+    expect(Object.keys(v2.turn as object)).toContain("pendingTriggerFromEffect");
+    const live = (await repository(storageWith(v2, [structuredClone(v2)])).load())!;
+    expect(hasRetiredKey(live.state)).toBe(false);
+    expect(hasRetiredKey(live.undoHistory[0])).toBe(false);
+    expect(classifyLegacyShapes(live.state)).toEqual([]);
+    expect(runtime(live.state)).toEqual(runtime(live.undoHistory[0]));
+    expect(runtime(live.state)).toEqual(runtime(liftedGolden(name)));
+  });
+
+  it("(b) through convertPersistedGameState on a structuredClone'd object", () => {
+    const v2 = structuredClone(withUndefinedRetiredKeys(goldenV2Raw("battle-ready-with-undo")));
+    const loaded = convertPersistedGameState(v2, "state");
+    expect(hasRetiredKey(loaded)).toBe(false);
+    expect(classifyLegacyShapes(loaded)).toEqual([]);
+    expect(runtime(loaded)).toEqual(runtime(liftedGolden("battle-ready-with-undo")));
+  });
+
+  it("(c) a version 2 TERMINAL state as the version 2 terminateGame wrote it (status FINISHED, winner, both turn keys undefined, empty stack) loads", async () => {
+    const base = goldenV2Raw("battle-ready-with-undo");
+    const turn = base.turn as Record<string, unknown>;
+    // terminal.ts at 1cd06cb5: effectStack [], pendingPrompt null, pendingEventActivationEvents undefined,
+    // turn.battle null, battleSubPhase null, pendingTriggerFromEffect/pendingBattleDamageContinuation undefined.
+    const terminal = structuredClone({
+      ...base,
+      status: "FINISHED",
+      winner: 0,
+      winReason: "concede",
+      effectStack: [],
+      pendingPrompt: null,
+      pendingEventActivationEvents: undefined,
+      turn: { ...turn, battle: null, battleSubPhase: null, pendingTriggerFromEffect: undefined, pendingBattleDamageContinuation: undefined },
+    });
+    const direct = convertPersistedGameState(structuredClone(terminal), "state");
+    expect(direct.status).toBe("FINISHED");
+    expect(direct.winner).toBe(0);
+    expect(hasRetiredKey(direct)).toBe(false);
+    const loaded = (await repository(storageWith(terminal, [structuredClone(terminal)])).load())!;
+    expect(loaded.state.status).toBe("FINISHED");
+    expect(hasRetiredKey(loaded.state)).toBe(false);
+    expect(hasRetiredKey(loaded.undoHistory[0])).toBe(false);
+    expect(classifyLegacyShapes(loaded.state)).toEqual([]);
+  });
+
+  it("a version 3 object carrying a retired key with the value undefined loads too, while a record is still rejected by name", () => {
+    const v3 = structuredClone(persistedV3(byName("effect-window-with-parent-chain").state)) as Record<string, unknown>;
+    const turn = v3.turn as Record<string, unknown>;
+    v3.turn = { ...turn, pendingTriggerFromEffect: undefined, pendingBattleDamageContinuation: undefined };
+    (v3.effectStack as Array<Record<string, unknown>>)[0] = { ...(v3.effectStack as Array<Record<string, unknown>>)[0], replacementBatchContinuation: undefined };
+    const loaded = convertPersistedGameState(structuredClone(v3), "state");
+    expect(hasRetiredKey(loaded)).toBe(false);
+    expect(runtime(loaded)).toEqual(runtime(byName("effect-window-with-parent-chain").state));
+  });
+});
