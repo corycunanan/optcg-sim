@@ -167,13 +167,11 @@ describe("OPT-961 field-exit costs respect protecting prohibitions (rules 1-3-3,
   });
 });
 
-// ─── Round 2 (G1): effect- and battle-scoped protections never gate a cost ──
+// ─── Round 2 (G1): authored cause scopes and K.O. costs ────────────────────
 //
-// A cost matches only an unscoped / cause ANY protection. The authored
-// aliases BY_EFFECT (OP09-033 "cannot be K.O.'d by effects", op09.ts) and
-// IN_BATTLE (OP02-118 "cannot be K.O.'d during this battle", op02.ts) protect
-// against effects and battle, not against the player's own K.O. cost.
-describe("OPT-961 round 2: effect- and battle-scoped protections allow the player's own cost", () => {
+// BY_EFFECT does not cover costs. OPT-983: OP02-118's "during this battle"
+// is a duration, so IN_BATTLE is unscoped protection and also stops K.O. costs.
+describe("OPT-961 round 2: authored protection scopes gate costs correctly", () => {
   /** Run the authored APPLY_PROHIBITION action (its real scope object). */
   function applyAuthored(r: Rig, cardId: string, blockId: string, targetOverride?: EffectBlock["actions"]) {
     const authored = getEffectSchema(cardId)!.effects.find((b) => b.id === blockId)!;
@@ -213,7 +211,7 @@ describe("OPT-961 round 2: effect- and battle-scoped protections allow the playe
     expectPayable(r, source);
   });
 
-  it("OP02-118 (authored scope IN_BATTLE): the protected Character still pays a K.O. cost", () => {
+  it("OP02-118 (authored scope IN_BATTLE): the protected Character cannot pay a K.O. cost", () => {
     const r = rig();
     r.deck(P0, 5);
     const source = r.put("OPT961-JEWEL-TARGET", P0, "CHARACTER", { schema: synSchema("OPT961-JEWEL-TARGET", [KO_COST]) });
@@ -227,7 +225,8 @@ describe("OPT-961 round 2: effect- and battle-scoped protections allow the playe
     const { created } = applyAuthored(r, "OP02-118", "counter_protection", [fixedTarget]);
     expect(created.scope).toEqual({ cause: "IN_BATTLE" });
     expect(created.appliesTo).toContain(source.instanceId);
-    expectPayable(r, source);
+    expect(availability(r, source, KO_COST.id)).toEqual({ effectId: KO_COST.id, status: "blocked", reason: "COST" });
+    expect(activate(r, source, KO_COST.id)).toBe("Cost cannot be paid");
   });
 
   it("control: an unscoped CANNOT_BE_KO still blocks the K.O. cost", () => {
