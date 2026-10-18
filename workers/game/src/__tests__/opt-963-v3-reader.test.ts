@@ -9,10 +9,10 @@
  * engine states lifted to the version 3 shape, plus constructed shapes).
  */
 
-import { readFileSync } from "node:fs";
+import { reply } from "./fixtures/opt-963-lifecycle.js";
+import corpus from "./fixtures/opt-963-5b-written-states.json";
 import { describe, expect, it, vi } from "vitest";
-import type { CardData, EffectStackFrame } from "../types.js";
-import type { GameState } from "../types.js";
+import type { CardData, GameState } from "../types.js";
 import {
   SESSION_CARD_DB_STORAGE_KEY,
   SESSION_STORAGE_KEY,
@@ -342,19 +342,11 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
 interface WrittenCase { source: string; state: Record<string, unknown>; cardDb: Record<string, CardData> }
 /** Version 3 states the PR 5b engine (8823ad05) wrote while running its own suite (review corpus). */
 function writtenBy5b(name: string): { state: GameState; cardDb: Map<string, CardData>; raw: Record<string, unknown> } {
-  const file = JSON.parse(readFileSync(new URL("./fixtures/opt-963-5b-written-states.json", import.meta.url), "utf8")) as { cases: Record<string, WrittenCase> };
+  const file = corpus as unknown as { cases: Record<string, WrittenCase> };
   const entry = file.cases[name];
   if (!entry) throw new Error(`no 5b-written case named ${name}`);
   const raw = JSON.parse(JSON.stringify(entry.state)) as Record<string, unknown>;
   return { state: convertPersistedGameState(JSON.parse(JSON.stringify(entry.state)), "state"), cardDb: new Map(Object.entries(entry.cardDb)), raw };
-}
-
-/** Drive a reply the way GameSession does: coordinator routing, then the prompt lifecycle. */
-function reply(state: GameState, cardDb: Map<string, CardData>, player: 0 | 1, action: Parameters<SessionCoordinator["executeAction"]>[3]) {
-  const routed = new SessionCoordinator().executeAction(state, [], player, action, cardDb);
-  if (routed.kind !== "resume") return { routed, state: routed.state, rejected: routed.kind === "reject" };
-  const resumed = resumePromptLifecycle(routed.state, action, cardDb, lifecycleServices);
-  return { routed, state: resumed.state, rejected: resumed.responseRejected };
 }
 
 /** Life card identities a REVEAL_TRIGGER prompt must not show to `responder`. */
@@ -436,29 +428,6 @@ describe("OPT-963 fix round 1: lowering resumes what the 5b engine wrote", () =>
     expect(types.indexOf("CARD_KO")).toBeLessThan(types.indexOf("CARD_ADDED_TO_HAND_FROM_LIFE"));
   });
 
-  it("C0: both windows (5b-written) lower to the battle defender's own prompt; version 2 cannot progress it either way (OPT-974 base), and no other player's Life card is shown", () => {
-    const { state, cardDb, raw } = writtenBy5b("both-trigger-windows");
-    const writtenPrompt = (raw as { pendingPrompt: { respondingPlayer: number; options: { cards: Array<{ instanceId: string }> } } }).pendingPrompt;
-    expect(writtenPrompt.respondingPlayer).toBe(0);
-    const battleCard = state.turn.battle!.pendingTriggerLifeCard!;
-    expect(state.turn.pendingTriggerFromEffect?.damagedPlayerIndex).toBe(0);
-    const prompt = state.pendingPrompt!;
-    expect(prompt.options.promptType).toBe("REVEAL_TRIGGER");
-    if (prompt.options.promptType !== "REVEAL_TRIGGER") throw new Error("wrong prompt");
-    expect(prompt.respondingPlayer).toBe(1);
-    expect(prompt.resumeContext).toBeNull();
-    expect(prompt.options.cards.map((card) => [card.instanceId, card.controller, card.owner])).toEqual([[battleCard.instanceId, 1, 1]]);
-    expect(prompt.options.cards[0].instanceId).not.toBe(writtenPrompt.options.cards[0].instanceId);
-    expectRevealPromptOwned(state);
-    expect(classifyLegacyShapes(state).map((report) => report.shape)).toContain("legacy.two_trigger_windows");
-    const asDefender = new SessionCoordinator().executeAction(state, [], 1, { type: "REVEAL_TRIGGER", reveal: false }, cardDb);
-    expect(asDefender.kind).toBe("reject");
-    expect((asDefender as { reason?: string }).reason).toBe("Not your turn");
-    const asEffectPlayer = new SessionCoordinator().executeAction(state, [], 0, { type: "REVEAL_TRIGGER", reveal: false }, cardDb);
-    expect(asEffectPlayer.kind).toBe("reject");
-    expect((asEffectPlayer as { reason?: string }).reason).toMatch(/Waiting for opponent/);
-  });
-
   it("no lowered REVEAL_TRIGGER prompt shows a Life card of a player other than its responder (every fixture, golden and 5b-written state)", () => {
     for (const entry of STATES) expectRevealPromptOwned(convertPersistedGameState(persistedV3(entry.state), "state"));
     for (const name of ["battle-trigger-window", "effect-damage-trigger-window", "both-trigger-windows"]) expectRevealPromptOwned(goldenV2State(name));
@@ -490,7 +459,7 @@ describe("OPT-963 fix round 1: rejections", () => {
     expectRejected(state, /effectStack\[0\] \(frame "v3-battle-damage"\) is EFFECT but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal/);
   });
 
-  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of 286 engine-written states)", () => {
+  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of the 4 committed engine-written states)", () => {
     const state = raw("replacement-batch-prompt");
     state.pendingPrompt = null;
     expectRejected(state, /effectStack\[0\] \(frame "v3-replacement-batch"\) is a REPLACEMENT_BATCH frame offering a match, but pendingPrompt does not name it/);

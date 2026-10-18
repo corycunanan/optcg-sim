@@ -705,5 +705,25 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
     reports: ["lowered.effect_damage", "lowered.effect_damage_events_dropped"],
   });
 
+  // SYNTHETIC: the capture has no battle TRIGGER_EFFECT with non-removal debt.
+  const battleDebt = states.find(entry => entry.name === "battle-trigger-effect-unscanned")!;
+  states.push({
+    name: "battle-trigger-effect-non-removal-events",
+    shape: "SYNTHETIC: battle TRIGGER_EFFECT carries an unpublished activation to its publishing Trigger frame",
+    state: { ...battleDebt.state, effectStack: battleDebt.state.effectStack.map((frame, index) =>
+      index === 0 ? { ...frame, accumulatedEvents: [...frame.accumulatedEvents, retainedEvents[0]] } : frame) },
+    lowered: { ...battleDebt.lowered, effectStack: battleDebt.lowered.effectStack.map((frame, index) =>
+      index === 0 ? { ...frame, accumulatedEvents: [retainedEvents[0], ...frame.accumulatedEvents] } : frame) },
+    reports: ["lowered.battle_damage"],
+  });
+  const effectDebt = states.find(entry => entry.name === "effect-trigger-effect-retained-events")!;
+  states.push({
+    name: "effect-trigger-effect-parent-carrier",
+    shape: "SYNTHETIC: no Trigger frame above; the surviving interrupted parent publishes the retained events",
+    state: { ...effectDebt.state, effectStack: effectDebt.state.effectStack.slice(0, 2), pendingPrompt: null },
+    lowered: { ...effectDebt.lowered, effectStack: [{ ...parent, accumulatedEvents: [...parent.accumulatedEvents, ...retainedEvents] }], pendingPrompt: null },
+    reports: ["lowered.effect_damage"],
+  });
+
   return states;
 }

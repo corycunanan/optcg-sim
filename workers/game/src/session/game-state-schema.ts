@@ -627,7 +627,7 @@ export function validateContinuationReferences(
   // Likewise a REPLACEMENT_BATCH frame offering a match: openReplacementBatchFrame
   // at AWAITING_OPTIONAL_RESPONSE and the prompt naming it are one step
   // (engine/replacements.ts, stepBatch); no engine state holds the offer
-  // without its prompt (0 of 286 engine-written version 3 states, OPT-963 review).
+  // without its prompt (0 of the 4 committed engine-written version 3 states).
   const unownedBatchOffer = frames.findIndex(
     (frame) =>
       frameKindOf(frame) === "REPLACEMENT_BATCH" &&
@@ -663,8 +663,8 @@ export interface LoweringReport {
  * CHARACTER_KO_REPLACEMENT with every field; a battle TRIGGER_EFFECT (version
  * 2 LIFE_REMOVAL while the retained Life removal is unscanned, else DAMAGE);
  * an effect TRIGGER_EFFECT whose retained, still-pending events move to the
- * frame directly above it (the Trigger's effect), which the version 2
- * resolver publishes and scans when that frame resolves.
+ * first publishing frame above it, or a publishing parent below (see
+ * publishesEvents). Block-level optional and cost frames are not carriers.
  *
  * Degraded, classified (`lowered.*_dropped`) where version 2 has no place for
  * the part, so a game rolled back from PR 5b in that exact state loses it:
@@ -681,7 +681,7 @@ export interface LoweringReport {
  *   - the outer of two EFFECT_DAMAGE windows (version 2 has one slot);
  *   - a BATTLE_DAMAGE frame at TRIGGER_WINDOW whose battle is gone;
  *   - a batch waiting with nothing above it to carry the rider (transient);
- *   - retained events of an effect TRIGGER_EFFECT with no surviving frame.
+ *   - retained events of an effect TRIGGER_EFFECT with no surviving publishing frame.
  *
  * Two Trigger windows (battle below, effect above) lower to the two version 2
  * records with the battle defender's own prompt, rebuilt from the battle
@@ -733,8 +733,17 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
     }
     rider = undefined;
   };
-  // Events retained on a lowered frame move to the next surviving frame above
-  // it, which the version 2 resolver publishes and scans when it resolves.
+  // Only committed-event consumers may carry a lowered frame's event debt.
+  // Block-level optional frames discard their accumulator; cost frames stage
+  // transactions and may roll back. Trigger-order selection also starts a fresh accumulator. None is a safe
+  // publication boundary. Action-level optional responses do consume it.
+  const publishesEvents = (frame: EffectStackFrame): boolean =>
+    frame.phase === "INTERRUPTED_BY_TRIGGERS" ||
+    frame.phase === "AWAITING_TARGET_SELECTION" ||
+    frame.phase === "AWAITING_ARRANGE_CARDS" ||
+    frame.phase === "AWAITING_PLAYER_CHOICE" ||
+    (frame.phase === "AWAITING_OPTIONAL_RESPONSE" && frame.pausedAction?.optional === true) ||
+    (frame.phase === "AWAITING_BATCH_RESUME" && !!frame.batchResumeMarker);
   let carried: PendingEvent[] = [];
   let carriedFrom: EffectStackFrame | undefined;
   const carry = (frame: EffectStackFrame, events: PendingEvent[]) => {
@@ -750,9 +759,12 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
     }
     const kind = frameKindOf(frame);
     if (!VERSION_3_FRAME_KINDS.has(kind)) {
-      kept.push(carried.length > 0 ? { ...frame, accumulatedEvents: [...carried, ...frame.accumulatedEvents] } : frame);
-      carried = [];
-      carriedFrom = undefined;
+      const canCarry = publishesEvents(frame);
+      kept.push(carried.length > 0 && canCarry ? { ...frame, accumulatedEvents: [...carried, ...frame.accumulatedEvents] } : frame);
+      if (canCarry) {
+        carried = [];
+        carriedFrom = undefined;
+      }
       continue;
     }
     if (frame.pendingTriggers.length > 0) report("lowered.deferred_triggers_dropped", frame);
@@ -840,8 +852,8 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
         } else {
           // The Trigger's effect resolves in the frames above and its parent
           // chain (if any) stays below: the version 2 lifecycle drains both.
-          // The frame's retained events ride up to the Trigger's frame; only
-          // the remaining points have no version 2 home.
+          // Retained events need a publishing carrier; remaining points have
+          // no version 2 home.
           carry(frame, pendingPropagationEvents(frame.accumulatedEvents));
           if (damage.remainingDamages > 0) report("lowered.effect_damage_remaining_dropped", frame);
           report("lowered.effect_damage", frame);
@@ -854,9 +866,10 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
   }
   flushRider();
   if (carried.length > 0) {
-    // Nothing above the frame: its parent chain below resolves next.
-    if (kept.length > 0) {
-      const top = kept.length - 1;
+    // No publishing frame above: use the nearest publishing parent below.
+    let top = kept.length - 1;
+    while (top >= 0 && !publishesEvents(kept[top])) top -= 1;
+    if (top >= 0) {
       kept[top] = { ...kept[top], accumulatedEvents: [...kept[top].accumulatedEvents, ...carried] };
     } else {
       report("lowered.effect_damage_events_dropped", carriedFrom!);
