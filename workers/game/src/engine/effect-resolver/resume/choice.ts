@@ -5,8 +5,9 @@ import {
   withdrawUnactivatedTrashMain,
 } from "../event-activation.js";
 import { pendingPropagationEvents, retainEventsOnFrame } from "./events.js";
-import { updateFrameById } from "../../damage-frames.js";
+import { insertFrameAt } from "../../damage-frames.js";
 import { isHandlerOwnedFrame } from "../../frame-kinds.js";
+import { outerSuffixContinuation } from "../resolver.js";
 import { isGameTerminated } from "../../terminal.js";
 import { log } from "../../../lib/log.js";
 /**
@@ -36,8 +37,9 @@ import type {
 } from "../../../types.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
-  popFrame,
+  generateFrameId,
   peekFrame,
+  popFrame,
   updateTopFrame,
 } from "../../effect-stack.js";
 import {
@@ -482,12 +484,23 @@ export function handlePlayerChoiceBranch(
         frameAbove !== undefined &&
         isHandlerOwnedFrame(frameAbove)
       ) {
-        // The actions after the choice outlive the handler's frame: they go
-        // on the branch's continuation below it, never on the handler's frame.
-        nextState = updateFrameById(nextState, continuationBelow.id, (frame) => ({
-          ...frame,
-          remainingActions: [...frame.remainingActions, ...remainingActions],
-        }));
+        // The actions after the choice outlive the handler's frame and the
+        // branch: their own continuation, under the choosing chain's
+        // controller, below the branch's continuation (PR #758 D-F1b).
+        const outerId = generateFrameId(nextState);
+        nextState = insertFrameAt(
+          outerId.state,
+          branchDepth,
+          outerSuffixContinuation(
+            outerId.id,
+            effectSourceInstanceId,
+            resumeCtx.remainingActionsController ?? controller,
+            resumeCtx.effectDescription,
+            pausedAction,
+            remainingActions,
+            resultRefs
+          )
+        );
       } else if (replacementFrame && remainingActions.length > 0) {
         nextState = updateTopFrame(nextState, {
           remainingActions: [

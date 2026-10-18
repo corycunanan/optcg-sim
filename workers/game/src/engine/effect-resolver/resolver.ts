@@ -1086,8 +1086,10 @@ export function executeActionChain(
         // EFFECT_DAMAGE window, a REPLACEMENT_BATCH offer or substitute), the
         // branch's chain continuation sits at the pre-action depth with the
         // handler's frame directly above it. The actions after the choice
-        // belong on that continuation: the handler's frame pops when its
-        // work is done and would take them with it.
+        // outlive both: they get their own continuation under this chain's
+        // controller, inserted below the branch's continuation, so the branch
+        // (possibly the opponent's, under OPPONENT_ACTION) finishes first and
+        // the suffix then resumes as this chain's controller (PR #758 D-F1b).
         const continuationBelow = result.state.effectStack[stackDepthBeforeAction];
         const frameAbove = result.state.effectStack[stackDepthBeforeAction + 1];
         const handlerOwnsPause =
@@ -1096,18 +1098,17 @@ export function executeActionChain(
           frameAbove !== undefined &&
           isHandlerOwnedFrame(frameAbove);
         if (handlerOwnsPause) {
-          const appended =
-            remainingActions.length > 0
-              ? updateFrameById(result.state, continuationBelow.id, (frame) => ({
-                  ...frame,
-                  remainingActions: [...frame.remainingActions, ...remainingActions],
-                  ...(action.type === "OPPONENT_ACTION"
-                    ? { remainingActionsController: controller }
-                    : {}),
-                }))
-              : result.state;
+          let parked = result.state;
+          if (remainingActions.length > 0) {
+            const outerId = generateFrameId(parked);
+            parked = insertFrameAt(
+              outerId.state,
+              stackDepthBeforeAction,
+              outerSuffixContinuation(outerId.id, sourceCardInstanceId, controller, effectDescription, action, remainingActions, resultRefs)
+            );
+          }
           return {
-            state: retainEventsOnFrame(appended, stackDepthBeforeAction, events),
+            state: retainEventsOnFrame(parked, stackDepthBeforeAction, events),
             events,
             // The nested prompt belongs to the handler's frame: its own description.
             pendingPrompt: result.pendingPrompt,
@@ -1278,6 +1279,45 @@ export function executeActionChain(
   }
 
   return { state, events };
+}
+
+/**
+ * The continuation of the actions after a choice whose branch paused on a
+ * handler-owned frame (PR #758 D-F1b). It runs as the choosing chain's
+ * controller once the branch's own continuation (which may be the opponent's,
+ * under OPPONENT_ACTION) has finished; the choice itself counts as succeeded,
+ * as it does when its branch completes without pausing.
+ */
+export function outerSuffixContinuation(
+  id: string,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  effectDescription: string | undefined,
+  choice: Action,
+  remainingActions: Action[],
+  resultRefs: Map<string, EffectResult>
+): EffectStackFrame {
+  return {
+    id,
+    sourceCardInstanceId,
+    controller,
+    effectDescription,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "INTERRUPTED_BY_TRIGGERS",
+    pausedAction: choice,
+    remainingActions,
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [],
+    priorActionSucceeded: true,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+  };
 }
 
 /** Name the chain continuation as the parent of the EFFECT_DAMAGE frame directly above it. */

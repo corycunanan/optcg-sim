@@ -376,10 +376,13 @@ describe("PR #758 F1: the actions after a choice branch survive a handler-owned 
     activate(r);
     chooseIfAsked(r, "0");
     expectWindow(r, "l-trig");
-    // The suffix waits on the chain continuation below the window, not on the window.
+    // The suffix waits on its own continuation below the branch's continuation, never on the window.
     const window = r.state.effectStack.find((frame) => frame.effectDamage)!;
+    const at = r.state.effectStack.indexOf(window);
     expect(window.remainingActions).toEqual([]);
-    expect(r.state.effectStack[r.state.effectStack.indexOf(window) - 1].remainingActions.map((a) => a.type)).toEqual(["DRAW"]);
+    expect(r.state.effectStack[at - 1].id).toBe(window.effectDamage?.parentFrameId);
+    expect(r.state.effectStack[at - 1].remainingActions).toEqual([]);
+    expect([r.state.effectStack[at - 2].controller, r.state.effectStack[at - 2].remainingActions.map((a) => a.type)]).toEqual([0, ["DRAW"]]);
     reveal(r, false);
     expect(r.state.pendingPrompt).toBeNull();
     expect(r.state.effectStack).toEqual([]);
@@ -475,5 +478,139 @@ describe("PR #758 F2: the effect window logs the point before its prompt, as the
     expect(log.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 0)).toHaveLength(2);
     expect(r.state.players[0].hand).toHaveLength(hand0 + 2);
     expect(r.state.effectStack).toEqual([]);
+  });
+});
+
+describe("PR #758 D-F1b: the actions after an OPPONENT_ACTION run as the effect's controller after the opponent's branch", () => {
+  const DEAL_ONE_WRAPPED: Action = { type: "DEAL_DAMAGE", target: { type: "PLAYER", controller: "OPPONENT" }, params: { amount: 1 } };
+  /** p0 Character: [Activate: Main] OPPONENT_ACTION{wrapped}, then draw 1 (the outer suffix, p0's). */
+  function opponentActs(id: string, wrapped: Action): CardData {
+    return synCard(id, {}, [
+      {
+        id: "deal",
+        category: "activate",
+        trigger: { keyword: "ACTIVATE_MAIN" },
+        actions: [
+          { type: "OPPONENT_ACTION", params: { action: wrapped } },
+          { type: "DRAW", params: { amount: 1 }, chain: "THEN" },
+        ],
+      },
+    ]);
+  }
+  /** The rig with p0's Life set (the wrapped damage, dealt by p1, hits p0). */
+  function s11Rig(dealerCard: CardData) {
+    const r = rig({ p1Life: [life("l1-trig", TRIG_OPTIONAL.id), life("l1-vanilla", CARDS.VANILLA.id)], dealer: dealerCard });
+    const players = [...r.state.players] as [PlayerState, PlayerState];
+    players[0] = { ...players[0], life: [life("l0-trig", TRIG_OPTIONAL.id), life("l0-vanilla", CARDS.VANILLA.id)] };
+    r.state = { ...r.state, players };
+    return r;
+  }
+  function expectP0Window(r: Rig) {
+    expect(r.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(r.state.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(effectTriggerWindow(r.state)?.lifeCard.instanceId).toBe("l0-trig");
+    // Stack: the outer suffix (p0's) below the opponent's branch continuation, below the window.
+    const [outer, wrapped, window] = r.state.effectStack;
+    expect(r.state.effectStack).toHaveLength(3);
+    expect([outer.controller, outer.remainingActions.map((a) => a.type)]).toEqual([0, ["DRAW"]]);
+    expect(wrapped.controller).toBe(1);
+    expect(window.effectDamage?.parentFrameId).toBe(wrapped.id);
+    expect(window.remainingActions).toEqual([]);
+  }
+  const draws = (r: Rig, player: 0 | 1) => r.log().filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === player).length;
+
+  it("S11: p0's window is declined; p0 draws once (the outer suffix), p1 draws nothing", () => {
+    const r = s11Rig(opponentActs("SYN-OPP-DEAL", DEAL_ONE_WRAPPED));
+    const hand0 = r.state.players[0].hand.length;
+    const hand1 = r.state.players[1].hand.length;
+    activate(r);
+    expectP0Window(r);
+    expect(r.act(0, { type: "REVEAL_TRIGGER", reveal: false })).toBeNull();
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(draws(r, 0)).toBe(1);
+    expect(draws(r, 1)).toBe(0);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 2); // the declined Life card and the draw
+    expect(r.state.players[1].hand).toHaveLength(hand1);
+  });
+
+  it("S11, accept: the Trigger's optional draw and the outer draw are both p0's", () => {
+    const r = s11Rig(opponentActs("SYN-OPP-DEAL", DEAL_ONE_WRAPPED));
+    const hand0 = r.state.players[0].hand.length;
+    const hand1 = r.state.players[1].hand.length;
+    activate(r);
+    expectP0Window(r);
+    expect(r.act(0, { type: "REVEAL_TRIGGER", reveal: true })).toBeNull();
+    expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect(r.state.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(r.act(0, { type: "PLAYER_CHOICE", choiceId: "accept" })).toBeNull();
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(draws(r, 0)).toBe(2);
+    expect(draws(r, 1)).toBe(0);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 2); // the Trigger's draw and the outer draw (the Life card went to the trash)
+    expect(r.state.players[1].hand).toHaveLength(hand1);
+  });
+
+  it("S11 across a reload at the window: the same outcome", async () => {
+    const r = s11Rig(opponentActs("SYN-OPP-DEAL", DEAL_ONE_WRAPPED));
+    const hand0 = r.state.players[0].hand.length;
+    activate(r);
+    expectP0Window(r);
+    await r.reload();
+    expectP0Window(r);
+    expect(r.act(0, { type: "REVEAL_TRIGGER", reveal: false })).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(draws(r, 0)).toBe(1);
+    expect(draws(r, 1)).toBe(0);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 2);
+  });
+
+  it("control: the opponent's branch has a trailing action of its own; it runs as p1 before the outer suffix runs as p0", () => {
+    const wrappedChoice: Action = { type: "PLAYER_CHOICE", params: { options: [[DEAL_ONE_WRAPPED, { type: "DRAW", params: { amount: 1 } }]] } };
+    const r = s11Rig(opponentActs("SYN-OPP-CHOICE-TRAIL", wrappedChoice));
+    const hand0 = r.state.players[0].hand.length;
+    const hand1 = r.state.players[1].hand.length;
+    activate(r);
+    expectP0Window(r);
+    expect(r.state.effectStack[1].remainingActions.map((a) => a.type)).toEqual(["DRAW"]);
+    expect(r.act(0, { type: "REVEAL_TRIGGER", reveal: false })).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(draws(r, 1)).toBe(1);
+    expect(draws(r, 0)).toBe(1);
+    const log = r.log();
+    expect(idx(log, "CARD_DRAWN", 1)).toBeLessThan(idx(log, "CARD_DRAWN", 0));
+    expect(r.state.players[1].hand).toHaveLength(hand1 + 1);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 2);
+  });
+
+  it("OPPONENT_CHOICE: the opponent chooses, but the chosen option and the suffix run as the effect's controller (no controller flip)", () => {
+    const card = synCard("SYN-OPP-CHOICE", {}, [
+      {
+        id: "deal",
+        category: "activate",
+        trigger: { keyword: "ACTIVATE_MAIN" },
+        actions: [
+          { type: "OPPONENT_CHOICE", params: { options: [[DEAL_ONE_WRAPPED], [{ type: "DRAW", params: { amount: 1 } }]], labels: ["Take 1 damage", "Let them draw"] } },
+          { type: "DRAW", params: { amount: 1 }, chain: "THEN" },
+        ],
+      },
+    ]);
+    const r = rig({ p1Life: [life("l1-trig", TRIG_OPTIONAL.id), life("l1-vanilla", CARDS.VANILLA.id)], dealer: card });
+    const hand0 = r.state.players[0].hand.length;
+    const hand1 = r.state.players[1].hand.length;
+    activate(r);
+    expect(r.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(r.state.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(r.act(1, { type: "PLAYER_CHOICE", choiceId: "0" })).toBeNull();
+    // The option ran as p0: the damage hit p0's opponent, p1.
+    expectWindow(r, "l1-trig");
+    expect(r.state.effectStack[0].controller).toBe(0);
+    reveal(r, false);
+    expect(r.state.effectStack).toEqual([]);
+    expect(draws(r, 0)).toBe(1);
+    expect(draws(r, 1)).toBe(0);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 1);
+    expect(r.state.players[1].hand).toHaveLength(hand1 + 1); // the declined Life card only
   });
 });
