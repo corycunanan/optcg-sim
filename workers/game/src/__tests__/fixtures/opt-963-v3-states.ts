@@ -315,7 +315,7 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
       pendingPrompt: {
         ...effectWindow.pendingPrompt!,
         resumeContext: waveFrame.id,
-        options: { ...effectWindow.pendingPrompt!.options, cards: [promptCardForLifeCard(waveEffect.lifeCard, 1)] } as PendingPromptState["options"],
+        options: { ...effectWindow.pendingPrompt!.options, cards: [promptCardForLifeCard((waveFrame.effectDamage as Extract<EffectDamageContinuation, { stage: "TRIGGER_WINDOW" }>).lifeCard, 1)] } as PendingPromptState["options"],
       },
     },
   });
