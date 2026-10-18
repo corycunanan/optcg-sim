@@ -29,6 +29,7 @@
 
 import type { EffectStackFrame, GameState, PhaseBoundaryContinuation } from "../types.js";
 import { EFFECT_STACK_FRAME_KINDS, VERSION_3_CONTINUATION_FIELDS, VERSION_3_FRAME_KINDS, frameKindOf, type EffectStackFrameKind } from "../engine/frame-kinds.js";
+import { promptCardForLifeCard, revealTriggerPromptOptions } from "../engine/damage-frames.js";
 import { log } from "../lib/log.js";
 
 /** The version this build's writer emits for state its own engine produces. */
@@ -249,10 +250,24 @@ const convertFromV2: Converter = (raw, location) => {
   const bottom: Record<string, unknown>[] = [];
   let changed = false;
 
-  const pointWindowPrompt = (frameId: string, responder: 0 | 1) => {
-    if (prompt && promptOptions?.promptType === "REVEAL_TRIGGER") {
-      prompt = { ...prompt, respondingPlayer: responder, resumeContext: frameId };
-    }
+  // The surfaced REVEAL_TRIGGER prompt belongs to the last window lifted
+  // (PR #758 L5). A prompt re-pointed at another window (another responder
+  // or another card) is rebuilt from that window's own Life card with the
+  // engine's generic reveal text (the converter is deterministic and has no
+  // card data); a prompt version 2 wrote for this same window without its
+  // card keeps its text and gets the card. A player is never shown another
+  // player's Life card.
+  const pointWindowPrompt = (frameId: string, responder: 0 | 1, lifeCard: V2LifeCard) => {
+    if (!prompt || promptOptions?.promptType !== "REVEAL_TRIGGER") return;
+    const cards = Array.isArray(promptOptions.cards) ? promptOptions.cards : [];
+    const shown = isRecord(cards[0]) ? cards[0] : undefined;
+    const rePointed = prompt.respondingPlayer !== responder || (shown !== undefined && shown.instanceId !== lifeCard.instanceId);
+    const options = rePointed
+      ? revealTriggerPromptOptions(lifeCard, responder)
+      : shown === undefined
+        ? { ...promptOptions, cards: [promptCardForLifeCard(lifeCard, responder)] }
+        : promptOptions;
+    prompt = { ...prompt, respondingPlayer: responder, resumeContext: frameId, options };
   };
 
   if (battle && battle.pendingTriggerLifeCard !== undefined) {
@@ -268,7 +283,7 @@ const convertFromV2: Converter = (raw, location) => {
         battleDamage: { stage: "TRIGGER_WINDOW", battleId: battle.battleId, damagedPlayerIndex, lifeCard },
       })
     );
-    pointWindowPrompt(LIFTED_FRAME_ID.battleDamage, damagedPlayerIndex);
+    pointWindowPrompt(LIFTED_FRAME_ID.battleDamage, damagedPlayerIndex, lifeCard);
     changed = true;
   }
   if (turn.pendingBattleDamageContinuation !== undefined) {
@@ -336,7 +351,7 @@ const convertFromV2: Converter = (raw, location) => {
           },
         })
       );
-      pointWindowPrompt(LIFTED_FRAME_ID.effectDamage, window.damagedPlayerIndex);
+      pointWindowPrompt(LIFTED_FRAME_ID.effectDamage, window.damagedPlayerIndex, window.lifeCard);
       changed = true;
     }
   }

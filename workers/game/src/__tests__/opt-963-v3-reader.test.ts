@@ -8,8 +8,9 @@
  * lifted by the real reader, plus constructed version 3 shapes).
  */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { GameState } from "../types.js";
+import type { CardData, GameState, PendingPromptState } from "../types.js";
 import {
   SESSION_CARD_DB_STORAGE_KEY,
   SESSION_STORAGE_KEY,
@@ -147,6 +148,11 @@ describe("OPT-963 v2 → v3 lift: every version 2 record becomes a frame, live a
       const prompt = state.pendingPrompt!;
       expect(prompt.options.promptType).toBe("REVEAL_TRIGGER");
       expect(prompt.respondingPlayer).toBe(player);
+      // The card shown is the answering player's own window card (PR #758 L5).
+      const owner = state.effectStack.find((frame) => frame.id === prompt.resumeContext)!;
+      const window = owner.battleDamage?.stage === "TRIGGER_WINDOW" ? owner.battleDamage : owner.effectDamage?.stage === "TRIGGER_WINDOW" ? owner.effectDamage : null;
+      expect(window?.damagedPlayerIndex).toBe(player);
+      expect(prompt.options.promptType === "REVEAL_TRIGGER" ? prompt.options.cards.map((card) => [card.instanceId, card.controller, card.owner]) : []).toEqual([[window!.lifeCard.instanceId, player, player]]);
       const action = { type: "REVEAL_TRIGGER" as const, reveal: false, promptId: prompt.promptId };
       const routed = coordinator.executeAction(state, [], player, action, cardDb);
       expect(routed.kind).toBe("resume");
@@ -435,5 +441,98 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
     });
     expect(JSON.stringify([...storage.data.entries()])).toBe(before);
     expect(storage.writes).toEqual([]);
+  });
+});
+
+// ─── PR #758 fix round 1: L5 (lift prompt ownership) and the 5b-written corpus ─
+
+interface WrittenCase { source: string; state: Record<string, unknown>; cardDb: Record<string, CardData> }
+/** Version 3 states this engine (8823ad05) wrote while running its own suite, captured by the PR #757 review. */
+function writtenBy5b(name: string): { raw: Record<string, unknown>; cardDb: Map<string, CardData> } {
+  const file = JSON.parse(readFileSync(new URL("./fixtures/opt-963-5b-written-states.json", import.meta.url), "utf8")) as { cases: Record<string, WrittenCase> };
+  const entry = file.cases[name];
+  if (!entry) throw new Error(`no 5b-written case named ${name}`);
+  return { raw: JSON.parse(JSON.stringify(entry.state)) as Record<string, unknown>, cardDb: new Map(Object.entries(entry.cardDb)) };
+}
+const WRITTEN_CASES = ["nested-batch-below-substitute-prompt", "effect-trigger-effect-retained-events", "both-trigger-windows"] as const;
+
+/** The Trigger window a REVEAL_TRIGGER prompt names, or null. */
+function windowOfPrompt(state: GameState, prompt: PendingPromptState) {
+  const owner = state.effectStack.find((frame) => frame.id === prompt.resumeContext);
+  if (!owner) return null;
+  if (owner.battleDamage?.stage === "TRIGGER_WINDOW") return owner.battleDamage;
+  if (owner.effectDamage?.stage === "TRIGGER_WINDOW") return owner.effectDamage;
+  return null;
+}
+
+/** Life card identities a REVEAL_TRIGGER prompt must not show to `responder`: the other player's Life area and every window held for the other player. */
+function foreignLifeIdentities(state: GameState, responder: 0 | 1): Set<string> {
+  const other = responder === 0 ? 1 : 0;
+  const ids = new Set(state.players[other].life.map((card) => card.instanceId));
+  for (const frame of state.effectStack) {
+    const window = frame.battleDamage?.stage === "TRIGGER_WINDOW" ? frame.battleDamage : frame.effectDamage?.stage === "TRIGGER_WINDOW" ? frame.effectDamage : null;
+    if (window && window.damagedPlayerIndex !== responder) ids.add(window.lifeCard.instanceId);
+  }
+  return ids;
+}
+
+function expectRevealPromptOwned(state: GameState) {
+  const prompt = state.pendingPrompt;
+  if (!prompt) return;
+  const options = prompt.options;
+  if (options.promptType !== "REVEAL_TRIGGER") return;
+  const foreign = foreignLifeIdentities(state, prompt.respondingPlayer);
+  const window = windowOfPrompt(state, prompt);
+  expect(window?.damagedPlayerIndex).toBe(prompt.respondingPlayer);
+  expect(options.cards.map((card) => [card.instanceId, card.controller, card.owner])).toEqual([[window!.lifeCard.instanceId, prompt.respondingPlayer, prompt.respondingPlayer]]);
+  for (const card of options.cards) expect(foreign.has(card.instanceId)).toBe(false);
+}
+
+describe("PR #758 L5: a lifted Trigger-window prompt shows the responder their own Life card", () => {
+  const WINDOW_GOLDENS = ["battle-trigger-window", "effect-damage-trigger-window", "both-trigger-windows"] as const;
+
+  it.each(WINDOW_GOLDENS)("%s: after conversion options.cards[0] is the responder's own window card", (name) => {
+    const state = liftedGolden(name);
+    const prompt = state.pendingPrompt!;
+    expect(prompt.options.promptType).toBe("REVEAL_TRIGGER");
+    expectRevealPromptOwned(state);
+  });
+
+  it("both-trigger-windows: the version 2 prompt showed the battle defender's card; the lift re-points it at the effect window and rebuilds it with that window's card (generic text: the converter has no card data)", () => {
+    const v2 = goldenV2Raw("both-trigger-windows") as { pendingPrompt: { respondingPlayer: number; options: { cards: Array<{ instanceId: string }>; effectDescription: string } } };
+    const state = liftedGolden("both-trigger-windows");
+    const prompt = state.pendingPrompt!;
+    if (prompt.options.promptType !== "REVEAL_TRIGGER") throw new Error("expected a REVEAL_TRIGGER prompt");
+    const effectWindow = effectTriggerWindow(state)!;
+    expect(v2.pendingPrompt.respondingPlayer).toBe(1);
+    expect(v2.pendingPrompt.options.cards[0].instanceId).toBe(battleTriggerLifeCard(state)!.instanceId);
+    expect(prompt.respondingPlayer).toBe(0);
+    expect(prompt.options.cards.map((card) => [card.instanceId, card.controller, card.owner])).toEqual([[effectWindow.lifeCard.instanceId, 0, 0]]);
+    expect(prompt.options.cards[0].instanceId).not.toBe(battleTriggerLifeCard(state)!.instanceId);
+    expect(prompt.options.effectDescription).toBe("You may reveal this Trigger card to activate its effect");
+    expect(prompt.options.effectDescription).not.toBe(v2.pendingPrompt.options.effectDescription);
+  });
+
+  it("effect-damage-trigger-window: a version 2 prompt written for its own window without the card keeps its text and gets the card", () => {
+    const v2 = goldenV2Raw("effect-damage-trigger-window") as { pendingPrompt: { options: { cards: unknown[]; effectDescription: string } } };
+    expect(v2.pendingPrompt.options.cards).toEqual([]);
+    const state = liftedGolden("effect-damage-trigger-window");
+    const prompt = state.pendingPrompt!;
+    if (prompt.options.promptType !== "REVEAL_TRIGGER") throw new Error("expected a REVEAL_TRIGGER prompt");
+    expect(prompt.options.effectDescription).toBe(v2.pendingPrompt.options.effectDescription);
+    expect(prompt.options.cards.map((card) => [card.instanceId, card.controller, card.owner])).toEqual([[effectTriggerWindow(state)!.lifeCard.instanceId, 1, 1]]);
+  });
+
+  it("no REVEAL_TRIGGER prompt of any version 3 fixture, lifted golden or 5b-written state shows a Life card of a player other than its responder", () => {
+    for (const entry of STATES) expectRevealPromptOwned(convertPersistedGameState(persistedV3(entry.state), "state"));
+    for (const name of LIFTED_GOLDEN_CASES) expectRevealPromptOwned(liftedGolden(name));
+    for (const name of WRITTEN_CASES) expectRevealPromptOwned(convertPersistedGameState(writtenBy5b(name).raw, "state"));
+  });
+
+  it.each(WRITTEN_CASES)("5b-written %s: this reader loads what this writer wrote, and writes it back byte-for-byte", (name) => {
+    const { raw } = writtenBy5b(name);
+    const loaded = convertPersistedGameState(raw, "state");
+    expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded)))).toEqual(raw);
+    expect(classifyLegacyShapes(loaded)).toEqual([]);
   });
 });

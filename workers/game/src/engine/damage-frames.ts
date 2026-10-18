@@ -127,6 +127,31 @@ export function triggerWindowOf(
   return null;
 }
 
+/**
+ * The player-facing content of a Trigger window's REVEAL_TRIGGER prompt: the
+ * window's own Life card, shown to its owner, and the card's Trigger text
+ * (the generic line when no card data is at hand). The one builder for the
+ * engine (`revealTriggerPromptFor`) and the version 2 → 3 lift, so a prompt
+ * never shows a player another player's Life card.
+ */
+export function revealTriggerPromptOptions(
+  lifeCard: LifeCard,
+  responder: 0 | 1,
+  cardDb?: Map<string, CardData>
+): Extract<PendingPromptState["options"], { promptType: "REVEAL_TRIGGER" }> {
+  const cardData = cardDb?.get(lifeCard.cardId);
+  return {
+    promptType: "REVEAL_TRIGGER",
+    cards: [promptCardForLifeCard(lifeCard, responder)],
+    effectDescription:
+      cardData?.triggerText ??
+      cardData?.effectText ??
+      "You may reveal this Trigger card to activate its effect",
+    optional: false,
+    timeoutMs: REVEAL_TRIGGER_TIMEOUT_MS,
+  };
+}
+
 /** The REVEAL_TRIGGER prompt of a damage frame at its Trigger window (derived, never stored). */
 export function revealTriggerPromptFor(
   frame: EffectStackFrame,
@@ -134,18 +159,8 @@ export function revealTriggerPromptFor(
 ): PendingPromptState | null {
   const window = triggerWindowOf(frame);
   if (!window) return null;
-  const cardData = cardDb.get(window.lifeCard.cardId);
   return {
-    options: {
-      promptType: "REVEAL_TRIGGER",
-      cards: [promptCardForLifeCard(window.lifeCard, window.damagedPlayerIndex)],
-      effectDescription:
-        cardData?.triggerText ??
-        cardData?.effectText ??
-        "You may reveal this Trigger card to activate its effect",
-      optional: false,
-      timeoutMs: REVEAL_TRIGGER_TIMEOUT_MS,
-    },
+    options: revealTriggerPromptOptions(window.lifeCard, window.damagedPlayerIndex, cardDb),
     respondingPlayer: window.damagedPlayerIndex,
     resumeContext: frame.id,
   };

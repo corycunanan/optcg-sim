@@ -20,8 +20,10 @@ import type {
   EffectStackFrame,
   GameState,
   QueuedTrigger,
+  PendingPromptState,
 } from "../../types.js";
 import { CONTINUATION_EFFECT_BLOCK } from "../../engine/effect-stack.js";
+import { promptCardForLifeCard } from "../../engine/damage-frames.js";
 import { convertPersistedGameState } from "../../session/persistence.js";
 import { GAME_STATE_SCHEMA_VERSION_KEY } from "../../session/game-state-schema.js";
 import { loadGoldenFixture, loadV2WriterGolden } from "./opt-940-golden.js";
@@ -205,7 +207,13 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
     state: {
       ...effectWindow,
       effectStack: [outerEffect, { ...effectFrame, id: "v3-effect-damage-inner", controller: 1, effectDamage: innerWindow }],
-      pendingPrompt: { ...effectWindow.pendingPrompt!, respondingPlayer: 0, resumeContext: "v3-effect-damage-inner" },
+      // Re-pointed at player 0's window: the prompt shows player 0 their own card.
+      pendingPrompt: {
+        ...effectWindow.pendingPrompt!,
+        respondingPlayer: 0,
+        resumeContext: "v3-effect-damage-inner",
+        options: { ...effectWindow.pendingPrompt!.options, cards: [promptCardForLifeCard(innerWindow.lifeCard, 0)] } as PendingPromptState["options"],
+      },
     },
   });
 
@@ -303,7 +311,12 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
     state: {
       ...endPhase,
       effectStack: [phaseFrame, waveParent, waveFrame],
-      pendingPrompt: { ...effectWindow.pendingPrompt!, resumeContext: waveFrame.id },
+      // The prompt belongs to the wave window: it shows that window's card.
+      pendingPrompt: {
+        ...effectWindow.pendingPrompt!,
+        resumeContext: waveFrame.id,
+        options: { ...effectWindow.pendingPrompt!.options, cards: [promptCardForLifeCard(waveEffect.lifeCard, 1)] } as PendingPromptState["options"],
+      },
     },
   });
 
