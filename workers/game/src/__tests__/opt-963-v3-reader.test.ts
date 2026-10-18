@@ -419,7 +419,7 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
     expectRejected(state, new RegExp(`effectStack\\[0\\] \\(frame "${battleId()}"\\) is EFFECT but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal`));
   });
 
-  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of 286 engine-written states)", () => {
+  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of the 286 reviewed and 4 committed engine-written states)", () => {
     const state = raw("replacement-batch-prompt");
     const id = state.effectStack[0].id as string;
     state.pendingPrompt = null;
@@ -454,7 +454,7 @@ function writtenBy5b(name: string): { raw: Record<string, unknown>; cardDb: Map<
   if (!entry) throw new Error(`no 5b-written case named ${name}`);
   return { raw: JSON.parse(JSON.stringify(entry.state)) as Record<string, unknown>, cardDb: new Map(Object.entries(entry.cardDb)) };
 }
-const WRITTEN_CASES = ["nested-batch-below-substitute-prompt", "effect-trigger-effect-retained-events", "both-trigger-windows"] as const;
+const WRITTEN_CASES = ["nested-batch-below-substitute-prompt", "effect-trigger-effect-retained-events", "both-trigger-windows", "optional-trigger-retained-events"] as const;
 
 /** The Trigger window a REVEAL_TRIGGER prompt names, or null. */
 function windowOfPrompt(state: GameState, prompt: PendingPromptState) {

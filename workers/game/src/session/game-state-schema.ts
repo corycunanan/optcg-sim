@@ -790,7 +790,7 @@ export function validateContinuationReferences(
   // Likewise a REPLACEMENT_BATCH frame offering a match: openReplacementBatchFrame
   // at AWAITING_OPTIONAL_RESPONSE and the prompt naming it are one step
   // (engine/replacements.ts, stepBatch); no engine state holds the offer
-  // without its prompt (0 of 286 engine-written version 3 states, OPT-963 review).
+  // without its prompt (0 of the 286 reviewed and 4 committed engine-written version 3 states, OPT-963 review).
   const unownedBatchOffer = frames.findIndex(
     (frame) =>
       frameKindOf(frame) === "REPLACEMENT_BATCH" &&
