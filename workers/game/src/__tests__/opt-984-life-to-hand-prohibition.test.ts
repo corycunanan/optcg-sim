@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getEffectivePower } from "../engine/modifiers.js";
 import type { Action } from "../engine/effect-types.js";
 import { rig, synSchema, type Rig } from "./opt-960-rig.js";
+import { battleTriggerLifeCard, effectTriggerWindow } from "./trigger-window-helpers.js";
 
 // Card text: OP02-004/023, OP06-020, ST15-001. FAQ qa_op02:24-32
 // explicitly permits Squard's debuff while its Life-to-hand action is blocked.
@@ -83,7 +84,10 @@ describe("OPT-984 own effects cannot add Life to hand", () => {
     r.state.turn.activePlayerIndex = 1;
     activate(r, 1, [{ type: "DEAL_DAMAGE", params: { amount: 1 } }]);
     if (trigger) {
-      expect(r.state.turn.pendingTriggerFromEffect?.lifeCard.cardId).toBe("OP02-023");
+      // OPT-963: the window is an EFFECT_DAMAGE frame owning player 0's REVEAL_TRIGGER prompt.
+      expect(r.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+      expect(r.state.pendingPrompt?.respondingPlayer).toBe(0);
+      expect(effectTriggerWindow(r.state)?.lifeCard.cardId).toBe("OP02-023");
       r.act({ type: "REVEAL_TRIGGER", reveal: false }, 0);
     }
     expect(r.state.players[0].life).toEqual(before[0].life.slice(1));
@@ -103,7 +107,10 @@ describe("OPT-984 own effects cannot add Life to hand", () => {
     r.act({ type: "DECLARE_ATTACK", attackerInstanceId: r.state.players[1].leader.instanceId, targetInstanceId: r.state.players[0].leader.instanceId }, 1);
     r.act({ type: "PASS" }, 0);
     r.act({ type: "PASS" }, 0);
-    expect(r.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe("OP02-023");
+    // OPT-963: the window is a BATTLE_DAMAGE frame owning player 0's REVEAL_TRIGGER prompt.
+    expect(r.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(r.state.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(battleTriggerLifeCard(r.state)?.cardId).toBe("OP02-023");
     r.act({ type: "REVEAL_TRIGGER", reveal: false }, 0);
     expect(r.state.players[0].life).toEqual(before[0].life.slice(1));
     expect(r.state.players[0].hand).toHaveLength(before[0].hand.length + 1);

@@ -41,6 +41,8 @@ import { GameSession } from "../GameSession.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { expectTerminal, rig, synSchema } from "./opt-960-rig.js";
 import { CARDS } from "./helpers.js";
+import { withEffectTriggerWindow } from "./trigger-window-helpers.js";
+import { createTestCardDb } from "./helpers.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -378,20 +380,20 @@ describe("terminal writer inventory: every writer goes through terminateGame wit
 
   it("the writer clears a parked effect-damage Trigger window", () => {
     const { state } = liveDecisionState();
-    const loaded: GameState = {
-      ...state,
-      turn: {
-        ...state.turn,
-        pendingTriggerFromEffect: {
-          lifeCard: { instanceId: "life-x", cardId: CARDS.VANILLA.id, face: "DOWN" },
-          damagedPlayerIndex: 1,
-          remainingDamages: 1,
-          sourceCardInstanceId: "src",
-          controllerIndex: 0,
-        },
+    const loaded: GameState = withEffectTriggerWindow(
+      state,
+      {
+        lifeCard: { instanceId: "life-x", cardId: CARDS.VANILLA.id, face: "DOWN" },
+        damagedPlayerIndex: 1,
+        remainingDamages: 1,
+        sourceCardInstanceId: "src",
+        controllerIndex: 0,
       },
-    };
-    expectTerminal(terminateGame(loaded, { kind: "CONCESSION", concedingPlayer: 0 }), { winner: 1, reason: "Player 1 conceded" });
+      createTestCardDb(),
+    );
+    const terminal = terminateGame(loaded, { kind: "CONCESSION", concedingPlayer: 0 });
+    expectTerminal(terminal, { winner: 1, reason: "Player 1 conceded" });
+    expect(terminal.effectStack).toEqual([]);
   });
 });
 

@@ -26,6 +26,8 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { parseStoredSession, SessionRepository, type SessionStorage } from "../session/persistence.js";
 import { readFileSync } from "node:fs";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 
 const printedText: Record<string, string> = {
   "OP03-040": "When your deck is reduced to 0, you win the game instead of losing, according to the rules.\n[DON!! x1] When this Leader's attack deals damage to your opponent's Life, you may trash 1 card from the top of your deck.",
@@ -132,27 +134,28 @@ function attack(f: Pick<Fixture, "state" | "cardDb">, attackerId: string, answer
   const steps: Step[] = [];
   for (let guard = 0; guard < 20 && !gameOver && state.status === "IN_PROGRESS"; guard++) {
     const prompt = state.pendingPrompt;
+    if (prompt?.options.promptType === "REVEAL_TRIGGER" || (!prompt && battleTriggerLifeCard(state))) {
+      // OPT-963: the window's own prompt (the frame surfaces it).
+      steps.push({ kind: "REVEAL" });
+      const revealed = revealTrigger(state, false, f.cardDb);
+      expect(revealed.valid).toBe(true);
+      state = revealed.state;
+      gameOver = revealed.gameOver;
+      continue;
+    }
     if (prompt) {
       expect(prompt.options.promptType).toBe("OPTIONAL_EFFECT");
       if (prompt.options.promptType !== "OPTIONAL_EFFECT") break;
       steps.push({
         kind: "OPTIONAL",
         source: state.effectStack.at(-1)?.sourceCardInstanceId,
-        triggerPending: !!state.turn.battle?.pendingTriggerLifeCard,
+        triggerPending: !!battleTriggerLifeCard(state),
         defenderHand: state.players[defending].hand.length,
       });
       const resumed = resumePromptLifecycle(state, { type: "PLAYER_CHOICE", choiceId: answer }, f.cardDb, SERVICES);
       expect(resumed.responseRejected).toBe(false);
       state = resumed.state;
       gameOver = resumed.gameOver;
-      continue;
-    }
-    if (state.turn.battle?.pendingTriggerLifeCard) {
-      steps.push({ kind: "REVEAL" });
-      const revealed = runPipeline(state, { type: "REVEAL_TRIGGER", reveal: false }, f.cardDb, defending);
-      expect(revealed.valid).toBe(true);
-      state = revealed.state;
-      gameOver = revealed.gameOver;
       continue;
     }
     break;
@@ -388,7 +391,7 @@ describe("OPT-796 Leaders OP03-040 / P-117 — this Leader's attack", () => {
 
 describe("OPT-796 persisted sessions and the #692 damage continuation", () => {
   const roundTrip = (state: GameState, cardDb: Map<string, CardData>) => {
-    const stored = parseStoredSession(JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(cardDb), mode: "PVP" })));
+    const stored = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(cardDb), mode: "PVP" })));
     return { state: stored.state, cardDb: new Map(Object.entries(stored.cardDb)) };
   };
 
@@ -420,16 +423,17 @@ describe("OPT-796 persisted sessions and the #692 damage continuation", () => {
     for (let i = 0; i < 2; i++) result = runPipeline(result.state, { type: "PASS" }, f.cardDb, 0);
     expect(result.state.effectStack.at(-1)?.sourceCardInstanceId).toBe(gaimon.instanceId);
     const declined = resumePromptLifecycle(result.state, { type: "PLAYER_CHOICE", choiceId: "skip" }, f.cardDb, SERVICES);
-    expect(declined.state.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
+    expect(battleTriggerLifeCard(declined.state)).toBeTruthy();
 
     // Persist mid-Damage-Step (first Life held for its [Trigger]), then resume.
     const restored = roundTrip(declined.state, f.cardDb);
-    const revealed = runPipeline(restored.state, { type: "REVEAL_TRIGGER", reveal: false }, restored.cardDb, 1);
+    const revealed = revealTrigger(restored.state, false, restored.cardDb);
     expect(revealed.valid).toBe(true);
-    // The second damage reveals another [Trigger]; Gaimon stays silent.
-    expect(revealed.state.pendingPrompt).toBeFalsy();
-    expect(revealed.state.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
-    const finished = runPipeline(revealed.state, { type: "REVEAL_TRIGGER", reveal: false }, restored.cardDb, 1);
+    // The second damage reveals another [Trigger] (its own REVEAL_TRIGGER
+    // prompt, OPT-963); Gaimon stays silent.
+    expect(revealed.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(battleTriggerLifeCard(revealed.state)).toBeTruthy();
+    const finished = revealTrigger(revealed.state, false, restored.cardDb);
     expect(finished.state.pendingPrompt).toBeFalsy();
     expect(finished.state.players[1].life).toHaveLength(1);
     expect(finished.state.eventLog.filter((e) => e.type === "DAMAGE_DEALT").map((e) => e.payload.firstDamageOfAttack)).toEqual([true, false]);

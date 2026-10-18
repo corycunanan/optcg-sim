@@ -13,6 +13,7 @@ import {
   visibleStateForSpectator,
 } from "../session/visibility.js";
 import { CARDS, createTestPayload } from "./factories.js";
+import { battleTriggerLifeCard } from "./trigger-window-helpers.js";
 
 type PeekExpectation =
   | { kind: "visible"; cardIds: readonly string[]; instanceIds: readonly string[] }
@@ -213,11 +214,11 @@ function buildPendingTriggerScenario(): Scenario {
     "pending-trigger scenario must remain in MAIN",
   ).toBe("MAIN");
   expect(
-    state.turn.battle?.pendingTriggerLifeCard,
+    battleTriggerLifeCard(state),
     "pending-trigger scenario must pause with a revealed Trigger Life card",
   ).toBeDefined();
   expect(
-    state.turn.battle?.pendingTriggerLifeCard?.cardId,
+    battleTriggerLifeCard(state)?.cardId,
     "pending-trigger scenario must retain a real revealed card identity",
   ).not.toBe("hidden");
 

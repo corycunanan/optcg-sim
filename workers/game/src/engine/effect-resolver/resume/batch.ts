@@ -33,6 +33,7 @@ import type {
 } from "../types.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { generateFrameId } from "../../effect-stack.js";
+import { insertFrameAt } from "../../damage-frames.js";
 
 /**
  * Loop in case the re-entered handler completes cleanly (no prompt, no new
@@ -116,7 +117,11 @@ export function reenterBatchResume(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        nextState = pushFrame(generated.state, continuationFrame);
+        // OPT-963: the re-entered handler owns its pause on a frame it pushed
+        // (a replacement batch offer, an effect-damage window); this
+        // continuation goes directly below it, at the depth the batch frame
+        // occupied, so the handler's work finishes before the suffix resumes.
+        nextState = insertFrameAt(generated.state, stackDepth, continuationFrame);
         return {
           state: nextState,
           events,

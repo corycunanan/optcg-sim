@@ -5,6 +5,9 @@ import {
   withdrawUnactivatedTrashMain,
 } from "../event-activation.js";
 import { pendingPropagationEvents, retainEventsOnFrame } from "./events.js";
+import { insertFrameAt } from "../../damage-frames.js";
+import { isHandlerOwnedFrame } from "../../frame-kinds.js";
+import { outerSuffixContinuation } from "../resolver.js";
 import { isGameTerminated } from "../../terminal.js";
 import { log } from "../../../lib/log.js";
 /**
@@ -34,8 +37,9 @@ import type {
 } from "../../../types.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
-  popFrame,
+  generateFrameId,
   peekFrame,
+  popFrame,
   updateTopFrame,
 } from "../../effect-stack.js";
 import {
@@ -450,6 +454,9 @@ export function handlePlayerChoiceBranch(
   }
 
   let nextState = state;
+  // The branch runs at this depth; a handler-owned pause inserts the branch's
+  // chain continuation here, directly below the handler's frame (OPT-963).
+  const branchDepth = state.effectStack.length;
   const options = getActionParams(pausedAction, pausedAction.type).options;
   const chosenIndex = parseInt(action.choiceId, 10);
   const chosenBranch = options[chosenIndex];
@@ -467,8 +474,34 @@ export function handlePlayerChoiceBranch(
     events.push(...branchResult.events);
 
     if (branchResult.pendingPrompt) {
+      const continuationBelow = nextState.effectStack[branchDepth];
+      const frameAbove = nextState.effectStack[branchDepth + 1];
       const replacementFrame = peekFrame(nextState);
-      if (replacementFrame && remainingActions.length > 0) {
+      if (
+        remainingActions.length > 0 &&
+        continuationBelow !== undefined &&
+        continuationBelow !== replacementFrame &&
+        frameAbove !== undefined &&
+        isHandlerOwnedFrame(frameAbove)
+      ) {
+        // The actions after the choice outlive the handler's frame and the
+        // branch: their own continuation, under the choosing chain's
+        // controller, below the branch's continuation (PR #758 D-F1b).
+        const outerId = generateFrameId(nextState);
+        nextState = insertFrameAt(
+          outerId.state,
+          branchDepth,
+          outerSuffixContinuation(
+            outerId.id,
+            effectSourceInstanceId,
+            resumeCtx.remainingActionsController ?? controller,
+            resumeCtx.effectDescription,
+            pausedAction,
+            remainingActions,
+            resultRefs
+          )
+        );
+      } else if (replacementFrame && remainingActions.length > 0) {
         nextState = updateTopFrame(nextState, {
           remainingActions: [
             ...replacementFrame.remainingActions,
@@ -809,9 +842,6 @@ export function handleAwaitingOptionalActionResponse(
         pendingTriggers: [...frame.pendingTriggers, ...topFrame.pendingTriggers],
         triggerOrderingGroup:
           topFrame.triggerOrderingGroup ?? frame.triggerOrderingGroup,
-        ...(topFrame.replacementBatchContinuation
-          ? { replacementBatchContinuation: topFrame.replacementBatchContinuation }
-          : {}),
       }));
       return {
         state: nextState,

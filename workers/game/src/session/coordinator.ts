@@ -1,13 +1,12 @@
 import type {
   CardData,
-  CardInstance,
   GameAction,
   GameState,
-  LifeCard,
   PendingPromptState,
   PromptType,
 } from "../types.js";
 import { isStartOfTurnAutoPhase } from "../engine/phases.js";
+import { surfaceDamageFramePrompt } from "../engine/damage-frames.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { setPlayerConnected } from "../engine/state.js";
 import { boundUndoHistory } from "./history.js";
@@ -150,9 +149,8 @@ export class SessionCoordinator {
 
     const reason = validatePromptPayload(prompt, action);
     if (reason) return { kind: "reject", reason, state };
-    if (action.type === "REVEAL_TRIGGER") {
-      return { kind: "pipeline", state: { ...state, pendingPrompt: null } };
-    }
+    // OPT-963: a REVEAL_TRIGGER prompt names the damage frame that owns it and
+    // is answered through the prompt lifecycle like every other prompt.
     return { kind: "resume", state };
   }
 
@@ -223,18 +221,11 @@ export class SessionCoordinator {
 
     const stateBeforePipeline = promptRoute.state;
     if (action.type !== "CONCEDE") {
-      let expectedPlayer: 0 | 1 = INACTIVE_PLAYER_ACTIONS.has(action.type)
+      const expectedPlayer: 0 | 1 = INACTIVE_PLAYER_ACTIONS.has(action.type)
         ? stateBeforePipeline.turn.activePlayerIndex === 0
           ? 1
           : 0
         : stateBeforePipeline.turn.activePlayerIndex;
-      if (
-        action.type === "REVEAL_TRIGGER" &&
-        stateBeforePipeline.turn.pendingTriggerFromEffect
-      ) {
-        expectedPlayer =
-          stateBeforePipeline.turn.pendingTriggerFromEffect.damagedPlayerIndex;
-      }
       if (playerIndex !== expectedPlayer) {
         return {
           kind: "reject",
@@ -308,53 +299,17 @@ export class SessionCoordinator {
     return current;
   }
 
+  /**
+   * OPT-963: a damage frame at its Trigger window owns its REVEAL_TRIGGER
+   * prompt; the engine attaches it when the frame pauses or when the frames
+   * above it unwind. This keeps the session's call sites and reads only the
+   * top frame, never a turn or battle side channel.
+   */
   surfaceRevealTrigger(
     state: GameState,
     cardDb: Map<string, CardData>
   ): GameState {
-    if (state.pendingPrompt || state.effectStack.length > 0) return state;
-    const { battleSubPhase, battle, pendingTriggerFromEffect } = state.turn;
-    let lifeCard: LifeCard | undefined;
-    let respondingPlayer: 0 | 1 | undefined;
-
-    if (battleSubPhase === "DAMAGE_STEP" && battle) {
-      lifeCard = battle.pendingTriggerLifeCard;
-      if (lifeCard)
-        respondingPlayer = state.turn.activePlayerIndex === 0 ? 1 : 0;
-    } else if (pendingTriggerFromEffect) {
-      lifeCard = pendingTriggerFromEffect.lifeCard;
-      respondingPlayer = pendingTriggerFromEffect.damagedPlayerIndex;
-    }
-    if (!lifeCard || respondingPlayer === undefined) return state;
-
-    const cardData = cardDb.get(lifeCard.cardId);
-    const promptCard: CardInstance = {
-      instanceId: lifeCard.instanceId,
-      cardId: lifeCard.cardId,
-      zone: "LIFE",
-      state: "ACTIVE",
-      attachedDon: [],
-      turnPlayed: null,
-      controller: respondingPlayer,
-      owner: respondingPlayer,
-    };
-    return {
-      ...state,
-      pendingPrompt: {
-        options: {
-          promptType: "REVEAL_TRIGGER",
-          cards: [promptCard],
-          effectDescription:
-            cardData?.triggerText ??
-            cardData?.effectText ??
-            "You may reveal this Trigger card to activate its effect",
-          optional: false,
-          timeoutMs: 30_000,
-        },
-        respondingPlayer,
-        resumeContext: null,
-      },
-    };
+    return surfaceDamageFramePrompt(state, cardDb);
   }
 
   setPlayerPresence(

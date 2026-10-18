@@ -51,7 +51,7 @@ export function validate(
       return validateUseCounterEvent(state, action.cardInstanceId, cardDb);
 
     case "REVEAL_TRIGGER":
-      return validateRevealTrigger(state);
+      return validateRevealTrigger();
 
     case "PASS":
       return validatePass(state);
@@ -330,12 +330,10 @@ function validateUseCounterEvent(
   return null;
 }
 
-function validateRevealTrigger(state: GameState): string | null {
-  // OPT-259 (F6): effect-sourced damage can open a [Trigger] window outside a
-  // battle. Allow REVEAL_TRIGGER whenever either path has a pending Life card.
-  if (state.turn.pendingTriggerFromEffect) return null;
-  if (state.turn.battleSubPhase !== "DAMAGE_STEP") return "Trigger reveal only during Damage Step";
-  return null;
+function validateRevealTrigger(): string | null {
+  // OPT-963: a Trigger window is a damage frame that owns its REVEAL_TRIGGER
+  // prompt; the reply is a prompt response, not a pipeline action.
+  return "Trigger reveals answer the pending prompt";
 }
 
 function validatePass(state: GameState): string | null {

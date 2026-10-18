@@ -170,6 +170,7 @@ describe("OPT-474 authoritative zone-transition matrix", () => {
       "triggers.ts", // read-only deck snapshot adapter
       "effect-resolver/target-resolver.ts", // read-only LifeCard adapter
       "effect-resolver/actions/life.ts", // read-only reorder prompt adapter
+      "damage-frames.ts", // read-only LifeCard adapter for the REVEAL_TRIGGER prompt (OPT-963)
       "zone-transition.ts",
     ]);
     const reconstruction = /\{(?=[^{}]{0,600}\bzone\s*:\s*"(?:CHARACTER|STAGE|HAND|DECK|TRASH|LIFE|REMOVED_FROM_GAME)")(?=[^{}]{0,600}\battachedDon\s*:)[^{}]{0,600}\}/gs;

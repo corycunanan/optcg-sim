@@ -25,6 +25,7 @@ import type { CardData } from "../types.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { expectTerminal, rig, synSchema, type Rig } from "./opt-960-rig.js";
 import { CARDS } from "./helpers.js";
+import { battleTriggerLifeCard, effectTriggerWindow, revealTrigger } from "./trigger-window-helpers.js";
 
 const MILL5_TRIGGER = "SYN-TRIGGER-MILL5";
 
@@ -42,8 +43,8 @@ function attackAndReveal(r: Rig, attackerId: string) {
   r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attackerId, targetInstanceId: r.state.players[1].leader.instanceId });
   r.act({ type: "PASS" });
   r.act({ type: "PASS" });
-  expect(r.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(MILL5_TRIGGER);
-  const result = runPipeline(r.state, { type: "REVEAL_TRIGGER", reveal: true }, r.db, 1);
+  expect(battleTriggerLifeCard(r.state)?.cardId).toBe(MILL5_TRIGGER);
+  const result = revealTrigger(r.state, true, r.db);
   expect(result.valid, result.error).toBe(true);
   r.state = result.state;
 }
@@ -96,8 +97,8 @@ describe("battle [Trigger] that ends the game stops the battle (rules 9-1-2 line
       ]),
     });
     r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: dealer.instanceId, effectId: "dmg" });
-    expect(r.state.turn.pendingTriggerFromEffect?.lifeCard.cardId).toBe(MILL5_TRIGGER);
-    const result = runPipeline(r.state, { type: "REVEAL_TRIGGER", reveal: true }, r.db, 1);
+    expect(effectTriggerWindow(r.state)?.lifeCard.cardId).toBe(MILL5_TRIGGER);
+    const result = revealTrigger(r.state, true, r.db);
     expect(result.valid, result.error).toBe(true);
     r.state = result.state;
     expectTerminal(r.state, { winner: 0, reason: "Player 2 decked out" });

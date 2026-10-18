@@ -34,6 +34,7 @@ import { startPregame } from "../../engine/pregame.js";
 import { SessionCoordinator } from "../../session/coordinator.js";
 import { resumePromptLifecycle } from "../../session/prompt-lifecycle.js";
 import { registerTriggersForCard } from "../../engine/triggers.js";
+import { CONTINUATION_EFFECT_BLOCK } from "../../engine/effect-stack.js";
 import {
   CARDS,
   createBattleReadyState,
@@ -197,12 +198,14 @@ function battleTriggerWindow(cardDb: Map<string, CardData>): GameState {
   if (!result.valid) throw new Error(`golden: block pass rejected: ${result.error}`);
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 1);
   if (!result.valid) throw new Error(`golden: counter pass rejected: ${result.error}`);
-  if (!result.state.turn.battle?.pendingTriggerLifeCard) {
-    throw new Error("golden: expected a paused battle Trigger window");
+  // OPT-963: the Damage Step pauses on its BATTLE_DAMAGE frame and the
+  // pipeline returns the frame's REVEAL_TRIGGER prompt.
+  if (!result.state.effectStack.at(-1)?.battleDamage) {
+    throw new Error("golden: expected a paused battle Trigger window frame");
   }
   const surfaced = new SessionCoordinator().surfaceRevealTrigger(result.state, cardDb);
   if (surfaced.pendingPrompt?.options.promptType !== "REVEAL_TRIGGER") {
-    throw new Error("golden: expected the coordinator to surface REVEAL_TRIGGER");
+    throw new Error("golden: expected the REVEAL_TRIGGER prompt on the frame");
   }
   return surfaced;
 }
@@ -254,7 +257,9 @@ function endPhaseParked(cardDb: Map<string, CardData>): GameState {
  * of the PR #746 review): p0's Leader "when this attack deals damage" K.O.s a
  * p1 Character whose [On K.O.] deals 1 effect damage back to p0 while p1's
  * own battle Trigger is still parked. Both top Life cards carry [Trigger].
- * The coordinator serves the battle Trigger first (surfaceRevealTrigger).
+ * Since OPT-963 the two windows are nested frames and p0's (inner) window is
+ * answered first; the version 1 golden of this case holds the base engine's
+ * two records and the coordinator's battle prompt.
  */
 function bothTriggerWindows(cardDb: Map<string, CardData>): GameState {
   const noKeywords = { ...CARDS.VANILLA.keywords };
@@ -368,11 +373,21 @@ function bothTriggerWindows(cardDb: Map<string, CardData>): GameState {
   );
   if (resumed.responseRejected) throw new Error("golden: K.O. selection was rejected");
   state = coordinator.surfaceRevealTrigger(resumed.state, cardDb);
-  if (!state.turn.battle?.pendingTriggerLifeCard || !state.turn.pendingTriggerFromEffect) {
-    throw new Error("golden: expected both Trigger windows to be open");
+  // OPT-963: both windows are nested frames. The battle window sits at the
+  // bottom; the K.O. effect paused mid-batch (rule 6-2) to drain Robin's
+  // [On K.O.], whose DEAL_DAMAGE opened the effect window on top, above its
+  // chain continuation. The prompt belongs to the inner (effect) window, p0's.
+  const bottom = state.effectStack[0];
+  const top = state.effectStack.at(-1);
+  if (!bottom?.battleDamage || !top?.effectDamage) {
+    throw new Error(
+      `golden: expected a battle window below an effect window, got ${state.effectStack
+        .map((frame) => frame.battleDamage ? "BATTLE_DAMAGE" : frame.effectDamage ? "EFFECT_DAMAGE" : frame.phase)
+        .join(",")}`
+    );
   }
-  if (state.pendingPrompt?.options.promptType !== "REVEAL_TRIGGER" || state.effectStack.length !== 0) {
-    throw new Error("golden: expected the battle REVEAL_TRIGGER prompt on an empty stack");
+  if (state.pendingPrompt?.options.promptType !== "REVEAL_TRIGGER" || state.pendingPrompt.respondingPlayer !== 0) {
+    throw new Error("golden: expected p0's REVEAL_TRIGGER prompt on the effect window");
   }
   return state;
 }
@@ -457,6 +472,62 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
     remainingActions: [],
     resultRefs: [],
     validTargets: [p1Char],
+  });
+
+  // OPT-963 (version 3): the replacement and damage records are frames.
+  const effectWindowFrame = baseFrame({
+    id: "golden-effect-damage",
+    sourceCardInstanceId: p0Char,
+    controller: 0,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_TRIGGER_REVEAL",
+    effectDamage: {
+      stage: "TRIGGER_WINDOW",
+      damagedPlayerIndex: 1,
+      remainingDamages: 0,
+      dealt: 1,
+      sourceCardInstanceId: p0Char,
+      controllerIndex: 0,
+      lifeCard: { instanceId: "life-golden-effect", cardId: CARDS.TRIGGER.id, face: "DOWN" },
+    },
+  });
+  const replacementFrame = baseFrame({
+    id: "golden-replacement-offer",
+    sourceCardInstanceId: p1Char,
+    controller: 1,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_OPTIONAL_RESPONSE",
+    replacement: { effectId: "golden-replacement", targetInstanceId: p1Char, event: "WOULD_BE_KO" },
+  });
+  const batchOfferFrame = baseFrame({
+    id: "golden-replacement-batch",
+    sourceCardInstanceId: p1Char,
+    controller: 1,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_OPTIONAL_RESPONSE",
+    replacementBatch: {
+      actionKind: "KO",
+      event: "WOULD_BE_KO",
+      allTargetIds: [p1Char, battleReady.players[1].characters[1]!.instanceId],
+      protectedIds: [],
+      pendingMatches: [{ effectId: "golden-replacement", matchedTargetIds: [p1Char], optional: true }],
+      currentMatchIndex: 0,
+      causingController: 0,
+    },
+  });
+  const stuckBattleFrame = baseFrame({
+    id: "golden-stuck-battle-damage",
+    sourceCardInstanceId: p0Char,
+    controller: 0,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "INTERRUPTED_BY_TRIGGERS",
+    battleDamage: {
+      stage: "CHARACTER_KO_REPLACEMENT",
+      battleId: "golden-stuck-battle",
+      targetInstanceId: "char-1-gone",
+      causingPlayerIndex: 0,
+      attackerIsCharacter: true,
+    },
   });
 
   const states: SyntheticSessionState[] = [
@@ -554,20 +625,11 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
     },
     {
       name: "effect-damage-trigger-window",
-      shape: "turn.pendingTriggerFromEffect with its REVEAL_TRIGGER prompt",
+      shape: "EFFECT_DAMAGE frame at its Trigger window with its REVEAL_TRIGGER prompt (version 2: turn.pendingTriggerFromEffect)",
       snapshot: snapshot(
         {
           ...battleReady,
-          turn: {
-            ...battleReady.turn,
-            pendingTriggerFromEffect: {
-              lifeCard: { instanceId: "life-golden-effect", cardId: CARDS.TRIGGER.id, face: "DOWN" },
-              damagedPlayerIndex: 1,
-              remainingDamages: 0,
-              sourceCardInstanceId: p0Char,
-              controllerIndex: 0,
-            },
-          },
+          effectStack: [effectWindowFrame],
           pendingPrompt: {
             options: {
               promptType: "REVEAL_TRIGGER",
@@ -577,7 +639,7 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
               timeoutMs: 30_000,
             },
             respondingPlayer: 1,
-            resumeContext: null,
+            resumeContext: effectWindowFrame.id,
           },
         },
         cardDb
@@ -585,19 +647,15 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
     },
     {
       name: "replacement-prompt",
-      shape: "REPLACEMENT resume context",
+      shape: "REPLACEMENT frame owning its OPTIONAL_EFFECT offer (version 2: REPLACEMENT resume context)",
       snapshot: snapshot(
         {
           ...battleReady,
+          effectStack: [replacementFrame],
           pendingPrompt: {
             options: { promptType: "OPTIONAL_EFFECT", effectDescription: "Trash 1 card instead?", cards: [] },
             respondingPlayer: 1,
-            resumeContext: {
-              type: "REPLACEMENT",
-              effectId: "golden-replacement",
-              targetInstanceId: p1Char,
-              event: "WOULD_BE_KO",
-            },
+            resumeContext: replacementFrame.id,
           },
         },
         cardDb
@@ -605,25 +663,15 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
     },
     {
       name: "replacement-batch-prompt",
-      shape: "REPLACEMENT_BATCH resume context",
+      shape: "REPLACEMENT_BATCH frame owning its OPTIONAL_EFFECT offer (version 2: REPLACEMENT_BATCH resume context)",
       snapshot: snapshot(
         {
           ...battleReady,
+          effectStack: [batchOfferFrame],
           pendingPrompt: {
             options: { promptType: "OPTIONAL_EFFECT", effectDescription: "Trash 1 card instead?", cards: [] },
             respondingPlayer: 1,
-            resumeContext: {
-              type: "REPLACEMENT_BATCH",
-              actionKind: "KO",
-              event: "WOULD_BE_KO",
-              allTargetIds: [p1Char, battleReady.players[1].characters[1]!.instanceId],
-              protectedIds: [],
-              pendingMatches: [
-                { effectId: "golden-replacement", matchedTargetIds: [p1Char], optional: true },
-              ],
-              currentMatchIndex: 0,
-              causingController: 0,
-            },
+            resumeContext: batchOfferFrame.id,
           },
         },
         cardDb
@@ -631,7 +679,7 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
     },
     {
       name: "stuck-damage-step",
-      shape: "OPT-884: DAMAGE_STEP with an unanswered CHARACTER_KO_REPLACEMENT continuation whose target has left the field, no prompt, empty stack",
+      shape: "OPT-884: DAMAGE_STEP with an unanswered CHARACTER_KO_REPLACEMENT frame alone on the stack whose target has left the field, no prompt",
       snapshot: snapshot(
         {
           ...battleReady,
@@ -647,14 +695,8 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
               counterPowerAdded: 0,
               blockerActivated: false,
             },
-            pendingBattleDamageContinuation: {
-              battleId: "golden-stuck-battle",
-              stage: "CHARACTER_KO_REPLACEMENT",
-              targetInstanceId: "char-1-gone",
-              causingPlayerIndex: 0,
-              attackerIsCharacter: true,
-            },
           },
+          effectStack: [stuckBattleFrame],
         },
         cardDb
       ),

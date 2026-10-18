@@ -103,7 +103,6 @@ export function executeDealDamage(
     cardDb
   );
   const opp: 0 | 1 = controller === 0 ? 1 : 0;
-  const startingLife = state.players[opp].life.length;
 
   const cont = continueEffectDamageSequence(
     state,
@@ -115,22 +114,18 @@ export function executeDealDamage(
     true
   );
 
-  const dealtSoFar = Math.max(
-    0,
-    startingLife - cont.state.players[opp].life.length
-  );
-
+  // A [Trigger] window pauses the instruction on its EFFECT_DAMAGE frame
+  // (OPT-963); the chain parks below it and learns the final count when the
+  // frame completes (completeEffectDamageFrame).
   return {
     state: cont.state,
     events: cont.events,
-    succeeded:
-      dealtSoFar > 0 ||
-      !!cont.state.turn.pendingTriggerFromEffect ||
-      cont.lethalDamagePlayerIndex !== undefined,
-    result: { targetInstanceIds: [], count: dealtSoFar },
+    succeeded: cont.dealt > 0 || cont.lethalDamagePlayerIndex !== undefined,
+    result: { targetInstanceIds: [], count: cont.dealt },
     ...(cont.lethalDamagePlayerIndex !== undefined
       ? { lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex }
       : {}),
+    ...(cont.pendingPrompt ? { pendingPrompt: cont.pendingPrompt } : {}),
   };
 }
 

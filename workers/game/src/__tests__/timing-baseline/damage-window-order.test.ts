@@ -13,6 +13,7 @@ import type { CardData, CardInstance, GameEvent, GameState, LifeCard, PlayerStat
 import type { EffectBlock } from "../../engine/effect-types.js";
 import { registerTriggersForCard } from "../../engine/triggers.js";
 import { SessionCoordinator } from "../../session/coordinator.js";
+import { resumePromptLifecycle } from "../../session/prompt-lifecycle.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "../helpers.js";
 
 const NO_KW = {
@@ -129,9 +130,19 @@ export interface Rig {
   coord: SessionCoordinator;
 }
 
+/** Route an action as GameSession does: the coordinator, then the pipeline or the prompt lifecycle. */
 function act(rig: Rig, playerIndex: 0 | 1, action: Parameters<SessionCoordinator["executeAction"]>[3]) {
   const r = rig.coord.executeAction(rig.state, [], playerIndex, action, rig.db);
-  expect(r.kind, `${action.type} p${playerIndex}: ${"reason" in r ? r.reason : ""}`).toBe("applied");
+  expect(r.kind, `${action.type} p${playerIndex}: ${"reason" in r ? r.reason : ""}`).not.toBe("reject");
+  if (r.kind === "resume") {
+    const resumed = resumePromptLifecycle(r.state, action, rig.db, {
+      drainPregame: (s) => s,
+      advanceStartOfTurn: (s) => rig.coord.advanceStartOfTurn(s, rig.db),
+    });
+    expect(resumed.responseRejected, `${action.type} p${playerIndex} rejected at resume`).toBe(false);
+    rig.state = rig.coord.surfaceRevealTrigger(resumed.state, rig.db);
+    return;
+  }
   rig.state = r.state;
 }
 
@@ -182,9 +193,9 @@ describe("F5 [Rule 7-1-4-1-1-2 line 670, 8-6-2-1 line 864, 8-6-2 line 862; FAQ q
     return rig;
   }
 
-  // Engine: DAMAGE_DEALT, p1 CARD_DRAWN (defender effect) and mill all run BEFORE the REVEAL_TRIGGER
-  // prompt exists, so step 4 precedes step 3. Rule 8-6-2 / FAQ qa_op13.md:13-15 put step 4 after the Trigger.
-  it.fails("F5a accept: Life check, attacker effect, Trigger choice, Trigger, then defender's own effect (ratchet OPT-963)", () => {
+  // OPT-963: the BATTLE_DAMAGE frame resolves the attacker's per-point effect before the REVEAL_TRIGGER
+  // prompt and defers the defender's DAMAGE_TAKEN watcher until the damage processing completes (rule 8-6-2).
+  it("F5a accept: Life check, attacker effect, Trigger choice, Trigger, then defender's own effect (flipped by OPT-963)", () => {
     const rig = setup();
     const start = rig.state.eventLog.length;
     const lifeBefore = rig.state.players[1].life.length;
@@ -205,8 +216,7 @@ describe("F5 [Rule 7-1-4-1-1-2 line 670, 8-6-2-1 line 864, 8-6-2 line 862; FAQ q
     expect(idx(after, "CARD_DRAWN", 1)).toBeGreaterThan(trig);
   });
 
-  // Engine: same early p1 CARD_DRAWN as F5a, before the decline reply.
-  it.fails("F5b decline: Trigger declined, Life card to hand, then defender's own effect (ratchet OPT-963)", () => {
+  it("F5b decline: Trigger declined, Life card to hand, then defender's own effect (flipped by OPT-963)", () => {
     const rig = setup();
     const start = rig.state.eventLog.length;
     attackLeader(rig, rig.state.players[0].leader.instanceId);
@@ -224,8 +234,7 @@ describe("F5 [Rule 7-1-4-1-1-2 line 670, 8-6-2-1 line 864, 8-6-2 line 862; FAQ q
 });
 
 describe("F6 [Rule 8-6-2 line 862, 8-6-2-1 line 864; FAQ qa_op13.md:13-15] Ace alone: Trigger before the defender's own taking-damage effect", () => {
-  // Engine: p1 CARD_DRAWN is logged before the REVEAL_TRIGGER prompt exists.
-  it.fails("F6 Trigger activates before Ace's draw (ratchet OPT-963)", () => {
+  it("F6 Trigger activates before Ace's draw (flipped by OPT-963)", () => {
     const { rig, db } = baseRig();
     let s = withLeader(rig.state, db, 1, SYN_ACE);
     s = withLife(s, 1, [life("life-trig", SYN_TRIGGER_LIFE.id), life("life-v", CARDS.VANILLA.id)]);

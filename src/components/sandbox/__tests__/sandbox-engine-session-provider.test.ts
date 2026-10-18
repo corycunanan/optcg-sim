@@ -7,6 +7,8 @@
 // against a real `runPipeline` call, which is exactly what the hook does on
 // dispatch — minus React state.
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runPipeline } from "@engine/engine/pipeline";
 import type {
@@ -14,7 +16,7 @@ import type {
   KeywordSet,
   TurnState,
 } from "@shared/game-types";
-import type { CardData } from "@engine/types";
+import type { CardData, GameState } from "@engine/types";
 import type { BoardLayoutProps } from "@/components/game/board-layout";
 import {
   makeCard,
@@ -24,6 +26,7 @@ import {
 } from "@/lib/sandbox/scenarios/helpers";
 import type { PartialGameState } from "@/lib/sandbox/scenarios/types";
 import {
+  applySandboxAction,
   buildEngineSessionGame,
   hydrateToGameState,
   withSandboxPromptIdentity,
@@ -333,5 +336,60 @@ describe("buildEngineSessionGame", () => {
     expect(game.isMyTurn).toBe(true);
     expect(game.turn).toBe(state.turn);
     expect(game.activePrompt).toBeNull();
+  });
+});
+
+// ─── Prompt replies (OPT-963, PR #758 F3) ───────────────────────────────────
+
+/** A real engine state with two Trigger windows open and a REVEAL_TRIGGER prompt for player 0 (5b-written corpus). */
+function triggerWindowState() {
+  const file = JSON.parse(
+    readFileSync(
+      resolve(__dirname, "../../../../workers/game/src/__tests__/fixtures/opt-963-5b-written-states.json"),
+      "utf8"
+    )
+  ) as { cases: Record<string, { state: Record<string, unknown>; cardDb: Record<string, CardData> }> };
+  const entry = file.cases["both-trigger-windows"];
+  // The persisted object is the runtime shape plus the schema-version key.
+  const { schemaVersion: _version, ...state } = entry.state;
+  return { state: state as unknown as GameState, cardDb: new Map(Object.entries(entry.cardDb)) };
+}
+
+describe("applySandboxAction routes prompt replies through the prompt lifecycle", () => {
+  it("answers a Trigger window's REVEAL_TRIGGER (the pipeline rejects it as an action)", () => {
+    const { state, cardDb } = triggerWindowState();
+    const prompt = state.pendingPrompt!;
+    expect(prompt.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(prompt.respondingPlayer).toBe(0);
+    const reply: GameAction = { type: "REVEAL_TRIGGER", reveal: false, promptId: prompt.promptId };
+    // The old route: a pipeline action, rejected and silently dropped.
+    expect(runPipeline(state, reply, cardDb, 0).valid).toBe(false);
+    // The lifecycle route: the window is answered and the next window's prompt surfaces.
+    const hand0 = state.players[0].hand.length;
+    const next = applySandboxAction(state, reply, cardDb, 0);
+    expect(next.players[0].hand).toHaveLength(hand0 + 1);
+    expect(next.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(next.pendingPrompt?.respondingPlayer).toBe(1);
+    const done = applySandboxAction(next, { type: "REVEAL_TRIGGER", reveal: false, promptId: next.pendingPrompt!.promptId }, cardDb, 1);
+    expect(done.pendingPrompt).toBeNull();
+    expect(done.turn.battle).toBeNull();
+    expect(done.effectStack).toEqual([]);
+  });
+
+  it("leaves the state unchanged when the reply names another prompt", () => {
+    const { state: raw, cardDb } = triggerWindowState();
+    const state = withSandboxPromptIdentity(raw, 0).gameState;
+    expect(state.pendingPrompt?.promptId).toBe("sandbox-engine-prompt-1");
+    const stale = applySandboxAction(state, { type: "REVEAL_TRIGGER", reveal: false, promptId: "not-this-prompt" }, cardDb, 0);
+    expect(stale).toBe(state);
+  });
+
+  it("still sends ordinary actions through the pipeline", () => {
+    const { state, cardDb } = triggerWindowState();
+    const answered = applySandboxAction(state, { type: "REVEAL_TRIGGER", reveal: false, promptId: state.pendingPrompt!.promptId }, cardDb, 0);
+    const finished = applySandboxAction(answered, { type: "REVEAL_TRIGGER", reveal: false, promptId: answered.pendingPrompt!.promptId }, cardDb, 1);
+    const ended = applySandboxAction(finished, { type: "ADVANCE_PHASE" }, cardDb, finished.turn.activePlayerIndex);
+    expect(ended).not.toBe(finished);
+    expect(ended.eventLog.length).toBeGreaterThan(finished.eventLog.length);
   });
 });

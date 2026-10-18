@@ -40,6 +40,7 @@ import {
   OP17_SCHEMAS,
 } from "../engine/schemas/op17.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 type PromptResult = {
   state: GameState;
@@ -234,7 +235,7 @@ function driveToTrigger(schema: EffectSchema) {
   );
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
-  expect(result.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(card.id);
+  expect(battleTriggerLifeCard(result.state)?.cardId).toBe(card.id);
   return { state: result.state, cardDb };
 }
 
@@ -298,7 +299,7 @@ describe("OPT-729 direct Character Triggers through Life", () => {
       const { state, cardDb } = driveToTrigger(schema);
       const ownerField = fieldCount(state, 1);
       const opponentField = fieldCount(state, 0);
-      let result: PromptResult = runPipeline(state, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+      let result: PromptResult = revealTrigger(state, true, cardDb);
       result = finishTriggeredOnPlay(result, cardDb);
       expect(result.pendingPrompt).toBeUndefined();
       expect(fieldCount(result.state, 1)).toBe(ownerField + 1);
@@ -311,7 +312,7 @@ describe("OPT-729 direct Character Triggers through Life", () => {
     const { state, cardDb } = driveToTrigger(OP17_108_CHARLOTTE_BRULEE);
     const target = state.players[0].characters[0]!;
     const ownerField = fieldCount(state, 1);
-    let result: PromptResult = runPipeline(state, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    let result: PromptResult = revealTrigger(state, true, cardDb);
     result = selectTargets(result, [target.instanceId], cardDb);
     expect(result.pendingPrompt).toBeUndefined();
     expect(result.state.players[0].characters[0]?.state).toBe("RESTED");

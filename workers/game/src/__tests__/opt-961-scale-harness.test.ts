@@ -24,6 +24,7 @@ import { costSelectionCount } from "../engine/effect-resolver/cost/targets.js";
 import type { SimpleCost } from "../engine/effect-types.js";
 import { processBatchReplacements, resumeReplacementBatch, scanReplacementsForBatch } from "../engine/replacements.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/index.js";
+import { batchOfferOf } from "./trigger-window-helpers.js";
 
 const MODULE = fileURLToPath(new URL("./opt-961-scale-scenarios.ts", import.meta.url));
 const CWD = path.resolve(path.dirname(MODULE), "../..");
@@ -160,8 +161,8 @@ it.each([1, 5])("OPT-986 batch recheck with %i authored matches and five targets
   r.life(0, 2);
   const offer = () => processBatchReplacements(r.state, ids, "KO", "WOULD_BE_REMOVED_FROM_FIELD", "effect", 1, r.db, resolverExecutionServices);
   const offered = offer();
-  const ctx = offered.pendingPrompt?.resumeContext;
-  if (!ctx || typeof ctx !== "object" || !("type" in ctx) || ctx.type !== "REPLACEMENT_BATCH") throw new Error("missing batch");
+  // OPT-963: the offer is a REPLACEMENT_BATCH frame the prompt names; its batch state machine is the resume context.
+  const ctx = batchOfferOf(offered);
   expect(ctx.pendingMatches).toHaveLength(matches);
   expect(ctx.pendingMatches.every(match => match.matchedTargetIds.length === 5)).toBe(true);
   // Recheck an already-scanned offer after the available Life has been spent.

@@ -28,6 +28,7 @@ import { registerTriggersForCard } from "../engine/triggers.js";
 import type { Action, EffectResult, EffectSchema, RuntimeActiveEffect } from "../engine/effect-types.js";
 import type { CardData, CardInstance, GameState, PlayerState } from "../types.js";
 import { createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { answerBatchOffer, batchOfferOf } from "./trigger-window-helpers.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -198,22 +199,22 @@ describe("multiple replacement effects on the same KO batch", () => {
       [ids.aa, ids.ab], resolverExecutionServices
     );
     expect(first.pendingPrompt).toBeDefined();
-    const ctx1 = first.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const ctx1 = batchOfferOf(first);
     expect(ctx1.pendingMatches).toHaveLength(2);
     expect(ctx1.currentMatchIndex).toBe(0);
     expect(ctx1.pendingMatches[0].matchedTargetIds).toEqual([ids.aa]);
     expect(ctx1.pendingMatches[1].matchedTargetIds).toEqual([ids.ab]);
 
     // Accept A.
-    const afterAccept = resumeReplacementBatch(first.state, ctx1, true, cardDb, resolverExecutionServices);
+    const afterAccept = answerBatchOffer(first, true, cardDb);
     expect(afterAccept.pendingPrompt).toBeDefined();
-    const ctx2 = afterAccept.pendingPrompt!.resumeContext as unknown as ReplacementBatchResumeContext;
+    const ctx2 = batchOfferOf(afterAccept);
     expect(ctx2.currentMatchIndex).toBe(1);
     // Ally A is already in the protected set.
     expect(ctx2.protectedIds).toContain(ids.aa);
 
     // Decline B.
-    const final = resumeReplacementBatch(afterAccept.state, ctx2, false, cardDb, resolverExecutionServices);
+    const final = answerBatchOffer(afterAccept, false, cardDb);
     expect(final.pendingPrompt).toBeUndefined();
 
     // Ally A survived (guardian A trashed); ally B was KO'd (guardian B still on field).

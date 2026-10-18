@@ -37,6 +37,7 @@ import { isCostSequencePayable } from "../engine/effect-resolver/cost/feasibilit
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { log } from "../lib/log.js";
 import { rig, synSchema, type Rig } from "./opt-960-rig.js";
+import { battleTriggerLifeCard } from "./trigger-window-helpers.js";
 
 const P0 = 0 as const;
 const P1 = 1 as const;
@@ -235,7 +236,7 @@ describe("OPT-864 an earlier cost enables a later one (rule 8-3-1-1)", () => {
     });
     r.act({ type: "PASS" });
     r.act({ type: "PASS" });
-    expect(r.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe("OPT864-TRIGGER");
+    expect(battleTriggerLifeCard(r.state)?.cardId).toBe("OPT864-TRIGGER");
   });
 });
 

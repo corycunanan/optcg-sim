@@ -28,13 +28,15 @@ import { ALL_ACTION_TYPES, ALL_CAUSE_FILTER_BY, REPLACED_CARD_REF } from "./effe
 import type {
   CardData,
   CardInstance,
+  EffectStackFrame,
   GameAction,
   GameState,
   PendingEvent,
   PendingPromptState,
 } from "../types.js";
 import { findCardInstance } from "./state.js";
-import { updateTopFrame } from "./effect-stack.js";
+import { CONTINUATION_EFFECT_BLOCK, generateFrameId, pushFrame } from "./effect-stack.js";
+import { insertFrameAt } from "./damage-frames.js";
 import { matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
 import { isLifeToHandProhibited, isProhibitedForCard } from "./prohibitions.js";
@@ -64,7 +66,16 @@ export interface ReplacementResult {
   events: PendingEvent[];
 }
 
+/** An optional replacement offer awaiting its REPLACEMENT frame (OPT-963); never persisted. */
+export interface ReplacementOffer {
+  effectId: string;
+  targetInstanceId: string;
+  event: ReplacementEvent;
+}
+
 export interface ReplacementCheckResult {
+  /** Set with `pendingPrompt` when the prompt is an optional replacement offer. */
+  offer?: ReplacementOffer;
   /** A matching replacement was found and applied (non-optional) */
   replaced: boolean;
   state: GameState;
@@ -429,15 +440,13 @@ export function applyBatchReplacement(
 }
 
 /**
- * Build the opt-in prompt for a batch match. The resume context carries the
- * information the batch-aware resume handler needs to continue the event after
- * the player accepts or declines.
+ * Build the opt-in prompt for a batch match. The REPLACEMENT_BATCH frame the
+ * caller opens carries the state machine; the prompt is player-facing only.
  */
 export function buildBatchReplacementPrompt(
   state: GameState,
   effectId: string,
   event: ReplacementEvent,
-  resumeContext: ReplacementBatchResumeContext,
   cardDb: Map<string, CardData>,
 ): PendingPromptState {
   const effects = state.activeEffects;
@@ -454,7 +463,7 @@ export function buildBatchReplacementPrompt(
   return {
     options: { promptType: "OPTIONAL_EFFECT", effectDescription, cards },
     respondingPlayer: effect?.controller ?? 0,
-    resumeContext,
+    resumeContext: null,
   };
 }
 
@@ -886,6 +895,9 @@ function buildReplacementPrompt(
 
   const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
 
+  // The offer is materialized as a REPLACEMENT frame by the caller that owns
+  // the stack layout (materializeReplacementOffer); until then the prompt
+  // names no frame.
   const pendingPrompt: PendingPromptState = {
     options: {
       promptType: "OPTIONAL_EFFECT",
@@ -893,15 +905,16 @@ function buildReplacementPrompt(
       cards,
     },
     respondingPlayer: effect.controller,
-    resumeContext: {
-      type: "REPLACEMENT",
-      effectId: effect.id,
-      targetInstanceId,
-      event,
-    },
+    resumeContext: null,
   };
 
-  return { replaced: false, state, events: [], pendingPrompt };
+  return {
+    replaced: false,
+    state,
+    events: [],
+    pendingPrompt,
+    offer: { effectId: effect.id, targetInstanceId, event },
+  };
 }
 
 function describeReplacementEvent(event: ReplacementEvent): string {
@@ -921,6 +934,7 @@ function describeReplacementEvent(event: ReplacementEvent): string {
 
 // ─── Resume from Optional Replacement Prompt ─────────────────────────────────
 
+/** The answered offer as `resumeReplacement` consumes it (in memory; the REPLACEMENT frame persists it). */
 export interface ReplacementResumeContext {
   type: "REPLACEMENT";
   effectId: string;
@@ -929,9 +943,52 @@ export interface ReplacementResumeContext {
 }
 
 /**
+ * OPT-963: give a pending optional replacement offer its REPLACEMENT frame.
+ * `buildReplacementPrompt` describes the offer on the prompt; the caller that
+ * owns the stack layout (the Damage Step, a cost frame, an action chain)
+ * materializes it on top once its own frames are in place, and the prompt
+ * then names the frame. A prompt that is not an offer is returned as is.
+ */
+export function materializeReplacementOffer(
+  state: GameState,
+  pendingPrompt: PendingPromptState,
+  offer: ReplacementOffer | undefined,
+): { state: GameState; pendingPrompt: PendingPromptState } {
+  if (!offer) return { state, pendingPrompt };
+  const { effectId, targetInstanceId, event } = offer;
+  const effect = state.activeEffects.find((candidate) => candidate.id === effectId);
+  const generated = generateFrameId(state);
+  const frame: EffectStackFrame = {
+    id: generated.id,
+    sourceCardInstanceId: effect?.sourceCardInstanceId ?? targetInstanceId,
+    controller: pendingPrompt.respondingPlayer,
+    ...("effectDescription" in pendingPrompt.options
+      ? { effectDescription: pendingPrompt.options.effectDescription }
+      : {}),
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_OPTIONAL_RESPONSE",
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: [],
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+    replacement: { effectId, targetInstanceId, event },
+  };
+  const nextState = pushFrame(generated.state, frame);
+  return { state: nextState, pendingPrompt: { ...pendingPrompt, resumeContext: frame.id } };
+}
+
+/**
  * Resume after the player has accepted or declined an optional replacement.
- * Called from GameSession.resumeFromPrompt when the resume context is a
- * replacement type.
+ * Called from the prompt lifecycle when the answered REPLACEMENT frame is
+ * popped (OPT-963).
  *
  * @returns replaced=true if the replacement was applied (original event should be skipped)
  */
@@ -965,6 +1022,12 @@ export function resumeReplacement(
 
 export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "SET_REST";
 
+/**
+ * The batch state machine as the batch functions pass it around. From
+ * OPT-963 it is persisted only as a REPLACEMENT_BATCH frame
+ * (`frame.replacementBatch`, the same fields without `type`), never as a
+ * prompt context.
+ */
 export interface ReplacementBatchResumeContext {
   type: "REPLACEMENT_BATCH";
   actionKind: BatchActionKind;
@@ -1008,6 +1071,50 @@ export interface BatchResumeResult {
    * own prompt, so the attached continuation protects only those cards.
    */
   continuationContext?: ReplacementBatchResumeContext;
+}
+
+/**
+ * OPT-963: push a REPLACEMENT_BATCH frame holding `batch`, on top or (with
+ * `insertAt`) below everything pushed since that depth. Returns the frame id.
+ */
+export function openReplacementBatchFrame(
+  state: GameState,
+  batch: ReplacementBatchResumeContext,
+  phase: "AWAITING_OPTIONAL_RESPONSE" | "INTERRUPTED_BY_TRIGGERS",
+  controller: 0 | 1,
+  insertAt?: number,
+): { state: GameState; frameId: string } {
+  const { type: _type, ...replacementBatch } = batch;
+  const generated = generateFrameId(state);
+  const frame: EffectStackFrame = {
+    id: generated.id,
+    sourceCardInstanceId: batch.causingSource?.instanceId ?? batch.allTargetIds[0] ?? "",
+    controller,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase,
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: [],
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+    replacementBatch,
+  };
+  const nextState = insertAt === undefined
+    ? pushFrame(generated.state, frame)
+    : insertFrameAt(generated.state, insertAt, frame);
+  return { state: nextState, frameId: frame.id };
+}
+
+/** The batch state machine as a REPLACEMENT_BATCH frame carries it. */
+export function batchContextOf(frame: EffectStackFrame): ReplacementBatchResumeContext {
+  return { type: "REPLACEMENT_BATCH", ...frame.replacementBatch! };
 }
 
 /**
@@ -1077,44 +1184,43 @@ function stepBatch(
     pendingMatches[i] = { ...match, matchedTargetIds: applicable };
 
     if (match.optional) {
-      const prompt = buildBatchReplacementPrompt(
-        nextState,
-        match.effectId,
-        ctx.event,
-        {
-          ...ctx,
-          pendingMatches,
-          protectedIds: [...protectedIds],
-          currentMatchIndex: i,
-        },
-        cardDb,
-      );
+      const offer = {
+        ...ctx,
+        pendingMatches,
+        protectedIds: [...protectedIds],
+        currentMatchIndex: i,
+      };
+      const prompt = buildBatchReplacementPrompt(nextState, match.effectId, ctx.event, cardDb);
+      // OPT-963: the offer is owned by a REPLACEMENT_BATCH frame on top; the
+      // prompt names the frame.
+      const opened = openReplacementBatchFrame(nextState, offer, "AWAITING_OPTIONAL_RESPONSE", prompt.respondingPlayer);
       return {
-        state: nextState,
+        state: opened.state,
         events,
         protectedIds: [...protectedIds],
         finalizedIds: [],
         unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
-        pendingPrompt: prompt,
+        pendingPrompt: { ...prompt, resumeContext: opened.frameId },
       };
     }
 
     // Non-optional: apply once, mark covered targets as protected.
+    const depthBefore = nextState.effectStack.length;
     const applied = applyBatchReplacement(nextState, match.effectId, cardDb, services, applicable);
     nextState = applied.state;
     events.push(...applied.events);
     if (applied.pendingPrompt) {
-      // executeActionChain has already pushed the substitute prompt's frame.
-      // Park this batch on that frame so the prompt lifecycle can finish the
-      // replacement before the original action continuation resumes.
-      nextState = updateTopFrame(nextState, {
-        replacementBatchContinuation: {
-          ...ctx,
-          pendingMatches,
-          protectedIds: [...protectedIds],
-          currentMatchIndex: i,
-        },
-      });
+      // executeActionChain has already pushed the substitute prompt's frames.
+      // Park this batch on a REPLACEMENT_BATCH frame directly below them so
+      // the prompt lifecycle finishes the replacement before the original
+      // action continuation (inserted lower still) resumes (OPT-963).
+      nextState = openReplacementBatchFrame(
+        nextState,
+        { ...ctx, pendingMatches, protectedIds: [...protectedIds], currentMatchIndex: i },
+        "INTERRUPTED_BY_TRIGGERS",
+        ctx.causingController,
+        depthBefore,
+      ).state;
       return {
         state: nextState,
         events,

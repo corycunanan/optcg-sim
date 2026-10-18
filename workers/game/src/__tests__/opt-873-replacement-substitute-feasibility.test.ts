@@ -140,8 +140,9 @@ function fixture() {
   const inTrash = (c: CardInstance) => state.players[c.owner].trash.some((x) => x.cardId === c.cardId);
   const promptType = () => state.pendingPrompt?.options.promptType;
   const replacementOffered = () => {
-    const ctx = state.pendingPrompt?.resumeContext;
-    return typeof ctx === "object" && ctx !== null && "type" in ctx && /^REPLACEMENT/.test(String(ctx.type));
+    // OPT-963: an offer is a REPLACEMENT / REPLACEMENT_BATCH frame that owns the prompt.
+    const top = state.effectStack.at(-1);
+    return !!top && !!(top.replacement || top.replacementBatch) && state.pendingPrompt?.resumeContext === top.id;
   };
 
   return {

@@ -13,7 +13,7 @@
  */
 
 import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
-import type { CardData, GameAction, GameState, ExecuteResult, PendingPromptState } from "../types.js";
+import type { CardData, GameAction, GameState, ExecuteResult, PendingPromptState, QueuedTrigger } from "../types.js";
 import { validate } from "./validation.js";
 import { execute } from "./execute.js";
 import { emitPendingEvent } from "./events.js";
@@ -201,6 +201,7 @@ export function continuePipelineFromExecution(
   execResult: ExecuteResult,
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
+  deferredTriggers: readonly QueuedTrigger[] = [],
 ): PipelineResult {
   const continuationAction: GameAction = { type: "REVEAL_TRIGGER", reveal: true };
   // Checkpoint for the resumed execution's lethal damage determination
@@ -218,6 +219,7 @@ export function continuePipelineFromExecution(
     cardDb,
     undefined,
     false,
+    deferredTriggers,
   );
 
   if (isGameTerminated(nextState)) {

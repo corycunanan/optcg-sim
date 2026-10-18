@@ -29,8 +29,9 @@ import {
   popFrame,
   peekFrame,
   pushFrame,
-  updateTopFrame,
 } from "../effect-stack.js";
+import { insertFrameAt } from "../damage-frames.js";
+import { frameKindOf } from "../frame-kinds.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
 import type { EffectResolverResult, EffectResolverServices } from "./types.js";
 import {
@@ -74,6 +75,13 @@ import {
   takeInterruptedEvents,
 } from "./resume/events.js";
 import { withChainDescription } from "./resolver.js";
+
+/** A frame a handler pushed to own its own pause (OPT-963 kinds). */
+function isHandlerOwnedFrame(frame: EffectStackFrame | undefined): boolean {
+  if (!frame) return false;
+  const kind = frameKindOf(frame);
+  return kind === "REPLACEMENT" || kind === "REPLACEMENT_BATCH" || kind === "EFFECT_DAMAGE";
+}
 
 // Re-export the stable public API so existing imports keep working.
 export { processRemainingTriggers } from "./resume/triggers.js";
@@ -542,15 +550,13 @@ export function resumeFromStack(
 
       if (result.pendingPrompt) {
         let pendingPrompt = result.pendingPrompt;
-        const pendingResumeContext = pendingPrompt.resumeContext as {
-          type?: unknown;
-        } | null;
-        const isReplacementPrompt =
-          pendingResumeContext?.type === "REPLACEMENT" ||
-          pendingResumeContext?.type === "REPLACEMENT_BATCH";
         if (result.rejected) {
           pendingPrompt = { ...pendingPrompt, resumeContext: topFrame.id };
-        } else if (!replacementFrameWasPushed && isReplacementPrompt) {
+        } else if (replacementFrameWasPushed && isHandlerOwnedFrame(nextState.effectStack[stackDepthAfterPop])) {
+          // OPT-963: the resumed action's handler owns its pause on a frame
+          // it pushed (a replacement batch, an effect-damage window). This
+          // chain's continuation goes directly below it, at the depth the
+          // resumed frame occupied, so the handler's work finishes first.
           const frameId = generateFrameId(nextState);
           nextState = frameId.state;
           const continuationFrame: EffectStackFrame = {
@@ -561,9 +567,20 @@ export function resumeFromStack(
             priorActionSucceeded: false,
             accumulatedEvents: [...events],
           };
-          nextState = pushFrame(nextState, continuationFrame);
+          nextState = insertFrameAt(nextState, stackDepthAfterPop, continuationFrame);
           if (isGameTerminated(nextState)) {
             return { state: nextState, events, resolved: false };
+          }
+          const damage = nextState.effectStack[stackDepthAfterPop + 1];
+          if (damage?.effectDamage) {
+            nextState = {
+              ...nextState,
+              effectStack: nextState.effectStack.map((frame, index) =>
+                index === stackDepthAfterPop + 1
+                  ? { ...frame, effectDamage: { ...frame.effectDamage!, parentFrameId: frameId.id } }
+                  : frame
+              ),
+            };
           }
         } else if (!replacementFrameWasPushed) {
           const promptCtx = pendingPrompt.resumeContext as ResumeContext;
@@ -599,7 +616,6 @@ export function resumeFromStack(
           nextState = updateEffectContinuation(nextState, stackDepthAfterPop, frame => ({
             pendingTriggers: [...frame.pendingTriggers, ...topFrame.pendingTriggers],
             triggerOrderingGroup: topFrame.triggerOrderingGroup ?? frame.triggerOrderingGroup,
-            replacementBatchContinuation: topFrame.replacementBatchContinuation,
           }));
         }
         return {
@@ -669,13 +685,6 @@ export function resumeFromStack(
 
         if (chainResult.pendingPrompt) {
           nextState = retainEventsOnFrame(nextState, stackDepthAfterPop, events);
-          const nestedFrame = peekFrame(nextState);
-          if (nestedFrame && topFrame.replacementBatchContinuation) {
-            nextState = updateTopFrame(nextState, {
-              replacementBatchContinuation:
-                topFrame.replacementBatchContinuation,
-            });
-          }
           return {
             state: nextState,
             events,

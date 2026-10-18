@@ -807,12 +807,11 @@ export class GameSession implements DurableObject {
   }
 
   /**
-   * If the effect stack is empty and no prompt is pending, check whether a
-   * [Trigger] Life card reveal is awaiting a decision — either on the active
-   * battle (battle damage, battle.pendingTriggerLifeCard) or on the turn
-   * (effect damage, turn.pendingTriggerFromEffect / OPT-259 F6). Surfacing it
-   * as a durable pendingPrompt on the game state makes it survive reconnections
-   * and prevents a race between game:update (clears activePrompt) and
+   * If no prompt is pending, check whether a [Trigger] Life card reveal is
+   * awaiting a decision on the top BATTLE_DAMAGE or EFFECT_DAMAGE frame
+   * (OPT-963; effect damage was OPT-259 F6). Surfacing it as a durable
+   * pendingPrompt on the game state makes it survive reconnections and
+   * prevents a race between game:update (clears activePrompt) and
    * game:prompt (sets it again).
    */
   private surfaceRevealTriggerIfNeeded(): void {

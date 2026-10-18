@@ -5,7 +5,6 @@ export type {
   Zone, CardInstance, LifeCard, DonInstance,
   BattleContext, BattleSubPhase,
   Phase, PerformedAction, TurnState,
-  LeaderDamageContinuation, BattleKOReplacementContinuation,
   PlayerState,
   ActiveEffect, ActiveProhibition, ScheduledActionEntry, ActiveOneTimeModifier, RegisteredTrigger,
   EngineLimitDiagnostic, EngineTerminalOutcome,
@@ -80,11 +79,14 @@ export type PregamePromptResumeContext = {
   type: "PREGAME_PRIORITY_CHOICE" | "PREGAME_MULLIGAN";
 };
 
-/** Exhaustive persisted prompt continuation shapes used by the worker. */
+/**
+ * Exhaustive persisted prompt continuation shapes used by the worker. A
+ * string names the frame that owns the prompt (every replacement and damage
+ * prompt since OPT-963); the structural ResumeContext is the version 1
+ * legacy shape (SAVED-STATE-COMPATIBILITY.md §4).
+ */
 export type PromptResumeContext =
   | ResumeContext
-  | import("./engine/replacements.js").ReplacementBatchResumeContext
-  | import("./engine/replacements.js").ReplacementResumeContext
   | PregamePromptResumeContext
   | string
   | null;
@@ -426,8 +428,6 @@ export interface EffectStackFrame {
   priorActionSucceeded?: boolean;
   /** AND transaction waiting for all snapshot-locked target choices. */
   simultaneousGroup?: import("./engine/effect-resolver/simultaneous.js").SimultaneousGroupPlan;
-  /** Outer replacement batch to continue after a nested substitute prompt. */
-  replacementBatchContinuation?: import("./engine/replacements.js").ReplacementBatchResumeContext;
   /** End-phase work parked below a scheduled effect's prompt frame. */
   phaseBoundaryContinuation?: PhaseBoundaryContinuation;
   /** OPT-963 REPLACEMENT frame: the pending optional replacement offer. */

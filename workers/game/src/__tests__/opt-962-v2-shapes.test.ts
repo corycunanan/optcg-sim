@@ -45,9 +45,9 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
     expect(built.map((s) => s.name).sort()).toEqual(Object.keys(fixture.cases).sort());
   });
 
-  it.each(built.map((s) => s.name))("%s: the persisted object equals the fixture", (name) => {
+  it.each(built.map((s) => s.name))("%s: the persisted object equals the fixture (the version key is 3 since OPT-963)", (name) => {
     const state = built.find((s) => s.name === name)!.state;
-    expect(persisted(state)).toEqual(fixture.cases[name].state);
+    expect(persisted(state)).toEqual({ ...fixture.cases[name].state, schemaVersion: 3 });
   });
 
   it("every End Phase frame parked across the full scenario, live and reloaded, has a fixture-covered shape", () => {

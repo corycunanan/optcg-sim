@@ -27,6 +27,7 @@ import type { Cost, EffectBlock, RuntimeActiveEffect } from "../engine/effect-ty
 import { payCostsWithSelection } from "../engine/effect-resolver/cost-handler.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
+import { batchOfferOf } from "./trigger-window-helpers.js";
 
 class MockWebSocket {
   sent: string[] = [];
@@ -379,7 +380,7 @@ describe("OPT-446: skip declines replacement prompts instead of accepting them",
       selectedInstanceIds: [target.instanceId],
     } as GameAction);
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type)
+    expect(batchOfferOf(session.gameState).type)
       .toBe("REPLACEMENT_BATCH");
 
     await session.handleAction(player1 as unknown as WebSocket, 1, {

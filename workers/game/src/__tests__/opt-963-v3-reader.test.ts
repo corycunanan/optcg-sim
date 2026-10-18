@@ -1,18 +1,16 @@
 /**
- * OPT-963 (PR 5a of OPT-963): the version 3 reader for typed replacement and
- * damage continuation frames, the v2 → v3 and v3 lowering converters,
- * reference integrity for the new kinds, mixed-version undo, and the
- * unchanged version 2 writer.
+ * OPT-963 (PR 5b): the version 3 runtime and writer, the v2 → v3 lift of
+ * every replacement and damage record (live and undo), reference integrity
+ * for the new kinds, mixed-version undo, and the retired version 2 records.
  *
- * Contract: docs/game-engine/SAVED-STATE-COMPATIBILITY.md §1.7, §2, §8.
- * Fixtures: `fixtures/opt-963-v3-states.ts` (SYNTHETIC: golden version 2
- * engine states lifted to the version 3 shape, plus constructed shapes).
+ * Contract: docs/game-engine/SAVED-STATE-COMPATIBILITY.md §1.8, §2, §8.
+ * Fixtures: `fixtures/opt-963-v3-states.ts` (SYNTHETIC: version 2 goldens
+ * lifted by the real reader, plus constructed version 3 shapes).
  */
 
-import { reply } from "./fixtures/opt-963-lifecycle.js";
-import corpus from "./fixtures/opt-963-5b-written-states.json";
-import { describe, expect, it, vi } from "vitest";
-import type { CardData, GameState } from "../types.js";
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import type { CardData, GameState, PendingPromptState } from "../types.js";
 import {
   SESSION_CARD_DB_STORAGE_KEY,
   SESSION_STORAGE_KEY,
@@ -29,7 +27,7 @@ import {
   SUPPORTED_GAME_STATE_SCHEMA_VERSIONS,
   classifyLegacyShapes,
   frameKindOf,
-  lowerVersion3Frames,
+  isStuckDamageStep,
   toPersistedGameState,
 } from "../session/game-state-schema.js";
 import { SessionCoordinator } from "../session/coordinator.js";
@@ -37,14 +35,14 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { loadGoldenFixture } from "./fixtures/opt-940-golden.js";
 import {
-  LOSSLESS_GOLDEN_CASES,
-  V3_FRAME_ID,
+  LIFTED_GOLDEN_CASES,
   buildV3SyntheticStates,
-  goldenV2State,
-  liftToVersion3,
+  goldenV1Raw,
+  goldenV2Raw,
+  liftedGolden,
   persistedV3,
 } from "./fixtures/opt-963-v3-states.js";
-import * as logModule from "../lib/log.js";
+import { battleTriggerLifeCard, effectTriggerWindow } from "./trigger-window-helpers.js";
 
 const STATES = buildV3SyntheticStates();
 const NAMES = STATES.map((entry) => entry.name);
@@ -79,149 +77,217 @@ function runtime(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;
 }
 
-const lifecycleServices = {
-  drainPregame: (state: GameState) => state,
-  advanceStartOfTurn: (state: GameState) => state,
-};
+function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
+  const rest = { ...raw };
+  delete rest[GAME_STATE_SCHEMA_VERSION_KEY];
+  return rest;
+}
 
-describe("OPT-963 version 3 support window (PR 5a)", () => {
-  it("reads 1, 2 and 3, executes 2, and writes 2", () => {
+const kindsOf = (state: GameState) => state.effectStack.map(frameKindOf);
+
+describe("OPT-963 version 3 runtime and writer (PR 5b)", () => {
+  it("reads 1, 2 and 3, executes 3, and writes 3", () => {
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3]);
     expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(3);
-    expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(2);
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(2);
+    expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(3);
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(3);
     expect([...EFFECT_STACK_FRAME_KINDS]).toEqual(
       expect.arrayContaining(["REPLACEMENT", "REPLACEMENT_BATCH", "BATTLE_DAMAGE", "EFFECT_DAMAGE"])
     );
   });
 
   it("derives the four kinds from their one field, before the phase", () => {
-    const [battle] = liftToVersion3(goldenV2State("battle-trigger-window")).effectStack;
-    expect(frameKindOf(battle)).toBe("BATTLE_DAMAGE");
-    const [effect] = liftToVersion3(goldenV2State("effect-damage-trigger-window")).effectStack;
-    expect(frameKindOf(effect)).toBe("EFFECT_DAMAGE");
-    const replacement = liftToVersion3(goldenV2State("replacement-prompt")).effectStack.at(-1)!;
-    expect(frameKindOf(replacement)).toBe("REPLACEMENT");
-    const batch = liftToVersion3(goldenV2State("replacement-batch-prompt")).effectStack.at(-1)!;
+    expect(kindsOf(liftedGolden("battle-trigger-window"))).toEqual(["BATTLE_DAMAGE"]);
+    expect(kindsOf(liftedGolden("effect-damage-trigger-window"))).toEqual(["EFFECT_DAMAGE"]);
+    expect(kindsOf(liftedGolden("replacement-prompt"))).toEqual(["REPLACEMENT"]);
+    const batch = liftedGolden("replacement-batch-prompt").effectStack[0];
     expect(frameKindOf(batch)).toBe("REPLACEMENT_BATCH");
     expect(frameKindOf({ ...batch, phase: "INTERRUPTED_BY_TRIGGERS" })).toBe("REPLACEMENT_BATCH");
   });
 });
 
-describe("OPT-963 v3 reader: every shape loads live and as undo, lowered to its version 2 record", () => {
-  it.each(NAMES)("%s loads live, lowered, with the documented reports", (name) => {
-    const entry = byName(name);
-    const logSpy = vi.spyOn(logModule, "log").mockImplementation(() => {});
-    try {
-      const loaded = convertPersistedGameState(persistedV3(entry.state), "state");
-      expect(loaded).toEqual(runtime(entry.lowered));
-      expect(loaded).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
-      const shapes = logSpy.mock.calls
-        .filter(([event]) => event === "session.legacy_shape")
-        .map(([, data]) => (data as { shape: string }).shape)
-        .filter((shape) => shape.startsWith("lowered."));
-      expect(shapes).toEqual(entry.reports);
-    } finally {
-      logSpy.mockRestore();
+describe("OPT-963 v2 → v3 lift: every version 2 record becomes a frame, live and as undo", () => {
+  it("battle Trigger window: battle.pendingTriggerLifeCard becomes a BATTLE_DAMAGE frame that owns the prompt", () => {
+    const raw = goldenV2Raw("battle-trigger-window");
+    const state = liftedGolden("battle-trigger-window");
+    expect(kindsOf(state)).toEqual(["BATTLE_DAMAGE"]);
+    const frame = state.effectStack[0];
+    expect(frame.phase).toBe("AWAITING_TRIGGER_REVEAL");
+    expect(battleTriggerLifeCard(state)).toEqual((raw.turn as { battle: { pendingTriggerLifeCard: unknown } }).battle.pendingTriggerLifeCard);
+    expect(state.turn.battle).not.toHaveProperty("pendingTriggerLifeCard");
+    expect(state.pendingPrompt?.resumeContext).toBe(frame.id);
+    expect(state.pendingPrompt?.respondingPlayer).toBe(1);
+  });
+
+  it("effect Trigger window: turn.pendingTriggerFromEffect becomes an EFFECT_DAMAGE frame with no parent (the chain already ran on)", () => {
+    const raw = goldenV2Raw("effect-damage-trigger-window");
+    const state = liftedGolden("effect-damage-trigger-window");
+    expect(kindsOf(state)).toEqual(["EFFECT_DAMAGE"]);
+    const window = effectTriggerWindow(state)!;
+    const record = raw.turn as { pendingTriggerFromEffect: Record<string, unknown> };
+    expect(window).toEqual({ stage: "TRIGGER_WINDOW", dealt: 0, ...record.pendingTriggerFromEffect });
+    expect(window.parentFrameId).toBeUndefined();
+    expect(state.turn).not.toHaveProperty("pendingTriggerFromEffect");
+    expect(state.pendingPrompt?.resumeContext).toBe(state.effectStack[0].id);
+  });
+
+  it("both windows: the two records nest (battle below, effect above) and the prompt moves to the inner window's responder", () => {
+    const state = liftedGolden("both-trigger-windows");
+    expect(kindsOf(state)).toEqual(["BATTLE_DAMAGE", "EFFECT_DAMAGE"]);
+    expect(state.pendingPrompt?.resumeContext).toBe(state.effectStack[1].id);
+    expect(state.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(classifyLegacyShapes(state)).toEqual([]);
+  });
+
+  it("both windows: both replies resolve through the coordinator and the battle ends (OPT-974 recovered)", () => {
+    const entry = golden("both-trigger-windows");
+    const cardDb = new Map(Object.entries(entry.cardDb)) as Map<string, never>;
+    let state = liftedGolden("both-trigger-windows");
+    const coordinator = new SessionCoordinator();
+    const answer = (player: 0 | 1) => {
+      const prompt = state.pendingPrompt!;
+      expect(prompt.options.promptType).toBe("REVEAL_TRIGGER");
+      expect(prompt.respondingPlayer).toBe(player);
+      // The card shown is the answering player's own window card (PR #758 L5).
+      const owner = state.effectStack.find((frame) => frame.id === prompt.resumeContext)!;
+      const window = owner.battleDamage?.stage === "TRIGGER_WINDOW" ? owner.battleDamage : owner.effectDamage?.stage === "TRIGGER_WINDOW" ? owner.effectDamage : null;
+      expect(window?.damagedPlayerIndex).toBe(player);
+      expect(prompt.options.promptType === "REVEAL_TRIGGER" ? prompt.options.cards.map((card) => [card.instanceId, card.controller, card.owner]) : []).toEqual([[window!.lifeCard.instanceId, player, player]]);
+      const action = { type: "REVEAL_TRIGGER" as const, reveal: false, promptId: prompt.promptId };
+      const routed = coordinator.executeAction(state, [], player, action, cardDb);
+      expect(routed.kind).toBe("resume");
+      const resumed = resumePromptLifecycle(routed.state, action, cardDb, {
+        drainPregame: (s) => s,
+        advanceStartOfTurn: (s) => s,
+      });
+      expect(resumed.responseRejected).toBe(false);
+      state = coordinator.surfaceRevealTrigger(resumed.state, cardDb);
+    };
+    answer(0);
+    answer(1);
+    expect(state.pendingPrompt).toBeNull();
+    expect(state.effectStack).toEqual([]);
+    expect(state.turn.battle).toBeNull();
+    expect(state.status).toBe("IN_PROGRESS");
+  });
+
+  it("replacement offer: the REPLACEMENT context becomes a REPLACEMENT frame on top that owns the prompt", () => {
+    const raw = goldenV2Raw("replacement-prompt");
+    const state = liftedGolden("replacement-prompt");
+    const context = (raw.pendingPrompt as { resumeContext: Record<string, unknown> }).resumeContext;
+    expect(kindsOf(state)).toEqual(["REPLACEMENT"]);
+    expect(state.effectStack[0].replacement).toEqual({
+      effectId: context.effectId,
+      targetInstanceId: context.targetInstanceId,
+      event: context.event,
+    });
+    expect(state.pendingPrompt?.resumeContext).toBe(state.effectStack[0].id);
+  });
+
+  it("replacement batch offer: the REPLACEMENT_BATCH context becomes a REPLACEMENT_BATCH frame on top", () => {
+    const raw = goldenV2Raw("replacement-batch-prompt");
+    const state = liftedGolden("replacement-batch-prompt");
+    const { type: _type, ...batch } = (raw.pendingPrompt as { resumeContext: Record<string, unknown> }).resumeContext;
+    expect(kindsOf(state)).toEqual(["REPLACEMENT_BATCH"]);
+    expect(state.effectStack[0].replacementBatch).toEqual(batch);
+    expect(state.pendingPrompt?.resumeContext).toBe(state.effectStack[0].id);
+  });
+
+  it("stuck Damage Step (OPT-884): the K.O. replacement record becomes a BATTLE_DAMAGE frame and keeps its classification", () => {
+    const state = liftedGolden("stuck-damage-step");
+    expect(kindsOf(state)).toEqual(["BATTLE_DAMAGE"]);
+    expect(state.effectStack[0].battleDamage).toMatchObject({ stage: "CHARACTER_KO_REPLACEMENT", targetInstanceId: "char-1-gone" });
+    expect(isStuckDamageStep(state)).toBe(true);
+    expect(classifyLegacyShapes(state)).toEqual([{ shape: "legacy.stuck_damage_step" }]);
+  });
+
+  it("LIFE_REMOVAL and DAMAGE continuations become TRIGGER_EFFECT with the removal retained unscanned or not", () => {
+    const base = goldenV2Raw("battle-trigger-window") as Record<string, unknown> & { turn: Record<string, unknown> & { battle: Record<string, unknown> } };
+    for (const stage of ["LIFE_REMOVAL", "DAMAGE"] as const) {
+      const { pendingTriggerLifeCard: _card, ...battle } = base.turn.battle;
+      const raw = {
+        ...base,
+        turn: {
+          ...base.turn,
+          battle,
+          pendingBattleDamageContinuation: { battleId: battle.battleId, lifeCardInstanceId: "life-x", damagedPlayerIndex: 1, stage },
+        },
+        pendingPrompt: null,
+      };
+      const state = convertPersistedGameState(raw, "state");
+      expect(kindsOf(state)).toEqual(["BATTLE_DAMAGE"]);
+      expect(state.effectStack[0].phase).toBe("INTERRUPTED_BY_TRIGGERS");
+      expect(state.effectStack[0].battleDamage).toEqual({ stage: "TRIGGER_EFFECT", battleId: battle.battleId, damagedPlayerIndex: 1, lifeCardInstanceId: "life-x" });
+      expect(state.effectStack[0].accumulatedEvents).toHaveLength(stage === "LIFE_REMOVAL" ? 1 : 0);
     }
   });
 
-  it.each(NAMES)("%s loads as an undo snapshot through the same hook", async (name) => {
-    const entry = byName(name);
-    const live = golden("battle-ready-with-undo");
-    const loaded = (await repository(storageWith(live.session.state, [persistedV3(entry.state)])).load())!;
-    expect(loaded.undoHistory[0]).toEqual(runtime(entry.lowered));
+  it("a frame's replacementBatchContinuation rider becomes a REPLACEMENT_BATCH frame directly below it", () => {
+    const raw = goldenV2Raw("effect-frame-prompt") as Record<string, unknown> & { effectStack: Array<Record<string, unknown>> };
+    const rider = (goldenV2Raw("replacement-batch-prompt").pendingPrompt as { resumeContext: Record<string, unknown> }).resumeContext;
+    raw.effectStack = [{ ...raw.effectStack[0], replacementBatchContinuation: rider }];
+    const state = convertPersistedGameState(raw, "state");
+    expect(kindsOf(state)).toEqual(["REPLACEMENT_BATCH", "EFFECT"]);
+    expect(state.effectStack[0].phase).toBe("INTERRUPTED_BY_TRIGGERS");
+    expect(state.effectStack[1]).not.toHaveProperty("replacementBatchContinuation");
+    expect(state.pendingPrompt?.resumeContext).toBe(state.effectStack[1].id);
   });
 
-  it("lowers nothing on a state without version 3 frames (same object)", () => {
-    const state = goldenV2State("effect-frame-prompt");
-    expect(lowerVersion3Frames(state).state).toBe(state);
-  });
-
-  it.each([...LOSSLESS_GOLDEN_CASES])("%s: lift then lower is the identity on the version 2 golden", (name) => {
-    const v2 = goldenV2State(name);
-    const lowered = lowerVersion3Frames(liftToVersion3(v2));
-    expect(runtime(lowered.state)).toEqual(runtime(v2));
-    expect(lowered.reports.every((report) => !report.shape.includes("dropped"))).toBe(true);
-  });
-
-  it("keeps OPT-884's evidence: the stuck Damage Step classifies after lowering", () => {
-    const loaded = convertPersistedGameState(persistedV3(byName("stuck-damage-step").state), "state");
-    expect(classifyLegacyShapes(loaded).map((report) => report.shape)).toContain("legacy.stuck_damage_step");
-  });
-
-  it("both-trigger-windows: nested frames lower to the two version 2 records (base behavior, classified)", () => {
-    const entry = byName("both-trigger-windows");
-    expect(entry.state.effectStack.map(frameKindOf)).toEqual(["BATTLE_DAMAGE", "EFFECT_DAMAGE"]);
-    expect(entry.state.pendingPrompt?.resumeContext).toBe(V3_FRAME_ID.effectDamage);
-    const loaded = convertPersistedGameState(persistedV3(entry.state), "state");
-    expect(loaded.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
-    expect(loaded.turn.pendingTriggerFromEffect).toBeTruthy();
-    expect(classifyLegacyShapes(loaded).map((report) => report.shape)).toContain("legacy.two_trigger_windows");
+  it.each([...LIFTED_GOLDEN_CASES])("%s lifts identically live, as a version 1 object and as an undo snapshot", async (name) => {
+    const live = liftedGolden(name);
+    expect(convertPersistedGameState(goldenV1Raw(name), "state")).toEqual(live);
+    const loaded = (await repository(storageWith(golden("battle-ready-with-undo").session.state, [goldenV2Raw(name)])).load())!;
+    expect(loaded.undoHistory[0]).toEqual(live);
   });
 });
 
-describe("OPT-963 the version 2 engine resumes a lowered version 3 state (5a is a rollback target)", () => {
-  it("battle Trigger window: the REVEAL_TRIGGER reply ends the battle through the coordinator, exactly as from the version 2 state", async () => {
-    const entry = golden("battle-trigger-window");
-    const storage = storageWith(persistedV3(byName("battle-trigger-window").state), [], entry.cardDb);
-    const loaded = (await repository(storage).load())!;
-    const v2 = goldenV2State("battle-trigger-window");
-    const coordinator = new SessionCoordinator();
-    const prompt = loaded.state.pendingPrompt!;
-    expect(prompt.options.promptType).toBe("REVEAL_TRIGGER");
-    const reply = { type: "REVEAL_TRIGGER" as const, reveal: false, promptId: prompt.promptId };
-    const fromLowered = coordinator.executeAction(loaded.state, [], prompt.respondingPlayer, reply, loaded.cardDb);
-    const fromV2 = coordinator.executeAction(v2, [], prompt.respondingPlayer, reply, loaded.cardDb);
-    expect(fromLowered.kind).toBe("applied");
-    expect(fromLowered.state.turn.battle).toBeNull();
-    expect(fromLowered.state.turn.battleSubPhase).toBeNull();
-    expect(fromLowered.state.players[1].hand.length).toBeGreaterThan(v2.players[1].hand.length);
-    expect(fromLowered).toEqual(fromV2);
+describe("OPT-963 v3 reader: every version 3 shape loads unchanged, live and as undo", () => {
+  it.each(NAMES)("%s loads live with nothing dropped", (name) => {
+    const raw = persistedV3(byName(name).state);
+    const loaded = convertPersistedGameState(raw, "state");
+    expect(loaded).toEqual(withoutVersion(raw));
+    expect(loaded).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
   });
 
-  it("replacement offer: the decline resumes the chain exactly as the version 2 state does", async () => {
-    const v2 = goldenV2State("replacement-prompt");
-    const entry = golden("replacement-prompt");
-    const storage = storageWith(persistedV3(liftToVersion3(v2)), [], entry.cardDb);
-    const loaded = (await repository(storage).load())!;
-    const reply = { type: "PASS" as const, promptId: loaded.state.pendingPrompt!.promptId };
-    const fromLowered = resumePromptLifecycle(loaded.state, reply, loaded.cardDb, lifecycleServices);
-    const fromV2 = resumePromptLifecycle({ ...v2, pendingPrompt: loaded.state.pendingPrompt }, reply, loaded.cardDb, lifecycleServices);
-    expect(fromLowered.responseRejected).toBe(false);
-    expect(fromLowered).toEqual(fromV2);
+  it.each(NAMES)("%s loads as an undo snapshot through the same hook", async (name) => {
+    const raw = persistedV3(byName(name).state);
+    const loaded = (await repository(storageWith(golden("battle-ready-with-undo").session.state, [raw])).load())!;
+    expect(loaded.undoHistory[0]).toEqual(withoutVersion(raw));
+  });
+
+  it.each(NAMES)("%s round-trips through the writer as version 3", (name) => {
+    const state = runtime(byName(name).state);
+    const out = toPersistedGameState(state) as unknown as Record<string, unknown>;
+    expect(Object.keys(out)[0]).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
+    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    expect(convertPersistedGameState(JSON.parse(JSON.stringify(out)), "state")).toEqual(state);
   });
 });
 
 describe("OPT-963 mixed-version undo history", () => {
-  it("[2, 3]: a version 2 live state with a version 3 undo snapshot loads", async () => {
-    const live = golden("battle-ready-with-undo");
-    const undo = persistedV3(byName("battle-trigger-window").state);
-    const loaded = (await repository(storageWith(live.session.state, [undo])).load())!;
-    expect(loaded.state).toEqual(convertPersistedGameState(live.session.state, "state"));
-    expect(loaded.undoHistory[0]).toEqual(runtime(goldenV2State("battle-trigger-window")));
-  });
-
-  it("[3, 2]: a version 3 live state with a version 2 undo snapshot loads, and re-saves as version 2", async () => {
-    const v1Undo = golden("battle-ready-with-undo").undoHistory;
-    const entry = golden("replacement-batch-prompt");
-    const storage = storageWith(persistedV3(byName("replacement-batch-prompt").state), v1Undo, entry.cardDb);
+  it("[3, 2]: a version 3 live state with a version 2 undo snapshot loads, both as version 3, and re-saves as version 3", async () => {
+    const entry = golden("battle-trigger-window");
+    const storage = storageWith(persistedV3(byName("battle-trigger-window").state), [goldenV2Raw("effect-damage-trigger-window")], entry.cardDb);
     const first = (await repository(storage).load())!;
-    expect(first.state).toEqual(runtime(goldenV2State("replacement-batch-prompt")));
+    expect(kindsOf(first.state)).toEqual(["BATTLE_DAMAGE"]);
+    expect(kindsOf(first.undoHistory[0])).toEqual(["EFFECT_DAMAGE"]);
     const target = new MemorySessionStorage();
     const saved = await repository(target).save(first);
     const written = target.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(2);
-    expect(JSON.stringify(written.state)).not.toContain("replacementBatch\"");
+    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    const writtenUndo = target.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Record<string, unknown>[];
+    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
     const second = (await repository(target).load())!;
     expect(second.state).toEqual(saved.state);
+    expect(second.undoHistory).toEqual(saved.undoHistory);
   });
 
-  it("the writer labels a lowered state as version 2 (writer unchanged by PR 5a)", () => {
-    const loaded = convertPersistedGameState(persistedV3(byName("effect-window-with-parent-chain").state), "state");
-    const out = toPersistedGameState(loaded) as unknown as Record<string, unknown>;
-    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(2);
-    expect(convertPersistedGameState(out, "state")).toEqual(loaded);
+  it("[2, 3]: a version 2 live state with a version 3 undo snapshot loads", async () => {
+    const live = goldenV2Raw("replacement-prompt");
+    const undo = persistedV3(byName("effect-window-with-parent-chain").state);
+    const loaded = (await repository(storageWith(live, [undo], golden("replacement-prompt").cardDb)).load())!;
+    expect(kindsOf(loaded.state)).toEqual(["REPLACEMENT"]);
+    expect(loaded.undoHistory[0]).toEqual(withoutVersion(undo));
   });
 });
 
@@ -234,18 +300,20 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
   const raw = (name: string): Raw => persistedV3(byName(name).state) as Raw;
   const expectRejected = (state: Raw, message: string | RegExp) =>
     expect(() => convertPersistedGameState(state, "state")).toThrow(message);
+  const battleId = () => raw("battle-trigger-window").effectStack[0].id as string;
+  const replacementId = () => raw("replacement-prompt").effectStack[0].id as string;
 
   it("rejects a REVEAL_TRIGGER prompt naming a frame that is not a damage frame", () => {
     const state = raw("battle-trigger-window");
     state.effectStack[0] = { ...state.effectStack[0], battleDamage: undefined, phase: "AWAITING_TARGET_SELECTION" };
-    expectRejected(state, /pendingPrompt\.resumeContext names frame "v3-battle-damage" of kind EFFECT for a REVEAL_TRIGGER prompt; only a damage frame owns one/);
+    expectRejected(state, new RegExp(`pendingPrompt\\.resumeContext names frame "${battleId()}" of kind EFFECT for a REVEAL_TRIGGER prompt; only a damage frame owns one`));
   });
 
   it("rejects an OPTIONAL_EFFECT prompt naming a damage frame", () => {
     const state = raw("replacement-prompt");
     const battle = raw("battle-trigger-window").effectStack[0];
-    state.effectStack = [{ ...battle, id: "v3-replacement" }];
-    expectRejected(state, /names BATTLE_DAMAGE frame "v3-replacement" for a OPTIONAL_EFFECT prompt/);
+    state.effectStack = [{ ...battle, id: replacementId() }];
+    expectRejected(state, /names BATTLE_DAMAGE frame "[^"]+" for a OPTIONAL_EFFECT prompt/);
   });
 
   it("rejects a damage frame owning a prompt while not at AWAITING_TRIGGER_REVEAL", () => {
@@ -262,13 +330,13 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
     const state = raw("replacement-prompt");
     const above = raw("effect-window-with-parent-chain").effectStack[0];
     state.effectStack = [...state.effectStack, { ...above, id: "above" }];
-    expectRejected(state, /names REPLACEMENT frame "v3-replacement", which is not the top frame/);
+    expectRejected(state, /names REPLACEMENT frame "[^"]+", which is not the top frame/);
   });
 
   it("rejects a REPLACEMENT frame that no prompt names", () => {
     const state = raw("replacement-prompt");
     state.pendingPrompt = null;
-    expectRejected(state, /effectStack\[0\] \(frame "v3-replacement"\) is a REPLACEMENT frame waiting for an answer, but pendingPrompt does not name it/);
+    expectRejected(state, /effectStack\[0\] \(frame "[^"]+"\) is a REPLACEMENT frame waiting for an answer, but pendingPrompt does not name it/);
   });
 
   it("rejects an effectDamage.parentFrameId that is not the frame directly below", () => {
@@ -319,11 +387,64 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
     expectRejected(state, /invalid core shape at effectStack\.0\.battleDamage/);
   });
 
+  it("rejects a version 3 object carrying an executable replacement prompt context", () => {
+    const state = raw("replacement-prompt");
+    state.effectStack = [];
+    state.pendingPrompt = { ...state.pendingPrompt!, resumeContext: { type: "REPLACEMENT", effectId: "e", targetInstanceId: "t", event: "WOULD_BE_KO" } };
+    expectRejected(state, /pendingPrompt\.resumeContext is an executable REPLACEMENT context; from version 3 a replacement prompt names its frame/);
+  });
+
+  it.each([
+    ["turn.pendingTriggerFromEffect", (state: Raw) => { state.turn.pendingTriggerFromEffect = { lifeCard: { instanceId: "l", cardId: "c", face: "DOWN" }, damagedPlayerIndex: 1, remainingDamages: 0, sourceCardInstanceId: "s", controllerIndex: 0 }; }],
+    ["turn.pendingBattleDamageContinuation", (state: Raw) => { state.turn.pendingBattleDamageContinuation = { battleId: "b", stage: "CHARACTER_KO_REPLACEMENT", targetInstanceId: "t", causingPlayerIndex: 0, attackerIsCharacter: true }; }],
+    ["turn.battle.pendingTriggerLifeCard", (state: Raw) => { state.turn.battle = { ...(raw("battle-trigger-window").turn.battle as object), pendingTriggerLifeCard: { instanceId: "l", cardId: "c", face: "DOWN" } }; }],
+    ["effectStack[0].replacementBatchContinuation", (state: Raw) => { state.effectStack[0] = { ...state.effectStack[0], replacementBatchContinuation: { type: "REPLACEMENT_BATCH", actionKind: "KO", event: "WOULD_BE_KO", allTargetIds: [], protectedIds: [], pendingMatches: [], currentMatchIndex: 0, causingController: 0 } }; }],
+  ] as const)("rejects a version 3 object carrying the retired record %s, by name (the version 3 writer lifts it into a frame)", (field, edit) => {
+    const state = raw("effect-window-with-parent-chain");
+    edit(state);
+    expectRejected(state, new RegExp(`is schemaVersion 3 but carries ${field.replace(/[.[\]]/g, "\\$&")}, a version 2 record the version 3 writer lifts into a frame`));
+  });
+
+  it("F5: a REPLACEMENT frame owns only its OPTIONAL_EFFECT offer (a SELECT_TARGET prompt naming it is rejected)", () => {
+    const state = raw("replacement-prompt");
+    state.pendingPrompt = { ...state.pendingPrompt!, options: { promptType: "SELECT_TARGET", cards: [], validTargets: [], effectDescription: "x", countMin: 0, countMax: 0, ctaLabel: "c" } };
+    expectRejected(state, new RegExp(`names REPLACEMENT frame "${replacementId()}" for a SELECT_TARGET prompt; a replacement frame owns only its OPTIONAL_EFFECT offer`));
+  });
+
+  it.each([
+    ["REPLACEMENT", "replacement-prompt"],
+    ["REPLACEMENT_BATCH", "replacement-batch-prompt"],
+    ["BATTLE_DAMAGE", "battle-trigger-window"],
+    ["EFFECT_DAMAGE", "effect-damage-trigger-window"],
+  ] as const)("D-N3: a %s frame carrying remainingActions is rejected by name (no engine path writes one; the suffix lives on the continuation below)", (kind, fixture) => {
+    const state = raw(fixture);
+    const index = state.effectStack.findIndex((frame) => frameKindOf(frame as unknown as Parameters<typeof frameKindOf>[0]) === kind);
+    expect(index).toBeGreaterThanOrEqual(0);
+    const id = state.effectStack[index].id as string;
+    state.effectStack[index] = { ...state.effectStack[index], remainingActions: [{ type: "DRAW", params: { amount: 1 } }] };
+    expectRejected(state, new RegExp(`effectStack\\[${index}\\] \\(frame "${id}"\\) is ${kind} but carries 1 remainingActions; a continuation frame holds no chain suffix`));
+  });
+
+  it("F6a: a non-damage frame at AWAITING_TRIGGER_REVEAL is rejected (only openBattleTriggerWindow and continueEffectDamageSequence write the phase)", () => {
+    const state = raw("battle-trigger-window");
+    const { battleDamage: _dropped, ...plain } = state.effectStack[0];
+    state.effectStack = [plain];
+    state.pendingPrompt = null;
+    expectRejected(state, new RegExp(`effectStack\\[0\\] \\(frame "${battleId()}"\\) is EFFECT but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal`));
+  });
+
+  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of the 4 committed engine-written states)", () => {
+    const state = raw("replacement-batch-prompt");
+    const id = state.effectStack[0].id as string;
+    state.pendingPrompt = null;
+    expectRejected(state, new RegExp(`effectStack\\[0\\] \\(frame "${id}"\\) is a REPLACEMENT_BATCH frame offering a match, but pendingPrompt does not name it`));
+  });
+
   it.each([
     ["battleDamage", (frame: Record<string, unknown>) => { frame.battleDamage = { stage: "TRIGGER_WINDOW", battleId: "b", damagedPlayerIndex: 1, lifeCard: { instanceId: "l", cardId: "c", face: "DOWN" } }; }, /carries battleDamage, which no version 2 writer wrote/],
     ["AWAITING_TRIGGER_REVEAL", (frame: Record<string, unknown>) => { frame.phase = "AWAITING_TRIGGER_REVEAL"; }, /has phase AWAITING_TRIGGER_REVEAL, which no version 2 writer wrote/],
   ] as const)("rejects a version 2 object carrying %s, naming the undo entry and touching nothing", async (_key, edit, message) => {
-    const v2 = JSON.parse(JSON.stringify(toPersistedGameState(goldenV2State("effect-frame-prompt")))) as Raw;
+    const v2 = goldenV2Raw("effect-frame-prompt") as Raw;
     edit(v2.effectStack[0]);
     const storage = storageWith(golden("battle-ready-with-undo").session.state, [v2]);
     const before = JSON.stringify([...storage.data.entries()]);
@@ -337,27 +458,35 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
   });
 });
 
-// ─── OPT-963 PR #757 fix round 1 ─────────────────────────────────────────────
+// ─── PR #758 fix round 1: L5 (lift prompt ownership) and the 5b-written corpus ─
 
 interface WrittenCase { source: string; state: Record<string, unknown>; cardDb: Record<string, CardData> }
-/** Version 3 states the PR 5b engine (8823ad05) wrote while running its own suite (review corpus). */
-function writtenBy5b(name: string): { state: GameState; cardDb: Map<string, CardData>; raw: Record<string, unknown> } {
-  const file = corpus as unknown as { cases: Record<string, WrittenCase> };
+/** Version 3 states this engine (8823ad05) wrote while running its own suite, captured by the PR #757 review. */
+function writtenBy5b(name: string): { raw: Record<string, unknown>; cardDb: Map<string, CardData> } {
+  const file = JSON.parse(readFileSync(new URL("./fixtures/opt-963-5b-written-states.json", import.meta.url), "utf8")) as { cases: Record<string, WrittenCase> };
   const entry = file.cases[name];
   if (!entry) throw new Error(`no 5b-written case named ${name}`);
-  const raw = JSON.parse(JSON.stringify(entry.state)) as Record<string, unknown>;
-  return { state: convertPersistedGameState(JSON.parse(JSON.stringify(entry.state)), "state"), cardDb: new Map(Object.entries(entry.cardDb)), raw };
+  return { raw: JSON.parse(JSON.stringify(entry.state)) as Record<string, unknown>, cardDb: new Map(Object.entries(entry.cardDb)) };
+}
+const WRITTEN_CASES = ["nested-batch-below-substitute-prompt", "effect-trigger-effect-retained-events", "both-trigger-windows", "optional-trigger-retained-events"] as const;
+
+/** The Trigger window a REVEAL_TRIGGER prompt names, or null. */
+function windowOfPrompt(state: GameState, prompt: PendingPromptState) {
+  const owner = state.effectStack.find((frame) => frame.id === prompt.resumeContext);
+  if (!owner) return null;
+  if (owner.battleDamage?.stage === "TRIGGER_WINDOW") return owner.battleDamage;
+  if (owner.effectDamage?.stage === "TRIGGER_WINDOW") return owner.effectDamage;
+  return null;
 }
 
-/** Life card identities a REVEAL_TRIGGER prompt must not show to `responder`. */
+/** Life card identities a REVEAL_TRIGGER prompt must not show to `responder`: the other player's Life area and every window held for the other player. */
 function foreignLifeIdentities(state: GameState, responder: 0 | 1): Set<string> {
   const other = responder === 0 ? 1 : 0;
   const ids = new Set(state.players[other].life.map((card) => card.instanceId));
-  const defender = state.turn.activePlayerIndex === 0 ? 1 : 0;
-  const battleCard = state.turn.battle?.pendingTriggerLifeCard;
-  if (battleCard && defender !== responder) ids.add(battleCard.instanceId);
-  const effect = state.turn.pendingTriggerFromEffect;
-  if (effect && effect.damagedPlayerIndex !== responder) ids.add(effect.lifeCard.instanceId);
+  for (const frame of state.effectStack) {
+    const window = frame.battleDamage?.stage === "TRIGGER_WINDOW" ? frame.battleDamage : frame.effectDamage?.stage === "TRIGGER_WINDOW" ? frame.effectDamage : null;
+    if (window && window.damagedPlayerIndex !== responder) ids.add(window.lifeCard.instanceId);
+  }
   return ids;
 }
 
@@ -367,113 +496,138 @@ function expectRevealPromptOwned(state: GameState) {
   const options = prompt.options;
   if (options.promptType !== "REVEAL_TRIGGER") return;
   const foreign = foreignLifeIdentities(state, prompt.respondingPlayer);
-  for (const card of options.cards) {
-    expect(card.controller).toBe(prompt.respondingPlayer);
-    expect(card.owner).toBe(prompt.respondingPlayer);
-    expect(foreign.has(card.instanceId)).toBe(false);
-  }
+  const window = windowOfPrompt(state, prompt);
+  expect(window?.damagedPlayerIndex).toBe(prompt.respondingPlayer);
+  expect(options.cards.map((card) => [card.instanceId, card.controller, card.owner])).toEqual([[window!.lifeCard.instanceId, prompt.respondingPlayer, prompt.respondingPlayer]]);
+  for (const card of options.cards) expect(foreign.has(card.instanceId)).toBe(false);
 }
 
-describe("OPT-963 fix round 1: lowering resumes what the 5b engine wrote", () => {
-  it("F1: a batch waiting below a substitute's prompt frames rides on the top frame and resumes on the version 2 engine (5b-written)", () => {
-    const { state, cardDb } = writtenBy5b("nested-batch-below-substitute-prompt");
-    expect(state.effectStack.map((frame) => frame.phase)).toEqual(["INTERRUPTED_BY_TRIGGERS", "AWAITING_BATCH_RESUME", "AWAITING_OPTIONAL_RESPONSE"]);
-    expect(state.effectStack.at(-1)?.replacementBatchContinuation).toBeDefined();
-    expect(state.effectStack.at(-2)?.replacementBatchContinuation).toBeUndefined();
-    for (const answer of [{ type: "PASS" as const }, { type: "PLAYER_CHOICE" as const, choiceId: "accept" }]) {
-      const done = reply(state, cardDb, 1, answer);
-      expect(done.rejected, JSON.stringify(done.routed)).toBe(false);
-      // The nested substitute rested char-1-v1 instead of K.O.ing it; the batch then K.O.s char-1-b1.
-      const chars = done.state.players[1].characters.filter(Boolean).map((card) => `${card!.instanceId}/${card!.state}`);
-      expect(chars).toEqual(["char-1-v1/RESTED"]);
-      expect(done.state.players[1].trash).toHaveLength(1);
-      expect(done.state.pendingPrompt).toBeNull();
-    }
+describe("PR #758 L5: a lifted Trigger-window prompt shows the responder their own Life card", () => {
+  const WINDOW_GOLDENS = ["battle-trigger-window", "effect-damage-trigger-window", "both-trigger-windows"] as const;
+
+  it.each(WINDOW_GOLDENS)("%s: after conversion options.cards[0] is the responder's own window card", (name) => {
+    const state = liftedGolden(name);
+    const prompt = state.pendingPrompt!;
+    expect(prompt.options.promptType).toBe("REVEAL_TRIGGER");
+    expectRevealPromptOwned(state);
   });
 
-  it("C1: events retained on an effect TRIGGER_EFFECT frame reach the log once through the Trigger's frame (5b-written)", () => {
-    const { state, cardDb, raw } = writtenBy5b("effect-trigger-effect-retained-events");
-    const written = (raw.effectStack as Array<{ effectDamage?: unknown; accumulatedEvents: Array<{ type: string }> }>).find((frame) => frame.effectDamage)!;
-    expect(written.accumulatedEvents.map((event) => event.type)).toEqual(["TRIGGER_ACTIVATED", "CARD_REMOVED_FROM_LIFE"]);
-    const top = state.effectStack.at(-1)!;
-    expect(top.phase).toBe("AWAITING_TARGET_SELECTION");
-    expect(top.accumulatedEvents.map((event) => event.type)).toEqual(["TRIGGER_ACTIVATED", "CARD_REMOVED_FROM_LIFE"]);
-    let current = reply(state, cardDb, 1, { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-v1"] });
-    expect(current.rejected, JSON.stringify(current.routed)).toBe(false);
-    for (let guard = 0; guard < 4 && current.state.pendingPrompt; guard += 1) {
-      const pending = current.state.pendingPrompt;
-      const next = pending.options.promptType === "SELECT_TARGET"
-        ? { type: "SELECT_TARGET" as const, selectedInstanceIds: (pending.options as { validTargets: string[] }).validTargets.slice(0, 1), promptId: pending.promptId }
-        : { type: "PASS" as const, promptId: pending.promptId };
-      current = reply(current.state, cardDb, pending.respondingPlayer, next);
-      expect(current.rejected).toBe(false);
-    }
-    expect(current.state.pendingPrompt).toBeNull();
-    expect(current.state.effectStack).toEqual([]);
-    const log = current.state.eventLog;
-    const removalOf = (id: string) => log.filter((event) => event.type === "CARD_REMOVED_FROM_LIFE" && (event.payload as { cardInstanceId?: string }).cardInstanceId === id);
-    // The retained point events: the Trigger's Life card removal and its activation, once each.
-    expect(removalOf("p1-life-ko")).toHaveLength(1);
-    expect(log.filter((event) => event.type === "TRIGGER_ACTIVATED" && (event.payload as { activated?: boolean }).activated === true)).toHaveLength(1);
-    // The parent chain's own retained events, then its suffix (OP06-116's THEN: LIFE_TO_HAND on p0).
-    expect(log.filter((event) => event.type === "LIFE_COUNT_BECOMES_ZERO")).toHaveLength(1);
-    expect(log.filter((event) => event.type === "CARD_KO")).toHaveLength(1);
-    expect(log.filter((event) => event.type === "CARD_ADDED_TO_HAND_FROM_LIFE")).toHaveLength(1);
-    expect(removalOf("p0-life-a")).toHaveLength(1);
-    expect(log.filter((event) => event.type === "CARD_REMOVED_FROM_LIFE")).toHaveLength(2);
-    expect(current.state.players[0].life).toHaveLength(1);
-    expect(current.state.players[0].hand).toHaveLength(6);
-    const types = log.map((event) => event.type);
-    expect(types.indexOf("TRIGGER_ACTIVATED")).toBeLessThan(types.indexOf("CARD_KO"));
-    expect(types.indexOf("CARD_KO")).toBeLessThan(types.indexOf("CARD_ADDED_TO_HAND_FROM_LIFE"));
+  it("both-trigger-windows: the version 2 prompt showed the battle defender's card; the lift re-points it at the effect window and rebuilds it with that window's card (generic text: the converter has no card data)", () => {
+    const v2 = goldenV2Raw("both-trigger-windows") as { pendingPrompt: { respondingPlayer: number; options: { cards: Array<{ instanceId: string }>; effectDescription: string } } };
+    const state = liftedGolden("both-trigger-windows");
+    const prompt = state.pendingPrompt!;
+    if (prompt.options.promptType !== "REVEAL_TRIGGER") throw new Error("expected a REVEAL_TRIGGER prompt");
+    const effectWindow = effectTriggerWindow(state)!;
+    expect(v2.pendingPrompt.respondingPlayer).toBe(1);
+    expect(v2.pendingPrompt.options.cards[0].instanceId).toBe(battleTriggerLifeCard(state)!.instanceId);
+    expect(prompt.respondingPlayer).toBe(0);
+    expect(prompt.options.cards.map((card) => [card.instanceId, card.controller, card.owner])).toEqual([[effectWindow.lifeCard.instanceId, 0, 0]]);
+    expect(prompt.options.cards[0].instanceId).not.toBe(battleTriggerLifeCard(state)!.instanceId);
+    expect(prompt.options.effectDescription).toBe("You may reveal this Trigger card to activate its effect");
+    expect(prompt.options.effectDescription).not.toBe(v2.pendingPrompt.options.effectDescription);
   });
 
-  it("no lowered REVEAL_TRIGGER prompt shows a Life card of a player other than its responder (every fixture, golden and 5b-written state)", () => {
+  it("effect-damage-trigger-window: a version 2 prompt written for its own window without the card keeps its text and gets the card", () => {
+    const v2 = goldenV2Raw("effect-damage-trigger-window") as { pendingPrompt: { options: { cards: unknown[]; effectDescription: string } } };
+    expect(v2.pendingPrompt.options.cards).toEqual([]);
+    const state = liftedGolden("effect-damage-trigger-window");
+    const prompt = state.pendingPrompt!;
+    if (prompt.options.promptType !== "REVEAL_TRIGGER") throw new Error("expected a REVEAL_TRIGGER prompt");
+    expect(prompt.options.effectDescription).toBe(v2.pendingPrompt.options.effectDescription);
+    expect(prompt.options.cards.map((card) => [card.instanceId, card.controller, card.owner])).toEqual([[effectTriggerWindow(state)!.lifeCard.instanceId, 1, 1]]);
+  });
+
+  it("no REVEAL_TRIGGER prompt of any version 3 fixture, lifted golden or 5b-written state shows a Life card of a player other than its responder", () => {
     for (const entry of STATES) expectRevealPromptOwned(convertPersistedGameState(persistedV3(entry.state), "state"));
-    for (const name of ["battle-trigger-window", "effect-damage-trigger-window", "both-trigger-windows"]) expectRevealPromptOwned(goldenV2State(name));
-    for (const name of ["nested-batch-below-substitute-prompt", "effect-trigger-effect-retained-events", "both-trigger-windows"]) expectRevealPromptOwned(writtenBy5b(name).state);
+    for (const name of LIFTED_GOLDEN_CASES) expectRevealPromptOwned(liftedGolden(name));
+    for (const name of WRITTEN_CASES) expectRevealPromptOwned(convertPersistedGameState(writtenBy5b(name).raw, "state"));
   });
 
-  it("F4: CHARACTER_KO_REPLACEMENT keeps replacementEffectId and resolution through lowering", () => {
-    const loaded = convertPersistedGameState(persistedV3(byName("battle-ko-replacement-fields").state), "state");
-    expect(loaded.turn.pendingBattleDamageContinuation).toMatchObject({ stage: "CHARACTER_KO_REPLACEMENT", replacementEffectId: "ko-replacement-effect", resolution: "REPLACED" });
+  it.each(WRITTEN_CASES)("5b-written %s: this reader loads what this writer wrote, and writes it back byte-for-byte", (name) => {
+    const { raw } = writtenBy5b(name);
+    const loaded = convertPersistedGameState(raw, "state");
+    expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded)))).toEqual(raw);
+    expect(classifyLegacyShapes(loaded)).toEqual([]);
   });
 });
 
-describe("OPT-963 fix round 1: rejections", () => {
-  type Raw = Record<string, unknown> & { effectStack: Array<Record<string, unknown>>; pendingPrompt: Record<string, unknown> | null; turn: Record<string, unknown> };
-  const raw = (name: string): Raw => persistedV3(byName(name).state) as Raw;
-  const expectRejected = (state: Raw, message: string | RegExp) => expect(() => convertPersistedGameState(state, "state")).toThrow(message);
+// ─── PR #758 fix round 3: retired keys stored with the value undefined ─────────
 
-  it("F5: a REPLACEMENT frame owns only its OPTIONAL_EFFECT offer (a SELECT_TARGET prompt naming it is rejected)", () => {
-    const state = raw("replacement-prompt");
-    state.pendingPrompt = { ...state.pendingPrompt!, options: { promptType: "SELECT_TARGET", cards: [], validTargets: [], effectDescription: "x", countMin: 0, countMax: 0, ctaLabel: "c" } };
-    expectRejected(state, /names REPLACEMENT frame "v3-replacement" for a SELECT_TARGET prompt; a replacement frame owns only its OPTIONAL_EFFECT offer/);
+describe("PR #758 round 3: a version 2 object whose retired keys are present with the value undefined loads (structured clone keeps such keys; JSON drops them)", () => {
+  /** The keys the version 2 terminal writer stored as explicit undefined, plus the other retired records, all undefined. */
+  function withUndefinedRetiredKeys(v2: Record<string, unknown>): Record<string, unknown> {
+    const turn = v2.turn as Record<string, unknown>;
+    const battle = turn.battle as Record<string, unknown> | null;
+    const stack = v2.effectStack as Array<Record<string, unknown>>;
+    return {
+      ...v2,
+      turn: {
+        ...turn,
+        pendingTriggerFromEffect: undefined,
+        pendingBattleDamageContinuation: undefined,
+        ...(battle ? { battle: { ...battle, pendingTriggerLifeCard: undefined } } : {}),
+      },
+      effectStack: stack.map((frame) => ({ ...frame, replacementBatchContinuation: undefined })),
+    };
+  }
+  const hasRetiredKey = (state: GameState) =>
+    "pendingTriggerFromEffect" in state.turn ||
+    "pendingBattleDamageContinuation" in state.turn ||
+    (state.turn.battle !== null && "pendingTriggerLifeCard" in state.turn.battle) ||
+    state.effectStack.some((frame) => "replacementBatchContinuation" in frame);
+
+  it.each(["fresh-setup", "battle-ready-with-undo", "effect-frame-prompt"])("(a) %s: through SessionRepository.load, live and as an undo snapshot, the keys are gone and nothing is classified", async (name) => {
+    const v2 = structuredClone(withUndefinedRetiredKeys(goldenV2Raw(name)));
+    expect(Object.keys(v2.turn as object)).toContain("pendingTriggerFromEffect");
+    const live = (await repository(storageWith(v2, [structuredClone(v2)])).load())!;
+    expect(hasRetiredKey(live.state)).toBe(false);
+    expect(hasRetiredKey(live.undoHistory[0])).toBe(false);
+    expect(classifyLegacyShapes(live.state)).toEqual([]);
+    expect(runtime(live.state)).toEqual(runtime(live.undoHistory[0]));
+    expect(runtime(live.state)).toEqual(runtime(liftedGolden(name)));
   });
 
-  it("F6a: a non-damage frame at AWAITING_TRIGGER_REVEAL is rejected (no engine path writes it)", () => {
-    const state = raw("battle-trigger-window");
-    const { battleDamage: _dropped, ...plain } = state.effectStack[0];
-    state.effectStack = [plain];
-    state.pendingPrompt = null;
-    expectRejected(state, /effectStack\[0\] \(frame "v3-battle-damage"\) is EFFECT but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal/);
+  it("(b) through convertPersistedGameState on a structuredClone'd object", () => {
+    const v2 = structuredClone(withUndefinedRetiredKeys(goldenV2Raw("battle-ready-with-undo")));
+    const loaded = convertPersistedGameState(v2, "state");
+    expect(hasRetiredKey(loaded)).toBe(false);
+    expect(classifyLegacyShapes(loaded)).toEqual([]);
+    expect(runtime(loaded)).toEqual(runtime(liftedGolden("battle-ready-with-undo")));
   });
 
-  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of the 4 committed engine-written states)", () => {
-    const state = raw("replacement-batch-prompt");
-    state.pendingPrompt = null;
-    expectRejected(state, /effectStack\[0\] \(frame "v3-replacement-batch"\) is a REPLACEMENT_BATCH frame offering a match, but pendingPrompt does not name it/);
+  it("(c) a version 2 TERMINAL state as the version 2 terminateGame wrote it (status FINISHED, winner, both turn keys undefined, empty stack) loads", async () => {
+    const base = goldenV2Raw("battle-ready-with-undo");
+    const turn = base.turn as Record<string, unknown>;
+    // terminal.ts at 1cd06cb5: effectStack [], pendingPrompt null, pendingEventActivationEvents undefined,
+    // turn.battle null, battleSubPhase null, pendingTriggerFromEffect/pendingBattleDamageContinuation undefined.
+    const terminal = structuredClone({
+      ...base,
+      status: "FINISHED",
+      winner: 0,
+      winReason: "concede",
+      effectStack: [],
+      pendingPrompt: null,
+      pendingEventActivationEvents: undefined,
+      turn: { ...turn, battle: null, battleSubPhase: null, pendingTriggerFromEffect: undefined, pendingBattleDamageContinuation: undefined },
+    });
+    const direct = convertPersistedGameState(structuredClone(terminal), "state");
+    expect(direct.status).toBe("FINISHED");
+    expect(direct.winner).toBe(0);
+    expect(hasRetiredKey(direct)).toBe(false);
+    const loaded = (await repository(storageWith(terminal, [structuredClone(terminal)])).load())!;
+    expect(loaded.state.status).toBe("FINISHED");
+    expect(hasRetiredKey(loaded.state)).toBe(false);
+    expect(hasRetiredKey(loaded.undoHistory[0])).toBe(false);
+    expect(classifyLegacyShapes(loaded.state)).toEqual([]);
   });
 
-  it.each([
-    ["turn.pendingTriggerFromEffect", (state: Raw) => { state.turn.pendingTriggerFromEffect = byName("effect-damage-trigger-window").lowered.turn.pendingTriggerFromEffect; }],
-    ["turn.pendingBattleDamageContinuation", (state: Raw) => { state.turn.pendingBattleDamageContinuation = byName("stuck-damage-step").lowered.turn.pendingBattleDamageContinuation; }],
-    ["turn.battle.pendingTriggerLifeCard", (state: Raw) => { state.turn.battle = { ...(byName("battle-trigger-window").lowered.turn.battle as object), pendingTriggerLifeCard: { instanceId: "l", cardId: "c", face: "DOWN" } }; }],
-    ["effectStack[0].replacementBatchContinuation", (state: Raw) => { state.effectStack[0] = { ...state.effectStack[0], replacementBatchContinuation: byName("replacement-batch-prompt").lowered.pendingPrompt!.resumeContext }; }],
-    ["pendingPrompt.resumeContext of type REPLACEMENT", (state: Raw) => { state.pendingPrompt = { ...state.pendingPrompt!, resumeContext: { type: "REPLACEMENT", effectId: "e", targetInstanceId: "t", event: "WOULD_BE_KO" } }; }],
-  ])("F6c: a version 3 object also carrying %s is rejected by name", (field, edit) => {
-    const state = raw("effect-window-with-parent-chain");
-    edit(state);
-    expectRejected(state, new RegExp(`is schemaVersion 3 but carries ${field.replace(/[.[\]]/g, "\\$&")}, a version 2 record the version 3 writer lifts into a frame`));
+  it("a version 3 object carrying a retired key with the value undefined loads too, while a record is still rejected by name", () => {
+    const v3 = structuredClone(persistedV3(byName("effect-window-with-parent-chain").state)) as Record<string, unknown>;
+    const turn = v3.turn as Record<string, unknown>;
+    v3.turn = { ...turn, pendingTriggerFromEffect: undefined, pendingBattleDamageContinuation: undefined };
+    (v3.effectStack as Array<Record<string, unknown>>)[0] = { ...(v3.effectStack as Array<Record<string, unknown>>)[0], replacementBatchContinuation: undefined };
+    const loaded = convertPersistedGameState(structuredClone(v3), "state");
+    expect(hasRetiredKey(loaded)).toBe(false);
+    expect(runtime(loaded)).toEqual(runtime(byName("effect-window-with-parent-chain").state));
   });
 });

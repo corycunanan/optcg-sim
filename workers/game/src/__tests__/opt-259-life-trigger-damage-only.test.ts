@@ -41,6 +41,7 @@ import {
 } from "../engine/effect-resolver/actions/life.js";
 import { executeDealDamage, executeSelfTakeDamage } from "../engine/effect-resolver/actions/battle-actions.js";
 import { runPipeline } from "../engine/pipeline.js";
+import { battleTriggerLifeCard, effectTriggerWindow, revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -168,13 +169,12 @@ describe("OPT-259 F6 — battle damage correctly opens the Trigger window", () =
     const { state, attackerId, targetId } = setupBattleWithDefenderLife(cardDb, [top]);
     const paused = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
 
-    const pending = (paused.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard;
+    const pending = battleTriggerLifeCard(paused);
     expect(pending?.instanceId).toBe(top.instanceId);
     // Life→hand has NOT yet happened — the card is suspended awaiting decision.
     expect(paused.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
     // Effect-damage bookkeeping stays untouched on battle damage.
-    expect(paused.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(paused) ?? null).toBeNull();
   });
 
   it("attacking does NOT open a window when the revealed Life lacks [Trigger]", () => {
@@ -184,8 +184,7 @@ describe("OPT-259 F6 — battle damage correctly opens the Trigger window", () =
     const p1HandBefore = state.players[1].hand.length;
     const after = declareAttackThroughCounter(state, attackerId, targetId, cardDb);
 
-    expect((after.turn.battle as { pendingTriggerLifeCard?: LifeCard } | null)
-      ?.pendingTriggerLifeCard ?? null).toBeNull();
+    expect(battleTriggerLifeCard(after) ?? null).toBeNull();
     // Went straight to hand.
     expect(after.players[1].hand.length).toBe(p1HandBefore + 1);
     expect(after.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
@@ -231,7 +230,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     expect(result.succeeded).toBe(true);
     expect(result.events.some((e) => e.type === "LIFE_SCRIED")).toBe(true);
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     // Life stack is unchanged — scry does not pop the card.
     expect(result.state.players[0].life[0].instanceId).toBe(triggerLife.instanceId);
   });
@@ -255,7 +254,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     // Reorder emits an ARRANGE_TOP_CARDS pending prompt, NOT a reveal-trigger prompt.
     expect(result.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
   });
 
   it("TURN_LIFE_FACE_UP (Pudding) does not fire [Trigger]", () => {
@@ -279,7 +278,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     expect(result.succeeded).toBe(true);
     expect(result.events.some((e) => e.type === "LIFE_CARD_FACE_CHANGED")).toBe(true);
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     // Card is still in Life, now face-up — not in hand.
     const stillInLife = result.state.players[0].life.find((l) => l.instanceId === triggerLife.instanceId);
     expect(stillInLife?.face).toBe("UP");
@@ -307,7 +306,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     expect(result.succeeded).toBe(true);
     expect(result.events.some((e) => e.type === "CARD_ADDED_TO_HAND_FROM_LIFE")).toBe(true);
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     // Card moved to hand directly — no Trigger mediation.
     expect(result.state.players[0].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(result.state.players[0].life).toHaveLength(0);
@@ -339,7 +338,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
       from: "LIFE",
     });
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     expect(result.state.players[0].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
   });
 
@@ -364,7 +363,7 @@ describe("OPT-259 F6 — non-damage Life actions never open the Trigger window",
     expect(result.succeeded).toBe(true);
     expect(result.events.some((e) => e.type === "LIFE_CARD_TO_DECK")).toBe(true);
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     expect(result.state.players[0].life).toHaveLength(0);
   });
 });
@@ -389,7 +388,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     );
 
     expect(result.succeeded).toBe(true);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     expect(result.events.some((event) => event.type === "TRIGGER_ACTIVATED")).toBe(false);
     expect(result.state.players[1].life).toHaveLength(0);
     expect(result.state.players[1].hand).toHaveLength(handBefore + 1);
@@ -415,7 +414,7 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
 
     expect(result.succeeded).toBe(true);
     // Pending state parked on turn — NOT on battle (no battle is active).
-    const pending = result.state.turn.pendingTriggerFromEffect;
+    const pending = effectTriggerWindow(result.state);
     expect(pending).toBeTruthy();
     expect(pending?.lifeCard.instanceId).toBe(triggerLife.instanceId);
     expect(pending?.damagedPlayerIndex).toBe(1);
@@ -444,14 +443,9 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     );
 
     // Damaged player (1) declines via REVEAL_TRIGGER reveal=false.
-    const after = runPipeline(
-      dealt.state,
-      { type: "REVEAL_TRIGGER", reveal: false },
-      cardDb,
-      1,
-    );
+    const after = revealTrigger(dealt.state, false, cardDb);
     expect(after.valid).toBe(true);
-    expect(after.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(after.state) ?? null).toBeNull();
     expect(after.state.players[1].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(after.state.players[1].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
   });
@@ -472,14 +466,9 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
       emptyRefs(),
     );
 
-    const after = runPipeline(
-      dealt.state,
-      { type: "REVEAL_TRIGGER", reveal: true },
-      cardDb,
-      1,
-    );
+    const after = revealTrigger(dealt.state, true, cardDb);
     expect(after.valid).toBe(true);
-    expect(after.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(after.state) ?? null).toBeNull();
     // Trigger's DRAW 1 resolved — hand grew by 1 (the draw), but the Life card
     // itself was trashed (activated path §10-1-5-3).
     expect(after.state.players[1].trash.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
@@ -508,21 +497,16 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
     );
 
     // Paused after 1st damage with 1 remaining damage queued.
-    expect(dealt.state.turn.pendingTriggerFromEffect?.lifeCard.instanceId).toBe(top.instanceId);
-    expect(dealt.state.turn.pendingTriggerFromEffect?.remainingDamages).toBe(1);
+    expect(effectTriggerWindow(dealt.state)?.lifeCard.instanceId).toBe(top.instanceId);
+    expect(effectTriggerWindow(dealt.state)?.remainingDamages).toBe(1);
     // 2nd life card still in place.
     expect(dealt.state.players[1].life.map((l) => l.instanceId)).toEqual([bot.instanceId]);
 
     // Defender declines — 1st card goes to hand. Then the 2nd damage resumes
     // automatically: bot has no [Trigger], so it flows straight to hand.
-    const after = runPipeline(
-      dealt.state,
-      { type: "REVEAL_TRIGGER", reveal: false },
-      cardDb,
-      1,
-    );
+    const after = revealTrigger(dealt.state, false, cardDb);
     expect(after.valid).toBe(true);
-    expect(after.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(after.state) ?? null).toBeNull();
     // Both Life cards ended up in hand, Life zone empty.
     expect(after.state.players[1].life).toHaveLength(0);
     expect(after.state.players[1].hand.some((c) => c.instanceId === top.instanceId)).toBe(false);
@@ -553,7 +537,7 @@ describe("OPT-259 F6 — SELF_TAKE_DAMAGE does not open the Trigger window", () 
 
     expect(result.succeeded).toBe(true);
     expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     // Self damage = not opponent damage → Trigger does not open; Life goes to hand.
     expect(result.state.players[0].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
     expect(result.state.players[0].life).toHaveLength(0);

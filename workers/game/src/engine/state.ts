@@ -595,27 +595,9 @@ export function filterStateForPlayer(
   const filteredEventLog = state.eventLog.map((event) =>
     filterEventForPlayer(event, receivingPlayer));
   const filteredPrompt = filterPromptForPlayer(state.pendingPrompt, receivingPlayer);
-  const battleTriggerOwner = state.turn.activePlayerIndex === 0 ? 1 : 0;
-  const filteredTurn = {
-    ...state.turn,
-    battle:
-      state.turn.battle?.pendingTriggerLifeCard && receivingPlayer !== battleTriggerOwner
-        ? { ...state.turn.battle, pendingTriggerLifeCard: undefined }
-        : state.turn.battle,
-    pendingTriggerFromEffect:
-      state.turn.pendingTriggerFromEffect &&
-      receivingPlayer !== state.turn.pendingTriggerFromEffect.damagedPlayerIndex
-        ? null
-        : state.turn.pendingTriggerFromEffect,
-    // The Life card is secret until revealed. A battle-K.O. replacement
-    // continuation (OPT-872) names only public field cards, so both see it.
-    pendingBattleDamageContinuation:
-      state.turn.pendingBattleDamageContinuation &&
-      state.turn.pendingBattleDamageContinuation.stage !== "CHARACTER_KO_REPLACEMENT" &&
-      receivingPlayer !== state.turn.pendingBattleDamageContinuation.damagedPlayerIndex
-        ? null
-        : state.turn.pendingBattleDamageContinuation,
-  };
+  // Every damage and replacement continuation lives on the effect stack
+  // (OPT-963), which is never sent; the turn carries no private identity.
+  const filteredTurn = state.turn;
 
   const playerViewOverrides = {
     executionContext: {

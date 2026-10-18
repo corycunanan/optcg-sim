@@ -24,6 +24,7 @@ import type { Cost, EffectBlock, RuntimeActiveEffect } from "../engine/effect-ty
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
 import { payCostsWithSelection } from "../engine/effect-resolver/cost-handler.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
+import { batchOfferOf } from "./trigger-window-helpers.js";
 
 // ─── Minimal GameSession harness (pattern from opt-337) ─────────────────────
 
@@ -465,8 +466,9 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     });
 
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type).toBe("REPLACEMENT_BATCH");
-    expect(session.gameState.effectStack.at(-1)?.phase).toBe("INTERRUPTED_BY_TRIGGERS");
+    expect(batchOfferOf(session.gameState).type).toBe("REPLACEMENT_BATCH");
+    // OPT-963: the offer frame sits on top of the chain's continuation.
+    expect(session.gameState.effectStack.at(-2)?.phase).toBe("INTERRUPTED_BY_TRIGGERS");
 
     await session.handleAction(player1 as unknown as WebSocket, 1, {
       type: "PLAYER_CHOICE",
@@ -653,9 +655,9 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     });
 
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect((session.gameState.effectStack.at(-1) as unknown as {
-      replacementBatchContinuation?: unknown;
-    }).replacementBatchContinuation).toBeDefined();
+    // OPT-963: the batch waits on its own frame below the substitute's prompt frames.
+    expect(session.gameState.effectStack.some((frame) => frame.replacementBatch)).toBe(true);
+    expect(session.gameState.effectStack.at(-1)?.replacementBatch).toBeUndefined();
 
     await session.handleAction(player1 as unknown as WebSocket, 1, {
       type: "PLAYER_CHOICE",
@@ -755,7 +757,7 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     });
 
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type).toBe(
+    expect(batchOfferOf(session.gameState).type).toBe(
       "REPLACEMENT_BATCH",
     );
 

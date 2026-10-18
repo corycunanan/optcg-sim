@@ -38,6 +38,9 @@ import {
   updateTopFrame,
 } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
+import { insertFrameAt, updateFrameById } from "../damage-frames.js";
+import { isHandlerOwnedFrame } from "../frame-kinds.js";
+import { frameKindOf } from "../frame-kinds.js";
 import type {
   EffectResolverResult,
   ActionResult,
@@ -1079,6 +1082,38 @@ export function executeActionChain(
             pendingPrompt: result.pendingPrompt,
           };
         }
+        // OPT-963: when the branch paused on a frame its handler owns (an
+        // EFFECT_DAMAGE window, a REPLACEMENT_BATCH offer or substitute), the
+        // branch's chain continuation sits at the pre-action depth with the
+        // handler's frame directly above it. The actions after the choice
+        // outlive both: they get their own continuation under this chain's
+        // controller, inserted below the branch's continuation, so the branch
+        // (possibly the opponent's, under OPPONENT_ACTION) finishes first and
+        // the suffix then resumes as this chain's controller (PR #758 D-F1b).
+        const continuationBelow = result.state.effectStack[stackDepthBeforeAction];
+        const frameAbove = result.state.effectStack[stackDepthBeforeAction + 1];
+        const handlerOwnsPause =
+          continuationBelow !== undefined &&
+          continuationBelow !== nestedPromptFrame &&
+          frameAbove !== undefined &&
+          isHandlerOwnedFrame(frameAbove);
+        if (handlerOwnsPause) {
+          let parked = result.state;
+          if (remainingActions.length > 0) {
+            const outerId = generateFrameId(parked);
+            parked = insertFrameAt(
+              outerId.state,
+              stackDepthBeforeAction,
+              outerSuffixContinuation(outerId.id, sourceCardInstanceId, controller, effectDescription, action, remainingActions, resultRefs)
+            );
+          }
+          return {
+            state: retainEventsOnFrame(parked, stackDepthBeforeAction, events),
+            events,
+            // The nested prompt belongs to the handler's frame: its own description.
+            pendingPrompt: result.pendingPrompt,
+          };
+        }
         const nestedState =
           remainingActions.length > 0 || effectDescription
             ? updateTopFrame(result.state, {
@@ -1109,58 +1144,19 @@ export function executeActionChain(
           ),
         };
       }
-      if (nestedPromptFrame?.replacementBatchContinuation) {
-        // A non-optional replacement substitute opened its own prompt and
-        // already pushed that prompt's frame. Insert this action chain's
-        // continuation immediately below it so the substitute can finish the
-        // replacement batch before the original suffix resumes.
-        const frameId = generateFrameId(popFrame(result.state));
-        const continuationFrame: EffectStackFrame = {
-          id: frameId.id,
-          sourceCardInstanceId,
-          controller,
-          effectDescription,
-          effectBlock: CONTINUATION_EFFECT_BLOCK,
-          phase: "INTERRUPTED_BY_TRIGGERS",
-          pausedAction: action,
-          remainingActions: actions.slice(i + 1),
-          resultRefs: [...resultRefs.entries()],
-          validTargets: [],
-          priorActionSucceeded: false,
-          costs: [],
-          currentCostIndex: 0,
-          costsPaid: true,
-          oncePerTurnMarked: true,
-          costResultRefs: [],
-          pendingTriggers: [],
-          simultaneousTriggers: [],
-          accumulatedEvents: events,
-        };
-        const continuationState = pushFrame(frameId.state, continuationFrame);
-        if (isGameTerminated(continuationState))
-          return { state: continuationState, events };
-        const restoredPromptState = pushFrame(
-          continuationState,
-          nestedPromptFrame
-        );
-        return isGameTerminated(restoredPromptState)
-          ? { state: restoredPromptState, events }
-          : {
-              state: restoredPromptState,
-              events,
-              // The nested prompt belongs to the replacement substitute, so
-              // preserve its own description instead of the outer chain's.
-              pendingPrompt: result.pendingPrompt,
-            };
-      }
-
-      const rawContext = result.pendingPrompt.resumeContext as {
-        type?: unknown;
-      } | null;
-      const isReplacementPrompt =
-        rawContext?.type === "REPLACEMENT" ||
-        rawContext?.type === "REPLACEMENT_BATCH";
-      if (isReplacementPrompt) {
+      // OPT-963: the handler owns the pause on a frame it pushed itself (a
+      // REPLACEMENT_BATCH offer or substitute, an EFFECT_DAMAGE window). This
+      // action chain's continuation is inserted at the depth the action
+      // started from, below everything the handler pushed, so the handler's
+      // work finishes before the suffix resumes. An EFFECT_DAMAGE frame names
+      // the continuation as its parent so the instruction's final count
+      // reaches the chain (completeEffectDamageFrame).
+      // The handler's own frame is the first one it pushed (an offer or a
+      // window on top, or a batch frame inserted below its substitute's
+      // prompt frames).
+      const handlerFrame = result.state.effectStack[stackDepthBeforeAction];
+      const ownsPause = handlerFrame !== undefined && isHandlerOwnedFrame(handlerFrame);
+      if (ownsPause) {
         const frameId = generateFrameId(result.state);
         const continuationFrame: EffectStackFrame = {
           id: frameId.id,
@@ -1183,14 +1179,15 @@ export function executeActionChain(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        const continuationState = pushFrame(frameId.state, continuationFrame);
-        return isGameTerminated(continuationState)
-          ? { state: continuationState, events }
-          : {
-              state: continuationState,
-              events,
-              pendingPrompt: result.pendingPrompt,
-            };
+        const continuationState = insertFrameAt(frameId.state, stackDepthBeforeAction, continuationFrame);
+        if (isGameTerminated(continuationState)) return { state: continuationState, events };
+        return {
+          state: linkDamageParent(continuationState, stackDepthBeforeAction + 1, frameId.id),
+          events,
+          // The nested prompt belongs to the handler's own frame, so
+          // preserve its own description instead of the outer chain's.
+          pendingPrompt: result.pendingPrompt,
+        };
       }
 
       const ctx = result.pendingPrompt
@@ -1282,6 +1279,59 @@ export function executeActionChain(
   }
 
   return { state, events };
+}
+
+/**
+ * The continuation of the actions after a choice whose branch paused on a
+ * handler-owned frame (PR #758 D-F1b). It runs as the choosing chain's
+ * controller once the branch's own continuation (which may be the opponent's,
+ * under OPPONENT_ACTION) has finished; the choice itself counts as succeeded,
+ * as it does when its branch completes without pausing.
+ */
+export function outerSuffixContinuation(
+  id: string,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  effectDescription: string | undefined,
+  choice: Action,
+  remainingActions: Action[],
+  resultRefs: Map<string, EffectResult>
+): EffectStackFrame {
+  return {
+    id,
+    sourceCardInstanceId,
+    controller,
+    effectDescription,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "INTERRUPTED_BY_TRIGGERS",
+    pausedAction: choice,
+    remainingActions,
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [],
+    priorActionSucceeded: true,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+  };
+}
+
+/** Name the chain continuation as the parent of the EFFECT_DAMAGE frame directly above it. */
+function linkDamageParent(state: GameState, damageIndex: number, parentFrameId: string): GameState {
+  const frame = state.effectStack[damageIndex];
+  if (!frame?.effectDamage) return state;
+  return {
+    ...state,
+    effectStack: [
+      ...state.effectStack.slice(0, damageIndex),
+      { ...frame, effectDamage: { ...frame.effectDamage, parentFrameId } },
+      ...state.effectStack.slice(damageIndex + 1),
+    ],
+  };
 }
 
 /**

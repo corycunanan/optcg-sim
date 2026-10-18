@@ -31,6 +31,7 @@ export function fireEventsAndTriggers(
   cardDb: Map<string, CardData>,
   actedCard?: ActedCardSnapshot,
   recordPerformedAction = true,
+  deferredTriggers: readonly QueuedTrigger[] = [],
 ): GameState {
   const pi = state.turn.activePlayerIndex;
 
@@ -42,8 +43,11 @@ export function fireEventsAndTriggers(
   // Register triggers for newly played cards BEFORE matching
   state = registerNewCardTriggers(state, execResult, cardDb);
 
-  // Collect ALL matched triggers from ALL events, ordered per rule §8-6
-  const triggerQueue: QueuedTrigger[] = [];
+  // Collect ALL matched triggers from ALL events, ordered per rule §8-6.
+  // OPT-963: triggers a damage frame deferred until its damage processing
+  // completed (rule 8-6-2) were matched from earlier events, so they head
+  // the queue with the same grouping as if matched here.
+  const triggerQueue: QueuedTrigger[] = [...deferredTriggers];
 
   for (const pendingEvent of execResult.events) {
     // Resolver-side per-frame drains mark events after matching them. They

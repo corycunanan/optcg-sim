@@ -157,11 +157,12 @@ describe("OPT-940 battle damage records: classified, never rejected (review find
     return classifyLegacyShapes(state).map((report) => report.shape);
   }
 
-  it("loads both Trigger windows open at once, as the real engine writes them", () => {
+  it("loads both Trigger windows open at once, as the version 2 engine wrote them, lifted into nested frames (OPT-963)", () => {
     const raw = rawState("both-trigger-windows");
     expect(raw.turn.pendingTriggerFromEffect).toBeTruthy();
     expect((raw.turn.battle as { pendingTriggerLifeCard?: unknown }).pendingTriggerLifeCard).toBeTruthy();
-    expect(loadAndClassify(raw)).toEqual(["legacy.two_trigger_windows"]);
+    expect(loadAndClassify(raw)).toEqual([]);
+    expect(convertPersistedGameState(raw, "state").effectStack).toHaveLength(2);
   });
 
   it("loads a damage continuation with no battle and classifies it", () => {

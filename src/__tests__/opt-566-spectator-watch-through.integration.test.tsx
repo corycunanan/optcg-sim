@@ -513,15 +513,22 @@ describe("OPT-566 full spectated-game watch-through", () => {
     spectatorState = await drive(1, { type: "PASS" });
     expect(spectatorState.turn.battleSubPhase).toBe("COUNTER_STEP");
     spectatorState = await drive(1, { type: "PASS" });
-    expect(spectatorState.pendingPrompt?.options.promptType).toBe(
-      "REVEAL_TRIGGER"
-    );
-    expect(spectatorState.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(
-      "hidden"
-    );
-    expect(session.gameState.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(
-      CARDS.TRIGGER.id
-    );
+    // OPT-963: the held Life card lives on the BATTLE_DAMAGE frame, which
+    // never crosses a socket; the spectator sees only the prompt's redacted
+    // card, while the session still holds the real one.
+    const spectatorPromptOptions = spectatorState.pendingPrompt?.options;
+    expect(spectatorPromptOptions?.promptType).toBe("REVEAL_TRIGGER");
+    expect(
+      spectatorPromptOptions?.promptType === "REVEAL_TRIGGER"
+        ? spectatorPromptOptions.cards[0]?.cardId
+        : undefined
+    ).toBe("hidden");
+    expect(spectatorState.effectStack).toEqual([]);
+    const heldLifeCard = session.gameState.effectStack.find(
+      (frame) => frame.battleDamage
+    )?.battleDamage as { stage: string; lifeCard?: { cardId: string } } | undefined;
+    expect(heldLifeCard?.stage).toBe("TRIGGER_WINDOW");
+    expect(heldLifeCard?.lifeCard?.cardId).toBe(CARDS.TRIGGER.id);
     affordances.auditMenu();
 
     spectatorState = await drive(1, {
