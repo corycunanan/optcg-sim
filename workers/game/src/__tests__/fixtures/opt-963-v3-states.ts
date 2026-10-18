@@ -12,9 +12,12 @@
 
 import type {
   BattleDamageContinuation,
+  CardInstance,
   EffectDamageContinuation,
   EffectStackFrame,
   GameState,
+  LifeCard,
+  PendingEvent,
   QueuedTrigger,
 } from "../../types.js";
 import type { ReplacementBatchResumeContext, ReplacementResumeContext } from "../../engine/replacements.js";
@@ -52,6 +55,23 @@ function continuationFrame(
   };
 }
 
+/** The version 2 coordinator's fallback REVEAL_TRIGGER description (coordinator.ts surfaceRevealTrigger). */
+export const REVEAL_FALLBACK_DESCRIPTION = "You may reveal this Trigger card to activate its effect";
+
+/** The prompt card the version 2 coordinator builds for a Trigger window (coordinator.ts surfaceRevealTrigger). */
+export function revealPromptCard(lifeCard: LifeCard, responder: 0 | 1): CardInstance {
+  return {
+    instanceId: lifeCard.instanceId,
+    cardId: lifeCard.cardId,
+    zone: "LIFE",
+    state: "ACTIVE",
+    attachedDon: [],
+    turnPlayed: null,
+    controller: responder,
+    owner: responder,
+  };
+}
+
 function isReplacementContext(value: unknown): value is ReplacementResumeContext {
   return typeof value === "object" && value !== null && (value as { type?: unknown }).type === "REPLACEMENT";
 }
@@ -81,10 +101,20 @@ export function liftToVersion3(state: GameState): GameState {
 
   // The surfaced REVEAL_TRIGGER prompt belongs to the top-most window frame
   // (the one that opened last): with both windows open, the effect window.
-  const windowPrompt = (frame: EffectStackFrame, responder: 0 | 1) => {
-    if (prompt?.options.promptType === "REVEAL_TRIGGER") {
-      prompt = { ...prompt, respondingPlayer: responder, resumeContext: frame.id };
-    }
+  // A prompt re-pointed at another window is rebuilt from that window's own
+  // Life card (never another player's card).
+  const windowPrompt = (frame: EffectStackFrame, responder: 0 | 1, lifeCard: LifeCard) => {
+    if (prompt?.options.promptType !== "REVEAL_TRIGGER") return;
+    const shown = prompt.options.cards[0];
+    const sameCard = prompt.respondingPlayer === responder && (!shown || shown.instanceId === lifeCard.instanceId);
+    prompt = {
+      ...prompt,
+      respondingPlayer: responder,
+      resumeContext: frame.id,
+      options: sameCard
+        ? prompt.options
+        : { ...prompt.options, cards: [revealPromptCard(lifeCard, responder)], effectDescription: REVEAL_FALLBACK_DESCRIPTION },
+    };
   };
 
   if (battle?.pendingTriggerLifeCard) {
@@ -103,7 +133,7 @@ export function liftToVersion3(state: GameState): GameState {
       battleDamage,
     });
     bottom.push(frame);
-    windowPrompt(frame, damagedPlayerIndex);
+    windowPrompt(frame, damagedPlayerIndex, battle.pendingTriggerLifeCard);
   }
   const continuation = turn.pendingBattleDamageContinuation;
   if (continuation) {
@@ -166,7 +196,7 @@ export function liftToVersion3(state: GameState): GameState {
       effectDamage,
     });
     bottom.push(frame);
-    windowPrompt(frame, effectWindow.damagedPlayerIndex);
+    windowPrompt(frame, effectWindow.damagedPlayerIndex, effectWindow.lifeCard);
   }
 
   const middle: EffectStackFrame[] = [];
@@ -244,7 +274,6 @@ export function goldenV2State(name: string): GameState {
 export const LOSSLESS_GOLDEN_CASES = [
   "battle-trigger-window",
   "effect-damage-trigger-window",
-  "both-trigger-windows",
   "replacement-prompt",
   "replacement-batch-prompt",
   "stuck-damage-step",
@@ -368,7 +397,7 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
   const battleFrame = liftedBattle.effectStack[0];
   states.push({
     name: "battle-window-deferred-triggers",
-    shape: "BATTLE_DAMAGE at TRIGGER_WINDOW holding deferred ordinary triggers (version 2 had fired them before the window: dropped)",
+    shape: "BATTLE_DAMAGE at TRIGGER_WINDOW holding rule 8-6-2 deferred watchers (version 2 fires watchers only from its own Step 5: after a rollback these never fire; dropped and classified)",
     state: { ...liftedBattle, effectStack: [{ ...battleFrame, pendingTriggers: [queuedTrigger(1)] }] },
     lowered: battleWindow,
     reports: ["lowered.deferred_triggers_dropped", "lowered.battle_damage"],
@@ -401,7 +430,7 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
   const innerFrame = innerLifted.effectStack[0];
   states.push({
     name: "nested-effect-windows",
-    shape: "an EFFECT_DAMAGE frame above another at TRIGGER_EFFECT (version 2 has one slot: the inner window is kept)",
+    shape: "an EFFECT_DAMAGE window above another at TRIGGER_EFFECT (the outer is draining its Trigger; both lower, nothing dropped)",
     state: { ...innerLifted, effectStack: [outerEffect, innerFrame] },
     lowered: {
       ...effectWindow,
@@ -495,7 +524,7 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
   });
   const substitutePrompt = {
     ...triggerPrompt,
-    options: { ...triggerPrompt.options, validTargets: substitute.validTargets, effectDescription: "Trash 1 card instead" },
+    options: { ...triggerPrompt.options, validTargets: substitute.validTargets, countMin: 1, countMax: 1, effectDescription: "Trash 1 card instead" },
     resumeContext: substitute.id,
   };
   const batchLowered: GameState = { ...batchGolden, effectStack: [substitute], pendingPrompt: substitutePrompt };
@@ -549,6 +578,131 @@ export function buildV3SyntheticStates(): V3SyntheticState[] {
       pendingPrompt: { ...wavePrompt, resumeContext: null },
     },
     reports: ["lowered.effect_damage_parent_dropped", "lowered.effect_damage"],
+  });
+
+  // Both Trigger windows (golden): the lowering keeps the two version 2 records
+  // and gives the battle defender their own prompt, rebuilt from the battle
+  // Life card (OPT-974 base deadlock, no hidden-information leak).
+  const bothGolden = goldenV2State("both-trigger-windows");
+  const bothLifted = liftToVersion3(bothGolden);
+  const bothBattleCard = bothGolden.turn.battle!.pendingTriggerLifeCard!;
+  states.push({
+    name: "both-trigger-windows",
+    shape: "golden both-trigger-windows lifted to nested frames (battle below, effect above, the prompt on the effect window)",
+    state: bothLifted,
+    lowered: {
+      ...bothGolden,
+      pendingPrompt: {
+        ...bothGolden.pendingPrompt!,
+        respondingPlayer: bothGolden.turn.activePlayerIndex === 0 ? 1 : 0,
+        resumeContext: null,
+        options: {
+          promptType: "REVEAL_TRIGGER",
+          cards: [revealPromptCard(bothBattleCard, bothGolden.turn.activePlayerIndex === 0 ? 1 : 0)],
+          effectDescription: REVEAL_FALLBACK_DESCRIPTION,
+          optional: false,
+          timeoutMs: 30_000,
+        },
+      },
+    },
+    reports: ["lowered.battle_damage", "lowered.effect_damage"],
+  });
+
+  // CHARACTER_KO_REPLACEMENT with both optional fields (OPT-884's evidence): lifted and lowered intact.
+  const stuck = goldenV2State("stuck-damage-step");
+  const stuckRecord = stuck.turn.pendingBattleDamageContinuation!;
+  if (stuckRecord.stage !== "CHARACTER_KO_REPLACEMENT") throw new Error("stuck-damage-step golden is not a K.O. replacement");
+  const koWithFields: GameState = {
+    ...stuck,
+    turn: {
+      ...stuck.turn,
+      pendingBattleDamageContinuation: { ...stuckRecord, replacementEffectId: "ko-replacement-effect", resolution: "REPLACED" },
+    },
+  };
+  states.push({
+    name: "battle-ko-replacement-fields",
+    shape: "BATTLE_DAMAGE at CHARACTER_KO_REPLACEMENT carrying replacementEffectId and resolution (lossless, every field)",
+    state: liftToVersion3(koWithFields),
+    lowered: koWithFields,
+    reports: ["lowered.battle_damage"],
+  });
+
+  // Two effect windows both open: the outer window's record is the one version 2 loses.
+  const outerOpen = continuationFrame({
+    id: "v3-effect-window-outer",
+    sourceCardInstanceId: p0Char,
+    controller: 0,
+    phase: "AWAITING_TRIGGER_REVEAL",
+    effectDamage: {
+      stage: "TRIGGER_WINDOW",
+      damagedPlayerIndex: 1,
+      remainingDamages: 1,
+      dealt: 1,
+      sourceCardInstanceId: p0Char,
+      controllerIndex: 0,
+      lifeCard: { instanceId: "life-golden-outer", cardId: CARDS.TRIGGER.id, face: "DOWN" },
+    },
+  });
+  states.push({
+    name: "nested-effect-windows-both-open",
+    shape: "an EFFECT_DAMAGE window at TRIGGER_WINDOW above another at TRIGGER_WINDOW (version 2 has one slot: the outer window is dropped)",
+    state: { ...innerLifted, effectStack: [outerOpen, innerFrame] },
+    lowered: {
+      ...effectWindow,
+      turn: {
+        ...effectWindow.turn,
+        pendingTriggerFromEffect: { ...effectWindow.turn.pendingTriggerFromEffect!, damagedPlayerIndex: 0, controllerIndex: 1 },
+      },
+      pendingPrompt: { ...effectWindow.pendingPrompt!, respondingPlayer: 0 },
+    },
+    reports: ["lowered.effect_damage", "lowered.second_effect_damage_dropped", "lowered.effect_damage"],
+  });
+
+  // A batch waiting on top with nothing above it (transient: substitute finished, batch not yet continued).
+  const batchOnTop = liftToVersion3(batchLowered).effectStack.find((frame) => frame.replacementBatch)!;
+  states.push({
+    name: "replacement-batch-on-top-transient",
+    shape: "REPLACEMENT_BATCH at INTERRUPTED_BY_TRIGGERS as the top frame with no prompt (no frame can carry the version 2 rider: dropped)",
+    state: { ...batchGolden, effectStack: [batchOnTop], pendingPrompt: null },
+    lowered: { ...batchGolden, effectStack: [], pendingPrompt: null },
+    reports: ["lowered.replacement_batch", "lowered.replacement_batch_dropped"],
+  });
+
+  // An effect window at TRIGGER_EFFECT holding the point's still-pending events:
+  // they move to the Trigger's frame above, which the version 2 resolver drains.
+  const retainedEvents: PendingEvent[] = [
+    { type: "TRIGGER_ACTIVATED", playerIndex: 1, payload: { cardId: CARDS.TRIGGER.id, activated: true } } as PendingEvent,
+    { type: "CARD_REMOVED_FROM_LIFE", playerIndex: 1, payload: { cardInstanceId: "life-golden-effect" } } as PendingEvent,
+  ];
+  const effectDone: EffectDamageContinuation = { ...effectInProgress, remainingDamages: 0 };
+  states.push({
+    name: "effect-trigger-effect-retained-events",
+    shape: "EFFECT_DAMAGE at TRIGGER_EFFECT retaining the point's unpublished events, its Trigger effect prompting above (the events ride up to the Trigger's frame)",
+    state: {
+      ...effectWindow,
+      turn: { ...effectWindow.turn, pendingTriggerFromEffect: undefined },
+      effectStack: [parent, { ...effectFrame, phase: "INTERRUPTED_BY_TRIGGERS", effectDamage: effectDone, accumulatedEvents: retainedEvents }, triggerFrame],
+      pendingPrompt: triggerPrompt,
+    },
+    lowered: {
+      ...effectWindow,
+      turn: { ...effectWindow.turn, pendingTriggerFromEffect: undefined },
+      effectStack: [parent, { ...triggerFrame, accumulatedEvents: retainedEvents }],
+      pendingPrompt: triggerPrompt,
+    },
+    reports: ["lowered.effect_damage"],
+  });
+  states.push({
+    name: "effect-trigger-effect-events-no-carrier",
+    shape: "EFFECT_DAMAGE at TRIGGER_EFFECT retaining events with no frame above (transient) and no parent: the events are dropped and classified",
+    state: {
+      ...effectWindow,
+      turn: { ...effectWindow.turn, pendingTriggerFromEffect: undefined },
+      effectStack: [{ ...effectFrame, phase: "INTERRUPTED_BY_TRIGGERS", effectDamage: { ...effectDone, parentFrameId: undefined }, accumulatedEvents: retainedEvents }],
+      pendingPrompt: null,
+    },
+    lowered: { ...effectWindow, turn: { ...effectWindow.turn, pendingTriggerFromEffect: undefined }, effectStack: [], pendingPrompt: null },
+    reports: ["lowered.effect_damage", "lowered.effect_damage_events_dropped"],
   });
 
   return states;

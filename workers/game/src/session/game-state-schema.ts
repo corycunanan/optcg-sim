@@ -23,12 +23,17 @@
  */
 
 import type {
+  CardInstance,
   EffectStackFrame,
   GameState,
+  PendingEvent,
+  PendingPromptState,
   PhaseBoundaryContinuation,
   PromptResumeContext,
   TurnState,
 } from "../types.js";
+import type { ReplacementBatchResumeContext } from "../engine/replacements.js";
+import { pendingPropagationEvents } from "../engine/effect-resolver/resume/events.js";
 import { log } from "../lib/log.js";
 
 /** The version this build's writer emits for state its own engine produces. */
@@ -105,7 +110,9 @@ export type LegacyShape =
   | "lowered.effect_damage_remaining_dropped"
   | "lowered.second_effect_damage_dropped"
   | "lowered.orphan_battle_damage_dropped"
-  | "lowered.replacement_batch_dropped";
+  | "lowered.replacement_batch_dropped"
+  /** Events retained on an EFFECT_DAMAGE frame at TRIGGER_EFFECT with no surviving frame to carry them. */
+  | "lowered.effect_damage_events_dropped";
 
 /**
  * A session failed to load. `location` is `state` or `undoHistory[i]`;
@@ -227,11 +234,44 @@ const convertFromV2: Converter = (raw, location) => {
   return rest;
 };
 
-/** Version 3 is validated as written; the converter only removes the envelope key. */
-const convertFromV3: Converter = (raw) => {
+/** The version 2 records the version 3 writer lifted into frames (SAVED-STATE-COMPATIBILITY.md §8.3). */
+const VERSION_2_RECORDS_RETIRED_BY_V3 = ["pendingTriggerFromEffect", "pendingBattleDamageContinuation"] as const;
+
+/**
+ * Version 3 is validated as written; the converter removes the envelope key
+ * and rejects, by name, a version 2 record beside the frames: the version 3
+ * writer (PR 5b) lifts every such record into a frame, so an object carrying
+ * both has two owners for one continuation and was not written by it.
+ * (A version 1 or 2 object has lost its envelope key by the time it gets
+ * here and is left alone: its records are the shape this build executes.)
+ */
+const convertFromV3: Converter = (raw, location) => {
   if (!(GAME_STATE_SCHEMA_VERSION_KEY in raw)) return raw;
   const rest: Record<string, unknown> = { ...raw };
   delete rest[GAME_STATE_SCHEMA_VERSION_KEY];
+  const reject = (field: string) => {
+    throw new SessionLoadError(
+      location,
+      `is schemaVersion 3 but carries ${field}, a version 2 record the version 3 writer lifts into a frame`
+    );
+  };
+  const turn = isRecord(rest.turn) ? rest.turn : undefined;
+  if (turn) {
+    for (const key of VERSION_2_RECORDS_RETIRED_BY_V3) {
+      if (turn[key] !== undefined && turn[key] !== null) reject(`turn.${key}`);
+    }
+    if (isRecord(turn.battle) && turn.battle.pendingTriggerLifeCard !== undefined) reject("turn.battle.pendingTriggerLifeCard");
+  }
+  if (Array.isArray(rest.effectStack)) {
+    rest.effectStack.forEach((frame: unknown, index: number) => {
+      if (isRecord(frame) && frame.replacementBatchContinuation !== undefined) reject(`effectStack[${index}].replacementBatchContinuation`);
+    });
+  }
+  const prompt = isRecord(rest.pendingPrompt) ? rest.pendingPrompt : undefined;
+  const context = prompt && isRecord(prompt.resumeContext) ? prompt.resumeContext : undefined;
+  if (context && (context.type === "REPLACEMENT" || context.type === "REPLACEMENT_BATCH")) {
+    reject(`pendingPrompt.resumeContext of type ${String(context.type)}`);
+  }
   return rest;
 };
 
@@ -325,6 +365,13 @@ function frameInvariantViolation(
   kind: EffectStackFrameKind,
   state: GameState
 ): string | null {
+  // Only a damage frame at TRIGGER_WINDOW waits for a reveal: the phase is
+  // written by openBattleTriggerWindow / continueEffectDamageSequence alone
+  // (engine/damage-frames.ts, engine/effect-damage.ts) and the version 2
+  // engine never saw it.
+  if (frame.phase === "AWAITING_TRIGGER_REVEAL" && kind !== "BATTLE_DAMAGE" && kind !== "EFFECT_DAMAGE") {
+    return `is ${kind} but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal`;
+  }
   switch (kind) {
     case "PHASE_BOUNDARY": {
       const continuation = frame.phaseBoundaryContinuation!;
@@ -577,6 +624,23 @@ export function validateContinuationReferences(
       `effectStack[${unownedOffer}] (frame ${JSON.stringify(frame.id)}) is a REPLACEMENT frame waiting for an answer, but pendingPrompt does not name it`
     );
   }
+  // Likewise a REPLACEMENT_BATCH frame offering a match: openReplacementBatchFrame
+  // at AWAITING_OPTIONAL_RESPONSE and the prompt naming it are one step
+  // (engine/replacements.ts, stepBatch); no engine state holds the offer
+  // without its prompt (0 of 286 engine-written version 3 states, OPT-963 review).
+  const unownedBatchOffer = frames.findIndex(
+    (frame) =>
+      frameKindOf(frame) === "REPLACEMENT_BATCH" &&
+      frame.phase === "AWAITING_OPTIONAL_RESPONSE" &&
+      prompt?.resumeContext !== frame.id
+  );
+  if (unownedBatchOffer >= 0) {
+    const frame = frames[unownedBatchOffer];
+    throw new SessionLoadError(
+      location,
+      `effectStack[${unownedBatchOffer}] (frame ${JSON.stringify(frame.id)}) is a REPLACEMENT_BATCH frame offering a match, but pendingPrompt does not name it`
+    );
+  }
 }
 
 // ─── OPT-963 PR 5a: lowering version 3 frames to the version 2 runtime ───────
@@ -590,17 +654,42 @@ export interface LoweringReport {
  * Lower every version 3 continuation frame of a validated state to the
  * version 2 record this build's engine executes (SAVED-STATE-COMPATIBILITY.md
  * §1.7, the §8 table read right to left). Pure: returns the lowered state and
- * one report per lowered frame; the caller logs them. Lossless for every
- * replacement frame, for CHARACTER_KO_REPLACEMENT and for TRIGGER_EFFECT;
- * degraded where version 2 has no place for the dropped part:
- *   - a damage frame's deferred `pendingTriggers` (version 2 fired them
- *     before the Trigger window);
+ * one report per lowered frame; the caller logs them.
+ *
+ * Lossless: every REPLACEMENT frame; a REPLACEMENT_BATCH frame (its offer
+ * becomes the prompt context; a batch waiting below a substitute becomes the
+ * version 2 rider on the top-most surviving frame of the segment above it,
+ * where the version 2 lifecycle reads it from the frame it resumes);
+ * CHARACTER_KO_REPLACEMENT with every field; a battle TRIGGER_EFFECT (version
+ * 2 LIFE_REMOVAL while the retained Life removal is unscanned, else DAMAGE);
+ * an effect TRIGGER_EFFECT whose retained, still-pending events move to the
+ * frame directly above it (the Trigger's effect), which the version 2
+ * resolver publishes and scans when that frame resolves.
+ *
+ * Degraded, classified (`lowered.*_dropped`) where version 2 has no place for
+ * the part, so a game rolled back from PR 5b in that exact state loses it:
+ *   - a damage frame's deferred `pendingTriggers` (rule 8-6-2 watchers that
+ *     PR 5b holds until the damage completes; version 2 fires watchers only
+ *     from its own Step 5, so after a rollback these never fire);
  *   - the parent chain frame of an EFFECT_DAMAGE frame at TRIGGER_WINDOW
- *     (version 2 ran the chain on before the window; its lifecycle would
- *     leave the frame as a zombie after the pipeline-routed REVEAL_TRIGGER);
- *   - remaining effect damage at TRIGGER_EFFECT (version 2 abandoned it, OPT-926);
- *   - a second EFFECT_DAMAGE frame (version 2 has one slot; the inner one wins);
- *   - a BATTLE_DAMAGE frame at TRIGGER_WINDOW whose battle is gone.
+ *     (the actions after DEAL_DAMAGE, e.g. OP06-116's THEN; the version 2
+ *     lifecycle would leave the frame as a zombie after its pipeline-routed
+ *     REVEAL_TRIGGER, so it is dropped rather than wedged);
+ *   - remaining effect damage at TRIGGER_EFFECT (version 2 abandons it,
+ *     OPT-926; at TRIGGER_WINDOW the count is lowered losslessly but the
+ *     version 2 reply abandons it just the same);
+ *   - the outer of two EFFECT_DAMAGE windows (version 2 has one slot);
+ *   - a BATTLE_DAMAGE frame at TRIGGER_WINDOW whose battle is gone;
+ *   - a batch waiting with nothing above it to carry the rider (transient);
+ *   - retained events of an effect TRIGGER_EFFECT with no surviving frame.
+ *
+ * Two Trigger windows (battle below, effect above) lower to the two version 2
+ * records with the battle defender's own prompt, rebuilt from the battle
+ * Life card: the version 2 coordinator expects the effect player's reply but
+ * `executeRevealTrigger` consumes the battle window first, so version 2
+ * cannot faithfully progress this state either way (the OPT-974 base deadlock, logged
+ * as `legacy.two_trigger_windows`); the lowering only guarantees that no
+ * player is shown another player's Life card.
  */
 export function lowerVersion3Frames(state: GameState): { state: GameState; reports: LoweringReport[] } {
   const frames = state.effectStack;
@@ -624,8 +713,35 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
     state.turn.pendingBattleDamageContinuation;
   let promptContext: PromptResumeContext | undefined;
   let promptResponder: 0 | 1 | undefined;
-  let attachToNext: import("../engine/replacements.js").ReplacementBatchResumeContext | undefined;
+  let promptOptions: PendingPromptState["options"] | undefined;
+  let battleWindow: EffectStackFrame | undefined;
+  let effectWindow: EffectStackFrame | undefined;
   const kept: EffectStackFrame[] = [];
+
+  // A batch waiting below a substitute rides on the top-most surviving frame
+  // of the segment above it (up to the next batch frame or the stack top):
+  // the version 2 lifecycle reads the rider from the frame it resumes and
+  // re-attaches it to the top frame as that segment unwinds.
+  let rider: { context: ReplacementBatchResumeContext; frame: EffectStackFrame; keptAt: number } | undefined;
+  const flushRider = () => {
+    if (!rider) return;
+    if (kept.length > rider.keptAt) {
+      const top = kept.length - 1;
+      kept[top] = { ...kept[top], replacementBatchContinuation: rider.context };
+    } else {
+      report("lowered.replacement_batch_dropped", rider.frame);
+    }
+    rider = undefined;
+  };
+  // Events retained on a lowered frame move to the next surviving frame above
+  // it, which the version 2 resolver publishes and scans when it resolves.
+  let carried: PendingEvent[] = [];
+  let carriedFrom: EffectStackFrame | undefined;
+  const carry = (frame: EffectStackFrame, events: PendingEvent[]) => {
+    if (events.length === 0) return;
+    carried = [...carried, ...events];
+    carriedFrom = frame;
+  };
 
   for (const frame of frames) {
     if (droppedParents.has(frame.id)) {
@@ -634,8 +750,9 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
     }
     const kind = frameKindOf(frame);
     if (!VERSION_3_FRAME_KINDS.has(kind)) {
-      kept.push(attachToNext ? { ...frame, replacementBatchContinuation: attachToNext } : frame);
-      attachToNext = undefined;
+      kept.push(carried.length > 0 ? { ...frame, accumulatedEvents: [...carried, ...frame.accumulatedEvents] } : frame);
+      carried = [];
+      carriedFrom = undefined;
       continue;
     }
     if (frame.pendingTriggers.length > 0) report("lowered.deferred_triggers_dropped", frame);
@@ -648,8 +765,12 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
       }
       case "REPLACEMENT_BATCH": {
         const context = { type: "REPLACEMENT_BATCH" as const, ...frame.replacementBatch! };
-        if (promptNames(frame)) promptContext = context;
-        else attachToNext = context;
+        if (promptNames(frame)) {
+          promptContext = context;
+        } else {
+          flushRider();
+          rider = { context, frame, keptAt: kept.length };
+        }
         report("lowered.replacement_batch", frame);
         break;
       }
@@ -660,23 +781,23 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
             report("lowered.orphan_battle_damage_dropped", frame);
           } else {
             battle = { ...battle, pendingTriggerLifeCard: damage.lifeCard };
+            battleWindow = frame;
             report("lowered.battle_damage", frame);
-            // The version 2 coordinator served the battle window first, so a
-            // surfaced REVEAL_TRIGGER prompt beside this record is always the
-            // defender's (the only two-window prompt version 2 ever wrote).
-            if (prompt?.options.promptType === "REVEAL_TRIGGER") {
-              promptContext = null;
-              promptResponder = damage.damagedPlayerIndex;
-            }
           }
-          if (promptNames(frame)) promptContext = null;
+          if (promptNames(frame)) {
+            promptContext = null;
+            promptResponder = damage.damagedPlayerIndex;
+          }
         } else if (damage.stage === "TRIGGER_EFFECT") {
+          const isOwnRemoval = (event: PendingEvent) =>
+            event.type === "CARD_REMOVED_FROM_LIFE" &&
+            (event.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId === damage.lifeCardInstanceId;
           const unscannedRemoval = frame.accumulatedEvents.some(
-            (event) =>
-              event.type === "CARD_REMOVED_FROM_LIFE" &&
-              (event.payload as { cardInstanceId?: string } | undefined)?.cardInstanceId === damage.lifeCardInstanceId &&
-              !event.propagation?.triggerScanned
+            (event) => isOwnRemoval(event) && !event.propagation?.triggerScanned
           );
+          // The removal has a version 2 home (LIFE_REMOVAL re-emits and scans
+          // it); anything else still pending rides up to the Trigger's frame.
+          carry(frame, pendingPropagationEvents(frame.accumulatedEvents).filter((event) => !isOwnRemoval(event)));
           pendingBattleDamageContinuation = {
             battleId: damage.battleId,
             lifeCardInstanceId: damage.lifeCardInstanceId,
@@ -701,7 +822,8 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
       case "EFFECT_DAMAGE": {
         const damage = frame.effectDamage!;
         if (damage.stage === "TRIGGER_WINDOW") {
-          if (pendingTriggerFromEffect) report("lowered.second_effect_damage_dropped", frame);
+          // Version 2 has one effect-window slot: the inner (later) window wins.
+          if (effectWindow) report("lowered.second_effect_damage_dropped", effectWindow);
           pendingTriggerFromEffect = {
             lifeCard: damage.lifeCard,
             damagedPlayerIndex: damage.damagedPlayerIndex,
@@ -709,12 +831,18 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
             sourceCardInstanceId: damage.sourceCardInstanceId,
             controllerIndex: damage.controllerIndex,
           };
-          if (promptNames(frame)) promptContext = null;
+          effectWindow = frame;
+          if (promptNames(frame)) {
+            promptContext = null;
+            promptResponder = damage.damagedPlayerIndex;
+          }
           report("lowered.effect_damage", frame);
         } else {
           // The Trigger's effect resolves in the frames above and its parent
           // chain (if any) stays below: the version 2 lifecycle drains both.
-          // Only the remaining points have no version 2 home.
+          // The frame's retained events ride up to the Trigger's frame; only
+          // the remaining points have no version 2 home.
+          carry(frame, pendingPropagationEvents(frame.accumulatedEvents));
           if (damage.remainingDamages > 0) report("lowered.effect_damage_remaining_dropped", frame);
           report("lowered.effect_damage", frame);
         }
@@ -724,10 +852,44 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
         kept.push(frame);
     }
   }
-  if (attachToNext) {
-    // Only a transient state (substitute finished, batch not yet continued)
-    // leaves a batch frame on top; nothing above it can carry the rider.
-    report("lowered.replacement_batch_dropped", [...frames].reverse().find((frame) => frame.replacementBatch)!);
+  flushRider();
+  if (carried.length > 0) {
+    // Nothing above the frame: its parent chain below resolves next.
+    if (kept.length > 0) {
+      const top = kept.length - 1;
+      kept[top] = { ...kept[top], accumulatedEvents: [...kept[top].accumulatedEvents, ...carried] };
+    } else {
+      report("lowered.effect_damage_events_dropped", carriedFrom!);
+    }
+  }
+
+  if (battleWindow && effectWindow && prompt?.options.promptType === "REVEAL_TRIGGER") {
+    // Both windows: the battle defender's own prompt (see the function comment).
+    const damage = battleWindow.battleDamage!;
+    if (damage.stage === "TRIGGER_WINDOW") {
+      const responder = damage.damagedPlayerIndex;
+      const promptCard: CardInstance = {
+        instanceId: damage.lifeCard.instanceId,
+        cardId: damage.lifeCard.cardId,
+        zone: "LIFE",
+        state: "ACTIVE",
+        attachedDon: [],
+        turnPlayed: null,
+        controller: responder,
+        owner: responder,
+      };
+      promptContext = null;
+      promptResponder = responder;
+      promptOptions = {
+        promptType: "REVEAL_TRIGGER",
+        cards: [promptCard],
+        effectDescription: prompt.options.cards[0]?.cardId === damage.lifeCard.cardId
+          ? prompt.options.effectDescription
+          : "You may reveal this Trigger card to activate its effect",
+        optional: false,
+        timeoutMs: 30_000,
+      };
+    }
   }
 
   const turn: TurnState = {
@@ -742,6 +904,7 @@ export function lowerVersion3Frames(state: GameState): { state: GameState; repor
           ...prompt,
           resumeContext: promptContext,
           ...(promptResponder !== undefined ? { respondingPlayer: promptResponder } : {}),
+          ...(promptOptions !== undefined ? { options: promptOptions } : {}),
         }
       : prompt;
   return { state: { ...state, turn, effectStack: kept, pendingPrompt }, reports };
