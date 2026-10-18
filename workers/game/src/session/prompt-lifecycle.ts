@@ -357,7 +357,10 @@ function resumeContinuations(
 ): { state: GameState; gameOver?: GameOver } {
   let state = initialState;
   let gameOver = initialGameOver;
-  while (!gameOver && state.status === "IN_PROGRESS" && !state.pendingPrompt) {
+  // A finished game has no frames to unwind: terminateGame, the only terminal
+  // writer, clears the effect stack (pinned by the terminal suites), so the
+  // loop stops on the empty stack; it needs no status guard of its own.
+  while (!state.pendingPrompt) {
     const frame = state.effectStack.at(-1);
     if (!frame) break;
     const kind = frameKindOf(frame);
