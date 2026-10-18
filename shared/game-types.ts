@@ -511,7 +511,10 @@ export type EffectStackPhase =
   // frame N can fully resolve before frame N+1 begins (rule 6-2). Frame carries
   // a BatchResumeMarker identifying which action to re-invoke and with what
   // remaining-batch state once pendingTriggers drain.
-  | "AWAITING_BATCH_RESUME";
+  | "AWAITING_BATCH_RESUME"
+  // OPT-963 (game-state schema version 3): a damage frame waiting for the
+  // damaged player's Life [Trigger] choice (rule 8-6-2-1).
+  | "AWAITING_TRIGGER_REVEAL";
 
 export interface EffectStackFrame {
   /** Notify activation watchers only after the nested Event Main finishes. */
@@ -532,6 +535,15 @@ export interface EffectStackFrame {
   priorActionSucceeded?: boolean;
   /** Outer replacement batch to continue after a nested substitute prompt. */
   replacementBatchContinuation?: unknown;
+  /**
+   * OPT-963 typed continuations (game-state schema version 3), one per frame
+   * kind; typed in the worker, opaque here. Never sent to clients (frames are
+   * engine-only).
+   */
+  replacement?: unknown;
+  replacementBatch?: unknown;
+  battleDamage?: unknown;
+  effectDamage?: unknown;
 
   // Cost tracking
   costs: unknown[];
