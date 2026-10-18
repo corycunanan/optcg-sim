@@ -411,6 +411,20 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
     expectRejected(state, new RegExp(`names REPLACEMENT frame "${replacementId()}" for a SELECT_TARGET prompt; a replacement frame owns only its OPTIONAL_EFFECT offer`));
   });
 
+  it.each([
+    ["REPLACEMENT", "replacement-prompt"],
+    ["REPLACEMENT_BATCH", "replacement-batch-prompt"],
+    ["BATTLE_DAMAGE", "battle-trigger-window"],
+    ["EFFECT_DAMAGE", "effect-damage-trigger-window"],
+  ] as const)("D-N3: a %s frame carrying remainingActions is rejected by name (no engine path writes one; the suffix lives on the continuation below)", (kind, fixture) => {
+    const state = raw(fixture);
+    const index = state.effectStack.findIndex((frame) => frameKindOf(frame as unknown as Parameters<typeof frameKindOf>[0]) === kind);
+    expect(index).toBeGreaterThanOrEqual(0);
+    const id = state.effectStack[index].id as string;
+    state.effectStack[index] = { ...state.effectStack[index], remainingActions: [{ type: "DRAW", params: { amount: 1 } }] };
+    expectRejected(state, new RegExp(`effectStack\\[${index}\\] \\(frame "${id}"\\) is ${kind} but carries 1 remainingActions; a continuation frame holds no chain suffix`));
+  });
+
   it("F6a: a non-damage frame at AWAITING_TRIGGER_REVEAL is rejected (only openBattleTriggerWindow and continueEffectDamageSequence write the phase)", () => {
     const state = raw("battle-trigger-window");
     const { battleDamage: _dropped, ...plain } = state.effectStack[0];
@@ -419,7 +433,7 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
     expectRejected(state, new RegExp(`effectStack\\[0\\] \\(frame "${battleId()}"\\) is EFFECT but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal`));
   });
 
-  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of the 286 reviewed and 4 committed engine-written states)", () => {
+  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of the 4 committed engine-written states)", () => {
     const state = raw("replacement-batch-prompt");
     const id = state.effectStack[0].id as string;
     state.pendingPrompt = null;
