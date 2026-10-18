@@ -450,3 +450,30 @@ describe("PR #758 F1: the actions after a choice branch survive a handler-owned 
     expect(r.state.players[0].hand).toHaveLength(hand0 + 1);
   });
 });
+
+describe("PR #758 F2: the effect window logs the point before its prompt, as the battle path does", () => {
+  it("while the REVEAL_TRIGGER prompt is pending the log already shows the point; the reply's events and the suffix follow, each event once", () => {
+    const r = rig({ p1Life: [life("l-trig", TRIG_OPTIONAL.id)], dealer: dealer("SYN-DEALER-ORDER", 1, [{ type: "DRAW", params: { amount: 2 }, chain: "THEN" }]) });
+    const hand0 = r.state.players[0].hand.length;
+    activate(r);
+    expectWindow(r, "l-trig");
+    const pending = r.log().map((e) => e.type);
+    expect(pending).toContain("LIFE_COUNT_BECOMES_ZERO");
+    expect(pending).toContain("TRIGGER_ACTIVATED");
+    expect(pending).not.toContain("CARD_ADDED_TO_HAND_FROM_LIFE");
+    expect(pending).not.toContain("CARD_DRAWN");
+    reveal(r, false);
+    const log = r.log();
+    const types = log.map((e) => e.type);
+    const first = (type: GameEvent["type"]) => types.indexOf(type);
+    expect(first("LIFE_COUNT_BECOMES_ZERO")).toBeLessThan(first("TRIGGER_ACTIVATED"));
+    expect(first("TRIGGER_ACTIVATED")).toBeLessThan(first("CARD_ADDED_TO_HAND_FROM_LIFE"));
+    expect(first("CARD_ADDED_TO_HAND_FROM_LIFE")).toBeLessThan(first("CARD_REMOVED_FROM_LIFE"));
+    expect(first("CARD_REMOVED_FROM_LIFE")).toBeLessThan(first("CARD_DRAWN"));
+    expect(types.filter((t) => t === "LIFE_COUNT_BECOMES_ZERO")).toHaveLength(1);
+    expect(types.filter((t) => t === "TRIGGER_ACTIVATED")).toHaveLength(1);
+    expect(log.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 0)).toHaveLength(2);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 2);
+    expect(r.state.effectStack).toEqual([]);
+  });
+});

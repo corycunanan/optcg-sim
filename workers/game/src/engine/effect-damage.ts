@@ -14,6 +14,7 @@ import { lifeToHandDestination } from "./life-destination.js";
 import { transitionDetachedCard } from "./zone-transition.js";
 import { generateFrameId, popFrame, pushFrame } from "./effect-stack.js";
 import { continuationFrame, revealTriggerPromptFor, updateFrameById } from "./damage-frames.js";
+import { emitPendingEvent, withEventLogEmitted } from "./events.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { isGameTerminated } from "./terminal.js";
 import { retainEventsOnFrame } from "./effect-resolver/resume/events.js";
@@ -255,6 +256,17 @@ export function continueEffectDamageSequence(
         playerIndex: damagedPlayerIndex,
         payload: { cardId: lifeCard.cardId },
       });
+      // Publish the point now, log only, as the battle path does
+      // (openBattleTriggerWindow): the log shows the damage while the window
+      // is open and before the reply's own events. The watchers still wait
+      // for the instruction to complete (rule 8-6-2): the events stay
+      // unscanned and the parent chain scans them at its end (PR #758 F2).
+      for (let index = 0; index < events.length; index++) {
+        const pending = events[index];
+        if (pending.propagation?.eventLogEmitted) continue;
+        nextState = emitPendingEvent(nextState, pending, nextState.turn.activePlayerIndex);
+        events[index] = withEventLogEmitted(pending);
+      }
       const window: EffectDamageContinuation = {
         stage: "TRIGGER_WINDOW",
         damagedPlayerIndex,
