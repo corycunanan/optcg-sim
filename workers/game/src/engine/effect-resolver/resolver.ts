@@ -38,7 +38,8 @@ import {
   updateTopFrame,
 } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
-import { insertFrameAt } from "../damage-frames.js";
+import { insertFrameAt, updateFrameById } from "../damage-frames.js";
+import { isHandlerOwnedFrame } from "../frame-kinds.js";
 import { frameKindOf } from "../frame-kinds.js";
 import type {
   EffectResolverResult,
@@ -1081,6 +1082,37 @@ export function executeActionChain(
             pendingPrompt: result.pendingPrompt,
           };
         }
+        // OPT-963: when the branch paused on a frame its handler owns (an
+        // EFFECT_DAMAGE window, a REPLACEMENT_BATCH offer or substitute), the
+        // branch's chain continuation sits at the pre-action depth with the
+        // handler's frame directly above it. The actions after the choice
+        // belong on that continuation: the handler's frame pops when its
+        // work is done and would take them with it.
+        const continuationBelow = result.state.effectStack[stackDepthBeforeAction];
+        const frameAbove = result.state.effectStack[stackDepthBeforeAction + 1];
+        const handlerOwnsPause =
+          continuationBelow !== undefined &&
+          continuationBelow !== nestedPromptFrame &&
+          frameAbove !== undefined &&
+          isHandlerOwnedFrame(frameAbove);
+        if (handlerOwnsPause) {
+          const appended =
+            remainingActions.length > 0
+              ? updateFrameById(result.state, continuationBelow.id, (frame) => ({
+                  ...frame,
+                  remainingActions: [...frame.remainingActions, ...remainingActions],
+                  ...(action.type === "OPPONENT_ACTION"
+                    ? { remainingActionsController: controller }
+                    : {}),
+                }))
+              : result.state;
+          return {
+            state: retainEventsOnFrame(appended, stackDepthBeforeAction, events),
+            events,
+            // The nested prompt belongs to the handler's frame: its own description.
+            pendingPrompt: result.pendingPrompt,
+          };
+        }
         const nestedState =
           remainingActions.length > 0 || effectDescription
             ? updateTopFrame(result.state, {
@@ -1246,12 +1278,6 @@ export function executeActionChain(
   }
 
   return { state, events };
-}
-
-/** A frame a handler pushed to own its own pause (OPT-963 kinds). */
-function isHandlerOwnedFrame(frame: EffectStackFrame): boolean {
-  const kind = frameKindOf(frame);
-  return kind === "REPLACEMENT" || kind === "REPLACEMENT_BATCH" || kind === "EFFECT_DAMAGE";
 }
 
 /** Name the chain continuation as the parent of the EFFECT_DAMAGE frame directly above it. */

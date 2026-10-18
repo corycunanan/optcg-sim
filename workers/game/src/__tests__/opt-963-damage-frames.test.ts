@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameEvent, GameState, LifeCard, PlayerState } from "../types.js";
-import type { EffectBlock, EffectSchema } from "../engine/effect-types.js";
+import type { Action, EffectBlock, EffectSchema } from "../engine/effect-types.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
@@ -342,5 +342,111 @@ describe("OPT-960 note: events retained on a suspended frame when a checkpoint e
     expect(idx(log, "LIFE_COUNT_BECOMES_ZERO", 1)).toBeGreaterThanOrEqual(0);
     expect(idx(log, "LIFE_COUNT_BECOMES_ZERO", 1)).toBeLessThan(gameOver);
     expect(idx(log, "CARD_KO")).toBeLessThan(gameOver);
+  });
+});
+
+describe("PR #758 F1: the actions after a choice branch survive a handler-owned pause", () => {
+  /** p0 Character: [Activate: Main] PLAYER_CHOICE over `branches`, then draw 1 (the outer suffix). */
+  function chooser(id: string, branches: Action[][], labels?: string[]): CardData {
+    return synCard(id, {}, [
+      {
+        id: "deal",
+        category: "activate",
+        trigger: { keyword: "ACTIVATE_MAIN" },
+        actions: [
+          { type: "PLAYER_CHOICE", params: { options: branches, ...(labels ? { labels } : {}) } },
+          { type: "DRAW", params: { amount: 1 }, chain: "THEN" },
+        ],
+      },
+    ]);
+  }
+  const DEAL_ONE: Action[] = [{ type: "DEAL_DAMAGE", target: { type: "PLAYER", controller: "OPPONENT" }, params: { amount: 1 } }];
+  const KO_ALL: Action[] = [{ type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } } }];
+  /** Answer a PLAYER_CHOICE prompt if the engine asked (a single branch may be auto-selected). */
+  function chooseIfAsked(r: Rig, choiceId: string) {
+    if (r.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+      expect(r.state.pendingPrompt.respondingPlayer).toBe(0);
+      expect(r.act(0, { type: "PLAYER_CHOICE", choiceId })).toBeNull();
+    }
+  }
+
+  it("S2: a single DEAL_DAMAGE branch opens a Trigger window; the decline resumes the outer draw (regression vs 5a)", () => {
+    const r = rig({ p1Life: [life("l-trig", TRIG_OPTIONAL.id), life("l-vanilla", CARDS.VANILLA.id)], dealer: chooser("SYN-CHOICE-DEAL", [DEAL_ONE]) });
+    const hand0 = r.state.players[0].hand.length;
+    activate(r);
+    chooseIfAsked(r, "0");
+    expectWindow(r, "l-trig");
+    // The suffix waits on the chain continuation below the window, not on the window.
+    const window = r.state.effectStack.find((frame) => frame.effectDamage)!;
+    expect(window.remainingActions).toEqual([]);
+    expect(r.state.effectStack[r.state.effectStack.indexOf(window) - 1].remainingActions.map((a) => a.type)).toEqual(["DRAW"]);
+    reveal(r, false);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 1);
+  });
+
+  it("S3: a prompted two-branch choice; branch 0 opens the window; the decline resumes the outer draw", () => {
+    const r = rig({ p1Life: [life("l-trig", TRIG_OPTIONAL.id), life("l-vanilla", CARDS.VANILLA.id)], dealer: chooser("SYN-CHOICE-TWO", [DEAL_ONE, [{ type: "DRAW", params: { amount: 1 } }]], ["Deal 1 damage", "Draw 1"]) });
+    const hand0 = r.state.players[0].hand.length;
+    activate(r);
+    expect(r.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(r.act(0, { type: "PLAYER_CHOICE", choiceId: "0" })).toBeNull();
+    expectWindow(r, "l-trig");
+    reveal(r, false);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 1);
+    expect(r.state.players[1].life).toHaveLength(1);
+  });
+
+  it("S9: a K.O. branch raises an optional batch replacement; declining it resumes the outer draw", () => {
+    const r = rig({ p1Life: [life("l-vanilla", CARDS.VANILLA.id)], dealer: chooser("SYN-CHOICE-KO", [KO_ALL]) });
+    const source: CardInstance = { instanceId: "p1-ivankov", cardId: CARDS.VANILLA.id, zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: 1, controller: 1, owner: 1 };
+    const ally: CardInstance = { instanceId: "p1-ally", cardId: CARDS.VANILLA.id, zone: "CHARACTER", state: "ACTIVE", attachedDon: [], turnPlayed: 1, controller: 1, owner: 1 };
+    const players = [...r.state.players] as [PlayerState, PlayerState];
+    players[1] = { ...players[1], characters: padChars([source, ally]) };
+    r.state = {
+      ...r.state,
+      players,
+      activeEffects: [
+        ...r.state.activeEffects,
+        {
+          id: "repl-ivankov",
+          sourceCardInstanceId: source.instanceId,
+          sourceEffectBlockId: "ivan-block",
+          category: "replacement",
+          modifiers: [{
+            type: "REPLACEMENT_EFFECT",
+            params: {
+              trigger: "WOULD_BE_KO",
+              cause_filter: { by: "OPPONENT_EFFECT" },
+              target_filter: { card_type: "CHARACTER", exclude_self: true },
+              replacement_actions: [{ type: "TRASH_CARD", target: { type: "SELF" } }],
+              optional: true,
+              once_per_turn: false,
+            },
+          }],
+          duration: { type: "PERMANENT" },
+          expiresAt: { wave: "SOURCE_LEAVES_ZONE" },
+          controller: 1,
+          appliesTo: [],
+          timestamp: Date.now(),
+        } as never,
+      ],
+    };
+    const hand0 = r.state.players[0].hand.length;
+    activate(r);
+    chooseIfAsked(r, "0");
+    expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+    expect(r.state.pendingPrompt?.respondingPlayer).toBe(1);
+    const batch = r.state.effectStack.find((frame) => frame.replacementBatch)!;
+    expect(batch.remainingActions).toEqual([]);
+    expect(r.state.effectStack[0].remainingActions.map((a) => a.type)).toEqual(["DRAW"]);
+    expect(r.act(1, { type: "PASS" })).toBeNull();
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(r.state.players[1].characters.filter(Boolean)).toEqual([]);
+    expect(r.state.players[0].hand).toHaveLength(hand0 + 1);
   });
 });

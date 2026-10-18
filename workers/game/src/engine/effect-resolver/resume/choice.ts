@@ -5,6 +5,8 @@ import {
   withdrawUnactivatedTrashMain,
 } from "../event-activation.js";
 import { pendingPropagationEvents, retainEventsOnFrame } from "./events.js";
+import { updateFrameById } from "../../damage-frames.js";
+import { isHandlerOwnedFrame } from "../../frame-kinds.js";
 import { isGameTerminated } from "../../terminal.js";
 import { log } from "../../../lib/log.js";
 /**
@@ -450,6 +452,9 @@ export function handlePlayerChoiceBranch(
   }
 
   let nextState = state;
+  // The branch runs at this depth; a handler-owned pause inserts the branch's
+  // chain continuation here, directly below the handler's frame (OPT-963).
+  const branchDepth = state.effectStack.length;
   const options = getActionParams(pausedAction, pausedAction.type).options;
   const chosenIndex = parseInt(action.choiceId, 10);
   const chosenBranch = options[chosenIndex];
@@ -467,8 +472,23 @@ export function handlePlayerChoiceBranch(
     events.push(...branchResult.events);
 
     if (branchResult.pendingPrompt) {
+      const continuationBelow = nextState.effectStack[branchDepth];
+      const frameAbove = nextState.effectStack[branchDepth + 1];
       const replacementFrame = peekFrame(nextState);
-      if (replacementFrame && remainingActions.length > 0) {
+      if (
+        remainingActions.length > 0 &&
+        continuationBelow !== undefined &&
+        continuationBelow !== replacementFrame &&
+        frameAbove !== undefined &&
+        isHandlerOwnedFrame(frameAbove)
+      ) {
+        // The actions after the choice outlive the handler's frame: they go
+        // on the branch's continuation below it, never on the handler's frame.
+        nextState = updateFrameById(nextState, continuationBelow.id, (frame) => ({
+          ...frame,
+          remainingActions: [...frame.remainingActions, ...remainingActions],
+        }));
+      } else if (replacementFrame && remainingActions.length > 0) {
         nextState = updateTopFrame(nextState, {
           remainingActions: [
             ...replacementFrame.remainingActions,

@@ -508,6 +508,11 @@ function frameInvariantViolation(
   if (frame.phase === "AWAITING_TRIGGER_REVEAL" && kind !== "BATTLE_DAMAGE" && kind !== "EFFECT_DAMAGE") {
     return `is ${kind} but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal`;
   }
+  // A version 3 continuation frame owns one piece of paused work; the actions
+  // after a choice branch live on the chain continuation below it (PR #758 F1).
+  if (VERSION_3_FRAME_KINDS.has(kind) && frame.remainingActions.length > 0) {
+    return `is ${kind} but carries ${frame.remainingActions.length} remainingActions; a continuation frame holds no chain suffix`;
+  }
   switch (kind) {
     case "PHASE_BOUNDARY": {
       const continuation = frame.phaseBoundaryContinuation!;

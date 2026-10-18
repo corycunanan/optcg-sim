@@ -39,6 +39,20 @@ export const VERSION_3_CONTINUATION_FIELDS = [
 export type EffectStackFrameKind = (typeof EFFECT_STACK_FRAME_KINDS)[number];
 
 /**
+ * A frame an action handler pushed to own its own pause (a REPLACEMENT or
+ * REPLACEMENT_BATCH offer, an EFFECT_DAMAGE window). The handler's chain
+ * continuation is inserted directly below it (resolver.ts executeActionChain),
+ * so anything that must survive the handler's frame, such as the actions
+ * after a choice branch, belongs on that continuation, never on this frame.
+ */
+export function isHandlerOwnedFrame(
+  frame: Pick<EffectStackFrame, "phase" | "phaseBoundaryContinuation" | "replacement" | "replacementBatch" | "battleDamage" | "effectDamage">
+): boolean {
+  const kind = frameKindOf(frame);
+  return kind === "REPLACEMENT" || kind === "REPLACEMENT_BATCH" || kind === "EFFECT_DAMAGE";
+}
+
+/**
  * The single definition of a frame's kind, derived from its content. A
  * persisted `kind` must agree with this projection.
  */
