@@ -128,6 +128,9 @@ A prompt or frame may point at a frame by id. From PR 1 the reader resolves ever
 | `pendingPrompt.resumeContext` naming a version 3 frame (from PR 5a, §8) | A `REVEAL_TRIGGER` prompt names a `BATTLE_DAMAGE` or `EFFECT_DAMAGE` frame at `AWAITING_TRIGGER_REVEAL`; an `OPTIONAL_EFFECT` prompt naming a `REPLACEMENT` / `REPLACEMENT_BATCH` frame finds it at `AWAITING_OPTIONAL_RESPONSE`; a `REPLACEMENT` frame is the top frame. | Any other pairing (a `REVEAL_TRIGGER` naming a non-damage frame, a damage frame owning another prompt type or at another phase, a replacement frame owning a non-offer prompt, a `REPLACEMENT` frame below another frame, or one no prompt names). |
 | `effectStack[i].effectDamage.parentFrameId` (from PR 5a, §8) | `effectStack[i-1].id`, a `TRIGGER_DRAIN` frame with `pausedAction.type === "DEAL_DAMAGE"` (the chain the damage paused). | The id is not the frame directly below, or that frame is not a chain paused on `DEAL_DAMAGE`. |
 | `effectStack[i]` carrying two continuation families (from PR 5a) | Exactly one of `replacement`, `replacementBatch`, `battleDamage`, `effectDamage`, `phaseBoundaryContinuation`. | Two or more present. |
+| `effectStack[i].phase === "AWAITING_TRIGGER_REVEAL"` (from PR 5a fix round 1) | A `BATTLE_DAMAGE` or `EFFECT_DAMAGE` frame at `TRIGGER_WINDOW` (the only writers: `engine/damage-frames.ts`, `engine/effect-damage.ts`). | Any other kind at that phase (0 of 286 engine-written states). |
+| A `REPLACEMENT_BATCH` frame at `AWAITING_OPTIONAL_RESPONSE` (from PR 5a fix round 1) | Named by `pendingPrompt.resumeContext`: the offer frame and its prompt are one step (`engine/replacements.ts` `stepBatch`). | No prompt names it (0 of 286 engine-written states). |
+| A version 3 object beside a version 2 record (from PR 5a fix round 1) | Never: the version 3 writer lifts `turn.pendingTriggerFromEffect`, `turn.pendingBattleDamageContinuation`, `turn.battle.pendingTriggerLifeCard`, frame `replacementBatchContinuation` and object replacement prompt contexts into frames (§8.3). | Any of them present on a `schemaVersion: 3` object (the error names the field). |
 
 Battle-record coherence is **classified, not rejected**. Review finding A on PR #746 showed (rung 4, `opt-940-synthetic-states.ts` `bothTriggerWindows`) that the engine writes `turn.pendingTriggerFromEffect` and `turn.battle.pendingTriggerLifeCard` together: damage-time auto effects resolve before the coordinator surfaces the battle Trigger, and one of them can deal effect damage that parks a second Trigger. A reader that rejects a real save is worse than one that accepts a loose one, so every check in this family is a logged `session.legacy_shape` and the state loads unchanged:
 
@@ -159,6 +162,7 @@ History:
 | 2026-10-12 (PR 4a, OPT-980) | Version 2 reader and v1 → v2 converter; writer still writes 1 (§1.5). | `{1, 2}` |
 | 2026-10-12 (PR 4b, OPT-924) | Writer emits version 2 (§1.6). | `{1, 2}` |
 | 2026-10-16 (PR 5a, OPT-963) | Version 3 reader (§8) lowering to the version 2 runtime (§1.7); writer still writes 2. | `{1, 2, 3}` |
+| 2026-10-17 (PR 5a fix round 1, OPT-963) | Lowering: batch rider on the top surviving frame, effect `TRIGGER_EFFECT` events re-homed, nested windows lowered leak-free (§1.7 items 2–4); three unwritten shapes rejected by name (§1.7 item 1, §2.4); proof against 5b-written states. | `{1, 2, 3}` |
 
 ---
 
