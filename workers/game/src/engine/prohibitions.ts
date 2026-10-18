@@ -279,22 +279,23 @@ export function isCostMovementProhibited(
 }
 
 /**
- * OPT-961: may `controller` pay a "Life card to hand" cost? A
- * CANNOT_ADD_LIFE_TO_HAND prohibition on that player makes the cost
- * unpayable (docs/FAQs/qa_op02.md:24-26 OP02-004, :82-84 OP02-023: "The
- * effect cannot be activated because that activation cost cannot be paid").
+ * "Using your own effects" covers both Life-to-hand costs and effect actions
+ * (OP02-004/023 FAQ), but not damage processing or an opponent's effects.
+ * Keep the Life owner separate from the effect controller.
  */
-export function isLifeToHandCostProhibited(
+export function isLifeToHandProhibited(
   state: GameState,
-  controller: 0 | 1,
+  lifeOwner: 0 | 1,
+  causingController: 0 | 1,
   cardDb: Map<string, CardData>,
 ): boolean {
+  if (lifeOwner !== causingController) return false;
   for (const p of activationTimeProhibitions(state)) {
     if (p.prohibitionType !== "CANNOT_ADD_LIFE_TO_HAND") continue;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
     if (!isProhibitionConditionMet(p, state, cardDb)) continue;
     if (isProhibitionOverridden(p, state, cardDb)) continue;
-    if (matchesController(p.controller, controller, p.scope?.controller)) return true;
+    if (matchesController(p.controller, lifeOwner, p.scope?.controller)) return true;
   }
   return false;
 }
