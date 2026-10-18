@@ -1,0 +1,6261 @@
+{
+ "_comment": "SYNTHETIC-CORPUS: version 3 session states written by the PR 5b engine (8823ad05) while running its own worker suite, captured by the OPT-963 PR #757 review (toPersistedGameState output + card DB). Read-only inputs for the 5a lowering tests.",
+ "cases": {
+  "nested-batch-below-substitute-prompt": {
+   "source": "5b 8823ad05 engine, OPT-963 review corpus state #204 (lifecycle)",
+   "state": {
+    "schemaVersion": 3,
+    "id": "test-game-001",
+    "executionContext": {
+     "version": 1,
+     "seed": "test-game-001",
+     "rngState": 2134618106,
+     "idCounter": 149,
+     "clockEpochMs": 0,
+     "clockCounter": 2,
+     "actionBudget": {
+      "limit": 1000,
+      "consumed": 3
+     },
+     "trace": {
+      "gameId": "test-game-001",
+      "traceId": "trace-3bfc8754"
+     }
+    },
+    "players": [
+     {
+      "playerId": "user-p1",
+      "leader": {
+       "instanceId": "card_00000001",
+       "cardId": "LEADER-T",
+       "zone": "LEADER",
+       "state": "ACTIVE",
+       "attachedDon": [],
+       "turnPlayed": null,
+       "controller": 0,
+       "owner": 0
+      },
+      "characters": [
+       {
+        "instanceId": "char-0-v1",
+        "cardId": "CHAR-VANILLA",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "char-0-b1",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       },
+       null,
+       null,
+       null
+      ],
+      "stage": null,
+      "donCostArea": [
+       {
+        "instanceId": "don-p0-0",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-1",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-2",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-3",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-4",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-5",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-6",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-7",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ],
+      "trash": [],
+      "removedFromGame": [],
+      "deckList": [
+       {
+        "cardId": "CHAR-VANILLA",
+        "count": 16
+       },
+       {
+        "cardId": "CHAR-RUSH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-DATK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BLOCKER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BANISH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-TRIGGER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-UNBLK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-COUNTER",
+        "count": 6
+       },
+       {
+        "cardId": "EVENT-CTR",
+        "count": 2
+       },
+       {
+        "cardId": "STAGE-T",
+        "count": 2
+       }
+      ],
+      "connected": false,
+      "awayReason": null,
+      "rejoinDeadlineAt": null,
+      "sleeveUrl": null,
+      "donArtUrl": null,
+      "hand": [
+       {
+        "instanceId": "card_0000003f",
+        "cardId": "CHAR-VANILLA",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003g",
+        "cardId": "CHAR-RUSH",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003h",
+        "cardId": "CHAR-DATK",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003i",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003j",
+        "cardId": "CHAR-COUNTER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "deck": [
+       {
+        "instanceId": "card_00000017",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000v",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000j",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001f",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000007",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000009",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000003",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000011",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000q",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000r",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001a",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000018",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000u",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000005",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000013",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000002",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001e",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000015",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000o",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000x",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000b",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000014",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000k",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000016",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000w",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000019",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000a",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000010",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001c",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001d",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000012",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000n",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000006",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000m",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000008",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000i",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000z",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000004",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000s",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000y",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "life": [
+       {
+        "instanceId": "card_0000003t",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003s",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003r",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003q",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003p",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       }
+      ],
+      "donDeck": [
+       {
+        "instanceId": "don_0000002v",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_0000002w",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ]
+     },
+     {
+      "playerId": "user-p2",
+      "leader": {
+       "instanceId": "card_0000001g",
+       "cardId": "LEADER-T",
+       "zone": "LEADER",
+       "state": "ACTIVE",
+       "attachedDon": [],
+       "turnPlayed": null,
+       "controller": 1,
+       "owner": 1
+      },
+      "characters": [
+       {
+        "instanceId": "char-1-v1",
+        "cardId": "CHAR-VANILLA",
+        "zone": "CHARACTER",
+        "state": "RESTED",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "char-1-b1",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 1,
+        "owner": 1
+       },
+       null,
+       null,
+       null
+      ],
+      "stage": null,
+      "donCostArea": [
+       {
+        "instanceId": "don-p1-0",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-1",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-2",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-3",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-4",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-5",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ],
+      "trash": [],
+      "removedFromGame": [],
+      "deckList": [
+       {
+        "cardId": "CHAR-VANILLA",
+        "count": 16
+       },
+       {
+        "cardId": "CHAR-RUSH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-DATK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BLOCKER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BANISH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-TRIGGER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-UNBLK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-COUNTER",
+        "count": 6
+       },
+       {
+        "cardId": "EVENT-CTR",
+        "count": 2
+       },
+       {
+        "cardId": "STAGE-T",
+        "count": 2
+       }
+      ],
+      "connected": false,
+      "awayReason": null,
+      "rejoinDeadlineAt": null,
+      "sleeveUrl": null,
+      "donArtUrl": null,
+      "hand": [
+       {
+        "instanceId": "card_0000003k",
+        "cardId": "CHAR-VANILLA",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003l",
+        "cardId": "CHAR-RUSH",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003m",
+        "cardId": "CHAR-DATK",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003n",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003o",
+        "cardId": "CHAR-COUNTER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "deck": [
+       {
+        "instanceId": "card_0000002c",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000023",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001x",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002m",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000021",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002k",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002e",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001l",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000029",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002o",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000027",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002p",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002d",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001o",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000022",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001y",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000026",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002b",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002n",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001m",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002s",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002r",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002u",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001k",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001q",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002a",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002j",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002i",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002t",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002f",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001i",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001h",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001p",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001n",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001z",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000025",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001j",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002l",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002h",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002g",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "life": [
+       {
+        "instanceId": "card_0000003y",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003x",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003w",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003v",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "card_0000003u",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       }
+      ],
+      "donDeck": [
+       {
+        "instanceId": "don_00000035",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000036",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000037",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000038",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ]
+     }
+    ],
+    "turn": {
+     "number": 3,
+     "activePlayerIndex": 0,
+     "firstPlayerIndex": 0,
+     "phase": "MAIN",
+     "battleSubPhase": null,
+     "battle": null,
+     "oncePerTurnUsed": {},
+     "actionsPerformedThisTurn": [],
+     "deckHitZeroThisTurn": [
+      false,
+      false
+     ]
+    },
+    "pregame": null,
+    "activeEffects": [
+     {
+      "id": "opt439-nested-replacement",
+      "sourceCardInstanceId": "char-1-v1",
+      "sourceEffectBlockId": "opt439-nested-replacement-block",
+      "category": "replacement",
+      "modifiers": [
+       {
+        "type": "REPLACEMENT_EFFECT",
+        "params": {
+         "trigger": "WOULD_BE_KO",
+         "cause_filter": {
+          "by": "OPPONENT_EFFECT"
+         },
+         "target_filter": null,
+         "replacement_actions": [
+          {
+           "type": "PLAYER_CHOICE",
+           "params": {
+            "labels": [
+             "Rest this card",
+             "Do nothing"
+            ],
+            "options": [
+             [
+              {
+               "type": "SET_REST",
+               "target": {
+                "type": "SELF"
+               }
+              }
+             ],
+             []
+            ]
+           }
+          }
+         ],
+         "optional": true,
+         "once_per_turn": false
+        }
+       }
+      ],
+      "duration": {
+       "type": "PERMANENT"
+      },
+      "expiresAt": {
+       "wave": "SOURCE_LEAVES_ZONE"
+      },
+      "controller": 1,
+      "appliesTo": [
+       "char-1-v1"
+      ],
+      "timestamp": 1792268230009
+     }
+    ],
+    "prohibitions": [],
+    "scheduledActions": [],
+    "oneTimeModifiers": [],
+    "triggerRegistry": [
+     {
+      "id": "opt439-prompted-on-rest-registration",
+      "sourceCardInstanceId": "char-1-v1",
+      "effectBlockId": "opt439-prompted-on-rest",
+      "trigger": {
+       "event": "CHARACTER_BECOMES_RESTED"
+      },
+      "effectBlock": {
+       "id": "opt439-prompted-on-rest",
+       "category": "auto",
+       "trigger": {
+        "event": "CHARACTER_BECOMES_RESTED"
+       },
+       "actions": [
+        {
+         "type": "DRAW",
+         "params": {
+          "amount": 1
+         }
+        }
+       ],
+       "flags": {
+        "optional": true
+       }
+      },
+      "zone": "FIELD",
+      "controller": 1
+     }
+    ],
+    "pendingPrompt": {
+     "options": {
+      "promptType": "OPTIONAL_EFFECT",
+      "effectDescription": "You may activate this effect.",
+      "cards": [
+       {
+        "instanceId": "char-1-v1",
+        "cardId": "CHAR-VANILLA",
+        "zone": "CHARACTER",
+        "state": "RESTED",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 1,
+        "owner": 1
+       }
+      ]
+     },
+     "respondingPlayer": 1,
+     "resumeContext": "ef_00000045"
+    },
+    "effectStack": [
+     {
+      "id": "ef_00000040",
+      "sourceCardInstanceId": "card_00000001",
+      "controller": 0,
+      "effectDescription": "You may activate this effect.",
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "phase": "INTERRUPTED_BY_TRIGGERS",
+      "pausedAction": {
+       "type": "KO",
+       "target": {
+        "type": "CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+         "exact": 2
+        }
+       }
+      },
+      "remainingActions": [
+       {
+        "type": "DRAW",
+        "params": {
+         "amount": 1
+        }
+       }
+      ],
+      "resultRefs": [
+       [
+        "__effect_source_snapshot",
+        {
+         "targetInstanceIds": [],
+         "count": 0,
+         "sourceCardSnapshot": {
+          "instanceId": "card_00000001",
+          "cardId": "LEADER-T",
+          "zone": "LEADER",
+          "state": "ACTIVE",
+          "attachedDon": [],
+          "turnPlayed": null,
+          "controller": 0,
+          "owner": 0
+         }
+        }
+       ]
+      ],
+      "validTargets": [],
+      "priorActionSucceeded": false,
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": []
+     },
+     {
+      "id": "ef_00000042",
+      "sourceCardInstanceId": "char-1-v1",
+      "controller": 0,
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "phase": "INTERRUPTED_BY_TRIGGERS",
+      "pausedAction": null,
+      "remainingActions": [],
+      "resultRefs": [],
+      "validTargets": [],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [],
+      "replacementBatch": {
+       "actionKind": "KO",
+       "event": "WOULD_BE_KO",
+       "allTargetIds": [
+        "char-1-v1",
+        "char-1-b1"
+       ],
+       "protectedIds": [],
+       "pendingMatches": [
+        {
+         "effectId": "opt439-nested-replacement",
+         "matchedTargetIds": [
+          "char-1-v1"
+         ],
+         "optional": true
+        }
+       ],
+       "currentMatchIndex": 0,
+       "causingController": 0
+      }
+     },
+     {
+      "id": "ef_00000044",
+      "sourceCardInstanceId": "char-1-v1",
+      "controller": 1,
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "phase": "AWAITING_BATCH_RESUME",
+      "pausedAction": {
+       "type": "SET_REST",
+       "target": {
+        "type": "SELF"
+       }
+      },
+      "remainingActions": [],
+      "resultRefs": [
+       [
+        "__replaced_card",
+        {
+         "targetInstanceIds": [
+          "char-1-v1"
+         ],
+         "count": 1
+        }
+       ]
+      ],
+      "validTargets": [],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [
+       {
+        "sourceCardInstanceId": "char-1-v1",
+        "groupSourceInstanceId": "char-1-v1",
+        "controller": 1,
+        "effectBlock": {
+         "id": "opt439-prompted-on-rest",
+         "category": "auto",
+         "trigger": {
+          "event": "CHARACTER_BECOMES_RESTED"
+         },
+         "actions": [
+          {
+           "type": "DRAW",
+           "params": {
+            "amount": 1
+           }
+          }
+         ],
+         "flags": {
+          "optional": true
+         }
+        },
+        "triggeringEvent": {
+         "type": "CARD_STATE_CHANGED",
+         "playerIndex": 1,
+         "payload": {
+          "targetInstanceId": "char-1-v1",
+          "newState": "RESTED",
+          "cause": "EFFECT",
+          "causingController": 1,
+          "causingSource": {
+           "instanceId": "char-1-v1",
+           "cardId": "CHAR-VANILLA",
+           "cardType": "Character"
+          }
+         },
+         "propagation": {
+          "triggerScanned": true
+         }
+        }
+       }
+      ],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [],
+      "batchResumeMarker": {
+       "kind": "SET_REST",
+       "pausedAction": {
+        "type": "SET_REST",
+        "target": {
+         "type": "SELF"
+        }
+       },
+       "remainingTargetIds": [],
+       "restedSoFar": [
+        "char-1-v1"
+       ]
+      }
+     },
+     {
+      "id": "ef_00000045",
+      "sourceCardInstanceId": "char-1-v1",
+      "controller": 1,
+      "effectDescription": "You may activate this effect.",
+      "effectBlock": {
+       "id": "opt439-prompted-on-rest",
+       "category": "auto",
+       "trigger": {
+        "event": "CHARACTER_BECOMES_RESTED"
+       },
+       "actions": [
+        {
+         "type": "DRAW",
+         "params": {
+          "amount": 1
+         }
+        }
+       ],
+       "flags": {
+        "optional": true
+       }
+      },
+      "phase": "AWAITING_OPTIONAL_RESPONSE",
+      "pausedAction": null,
+      "remainingActions": [
+       {
+        "type": "DRAW",
+        "params": {
+         "amount": 1
+        }
+       }
+      ],
+      "resultRefs": [
+       [
+        "__effect_source_snapshot",
+        {
+         "targetInstanceIds": [],
+         "count": 0,
+         "sourceCardSnapshot": {
+          "instanceId": "char-1-v1",
+          "cardId": "CHAR-VANILLA",
+          "zone": "CHARACTER",
+          "state": "RESTED",
+          "attachedDon": [],
+          "turnPlayed": 1,
+          "controller": 1,
+          "owner": 1
+         }
+        }
+       ]
+      ],
+      "validTargets": [],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": false,
+      "oncePerTurnMarked": false,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": []
+     }
+    ],
+    "eventLog": [
+     {
+      "type": "CARD_STATE_CHANGED",
+      "playerIndex": 1,
+      "payload": {
+       "targetInstanceId": "char-1-v1",
+       "newState": "RESTED",
+       "cause": "EFFECT",
+       "causingController": 1,
+       "causingSource": {
+        "instanceId": "char-1-v1",
+        "cardId": "CHAR-VANILLA",
+        "cardType": "Character"
+       }
+      },
+      "timestamp": 1
+     }
+    ],
+    "status": "IN_PROGRESS",
+    "winner": null,
+    "winReason": null,
+    "engineActionCount": 3
+   },
+   "cardDb": {
+    "LEADER-T": {
+     "id": "LEADER-T",
+     "name": "LEADER-T",
+     "type": "Leader",
+     "color": [
+      "Red"
+     ],
+     "cost": null,
+     "power": 5000,
+     "counter": null,
+     "life": 5,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-VANILLA": {
+     "id": "CHAR-VANILLA",
+     "name": "CHAR-VANILLA",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 3,
+     "power": 4000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-RUSH": {
+     "id": "CHAR-RUSH",
+     "name": "CHAR-RUSH",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Rush]",
+     "triggerText": null,
+     "keywords": {
+      "rush": true,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-RUSH-C": {
+     "id": "CHAR-RUSH-C",
+     "name": "CHAR-RUSH-C",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Rush: Character]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": true,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-DATK": {
+     "id": "CHAR-DATK",
+     "name": "CHAR-DATK",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 4,
+     "power": 5000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Double Attack]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": true,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-BLOCKER": {
+     "id": "CHAR-BLOCKER",
+     "name": "CHAR-BLOCKER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 3,
+     "power": 4000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Blocker]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": true,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-BANISH": {
+     "id": "CHAR-BANISH",
+     "name": "CHAR-BANISH",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Banish]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": true,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-TRIGGER": {
+     "id": "CHAR-TRIGGER",
+     "name": "CHAR-TRIGGER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": 2000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": "[Trigger] Play this card.",
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": true,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "effects": [
+       {
+        "id": "test_trigger",
+        "category": "auto",
+        "trigger": {
+         "keyword": "TRIGGER"
+        },
+        "actions": [
+         {
+          "type": "DRAW",
+          "params": {
+           "amount": 0
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    },
+    "CHAR-UNBLK": {
+     "id": "CHAR-UNBLK",
+     "name": "CHAR-UNBLK",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 4,
+     "power": 5000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Unblockable]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": true
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-COUNTER": {
+     "id": "CHAR-COUNTER",
+     "name": "CHAR-COUNTER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": 2000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "EVENT-CTR": {
+     "id": "EVENT-CTR",
+     "name": "EVENT-CTR",
+     "type": "Event",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": null,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "STAGE-T": {
+     "id": "STAGE-T",
+     "name": "STAGE-T",
+     "type": "Stage",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": null,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    }
+   }
+  },
+  "effect-trigger-effect-retained-events": {
+   "source": "5b 8823ad05 engine, OPT-963 review corpus state #209 (lifecycle)",
+   "state": {
+    "schemaVersion": 3,
+    "id": "test-game-001",
+    "executionContext": {
+     "version": 1,
+     "seed": "test-game-001",
+     "rngState": 2134618106,
+     "idCounter": 148,
+     "clockEpochMs": 0,
+     "clockCounter": 3,
+     "actionBudget": {
+      "limit": 1000,
+      "consumed": 3
+     },
+     "trace": {
+      "gameId": "test-game-001",
+      "traceId": "trace-3bfc8754"
+     }
+    },
+    "players": [
+     {
+      "playerId": "user-p1",
+      "leader": {
+       "instanceId": "card_00000001",
+       "cardId": "LEADER-T",
+       "zone": "LEADER",
+       "state": "ACTIVE",
+       "attachedDon": [],
+       "turnPlayed": null,
+       "controller": 0,
+       "owner": 0
+      },
+      "characters": [
+       {
+        "instanceId": "char-0-v1",
+        "cardId": "CHAR-VANILLA",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "char-0-b1",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       },
+       null,
+       null,
+       null
+      ],
+      "stage": null,
+      "donCostArea": [
+       {
+        "instanceId": "don-p0-0",
+        "state": "RESTED",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-1",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-2",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-3",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-4",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-5",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-6",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-7",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ],
+      "trash": [
+       {
+        "instanceId": "card_0000003z",
+        "cardId": "OP06-116",
+        "zone": "TRASH",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "removedFromGame": [],
+      "deckList": [
+       {
+        "cardId": "CHAR-VANILLA",
+        "count": 16
+       },
+       {
+        "cardId": "CHAR-RUSH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-DATK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BLOCKER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BANISH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-TRIGGER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-UNBLK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-COUNTER",
+        "count": 6
+       },
+       {
+        "cardId": "EVENT-CTR",
+        "count": 2
+       },
+       {
+        "cardId": "STAGE-T",
+        "count": 2
+       }
+      ],
+      "connected": false,
+      "awayReason": null,
+      "rejoinDeadlineAt": null,
+      "sleeveUrl": null,
+      "donArtUrl": null,
+      "hand": [
+       {
+        "instanceId": "card_0000003f",
+        "cardId": "CHAR-VANILLA",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003g",
+        "cardId": "CHAR-RUSH",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003h",
+        "cardId": "CHAR-DATK",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003i",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003j",
+        "cardId": "CHAR-COUNTER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "deck": [
+       {
+        "instanceId": "card_00000017",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000v",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000j",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001f",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000007",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000009",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000003",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000011",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000q",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000r",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001a",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000018",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000u",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000005",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000013",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000002",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001e",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000015",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000o",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000x",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000b",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000014",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000k",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000016",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000w",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000019",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000a",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000010",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001c",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001d",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000012",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000n",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000006",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000m",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000008",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000i",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000z",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000004",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000s",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000y",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "life": [
+       {
+        "instanceId": "p0-life-a",
+        "cardId": "CHAR-BANISH",
+        "face": "DOWN"
+       },
+       {
+        "instanceId": "p0-life-b",
+        "cardId": "CHAR-BANISH",
+        "face": "DOWN"
+       }
+      ],
+      "donDeck": [
+       {
+        "instanceId": "don_0000002v",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_0000002w",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ]
+     },
+     {
+      "playerId": "user-p2",
+      "leader": {
+       "instanceId": "card_0000001g",
+       "cardId": "LEADER-T",
+       "zone": "LEADER",
+       "state": "ACTIVE",
+       "attachedDon": [],
+       "turnPlayed": null,
+       "controller": 1,
+       "owner": 1
+      },
+      "characters": [
+       {
+        "instanceId": "char-1-v1",
+        "cardId": "CHAR-VANILLA",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "char-1-b1",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 1,
+        "owner": 1
+       },
+       null,
+       null,
+       null
+      ],
+      "stage": null,
+      "donCostArea": [
+       {
+        "instanceId": "don-p1-0",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-1",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-2",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-3",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-4",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-5",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ],
+      "trash": [
+       {
+        "instanceId": "card_00000043",
+        "cardId": "SYN-TRIGGER-KO",
+        "zone": "TRASH",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "removedFromGame": [],
+      "deckList": [
+       {
+        "cardId": "CHAR-VANILLA",
+        "count": 16
+       },
+       {
+        "cardId": "CHAR-RUSH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-DATK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BLOCKER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BANISH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-TRIGGER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-UNBLK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-COUNTER",
+        "count": 6
+       },
+       {
+        "cardId": "EVENT-CTR",
+        "count": 2
+       },
+       {
+        "cardId": "STAGE-T",
+        "count": 2
+       }
+      ],
+      "connected": false,
+      "awayReason": null,
+      "rejoinDeadlineAt": null,
+      "sleeveUrl": null,
+      "donArtUrl": null,
+      "hand": [
+       {
+        "instanceId": "card_0000003k",
+        "cardId": "CHAR-VANILLA",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003l",
+        "cardId": "CHAR-RUSH",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003m",
+        "cardId": "CHAR-DATK",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003n",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003o",
+        "cardId": "CHAR-COUNTER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "deck": [
+       {
+        "instanceId": "card_0000002c",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000023",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001x",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002m",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000021",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002k",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002e",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001l",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000029",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002o",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000027",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002p",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002d",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001o",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000022",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001y",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000026",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002b",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002n",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001m",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002s",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002r",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002u",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001k",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001q",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002a",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002j",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002i",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002t",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002f",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001i",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001h",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001p",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001n",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001z",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000025",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001j",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002l",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002h",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002g",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "life": [],
+      "donDeck": [
+       {
+        "instanceId": "don_00000035",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000036",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000037",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000038",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ]
+     }
+    ],
+    "turn": {
+     "number": 3,
+     "activePlayerIndex": 0,
+     "firstPlayerIndex": 0,
+     "phase": "MAIN",
+     "battleSubPhase": null,
+     "battle": null,
+     "oncePerTurnUsed": {},
+     "actionsPerformedThisTurn": [
+      {
+       "actionType": "PLAY_CARD",
+       "timestamp": 2,
+       "controller": 0,
+       "cardId": "OP06-116",
+       "cardType": "EVENT",
+       "baseCost": 1
+      }
+     ],
+     "deckHitZeroThisTurn": [
+      false,
+      false
+     ],
+     "triggerStagingInstanceIds": []
+    },
+    "pregame": null,
+    "activeEffects": [],
+    "prohibitions": [],
+    "scheduledActions": [],
+    "oneTimeModifiers": [],
+    "triggerRegistry": [],
+    "pendingPrompt": {
+     "options": {
+      "promptType": "SELECT_TARGET",
+      "cards": [
+       {
+        "instanceId": "char-0-v1",
+        "cardId": "CHAR-VANILLA",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "char-0-b1",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "validTargets": [
+       "char-0-v1",
+       "char-0-b1"
+      ],
+      "effectDescription": "[Trigger] K.O. up to 1 of your opponent's Characters.",
+      "instruction": "KO up to 1 of your opponent's Characters.",
+      "countMin": 0,
+      "countMax": 1,
+      "ctaLabel": "Confirm"
+     },
+     "respondingPlayer": 1,
+     "resumeContext": "ef_00000044"
+    },
+    "effectStack": [
+     {
+      "id": "ef_00000042",
+      "sourceCardInstanceId": "card_0000003z",
+      "controller": 0,
+      "effectDescription": "[Main] Choose one: K.O. up to 1 cost 5 or less, or if the opponent has 1 Life, deal 1 damage. Then add 1 Life to hand.",
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "phase": "INTERRUPTED_BY_TRIGGERS",
+      "pausedAction": {
+       "type": "DEAL_DAMAGE",
+       "target": {
+        "type": "PLAYER",
+        "controller": "OPPONENT"
+       },
+       "params": {
+        "amount": 1
+       },
+       "conditions": {
+        "type": "LIFE_COUNT",
+        "controller": "OPPONENT",
+        "operator": "==",
+        "value": 1
+       }
+      },
+      "remainingActions": [
+       {
+        "type": "LIFE_TO_HAND",
+        "params": {
+         "amount": 1,
+         "position": "TOP"
+        },
+        "chain": "THEN"
+       }
+      ],
+      "resultRefs": [
+       [
+        "__effect_source_snapshot",
+        {
+         "targetInstanceIds": [],
+         "count": 0,
+         "sourceCardSnapshot": {
+          "instanceId": "card_0000003z",
+          "cardId": "OP06-116",
+          "zone": "TRASH",
+          "state": "ACTIVE",
+          "attachedDon": [],
+          "turnPlayed": null,
+          "controller": 0,
+          "owner": 0
+         }
+        }
+       ]
+      ],
+      "validTargets": [],
+      "priorActionSucceeded": false,
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [
+       {
+        "type": "LIFE_COUNT_BECOMES_ZERO",
+        "playerIndex": 1,
+        "payload": {}
+       },
+       {
+        "type": "TRIGGER_ACTIVATED",
+        "playerIndex": 1,
+        "payload": {
+         "cardId": "SYN-TRIGGER-KO"
+        }
+       }
+      ]
+     },
+     {
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "pausedAction": null,
+      "remainingActions": [],
+      "resultRefs": [],
+      "validTargets": [],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [
+       {
+        "type": "TRIGGER_ACTIVATED",
+        "playerIndex": 1,
+        "payload": {
+         "cardId": "SYN-TRIGGER-KO",
+         "activated": true
+        }
+       },
+       {
+        "type": "CARD_REMOVED_FROM_LIFE",
+        "playerIndex": 1,
+        "payload": {
+         "cardInstanceId": "p1-life-ko",
+         "newCardInstanceId": "card_00000043"
+        }
+       }
+      ],
+      "id": "ef_00000041",
+      "sourceCardInstanceId": "card_0000003z",
+      "controller": 0,
+      "phase": "INTERRUPTED_BY_TRIGGERS",
+      "effectDamage": {
+       "stage": "TRIGGER_EFFECT",
+       "damagedPlayerIndex": 1,
+       "remainingDamages": 0,
+       "dealt": 1,
+       "sourceCardInstanceId": "card_0000003z",
+       "controllerIndex": 0,
+       "parentFrameId": "ef_00000042",
+       "lifeCardInstanceId": "p1-life-ko"
+      }
+     },
+     {
+      "id": "ef_00000044",
+      "sourceCardInstanceId": "card_00000043",
+      "controller": 1,
+      "remainingActionsController": 1,
+      "effectDescription": "[Trigger] K.O. up to 1 of your opponent's Characters.",
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "phase": "AWAITING_TARGET_SELECTION",
+      "pausedAction": {
+       "type": "KO",
+       "target": {
+        "type": "CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+         "up_to": 1
+        }
+       }
+      },
+      "remainingActions": [],
+      "resultRefs": [
+       [
+        "__effect_source_snapshot",
+        {
+         "targetInstanceIds": [],
+         "count": 0,
+         "sourceCardSnapshot": {
+          "instanceId": "card_00000043",
+          "cardId": "SYN-TRIGGER-KO",
+          "zone": "TRASH",
+          "state": "ACTIVE",
+          "attachedDon": [],
+          "turnPlayed": null,
+          "controller": 1,
+          "owner": 1
+         }
+        }
+       ]
+      ],
+      "validTargets": [
+       "char-0-v1",
+       "char-0-b1"
+      ],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": []
+     }
+    ],
+    "eventLog": [
+     {
+      "type": "CARD_PLAYED",
+      "playerIndex": 0,
+      "payload": {
+       "cardId": "OP06-116",
+       "cardInstanceId": "card_0000003z",
+       "zone": "TRASH",
+       "source": "FROM_HAND",
+       "sourceZone": "HAND"
+      },
+      "timestamp": 0
+     },
+     {
+      "type": "EVENT_ACTIVATED_FROM_HAND",
+      "playerIndex": 0,
+      "payload": {
+       "cardId": "OP06-116",
+       "cardInstanceId": "card_0000003z",
+       "costReducedAmount": 0
+      },
+      "timestamp": 1
+     }
+    ],
+    "status": "IN_PROGRESS",
+    "winner": null,
+    "winReason": null,
+    "engineActionCount": 3,
+    "engineOutcome": null,
+    "pendingEventActivationEvents": [
+     {
+      "type": "CARD_PLAYED",
+      "playerIndex": 0,
+      "payload": {
+       "cardId": "OP06-116",
+       "cardInstanceId": "card_0000003z",
+       "zone": "TRASH",
+       "source": "FROM_HAND",
+       "sourceZone": "HAND"
+      },
+      "propagation": {
+       "eventLogEmitted": true
+      }
+     },
+     {
+      "type": "EVENT_ACTIVATED_FROM_HAND",
+      "playerIndex": 0,
+      "payload": {
+       "cardId": "OP06-116",
+       "cardInstanceId": "card_0000003z",
+       "costReducedAmount": 0
+      },
+      "propagation": {
+       "eventLogEmitted": true
+      }
+     }
+    ]
+   },
+   "cardDb": {
+    "LEADER-T": {
+     "id": "LEADER-T",
+     "name": "LEADER-T",
+     "type": "Leader",
+     "color": [
+      "Red"
+     ],
+     "cost": null,
+     "power": 5000,
+     "counter": null,
+     "life": 5,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-VANILLA": {
+     "id": "CHAR-VANILLA",
+     "name": "CHAR-VANILLA",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 3,
+     "power": 4000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-RUSH": {
+     "id": "CHAR-RUSH",
+     "name": "CHAR-RUSH",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Rush]",
+     "triggerText": null,
+     "keywords": {
+      "rush": true,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-RUSH-C": {
+     "id": "CHAR-RUSH-C",
+     "name": "CHAR-RUSH-C",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Rush: Character]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": true,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-DATK": {
+     "id": "CHAR-DATK",
+     "name": "CHAR-DATK",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 4,
+     "power": 5000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Double Attack]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": true,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-BLOCKER": {
+     "id": "CHAR-BLOCKER",
+     "name": "CHAR-BLOCKER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 3,
+     "power": 4000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Blocker]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": true,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-BANISH": {
+     "id": "CHAR-BANISH",
+     "name": "CHAR-BANISH",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Banish]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": true,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-TRIGGER": {
+     "id": "CHAR-TRIGGER",
+     "name": "CHAR-TRIGGER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": 2000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": "[Trigger] Play this card.",
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": true,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "effects": [
+       {
+        "id": "test_trigger",
+        "category": "auto",
+        "trigger": {
+         "keyword": "TRIGGER"
+        },
+        "actions": [
+         {
+          "type": "DRAW",
+          "params": {
+           "amount": 0
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    },
+    "CHAR-UNBLK": {
+     "id": "CHAR-UNBLK",
+     "name": "CHAR-UNBLK",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 4,
+     "power": 5000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Unblockable]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": true
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-COUNTER": {
+     "id": "CHAR-COUNTER",
+     "name": "CHAR-COUNTER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": 2000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "EVENT-CTR": {
+     "id": "EVENT-CTR",
+     "name": "EVENT-CTR",
+     "type": "Event",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": null,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "STAGE-T": {
+     "id": "STAGE-T",
+     "name": "STAGE-T",
+     "type": "Stage",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": null,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "SYN-TRIGGER-LIFE": {
+     "id": "SYN-TRIGGER-LIFE",
+     "name": "SYN-TRIGGER-LIFE",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": 2000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": "[Trigger] Add 1 from deck to Life.",
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": true,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "card_id": "SYN-TRIGGER-LIFE",
+      "card_name": "SYN-TRIGGER-LIFE",
+      "card_type": "Character",
+      "effects": [
+       {
+        "id": "syn_trigger_life",
+        "category": "auto",
+        "trigger": {
+         "keyword": "TRIGGER"
+        },
+        "actions": [
+         {
+          "type": "ADD_TO_LIFE_FROM_DECK",
+          "params": {
+           "amount": 1,
+           "position": "TOP",
+           "face": "DOWN"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    },
+    "SYN-TRIGGER-KO": {
+     "id": "SYN-TRIGGER-KO",
+     "name": "SYN-TRIGGER-KO",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": 2000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": "[Trigger] K.O. up to 1 of your opponent's Characters.",
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": true,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "card_id": "SYN-TRIGGER-KO",
+      "card_name": "SYN-TRIGGER-KO",
+      "card_type": "Character",
+      "effects": [
+       {
+        "id": "syn_trigger_ko",
+        "category": "auto",
+        "trigger": {
+         "keyword": "TRIGGER"
+        },
+        "actions": [
+         {
+          "type": "KO",
+          "target": {
+           "type": "CHARACTER",
+           "controller": "OPPONENT",
+           "count": {
+            "up_to": 1
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    },
+    "OP06-116": {
+     "id": "OP06-116",
+     "name": "Reject",
+     "type": "Event",
+     "color": [
+      "Purple"
+     ],
+     "cost": 1,
+     "power": null,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Main] Choose one: K.O. up to 1 cost 5 or less, or if the opponent has 1 Life, deal 1 damage. Then add 1 Life to hand.",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "card_id": "OP06-116",
+      "card_name": "Reject",
+      "card_type": "Event",
+      "effects": [
+       {
+        "id": "OP06-116_effect_1",
+        "category": "auto",
+        "trigger": {
+         "keyword": "MAIN_EVENT"
+        },
+        "actions": [
+         {
+          "type": "PLAYER_CHOICE",
+          "params": {
+           "options": [
+            [
+             {
+              "type": "KO",
+              "target": {
+               "type": "CHARACTER",
+               "controller": "OPPONENT",
+               "count": {
+                "up_to": 1
+               },
+               "filter": {
+                "cost_max": 5
+               }
+              }
+             }
+            ],
+            [
+             {
+              "type": "DEAL_DAMAGE",
+              "target": {
+               "type": "PLAYER",
+               "controller": "OPPONENT"
+              },
+              "params": {
+               "amount": 1
+              },
+              "conditions": {
+               "type": "LIFE_COUNT",
+               "controller": "OPPONENT",
+               "operator": "==",
+               "value": 1
+              }
+             },
+             {
+              "type": "LIFE_TO_HAND",
+              "params": {
+               "amount": 1,
+               "position": "TOP"
+              },
+              "chain": "THEN"
+             }
+            ]
+           ],
+           "labels": [
+            "K.O. up to 1 opponent Character with cost 5 or less",
+            "If opponent has 1 Life, deal 1 damage then add 1 Life to hand"
+           ]
+          }
+         }
+        ]
+       },
+       {
+        "id": "OP06-116_trigger",
+        "category": "auto",
+        "trigger": {
+         "keyword": "TRIGGER"
+        },
+        "actions": [
+         {
+          "type": "DRAW",
+          "params": {
+           "amount": 1
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    }
+   }
+  },
+  "both-trigger-windows": {
+   "source": "5b 8823ad05 engine, OPT-963 review corpus state #240 (lifecycle)",
+   "state": {
+    "schemaVersion": 3,
+    "id": "test-game-001",
+    "executionContext": {
+     "version": 1,
+     "seed": "test-game-001",
+     "rngState": 2134618106,
+     "idCounter": 151,
+     "clockEpochMs": 0,
+     "clockCounter": 20,
+     "actionBudget": {
+      "limit": 1000,
+      "consumed": 3
+     },
+     "trace": {
+      "gameId": "test-game-001",
+      "traceId": "trace-3bfc8754"
+     }
+    },
+    "players": [
+     {
+      "playerId": "user-p1",
+      "leader": {
+       "instanceId": "card_00000001",
+       "cardId": "SYN-LEADER-DAMAGE-KO",
+       "zone": "LEADER",
+       "state": "RESTED",
+       "attachedDon": [],
+       "turnPlayed": null,
+       "controller": 0,
+       "owner": 0
+      },
+      "characters": [
+       {
+        "instanceId": "char-0-v1",
+        "cardId": "CHAR-VANILLA",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "char-0-b1",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "CHARACTER",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": 1,
+        "controller": 0,
+        "owner": 0
+       },
+       null,
+       null,
+       null
+      ],
+      "stage": null,
+      "donCostArea": [
+       {
+        "instanceId": "don-p0-0",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-1",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-2",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-3",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-4",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-5",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-6",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p0-7",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ],
+      "trash": [],
+      "removedFromGame": [],
+      "deckList": [
+       {
+        "cardId": "CHAR-VANILLA",
+        "count": 16
+       },
+       {
+        "cardId": "CHAR-RUSH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-DATK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BLOCKER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BANISH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-TRIGGER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-UNBLK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-COUNTER",
+        "count": 6
+       },
+       {
+        "cardId": "EVENT-CTR",
+        "count": 2
+       },
+       {
+        "cardId": "STAGE-T",
+        "count": 2
+       }
+      ],
+      "connected": false,
+      "awayReason": null,
+      "rejoinDeadlineAt": null,
+      "sleeveUrl": null,
+      "donArtUrl": null,
+      "hand": [
+       {
+        "instanceId": "card_0000003f",
+        "cardId": "CHAR-VANILLA",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003g",
+        "cardId": "CHAR-RUSH",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003h",
+        "cardId": "CHAR-DATK",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003i",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000003j",
+        "cardId": "CHAR-COUNTER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "deck": [
+       {
+        "instanceId": "card_00000017",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000v",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000j",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001f",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000007",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000009",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000003",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000011",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000q",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000r",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001a",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000018",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000u",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000005",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000013",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000002",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001e",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000015",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000o",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000x",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000b",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000014",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000k",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000016",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000w",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000019",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000a",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000010",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001c",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000001d",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000012",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000n",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000006",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000m",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000008",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000i",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000z",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_00000004",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000s",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       },
+       {
+        "instanceId": "card_0000000y",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "life": [
+       {
+        "instanceId": "life-golden-p0-vanilla",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       }
+      ],
+      "donDeck": [
+       {
+        "instanceId": "don_0000002v",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_0000002w",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ]
+     },
+     {
+      "playerId": "user-p2",
+      "leader": {
+       "instanceId": "card_0000001g",
+       "cardId": "LEADER-T",
+       "zone": "LEADER",
+       "state": "ACTIVE",
+       "attachedDon": [],
+       "turnPlayed": null,
+       "controller": 1,
+       "owner": 1
+      },
+      "characters": [
+       null,
+       null,
+       null,
+       null,
+       null
+      ],
+      "stage": null,
+      "donCostArea": [
+       {
+        "instanceId": "don-p1-0",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-1",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-2",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-3",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-4",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don-p1-5",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ],
+      "trash": [
+       {
+        "instanceId": "card_00000044",
+        "cardId": "SYN-ROBIN-ON-KO-DAMAGE",
+        "zone": "TRASH",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "removedFromGame": [],
+      "deckList": [
+       {
+        "cardId": "CHAR-VANILLA",
+        "count": 16
+       },
+       {
+        "cardId": "CHAR-RUSH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-DATK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BLOCKER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-BANISH",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-TRIGGER",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-UNBLK",
+        "count": 4
+       },
+       {
+        "cardId": "CHAR-COUNTER",
+        "count": 6
+       },
+       {
+        "cardId": "EVENT-CTR",
+        "count": 2
+       },
+       {
+        "cardId": "STAGE-T",
+        "count": 2
+       }
+      ],
+      "connected": false,
+      "awayReason": null,
+      "rejoinDeadlineAt": null,
+      "sleeveUrl": null,
+      "donArtUrl": null,
+      "hand": [
+       {
+        "instanceId": "card_0000003k",
+        "cardId": "CHAR-VANILLA",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003l",
+        "cardId": "CHAR-RUSH",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003m",
+        "cardId": "CHAR-DATK",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003n",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000003o",
+        "cardId": "CHAR-COUNTER",
+        "zone": "HAND",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "deck": [
+       {
+        "instanceId": "card_0000002c",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000023",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001x",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002m",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000021",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002k",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002e",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001l",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000029",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002o",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000027",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002p",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002d",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001o",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000022",
+        "cardId": "CHAR-DATK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001y",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000026",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002b",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002n",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001m",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002s",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002r",
+        "cardId": "EVENT-CTR",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002u",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001k",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001q",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002a",
+        "cardId": "CHAR-BANISH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002j",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002i",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002t",
+        "cardId": "STAGE-T",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002f",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001i",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001h",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001p",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001n",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001z",
+        "cardId": "CHAR-RUSH",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_00000025",
+        "cardId": "CHAR-BLOCKER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000001j",
+        "cardId": "CHAR-VANILLA",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002l",
+        "cardId": "CHAR-COUNTER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002h",
+        "cardId": "CHAR-UNBLK",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       },
+       {
+        "instanceId": "card_0000002g",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "DECK",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 1,
+        "owner": 1
+       }
+      ],
+      "life": [
+       {
+        "instanceId": "life-golden-p1-vanilla",
+        "cardId": "CHAR-VANILLA",
+        "face": "DOWN"
+       }
+      ],
+      "donDeck": [
+       {
+        "instanceId": "don_00000035",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000036",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000037",
+        "state": "ACTIVE",
+        "attachedTo": null
+       },
+       {
+        "instanceId": "don_00000038",
+        "state": "ACTIVE",
+        "attachedTo": null
+       }
+      ]
+     }
+    ],
+    "turn": {
+     "number": 3,
+     "activePlayerIndex": 0,
+     "firstPlayerIndex": 0,
+     "phase": "MAIN",
+     "battleSubPhase": "DAMAGE_STEP",
+     "battle": {
+      "battleId": "battle_00000041",
+      "attackerInstanceId": "card_00000001",
+      "targetInstanceId": "card_0000001g",
+      "attackerPower": 5000,
+      "defenderPower": 5000,
+      "counterPowerAdded": 0,
+      "blockerActivated": false,
+      "damagesRemaining": 1
+     },
+     "oncePerTurnUsed": {},
+     "actionsPerformedThisTurn": [
+      {
+       "actionType": "DECLARE_ATTACK",
+       "timestamp": 6
+      },
+      {
+       "actionType": "PASS",
+       "timestamp": 11
+      },
+      {
+       "actionType": "CHARACTER_KO",
+       "timestamp": 19,
+       "controller": 1
+      }
+     ],
+     "deckHitZeroThisTurn": [
+      false,
+      false
+     ]
+    },
+    "pregame": null,
+    "activeEffects": [],
+    "prohibitions": [],
+    "scheduledActions": [],
+    "oneTimeModifiers": [],
+    "triggerRegistry": [
+     {
+      "id": "trigger_0000003z",
+      "sourceCardInstanceId": "card_00000001",
+      "effectBlockId": "syn-leader-damage-ko",
+      "trigger": {
+       "event": "ATTACK_DEALS_DAMAGE",
+       "filter": {
+        "attacker": "SELF"
+       }
+      },
+      "effectBlock": {
+       "id": "syn-leader-damage-ko",
+       "category": "auto",
+       "trigger": {
+        "event": "ATTACK_DEALS_DAMAGE",
+        "filter": {
+         "attacker": "SELF"
+        }
+       },
+       "actions": [
+        {
+         "type": "KO",
+         "target": {
+          "type": "CHARACTER",
+          "controller": "OPPONENT",
+          "count": {
+           "up_to": 1
+          }
+         }
+        }
+       ]
+      },
+      "zone": "FIELD",
+      "controller": 0
+     }
+    ],
+    "pendingPrompt": {
+     "options": {
+      "promptType": "REVEAL_TRIGGER",
+      "cards": [
+       {
+        "instanceId": "life-golden-p0-trigger",
+        "cardId": "CHAR-TRIGGER",
+        "zone": "LIFE",
+        "state": "ACTIVE",
+        "attachedDon": [],
+        "turnPlayed": null,
+        "controller": 0,
+        "owner": 0
+       }
+      ],
+      "effectDescription": "[Trigger] Play this card.",
+      "optional": false,
+      "timeoutMs": 30000
+     },
+     "respondingPlayer": 0,
+     "resumeContext": "ef_00000046"
+    },
+    "effectStack": [
+     {
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "pausedAction": null,
+      "remainingActions": [],
+      "resultRefs": [],
+      "validTargets": [],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [],
+      "id": "ef_00000042",
+      "sourceCardInstanceId": "card_00000001",
+      "controller": 0,
+      "phase": "AWAITING_TRIGGER_REVEAL",
+      "battleDamage": {
+       "stage": "TRIGGER_WINDOW",
+       "battleId": "battle_00000041",
+       "damagedPlayerIndex": 1,
+       "lifeCard": {
+        "instanceId": "life-golden-p1-trigger",
+        "cardId": "CHAR-TRIGGER",
+        "face": "DOWN"
+       }
+      }
+     },
+     {
+      "id": "ef_00000045",
+      "sourceCardInstanceId": "card_00000001",
+      "controller": 0,
+      "effectDescription": "You may activate this effect.",
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "phase": "AWAITING_BATCH_RESUME",
+      "pausedAction": {
+       "type": "KO",
+       "target": {
+        "type": "CHARACTER",
+        "controller": "OPPONENT",
+        "count": {
+         "up_to": 1
+        }
+       }
+      },
+      "remainingActions": [],
+      "resultRefs": [
+       [
+        "__effect_source_snapshot",
+        {
+         "targetInstanceIds": [],
+         "count": 0,
+         "sourceCardSnapshot": {
+          "instanceId": "card_00000001",
+          "cardId": "SYN-LEADER-DAMAGE-KO",
+          "zone": "LEADER",
+          "state": "RESTED",
+          "attachedDon": [],
+          "turnPlayed": null,
+          "controller": 0,
+          "owner": 0
+         }
+        }
+       ]
+      ],
+      "validTargets": [],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [
+       {
+        "sourceCardInstanceId": "card_00000044",
+        "groupSourceInstanceId": "card_00000001",
+        "controller": 1,
+        "effectBlock": {
+         "id": "syn-robin-on-ko-damage",
+         "category": "auto",
+         "trigger": {
+          "keyword": "ON_KO"
+         },
+         "actions": [
+          {
+           "type": "DEAL_DAMAGE",
+           "target": {
+            "type": "PLAYER",
+            "controller": "OPPONENT"
+           },
+           "params": {
+            "amount": 1
+           }
+          }
+         ]
+        },
+        "triggeringEvent": {
+         "type": "CARD_KO",
+         "playerIndex": 1,
+         "payload": {
+          "cardInstanceId": "robin-golden",
+          "newCardInstanceId": "card_00000044",
+          "cardId": "SYN-ROBIN-ON-KO-DAMAGE",
+          "cause": "OPPONENT_EFFECT",
+          "causingController": 0,
+          "sourceZone": "CHARACTER",
+          "sourceController": 1,
+          "movementCause": "EFFECT",
+          "preKO_donCount": 0,
+          "preKO_basePower": 4000
+         },
+         "propagation": {
+          "triggerScanned": true
+         }
+        }
+       }
+      ],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [],
+      "batchResumeMarker": {
+       "kind": "KO",
+       "pausedAction": {
+        "type": "KO",
+        "target": {
+         "type": "CHARACTER",
+         "controller": "OPPONENT",
+         "count": {
+          "up_to": 1
+         }
+        }
+       },
+       "remainingTargetIds": [],
+       "koedSoFar": [
+        "card_00000044"
+       ]
+      }
+     },
+     {
+      "id": "ef_00000047",
+      "sourceCardInstanceId": "card_00000044",
+      "controller": 1,
+      "effectDescription": "You may activate this effect.",
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "phase": "INTERRUPTED_BY_TRIGGERS",
+      "pausedAction": {
+       "type": "DEAL_DAMAGE",
+       "target": {
+        "type": "PLAYER",
+        "controller": "OPPONENT"
+       },
+       "params": {
+        "amount": 1
+       }
+      },
+      "remainingActions": [],
+      "resultRefs": [
+       [
+        "__effect_source_snapshot",
+        {
+         "targetInstanceIds": [],
+         "count": 0,
+         "sourceCardSnapshot": {
+          "instanceId": "card_00000044",
+          "cardId": "SYN-ROBIN-ON-KO-DAMAGE",
+          "zone": "TRASH",
+          "state": "ACTIVE",
+          "attachedDon": [],
+          "turnPlayed": null,
+          "controller": 1,
+          "owner": 1
+         }
+        }
+       ],
+       [
+        "__triggering_card",
+        {
+         "targetInstanceIds": [
+          "robin-golden"
+         ],
+         "count": 1
+        }
+       ]
+      ],
+      "validTargets": [],
+      "priorActionSucceeded": false,
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [
+       {
+        "type": "TRIGGER_ACTIVATED",
+        "playerIndex": 0,
+        "payload": {
+         "cardId": "CHAR-TRIGGER"
+        }
+       }
+      ]
+     },
+     {
+      "effectBlock": {
+       "id": "__engine_continuation__",
+       "category": "auto"
+      },
+      "pausedAction": null,
+      "remainingActions": [],
+      "resultRefs": [],
+      "validTargets": [],
+      "costs": [],
+      "currentCostIndex": 0,
+      "costsPaid": true,
+      "oncePerTurnMarked": true,
+      "costResultRefs": [],
+      "pendingTriggers": [],
+      "simultaneousTriggers": [],
+      "accumulatedEvents": [],
+      "id": "ef_00000046",
+      "sourceCardInstanceId": "card_00000044",
+      "controller": 1,
+      "phase": "AWAITING_TRIGGER_REVEAL",
+      "effectDamage": {
+       "stage": "TRIGGER_WINDOW",
+       "damagedPlayerIndex": 0,
+       "remainingDamages": 0,
+       "dealt": 1,
+       "sourceCardInstanceId": "card_00000044",
+       "controllerIndex": 1,
+       "lifeCard": {
+        "instanceId": "life-golden-p0-trigger",
+        "cardId": "CHAR-TRIGGER",
+        "face": "DOWN"
+       },
+       "parentFrameId": "ef_00000047"
+      }
+     }
+    ],
+    "eventLog": [
+     {
+      "type": "CARD_STATE_CHANGED",
+      "playerIndex": 0,
+      "payload": {
+       "cardInstanceId": "card_00000001",
+       "newState": "RESTED"
+      },
+      "timestamp": 0
+     },
+     {
+      "type": "ATTACK_DECLARED",
+      "playerIndex": 0,
+      "payload": {
+       "attackerInstanceId": "card_00000001",
+       "targetInstanceId": "card_0000001g",
+       "attackerPower": 5000
+      },
+      "timestamp": 1
+     },
+     {
+      "type": "PHASE_CHANGED",
+      "playerIndex": 0,
+      "payload": {
+       "from": "ATTACK_STEP",
+       "to": "BLOCK_STEP"
+      },
+      "timestamp": 2
+     },
+     {
+      "type": "ATTACK_TARGET_FINAL",
+      "playerIndex": 0,
+      "payload": {
+       "attackerInstanceId": "card_00000001",
+       "targetInstanceId": "card_0000001g",
+       "redirected": false
+      },
+      "timestamp": 7
+     },
+     {
+      "type": "PHASE_CHANGED",
+      "playerIndex": 0,
+      "payload": {
+       "from": "BLOCK_STEP",
+       "to": "COUNTER_STEP"
+      },
+      "timestamp": 8
+     },
+     {
+      "type": "PHASE_CHANGED",
+      "playerIndex": 0,
+      "payload": {
+       "from": "COUNTER_STEP",
+       "to": "DAMAGE_STEP"
+      },
+      "timestamp": 12
+     },
+     {
+      "type": "DAMAGE_DEALT",
+      "playerIndex": 0,
+      "payload": {
+       "amount": 1,
+       "attackerInstanceId": "card_00000001",
+       "attackerType": "LEADER",
+       "firstDamageOfAttack": true
+      },
+      "timestamp": 13
+     },
+     {
+      "type": "TRIGGER_ACTIVATED",
+      "playerIndex": 1,
+      "payload": {
+       "cardId": "CHAR-TRIGGER"
+      },
+      "timestamp": 14
+     },
+     {
+      "type": "CARD_KO",
+      "playerIndex": 1,
+      "payload": {
+       "cardInstanceId": "robin-golden",
+       "newCardInstanceId": "card_00000044",
+       "cardId": "SYN-ROBIN-ON-KO-DAMAGE",
+       "cause": "OPPONENT_EFFECT",
+       "causingController": 0,
+       "sourceZone": "CHARACTER",
+       "sourceController": 1,
+       "movementCause": "EFFECT",
+       "preKO_donCount": 0,
+       "preKO_basePower": 4000
+      },
+      "timestamp": 19
+     }
+    ],
+    "status": "IN_PROGRESS",
+    "winner": null,
+    "winReason": null,
+    "engineActionCount": 3,
+    "engineOutcome": null
+   },
+   "cardDb": {
+    "LEADER-T": {
+     "id": "LEADER-T",
+     "name": "LEADER-T",
+     "type": "Leader",
+     "color": [
+      "Red"
+     ],
+     "cost": null,
+     "power": 5000,
+     "counter": null,
+     "life": 5,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-VANILLA": {
+     "id": "CHAR-VANILLA",
+     "name": "CHAR-VANILLA",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 3,
+     "power": 4000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-RUSH": {
+     "id": "CHAR-RUSH",
+     "name": "CHAR-RUSH",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Rush]",
+     "triggerText": null,
+     "keywords": {
+      "rush": true,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-RUSH-C": {
+     "id": "CHAR-RUSH-C",
+     "name": "CHAR-RUSH-C",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Rush: Character]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": true,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-DATK": {
+     "id": "CHAR-DATK",
+     "name": "CHAR-DATK",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 4,
+     "power": 5000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Double Attack]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": true,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-BLOCKER": {
+     "id": "CHAR-BLOCKER",
+     "name": "CHAR-BLOCKER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 3,
+     "power": 4000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Blocker]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": true,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-BANISH": {
+     "id": "CHAR-BANISH",
+     "name": "CHAR-BANISH",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Banish]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": true,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-TRIGGER": {
+     "id": "CHAR-TRIGGER",
+     "name": "CHAR-TRIGGER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": 2000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": "[Trigger] Play this card.",
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": true,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "effects": [
+       {
+        "id": "test_trigger",
+        "category": "auto",
+        "trigger": {
+         "keyword": "TRIGGER"
+        },
+        "actions": [
+         {
+          "type": "DRAW",
+          "params": {
+           "amount": 0
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    },
+    "CHAR-UNBLK": {
+     "id": "CHAR-UNBLK",
+     "name": "CHAR-UNBLK",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 4,
+     "power": 5000,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "[Unblockable]",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": true
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "CHAR-COUNTER": {
+     "id": "CHAR-COUNTER",
+     "name": "CHAR-COUNTER",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": 3000,
+     "counter": 2000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "EVENT-CTR": {
+     "id": "EVENT-CTR",
+     "name": "EVENT-CTR",
+     "type": "Event",
+     "color": [
+      "Red"
+     ],
+     "cost": 1,
+     "power": null,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "STAGE-T": {
+     "id": "STAGE-T",
+     "name": "STAGE-T",
+     "type": "Stage",
+     "color": [
+      "Red"
+     ],
+     "cost": 2,
+     "power": null,
+     "counter": null,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": null,
+     "imageUrl": null
+    },
+    "SYN-LEADER-DAMAGE-KO": {
+     "id": "SYN-LEADER-DAMAGE-KO",
+     "name": "SYN-LEADER-DAMAGE-KO",
+     "type": "Leader",
+     "color": [
+      "Red"
+     ],
+     "cost": null,
+     "power": 5000,
+     "counter": null,
+     "life": 5,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "card_id": "SYN-LEADER-DAMAGE-KO",
+      "card_name": "SYN-LEADER-DAMAGE-KO",
+      "card_type": "Leader",
+      "effects": [
+       {
+        "id": "syn-leader-damage-ko",
+        "category": "auto",
+        "trigger": {
+         "event": "ATTACK_DEALS_DAMAGE",
+         "filter": {
+          "attacker": "SELF"
+         }
+        },
+        "actions": [
+         {
+          "type": "KO",
+          "target": {
+           "type": "CHARACTER",
+           "controller": "OPPONENT",
+           "count": {
+            "up_to": 1
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    },
+    "SYN-ROBIN-ON-KO-DAMAGE": {
+     "id": "SYN-ROBIN-ON-KO-DAMAGE",
+     "name": "SYN-ROBIN-ON-KO-DAMAGE",
+     "type": "Character",
+     "color": [
+      "Red"
+     ],
+     "cost": 3,
+     "power": 4000,
+     "counter": 1000,
+     "life": null,
+     "attribute": [],
+     "types": [],
+     "effectText": "",
+     "triggerText": null,
+     "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+     },
+     "effectSchema": {
+      "card_id": "SYN-ROBIN-ON-KO-DAMAGE",
+      "card_name": "SYN-ROBIN-ON-KO-DAMAGE",
+      "card_type": "Character",
+      "effects": [
+       {
+        "id": "syn-robin-on-ko-damage",
+        "category": "auto",
+        "trigger": {
+         "keyword": "ON_KO"
+        },
+        "actions": [
+         {
+          "type": "DEAL_DAMAGE",
+          "target": {
+           "type": "PLAYER",
+           "controller": "OPPONENT"
+          },
+          "params": {
+           "amount": 1
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "imageUrl": null
+    }
+   }
+  }
+ }
+}

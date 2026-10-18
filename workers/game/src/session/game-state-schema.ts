@@ -406,11 +406,38 @@ const convertFromV2: Converter = (raw, location) => {
   };
 };
 
-/** Version 3 is validated as written; the converter only removes the envelope key. */
-const convertFromV3: Converter = (raw) => {
+/** The version 2 records the version 3 writer lifted into frames (SAVED-STATE-COMPATIBILITY.md §8.3). */
+const VERSION_2_RECORDS_RETIRED_BY_V3 = ["pendingTriggerFromEffect", "pendingBattleDamageContinuation"] as const;
+
+/**
+ * Version 3 is validated as written; the converter removes the envelope key
+ * and rejects, by name, a version 2 record beside the frames: this writer
+ * lifts every such record into a frame (§8.3), so an object carrying both has
+ * two owners for one continuation and was not written by it. (The strict
+ * schema would reject the unknown key too; the named reason locates it.)
+ */
+const convertFromV3: Converter = (raw, location) => {
   if (!(GAME_STATE_SCHEMA_VERSION_KEY in raw)) return raw;
   const rest: Record<string, unknown> = { ...raw };
   delete rest[GAME_STATE_SCHEMA_VERSION_KEY];
+  const reject = (field: string) => {
+    throw new SessionLoadError(
+      location,
+      `is schemaVersion 3 but carries ${field}, a version 2 record the version 3 writer lifts into a frame`
+    );
+  };
+  const turn = isRecord(rest.turn) ? rest.turn : undefined;
+  if (turn) {
+    for (const key of VERSION_2_RECORDS_RETIRED_BY_V3) {
+      if (turn[key] !== undefined && turn[key] !== null) reject(`turn.${key}`);
+    }
+    if (isRecord(turn.battle) && turn.battle.pendingTriggerLifeCard !== undefined) reject("turn.battle.pendingTriggerLifeCard");
+  }
+  if (Array.isArray(rest.effectStack)) {
+    rest.effectStack.forEach((frame: unknown, index: number) => {
+      if (isRecord(frame) && frame.replacementBatchContinuation !== undefined) reject(`effectStack[${index}].replacementBatchContinuation`);
+    });
+  }
   return rest;
 };
 
@@ -475,6 +502,12 @@ function frameInvariantViolation(
   kind: EffectStackFrameKind,
   state: GameState
 ): string | null {
+  // Only a damage frame at TRIGGER_WINDOW waits for a reveal: the phase is
+  // written by openBattleTriggerWindow and continueEffectDamageSequence alone
+  // (engine/damage-frames.ts, engine/effect-damage.ts).
+  if (frame.phase === "AWAITING_TRIGGER_REVEAL" && kind !== "BATTLE_DAMAGE" && kind !== "EFFECT_DAMAGE") {
+    return `is ${kind} but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal`;
+  }
   switch (kind) {
     case "PHASE_BOUNDARY": {
       const continuation = frame.phaseBoundaryContinuation!;
@@ -732,6 +765,23 @@ export function validateContinuationReferences(
     throw new SessionLoadError(
       location,
       `effectStack[${unownedOffer}] (frame ${JSON.stringify(frame.id)}) is a REPLACEMENT frame waiting for an answer, but pendingPrompt does not name it`
+    );
+  }
+  // Likewise a REPLACEMENT_BATCH frame offering a match: openReplacementBatchFrame
+  // at AWAITING_OPTIONAL_RESPONSE and the prompt naming it are one step
+  // (engine/replacements.ts, stepBatch); no engine state holds the offer
+  // without its prompt (0 of 286 engine-written version 3 states, OPT-963 review).
+  const unownedBatchOffer = frames.findIndex(
+    (frame) =>
+      frameKindOf(frame) === "REPLACEMENT_BATCH" &&
+      frame.phase === "AWAITING_OPTIONAL_RESPONSE" &&
+      prompt?.resumeContext !== frame.id
+  );
+  if (unownedBatchOffer >= 0) {
+    const frame = frames[unownedBatchOffer];
+    throw new SessionLoadError(
+      location,
+      `effectStack[${unownedBatchOffer}] (frame ${JSON.stringify(frame.id)}) is a REPLACEMENT_BATCH frame offering a match, but pendingPrompt does not name it`
     );
   }
 }

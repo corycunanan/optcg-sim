@@ -389,12 +389,35 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
   });
 
   it.each([
-    ["pendingTriggerFromEffect", (turn: Record<string, unknown>) => { turn.pendingTriggerFromEffect = { lifeCard: { instanceId: "l", cardId: "c", face: "DOWN" }, damagedPlayerIndex: 1, remainingDamages: 0, sourceCardInstanceId: "s", controllerIndex: 0 }; }],
-    ["pendingBattleDamageContinuation", (turn: Record<string, unknown>) => { turn.pendingBattleDamageContinuation = { battleId: "b", stage: "CHARACTER_KO_REPLACEMENT", targetInstanceId: "t", causingPlayerIndex: 0, attackerIsCharacter: true }; }],
-  ] as const)("rejects a version 3 object carrying the retired record %s", (key, edit) => {
+    ["turn.pendingTriggerFromEffect", (state: Raw) => { state.turn.pendingTriggerFromEffect = { lifeCard: { instanceId: "l", cardId: "c", face: "DOWN" }, damagedPlayerIndex: 1, remainingDamages: 0, sourceCardInstanceId: "s", controllerIndex: 0 }; }],
+    ["turn.pendingBattleDamageContinuation", (state: Raw) => { state.turn.pendingBattleDamageContinuation = { battleId: "b", stage: "CHARACTER_KO_REPLACEMENT", targetInstanceId: "t", causingPlayerIndex: 0, attackerIsCharacter: true }; }],
+    ["turn.battle.pendingTriggerLifeCard", (state: Raw) => { state.turn.battle = { ...(raw("battle-trigger-window").turn.battle as object), pendingTriggerLifeCard: { instanceId: "l", cardId: "c", face: "DOWN" } }; }],
+    ["effectStack[0].replacementBatchContinuation", (state: Raw) => { state.effectStack[0] = { ...state.effectStack[0], replacementBatchContinuation: { type: "REPLACEMENT_BATCH", actionKind: "KO", event: "WOULD_BE_KO", allTargetIds: [], protectedIds: [], pendingMatches: [], currentMatchIndex: 0, causingController: 0 } }; }],
+  ] as const)("rejects a version 3 object carrying the retired record %s, by name (the version 3 writer lifts it into a frame)", (field, edit) => {
     const state = raw("effect-window-with-parent-chain");
-    edit(state.turn);
-    expectRejected(state, new RegExp(`invalid core shape at turn: Unrecognized key: "${key}"`));
+    edit(state);
+    expectRejected(state, new RegExp(`is schemaVersion 3 but carries ${field.replace(/[.[\]]/g, "\\$&")}, a version 2 record the version 3 writer lifts into a frame`));
+  });
+
+  it("F5: a REPLACEMENT frame owns only its OPTIONAL_EFFECT offer (a SELECT_TARGET prompt naming it is rejected)", () => {
+    const state = raw("replacement-prompt");
+    state.pendingPrompt = { ...state.pendingPrompt!, options: { promptType: "SELECT_TARGET", cards: [], validTargets: [], effectDescription: "x", countMin: 0, countMax: 0, ctaLabel: "c" } };
+    expectRejected(state, new RegExp(`names REPLACEMENT frame "${replacementId()}" for a SELECT_TARGET prompt; a replacement frame owns only its OPTIONAL_EFFECT offer`));
+  });
+
+  it("F6a: a non-damage frame at AWAITING_TRIGGER_REVEAL is rejected (only openBattleTriggerWindow and continueEffectDamageSequence write the phase)", () => {
+    const state = raw("battle-trigger-window");
+    const { battleDamage: _dropped, ...plain } = state.effectStack[0];
+    state.effectStack = [plain];
+    state.pendingPrompt = null;
+    expectRejected(state, new RegExp(`effectStack\\[0\\] \\(frame "${battleId()}"\\) is EFFECT but has phase AWAITING_TRIGGER_REVEAL; only a damage frame at TRIGGER_WINDOW waits for a reveal`));
+  });
+
+  it("F6b: a REPLACEMENT_BATCH frame offering a match that no prompt names is rejected (0 of 286 engine-written states)", () => {
+    const state = raw("replacement-batch-prompt");
+    const id = state.effectStack[0].id as string;
+    state.pendingPrompt = null;
+    expectRejected(state, new RegExp(`effectStack\\[0\\] \\(frame "${id}"\\) is a REPLACEMENT_BATCH frame offering a match, but pendingPrompt does not name it`));
   });
 
   it.each([
