@@ -165,7 +165,6 @@ History:
 | 2026-10-17 (PR 5a fix round 1, OPT-963) | Lowering: batch rider on the top surviving frame, effect `TRIGGER_EFFECT` events re-homed, nested windows lowered leak-free (§1.7 items 2–4); three unwritten shapes rejected by name (§1.7 item 1, §2.4); proof against 5b-written states. | `{1, 2, 3}` |
 | 2026-10-17 (PR 5b, OPT-963) | Runtime and writer at version 3; `convertFromV2` lifts the version 2 records into frames (§1.8, §8.3). | `{1, 2, 3}` |
 | 2026-10-18 (PR 5b fix rounds 1–2, OPT-963) | Lift rebuilds a re-pointed window prompt from that window's own card (L5); the actions after a choice branch live on their own continuation under the effect's controller, below a handler-owned frame (F1, D-F1b), and a continuation frame carrying `remainingActions` is rejected; the effect window logs its point before prompting (F2; writer golden re-captured for `both-trigger-windows` only). Rollback target: PR 5a squash `c972f14e`. | `{1, 2, 3}` |
-
 | 2026-10-20 (PR 6a, OPT-964) | Version 4 reader lowers the new owners into the v3 runtime (§9); runtime and writer remain 3. No input version retired. | `{1, 2, 3, 4}` |
 
 ---

@@ -677,25 +677,28 @@ it("reloads real mid-batch overflow live/undo and resumes the rule-trash pipelin
   }
 });
 
-it.each(["overflow.batch", "stateDistributionForPlay"])(
-  "rejects unrecognized executable payloads in %s",
-  (owner) => {
-    for (const location of locations) {
-      for (const key of ["effectBlock", "triggeringEvent"] as const) {
-        const { raw, queued: trigger } = queued(owner);
-        trigger[key] =
-          key === "effectBlock"
-            ? {
-                id: "unknown",
-                category: "auto",
-                actions: [{ type: "NOT_AN_ACTION" }],
-              }
-            : { type: "NOT_AN_EVENT", payload: {} };
-        expect(() => read(raw, location)).toThrow();
-      }
-    }
-  }
-);
+it.each(
+  ["overflow.batch", "stateDistributionForPlay"].flatMap((owner) =>
+    locations.flatMap((location) =>
+      ["effectBlock", "triggeringEvent"].map((key) => ({
+        owner,
+        location,
+        key,
+      }))
+    )
+  )
+)("rejects unknown $key in $owner at $location", ({ owner, location, key }) => {
+  const { raw, queued: trigger } = queued(owner);
+  trigger[key] =
+    key === "effectBlock"
+      ? {
+          id: "trigger-effect",
+          category: "auto",
+          actions: [{ type: "NOT_AN_ACTION" }],
+        }
+      : { type: "NOT_AN_EVENT", payload: {} };
+  expect(() => read(raw, location)).toThrow();
+});
 
 it.each([
   "scheduledActions",
