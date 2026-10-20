@@ -957,7 +957,13 @@ export function continueBattleDamageFrame(
     if (pending.resolution === undefined) {
       return { state: popFrame(state), events: [] };
     }
-    return finishCharacterBattleResult(popFrame(state), pending, replacementEvents, cardDb);
+    // Reader-first (OPT-965): a future writer can retain substitute debt and
+    // matched watchers on this existing frame. Consume both without adding
+    // a producer or changing how this build schedules new substitutes.
+    const result = finishCharacterBattleResult(
+      popFrame(state), pending, [...frame.accumulatedEvents, ...replacementEvents], cardDb
+    );
+    return { ...result, queuedTriggers: frame.pendingTriggers };
   }
 
   if (pending.stage === "TRIGGER_WINDOW") {
