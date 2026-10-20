@@ -21,7 +21,7 @@ export function liftLegacyPrompt(state: GameState, location: string): GameState 
   // Preserve that authoritative frame instead of creating a second executor.
   const top = state.effectStack.at(-1);
   if (top) return { ...state, pendingPrompt: { ...prompt, resumeContext: top.id } };
-  if (!["SELECT_TARGET", "REDISTRIBUTE_DON", "ARRANGE_TOP_CARDS", "PLAYER_CHOICE"].includes(prompt.options.promptType)) {
+  if (!["SELECT_TARGET", "REDISTRIBUTE_DON", "ARRANGE_TOP_CARDS", "PLAYER_CHOICE", "OPTIONAL_EFFECT"].includes(prompt.options.promptType)) {
     throw new SessionLoadError(location, "structural resume context has no supported action-choice frame phase");
   }
   const ctx: ResumeContext = context;
@@ -32,7 +32,12 @@ export function liftLegacyPrompt(state: GameState, location: string): GameState 
     controller: ctx.controller,
     effectDescription: ctx.effectDescription,
     remainingActionsController: ctx.remainingActionsController,
-    phase: promptTypeToPhase(prompt.options.promptType),
+    // Historical OPTIONAL_EFFECT carries the action suffix, not a schema
+    // block. Use the ordinary chain resume; optional-block resume would
+    // consume the sentinel block and lose that suffix.
+    phase: prompt.options.promptType === "OPTIONAL_EFFECT"
+      ? "AWAITING_PLAYER_CHOICE"
+      : promptTypeToPhase(prompt.options.promptType),
     pausedAction: ctx.pausedAction,
     remainingActions: ctx.remainingActions,
     resultRefs: ctx.resultRefs,

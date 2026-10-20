@@ -361,3 +361,25 @@ describe("OPT-965 terminal and structural ownership on live/undo load", () => {
     });
   }
 });
+
+
+describe("OPT-965 historical structural optional effect", () => {
+  for (const location of ["state", "undoHistory[0]"]) {
+    it(`${location}: accepts an optional suffix through one ordinary frame`, () => {
+      const original = golden("structural-resume-context");
+      const raw = original.session.state;
+      const prompt = raw.pendingPrompt as { options: Record<string, unknown>; resumeContext: Record<string, unknown> };
+      prompt.options = { promptType: "OPTIONAL_EFFECT", effectDescription: "Draw one" };
+      prompt.resumeContext = { ...prompt.resumeContext, pausedAction: null, remainingActions: [{ type: "DRAW", params: { amount: 1 } }] };
+      const state = convertPersistedGameState(raw, location);
+      const controller = state.pendingPrompt!.respondingPlayer;
+      const before = state.players[controller].hand.length;
+      const result = resumePromptLifecycle(state, { type: "PLAYER_CHOICE", choiceId: "accept" }, new Map(Object.entries(original.cardDb)) as never, lifecycleServices);
+      expect(result.responseRejected).toBe(false);
+      expect(result.state.players[controller].hand).toHaveLength(before + 1);
+      expect(result.state.pendingPrompt).toBeNull();
+      expect(result.state.effectStack).toEqual([]);
+      expect(convertPersistedGameState(toPersistedGameState(state), location)).toEqual(state);
+    });
+  }
+});
