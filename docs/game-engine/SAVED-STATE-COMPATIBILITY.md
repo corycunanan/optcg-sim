@@ -381,3 +381,32 @@ Existing strict once-per-turn, trigger-staging, pregame and loss ledgers remain 
 The frozen v1/v2/v3 synthetic goldens remain unchanged. A separate v4 golden records the actual current writer. Actual engine-produced suspension states cover queued source ordering, activated source departure, mid-batch overflow, Imu search, Teach cost/redirect, Counter redirect, and root/nested hand/nested Trash Event debt. Each has fixed public replies and live/undo replay expectations. These are synthetic games driven through the real pipeline and session writer, not production Durable Object captures; the §7 production-capture gate remains open.
 
 The independent deployed-reader replay uses the original `6b394da6` parser and runtime, not copied conversion code. Event debt checks compare full event order/payload/propagation, players, prompts, stack completion and execution context. Overflow checks fresh cards and completed batch; pregame checks deterministic shuffle and unchanged RNG on repeated polling; redirects check paid cost once and final-target timing. Source identity and new battle lock semantics can degrade on rollback as documented in §9.3; parse success is not claimed as semantic parity for those changes. New native v4 input retains the fields and does not emit lowering diagnostics.
+
+## 11. PR7a retained battle-substitute reader (OPT-965)
+
+PR7's event-order work can park matched substitute watchers on a
+`BATTLE_DAMAGE` frame at `CHARACTER_KO_REPLACEMENT` before a later substitute
+prompt. A concrete engine-produced **synthetic** witness extends EB03-001's
+substitute to K.O. a cost-1 Character with a surviving ANY_CHARACTER_KO draw watcher, then asks for a hand
+trash. The pending hand choice has one retained watcher on the battle frame.
+Both deployed reader `6b394da6` and pre-PR7 main `c4ef3637` load that state but
+silently drop the watcher when completing the battle (zero draws instead of one).
+This is lost work, not merely the old event ordering. The writer must not ship
+until the amended reader has merged and its worker deployment is verified.
+
+This reader-only amendment consumes existing `accumulatedEvents` and
+`pendingTriggers` when the matching answered battle frame completes. Child
+publication boundaries leave that battle debt with its owner. No scanner,
+substitute, or session path starts writing debt; version 4 writer goldens remain
+byte-identical. Ordinary pre-PR7 publication and ordering behavior is preserved.
+The actual writer-produced fixture is labelled synthetic with source commit
+`80c084f3d2b6b22adeb65801b34d66372f8f3633`; it is not a production capture.
+A constructed event-debt variant separately tests unpublished event consumption.
+Both are checked live and as undo, with deterministic reads and no repeat resume.
+
+After PR7 enables these writes, **the deployed PR7a reader is the minimum rollback
+build**. The older version-4 builds above are unsafe rollback targets despite
+accepting the syntax. The PR7 writer receipt must pin PR7a's merged SHA and successful
+worker deployment before enabling the writer. Until then this reader remains the
+old writer. Versions 1–4 and all converters remain supported; the OPT-971 captured
+session gate is still unmet and no automatic production repair is authorized.
