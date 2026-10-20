@@ -778,3 +778,72 @@ it.each(
     );
   }
 );
+
+// A finished snapshot must not revive work when its v4 owners are lowered.
+describe.each(locations)("v4 continuation safety at %s", (location) => {
+  it.each(kinds)("rejects finished state retaining %s", (_name, make) => {
+    const raw = make();
+    expect(() => read(raw, location)).not.toThrow();
+    raw.status = "FINISHED";
+    raw.winner = 0;
+    expect(() => read(raw, location)).toThrow(
+      "terminal version 4 state retains pending work"
+    );
+  });
+
+  it("rejects an effect damage parent owned by a removed activation boundary", () => {
+    const damageState = future(
+      convertPersistedGameState(
+        goldenV2Raw("effect-damage-trigger-window"),
+        "state"
+      )
+    );
+    expect(() => read(damageState, location)).not.toThrow();
+    const raw = activation();
+    const damage = damageState.effectStack[0];
+    damage.effectDamage.parentFrameId = raw.effectStack[0].id;
+    raw.effectStack.push(damage);
+    raw.pendingPrompt = damageState.pendingPrompt;
+    expect(() => read(raw, location)).toThrow();
+  });
+
+  it("lowers staged battle bookkeeping without changing the saved transaction", () => {
+    const raw = future();
+    const battleState = future(
+      convertPersistedGameState(goldenV2Raw("battle-trigger-window"), "state")
+    );
+    const staged = Object.fromEntries(
+      [
+        "players",
+        "turn",
+        "activeEffects",
+        "prohibitions",
+        "scheduledActions",
+        "oneTimeModifiers",
+        "triggerRegistry",
+      ].map((key) => [key, structuredClone(battleState[key])])
+    );
+    Object.assign(staged.turn.battle, {
+      redirectWindow: true,
+      targetLocked: true,
+      blockerLocked: true,
+    });
+    raw.effectStack = [{ ...frame(), costTransactionState: staged }];
+    const before = structuredClone(raw);
+    const expectedTurn = structuredClone(staged.turn);
+    for (const key of [
+      "step",
+      "redirectWindow",
+      "blockerLocked",
+      "targetLocked",
+    ])
+      delete expectedTurn.battle[key];
+    const loaded = read(raw, location);
+    expect(loaded.effectStack[0].costTransactionState).toEqual({
+      ...staged,
+      turn: expectedTurn,
+    });
+    expect(loaded.turn).toEqual(raw.turn);
+    expect(raw).toEqual(before);
+  });
+});
