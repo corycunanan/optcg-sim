@@ -86,9 +86,9 @@ function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
 const kindsOf = (state: GameState) => state.effectStack.map(frameKindOf);
 
 describe("OPT-963 version 3 runtime and writer (PR 5b)", () => {
-  it("reads 1, 2 and 3, executes 3, and writes 3", () => {
-    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3]);
-    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(3);
+  it("reads 1–4, executes 3, and writes 3", () => {
+    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4]);
+    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(4);
     expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(3);
     expect(GAME_STATE_SCHEMA_VERSION).toBe(3);
     expect([...EFFECT_STACK_FRAME_KINDS]).toEqual(

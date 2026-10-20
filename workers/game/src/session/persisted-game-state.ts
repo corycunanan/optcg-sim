@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { END_PHASE_STAGES, END_PHASE_STEPS, type GameEventType } from "../types.js";
-import { EFFECT_STACK_FRAME_KINDS } from "./game-state-schema.js";
+import { EFFECT_STACK_FRAME_KINDS } from "../engine/frame-kinds.js";
 
 const PlayerIndex = z.union([z.literal(0), z.literal(1)]);
 const FiniteNumber = z.number().finite();
@@ -93,7 +93,7 @@ const PerformedAction = z.strictObject({
   targetController: PlayerIndex.optional(),
 });
 
-const TurnState = z.strictObject({
+export const TurnState = z.strictObject({
   number: NonNegativeInteger,
   activePlayerIndex: PlayerIndex,
   firstPlayerIndex: PlayerIndex.optional(),
@@ -386,7 +386,7 @@ const EffectDamageContinuation = z.discriminatedUnion("stage", [
   }),
 ]);
 
-const StackFrameCore = z.strictObject({
+export const StackFrameCore = z.strictObject({
   /** OPT-940 frame-kind contract; optional in v1, validated against content. */
   kind: z.enum(EFFECT_STACK_FRAME_KINDS).optional(),
   id: z.string(),
@@ -452,7 +452,7 @@ const StackFrameCore = z.strictObject({
   namedPlayCostTargetId: z.string().optional(),
 });
 
-const PersistedGameStateV3 = z.strictObject({
+export const PersistedGameStateV3 = z.strictObject({
   id: z.string(),
   executionContext: ExecutionContext,
   players: z.tuple([PlayerState, PlayerState]),

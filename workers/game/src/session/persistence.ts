@@ -1,3 +1,4 @@
+import { version4LoweringNotes } from "./version4-reader.js";
 import type {
   CardData,
   GameEventType,
@@ -733,6 +734,9 @@ export function convertPersistedGameState(raw: unknown, location: string): GameS
   const converted = convertToCurrentShape(raw, location);
   const validated = parseStoredGameState(converted, location);
   validateContinuationReferences(validated, location);
+  for (const shape of version4LoweringNotes(converted)) {
+    log("session.legacy_shape", { gameId: validated.id, location, shape });
+  }
   const migrated = migrateLegacyTriggerRegistry(validated);
   logLegacyShapes(migrated, location);
   return migrated;

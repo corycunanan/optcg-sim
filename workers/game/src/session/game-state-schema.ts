@@ -25,22 +25,24 @@
  * four typed frame kinds (§8). PR 5a read it by lowering to the version 2
  * runtime; PR 5b raises the runtime to version 3, lifts version 2 records
  * into frames (`convertFromV2`) and writes version 3 (§1.8).
+ * PR 6a reads v4 by strict lowering; runtime and writer remain v3 (§9).
  */
 
 import type { EffectStackFrame, GameState, PhaseBoundaryContinuation } from "../types.js";
 import { EFFECT_STACK_FRAME_KINDS, VERSION_3_CONTINUATION_FIELDS, VERSION_3_FRAME_KINDS, frameKindOf, type EffectStackFrameKind } from "../engine/frame-kinds.js";
 import { promptCardForLifeCard, revealTriggerPromptOptions } from "../engine/damage-frames.js";
 import { log } from "../lib/log.js";
+import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 3;
-/** The newest version this build can read (the runtime shape). */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 3;
+/** The newest persisted version this build can read; v4 lowers to v3. */
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 4;
 /** The version of the runtime shape this build's engine executes. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 3;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3];
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
 
@@ -482,7 +484,7 @@ const convertFromV3: Converter = (raw, location) => {
   return rest;
 };
 
-/** Converter for version N produces version N + 1; the last one produces the latest readable shape. */
+/** Legacy conversion chain through the v3 runtime. v4 uses its separately validated lowering. */
 const CONVERTERS: Record<number, Converter> = {
   1: convertFromV1,
   2: convertFromV2,
@@ -502,8 +504,13 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
+  if (version === 4) {
+    return rememberVersion4Lowering(lowerVersion4(raw, reason => {
+      throw new SessionLoadError(location, reason);
+    }));
+  }
   let converted = raw;
-  for (let step = version; step <= LATEST_READABLE_GAME_STATE_SCHEMA_VERSION; step += 1) {
+  for (let step = version; step <= RUNTIME_GAME_STATE_SCHEMA_VERSION; step += 1) {
     const converter = CONVERTERS[step];
     if (!converter) {
       throw new SessionLoadError(
