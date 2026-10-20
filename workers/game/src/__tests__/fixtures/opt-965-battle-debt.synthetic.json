@@ -1,7 +1,7 @@
 {
   "provenance": "synthetic",
-  "writerCommit": "7bf07bffd027d03cf43062b868d5f7720af634c2",
-  "note": "Actual pipeline-produced paused game, with EB03-001 replacement actions synthetically extended to KO an OnKO-draw Character before hand-trash selection. Not a captured Durable Object session.",
+  "writerCommit": "80c084f3d2b6b22adeb65801b34d66372f8f3633",
+  "note": "Actual pipeline-produced paused game, with EB03-001 replacement actions synthetically extended to KO a Character while a surviving ANY_CHARACTER_KO draw watcher is present, before hand-trash selection. Not a captured Durable Object session.",
   "state": {
     "schemaVersion": 4,
     "id": "test-game-001",
@@ -35,10 +35,20 @@
           "turnPlayed": 1
         },
         "characters": [
+          {
+            "cardId": "SURVIVING-WATCHER",
+            "instanceId": "SURVIVING-WATCHER-0-1",
+            "owner": 0,
+            "controller": 0,
+            "zone": "CHARACTER",
+            "state": "ACTIVE",
+            "attachedDon": [],
+            "turnPlayed": 1
+          },
           null,
           {
             "cardId": "OP09-083",
-            "instanceId": "OP09-083-0-2",
+            "instanceId": "OP09-083-0-3",
             "owner": 0,
             "controller": 0,
             "zone": "CHARACTER",
@@ -46,7 +56,6 @@
             "attachedDon": [],
             "turnPlayed": 1
           },
-          null,
           null,
           null
         ],
@@ -156,16 +165,6 @@
         "hand": [
           {
             "cardId": "CHAR-VANILLA",
-            "instanceId": "CHAR-VANILLA-0-3",
-            "owner": 0,
-            "controller": 0,
-            "zone": "HAND",
-            "state": "ACTIVE",
-            "attachedDon": [],
-            "turnPlayed": 1
-          },
-          {
-            "cardId": "CHAR-VANILLA",
             "instanceId": "CHAR-VANILLA-0-4",
             "owner": 0,
             "controller": 0,
@@ -177,6 +176,16 @@
           {
             "cardId": "CHAR-VANILLA",
             "instanceId": "CHAR-VANILLA-0-5",
+            "owner": 0,
+            "controller": 0,
+            "zone": "HAND",
+            "state": "ACTIVE",
+            "attachedDon": [],
+            "turnPlayed": 1
+          },
+          {
+            "cardId": "CHAR-VANILLA",
+            "instanceId": "CHAR-VANILLA-0-6",
             "owner": 0,
             "controller": 0,
             "zone": "HAND",
@@ -641,8 +650,8 @@
         },
         "characters": [
           {
-            "cardId": "P1-ATTACKER-7000-6",
-            "instanceId": "P1-ATTACKER-7000-6-1-6",
+            "cardId": "P1-ATTACKER-7000-7",
+            "instanceId": "P1-ATTACKER-7000-7-1-7",
             "owner": 1,
             "controller": 1,
             "zone": "CHARACTER",
@@ -1199,8 +1208,8 @@
       "battleSubPhase": "DAMAGE_STEP",
       "battle": {
         "battleId": "battle_00000044",
-        "attackerInstanceId": "P1-ATTACKER-7000-6-1-6",
-        "targetInstanceId": "OP09-083-0-2",
+        "attackerInstanceId": "P1-ATTACKER-7000-7-1-7",
+        "targetInstanceId": "OP09-083-0-3",
         "attackerPower": 7000,
         "defenderPower": 6000,
         "counterPowerAdded": 0,
@@ -1349,8 +1358,39 @@
         "controller": 0
       },
       {
+        "id": "trigger_00000041",
+        "sourceCardInstanceId": "SURVIVING-WATCHER-0-1",
+        "effectBlockId": "draw",
+        "trigger": {
+          "event": "ANY_CHARACTER_KO",
+          "filter": {
+            "controller": "SELF"
+          }
+        },
+        "effectBlock": {
+          "id": "draw",
+          "category": "auto",
+          "trigger": {
+            "event": "ANY_CHARACTER_KO",
+            "filter": {
+              "controller": "SELF"
+            }
+          },
+          "actions": [
+            {
+              "type": "DRAW",
+              "params": {
+                "amount": 1
+              }
+            }
+          ]
+        },
+        "zone": "FIELD",
+        "controller": 0
+      },
+      {
         "id": "trigger_00000042",
-        "sourceCardInstanceId": "OP09-083-0-2",
+        "sourceCardInstanceId": "OP09-083-0-3",
         "effectBlockId": "activate_cost_reduction",
         "trigger": {
           "keyword": "ACTIVATE_MAIN"
@@ -1400,7 +1440,7 @@
       },
       {
         "id": "trigger_00000043",
-        "sourceCardInstanceId": "OP09-083-0-2",
+        "sourceCardInstanceId": "OP09-083-0-3",
         "effectBlockId": "on_ko_draw",
         "trigger": {
           "keyword": "ON_KO"
@@ -1428,9 +1468,9 @@
       "options": {
         "promptType": "SELECT_TARGET",
         "validTargets": [
-          "CHAR-VANILLA-0-3",
           "CHAR-VANILLA-0-4",
-          "CHAR-VANILLA-0-5"
+          "CHAR-VANILLA-0-5",
+          "CHAR-VANILLA-0-6"
         ],
         "countMin": 1,
         "countMax": 1,
@@ -1438,16 +1478,6 @@
         "instruction": "Trash 1 of your cards in hand.",
         "ctaLabel": "Trash",
         "cards": [
-          {
-            "cardId": "CHAR-VANILLA",
-            "instanceId": "CHAR-VANILLA-0-3",
-            "owner": 0,
-            "controller": 0,
-            "zone": "HAND",
-            "state": "ACTIVE",
-            "attachedDon": [],
-            "turnPlayed": 1
-          },
           {
             "cardId": "CHAR-VANILLA",
             "instanceId": "CHAR-VANILLA-0-4",
@@ -1461,6 +1491,16 @@
           {
             "cardId": "CHAR-VANILLA",
             "instanceId": "CHAR-VANILLA-0-5",
+            "owner": 0,
+            "controller": 0,
+            "zone": "HAND",
+            "state": "ACTIVE",
+            "attachedDon": [],
+            "turnPlayed": 1
+          },
+          {
+            "cardId": "CHAR-VANILLA",
+            "instanceId": "CHAR-VANILLA-0-6",
             "owner": 0,
             "controller": 0,
             "zone": "HAND",
@@ -1490,10 +1530,10 @@
         "costResultRefs": [],
         "pendingTriggers": [
           {
-            "sourceCardInstanceId": "card_00000047",
+            "sourceCardInstanceId": "SURVIVING-WATCHER-0-1",
             "sourceSnapshot": {
-              "instanceId": "card_00000047",
-              "cardId": "VICTIM",
+              "instanceId": "SURVIVING-WATCHER-0-1",
+              "cardId": "SURVIVING-WATCHER",
               "controller": 0,
               "effectBlockId": "draw"
             },
@@ -1503,7 +1543,10 @@
               "id": "draw",
               "category": "auto",
               "trigger": {
-                "keyword": "ON_KO"
+                "event": "ANY_CHARACTER_KO",
+                "filter": {
+                  "controller": "SELF"
+                }
               },
               "actions": [
                 {
@@ -1518,7 +1561,7 @@
               "type": "CARD_KO",
               "playerIndex": 0,
               "payload": {
-                "cardInstanceId": "VICTIM-0-1",
+                "cardInstanceId": "VICTIM-0-2",
                 "newCardInstanceId": "card_00000047",
                 "cardId": "VICTIM",
                 "cause": "EFFECT",
@@ -1538,13 +1581,13 @@
         "simultaneousTriggers": [],
         "accumulatedEvents": [],
         "id": "ef_00000046",
-        "sourceCardInstanceId": "P1-ATTACKER-7000-6-1-6",
+        "sourceCardInstanceId": "P1-ATTACKER-7000-7-1-7",
         "controller": 1,
         "phase": "INTERRUPTED_BY_TRIGGERS",
         "battleDamage": {
           "stage": "CHARACTER_KO_REPLACEMENT",
           "battleId": "battle_00000044",
-          "targetInstanceId": "OP09-083-0-2",
+          "targetInstanceId": "OP09-083-0-3",
           "causingPlayerIndex": 1,
           "attackerIsCharacter": true,
           "replacementEffectId": "active-effect_00000040",
@@ -1574,16 +1617,16 @@
             "__replaced_card",
             {
               "targetInstanceIds": [
-                "OP09-083-0-2"
+                "OP09-083-0-3"
               ],
               "count": 1
             }
           ]
         ],
         "validTargets": [
-          "CHAR-VANILLA-0-3",
           "CHAR-VANILLA-0-4",
-          "CHAR-VANILLA-0-5"
+          "CHAR-VANILLA-0-5",
+          "CHAR-VANILLA-0-6"
         ],
         "costs": [],
         "currentCostIndex": 0,
@@ -1597,7 +1640,7 @@
             "type": "CARD_KO",
             "playerIndex": 0,
             "payload": {
-              "cardInstanceId": "VICTIM-0-1",
+              "cardInstanceId": "VICTIM-0-2",
               "newCardInstanceId": "card_00000047",
               "cardId": "VICTIM",
               "cause": "EFFECT",
@@ -1607,6 +1650,9 @@
               "movementCause": "EFFECT",
               "preKO_donCount": 0,
               "preKO_basePower": 4000
+            },
+            "propagation": {
+              "triggerScanned": true
             }
           }
         ],
@@ -1618,7 +1664,7 @@
         "type": "CARD_STATE_CHANGED",
         "playerIndex": 1,
         "payload": {
-          "cardInstanceId": "P1-ATTACKER-7000-6-1-6",
+          "cardInstanceId": "P1-ATTACKER-7000-7-1-7",
           "newState": "RESTED"
         },
         "timestamp": 1
@@ -1627,8 +1673,8 @@
         "type": "ATTACK_DECLARED",
         "playerIndex": 1,
         "payload": {
-          "attackerInstanceId": "P1-ATTACKER-7000-6-1-6",
-          "targetInstanceId": "OP09-083-0-2",
+          "attackerInstanceId": "P1-ATTACKER-7000-7-1-7",
+          "targetInstanceId": "OP09-083-0-3",
           "attackerPower": 7000
         },
         "timestamp": 2
@@ -1646,8 +1692,8 @@
         "type": "ATTACK_TARGET_FINAL",
         "playerIndex": 1,
         "payload": {
-          "attackerInstanceId": "P1-ATTACKER-7000-6-1-6",
-          "targetInstanceId": "OP09-083-0-2",
+          "attackerInstanceId": "P1-ATTACKER-7000-7-1-7",
+          "targetInstanceId": "OP09-083-0-3",
           "redirected": false
         },
         "timestamp": 8
@@ -2157,16 +2203,46 @@
         "trigger": false,
         "unblockable": false
       },
+      "effectSchema": null,
+      "imageUrl": null
+    },
+    "SURVIVING-WATCHER": {
+      "id": "SURVIVING-WATCHER",
+      "name": "SURVIVING-WATCHER",
+      "type": "Character",
+      "color": [
+        "Red"
+      ],
+      "cost": 2,
+      "power": 4000,
+      "counter": 1000,
+      "life": null,
+      "attribute": [],
+      "types": [],
+      "effectText": "",
+      "triggerText": null,
+      "keywords": {
+        "rush": false,
+        "rushCharacter": false,
+        "doubleAttack": false,
+        "banish": false,
+        "blocker": false,
+        "trigger": false,
+        "unblockable": false
+      },
       "effectSchema": {
-        "card_id": "VICTIM",
-        "card_name": "Victim",
+        "card_id": "SURVIVING-WATCHER",
+        "card_name": "Surviving watcher",
         "card_type": "Character",
         "effects": [
           {
             "id": "draw",
             "category": "auto",
             "trigger": {
-              "keyword": "ON_KO"
+              "event": "ANY_CHARACTER_KO",
+              "filter": {
+                "controller": "SELF"
+              }
             },
             "actions": [
               {
@@ -2269,9 +2345,9 @@
       },
       "imageUrl": null
     },
-    "P1-ATTACKER-7000-6": {
-      "id": "P1-ATTACKER-7000-6",
-      "name": "P1-ATTACKER-7000-6",
+    "P1-ATTACKER-7000-7": {
+      "id": "P1-ATTACKER-7000-7",
+      "name": "P1-ATTACKER-7000-7",
       "type": "Character",
       "color": [
         "Red"
@@ -2300,7 +2376,7 @@
   "reply": {
     "type": "SELECT_TARGET",
     "selectedInstanceIds": [
-      "CHAR-VANILLA-0-3"
+      "CHAR-VANILLA-0-4"
     ]
   },
   "expected": {
@@ -2318,10 +2394,20 @@
           "turnPlayed": 1
         },
         "characters": [
+          {
+            "cardId": "SURVIVING-WATCHER",
+            "instanceId": "SURVIVING-WATCHER-0-1",
+            "owner": 0,
+            "controller": 0,
+            "zone": "CHARACTER",
+            "state": "ACTIVE",
+            "attachedDon": [],
+            "turnPlayed": 1
+          },
           null,
           {
             "cardId": "OP09-083",
-            "instanceId": "OP09-083-0-2",
+            "instanceId": "OP09-083-0-3",
             "owner": 0,
             "controller": 0,
             "zone": "CHARACTER",
@@ -2329,7 +2415,6 @@
             "attachedDon": [],
             "turnPlayed": 1
           },
-          null,
           null,
           null
         ],
@@ -2449,7 +2534,7 @@
         "hand": [
           {
             "cardId": "CHAR-VANILLA",
-            "instanceId": "CHAR-VANILLA-0-4",
+            "instanceId": "CHAR-VANILLA-0-5",
             "owner": 0,
             "controller": 0,
             "zone": "HAND",
@@ -2459,7 +2544,7 @@
           },
           {
             "cardId": "CHAR-VANILLA",
-            "instanceId": "CHAR-VANILLA-0-5",
+            "instanceId": "CHAR-VANILLA-0-6",
             "owner": 0,
             "controller": 0,
             "zone": "HAND",
@@ -2924,8 +3009,8 @@
         },
         "characters": [
           {
-            "cardId": "P1-ATTACKER-7000-6",
-            "instanceId": "P1-ATTACKER-7000-6-1-6",
+            "cardId": "P1-ATTACKER-7000-7",
+            "instanceId": "P1-ATTACKER-7000-7-1-7",
             "owner": 1,
             "controller": 1,
             "zone": "CHARACTER",
@@ -3479,7 +3564,7 @@
         "type": "CARD_STATE_CHANGED",
         "playerIndex": 1,
         "payload": {
-          "cardInstanceId": "P1-ATTACKER-7000-6-1-6",
+          "cardInstanceId": "P1-ATTACKER-7000-7-1-7",
           "newState": "RESTED"
         },
         "timestamp": 1
@@ -3488,8 +3573,8 @@
         "type": "ATTACK_DECLARED",
         "playerIndex": 1,
         "payload": {
-          "attackerInstanceId": "P1-ATTACKER-7000-6-1-6",
-          "targetInstanceId": "OP09-083-0-2",
+          "attackerInstanceId": "P1-ATTACKER-7000-7-1-7",
+          "targetInstanceId": "OP09-083-0-3",
           "attackerPower": 7000
         },
         "timestamp": 2
@@ -3507,8 +3592,8 @@
         "type": "ATTACK_TARGET_FINAL",
         "playerIndex": 1,
         "payload": {
-          "attackerInstanceId": "P1-ATTACKER-7000-6-1-6",
-          "targetInstanceId": "OP09-083-0-2",
+          "attackerInstanceId": "P1-ATTACKER-7000-7-1-7",
+          "targetInstanceId": "OP09-083-0-3",
           "redirected": false
         },
         "timestamp": 8
@@ -3535,8 +3620,8 @@
         "type": "CHARACTER_BATTLES",
         "playerIndex": 1,
         "payload": {
-          "cardInstanceId": "P1-ATTACKER-7000-6-1-6",
-          "targetInstanceId": "OP09-083-0-2"
+          "cardInstanceId": "P1-ATTACKER-7000-7-1-7",
+          "targetInstanceId": "OP09-083-0-3"
         },
         "timestamp": 17
       },
@@ -3544,8 +3629,8 @@
         "type": "COMBAT_VICTORY",
         "playerIndex": 1,
         "payload": {
-          "cardInstanceId": "P1-ATTACKER-7000-6-1-6",
-          "targetInstanceId": "OP09-083-0-2"
+          "cardInstanceId": "P1-ATTACKER-7000-7-1-7",
+          "targetInstanceId": "OP09-083-0-3"
         },
         "timestamp": 18
       },
@@ -3553,7 +3638,7 @@
         "type": "CARD_KO",
         "playerIndex": 0,
         "payload": {
-          "cardInstanceId": "VICTIM-0-1",
+          "cardInstanceId": "VICTIM-0-2",
           "newCardInstanceId": "card_00000047",
           "cardId": "VICTIM",
           "cause": "EFFECT",
@@ -3586,8 +3671,8 @@
         "type": "END_OF_BATTLE",
         "playerIndex": 1,
         "payload": {
-          "attackerInstanceId": "P1-ATTACKER-7000-6-1-6",
-          "targetInstanceId": "OP09-083-0-2",
+          "attackerInstanceId": "P1-ATTACKER-7000-7-1-7",
+          "targetInstanceId": "OP09-083-0-3",
           "aborted": false
         },
         "timestamp": 21
@@ -3613,7 +3698,7 @@
         "payload": {
           "cardId": "CHAR-COUNTER"
         },
-        "timestamp": 31
+        "timestamp": 30
       },
       {
         "type": "DRAW_OUTSIDE_DRAW_PHASE",
@@ -3621,7 +3706,7 @@
         "payload": {
           "count": 1
         },
-        "timestamp": 32
+        "timestamp": 31
       }
     ],
     "executionContext": {
@@ -3630,7 +3715,7 @@
       "rngState": 2134618106,
       "idCounter": 154,
       "clockEpochMs": 0,
-      "clockCounter": 35,
+      "clockCounter": 34,
       "actionBudget": {
         "limit": 1000,
         "consumed": 4

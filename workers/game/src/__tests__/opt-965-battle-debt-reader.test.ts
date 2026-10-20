@@ -12,7 +12,7 @@ const services = { drainPregame: (s: GameState) => s, advanceStartOfTurn: (s: Ga
 
 for (const location of ["state", "undoHistory[0]"]) {
   describe(`OPT-965 battle debt reader: ${location}`, () => {
-    it("loads actual future-writer state deterministically and releases the retained On K.O. watcher once", () => {
+    it("loads actual future-writer state deterministically and releases the retained surviving K.O. watcher once", () => {
       expect(fixture.provenance).toBe("synthetic");
       const raw = structuredClone(fixture.state);
       const session = parseStoredSession({ state: raw, cardDb: fixture.cardDb, undoHistory: [raw] });
@@ -20,6 +20,10 @@ for (const location of ["state", "undoHistory[0]"]) {
       expect(state).toEqual(convertPersistedGameState(structuredClone(raw), location));
       const owner = state.effectStack.find(frame => frame.battleDamage)!;
       expect(owner.pendingTriggers).toHaveLength(1);
+      expect(owner.pendingTriggers[0].sourceCardInstanceId).toContain("SURVIVING-WATCHER");
+      const koEvents = state.effectStack.flatMap(frame => frame.accumulatedEvents).filter(event => event.type === "CARD_KO");
+      expect(koEvents).toHaveLength(1);
+      expect(koEvents[0].propagation?.triggerScanned).toBe(true);
       expect(state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
       const result = resumePromptLifecycle(state, fixture.reply as GameAction, cardDb, services);
       expect(result.responseRejected).toBe(false);
@@ -42,7 +46,7 @@ for (const location of ["state", "undoHistory[0]"]) {
       const loaded = convertPersistedGameState(structuredClone(fixture.state), location);
       const owner = loaded.effectStack.find(frame => frame.battleDamage)!;
       const retained = { type: "CARD_TRASHED" as const, playerIndex: 0 as const,
-        payload: { cardId: "CHAR-VANILLA", cardInstanceId: "retained-card", from: "HAND" },
+        payload: { cardId: "CHAR-VANILLA", cardInstanceId: "retained-card", from: "HAND", reason: "effect" },
         propagation: { triggerScanned: true } };
       const state: GameState = { ...loaded, pendingPrompt: null, effectStack: [{ ...owner, accumulatedEvents: [retained] }] };
       const result = continueBattleDamageFrame(state, cardDb);

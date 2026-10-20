@@ -387,7 +387,7 @@ The independent deployed-reader replay uses the original `6b394da6` parser and r
 PR7's event-order work can park matched substitute watchers on a
 `BATTLE_DAMAGE` frame at `CHARACTER_KO_REPLACEMENT` before a later substitute
 prompt. A concrete engine-produced **synthetic** witness extends EB03-001's
-substitute to K.O. a cost-1 Character with On K.O. draw, then asks for a hand
+substitute to K.O. a cost-1 Character with a surviving ANY_CHARACTER_KO draw watcher, then asks for a hand
 trash. The pending hand choice has one retained watcher on the battle frame.
 Both deployed reader `6b394da6` and pre-PR7 main `c4ef3637` load that state but
 silently drop the watcher when completing the battle (zero draws instead of one).
@@ -400,7 +400,7 @@ publication boundaries leave that battle debt with its owner. No scanner,
 substitute, or session path starts writing debt; version 4 writer goldens remain
 byte-identical. Ordinary pre-PR7 publication and ordering behavior is preserved.
 The actual writer-produced fixture is labelled synthetic with source commit
-`7bf07bffd027d03cf43062b868d5f7720af634c2`; it is not a production capture.
+`80c084f3d2b6b22adeb65801b34d66372f8f3633`; it is not a production capture.
 A constructed event-debt variant separately tests unpublished event consumption.
 Both are checked live and as undo, with deterministic reads and no repeat resume.
 
