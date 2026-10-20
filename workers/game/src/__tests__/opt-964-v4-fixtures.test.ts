@@ -676,3 +676,73 @@ it("reloads real mid-batch overflow live/undo and resumes the rule-trash pipelin
     expect(result.state.players[0].trash).toHaveLength(1);
   }
 });
+
+it.each(["overflow.batch", "stateDistributionForPlay"])(
+  "rejects unrecognized executable payloads in %s",
+  (owner) => {
+    for (const location of locations) {
+      for (const key of ["effectBlock", "triggeringEvent"] as const) {
+        const { raw, queued: trigger } = queued(owner);
+        trigger[key] =
+          key === "effectBlock"
+            ? {
+                id: "unknown",
+                category: "auto",
+                actions: [{ type: "NOT_AN_ACTION" }],
+              }
+            : { type: "NOT_AN_EVENT", payload: {} };
+        expect(() => read(raw, location)).toThrow();
+      }
+    }
+  }
+);
+
+it.each([
+  "scheduledActions",
+  "activeEffects",
+  "prohibitions",
+  "oneTimeModifiers",
+  "triggerRegistry",
+])("rejects unknown executable variants in staged %s", (carrier) => {
+  for (const location of locations) {
+    const raw = future();
+    const staged = Object.fromEntries(
+      [
+        "players",
+        "turn",
+        "activeEffects",
+        "prohibitions",
+        "scheduledActions",
+        "oneTimeModifiers",
+        "triggerRegistry",
+      ].map((key) => [key, structuredClone(raw[key])])
+    );
+    staged[carrier] =
+      carrier === "scheduledActions"
+        ? [
+            {
+              id: "staged-obligation",
+              timing: "END_OF_THIS_BATTLE",
+              action: { type: "NOT_AN_ACTION" },
+              boundToInstanceId: null,
+              sourceEffectId: "source",
+              controller: 0,
+            },
+          ]
+        : carrier === "triggerRegistry"
+          ? [
+              {
+                effectBlock: {
+                  id: "staged-block",
+                  category: "auto",
+                  actions: [{ type: "NOT_AN_ACTION" }],
+                },
+              },
+            ]
+          : carrier === "prohibitions"
+            ? [{ conditionalOverride: { action: { type: "NOT_AN_ACTION" } } }]
+            : [{ type: "NOT_A_VARIANT" }];
+    raw.effectStack = [{ ...frame(), costTransactionState: staged }];
+    expect(() => read(raw, location)).toThrow();
+  }
+});

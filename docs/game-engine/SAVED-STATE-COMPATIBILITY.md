@@ -146,7 +146,7 @@ The error names the reference (`pendingPrompt.resumeContext`, `effectStack[2].tr
 
 ## 3. Support window
 
-**Supported input versions in this build: `{1, 2, 3}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980). Version 3 adds the typed replacement and damage continuation frames (§8) and is read from PR 5a (OPT-963).
+**Supported input versions in this build: `{1, 2, 3, 4}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980). Version 3 adds the typed replacement and damage continuation frames (§8) and is read from PR 5a (OPT-963). Version 4 adds the PR6 ownership records and battle bookkeeping (§9), read from PR6a by lowering to the v3 runtime.
 
 Policy, not a date:
 
@@ -165,6 +165,8 @@ History:
 | 2026-10-17 (PR 5a fix round 1, OPT-963) | Lowering: batch rider on the top surviving frame, effect `TRIGGER_EFFECT` events re-homed, nested windows lowered leak-free (§1.7 items 2–4); three unwritten shapes rejected by name (§1.7 item 1, §2.4); proof against 5b-written states. | `{1, 2, 3}` |
 | 2026-10-17 (PR 5b, OPT-963) | Runtime and writer at version 3; `convertFromV2` lifts the version 2 records into frames (§1.8, §8.3). | `{1, 2, 3}` |
 | 2026-10-18 (PR 5b fix rounds 1–2, OPT-963) | Lift rebuilds a re-pointed window prompt from that window's own card (L5); the actions after a choice branch live on their own continuation under the effect's controller, below a handler-owned frame (F1, D-F1b), and a continuation frame carrying `remainingActions` is rejected; the effect window logs its point before prompting (F2; writer golden re-captured for `both-trigger-windows` only). Rollback target: PR 5a squash `c972f14e`. | `{1, 2, 3}` |
+
+| 2026-10-20 (PR 6a, OPT-964) | Version 4 reader lowers the new owners into the v3 runtime (§9); runtime and writer remain 3. No input version retired. | `{1, 2, 3, 4}` |
 
 ---
 
@@ -323,7 +325,7 @@ PR 6 requires a reader/writer split under §5.1. **This build reads 1–4 and co
 
 ### 9.1 Version 4 contract
 
-The persisted-only schema and lowerer are in `session/version4-reader.ts`. Every frame has an explicit `kind`. Existing v3 frame content and phases keep their meanings. The reader validates the complete v4 shape **before** removing any named field, then passes the lowered object through the existing action/event validation and continuation-reference checks. All live and undo entries use the same conversion hook. No load writes storage.
+The persisted-only schema and lowerer are in `session/version4-reader.ts`. Every frame has an explicit `kind`. Existing v3 frame content and phases keep their meanings. The reader validates the complete v4 shape **before** removing any named field, then passes the lowered object through the existing action/event validation and continuation-reference checks. Embedded overflow/state-distribution queues and staged cost-transaction actions, effects and overrides are checked with the same existing executable-payload validators as their root counterparts; this additional check applies only to v4 input. All live and undo entries use the same conversion hook. No load writes storage.
 
 | Owner | Version 4 fields and invariants | Lowering to version 3 |
 |---|---|---|

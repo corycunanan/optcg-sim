@@ -442,3 +442,9 @@ export function rememberVersion4Lowering(result: LoweredVersion4): Raw {
 export function version4LoweringNotes(state: object): Version4Degradation[] {
   return loweringNotes.get(state) ?? [];
 }
+
+/** Allows the persistence validator to check v4-only embedded executable
+ * carriers without changing what historical versions accept. */
+export function isVersion4Lowering(state: object): boolean {
+  return loweringNotes.has(state);
+}
