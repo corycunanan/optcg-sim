@@ -1018,3 +1018,53 @@ describe("OPT-965 scoped battle recovery and substitute ordering", () => {
     });
   }
 });
+
+
+describe("OPT-965 deferred substitute scan propagation", () => {
+  for (const actionType of ["KO", "SET_REST"] as const) {
+    for (const location of [null, "state", "undoHistory[0]"] as const) {
+      it(`${actionType} ${location ?? "continuous"}: a surviving watcher fires exactly once after a later hand prompt`, () => {
+        const f = fixture();
+        const schema = structuredClone(getEffectSchema("EB03-001")!);
+        const block = schema.effects[0];
+        if (block.category !== "replacement") throw new Error("shape");
+        block.replacement_actions = [
+          { type: actionType, target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 }, filter: { cost_max: 1 } } },
+          { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+        ];
+        f.data("EB03-001", { type: "Leader", cost: null, power: 5000, counter: null, life: 4, effectSchema: schema });
+        f.put("EB03-001", 0, "LEADER");
+        f.data("VICTIM", { cost: 1 });
+        const victim = f.put("VICTIM", 0);
+        f.data("SURVIVING-WATCHER", { cost: 2, effectSchema: {
+          card_id: "SURVIVING-WATCHER", card_name: "Watcher", card_type: "Character",
+          effects: [{ id: "draw", category: "auto",
+            trigger: { event: actionType === "KO" ? "ANY_CHARACTER_KO" : "CHARACTER_BECOMES_RESTED", filter: { controller: "SELF" } },
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          }],
+        } as NonNullable<CardData["effectSchema"]> });
+        f.put("SURVIVING-WATCHER", 0);
+        const target = vanAugur(f);
+        const hand = handCards(f, 0, 3);
+        f.battle(target, f.attacker());
+        f.accept();
+        if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET" && f.state.pendingPrompt.options.validTargets.includes(victim.instanceId)) {
+          f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: [victim.instanceId] });
+        }
+        expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+        const owner = f.state.effectStack.find(frame => frame.battleDamage)!;
+        expect(owner.pendingTriggers).toHaveLength(1);
+        expect(f.events("CARD_DRAWN")).toHaveLength(0);
+        const childEvents = f.state.effectStack.flatMap(frame => frame.accumulatedEvents);
+        expect(childEvents.filter(event => event.type === (actionType === "KO" ? "CARD_KO" : "CARD_STATE_CHANGED")))
+          .toEqual(expect.arrayContaining([expect.objectContaining({ propagation: expect.objectContaining({ triggerScanned: true }) })]));
+        if (location) f.state = convertPersistedGameState(toPersistedGameState(f.state), location);
+        f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: [hand[0].instanceId] });
+        expect(f.state.pendingPrompt).toBeNull();
+        expect(f.events("CARD_DRAWN")).toHaveLength(1);
+        expect(f.state.effectStack).toEqual([]);
+        expectBattleClosedOnce(f);
+      });
+    }
+  }
+});
