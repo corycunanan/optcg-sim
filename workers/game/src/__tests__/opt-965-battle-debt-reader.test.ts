@@ -47,7 +47,7 @@ for (const location of ["state", "undoHistory[0]"]) {
       const owner = loaded.effectStack.find(frame => frame.battleDamage)!;
       const retained = { type: "CARD_TRASHED" as const, playerIndex: 0 as const,
         payload: { cardId: "CHAR-VANILLA", cardInstanceId: "retained-card", from: "HAND", reason: "effect" },
-        propagation: { triggerScanned: true } };
+        propagation: { triggerScanned: true as const } };
       const state: GameState = { ...loaded, pendingPrompt: null, effectStack: [{ ...owner, accumulatedEvents: [retained] }] };
       const result = continueBattleDamageFrame(state, cardDb);
       expect(result.events).toContainEqual(retained);
