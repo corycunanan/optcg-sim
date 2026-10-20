@@ -859,7 +859,7 @@ describe("a finished game never resumes the battle", () => {
   it("a substitute watcher waits until damage completes and then ends the game once", () => {
     // Constructed registered schema: "When a card is trashed from your hand,
     // draw 1 card." With a 1-card deck, EB03-001's hand-trash substitute makes
-    // the watcher draw the last card after damage completes (§8-6-2).
+    // the watcher draw the last card after the substitute completes (§8-6-3).
     const f = fixture();
     vivi(f);
     f.data("WATCHER", {

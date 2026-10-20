@@ -220,6 +220,13 @@ describe("OPT-940 structural ResumeContext: lifted to one frame", () => {
       expect(classifyLegacyShapes(state)).toEqual([]);
     }
     const state = loadLive("structural-resume-context");
+    // A constructed surviving Leader watcher exposes the old fallback's
+    // dropped scan obligation as well as its dropped event publication.
+    const watcher = { id: "legacy-ko-watch", category: "auto" as const,
+      trigger: { event: "ANY_CHARACTER_KO" as const, filter: { controller: "OPPONENT" as const } },
+      actions: [{ type: "DRAW" as const, params: { amount: 1 } }] };
+    state.triggerRegistry.push({ id: "legacy-ko-watch", sourceCardInstanceId: state.players[0].leader.instanceId,
+      effectBlockId: watcher.id, trigger: watcher.trigger, effectBlock: watcher, zone: "FIELD", controller: 0 });
     const cardDb = new Map(Object.entries(golden("structural-resume-context").cardDb) as Array<[string, never]>);
     const target = (state.pendingPrompt!.options as { validTargets: string[] }).validTargets[0];
     const result = resumePromptLifecycle(
@@ -229,11 +236,16 @@ describe("OPT-940 structural ResumeContext: lifted to one frame", () => {
       lifecycleServices
     );
     expect(result.responseRejected).toBe(false);
-    // The legacy path applies the resumed state directly (prompt-lifecycle.ts
-    // publishes no events for it), so observe the zone, not the event log.
+    // The retired fallback dropped resumed events. The common frame path
+    // intentionally publishes the committed K.O. once.
     expect(state.players[1].characters.some((card) => card?.instanceId === target)).toBe(true);
     expect(result.state.players[1].characters.some((card) => card?.instanceId === target)).toBe(false);
     expect(result.state.pendingPrompt).toBeNull();
+    expect(result.state.eventLog.filter(event => event.type === "CARD_KO")).toHaveLength(1);
+    expect(result.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(1);
+    const duplicate = resumePromptLifecycle(result.state, { type: "SELECT_TARGET", selectedInstanceIds: [target] }, cardDb, lifecycleServices);
+    expect(duplicate.responseRejected).toBe(true);
+    expect(duplicate.state.eventLog).toEqual(result.state.eventLog);
   });
 });
 

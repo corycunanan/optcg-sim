@@ -805,6 +805,12 @@ export function validateContinuationReferences(
         `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, a PHASE_BOUNDARY frame that cannot own a prompt`
       );
     }
+    if (frames.at(-1)?.id !== target.id) {
+      throw new SessionLoadError(
+        location,
+        `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, which is not the top frame ${JSON.stringify(frames.at(-1)?.id)}`
+      );
+    }
     const promptType = prompt.options.promptType;
     const isDamage = kind === "BATTLE_DAMAGE" || kind === "EFFECT_DAMAGE";
     if (promptType === "REVEAL_TRIGGER" && !isDamage) {
