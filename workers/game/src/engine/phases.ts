@@ -5,6 +5,7 @@
  * and turn handoff. Extracted from execute.ts for clarity.
  */
 
+import { queuedSourceSnapshot } from "./trigger-ordering.js";
 import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
 import { releaseMovedDonEffects } from "./don-area-effects.js";
 import type {
@@ -417,6 +418,12 @@ function collectWaveTriggers(
       controller,
       effectBlock: match.effectBlock,
       triggeringEvent: pending,
+      sourceSnapshot: queuedSourceSnapshot(
+        timed.state,
+        match.trigger.sourceCardInstanceId,
+        match.trigger.controller,
+        match.effectBlock.id
+      ),
     };
     const key = waveEffectKey(trigger);
     if (done.has(key)) continue;

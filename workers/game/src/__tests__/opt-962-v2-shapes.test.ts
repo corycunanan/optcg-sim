@@ -54,14 +54,16 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
     if (!Array.isArray(historical.effectStack)) throw new Error("fixture has no stack");
     for (const frame of historical.effectStack) {
       for (const [, result] of frame.resultRefs) {
-        if (result.sourceCardSnapshot?.cardId === "OP03-015") {
+        if (result.sourceCardSnapshot) {
           const source = result.sourceCardSnapshot;
           delete result.sourceCardSnapshot;
           result.sourceIdentity = {
             instanceId: source.instanceId,
             cardId: source.cardId,
             controller: source.controller,
-            effectBlockId: "on_ko_debuff",
+            effectBlockId: source.cardId === "OP03-015" ? "on_ko_debuff"
+              : source.cardId === "OP04-034" ? "eot_conditional_ko"
+              : "SYN-EOOT-D-block",
           };
         }
       }

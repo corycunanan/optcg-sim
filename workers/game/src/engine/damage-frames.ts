@@ -18,6 +18,7 @@
  * every other watcher on the frame.
  */
 
+import { queuedSourceSnapshot } from "./trigger-ordering.js";
 import type {
   CardData,
   CardInstance,
@@ -244,6 +245,12 @@ export function openBattleTriggerWindow(
           controller: match.trigger.controller,
           effectBlock: match.effectBlock,
           triggeringEvent: event,
+          sourceSnapshot: queuedSourceSnapshot(
+            nextState,
+            match.trigger.sourceCardInstanceId,
+            match.trigger.controller,
+            match.effectBlock.id
+          ),
         };
         (isAttackDamageClass(queued) ? attackerClass : deferred).push(queued);
       }
