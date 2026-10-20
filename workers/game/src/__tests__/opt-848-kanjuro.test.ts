@@ -5,7 +5,7 @@ import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { executeTrashFromHand } from "../engine/effect-resolver/actions/removal.js";
 import { runPipeline } from "../engine/pipeline.js";
-import { parseStoredSession } from "../session/persistence.js";
+import { convertPersistedGameState, parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import {
   visibleStateForPlayer,
@@ -356,7 +356,7 @@ describe("blind choice lifecycle shared consumers", () => {
       countMin: 0,
     });
     const resumed = resumePromptLifecycle(
-      { ...result.state, pendingPrompt: result.pendingPrompt! },
+      convertPersistedGameState(toPersistedGameState({ ...result.state, pendingPrompt: result.pendingPrompt! }), "state"),
       { type: "SELECT_TARGET", selectedInstanceIds: [] },
       f.db,
       { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }

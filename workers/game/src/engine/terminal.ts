@@ -101,6 +101,17 @@ function describe(outcome: TerminalOutcome): {
   }
 }
 
+/** Shared, event-free cleanup for terminal writes and validated historical loads. */
+export function clearTerminalPendingWork(state: GameState): GameState {
+  const { pendingEventActivationEvents: _legacyDebt, ...kept } = state;
+  return {
+    ...kept,
+    pendingPrompt: null,
+    effectStack: [],
+    turn: { ...state.turn, battle: null, battleSubPhase: null },
+  };
+}
+
 /**
  * Write a terminal outcome once. Clears the prompt, the effect stack (which
  * since OPT-963 holds every damage and replacement continuation), the
@@ -114,24 +125,15 @@ export function terminateGame(
 ): GameState {
   if (isGameTerminated(state)) return state;
   const { status, winner, reason, engineOutcome, diagnostic } = describe(outcome);
-  const { pendingEventActivationEvents: _legacyDebt, ...withoutLegacyDebt } =
-    state;
   const terminal: GameState = {
-    ...withoutLegacyDebt,
+    ...clearTerminalPendingWork(state),
     status,
     winner,
     winReason: reason,
     ...(engineOutcome ? { engineOutcome } : {}),
-    pendingPrompt: null,
-    effectStack: [],
     ...(outcome.kind === "ABANDONMENT" && outcome.clearPregame
       ? { pregame: null }
       : {}),
-    turn: {
-      ...state.turn,
-      battle: null,
-      battleSubPhase: null,
-    },
   };
   return emitEvent(terminal, "GAME_OVER", actorIndex, {
     winner,

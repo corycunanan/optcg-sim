@@ -1,3 +1,5 @@
+import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
+import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
 import { liftVersion3 } from "./version4-lift.js";
 import { isVersion4Lowering } from "./version4-reader.js";
 import type {
@@ -860,17 +862,19 @@ export function convertPersistedGameState(
     const native = { ...raw };
     delete native.schemaVersion;
     if (isValidNativeVersion4(native, location)) {
-      const migrated = migrateLegacyTriggerRegistry(native);
+      const migrated = migrateLegacyTriggerRegistry(liftLegacyPrompt(native, location));
+      validateContinuationReferences(migrated, location);
       logLegacyShapes(migrated, location);
-      return migrated;
+      return isGameTerminated(migrated) ? clearTerminalPendingWork(migrated) : migrated;
     }
   }
   const converted = convertToCurrentShape(raw, location);
   const validated = parseStoredGameState(converted, location);
   validateContinuationReferences(validated, location);
-  const migrated = migrateLegacyTriggerRegistry(liftVersion3(validated));
+  const migrated = migrateLegacyTriggerRegistry(liftLegacyPrompt(liftVersion3(validated), location));
+  validateContinuationReferences(migrated, location);
   logLegacyShapes(migrated, location);
-  return migrated;
+  return isGameTerminated(migrated) ? clearTerminalPendingWork(migrated) : migrated;
 }
 
 export function parseStoredSession(

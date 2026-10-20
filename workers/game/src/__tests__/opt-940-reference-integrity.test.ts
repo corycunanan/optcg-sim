@@ -168,8 +168,8 @@ describe("OPT-940 battle damage records: classified, never rejected (review find
   it("loads a damage continuation with no battle and classifies it", () => {
     const raw = rawState("stuck-damage-step");
     raw.turn.battle = null;
-    // Still stuck (target gone, no prompt, empty stack) and now orphaned too.
-    expect(loadAndClassify(raw)).toEqual(["legacy.stuck_damage_step", "legacy.orphan_battle_continuation"]);
+    // No battle remains to strand; the orphan itself is still classified.
+    expect(loadAndClassify(raw)).toEqual(["legacy.orphan_battle_continuation"]);
   });
 
   it("loads a damage continuation whose battle id differs from the battle and classifies it", () => {

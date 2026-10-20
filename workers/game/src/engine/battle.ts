@@ -945,19 +945,29 @@ export function continueBattleDamageFrame(
   if (state.status !== "IN_PROGRESS") return { state: popFrame(state), events: [] };
 
   const battle = state.turn.battle;
-  if (!battle || battle.battleId !== pending.battleId) {
-    return { state: popFrame(state), events: [] };
+  if (!battle || battle.battleId !== pending.battleId || state.turn.battleSubPhase !== "DAMAGE_STEP") {
+    const withoutStale = popFrame(state);
+    // A stale frame cannot own a newer battle. Only abort a Damage Step
+    // with no remaining work or prompt; otherwise preserve its live owner.
+    const events: PendingEvent[] = [];
+    return {
+      state: battle && state.turn.battleSubPhase === "DAMAGE_STEP" && withoutStale.effectStack.length === 0
+        ? endBattle(withoutStale, events, { aborted: true })
+        : withoutStale,
+      events,
+    };
   }
 
   if (pending.stage === "CHARACTER_KO_REPLACEMENT") {
     // Only an answered continuation finishes the battle. An unanswered one
     // reaching here has lost its prompt (no prompt is pending), so nothing
-    // can answer it any more; discard it rather than guess a decline and
-    // K.O. the Character (OPT-872 review).
+    // can answer it any more. Abort without guessing a decline or a K.O.
     if (pending.resolution === undefined) {
-      return { state: popFrame(state), events: [] };
+      const events: PendingEvent[] = [];
+      return { state: endBattle(popFrame(state), events, { aborted: true }), events };
     }
-    return finishCharacterBattleResult(popFrame(state), pending, replacementEvents, cardDb);
+    const result = finishCharacterBattleResult(popFrame(state), pending, [...frame.accumulatedEvents, ...replacementEvents], cardDb);
+    return { ...result, queuedTriggers: frame.pendingTriggers };
   }
 
   if (pending.stage === "TRIGGER_WINDOW") {
@@ -1303,9 +1313,9 @@ function koBattleLoser(
  * CHARACTER_BATTLES (Character attacker only), COMBAT_VICTORY, the
  * `replacementEvents` passed in, the K.O. when the replacement was not applied
  * (§8-1-3-4-1), then End of the Battle (§7-1-5). That matches the synchronous
- * order only when the substitute resolved without a prompt; a prompted
- * substitute's events were already published by its own frame. The caller
- * pops the BATTLE_DAMAGE frame and checks its battleId.
+ * order for both synchronous and prompted substitutes: the latter retain
+ * their publication debt and matched watchers on the BATTLE_DAMAGE frame
+ * until damage completes (§8-6-2). The caller pops that frame and checks its id.
  */
 export function finishCharacterBattleResult(
   state: GameState,

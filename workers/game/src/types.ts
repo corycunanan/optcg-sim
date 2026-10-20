@@ -112,7 +112,7 @@ export interface GameState extends Omit<
   triggerRegistry: RuntimeRegisteredTrigger[];
   pendingPrompt: PendingPromptState | null;
   effectStack: EffectStackFrame[];
-  /** Root Event activation debt, scanned only after its complete effect chain. */
+  /** Historical reader/projection shape only. Runtime debt belongs to EVENT_ACTIVATION frames. */
   pendingEventActivationEvents?: PendingEvent[];
 }
 

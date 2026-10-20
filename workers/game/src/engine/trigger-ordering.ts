@@ -100,6 +100,22 @@ export function scanEventsForTriggers(
   }
 
   nextState = deregisterDepartedSources(nextState, events);
+  // A battle K.O. substitute is still inside damage processing (§8-6-2).
+  // Match now (before sources can move), but let the owning damage frame
+  // release these watchers with CHARACTER_BATTLES / COMBAT_VICTORY.
+  const battleOwner = nextState.effectStack.find((frame) =>
+    frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+    frame.battleDamage.battleId === nextState.turn.battle?.battleId
+  );
+  if (battleOwner && triggers.length > 0) {
+    nextState = {
+      ...nextState,
+      effectStack: nextState.effectStack.map((frame) => frame.id === battleOwner.id
+        ? { ...frame, pendingTriggers: [...frame.pendingTriggers, ...triggers] }
+        : frame),
+    };
+    return { triggers: [], state: nextState, events: scannedEvents };
+  }
   return { triggers, state: nextState, events: scannedEvents };
 }
 

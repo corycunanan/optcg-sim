@@ -878,15 +878,6 @@ export function isLegacyCostTransactionFrame(frame: EffectStackFrame): boolean {
   );
 }
 
-function isOnField(state: GameState, instanceId: string): boolean {
-  return state.players.some(
-    (player) =>
-      player.leader.instanceId === instanceId ||
-      player.stage?.instanceId === instanceId ||
-      player.characters.some((card) => card?.instanceId === instanceId)
-  );
-}
-
 /** The one BATTLE_DAMAGE frame of a state, if any (one battle at a time). */
 export function battleDamageFrameOf(state: GameState): EffectStackFrame | undefined {
   return state.effectStack.find((frame) => frame.battleDamage !== undefined);
@@ -901,12 +892,14 @@ export function isStuckDamageStep(state: GameState): boolean {
   const frame = battleDamageFrameOf(state);
   const continuation = frame?.battleDamage;
   return (
+    state.status === "IN_PROGRESS" &&
+    state.turn.battle !== null &&
     state.turn.battleSubPhase === "DAMAGE_STEP" &&
-    continuation?.stage === "CHARACTER_KO_REPLACEMENT" &&
-    continuation.resolution === undefined &&
     state.pendingPrompt === null &&
-    state.effectStack.length === 1 &&
-    !isOnField(state, continuation.targetInstanceId)
+    (state.effectStack.length === 0 ||
+      (state.effectStack.length === 1 &&
+        continuation?.stage === "CHARACTER_KO_REPLACEMENT" &&
+        continuation.resolution === undefined))
   );
 }
 

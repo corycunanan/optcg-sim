@@ -58,7 +58,7 @@ export function takeInterruptedEvents(state: GameState): {
 } {
   const events: PendingEvent[] = [];
   const effectStack = state.effectStack.map((frame) => {
-    if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") return frame;
+    if (frame.phase !== "INTERRUPTED_BY_TRIGGERS" || frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT") return frame;
     events.push(...pendingPropagationEvents(frame.accumulatedEvents));
     return { ...frame, accumulatedEvents: [] };
   });
