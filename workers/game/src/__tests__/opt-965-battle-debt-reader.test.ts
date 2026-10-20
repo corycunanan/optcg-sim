@@ -5,6 +5,7 @@ import fixture from "./fixtures/opt-965-battle-debt.synthetic.json";
 import type { CardData, GameAction, GameState } from "../types.js";
 import { convertPersistedGameState, parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
+import { processRemainingTriggers } from "../engine/effect-resolver/resume.js";
 import { continueBattleDamageFrame } from "../engine/battle.js";
 
 const cardDb = new Map(Object.entries(fixture.cardDb)) as Map<string, CardData>;
@@ -37,6 +38,33 @@ for (const location of ["state", "undoHistory[0]"]) {
       const repeated = resumePromptLifecycle(result.state, fixture.reply as GameAction, cardDb, services);
       expect(repeated.responseRejected).toBe(true);
       expect(repeated.state).toEqual(result.state);
+    });
+
+    it("keeps battle publication debt through a prompted child trigger boundary", () => {
+      // Constructed consumer boundary, not a captured session: a committed
+      // battle prefix must not publish while a child trigger still asks input.
+      const loaded = convertPersistedGameState(structuredClone(fixture.state), location);
+      const owner = loaded.effectStack.find(frame => frame.battleDamage)!;
+      const retained = { type: "CARD_TRASHED" as const, playerIndex: 0 as const,
+        payload: { cardId: "CHAR-VANILLA", cardInstanceId: "retained-boundary", from: "HAND", reason: "effect" },
+        propagation: { triggerScanned: true as const } };
+      const state: GameState = { ...loaded, pendingPrompt: null,
+        effectStack: [{ ...owner, accumulatedEvents: [retained] }] };
+      const child = { ...owner.pendingTriggers[0], effectBlock: {
+        ...owner.pendingTriggers[0].effectBlock,
+        actions: [{ type: "TRASH_FROM_HAND" as const, params: { amount: 1 } }],
+      } };
+      const paused = processRemainingTriggers(state, [child], cardDb);
+      expect(paused.pendingPrompt).toBeDefined();
+      expect(paused.state.effectStack.find(frame => frame.id === owner.id)?.accumulatedEvents).toEqual([retained]);
+      expect(paused.state.eventLog.some(event => event.type === "CARD_TRASHED" && event.payload.cardInstanceId === "retained-boundary")).toBe(false);
+      const completed = resumePromptLifecycle({ ...paused.state, pendingPrompt: paused.pendingPrompt! }, fixture.reply as GameAction, cardDb, services);
+      expect(completed.responseRejected).toBe(false);
+      expect(completed.state.eventLog.filter(event => event.type === "CARD_TRASHED" && event.payload.cardInstanceId === "retained-boundary")).toHaveLength(1);
+      expect(completed.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(1);
+      expect(completed.state.pendingPrompt).toBeNull();
+      expect(completed.state.effectStack).toEqual([]);
+      expect(completed.state.turn.battle).toBeNull();
     });
 
     it("preserves retained publication debt when the battle owner completes", () => {
