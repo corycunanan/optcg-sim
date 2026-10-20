@@ -353,9 +353,9 @@ describe("F17 [Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; Decision 2; FAQ qa_op0
     },
   );
 
-  // Engine: DAMAGE_DEALT, DAMAGE_DEALT, END_OF_BATTLE with NO p1 CARD_DRAWN at all (a single-hit attack does draw, after END_OF_BATTLE).
+  // OPT-973: duplicate matches previously parked the draw behind an ordering prompt.
   // Rule 8-6-2 (line 862) / Decision 2: the effect resolves once, after the last damage point.
-  it.fails("F17 exactly one p1 CARD_DRAWN, after the second DAMAGE_DEALT; p1 Life 0, IN_PROGRESS (ratchet OPT-963)", () => {
+  it("F17 exactly one p1 CARD_DRAWN, after the second DAMAGE_DEALT; p1 Life 0, IN_PROGRESS (fixed OPT-973)", () => {
     const { rig, db } = baseRig();
     let s = withLeader(rig.state, db, 1, SYN_TAKE_DAMAGE);
     s = withLife(s, 1, [life("life-a", CARDS.VANILLA.id), life("life-b", CARDS.VANILLA.id)]);
@@ -372,4 +372,71 @@ describe("F17 [Rule 8-6-2 line 862, 7-1-4-1-1-3 line 672; Decision 2; FAQ qa_op0
     expect(rig.state.players[1].life.length).toBe(0);
     expect(rig.state.status).toBe("IN_PROGRESS");
   });
+
+  it("single damage still activates the defender exactly once", () => {
+    const { rig, db } = baseRig();
+    rig.state = withLife(withLeader(rig.state, db, 1, SYN_TAKE_DAMAGE), 1,
+      [life("life-single", CARDS.VANILLA.id)]);
+    attackLeader(rig, rig.state.players[0].leader.instanceId);
+    expect(rig.state.eventLog.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(1);
+    expect(rig.state.pendingPrompt).toBeNull();
+    expect(rig.state.effectStack).toHaveLength(0);
+  });
+
+  it.each([
+    { triggerPoint: 1, accept: true },
+    { triggerPoint: 1, accept: false },
+    { triggerPoint: 2, accept: true },
+    { triggerPoint: 2, accept: false },
+  ])("once after both points across restored point-$triggerPoint Trigger (accept=$accept)", ({ triggerPoint, accept }) => {
+    const { rig, db } = baseRig();
+    // Exercise the compound shape used by the authored Ace schema.
+    const watcher: CardData = { ...SYN_TAKE_DAMAGE, effectSchema: {
+      ...SYN_TAKE_DAMAGE.effectSchema!, effects: [{
+        ...SYN_TAKE_DAMAGE.effectSchema!.effects![0],
+        trigger: { any_of: [{ event: "DAMAGE_TAKEN" }, { keyword: "ON_PLAY" }] },
+      }],
+    } };
+    const cards = [life("life-a", CARDS.VANILLA.id), life("life-b", CARDS.VANILLA.id)];
+    cards[triggerPoint - 1] = life("life-trigger", SYN_TRIGGER_LIFE.id);
+    const da = withDoubleAttacker(vanillaDeck(withLife(withLeader(rig.state, db, 1, watcher), 1, cards)));
+    rig.state = da.state;
+    attackLeader(rig, da.attackerId);
+    expect(rig.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    expect(rig.state.eventLog.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(0);
+    // Damage-frame ownership and event markers survive a persisted JSON round trip.
+    rig.state = JSON.parse(JSON.stringify(rig.state));
+    reveal(rig, accept);
+    const log = rig.state.eventLog;
+    expect(log.filter((e) => e.type === "DAMAGE_DEALT")).toHaveLength(2);
+    expect(log.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(1);
+    expect(idx(log, "CARD_DRAWN", 1)).toBeGreaterThan(log.map((e) => e.type).lastIndexOf("DAMAGE_DEALT"));
+    expect(rig.state.pendingPrompt).toBeNull();
+    expect(rig.state.effectStack).toHaveLength(0);
+    expect(rig.state.turn.battle).toBeNull();
+  });
+
+  it("Double Attack into one Life still activates once when the second point finds no Life", () => {
+    const { rig, db } = baseRig();
+    const da = withDoubleAttacker(withLife(withLeader(rig.state, db, 1, SYN_TAKE_DAMAGE), 1,
+      [life("life-only", CARDS.VANILLA.id)]));
+    rig.state = da.state;
+    attackLeader(rig, da.attackerId);
+    expect(rig.state.eventLog.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(1);
+    expect(rig.state.status).toBe("IN_PROGRESS");
+    expect(rig.state.pendingPrompt).toBeNull();
+  });
+
+
+  it("a losing attack causes no damage and no taking-damage activation", () => {
+    const { rig, db } = baseRig();
+    rig.state = withLeader(rig.state, db, 1, { ...SYN_TAKE_DAMAGE, power: 12000 });
+    const lifeBefore = rig.state.players[1].life.length;
+    attackLeader(rig, rig.state.players[0].leader.instanceId);
+    expect(rig.state.eventLog.filter((e) => e.type === "DAMAGE_DEALT")).toHaveLength(0);
+    expect(rig.state.eventLog.filter((e) => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(0);
+    expect(rig.state.players[1].life).toHaveLength(lifeBefore);
+    expect(rig.state.pendingPrompt).toBeNull();
+  });
+
 });

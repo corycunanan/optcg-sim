@@ -240,8 +240,8 @@ retains a surviving external watcher's draw, then asks for hand trash. Both
 of one). Syntax compatibility is insufficient: **those builds are unsafe rollback
 targets once this writer activates**. Reader prerequisite PR #762 consumes existing
 battle-frame event/watcher debt without introducing writers. This writer cannot
-merge until that reader is merged and successfully deployed. The coordinator
-receipt pins the deployed minimum rollback SHA. No intermediate writer was shipped.
+merge until that reader is merged and successfully deployed. The minimum rollback build is `958fce9ddc729d3d571473ed7bb013dde62bda0b`,
+verified by [Worker deployment39486222062](https://github.com/corycunanan/optcg-sim/actions/runs/39486222062). No intermediate writer was shipped.
 All these states are synthetic, not captured sessions; OPT-971 remains unmet.
 
 ### Review corrections and consumer coverage
@@ -298,3 +298,28 @@ draw-to-deck-out proves one GAME_OVER and no resurrected battle/frame/prompt. Th
 are synthetic mechanics coverage, not claims of authored mandatory prompting cards
 or a general rule-6-2 scheduler rewrite. Existing unrelated multi-target batch suites
 remain the broader interleaving regression gate.
+
+Final pre-integration `pnpm verify` at `f192c6eb` exited0:361worker files,
+5373passed,19expected failures,5skipped; app2426passed7skipped, schema37passed,
+pipeline57passed, production build successful. Final integration carries reader
+PR762 plus main's first-damage watcher guard and its regression tests. The reader
+runtime overlap is identical; comment conflicts retain the current ownership rule.
+
+The synchronous-owner top contract follows `executeActionChain`: unfinished action
+or trigger work returns `pendingPrompt`; completed batch drains reenter and remove
+their batch owner; stack-depth termination returns terminal state and is handled
+before completion. No live no-prompt child owner was found in this consumer audit.
+Mandatory matrix and synchronous tests bound this claim; it is not exhaustive proof
+of future resolver actions. Terminal prefix publication is asserted before GAME_OVER.
+The optional insertion depth-limit branch preserves its preexisting committed prefix
+instead of dropping it through the new actual-result forwarding adapter.
+
+Integrated focused validation:5files232passed+1expected failure and worker typecheck
+passed. The reader boundary test now explicitly puts an ordinary interrupted child
+above the battle owner; the writer correctly defers work supplied directly to the
+battle owner, so that older constructed setup was no longer a child boundary. The
+actual writer80 fixture is unchanged. Removing only the extraction guard in an
+isolated final-source archive still kills both adapted live/undo boundary tests
+(2failed,4passed), by detaching their retained event before completion. A separate
+isolated mutation of normal-pipeline queued-trigger forwarding fails the synchronous
+watcher's one-draw assertion (1failed,1passed); terminal cleanup remains intact.

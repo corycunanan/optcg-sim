@@ -1235,7 +1235,7 @@ function executeDamageStep(
               battleDamage: paused,
             })
           );
-          if (isGameTerminated(withFrame)) return { state: withFrame, events: [] };
+          if (isGameTerminated(withFrame)) return { state: withFrame, events };
           return {
             state: withFrame,
             events: [],

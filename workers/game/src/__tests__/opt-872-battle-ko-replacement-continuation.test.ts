@@ -39,7 +39,9 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
-import { continueBattleDamageFrame } from "../engine/battle.js";
+import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
+import { continuePipelineFromExecution } from "../engine/pipeline.js";
+import { continueBattleDamageFrame, executePass } from "../engine/battle.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import {
   SessionRepository,
@@ -529,6 +531,30 @@ describe("a mandatory replacement whose substitute asks for input", () => {
   });
 });
 
+it("preserves the battle prefix when optional owner insertion hits the stack limit", () => {
+  const f = fixture();
+  vivi(f);
+  const target = vanAugur(f);
+  handCards(f, 0, 2);
+  f.battle(target, f.attacker());
+  const template = f.state.effectStack.find(frame => frame.battleDamage)!;
+  const state: GameState = { ...f.state, pendingPrompt: null,
+    effectStack: Array.from({ length: MAX_EFFECT_STACK_DEPTH - 1 }, (_, index) => ({
+      ...template, id: `depth-owner-${index}`, kind: "TRIGGER_DRAIN", battleDamage: undefined,
+    })),
+    turn: { ...f.state.turn, battleSubPhase: "COUNTER_STEP", battle: { ...f.state.turn.battle!, step: "COUNTER_STEP" } },
+  };
+  const executed = executePass(state, f.db);
+  expect(executed.state.status).toBe("FINISHED");
+  expect(executed.events.map(event => event.type)).toEqual(["PHASE_CHANGED", "CHARACTER_BATTLES", "COMBAT_VICTORY"]);
+  const completed = continuePipelineFromExecution(executed.state, executed, f.db, 0);
+  expect(completed.state.effectStack).toEqual([]);
+  expect(completed.state.pendingPrompt).toBeNull();
+  const types = completed.state.eventLog.map(event => event.type);
+  expect(types.filter(type => type === "GAME_OVER")).toHaveLength(1);
+  expect(types.lastIndexOf("COMBAT_VICTORY")).toBeLessThan(types.indexOf("GAME_OVER"));
+});
+
 describe("OPT-965 mandatory substitute owner completion", () => {
   for (const terminal of [false, true]) {
     it(`cleans the synchronous owner once${terminal ? " on terminal outcome" : " without a prompt"}`, () => {
@@ -570,6 +596,11 @@ describe("OPT-965 mandatory substitute owner completion", () => {
         expect(f.state.status).toBe("FINISHED");
         expect(f.events("GAME_OVER")).toHaveLength(1);
         expect(f.events("END_OF_BATTLE")).toHaveLength(0);
+        const types = f.state.eventLog.map(event => event.type);
+        for (const type of ["PHASE_CHANGED", "CHARACTER_BATTLES", "COMBAT_VICTORY", "CARD_DRAWN"]) {
+          expect(types).toContain(type);
+          expect(types.lastIndexOf(type as typeof types[number])).toBeLessThan(types.indexOf("GAME_OVER"));
+        }
       } else {
         expect(f.events("CARD_TRASHED")).toHaveLength(1);
         expect(f.events("CARD_DRAWN")).toHaveLength(1);
