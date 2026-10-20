@@ -44,7 +44,16 @@ export function resolveActivatedEvent(
     pendingTriggers: [],
     simultaneousTriggers: [],
     accumulatedEvents: [],
-    eventActivationCompletion: notification,
+    kind: "EVENT_ACTIVATION",
+    eventActivation: {
+      publication: "AFTER_EFFECT",
+      sourceZone:
+        notification.type === "EVENT_MAIN_RESOLVED_FROM_TRASH"
+          ? "TRASH"
+          : "HAND",
+      sourceClass: "EVENT",
+      events: [notification],
+    },
   });
   if (isGameTerminated(withCompletion))
     return { state: withCompletion, events: [], succeeded: false };
@@ -96,7 +105,8 @@ export function withdrawUnactivatedTrashMain(
   const top = state.effectStack.at(-1);
   const trigger = abandoned.effectBlock.trigger;
   if (
-    top?.eventActivationCompletion?.type !== "EVENT_MAIN_RESOLVED_FROM_TRASH" ||
+    top?.eventActivation?.events[0]?.type !==
+      "EVENT_MAIN_RESOLVED_FROM_TRASH" ||
     top.sourceCardInstanceId !== abandoned.sourceCardInstanceId ||
     !trigger ||
     !("keyword" in trigger) ||
@@ -104,7 +114,8 @@ export function withdrawUnactivatedTrashMain(
   )
     return state;
   const boundary: EffectStackFrame = { ...top };
-  delete boundary.eventActivationCompletion;
+  delete boundary.eventActivation;
+  delete boundary.kind;
   return {
     ...state,
     effectStack: [...state.effectStack.slice(0, -1), boundary],
@@ -179,8 +190,7 @@ export function updateEffectContinuation(
     candidate?.phase === "INTERRUPTED_BY_TRIGGERS" &&
     (candidate.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
       candidate.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH") &&
-    state.effectStack[firstNewFrame + 1]?.eventActivationCompletion !==
-      undefined;
+    state.effectStack[firstNewFrame + 1]?.eventActivation !== undefined;
   const index = isEventParent ? firstNewFrame : state.effectStack.length - 1;
   const frame = state.effectStack[index];
   if (!frame) return state;

@@ -1,3 +1,4 @@
+import { continuationBoundary, prependFrame } from "./effect-stack.js";
 /**
  * 7-Step Action Pipeline
  *
@@ -127,13 +128,31 @@ export function runPipeline(
     // suffix finishes, so keep only the outer debt in a separate root barrier.
     if (execResult.events.some(event => event.type === "EVENT_ACTIVATED_FROM_HAND")) {
       const frameOwned = new Set(nextState.effectStack.flatMap(frame => frame.accumulatedEvents));
-      nextState = {
-        ...nextState,
-        pendingEventActivationEvents: execResult.events.filter(event =>
-          !frameOwned.has(event) &&
-          (!event.propagation?.eventLogEmitted || !event.propagation?.triggerScanned)
-        ),
-      };
+      const activation = execResult.events.find(
+        (event) => event.type === "EVENT_ACTIVATED_FROM_HAND"
+      )!;
+      const boundary = continuationBoundary(
+        nextState,
+        String(activation.payload?.cardInstanceId),
+        activation.playerIndex ?? actingPlayerIndex
+      );
+      nextState = prependFrame(boundary.state, {
+        ...boundary.frame,
+        kind: "EVENT_ACTIVATION",
+        eventActivation: {
+          publication: "AFTER_STACK",
+          sourceZone: "HAND",
+          sourceClass: "EVENT",
+          events: execResult.events.filter(
+            (event) =>
+              !frameOwned.has(event) &&
+              (!event.propagation?.eventLogEmitted ||
+                !event.propagation?.triggerScanned)
+          ),
+        },
+      });
+      if (isGameTerminated(nextState))
+        return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
       nextState = recordAction(nextState, actionToExecute, actedCard);
     }
     nextState = { ...nextState, pendingPrompt: execResult.pendingPrompt };

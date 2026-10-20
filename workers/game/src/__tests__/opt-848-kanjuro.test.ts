@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
@@ -123,7 +124,7 @@ function fixture() {
     persist() {
       state = parseStoredSession(
         JSON.parse(
-          JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+          JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })
         )
       ).state;
     },

@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { expect, it } from "vitest";
 import type {
   CardData,
@@ -595,24 +596,25 @@ it("persisted completion accepts legacy absence and rejects malformed notificati
     JSON.parse(
       JSON.stringify({
         formatVersion: 1,
-        state: f.state,
+        state: toPersistedGameState(f.state),
         cardDb: Object.fromEntries(f.db),
         undoHistory: [],
       })
     );
   const index = f.state.effectStack.findIndex(
-    (frame) => frame.eventActivationCompletion
+    (frame) => frame.eventActivation
   );
   expect(index).toBeGreaterThanOrEqual(0);
   expect(
     parseStoredSession(snapshot()).state.effectStack[index]
-      .eventActivationCompletion?.type
+      .eventActivation?.events[0]?.type
   ).toBe("EVENT_ACTIVATED_FROM_HAND");
   const legacy = snapshot();
-  delete legacy.state.effectStack[index].eventActivationCompletion;
+  delete legacy.state.effectStack[index].eventActivation;
+  legacy.state.effectStack[index].kind = "TRIGGER_DRAIN";
   expect(
     parseStoredSession(legacy).state.effectStack[index]
-      .eventActivationCompletion
+      .eventActivation
   ).toBeUndefined();
   for (const completion of [
     "bad",
@@ -630,7 +632,7 @@ it("persisted completion accepts legacy absence and rejects malformed notificati
     },
   ]) {
     const malformed = snapshot();
-    malformed.state.effectStack[index].eventActivationCompletion = completion;
+    malformed.state.effectStack[index].eventActivation.events = [completion];
     expect(() => parseStoredSession(malformed)).toThrow();
   }
 });

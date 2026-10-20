@@ -253,22 +253,6 @@ function resumePromptLifecycleUnreleased(
     if (isGameTerminated(state)) gameOver = terminalOutcome(state);
   }
 
-  if (state.status !== "IN_PROGRESS" || gameOver) {
-    state = { ...state, pendingEventActivationEvents: undefined };
-  } else if (!responseRejected && !state.pendingPrompt && state.effectStack.length === 0 &&
-      state.pendingEventActivationEvents?.length) {
-    const events = state.pendingEventActivationEvents;
-    // Clear before scanning: a watcher may itself prompt, persist, or end play.
-    state = { ...state, pendingEventActivationEvents: undefined };
-    const activation = continuePipelineFromExecution(state, { state, events }, cardDb, respondingPlayer);
-    state = activation.state;
-    gameOver = activation.gameOver;
-    if (!gameOver) {
-      const unwound = resumeContinuations(state, action, cardDb, respondingPlayer, gameOver);
-      state = unwound.state;
-      gameOver = unwound.gameOver;
-    }
-  }
 
   if (
     !state.pendingPrompt &&

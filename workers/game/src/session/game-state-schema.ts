@@ -25,22 +25,24 @@
  * four typed frame kinds (§8). PR 5a read it by lowering to the version 2
  * runtime; PR 5b raises the runtime to version 3, lifts version 2 records
  * into frames (`convertFromV2`) and writes version 3 (§1.8).
+ * PR 6a reads v4 by strict lowering; runtime and writer remain v3 (§9).
  */
 
 import type { EffectStackFrame, GameState, PhaseBoundaryContinuation } from "../types.js";
 import { EFFECT_STACK_FRAME_KINDS, VERSION_3_CONTINUATION_FIELDS, VERSION_3_FRAME_KINDS, frameKindOf, type EffectStackFrameKind } from "../engine/frame-kinds.js";
 import { promptCardForLifeCard, revealTriggerPromptOptions } from "../engine/damage-frames.js";
 import { log } from "../lib/log.js";
+import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
-export const GAME_STATE_SCHEMA_VERSION = 3;
-/** The newest version this build can read (the runtime shape). */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 3;
+export const GAME_STATE_SCHEMA_VERSION = 4;
+/** The newest persisted version this build can read; v4 lowers to v3. */
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 4;
 /** The version of the runtime shape this build's engine executes. */
-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 3;
+export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 4;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3];
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
 
@@ -482,7 +484,7 @@ const convertFromV3: Converter = (raw, location) => {
   return rest;
 };
 
-/** Converter for version N produces version N + 1; the last one produces the latest readable shape. */
+/** Legacy conversion chain through the v3 runtime. v4 uses its separately validated lowering. */
 const CONVERTERS: Record<number, Converter> = {
   1: convertFromV1,
   2: convertFromV2,
@@ -491,8 +493,9 @@ const CONVERTERS: Record<number, Converter> = {
 
 /**
  * Convert a raw persisted game-state object of a recognized version into the
- * current runtime shape, before strict validation. The caller strictly
- * validates the result and then calls `validateContinuationReferences`.
+ * v3 validation shape. Native v4 callers validate this compatibility projection
+ * and retain the original graph; historical callers lift after validation.
+ * Every caller also checks continuation-reference integrity.
  */
 export function convertToCurrentShape(
   raw: unknown,
@@ -502,8 +505,13 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
+  if (version === 4) {
+    return rememberVersion4Lowering(lowerVersion4(raw, reason => {
+      throw new SessionLoadError(location, reason);
+    }));
+  }
   let converted = raw;
-  for (let step = version; step <= LATEST_READABLE_GAME_STATE_SCHEMA_VERSION; step += 1) {
+  for (let step = version; step <= 3; step += 1) {
     const converter = CONVERTERS[step];
     if (!converter) {
       throw new SessionLoadError(
@@ -518,8 +526,8 @@ export function convertToCurrentShape(
 
 /**
  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
- * PR 5b (OPT-963) every live state and undo snapshot is written as version 3:
- * `schemaVersion: 3` first, the typed continuation frames as they are, every
+ * PR 6b (OPT-964) every live state and undo snapshot is written as version 4:
+ * `schemaVersion: 4` first, every frame with its discriminant, every
  * End Phase frame with its stage. A runtime frame without a stage can only be
  * a version 1 frame, so it is written with the legacy stage, which is its
  * version 1 meaning.
@@ -535,7 +543,14 @@ export function toPersistedGameState(state: GameState): GameState {
           : frame
       )
     : state.effectStack;
-  return { [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION, ...state, effectStack } as GameState;
+  return {
+    [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION,
+    ...state,
+    effectStack: effectStack.map((frame) => ({
+      ...frame,
+      kind: frameKindOf(frame),
+    })),
+  } as GameState;
 }
 
 function frameInvariantViolation(
@@ -560,7 +575,11 @@ function frameInvariantViolation(
       if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") {
         return `is PHASE_BOUNDARY but has phase ${frame.phase}`;
       }
-      if (frame.batchResumeMarker || frame.triggerOrderingGroup || frame.costs.length > 0) {
+      if (
+        frame.batchResumeMarker ||
+        frame.triggerOrderingGroup ||
+        frame.costs.length > 0
+      ) {
         return "is PHASE_BOUNDARY but carries batch, ordering, or cost state";
       }
       if (continuation.kind !== "END_PHASE") {
@@ -577,36 +596,53 @@ function frameInvariantViolation(
     case "COST":
       return frame.costs.length === 0 ? "is COST but has no costs" : null;
     case "BATCH_RESUME":
-      return frame.batchResumeMarker ? null : "is BATCH_RESUME but has no batchResumeMarker";
+      return frame.batchResumeMarker
+        ? null
+        : "is BATCH_RESUME but has no batchResumeMarker";
     case "REPLACEMENT":
       return frame.phase === "AWAITING_OPTIONAL_RESPONSE"
         ? null
         : `is REPLACEMENT but has phase ${frame.phase}; an offer waits for its OPTIONAL_EFFECT answer`;
     case "REPLACEMENT_BATCH": {
       const batch = frame.replacementBatch!;
-      if (frame.phase !== "AWAITING_OPTIONAL_RESPONSE" && frame.phase !== "INTERRUPTED_BY_TRIGGERS") {
+      if (
+        frame.phase !== "AWAITING_OPTIONAL_RESPONSE" &&
+        frame.phase !== "INTERRUPTED_BY_TRIGGERS"
+      ) {
         return `is REPLACEMENT_BATCH but has phase ${frame.phase}`;
       }
       if (batch.currentMatchIndex > batch.pendingMatches.length) {
         return `has replacementBatch.currentMatchIndex ${batch.currentMatchIndex} past its ${batch.pendingMatches.length} pending match(es)`;
       }
-      if (frame.phase === "AWAITING_OPTIONAL_RESPONSE" && !batch.pendingMatches[batch.currentMatchIndex]) {
+      if (
+        frame.phase === "AWAITING_OPTIONAL_RESPONSE" &&
+        !batch.pendingMatches[batch.currentMatchIndex]
+      ) {
         return `offers replacementBatch match ${batch.currentMatchIndex}, which does not exist`;
       }
       return null;
     }
     case "BATTLE_DAMAGE": {
-      const expected = frame.battleDamage!.stage === "TRIGGER_WINDOW" ? "AWAITING_TRIGGER_REVEAL" : "INTERRUPTED_BY_TRIGGERS";
+      const expected =
+        frame.battleDamage!.stage === "TRIGGER_WINDOW"
+          ? "AWAITING_TRIGGER_REVEAL"
+          : "INTERRUPTED_BY_TRIGGERS";
       return frame.phase === expected
         ? null
         : `is BATTLE_DAMAGE at stage ${frame.battleDamage!.stage} but has phase ${frame.phase}; expected ${expected}`;
     }
     case "EFFECT_DAMAGE": {
-      const expected = frame.effectDamage!.stage === "TRIGGER_WINDOW" ? "AWAITING_TRIGGER_REVEAL" : "INTERRUPTED_BY_TRIGGERS";
+      const expected =
+        frame.effectDamage!.stage === "TRIGGER_WINDOW"
+          ? "AWAITING_TRIGGER_REVEAL"
+          : "INTERRUPTED_BY_TRIGGERS";
       return frame.phase === expected
         ? null
         : `is EFFECT_DAMAGE at stage ${frame.effectDamage!.stage} but has phase ${frame.phase}; expected ${expected}`;
     }
+    case "EVENT_ACTIVATION":
+    case "PLAY_OVERFLOW":
+    case "PREGAME":
     case "TRIGGER_ORDER":
     case "TRIGGER_DRAIN":
     case "EFFECT":

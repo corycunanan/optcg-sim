@@ -979,19 +979,22 @@ export function handleAwaitingTriggerOrderSelection(
 
   // Resolve the chosen trigger
   const chosenStackDepth = nextState.effectStack.length;
-  const result = services.withCommittedEvents(events).resolveEffect(
-    nextState,
-    chosenTrigger.effectBlock,
-    chosenTrigger.sourceCardInstanceId,
-    chosenTrigger.controller,
-    cardDb,
-    (
-      chosenTrigger.triggeringEvent?.payload as
-        | { cardInstanceId?: string }
-        | undefined
-    )?.cardInstanceId ?? null,
-    chosenTrigger.triggeringEvent,
-  );
+  const result = services
+    .withCommittedEvents(events)
+    .resolveEffect(
+      nextState,
+      chosenTrigger.effectBlock,
+      chosenTrigger.sourceCardInstanceId,
+      chosenTrigger.controller,
+      cardDb,
+      (
+        chosenTrigger.triggeringEvent?.payload as
+          | { cardInstanceId?: string }
+          | undefined
+      )?.cardInstanceId ?? null,
+      chosenTrigger.triggeringEvent,
+      chosenTrigger.sourceSnapshot
+    );
   nextState = result.state;
   events.push(...result.events);
 
@@ -1085,15 +1088,18 @@ export function handleAwaitingTriggerOrderSelection(
   if (remaining.length === 1) {
     // Auto-resolve the last one
     const lastStackDepth = nextState.effectStack.length;
-    const lastResult = services.withCommittedEvents(events).resolveEffect(
-      nextState,
-      remaining[0].effectBlock,
-      remaining[0].sourceCardInstanceId,
-      remaining[0].controller,
-      cardDb,
-      getEventCardInstanceId(remaining[0].triggeringEvent) ?? null,
-      remaining[0].triggeringEvent,
-    );
+    const lastResult = services
+      .withCommittedEvents(events)
+      .resolveEffect(
+        nextState,
+        remaining[0].effectBlock,
+        remaining[0].sourceCardInstanceId,
+        remaining[0].controller,
+        cardDb,
+        getEventCardInstanceId(remaining[0].triggeringEvent) ?? null,
+        remaining[0].triggeringEvent,
+        remaining[0].sourceSnapshot
+      );
     nextState = lastResult.state;
     events.push(...lastResult.events);
 

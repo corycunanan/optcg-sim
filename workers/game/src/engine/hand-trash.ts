@@ -23,7 +23,8 @@ export function handTrashEvent(
     ? effectSourceCard(
         state,
         sourceCardInstanceId,
-        resultRefs?.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot
+        resultRefs?.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceIdentity ??
+          resultRefs?.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot
       )
     : undefined;
   return {

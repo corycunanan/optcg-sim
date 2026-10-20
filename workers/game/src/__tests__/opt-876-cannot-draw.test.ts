@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 /**
  * OPT-876 — CANNOT_DRAW (OP12-099 Kalgara) is enforced at runtime.
  *
@@ -87,7 +88,7 @@ function fixture(kalgaraOwner: 0 | 1) {
     db, kalgaraOwner, opp, kalgara, attacker, act, attackLeader, advanceToMainOf,
     persist() {
       state = parseStoredSession(
-        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
+        JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })),
       ).state;
     },
     setState(s: GameState) { state = s; },

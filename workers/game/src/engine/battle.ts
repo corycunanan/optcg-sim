@@ -120,6 +120,10 @@ export function executeDeclareAttack(
     defenderPower,
     counterPowerAdded: 0,
     blockerActivated: false,
+    step: "ATTACK_STEP" as const,
+    redirectWindow: false,
+    blockerLocked: false,
+    targetLocked: false,
   };
 
   nextState = {
@@ -144,7 +148,13 @@ export function executeDeclareAttack(
   // Advance to BLOCK_STEP
   nextState = {
     ...nextState,
-    turn: { ...nextState.turn, battleSubPhase: "BLOCK_STEP" },
+    turn: {
+      ...nextState.turn,
+      battle: nextState.turn.battle
+        ? { ...nextState.turn.battle, step: "BLOCK_STEP" }
+        : null,
+      battleSubPhase: "BLOCK_STEP",
+    },
   };
   events.push({
     type: "PHASE_CHANGED",
@@ -179,6 +189,8 @@ export function executeDeclareBlocker(
     ...battle,
     targetInstanceId: blockerInstanceId,
     blockerActivated: true,
+    blockerLocked: true,
+    targetLocked: true,
   };
 
   // Recalculate defender power with new target
@@ -223,7 +235,18 @@ export function executeDeclareBlocker(
   // Advance to COUNTER_STEP
   nextState = {
     ...nextState,
-    turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" },
+    turn: {
+      ...nextState.turn,
+      battle: nextState.turn.battle
+        ? {
+            ...nextState.turn.battle,
+            step: "COUNTER_STEP",
+            blockerLocked: true,
+            targetLocked: true,
+          }
+        : null,
+      battleSubPhase: "COUNTER_STEP",
+    },
   };
   events.push({
     type: "PHASE_CHANGED",
@@ -260,7 +283,18 @@ export function executePass(
     });
     nextState = {
       ...nextState,
-      turn: { ...nextState.turn, battleSubPhase: "COUNTER_STEP" },
+      turn: {
+        ...nextState.turn,
+        battle: nextState.turn.battle
+          ? {
+              ...nextState.turn.battle,
+              step: "COUNTER_STEP",
+              blockerLocked: true,
+              targetLocked: true,
+            }
+          : null,
+        battleSubPhase: "COUNTER_STEP",
+      },
     };
     events.push({
       type: "PHASE_CHANGED",
@@ -271,7 +305,18 @@ export function executePass(
     // Defender passes counter window → advance to DAMAGE_STEP
     nextState = {
       ...nextState,
-      turn: { ...nextState.turn, battleSubPhase: "DAMAGE_STEP" },
+      turn: {
+        ...nextState.turn,
+        battle: nextState.turn.battle
+          ? {
+              ...nextState.turn.battle,
+              step: "DAMAGE_STEP",
+              blockerLocked: true,
+              targetLocked: true,
+            }
+          : null,
+        battleSubPhase: "DAMAGE_STEP",
+      },
     };
     events.push({
       type: "PHASE_CHANGED",

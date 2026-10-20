@@ -2,7 +2,7 @@
 
 > Written before the reader code for OPT-940 (PR 1 of the Game Engine Consolidation, parent OPT-959). This is the contract every later consolidation PR writes through. Code of record: `workers/game/src/session/game-state-schema.ts` (version dispatch and conversion), `workers/game/src/session/persisted-game-state.ts` (strict shape), `workers/game/src/session/persistence.ts` (storage boundary).
 
-**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6); from PR 4b (OPT-924) the writer writes version 2 (§1.6). From PR 5a (OPT-963) the reader also reads version 3 (typed replacement and damage continuation frames, §8) and lowers it to the version 2 runtime (§1.7); PR 5b raises the runtime and the writer to version 3 (§1.8).
+**Status:** Contract in force from PR 1. Writers are unchanged in PR 1; the reader assigns version 1 to every save that exists today. From PR 4a (OPT-980) the reader also reads version 2 (the End Phase stage, §6); from PR 4b (OPT-924) the writer writes version 2 (§1.6). From PR 5a (OPT-963) the reader also reads version 3 (typed replacement and damage continuation frames, §8) and lowers it to the version 2 runtime (§1.7); PR 5b raises the runtime and the writer to version 3 (§1.8). PR 6a reads version 4 by strict lowering while runtime and writer remain version 3 (§9). PR 6b executes and writes version 4 after the verified 6a deployment (§10).
 
 **Related:** [Rev 4 proposal snapshot §7, §10](./audits/consolidation-2026-10/proposal-rev4-snapshot.md) · [Handoff doc](../project/handoffs/game-engine-consolidation.md) · [Doc 08](./08-ENGINE-ARCHITECTURE.md)
 
@@ -30,7 +30,7 @@ The reader is one function, `convertPersistedGameState(raw, location)`, and it i
 
 Order of operations, fixed by this contract:
 
-1. **Read the version.** Absent → 1. A non-integer, a negative number, or `0` → reject. An integer above `GAME_STATE_SCHEMA_VERSION` → reject as unsupported (a newer writer wrote it; this build cannot interpret it). An integer below the oldest supported version → reject as retired (see §3).
+1. **Read the version.** Absent → 1. A non-integer, a negative number, or `0` → reject. An integer above `LATEST_READABLE_GAME_STATE_SCHEMA_VERSION` → reject as unsupported (a newer writer wrote it; this build cannot interpret it). An integer below the oldest supported version → reject as retired (see §3).
 2. **Convert.** The converter for that input version produces an object in the current runtime shape. Converters are a chain: `v1 → v2 → … → current`. A converter never discards an unknown field to make validation pass; it maps fields it understands and leaves the rest for strict validation to reject.
 3. **Strictly validate the converted object.** `validatePersistedGameStateCore` (Zod `strictObject`) plus the action, event, effect-block and frame checks in `parseStoredGameState`. Unknown keys fail here.
 4. **Validate continuation references and semantic invariants.** The converted state must be internally coherent: every frame reference resolves, every frame's `kind` (if present) agrees with its content, battle and phase-boundary records agree with turn state. See §2.3 and §4.
@@ -146,7 +146,7 @@ The error names the reference (`pendingPrompt.resumeContext`, `effectStack[2].tr
 
 ## 3. Support window
 
-**Supported input versions in this build: `{1, 2, 3}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980). Version 3 adds the typed replacement and damage continuation frames (§8) and is read from PR 5a (OPT-963).
+**Supported input versions in this build: `{1, 2, 3, 4}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980). Version 3 adds the typed replacement and damage continuation frames (§8) and is read from PR 5a (OPT-963). Version 4 adds the PR6 ownership records and battle bookkeeping (§9), read from PR6a by lowering to the v3 runtime and executed natively from PR6b.
 
 Policy, not a date:
 
@@ -165,6 +165,8 @@ History:
 | 2026-10-17 (PR 5a fix round 1, OPT-963) | Lowering: batch rider on the top surviving frame, effect `TRIGGER_EFFECT` events re-homed, nested windows lowered leak-free (§1.7 items 2–4); three unwritten shapes rejected by name (§1.7 item 1, §2.4); proof against 5b-written states. | `{1, 2, 3}` |
 | 2026-10-17 (PR 5b, OPT-963) | Runtime and writer at version 3; `convertFromV2` lifts the version 2 records into frames (§1.8, §8.3). | `{1, 2, 3}` |
 | 2026-10-18 (PR 5b fix rounds 1–2, OPT-963) | Lift rebuilds a re-pointed window prompt from that window's own card (L5); the actions after a choice branch live on their own continuation under the effect's controller, below a handler-owned frame (F1, D-F1b), and a continuation frame carrying `remainingActions` is rejected; the effect window logs its point before prompting (F2; writer golden re-captured for `both-trigger-windows` only). Rollback target: PR 5a squash `c972f14e`. | `{1, 2, 3}` |
+| 2026-10-20 (PR 6a, OPT-964) | Version 4 reader lowers the new owners into the v3 runtime (§9); runtime and writer remain 3. No input version retired. | `{1, 2, 3, 4}` |
+| 2026-10-20 (PR 6b, OPT-964) | Native version 4 runtime and writer after verified PR760 deployment; historical states lift to new owners (§10). | `{1, 2, 3, 4}` |
 
 ---
 
@@ -316,3 +318,66 @@ Version 3 gives the replacement and damage continuations one owner each: a frame
 
 * **PR 5a** (this build): version 3 is validated as written and lowered to version 2 (§1.7). `liftToVersion3` in `fixtures/opt-963-v3-states.ts` states the lift the 5b converter performs, so the 5a fixtures are the shape 5b writes.
 * **PR 5b** (this build): `convertFromV2` lifts, live and undo: `pendingTriggerLifeCard` and `pendingBattleDamageContinuation` become one `BATTLE_DAMAGE` frame and `pendingTriggerFromEffect` an `EFFECT_DAMAGE` frame, inserted at the bottom of the stack in the order they opened (version 2 surfaced them only once the stack emptied); a replacement prompt context becomes a frame on top owning the prompt; a frame's `replacementBatchContinuation` becomes a `REPLACEMENT_BATCH` frame at `INTERRUPTED_BY_TRIGGERS` directly below it. With both windows open the prompt is re-pointed at the top (effect) frame's responder and rebuilt from that window's own Life card (`revealTriggerPromptOptions`, the engine's own prompt builder, with its generic reveal text: the converter is deterministic and has no card data): a player is never shown another player's Life card, and a version 2 prompt written without its card keeps its text and gets the card (PR #758 L5). `both-trigger-windows` is **recovered**, not rejected. `legacy.stuck_damage_step` and `legacy.orphan_battle_continuation` read the lifted frame (OPT-884's evidence kept); `legacy.two_trigger_windows` is retired by the lift.
+
+## 9. PR 6a: version 4 reader, version 3 runtime and writer (OPT-964)
+
+PR 6 requires a reader/writer split under §5.1. **The PR6a build reads 1–4 and continues to execute and write version 3.** It introduces no engine scheduling, source eligibility, battle-window, overflow, or pregame behavior change. PR 6b may enable the v4 writer only after the reviewed 6a reader has merged and its worker deployment is verified. At the time of PR6a preparation there was no deployed v4 rollback target; §10 records the verified target used by PR6b. The version 3 writer golden remains byte-identical.
+
+### 9.1 Version 4 contract
+
+The persisted-only schema and lowerer are in `session/version4-reader.ts`. Every frame has an explicit `kind`. Existing v3 frame content and phases keep their meanings. The reader validates the complete v4 shape **before** removing any named field, then passes the lowered object through the existing action/event validation and continuation-reference checks. Embedded overflow/state-distribution queues and staged cost-transaction actions, effects and overrides are checked with the same existing executable-payload validators as their root counterparts; this additional check applies only to v4 input. All live and undo entries use the same conversion hook. No load writes storage.
+
+| Owner | Version 4 fields and invariants | Lowering to version 3 |
+|---|---|---|
+| Queued trigger | Optional `sourceSnapshot: { instanceId, cardId, controller, effectBlockId }`; instance/controller/effect reference agree with the enclosing trigger. Identity only: power, cost, modifiers and DON!! are rejected. The optional case is for queues inherited from older saves whose departed source cannot be reconstructed. Applies to `pendingTriggers`, `simultaneousTriggers`, ordering groups, overflow batches and state-distribution queues. | Remove snapshot; retain every existing queued field. Log `lowered.v4_source_snapshot`. This runtime cannot enforce PR6b's activation-time zone check or use the snapshot for cause attribution after a source disappears. It retains v3 behavior; this is explicitly **degraded**. Already-activated resolution is not restarted. |
+| `EVENT_ACTIVATION` frame | `eventActivation: { publication: "AFTER_STACK" | "AFTER_EFFECT", sourceZone: "HAND" | "TRASH", sourceClass: "EVENT", events }`. Exactly one activation notification, with zone/type, source instance and controller agreement. `EVENT_TRIGGER_RESOLVED` cannot stand in for an Event activation. | `AFTER_STACK` must be the bottom hand-activation boundary. Remove that boundary and put its entire ordered event array, including prefixes and propagation flags, in `pendingEventActivationEvents`. `AFTER_EFFECT` requires one event and becomes the existing `eventActivationCompletion` rider at the same stack position. |
+| `PLAY_OVERFLOW` frame | `playOverflow` has the existing `ruleTrashForPlay` fields: `playTargetId`, optional `batch { remainingTargetIds, remaining {ACTIVE, RESTED}, playedSoFar, forcedFirstState?, queuedTriggers? }`. Requires `pausedAction.type === "PLAY_CARD"`, the instruction replayed after rule-trash; null and other known actions are rejected. Owns an `AWAITING_TARGET_SELECTION` / `SELECT_TARGET` prompt for its controller. | Rename to `ruleTrashForPlay`, use kind `EFFECT`, preserve the full action continuation and neighboring frames. |
+| `PREGAME` frame | `pregameContinuation: { phase: "START_OF_GAME_FX", effectFrameId, controller }`. Bottom boundary; the immediate nested child belongs to that controller's Leader, the pregame phase matches, that player's start-effect ledger is marked, and the pending prompt names a nested child. | Remove boundary; existing nested effect frames and the pregame machine/ledger continue unchanged. The old machine advances after the child stack drains. |
+| `turn.battle` | Required `step` (the existing five battle-sub-phase values), `redirectWindow`, `blockerLocked`, `targetLocked`. `step` agrees with the retained `battleSubPhase`; an activated Blocker requires its lock. The redirect boolean does not imply Block Step: Counter redirects exist. The same schema applies to staged cost-transaction turn state. | Remove four named fields and retain the old battle state and `battleSubPhase`. Log `lowered.v4_battle_locks`. Extra redirect/target-lock semantics are **degraded** to the old engine's checks. No step-end checkpoint is added. |
+| Scheduled obligations | Strict `id`, `timing`, `action`, `boundToInstanceId`, `sourceEffectId`, `controller`; existing four timing values. Action DSL `target_ref` remains inside the validated action. | Preserve unchanged. The existing runtime no-ops an obligation whose bound instance has left. |
+
+`AFTER_STACK` retains all publication debt, not merely the activation notification: the current Main/Counter pipeline may retain already-logged but unscanned prefixes. It must not become an accumulator on a child whose early resume would scan it before Event completion. The two activation lifecycles remain distinct. Two frames cannot own the same activation notification, and v4 cannot also carry the retired root debt or either old rider.
+
+Event and pregame boundaries contain only the sentinel effect block (`__engine_continuation__`, category `auto`), empty action/cost/trigger/ref/event arrays, a null paused action, and completed cost/once-per-turn bookkeeping. Unknown or executable metadata on a removed wrapper is rejected. All raw frame IDs are unique before lowering; prompts and damage parents cannot reference a removed boundary. A terminal v4 state cannot retain any of the three new pending-work kinds.
+
+### 9.2 Existing strict state and loss rules
+
+`turn.oncePerTurnUsed`, `turn.triggerStagingInstanceIds`, `turn.deckHitZeroThisTurn`, and pregame phase/mulligan/start-effect ledgers already have strict schemas. Version 4 retains them rather than duplicating them. `LOSS_CONDITION_MOD` is an authored Leader rule (`WIN_INSTEAD` or `DELAYED_LOSS`), not another pending-work record; its deferred state is `deckHitZeroThisTurn`. Card schemas live in the separately persisted card database. Reader work does not move loss evaluation or change Nami/Brook rules.
+
+### 9.3 Release and evidence limits
+
+Fixtures are synthetic: some are structural v4 projections of real v3 pipeline states, some are constructed invalid inputs. They are **not** captures from a v4 writer or production sessions. The 6b writer must prove its actual produced states fit this contract and run them through the deployed 6a reader, live and undo. If actual writer states need a broader contract, ship/deploy the reader amendment first.
+
+Rollback limitations are explicit: queued identity snapshots and additional battle locks do not gain their new semantics in the v3 runtime. The reader logs those lowerings only after successful shape and reference validation. Event-publication debt, overflow action chains, pregame child chains, ledgers and scheduled obligations lower to existing owners. Byte-identical source/runtime comparisons and real prompt resumes are the relevant proof; accepting a constructed record alone is not proof of resumed behavior. PR6b still owns Sugar/Senor Pink activation semantics, the On K.O. exception, and any new pregame shuffle or battle target-rematch behavior. PR6a does not close OPT-964 or its children.
+
+
+## 10. PR 6b: native version 4 runtime and writer (OPT-964)
+
+PR760 merged as `6b394da6538d317eca314d9a6ef47553cb16c3d1`; game worker deployment run `39470617459` succeeded on 2026-10-20 at 17:58:42 UTC. That exact deployed reader is the rollback target for version 4. Its tracked source was archived independently before writer work. The writer and runtime now use version 4 for live and undo states; supported input remains 1–4. No legacy reader is retired.
+
+### 10.1 Native validation and historical lifting
+
+Native v4 validates the complete §9 contract and all executable payloads through a v3 compatibility projection, then retains the original validated graph for execution. It never executes the lowered projection, so source identities, battle locks and owned continuations survive loading. Activated `sourceIdentity` result refs use the same strict identity-only schema as queued snapshots, including cost and simultaneous-group refs. Historical full-card source refs remain readable.
+
+Versions 1–3 first use their existing converters, executable validation and reference checks. `version4-lift.ts` then replaces root Event debt with a bottom `AFTER_STACK` frame, renames nested completion and overflow riders in place, and wraps a suspended start-of-game child with a `PREGAME` boundary. New wrapper IDs come from the saved execution context; existing child IDs and prompt references are preserved. Battle bookkeeping derives from the saved sub-phase and consumed blocker choice. Recoverable queued sources acquire identity records; an absent historical source is not invented. Staged cost transaction battle state receives the same lift. Loading remains nonmutating and never writes storage.
+
+### 10.2 Runtime owners and consumers
+
+| Record | Producers and consumers | Behavioral boundary |
+|---|---|---|
+| Queued source identity | `trigger-queue.ts`, `trigger-ordering.ts`, `damage-frames.ts`, `phases.ts`; resolver and trigger/order resume drains | Capture instance/card/controller/effect identity at enqueue. Immediately before activation, a departed exact instance skips. No eligibility recheck during an activated effect's resume. Existing On K.O. matching supplies the fresh Trash identity. |
+| Activated source identity | Resolver result refs; action controller, hand-trash cause, play/cost cause, prohibition consumers | `OPPONENT_ACTION` changes the acting player without changing effect causation. A departed source's immutable card class can satisfy the authored rest-protection `source_filter`; no dynamic power, cost or DON snapshot is fabricated. |
+| Event activation debt | Pipeline bottom `AFTER_STACK`; nested Event `AFTER_EFFECT`; resume-core completion | Preserve every ordered pending event and propagation metadata, not just the activation notice. Publication occurs once when the owning continuation completes. Terminal cleanup drops all pending work. |
+| Play overflow | Resolver/batch frame builders; resume-core adapter and existing rule-trash target handler | `PLAY_OVERFLOW` owns the paused `PLAY_CARD`, remaining batch and queued triggers. Rule-trash and fresh replay use existing removal semantics; the internal handler adapter is not persisted as another owner. |
+| Pregame | `pregame.ts` bottom wrapper; ordinary stack unwind and session pregame continuation | The wrapper owns the suspended Leader child. Imu's existing `SEARCH_AND_PLAY` action persists `shuffle_after: true`; selection or decline shuffles once through the saved RNG before normal setup continues. No second shuffle or hidden dirty-deck marker is introduced. |
+| Battle | Battle constructor/step transitions; redirect action and reply; blocker validation | Step mirrors sub-phase. Closing Block consumes the blocker opportunity and locks the final target for normal battle progression. Explicit Counter redirect remains legal. Final-target `WHEN_ATTACKED` matching occurs at Block closure after Teach's cost/selection; Counter redirect does not reopen that timing. |
+
+The original OPT937 moved-source witness is reconciled with Decision 1: a normal source removed before activation must skip. The separate cause-attribution proof removes an already activated source before an opponent action; the On K.O. proof uses its explicit Trash exception. Senor Pink's paid, already activated scheduled effect survives source departure.
+
+Existing strict once-per-turn, trigger-staging, pregame and loss ledgers remain authoritative. Scheduled obligations stay instance-bound. Nami/Brook loss rules and checkpoint placement are unchanged. No step-end zone checkpoint or scheduling-order rewrite is included. Imu is the authored pregame deck-changing case proved here; this does not promise a generic future shuffle policy for unrelated setup actions.
+
+### 10.3 Writer evidence and rollback limits
+
+The frozen v1/v2/v3 synthetic goldens remain unchanged. A separate v4 golden records the actual current writer. Actual engine-produced suspension states cover queued source ordering, activated source departure, mid-batch overflow, Imu search, Teach cost/redirect, Counter redirect, and root/nested hand/nested Trash Event debt. Each has fixed public replies and live/undo replay expectations. These are synthetic games driven through the real pipeline and session writer, not production Durable Object captures; the §7 production-capture gate remains open.
+
+The independent deployed-reader replay uses the original `6b394da6` parser and runtime, not copied conversion code. Event debt checks compare full event order/payload/propagation, players, prompts, stack completion and execution context. Overflow checks fresh cards and completed batch; pregame checks deterministic shuffle and unchanged RNG on repeated polling; redirects check paid cost once and final-target timing. Source identity and new battle lock semantics can degrade on rollback as documented in §9.3; parse success is not claimed as semantic parity for those changes. New native v4 input retains the fields and does not emit lowering diagnostics.

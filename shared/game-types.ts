@@ -59,11 +59,16 @@ export interface DonInstance {
 // ─── Battle ───────────────────────────────────────────────────────────────────
 
 export interface BattleContext {
+  /** Explicit battle bookkeeping (v4); historical runtime constructors may omit it before conversion. */
+  step?: BattleSubPhase;
+  redirectWindow?: boolean;
+  blockerLocked?: boolean;
+  targetLocked?: boolean;
   battleId: string;
   attackerInstanceId: string;
   targetInstanceId: string;
-  attackerPower: number;    // computed at attack declaration
-  defenderPower: number;    // recomputed after counters are applied
+  attackerPower: number; // computed at attack declaration
+  defenderPower: number; // recomputed after counters are applied
   counterPowerAdded: number;
   blockerActivated: boolean;
   // OPT-239: damage count locked at Damage Step entry. 2 for [Double Attack],

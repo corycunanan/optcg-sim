@@ -41,7 +41,8 @@ import { getEffectiveBasePower, getEffectivePower } from "../engine/modifiers.js
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { SessionTransport } from "../session/transport.js";
-import { validatePersistedGameStateCore } from "../session/persisted-game-state.js";
+import { convertPersistedGameState } from "../session/persistence.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
 
 const ALL_NAMES_LEADER = "OPT834-ALL-NAMES-LEADER";
@@ -477,8 +478,7 @@ describe("OPT-834 persisted and resumed Block Step", () => {
     f.grantBlocker([f.leader.instanceId]);
     f.settle();
 
-    const restored = JSON.parse(JSON.stringify(f.state)) as GameState;
-    expect(validatePersistedGameStateCore(restored)).toBeNull();
+    const restored = convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(f.state))), "state");
     expect(getBlockerCandidateIds(restored, f.db)).toContain(f.leader.instanceId);
 
     const sent: string[] = [];

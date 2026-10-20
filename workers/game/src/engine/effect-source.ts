@@ -7,7 +7,7 @@ export function effectSourceIdentity(
   state: GameState,
   sourceInstanceId: string | undefined,
   cardDb: Map<string, CardData>,
-  snapshot?: CardInstance
+  snapshot?: Pick<CardInstance, "instanceId" | "cardId" | "controller">
 ): EffectSourceIdentity | undefined {
   if (!sourceInstanceId) return undefined;
   const source = effectSourceCard(state, sourceInstanceId, snapshot);
@@ -25,8 +25,11 @@ export function effectSourceIdentity(
 export function effectSourceCard(
   state: GameState,
   sourceInstanceId: string,
-  snapshot?: CardInstance,
-): CardInstance | undefined {
-  return (snapshot?.instanceId === sourceInstanceId ? snapshot : undefined)
-    ?? findCardInstance(state, sourceInstanceId) ?? undefined;
+  snapshot?: Pick<CardInstance, "instanceId" | "cardId" | "controller">
+): Pick<CardInstance, "instanceId" | "cardId" | "controller"> | undefined {
+  return (
+    (snapshot?.instanceId === sourceInstanceId ? snapshot : undefined) ??
+    findCardInstance(state, sourceInstanceId) ??
+    undefined
+  );
 }

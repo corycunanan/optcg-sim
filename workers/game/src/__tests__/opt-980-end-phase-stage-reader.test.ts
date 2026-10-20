@@ -1,3 +1,4 @@
+import { persistedV3 } from "./fixtures/opt-963-v3-states.js";
 /**
  * OPT-980 (PR 4a of OPT-962): the version 2 reader for the End Phase stage,
  * the v1 → v2 converter, stage semantics, mixed-version undo, and the
@@ -69,7 +70,7 @@ describe("OPT-980 v2 reader: every shape the PR 4b prototype writes", () => {
     const raw = v2State(name);
     const loaded = convertPersistedGameState(raw, "state");
     // Nothing accepted is dropped: the runtime state is the stored object minus the envelope key.
-    expect(loaded).toEqual(withoutVersion(raw));
+    expect(withoutVersion(persistedV3(loaded))).toEqual(withoutVersion(raw));
     expect(loaded).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
   });
 
@@ -77,7 +78,7 @@ describe("OPT-980 v2 reader: every shape the PR 4b prototype writes", () => {
     const live = golden("battle-ready-with-undo");
     const raw = v2State(name);
     const loaded = (await repository(storageWith(live.session.state, [raw])).load())!;
-    expect(loaded.undoHistory[0]).toEqual(withoutVersion(raw));
+    expect(withoutVersion(persistedV3(loaded.undoHistory[0]))).toEqual(withoutVersion(raw));
   });
 
   it("covers every stage the writer can park in", () => {
@@ -124,13 +125,13 @@ describe("OPT-980 mixed-version undo history", () => {
     const target = new MemorySessionStorage();
     const saved = await repository(target).save(first);
     const written = target.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
     const writtenUndo = target.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Record<string, unknown>[];
-    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
     const second = (await repository(target).load())!;
     // `saved` is `first` plus the prompt id the writer assigns (ensurePromptId).
-    expect(second.state).toEqual(saved.state);
-    expect(second.undoHistory).toEqual(saved.undoHistory);
+    expect(toPersistedGameState(second.state)).toEqual(toPersistedGameState(saved.state));
+    expect(second.undoHistory.map(toPersistedGameState)).toEqual(saved.undoHistory.map(toPersistedGameState));
     expect(continuationOf(second.state as never)).toEqual(continuationOf(first.state as never));
   });
 });
@@ -193,24 +194,24 @@ describe("OPT-924 version 2 writer (now the version 3 writer, OPT-963)", () => {
     const expectedState = structuredClone(base.state);
     (continuationOf(expectedState) as Record<string, unknown>).stage = "LEGACY_SCHEDULED_ACTIONS";
     const written = target.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(written.state).toEqual({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3, ...expectedState });
-    expect((await repository(target).load())!.state).toEqual(loaded.state);
+    expect(persistedV3(convertPersistedGameState(written.state, "state"))).toEqual({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3, ...expectedState });
+    expect(toPersistedGameState((await repository(target).load())!.state)).toEqual(toPersistedGameState(loaded.state));
   });
 
   it("labels every state, with or without an End Phase frame, as version 3", () => {
     const state = convertPersistedGameState(golden("fresh-setup").session.state, "state");
     const out = toPersistedGameState(state) as unknown as Record<string, unknown>;
     expect(Object.keys(out)[0]).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
-    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
-    expect(convertPersistedGameState(out, "state")).toEqual(state);
+    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
+    expect(persistedV3(convertPersistedGameState(out, "state"))).toEqual(persistedV3(state));
   });
 
   it("keeps the legacy and staged stages, and gives a stage-less runtime frame its legacy stage", () => {
     for (const name of ["legacy-reparked", "wave2-optional"]) {
       const state = convertPersistedGameState(v2State(name), "state");
       const out = toPersistedGameState(state) as unknown as Record<string, unknown>;
-      expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
-      expect(convertPersistedGameState(out, "state")).toEqual(state);
+      expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
+      expect(persistedV3(convertPersistedGameState(out, "state"))).toEqual(persistedV3(state));
     }
     const legacy = convertPersistedGameState(v2State("legacy-reparked"), "state");
     const stageLess = {
@@ -221,7 +222,7 @@ describe("OPT-924 version 2 writer (now the version 3 writer, OPT-963)", () => {
         return { ...f, phaseBoundaryContinuation: rest };
       }),
     };
-    expect(convertPersistedGameState(toPersistedGameState(stageLess), "state")).toEqual(legacy);
+    expect(persistedV3(convertPersistedGameState(toPersistedGameState(stageLess), "state"))).toEqual(persistedV3(legacy));
   });
 });
 

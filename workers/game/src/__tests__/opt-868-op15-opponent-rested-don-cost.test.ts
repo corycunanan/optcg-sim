@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
 import type { Cost } from "../engine/effect-types.js";
@@ -105,7 +106,7 @@ function fixture() {
       respond({ type: "SELECT_TARGET", selectedInstanceIds: ids }, rejected),
     persist() {
       state = parseStoredSession(
-        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
+        JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })),
       ).state;
     },
     get state() {

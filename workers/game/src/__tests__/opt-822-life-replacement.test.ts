@@ -227,7 +227,7 @@ describe("OPT-822 Life replacement", () => {
           selectedInstanceIds: ["nested-event"],
         });
       expect(
-        f.state.effectStack.some((frame) => frame.eventActivationCompletion)
+        f.state.effectStack.some((frame) => frame.eventActivation)
       ).toBe(true);
       f.choice("accept");
       expect(

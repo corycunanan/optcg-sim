@@ -17,6 +17,7 @@ import type { EffectStackFrame, GameState } from "../types.js";
 import { convertPersistedGameState } from "../session/persistence.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { buildV2EndPhaseStates } from "./fixtures/opt-962-v2-states.js";
+import { persistedV3 } from "./fixtures/opt-963-v3-states.js";
 import { loadV2EndPhaseFixture } from "./fixtures/opt-962-v2-fixture.js";
 import { endPhaseRig, fullEndPhaseReply, fullEndPhaseScenario } from "./opt-962-rig.js";
 
@@ -45,9 +46,29 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
     expect(built.map((s) => s.name).sort()).toEqual(Object.keys(fixture.cases).sort());
   });
 
-  it.each(built.map((s) => s.name))("%s: the persisted object equals the fixture (the version key is 3 since OPT-963)", (name) => {
+  it.each(built.map((s) => s.name))("%s: the historical projection equals the fixture with version 3", (name) => {
     const state = built.find((s) => s.name === name)!.state;
-    expect(persisted(state)).toEqual({ ...fixture.cases[name].state, schemaVersion: 3 });
+    const historical = structuredClone(fixture.cases[name].state);
+    // v4 deliberately retains only enqueue identity for activated queued sources.
+    // Pin that intentional difference while preserving every other historical field.
+    if (!Array.isArray(historical.effectStack)) throw new Error("fixture has no stack");
+    for (const frame of historical.effectStack) {
+      for (const [, result] of frame.resultRefs) {
+        if (result.sourceCardSnapshot) {
+          const source = result.sourceCardSnapshot;
+          delete result.sourceCardSnapshot;
+          result.sourceIdentity = {
+            instanceId: source.instanceId,
+            cardId: source.cardId,
+            controller: source.controller,
+            effectBlockId: source.cardId === "OP03-015" ? "on_ko_debuff"
+              : source.cardId === "OP04-034" ? "eot_conditional_ko"
+              : "SYN-EOOT-D-block",
+          };
+        }
+      }
+    }
+    expect(persistedV3(state)).toEqual({ ...historical, schemaVersion: 3 });
   });
 
   it("every End Phase frame parked across the full scenario, live and reloaded, has a fixture-covered shape", () => {

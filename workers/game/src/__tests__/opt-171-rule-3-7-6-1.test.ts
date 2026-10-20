@@ -107,7 +107,7 @@ describe("OPT-171: rule 3-7-6-1 replace-and-trash on full board", () => {
     // chosen victim and re-enter the original play.
     const topFrame = result.state.effectStack[result.state.effectStack.length - 1];
     expect(topFrame).toBeDefined();
-    expect((topFrame as any).ruleTrashForPlay?.playTargetId).toBe("trash-candidate");
+    expect((topFrame as any).playOverflow?.playTargetId).toBe("trash-candidate");
   });
 
   it("resuming with a chosen victim rule-trashes it (no CARD_KO event) and places the played card", () => {

@@ -168,7 +168,7 @@ describe("OPT-439 rejected response frame restoration", () => {
     expect(overflow.state.effectStack[0].id).toBe("outer");
     expect(overflow.state.effectStack[1].id).not.toBe("play-target");
     const replacement = overflow.state.effectStack[1] as unknown as EffectStackFrame;
-    expect(replacement.ruleTrashForPlay?.playTargetId).toBe(playTarget.instanceId);
+    expect(replacement.playOverflow?.playTargetId).toBe(playTarget.instanceId);
     expect(replacement.remainingActions).toEqual(pending.remainingActions);
 
     const victimId = overflow.state.players[0].characters[0]!.instanceId;

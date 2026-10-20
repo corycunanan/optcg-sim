@@ -8,6 +8,9 @@
 import type { EffectStackFrame } from "../types.js";
 
 export const EFFECT_STACK_FRAME_KINDS = [
+  "EVENT_ACTIVATION",
+  "PLAY_OVERFLOW",
+  "PREGAME",
   "EFFECT",
   "COST",
   "TRIGGER_ORDER",
@@ -46,10 +49,25 @@ export type EffectStackFrameKind = (typeof EFFECT_STACK_FRAME_KINDS)[number];
  * after a choice branch, belongs on that continuation, never on this frame.
  */
 export function isHandlerOwnedFrame(
-  frame: Pick<EffectStackFrame, "phase" | "phaseBoundaryContinuation" | "replacement" | "replacementBatch" | "battleDamage" | "effectDamage">
+  frame: Pick<
+    EffectStackFrame,
+    | "eventActivation"
+    | "playOverflow"
+    | "pregameContinuation"
+    | "phase"
+    | "phaseBoundaryContinuation"
+    | "replacement"
+    | "replacementBatch"
+    | "battleDamage"
+    | "effectDamage"
+  >
 ): boolean {
   const kind = frameKindOf(frame);
-  return kind === "REPLACEMENT" || kind === "REPLACEMENT_BATCH" || kind === "EFFECT_DAMAGE";
+  return (
+    kind === "REPLACEMENT" ||
+    kind === "REPLACEMENT_BATCH" ||
+    kind === "EFFECT_DAMAGE"
+  );
 }
 
 /**
@@ -59,9 +77,20 @@ export function isHandlerOwnedFrame(
 export function frameKindOf(
   frame: Pick<
     EffectStackFrame,
-    "phase" | "phaseBoundaryContinuation" | "replacement" | "replacementBatch" | "battleDamage" | "effectDamage"
+    | "eventActivation"
+    | "playOverflow"
+    | "pregameContinuation"
+    | "phase"
+    | "phaseBoundaryContinuation"
+    | "replacement"
+    | "replacementBatch"
+    | "battleDamage"
+    | "effectDamage"
   >
 ): EffectStackFrameKind {
+  if (frame.eventActivation) return "EVENT_ACTIVATION";
+  if (frame.playOverflow) return "PLAY_OVERFLOW";
+  if (frame.pregameContinuation) return "PREGAME";
   if (frame.replacement) return "REPLACEMENT";
   if (frame.replacementBatch) return "REPLACEMENT_BATCH";
   if (frame.battleDamage) return "BATTLE_DAMAGE";

@@ -308,8 +308,27 @@ function createResolverServices(
         targets,
         services
       ),
-    resolveEffect: (state, block, source, controller, db, triggering, event) =>
-      resolveEffect(state, block, source, controller, db, triggering, services, event),
+    resolveEffect: (
+      state,
+      block,
+      source,
+      controller,
+      db,
+      triggering,
+      event,
+      snapshot
+    ) =>
+      resolveEffect(
+        state,
+        block,
+        source,
+        controller,
+        db,
+        triggering,
+        services,
+        event,
+        snapshot
+      ),
     continueSimultaneousGroup: (...args) =>
       continueSimultaneousGroup(...args, services),
     processRemainingTriggers: (state, triggers, cardDb, events, group) =>
@@ -353,6 +372,7 @@ export function resolveEffect(
   triggeringCardInstanceId?: string | null,
   services: EffectResolverServices = resolverExecutionServices,
   triggeringEvent?: PendingEvent,
+  sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -364,6 +384,13 @@ export function resolveEffect(
 
   // OPT-960: nothing activates or resolves after a terminal outcome.
   if (isGameTerminated(state)) return { state, events, resolved: false };
+
+  // Rule 8-1-3-1-3: this boundary starts queued activation, never resumes it.
+  // On K.O. matches already name the fresh Trash instance (10-2-17-2).
+  // Any subsequent zone change creates another ID and invalidates this queue.
+  if (sourceSnapshot && !findCardInstance(state, sourceSnapshot.instanceId)) {
+    return { state, events, resolved: false, effectNotActivated: true };
+  }
 
   // Guard: reject once-per-turn effects already used this turn
   if (isOncePerTurnBlock(block)) {
@@ -382,22 +409,42 @@ export function resolveEffect(
 
   // Extract block-specific effect description for prompts
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
+  const sourceCardData = cardDb.get(
+    sourceSnapshot?.cardId ?? sourceCard?.cardId ?? ""
+  );
   const sourceSnapshotRef: [string, EffectResult][] = sourceCard
-    ? [[EFFECT_SOURCE_SNAPSHOT_REF, {
-        targetInstanceIds: [],
-        count: 0,
-        sourceCardSnapshot: structuredClone(sourceCard),
-      }]]
+    ? [
+        [
+          EFFECT_SOURCE_SNAPSHOT_REF,
+          {
+            targetInstanceIds: [],
+            count: 0,
+            ...(sourceSnapshot
+              ? { sourceIdentity: sourceSnapshot }
+              : { sourceCardSnapshot: structuredClone(sourceCard) }),
+          },
+        ],
+      ]
     : [];
-  if (triggeringEvent && isHandTrashByEffect(triggeringEvent) && triggeringEvent.type === "CARD_TRASHED") {
-    sourceSnapshotRef.push([TRIGGERING_HAND_TRASH_REF, {
-      targetInstanceIds: [], count: triggeringEvent.payload?.count ?? 0,
-    }]);
+  if (
+    triggeringEvent &&
+    isHandTrashByEffect(triggeringEvent) &&
+    triggeringEvent.type === "CARD_TRASHED"
+  ) {
+    sourceSnapshotRef.push([
+      TRIGGERING_HAND_TRASH_REF,
+      {
+        targetInstanceIds: [],
+        count: triggeringEvent.payload?.count ?? 0,
+      },
+    ]);
   }
   // OPT-797: rides with the other context refs into the optional-prompt
   // frame, the cost-prompt frame and the action chain.
-  const battleTargetRef = battleTargetRefFor(triggeringEvent, sourceCardInstanceId);
+  const battleTargetRef = battleTargetRefFor(
+    triggeringEvent,
+    sourceCardInstanceId
+  );
   if (battleTargetRef) sourceSnapshotRef.push(battleTargetRef);
   const fullText = sourceTextForBlock(sourceCardData, block);
   const blockDescription = extractEffectDescription(fullText, block);
@@ -419,7 +466,13 @@ export function resolveEffect(
     // Same evaluator and same state as the payment's own upfront check.
     if (
       block.costs?.length &&
-      !isCostSequencePayable(state, block.costs, controller, cardDb, sourceCardInstanceId)
+      !isCostSequencePayable(
+        state,
+        block.costs,
+        controller,
+        cardDb,
+        sourceCardInstanceId
+      )
     ) {
       log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
       return { state, events, resolved: false, effectNotActivated: true };
@@ -441,9 +494,15 @@ export function resolveEffect(
       resultRefs: [
         ...sourceSnapshotRef,
         ...(triggeringCardInstanceId
-          ? [[TRIGGERING_CARD_REF, {
-              targetInstanceIds: [triggeringCardInstanceId], count: 1,
-            }] as [string, EffectResult]]
+          ? [
+              [
+                TRIGGERING_CARD_REF,
+                {
+                  targetInstanceIds: [triggeringCardInstanceId],
+                  count: 1,
+                },
+              ] as [string, EffectResult],
+            ]
           : []),
       ],
       validTargets: [],
@@ -499,7 +558,7 @@ export function resolveEffect(
         [],
         cardDb,
         services,
-        new Map(sourceSnapshotRef),
+        new Map(sourceSnapshotRef)
       );
     }
 
@@ -510,7 +569,13 @@ export function resolveEffect(
     }
 
     state = costPayResult.state;
-    completeHandTrashCostSources(costPayResult.events, state, sourceCardInstanceId, controller, new Map(sourceSnapshotRef));
+    completeHandTrashCostSources(
+      costPayResult.events,
+      state,
+      sourceCardInstanceId,
+      controller,
+      new Map(sourceSnapshotRef)
+    );
     events.push(...costPayResult.events);
     costResult = costPayResult.costResult;
     // OPT-862: a cost that ended the game leaves no action to run.
@@ -524,7 +589,10 @@ export function resolveEffect(
           ...state,
           effectStack: [
             ...state.effectStack.slice(0, -1),
-            { ...frame, resultRefs: [...frame.resultRefs, ...sourceSnapshotRef] },
+            {
+              ...frame,
+              resultRefs: [...frame.resultRefs, ...sourceSnapshotRef],
+            },
           ],
         };
       }
@@ -1223,7 +1291,7 @@ export function executeActionChain(
         pendingTriggers: [],
         simultaneousTriggers: [],
         accumulatedEvents: events,
-        ruleTrashForPlay: ctx.ruleTrashForPlay,
+        playOverflow: ctx.ruleTrashForPlay,
         stateDistributionForPlay: ctx.stateDistributionForPlay,
       };
       const updatedState = pushFrame(frameId.state, frame);
