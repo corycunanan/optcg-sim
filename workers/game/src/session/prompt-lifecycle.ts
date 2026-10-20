@@ -161,6 +161,15 @@ function resumePromptLifecycleUnreleased(
     return { state: stateBeforeResume, responseRejected: true };
   }
 
+  // A lifted historical optional context uses the ordinary chain adapter.
+  // Its old executor rejected skip/PASS without consuming the prompt; modern
+  // optional schema blocks use AWAITING_OPTIONAL_RESPONSE and are unchanged.
+  if (prompt.options.promptType === "OPTIONAL_EFFECT" &&
+      stateBeforeResume.effectStack.at(-1)?.phase === "AWAITING_PLAYER_CHOICE" &&
+      isDeclineResponse(action)) {
+    return { state: stateBeforeResume, responseRejected: true };
+  }
+
   let state: GameState = { ...stateBeforeResume, pendingPrompt: null };
   let responseRejected = false;
   let reprompted = false;

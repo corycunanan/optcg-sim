@@ -374,6 +374,9 @@ describe("OPT-965 historical structural optional effect", () => {
       const state = convertPersistedGameState(raw, location);
       const controller = state.pendingPrompt!.respondingPlayer;
       const before = state.players[controller].hand.length;
+      const skipped = resumePromptLifecycle(state, { type: "PLAYER_CHOICE", choiceId: "skip" }, new Map(Object.entries(original.cardDb)) as never, lifecycleServices);
+      expect(skipped.responseRejected).toBe(true);
+      expect(skipped.state).toBe(state);
       const result = resumePromptLifecycle(state, { type: "PLAYER_CHOICE", choiceId: "accept" }, new Map(Object.entries(original.cardDb)) as never, lifecycleServices);
       expect(result.responseRejected).toBe(false);
       expect(result.state.players[controller].hand).toHaveLength(before + 1);
