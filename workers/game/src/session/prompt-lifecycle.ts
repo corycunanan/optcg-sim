@@ -5,9 +5,7 @@ import type {
   GameAction,
   GameState,
   PendingEvent,
-  PromptResumeContext,
   QueuedTrigger,
-  ResumeContext,
 } from "../types.js";
 import type { EffectResult } from "../engine/effect-types.js";
 import {
@@ -23,7 +21,6 @@ import {
 } from "../engine/effect-damage.js";
 import { surfaceDamageFramePrompt, updateFrameById } from "../engine/damage-frames.js";
 import {
-  resumeEffectChain,
   resumeFromStack,
 } from "../engine/effect-resolver/index.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
@@ -107,7 +104,7 @@ function resumePromptLifecycleUnreleased(
   services: PromptLifecycleServices
 ): PromptLifecycleResult {
   const prompt = stateBeforeResume.pendingPrompt;
-  if (!prompt) {
+  if (!prompt || isGameTerminated(stateBeforeResume)) {
     return { state: stateBeforeResume, responseRejected: true };
   }
 
@@ -158,6 +155,21 @@ function resumePromptLifecycleUnreleased(
     };
   }
 
+  // Gameplay prompts reference the top live frame. Historical object contexts
+  // are converted on load; stale or completed references cannot execute work.
+  if (typeof resumeContext !== "string" || stateBeforeResume.effectStack.at(-1)?.id !== resumeContext) {
+    return { state: stateBeforeResume, responseRejected: true };
+  }
+
+  // A lifted historical optional context uses the ordinary chain adapter.
+  // Its old executor rejected skip/PASS without consuming the prompt; modern
+  // optional schema blocks use AWAITING_OPTIONAL_RESPONSE and are unchanged.
+  if (prompt.options.promptType === "OPTIONAL_EFFECT" &&
+      stateBeforeResume.effectStack.at(-1)?.phase === "AWAITING_PLAYER_CHOICE" &&
+      isDeclineResponse(action)) {
+    return { state: stateBeforeResume, responseRejected: true };
+  }
+
   let state: GameState = { ...stateBeforeResume, pendingPrompt: null };
   let responseRejected = false;
   let reprompted = false;
@@ -201,6 +213,16 @@ function resumePromptLifecycleUnreleased(
       state = stateBeforeResume;
       responseRejected = true;
     } else if (resumed.events.length > 0) {
+      const battleOwner = state.effectStack.find((frame) =>
+        frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+        frame.battleDamage.battleId === state.turn.battle?.battleId
+      );
+      if (battleOwner) {
+        state = updateFrameById(state, battleOwner.id, (frame) => ({
+          ...frame,
+          accumulatedEvents: [...frame.accumulatedEvents, ...resumed.events],
+        }));
+      } else {
       const pipeline = continuePipelineFromExecution(
         state,
         { state, events: resumed.events },
@@ -209,28 +231,10 @@ function resumePromptLifecycleUnreleased(
       );
       state = pipeline.state;
       gameOver = pipeline.gameOver;
+      }
     }
   } else {
-    if (!isResumeContext(resumeContext)) {
-      return { state: stateBeforeResume, responseRejected: true };
-    }
-    const resumed = resumeEffectChain(state, resumeContext, action, cardDb);
-    state = resumed.state;
-    if (isGameTerminated(state)) {
-      state = publishBeforeGameOver(state, resumed.events, respondingPlayer);
-      gameOver = terminalOutcome(state);
-    } else if (resumed.rejected) {
-      // The reply must not consume this prompt: keep it exactly as persisted.
-      state = stateBeforeResume;
-      responseRejected = true;
-    } else if (resumed.pendingPrompt) {
-      state = { ...state, pendingPrompt: resumed.pendingPrompt };
-      reprompted = !!resumed.reprompted;
-      responseRejected = reprompted;
-    } else if (!resumed.resolved && resumed.events.length === 0) {
-      state = stateBeforeResume;
-      responseRejected = true;
-    }
+    return { state: stateBeforeResume, responseRejected: true };
   }
 
   // Any terminal outcome written during the resume (rules defeat, WIN_GAME,
@@ -274,20 +278,6 @@ function resumePromptLifecycleUnreleased(
     ...(reprompted ? { reprompted: true } : {}),
     gameOver,
   };
-}
-
-function isResumeContext(
-  context: PromptResumeContext
-): context is ResumeContext {
-  return (
-    typeof context === "object" &&
-    context !== null &&
-    "effectSourceInstanceId" in context &&
-    "controller" in context &&
-    "remainingActions" in context &&
-    "resultRefs" in context &&
-    "validTargets" in context
-  );
 }
 
 function withPendingPrompt(

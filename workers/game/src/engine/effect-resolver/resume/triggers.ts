@@ -33,6 +33,17 @@ export function processRemainingTriggers(
 ): EffectResolverResult {
   // OPT-960: no trigger drains after a terminal outcome (rule 9-1-2).
   if (isGameTerminated(state)) return { state, events: priorEvents, resolved: true };
+  const damageOwner = state.effectStack.at(-1);
+  if (damageOwner?.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+      damageOwner.battleDamage.battleId === state.turn.battle?.battleId) {
+    // Completing a substitute is not a trigger/publication boundary. The
+    // existing battle continuation publishes its prefix and substitute once.
+    return {
+      state: updateTopFrame(state, { pendingTriggers: [...damageOwner.pendingTriggers, ...pendingTriggers] }),
+      events: priorEvents,
+      resolved: true,
+    };
+  }
   // This is a publication boundary reached after a child accepts its action
   // or finishes/abandons its cost. Earlier committed effects publish first;
   // staged cost frames are not interrupted frames and remain untouched.

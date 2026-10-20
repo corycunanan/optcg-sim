@@ -116,8 +116,8 @@ export function executeKO(
 
   const scan = scanEventsForTriggers(nextState, events, controller, cardDb, sourceCardInstanceId);
   nextState = scan.state;
+  replacePendingEventReferences(events, [...events], scan.events);
   if (scan.triggers.length > 0) {
-    replacePendingEventReferences(events, [...events], scan.events);
     const marker: BatchResumeMarker = {
       kind: "KO",
       pausedAction: action,

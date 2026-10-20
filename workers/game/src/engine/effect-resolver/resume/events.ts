@@ -58,7 +58,7 @@ export function takeInterruptedEvents(state: GameState): {
 } {
   const events: PendingEvent[] = [];
   const effectStack = state.effectStack.map((frame) => {
-    // A future writer's battle substitute debt belongs to damage completion,
+    // Battle substitute debt belongs to damage completion,
     // not to an unrelated child publication boundary (OPT-965 reader-first).
     if (frame.phase !== "INTERRUPTED_BY_TRIGGERS" || frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT") return frame;
     events.push(...pendingPropagationEvents(frame.accumulatedEvents));

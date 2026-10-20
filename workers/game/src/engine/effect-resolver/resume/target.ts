@@ -279,7 +279,20 @@ export function handleSelectTargetRuleTrashForPlay(
         ? { ...trigger, triggeringEvent: scannedEvents[eventIndex] }
         : trigger;
     });
-    nextState = { ...nextState, executionContext: scan.state.executionContext };
+    nextState = {
+      ...nextState,
+      executionContext: scan.state.executionContext,
+      // Matching used the pre-trash board, but a battle deferral is live
+      // continuation state. Preserve that queue on the post-trash board.
+      effectStack: nextState.effectStack.map(frame => {
+        const scanned = scan.state.effectStack.find(candidate => candidate.id === frame.id);
+        if (!frame.battleDamage || !scanned) return frame;
+        return { ...frame, pendingTriggers: scanned.pendingTriggers.map(trigger => {
+          const eventIndex = scan.events.indexOf(trigger.triggeringEvent);
+          return eventIndex < 0 ? trigger : { ...trigger, triggeringEvent: scannedEvents[eventIndex] };
+        }) };
+      }),
+    };
     replacePendingEventReferences(events, [...events], scannedEvents);
     queuedTriggers = [...queuedTriggers, ...scannedTriggers];
   }

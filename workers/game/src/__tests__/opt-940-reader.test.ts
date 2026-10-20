@@ -116,7 +116,7 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
   // compared in opt-980-end-phase-stage-reader.test.ts and the writer golden
   // instead of here. The six OPT-963 cases hold version 2 records that the
   // reader lifts into frames (opt-963-v3-reader.test.ts pins the lift).
-  const LIFTED = new Set(["end-phase-parked", "battle-trigger-window", "both-trigger-windows", "effect-damage-trigger-window", "replacement-prompt", "replacement-batch-prompt", "stuck-damage-step"]);
+  const LIFTED = new Set(["structural-resume-context", "end-phase-parked", "battle-trigger-window", "both-trigger-windows", "effect-damage-trigger-window", "replacement-prompt", "replacement-batch-prompt", "stuck-damage-step"]);
   it.each(names.filter((name) => !LIFTED.has(name)))("%s: bytes written at the base commit load to the state the writer saved", async (name) => {
     const entry = getSyntheticStates().find((state) => state.name === name)!;
     const saved = await repository(new MemorySessionStorage()).save(entry.snapshot);

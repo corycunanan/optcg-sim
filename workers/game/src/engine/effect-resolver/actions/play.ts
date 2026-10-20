@@ -243,7 +243,6 @@ export function executePlayCard(
   let nextState = state;
   const playedIds: string[] = [...(resumeFrame?.playedSoFar ?? [])];
   const queuedTriggers: QueuedTrigger[] = [...(resumeFrame?.queuedTriggers ?? [])];
-  const scannedEvents: PendingEvent[] = [];
 
   for (let i = 0; i < targetIds.length; i++) {
     const id = targetIds[i];
@@ -264,9 +263,6 @@ export function executePlayCard(
           const activeLeft = remaining.ACTIVE > 0;
           const restedLeft = remaining.RESTED > 0;
           if (activeLeft && restedLeft) {
-            if (queuedTriggers.length > 0) {
-              replacePendingEventReferences(events, [...events], scannedEvents);
-            }
             // Pause for PLAYER_CHOICE on this frame.
             const pendingPrompt: PendingPromptState = {
               options: {
@@ -331,9 +327,6 @@ export function executePlayCard(
     nextState = frame.state;
     events.push(...frame.events);
     if (frame.pendingPrompt) {
-      if (queuedTriggers.length > 0) {
-        replacePendingEventReferences(events, [...events], scannedEvents);
-      }
       return { state: nextState, events, succeeded: false, pendingPrompt: frame.pendingPrompt };
     }
     if (frame.failed) break;
@@ -342,14 +335,13 @@ export function executePlayCard(
     if (frame.events.length > 0) {
       const scan = scanEventsForTriggers(nextState, frame.events, controller, cardDb, sourceCardInstanceId);
       nextState = scan.state;
-      scannedEvents.push(...scan.events);
+      replacePendingEventReferences(events, frame.events, scan.events);
       queuedTriggers.push(...scan.triggers);
     }
 
   }
 
   if (queuedTriggers.length > 0) {
-    replacePendingEventReferences(events, [...events], scannedEvents);
     const marker: BatchResumeMarker = {
       kind: "PLAY_CARD",
       pausedAction: action,
@@ -511,8 +503,8 @@ export function executeSetRest(
 
   const scan = scanEventsForTriggers(nextState, events, controller, cardDb, sourceCardInstanceId);
   nextState = scan.state;
+  replacePendingEventReferences(events, [...events], scan.events);
   if (scan.triggers.length > 0) {
-    replacePendingEventReferences(events, [...events], scan.events);
     const marker: BatchResumeMarker = {
       kind: "SET_REST",
       pausedAction: action,

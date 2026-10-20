@@ -329,7 +329,8 @@ export function executePass(
     nextState = dmgResult.state;
     return {
       state: nextState,
-      events,
+      events: dmgResult.events,
+      ...(dmgResult.queuedTriggers?.length ? { queuedTriggers: dmgResult.queuedTriggers } : {}),
       lethalDamagePlayerIndex: dmgResult.lethalDamagePlayerIndex,
       ...(dmgResult.pendingPrompt && {
         pendingPrompt: dmgResult.pendingPrompt,
@@ -466,7 +467,7 @@ export function executeUseCounterEvent(
 
 // ─── Reveal Trigger (OPT-963: the BATTLE_DAMAGE frame's window) ─────────────
 
-/** A BATTLE_DAMAGE frame's continuation; `queuedTriggers` are the rule 8-6-2 deferred watchers released when the sequence completes. */
+/** A BATTLE_DAMAGE continuation releases retained watchers when its sequence completes. */
 export type BattleDamageResult = ExecuteResult & {
   lethalDamagePlayerIndex?: 0 | 1;
   queuedTriggers?: QueuedTrigger[];
@@ -945,24 +946,28 @@ export function continueBattleDamageFrame(
   if (state.status !== "IN_PROGRESS") return { state: popFrame(state), events: [] };
 
   const battle = state.turn.battle;
-  if (!battle || battle.battleId !== pending.battleId) {
-    return { state: popFrame(state), events: [] };
+  if (!battle || battle.battleId !== pending.battleId || state.turn.battleSubPhase !== "DAMAGE_STEP") {
+    const withoutStale = popFrame(state);
+    // A stale frame cannot own a newer battle. Only abort a Damage Step
+    // with no remaining work or prompt; otherwise preserve its live owner.
+    const events: PendingEvent[] = [];
+    return {
+      state: battle && state.turn.battleSubPhase === "DAMAGE_STEP" && withoutStale.effectStack.length === 0
+        ? endBattle(withoutStale, events, { aborted: true })
+        : withoutStale,
+      events,
+    };
   }
 
   if (pending.stage === "CHARACTER_KO_REPLACEMENT") {
     // Only an answered continuation finishes the battle. An unanswered one
     // reaching here has lost its prompt (no prompt is pending), so nothing
-    // can answer it any more; discard it rather than guess a decline and
-    // K.O. the Character (OPT-872 review).
+    // can answer it any more. Abort without guessing a decline or a K.O.
     if (pending.resolution === undefined) {
-      return { state: popFrame(state), events: [] };
+      const events: PendingEvent[] = [];
+      return { state: endBattle(popFrame(state), events, { aborted: true }), events };
     }
-    // Reader-first (OPT-965): a future writer can retain substitute debt and
-    // matched watchers on this existing frame. Consume both without adding
-    // a producer or changing how this build schedules new substitutes.
-    const result = finishCharacterBattleResult(
-      popFrame(state), pending, [...frame.accumulatedEvents, ...replacementEvents], cardDb
-    );
+    const result = finishCharacterBattleResult(popFrame(state), pending, [...frame.accumulatedEvents, ...replacementEvents], cardDb);
     return { ...result, queuedTriggers: frame.pendingTriggers };
   }
 
@@ -1157,25 +1162,56 @@ function executeDamageStep(
 
         // Check for replacement effects before KO
         const depthBefore = nextState.effectStack.length;
+        let mandatoryOwnerId: string | undefined;
         const replacement = checkReplacementForKO(
           nextState,
           targetInstanceId,
           "battle",
           pi as 0 | 1,
           cardDb,
-          resolverExecutionServices
+          {
+            executeActionChain: (substituteState, ...args) => {
+              // Mandatory substitutes run before checkReplacementForKO returns.
+              // Give their events/watchers the same owner as optional ones
+              // before the first action can scan or publish a child prefix.
+              const generated = generateFrameId(substituteState);
+              mandatoryOwnerId = generated.id;
+              const owned = insertFrameAt(generated.state, depthBefore, continuationFrame({
+                id: generated.id,
+                sourceCardInstanceId: battle.attackerInstanceId,
+                controller: pi as 0 | 1,
+                phase: "INTERRUPTED_BY_TRIGGERS",
+                battleDamage: {
+                  stage: "CHARACTER_KO_REPLACEMENT",
+                  battleId: battle.battleId,
+                  targetInstanceId,
+                  causingPlayerIndex: pi as 0 | 1,
+                  attackerIsCharacter: attackerCheck.found!.card.zone === "CHARACTER",
+                  resolution: "REPLACED",
+                },
+              }));
+              return resolverExecutionServices.executeActionChain(owned, ...args);
+            },
+          }
         );
+        if (mandatoryOwnerId !== undefined) {
+          if (isGameTerminated(replacement.state)) return { state: replacement.state, events: [...events, ...replacement.events] };
+          if (replacement.pendingPrompt) {
+            return { state: replacement.state, events: [], lethalDamagePlayerIndex, pendingPrompt: replacement.pendingPrompt };
+          }
+          // The synchronous mandatory path consumes that same owner once;
+          // completion rebuilds the battle prefix and releases its queued work.
+          return continueBattleDamageFrame(replacement.state, cardDb, replacement.events);
+        }
         if (replacement.pendingPrompt) {
-          // OPT-872: the prompt pauses the Damage Step. Either the player is
-          // offered an optional replacement (its REPLACEMENT frame on top,
-          // resolution recorded when they answer), or a mandatory
-          // replacement's substitute awaits input in its own frames (already
-          // REPLACED). The BATTLE_DAMAGE frame sits below them (OPT-963).
+          // OPT-872: an optional offer pauses the Damage Step with its
+          // REPLACEMENT frame above the battle owner. Mandatory substitutes
+          // acquired that owner before execution in the branch above.
           // The pipeline drops a prompting execution's events, so the resumed
           // step rebuilds PHASE_CHANGED / CHARACTER_BATTLES / COMBAT_VICTORY
           // and publishes them with the K.O. and END_OF_BATTLE. When the
-          // substitute itself prompts, its events are published first (when
-          // its frame resolves), so that order differs from the synchronous path.
+          // substitute itself prompts, the battle owner retains its committed
+          // prefix until completion, matching the synchronous path.
           const optionalEffectId = !replacement.replaced ? replacement.offer?.effectId : undefined;
           const offered = materializeReplacementOffer(replacement.state, replacement.pendingPrompt, replacement.offer);
           const frameId = generateFrameId(offered.state);
@@ -1199,7 +1235,7 @@ function executeDamageStep(
               battleDamage: paused,
             })
           );
-          if (isGameTerminated(withFrame)) return { state: withFrame, events: [] };
+          if (isGameTerminated(withFrame)) return { state: withFrame, events };
           return {
             state: withFrame,
             events: [],
@@ -1309,9 +1345,9 @@ function koBattleLoser(
  * CHARACTER_BATTLES (Character attacker only), COMBAT_VICTORY, the
  * `replacementEvents` passed in, the K.O. when the replacement was not applied
  * (§8-1-3-4-1), then End of the Battle (§7-1-5). That matches the synchronous
- * order only when the substitute resolved without a prompt; a prompted
- * substitute's events were already published by its own frame. The caller
- * pops the BATTLE_DAMAGE frame and checks its battleId.
+ * order for both synchronous and prompted substitutes: the latter retain
+ * their publication debt and matched watchers on the BATTLE_DAMAGE frame
+ * until damage completes (§8-6-2). The caller pops that frame and checks its id.
  */
 export function finishCharacterBattleResult(
   state: GameState,

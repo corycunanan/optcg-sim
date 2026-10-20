@@ -17,6 +17,7 @@ import {
   convertPersistedGameState,
 } from "../session/persistence.js";
 import {
+  toPersistedGameState,
   classifyLegacyShapes,
   isLegacyCostTransactionFrame,
   isStuckDamageStep,
@@ -211,13 +212,21 @@ describe("OPT-962 legacy stage with a pending OP15-022 Brook delayed loss (the o
   });
 });
 
-describe("OPT-940 structural ResumeContext: supported as-is", () => {
-  it("loads live and as undo, classified, and still resumes through resumeEffectChain", async () => {
+describe("OPT-940 structural ResumeContext: lifted to one frame", () => {
+  it("loads live and as undo with a frame reference and resumes through the stack", async () => {
     for (const state of [loadLive("structural-resume-context"), await loadAsUndo("structural-resume-context")]) {
-      expect(state.effectStack).toEqual([]);
-      expect(classifyLegacyShapes(state)).toEqual([{ shape: "legacy.structural_resume_context" }]);
+      expect(state.effectStack).toHaveLength(1);
+      expect(state.pendingPrompt?.resumeContext).toBe(state.effectStack[0].id);
+      expect(classifyLegacyShapes(state)).toEqual([]);
     }
     const state = loadLive("structural-resume-context");
+    // A constructed surviving Leader watcher exposes the old fallback's
+    // dropped scan obligation as well as its dropped event publication.
+    const watcher = { id: "legacy-ko-watch", category: "auto" as const,
+      trigger: { event: "ANY_CHARACTER_KO" as const, filter: { controller: "OPPONENT" as const } },
+      actions: [{ type: "DRAW" as const, params: { amount: 1 } }] };
+    state.triggerRegistry.push({ id: "legacy-ko-watch", sourceCardInstanceId: state.players[0].leader.instanceId,
+      effectBlockId: watcher.id, trigger: watcher.trigger, effectBlock: watcher, zone: "FIELD", controller: 0 });
     const cardDb = new Map(Object.entries(golden("structural-resume-context").cardDb) as Array<[string, never]>);
     const target = (state.pendingPrompt!.options as { validTargets: string[] }).validTargets[0];
     const result = resumePromptLifecycle(
@@ -227,11 +236,16 @@ describe("OPT-940 structural ResumeContext: supported as-is", () => {
       lifecycleServices
     );
     expect(result.responseRejected).toBe(false);
-    // The legacy path applies the resumed state directly (prompt-lifecycle.ts
-    // publishes no events for it), so observe the zone, not the event log.
+    // The retired fallback dropped resumed events. The common frame path
+    // intentionally publishes the committed K.O. once.
     expect(state.players[1].characters.some((card) => card?.instanceId === target)).toBe(true);
     expect(result.state.players[1].characters.some((card) => card?.instanceId === target)).toBe(false);
     expect(result.state.pendingPrompt).toBeNull();
+    expect(result.state.eventLog.filter(event => event.type === "CARD_KO")).toHaveLength(1);
+    expect(result.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(1);
+    const duplicate = resumePromptLifecycle(result.state, { type: "SELECT_TARGET", selectedInstanceIds: [target] }, cardDb, lifecycleServices);
+    expect(duplicate.responseRejected).toBe(true);
+    expect(duplicate.state.eventLog).toEqual(result.state.eventLog);
   });
 });
 
@@ -270,13 +284,14 @@ describe("OPT-940 stuck DAMAGE_STEP (OPT-884): loaded as-is and classified", () 
     }
   });
 
-  it("is not stuck while the target is still on the field or a prompt is open", () => {
+  it("classifies an unanswered frame even if its target remains on the field", () => {
     const state = loadLive("stuck-damage-step");
     const onField = patchBattleContinuation(state, {
       targetInstanceId: state.players[1].characters[0]!.instanceId,
     });
-    expect(isStuckDamageStep(onField)).toBe(false);
-    expect(classifyLegacyShapes(onField)).toEqual([]);
+    expect(isStuckDamageStep(onField)).toBe(true);
+    expect(classifyLegacyShapes(onField)).toEqual([{ shape: "legacy.stuck_damage_step" }]);
+    expect(isStuckDamageStep({ ...onField, effectStack: [] })).toBe(true);
   });
 });
 
@@ -321,4 +336,65 @@ describe("OPT-940 clean states carry no legacy classification", () => {
       expect(classifyLegacyShapes(loadLive(name))).toEqual([]);
     }
   );
+});
+
+
+describe("OPT-965 terminal and structural ownership on live/undo load", () => {
+  for (const location of ["state", "undoHistory[0]"]) {
+    it(`${location}: terminal cleanup discards validated legacy decisions without another outcome`, () => {
+      const raw = golden("structural-resume-context").session.state;
+      const terminal = { ...raw, status: "FINISHED", winner: 0, winReason: "concession" };
+      const before = structuredClone(terminal);
+      const loaded = convertPersistedGameState(terminal, location);
+      expect(loaded.status).toBe("FINISHED");
+      expect(loaded.winner).toBe(0);
+      expect(loaded.eventLog).toEqual(raw.eventLog);
+      expect(loaded.effectStack).toEqual([]);
+      expect(loaded.pendingPrompt).toBeNull();
+      expect(loaded.turn.battle).toBeNull();
+      expect(terminal).toEqual(before);
+    });
+
+    it(`${location}: lifted structural work has one durable owner and deterministic reload`, () => {
+      const raw = golden("structural-resume-context").session.state;
+      const first = convertPersistedGameState(structuredClone(raw), location);
+      expect(first).toEqual(convertPersistedGameState(structuredClone(raw), location));
+      const written = toPersistedGameState(first);
+      expect(typeof written.pendingPrompt?.resumeContext).toBe("string");
+      expect(convertPersistedGameState(written, location)).toEqual(first);
+      expect(written.effectStack).toHaveLength(1);
+    });
+
+    it(`${location}: unknown structural payload is rejected instead of silently dropped`, () => {
+      const raw = golden("structural-resume-context").session.state;
+      const prompt = raw.pendingPrompt as Record<string, unknown>;
+      prompt.resumeContext = { ...(prompt.resumeContext as object), unknownExecutableWork: [] };
+      expect(() => convertPersistedGameState(raw, location)).toThrow("unknown field unknownExecutableWork");
+    });
+  }
+});
+
+
+describe("OPT-965 historical structural optional effect", () => {
+  for (const location of ["state", "undoHistory[0]"]) {
+    it(`${location}: accepts an optional suffix through one ordinary frame`, () => {
+      const original = golden("structural-resume-context");
+      const raw = original.session.state;
+      const prompt = raw.pendingPrompt as { options: Record<string, unknown>; resumeContext: Record<string, unknown> };
+      prompt.options = { promptType: "OPTIONAL_EFFECT", effectDescription: "Draw one" };
+      prompt.resumeContext = { ...prompt.resumeContext, pausedAction: null, remainingActions: [{ type: "DRAW", params: { amount: 1 } }] };
+      const state = convertPersistedGameState(raw, location);
+      const controller = state.pendingPrompt!.respondingPlayer;
+      const before = state.players[controller].hand.length;
+      const skipped = resumePromptLifecycle(state, { type: "PLAYER_CHOICE", choiceId: "skip" }, new Map(Object.entries(original.cardDb)) as never, lifecycleServices);
+      expect(skipped.responseRejected).toBe(true);
+      expect(skipped.state).toBe(state);
+      const result = resumePromptLifecycle(state, { type: "PLAYER_CHOICE", choiceId: "accept" }, new Map(Object.entries(original.cardDb)) as never, lifecycleServices);
+      expect(result.responseRejected).toBe(false);
+      expect(result.state.players[controller].hand).toHaveLength(before + 1);
+      expect(result.state.pendingPrompt).toBeNull();
+      expect(result.state.effectStack).toEqual([]);
+      expect(convertPersistedGameState(toPersistedGameState(state), location)).toEqual(state);
+    });
+  }
 });

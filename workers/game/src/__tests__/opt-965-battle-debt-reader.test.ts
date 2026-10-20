@@ -48,8 +48,10 @@ for (const location of ["state", "undoHistory[0]"]) {
       const retained = { type: "CARD_TRASHED" as const, playerIndex: 0 as const,
         payload: { cardId: "CHAR-VANILLA", cardInstanceId: "retained-boundary", from: "HAND", reason: "effect" },
         propagation: { triggerScanned: true as const } };
+      const childOwner = { ...loaded.effectStack.at(-1)!, phase: "INTERRUPTED_BY_TRIGGERS" as const,
+        pausedAction: null, remainingActions: [], accumulatedEvents: [] };
       const state: GameState = { ...loaded, pendingPrompt: null,
-        effectStack: [{ ...owner, accumulatedEvents: [retained] }] };
+        effectStack: [{ ...owner, accumulatedEvents: [retained] }, childOwner] };
       const child = { ...owner.pendingTriggers[0], effectBlock: {
         ...owner.pendingTriggers[0].effectBlock,
         actions: [{ type: "TRASH_FROM_HAND" as const, params: { amount: 1 } }],

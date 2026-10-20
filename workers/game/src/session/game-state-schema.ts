@@ -834,6 +834,12 @@ export function validateContinuationReferences(
         `${ref} names REPLACEMENT frame ${JSON.stringify(prompt.resumeContext)}, which is not the top frame; an offer is answered before anything above it`
       );
     }
+    if (frames.at(-1)?.id !== target.id) {
+      throw new SessionLoadError(
+        location,
+        `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, which is not the top frame ${JSON.stringify(frames.at(-1)?.id)}`
+      );
+    }
   }
   // A REPLACEMENT frame exists only while its offer is pending, so it is always
   // pushed together with the prompt that names it. (A damage frame at
@@ -878,15 +884,6 @@ export function isLegacyCostTransactionFrame(frame: EffectStackFrame): boolean {
   );
 }
 
-function isOnField(state: GameState, instanceId: string): boolean {
-  return state.players.some(
-    (player) =>
-      player.leader.instanceId === instanceId ||
-      player.stage?.instanceId === instanceId ||
-      player.characters.some((card) => card?.instanceId === instanceId)
-  );
-}
-
 /** The one BATTLE_DAMAGE frame of a state, if any (one battle at a time). */
 export function battleDamageFrameOf(state: GameState): EffectStackFrame | undefined {
   return state.effectStack.find((frame) => frame.battleDamage !== undefined);
@@ -901,12 +898,14 @@ export function isStuckDamageStep(state: GameState): boolean {
   const frame = battleDamageFrameOf(state);
   const continuation = frame?.battleDamage;
   return (
+    state.status === "IN_PROGRESS" &&
+    state.turn.battle !== null &&
     state.turn.battleSubPhase === "DAMAGE_STEP" &&
-    continuation?.stage === "CHARACTER_KO_REPLACEMENT" &&
-    continuation.resolution === undefined &&
     state.pendingPrompt === null &&
-    state.effectStack.length === 1 &&
-    !isOnField(state, continuation.targetInstanceId)
+    (state.effectStack.length === 0 ||
+      (state.effectStack.length === 1 &&
+        continuation?.stage === "CHARACTER_KO_REPLACEMENT" &&
+        continuation.resolution === undefined))
   );
 }
 

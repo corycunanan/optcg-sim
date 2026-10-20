@@ -104,6 +104,16 @@ describe("OPT-940 reference integrity: prompt → frame", () => {
     );
   });
 
+  it.each(["state", "undoHistory[0]"])("rejects a non-top prompt reference at %s without rewriting input", (location) => {
+    const raw = rawState("effect-frame-prompt");
+    raw.effectStack.push({ ...structuredClone(raw.effectStack[0]), id: "newer-child" });
+    const original = structuredClone(raw);
+    expect(() => convertPersistedGameState(raw, location)).toThrow(
+      `Stored session ${location} pendingPrompt.resumeContext names frame "golden-effect-frame", which is not the top frame "newer-child"`
+    );
+    expect(raw).toEqual(original);
+  });
+
   it("rejects duplicate frame ids", () => {
     const raw = rawState("end-phase-parked");
     raw.effectStack[1].id = raw.effectStack[0].id;
@@ -168,8 +178,8 @@ describe("OPT-940 battle damage records: classified, never rejected (review find
   it("loads a damage continuation with no battle and classifies it", () => {
     const raw = rawState("stuck-damage-step");
     raw.turn.battle = null;
-    // Still stuck (target gone, no prompt, empty stack) and now orphaned too.
-    expect(loadAndClassify(raw)).toEqual(["legacy.stuck_damage_step", "legacy.orphan_battle_continuation"]);
+    // No battle remains to strand; the orphan itself is still classified.
+    expect(loadAndClassify(raw)).toEqual(["legacy.orphan_battle_continuation"]);
   });
 
   it("loads a damage continuation whose battle id differs from the battle and classifies it", () => {
