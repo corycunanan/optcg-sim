@@ -99,6 +99,15 @@ function overflow(): Json {
       ...frame(),
       kind: "PLAY_OVERFLOW",
       phase: "AWAITING_TARGET_SELECTION",
+      pausedAction: {
+        type: "PLAY_CARD",
+        target: {
+          type: "CHARACTER_CARD",
+          source_zone: "HAND",
+          count: { exact: 1 },
+        },
+        params: { source_zone: "HAND", cost_override: "FREE" },
+      },
       playOverflow: {
         playTargetId: "v4-target",
         batch: {
@@ -749,3 +758,23 @@ it.each([
     expect(() => read(raw, location)).toThrow();
   }
 });
+
+it.each(
+  locations.flatMap((location) => [
+    { location, label: "null", pausedAction: null },
+    {
+      location,
+      label: "known DRAW",
+      pausedAction: { type: "DRAW", params: { amount: 1 } },
+    },
+  ])
+)(
+  "rejects overflow with $label paused action in $location",
+  ({ location, pausedAction }) => {
+    const raw = overflow();
+    raw.effectStack[0].pausedAction = pausedAction;
+    expect(() => read(raw, location)).toThrow(
+      "overflow requires a paused PLAY_CARD action"
+    );
+  }
+);

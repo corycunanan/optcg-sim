@@ -352,6 +352,15 @@ export function lowerVersion4(raw: Raw, fail: Fail): LoweredVersion4 {
     }
     if (playOverflow) {
       if (
+        !frame.pausedAction ||
+        typeof frame.pausedAction !== "object" ||
+        !("type" in frame.pausedAction) ||
+        frame.pausedAction.type !== "PLAY_CARD"
+      )
+        fail(
+          `effectStack[${index}] overflow requires a paused PLAY_CARD action`
+        );
+      if (
         frame.phase !== "AWAITING_TARGET_SELECTION" ||
         !state.pendingPrompt ||
         state.pendingPrompt.resumeContext !== frame.id ||
