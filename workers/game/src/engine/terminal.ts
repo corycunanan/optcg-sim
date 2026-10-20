@@ -114,16 +114,19 @@ export function terminateGame(
 ): GameState {
   if (isGameTerminated(state)) return state;
   const { status, winner, reason, engineOutcome, diagnostic } = describe(outcome);
+  const { pendingEventActivationEvents: _legacyDebt, ...withoutLegacyDebt } =
+    state;
   const terminal: GameState = {
-    ...state,
+    ...withoutLegacyDebt,
     status,
     winner,
     winReason: reason,
     ...(engineOutcome ? { engineOutcome } : {}),
     pendingPrompt: null,
     effectStack: [],
-    pendingEventActivationEvents: undefined,
-    ...(outcome.kind === "ABANDONMENT" && outcome.clearPregame ? { pregame: null } : {}),
+    ...(outcome.kind === "ABANDONMENT" && outcome.clearPregame
+      ? { pregame: null }
+      : {}),
     turn: {
       ...state.turn,
       battle: null,

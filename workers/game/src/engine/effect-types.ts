@@ -1982,6 +1982,8 @@ export interface RevealedCardSnapshot {
 }
 
 export interface EffectResult {
+  /** Immutable queued source identity, retained after activation. */
+  sourceIdentity?: import("../types.js").QueuedSourceSnapshot;
   /** Last-known effect source, retained across cost payment and prompts. */
   sourceCardSnapshot?: import("../types.js").CardInstance;
   targetInstanceIds: string[];

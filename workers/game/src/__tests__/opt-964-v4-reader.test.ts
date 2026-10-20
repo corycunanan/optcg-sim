@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { convertPersistedGameState } from "../session/persistence.js";
 import { goldenV2Raw } from "./fixtures/opt-963-v3-states.js";
@@ -13,14 +15,14 @@ export function version4Base(): Record<string, unknown> {
   );
 }
 
-describe("OPT-964 reader-before-writer", () => {
-  it("reads v4 live and undo while retaining the v3 writer", () => {
+describe("OPT-964 native v4 writer", () => {
+  it("reads and writes v4 live and undo", () => {
     for (const location of ["state", "undoHistory[0]"]) {
       const loaded = convertPersistedGameState(version4Base(), location);
       expect(
         (toPersistedGameState(loaded) as unknown as { schemaVersion: number })
           .schemaVersion
-      ).toBe(3);
+      ).toBe(4);
     }
   });
 });
@@ -29,12 +31,10 @@ import type {
   CardData,
   GameAction,
   GameState,
-  EffectStackFrame,
 } from "../types.js";
 import { CARDS, createBattleReadyState, createTestCardDb } from "./helpers.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { frameKindOf } from "../engine/frame-kinds.js";
-import { CONTINUATION_EFFECT_BLOCK } from "../engine/effect-stack.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import {
@@ -44,81 +44,9 @@ import {
 } from "../session/persistence.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 
-function boundary(id: string, sourceCardInstanceId: string, controller: 0 | 1) {
-  return {
-    id,
-    sourceCardInstanceId,
-    controller,
-    effectBlock: CONTINUATION_EFFECT_BLOCK,
-    phase: "INTERRUPTED_BY_TRIGGERS",
-    pausedAction: null,
-    remainingActions: [],
-    resultRefs: [],
-    validTargets: [],
-    costs: [],
-    currentCostIndex: 0,
-    costsPaid: true,
-    oncePerTurnMarked: true,
-    costResultRefs: [],
-    pendingTriggers: [],
-    simultaneousTriggers: [],
-    accumulatedEvents: [],
-  };
-}
-
-/** Structural proposed-writer projection of actual v3 engine states. Synthetic,
- * not a deployed v4 writer capture. Every lowering is compared with the source. */
+/** Actual v4 writer output from engine-produced runtime states. */
 function lift(state: GameState): Record<string, unknown> {
-  const raw = JSON.parse(JSON.stringify(toPersistedGameState(state)));
-  raw.schemaVersion = 4;
-  if (raw.turn.battle)
-    Object.assign(raw.turn.battle, {
-      step: raw.turn.battleSubPhase,
-      redirectWindow: false,
-      blockerLocked: raw.turn.battle.blockerActivated,
-      targetLocked: true,
-    });
-  raw.effectStack = raw.effectStack.map((frame: EffectStackFrame) => {
-    const next: Record<string, unknown> = {
-      ...frame,
-      kind: frameKindOf(frame),
-    };
-    if (frame.eventActivationCompletion) {
-      next.kind = "EVENT_ACTIVATION";
-      next.eventActivation = {
-        publication: "AFTER_EFFECT",
-        sourceZone:
-          frame.eventActivationCompletion.type === "EVENT_ACTIVATED_FROM_HAND"
-            ? "HAND"
-            : "TRASH",
-        sourceClass: "EVENT",
-        events: [frame.eventActivationCompletion],
-      };
-      delete next.eventActivationCompletion;
-    }
-    return next;
-  });
-  if (raw.pendingEventActivationEvents?.length) {
-    const event = raw.pendingEventActivationEvents.find(
-      (e: { type: string }) => e.type === "EVENT_ACTIVATED_FROM_HAND"
-    );
-    raw.effectStack.unshift({
-      ...boundary(
-        "reader-fixture:activation",
-        event.payload.cardInstanceId,
-        event.playerIndex
-      ),
-      kind: "EVENT_ACTIVATION",
-      eventActivation: {
-        publication: "AFTER_STACK",
-        sourceZone: "HAND",
-        sourceClass: "EVENT",
-        events: raw.pendingEventActivationEvents,
-      },
-    });
-  }
-  delete raw.pendingEventActivationEvents;
-  return raw;
+  return JSON.parse(JSON.stringify(toPersistedGameState(state)));
 }
 function eventFixture(nested: boolean, trash = false) {
   const db = createTestCardDb();
@@ -272,7 +200,7 @@ async function loadWithUndo(
   return loaded;
 }
 
-describe("OPT-964 actual pipeline debt survives reader rollback", () => {
+describe("OPT-964 actual pipeline debt survives native persistence", () => {
   it.each([
     [false, false],
     [true, false],
@@ -282,14 +210,14 @@ describe("OPT-964 actual pipeline debt survives reader rollback", () => {
     async (nested, trash) => {
       const { state, db } = eventFixture(nested, trash);
       if (!nested) {
-        expect(state.pendingEventActivationEvents!.length).toBeGreaterThan(1);
+        expect(state.effectStack[0].eventActivation!.events.length).toBeGreaterThan(1);
         expect(
-          state.pendingEventActivationEvents!.some(
+          state.effectStack[0].eventActivation!.events.some(
             (e) => e.propagation?.eventLogEmitted
           )
         ).toBe(true);
       } else
-        expect(state.effectStack.some((f) => f.eventActivationCompletion)).toBe(
+        expect(state.effectStack.some((f) => f.eventActivation)).toBe(
           true
         );
       const raw = lift(state);
@@ -302,6 +230,14 @@ describe("OPT-964 actual pipeline debt survives reader rollback", () => {
         ],
       };
       const expected = reply(state, db, action);
+      if (process.env.OPT964_CORPUS_DIR) {
+        mkdirSync(process.env.OPT964_CORPUS_DIR, { recursive: true });
+        writeFileSync(join(process.env.OPT964_CORPUS_DIR, `event-${nested ? "nested" : "root"}-${trash ? "trash" : "hand"}.json`), JSON.stringify({
+          state: raw, undoHistory: [raw], cardDb: Object.fromEntries(db),
+          replay: { actions: [action], expected: { players: expected.players, eventLog: expected.eventLog, pendingPrompt: expected.pendingPrompt, effectStackLength: expected.effectStack.length, executionContext: expected.executionContext }, parity: "lossless event ownership" },
+        }, null, 2));
+      }
+
       for (const restored of [loaded.state, loaded.undoHistory[0]]) {
         expect(JSON.parse(JSON.stringify(restored))).toEqual(
           JSON.parse(
@@ -350,13 +286,13 @@ it("preserves structured-clone event aliases without mutating stored bytes", () 
   const stored = structuredClone(raw);
   const before = JSON.stringify(stored);
   const loaded = convertPersistedGameState(stored, "state");
-  expect(loaded.pendingEventActivationEvents![0]).toBe(
-    loaded.effectStack[0].accumulatedEvents.at(-1)
+  expect(loaded.effectStack[0].eventActivation!.events[0]).toBe(
+    loaded.effectStack[1].accumulatedEvents.at(-1)
   );
   expect(JSON.stringify(stored)).toBe(before);
 });
 
-it("reports snapshot lowering only after a valid load and keeps v3 queue semantics unchanged", () => {
+it("retains native identity without logging rollback degradation", () => {
   const { state } = eventFixture(false);
   const raw = lift(state) as ReturnType<typeof lift> & {
     effectStack: Array<Record<string, unknown>>;
@@ -377,29 +313,13 @@ it("reports snapshot lowering only after a valid load and keeps v3 queue semanti
   const spy = vi.spyOn(logger, "log");
   try {
     const loaded = convertPersistedGameState(raw, "undoHistory[0]");
-    expect(spy).toHaveBeenCalledWith("session.legacy_shape", {
-      gameId: state.id,
-      location: "undoHistory[0]",
-      shape: "lowered.v4_source_snapshot",
-    });
-    expect(loaded.effectStack[0].pendingTriggers[0].sourceCardInstanceId).toBe(
-      "moved-source"
-    );
+    expect(spy).not.toHaveBeenCalledWith("session.legacy_shape", expect.objectContaining({ shape: "lowered.v4_source_snapshot" }));
+    expect(loaded.effectStack[1].pendingTriggers[0].sourceSnapshot).toEqual(queued.sourceSnapshot);
     spy.mockClear();
     const bad = structuredClone(raw);
     bad.effectStack[1].remainingActions = [{ type: "NOT_AN_ACTION" }];
     expect(() => convertPersistedGameState(bad, "state")).toThrow();
     expect(spy).not.toHaveBeenCalled();
-    // Older bytes do not acquire new strict snapshot validation or activation semantics.
-    const legacy = JSON.parse(JSON.stringify(toPersistedGameState(state)));
-    legacy.effectStack[0].pendingTriggers = [
-      { ...queued, sourceSnapshot: { historicalUnknownField: true } },
-    ];
-    expect(() => convertPersistedGameState(legacy, "state")).not.toThrow();
-    expect(spy).not.toHaveBeenCalledWith(
-      "session.legacy_shape",
-      expect.objectContaining({ shape: "lowered.v4_source_snapshot" })
-    );
   } finally {
     spy.mockRestore();
   }

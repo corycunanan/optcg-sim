@@ -68,7 +68,7 @@ describe("F9 Sugar: a pending auto effect whose source left the field does not a
 
   // Engine: CARD_PLAYED -> CARD_KO(p1) -> CARD_DRAWN(p1); Sugar's effect still activates after Sugar was K.O.'d.
   // Rule 8-1-3-1-3 (line 710): an auto effect whose source moved areas before activation does not activate.
-  it.fails("F9 Marco's On Play K.O.s Sugar first, then Sugar's Opponent's Turn effect does not activate (ratchet OPT-964)", () => {
+  it("F9 Marco's On Play K.O.s Sugar first, then Sugar's Opponent's Turn effect does not activate (ratchet OPT-964)", () => {
     const b = base([
       synCard(SUGAR, schema(SUGAR, [
         {

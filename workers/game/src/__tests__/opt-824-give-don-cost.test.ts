@@ -343,7 +343,7 @@ describe("OPT-824 GIVE_DON cost — OP13-007", () => {
     f.persist();
     expect(selectPrompt(f).validTargets).not.toContain(ally.instanceId);
     f.select([ally.instanceId], true);
-    expect(f.state).toEqual(JSON.parse(JSON.stringify(afterPay)));
+    expect(JSON.parse(JSON.stringify(toPersistedGameState(f.state)))).toEqual(JSON.parse(JSON.stringify(toPersistedGameState(afterPay))));
     f.select([foe.instanceId]);
     expect(donGivenEvents(f)).toHaveLength(1);
     expect(activeCostDon(f)).toBe(2);

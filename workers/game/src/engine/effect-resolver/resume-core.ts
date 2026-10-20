@@ -519,7 +519,7 @@ export function resumeFromStack(
         returnToDeckArrangement: topFrame.returnToDeckArrangement,
         fieldToLifeTargetIds: topFrame.fieldToLifeTargetIds,
         giveDonIdentity: topFrame.giveDonIdentity,
-        ruleTrashForPlay: topFrame.ruleTrashForPlay,
+        ruleTrashForPlay: topFrame.playOverflow,
         stateDistributionForPlay: topFrame.stateDistributionForPlay,
       };
 
@@ -600,7 +600,7 @@ export function resumeFromStack(
             fieldToLifeTargetIds: promptCtx.fieldToLifeTargetIds,
             giveDonIdentity: promptCtx.giveDonIdentity,
             accumulatedEvents: [...events],
-            ruleTrashForPlay: promptCtx.ruleTrashForPlay,
+            playOverflow: promptCtx.ruleTrashForPlay,
             stateDistributionForPlay: promptCtx.stateDistributionForPlay,
           };
           nextState = pushFrame(nextState, replacementFrame);
@@ -664,7 +664,8 @@ export function resumeFromStack(
     // ── Interrupted by nested triggers (triggers have completed, resume) ─
     case "INTERRUPTED_BY_TRIGGERS": {
       const events = pendingPropagationEvents(topFrame.accumulatedEvents);
-      if (topFrame.eventActivationCompletion) events.push(topFrame.eventActivationCompletion);
+      if (topFrame.eventActivation)
+        events.push(...topFrame.eventActivation.events);
       let nextState = popFrame(state);
       const stackDepthAfterPop = nextState.effectStack.length;
 

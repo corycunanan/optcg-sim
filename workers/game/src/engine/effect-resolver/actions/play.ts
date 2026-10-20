@@ -443,14 +443,28 @@ export function executeSetRest(
   preselectedTargets: string[] | undefined,
   services: EffectResolverServices,
 ): ActionResult {
-  const causingSource = effectSourceIdentity(state, sourceCardInstanceId, cardDb, resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot);
+  const causingSource = effectSourceIdentity(
+    state,
+    sourceCardInstanceId,
+    cardDb,
+    resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceIdentity ??
+      resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot
+  );
   const events: PendingEvent[] = [];
   const rawValidIds = preselectedTargets ?? computeAllValidTargets(state, action.target, controller, cardDb, sourceCardInstanceId, resultRefs);
   // OPT-250: strip targets under CANNOT_BE_RESTED before prompting or
   // auto-selecting. Rest-as-consequence is a silent no-op on protected
   // cards (qa_op13.md:85-87) — the effect proceeds for the remainder.
   const allValidIds = rawValidIds.filter(
-    (id) => !isProhibitedForCard(state, id, "CANNOT_BE_RESTED", cardDb, { causingController: controller, sourceCardInstanceId, sourceCardSnapshot: resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot }),
+    (id) =>
+      !isProhibitedForCard(state, id, "CANNOT_BE_RESTED", cardDb, {
+        causingController: controller,
+        sourceCardInstanceId,
+        sourceIdentity: resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)
+          ?.sourceIdentity,
+        sourceCardSnapshot: resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)
+          ?.sourceCardSnapshot,
+      })
   );
   if (!preselectedTargets && needsPlayerTargetSelection(action.target, allValidIds)) {
     return buildSelectTargetPrompt(state, action, allValidIds, sourceCardInstanceId, controller, cardDb, resultRefs);

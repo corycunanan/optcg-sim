@@ -72,6 +72,7 @@ export interface EffectResolverServices {
     cardDb: Map<string, CardData>,
     triggeringCardInstanceId?: string | null,
     triggeringEvent?: PendingEvent,
+    sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot
   ): EffectResolverResult;
 
   continueSimultaneousGroup(

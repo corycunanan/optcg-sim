@@ -632,7 +632,7 @@ describe("OPT805 Event activation lifecycle regressions", () => {
       };
       f.play("OP01-116");
       expect(
-        f.state.pendingEventActivationEvents?.some(
+        f.state.effectStack.find(frame => frame.eventActivation?.publication === "AFTER_STACK")?.eventActivation?.events.some(
           (e) => e.type === "EVENT_ACTIVATED_FROM_HAND"
         )
       ).toBe(true);

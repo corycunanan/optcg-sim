@@ -1,3 +1,5 @@
+import { lowerVersion4 } from "../../session/version4-reader.js";
+import { toPersistedGameState } from "../../session/game-state-schema.js";
 /**
  * OPT-963 version 3 fixtures.
  *
@@ -52,7 +54,12 @@ function continuationFrame(
 
 /** The version 3 persisted object of a runtime state (what this build's writer emits). */
 export function persistedV3(state: GameState): Record<string, unknown> {
-  return JSON.parse(JSON.stringify({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3, ...state })) as Record<string, unknown>;
+  const projected = lowerVersion4(toPersistedGameState(state) as unknown as Record<string, unknown>, message => { throw new Error(message); }).state;
+  // V3's writer did not stamp optional kind tags on ordinary frames.
+  const frames = projected.effectStack as Array<Record<string, unknown>>;
+  return JSON.parse(JSON.stringify({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3, ...projected,
+    effectStack: frames.map(({ kind: _kind, ...frame }) => frame),
+  })) as Record<string, unknown>;
 }
 
 /** The raw version 1 golden object of a case (base writer bytes). */

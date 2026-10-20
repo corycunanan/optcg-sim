@@ -74,7 +74,7 @@ function repository(storage: MemorySessionStorage): SessionRepository {
 
 /** A runtime state as the reader returns it: JSON round-tripped (drops undefined fields). */
 function runtime(state: GameState): GameState {
-  return JSON.parse(JSON.stringify(state)) as GameState;
+  return JSON.parse(JSON.stringify({ ...state, effectStack: state.effectStack.map(({ kind: _kind, ...frame }) => frame) })) as GameState;
 }
 
 function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
@@ -86,11 +86,11 @@ function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
 const kindsOf = (state: GameState) => state.effectStack.map(frameKindOf);
 
 describe("OPT-963 version 3 runtime and writer (PR 5b)", () => {
-  it("reads 1–4, executes 3, and writes 3", () => {
+  it("reads 1–4, executes and writes 4", () => {
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4]);
     expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(4);
-    expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(3);
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(3);
+    expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(4);
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(4);
     expect([...EFFECT_STACK_FRAME_KINDS]).toEqual(
       expect.arrayContaining(["REPLACEMENT", "REPLACEMENT_BATCH", "BATTLE_DAMAGE", "EFFECT_DAMAGE"])
     );
@@ -245,22 +245,22 @@ describe("OPT-963 v3 reader: every version 3 shape loads unchanged, live and as 
   it.each(NAMES)("%s loads live with nothing dropped", (name) => {
     const raw = persistedV3(byName(name).state);
     const loaded = convertPersistedGameState(raw, "state");
-    expect(loaded).toEqual(withoutVersion(raw));
+    expect(withoutVersion(persistedV3(loaded))).toEqual(withoutVersion(raw));
     expect(loaded).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
   });
 
   it.each(NAMES)("%s loads as an undo snapshot through the same hook", async (name) => {
     const raw = persistedV3(byName(name).state);
     const loaded = (await repository(storageWith(golden("battle-ready-with-undo").session.state, [raw])).load())!;
-    expect(loaded.undoHistory[0]).toEqual(withoutVersion(raw));
+    expect(withoutVersion(persistedV3(loaded.undoHistory[0]))).toEqual(withoutVersion(raw));
   });
 
-  it.each(NAMES)("%s round-trips through the writer as version 3", (name) => {
+  it.each(NAMES)("%s round-trips historical semantics through the version 4 writer", (name) => {
     const state = runtime(byName(name).state);
     const out = toPersistedGameState(state) as unknown as Record<string, unknown>;
     expect(Object.keys(out)[0]).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
-    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
-    expect(convertPersistedGameState(JSON.parse(JSON.stringify(out)), "state")).toEqual(state);
+    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
+    expect(persistedV3(convertPersistedGameState(JSON.parse(JSON.stringify(out)), "state"))).toEqual(persistedV3(state));
   });
 });
 
@@ -274,12 +274,12 @@ describe("OPT-963 mixed-version undo history", () => {
     const target = new MemorySessionStorage();
     const saved = await repository(target).save(first);
     const written = target.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
     const writtenUndo = target.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Record<string, unknown>[];
-    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
     const second = (await repository(target).load())!;
-    expect(second.state).toEqual(saved.state);
-    expect(second.undoHistory).toEqual(saved.undoHistory);
+    expect(toPersistedGameState(second.state)).toEqual(toPersistedGameState(saved.state));
+    expect(second.undoHistory.map(toPersistedGameState)).toEqual(saved.undoHistory.map(toPersistedGameState));
   });
 
   it("[2, 3]: a version 2 live state with a version 3 undo snapshot loads", async () => {
@@ -287,7 +287,7 @@ describe("OPT-963 mixed-version undo history", () => {
     const undo = persistedV3(byName("effect-window-with-parent-chain").state);
     const loaded = (await repository(storageWith(live, [undo], golden("replacement-prompt").cardDb)).load())!;
     expect(kindsOf(loaded.state)).toEqual(["REPLACEMENT"]);
-    expect(loaded.undoHistory[0]).toEqual(withoutVersion(undo));
+    expect(withoutVersion(persistedV3(loaded.undoHistory[0]))).toEqual(withoutVersion(undo));
   });
 });
 
@@ -543,10 +543,14 @@ describe("PR #758 L5: a lifted Trigger-window prompt shows the responder their o
     for (const name of WRITTEN_CASES) expectRevealPromptOwned(convertPersistedGameState(writtenBy5b(name).raw, "state"));
   });
 
-  it.each(WRITTEN_CASES)("5b-written %s: this reader loads what this writer wrote, and writes it back byte-for-byte", (name) => {
+  it.each(WRITTEN_CASES)("5b-written %s: this reader loads what this writer wrote, and preserves its v3 projection through the v4 writer", (name) => {
     const { raw } = writtenBy5b(name);
     const loaded = convertPersistedGameState(raw, "state");
-    expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded)))).toEqual(raw);
+    const expected = structuredClone(raw);
+    // Lifting root publication debt allocates one state-owned boundary ID.
+    if (Array.isArray(expected.pendingEventActivationEvents) && expected.pendingEventActivationEvents.length)
+      (expected.executionContext as { idCounter: number }).idCounter += 1;
+    expect(persistedV3(loaded)).toEqual(expected);
     expect(classifyLegacyShapes(loaded)).toEqual([]);
   });
 });

@@ -144,6 +144,7 @@ export function processRemainingTriggers(
           | undefined
       )?.cardInstanceId ?? null,
       trigger.triggeringEvent,
+      trigger.sourceSnapshot
     );
     nextState = result.state;
     events.push(...result.events);
@@ -210,6 +211,7 @@ export function processRemainingTriggers(
           | undefined
       )?.cardInstanceId ?? null,
       trigger.triggeringEvent,
+      trigger.sourceSnapshot
     );
     nextState = result.state;
     events.push(...result.events);

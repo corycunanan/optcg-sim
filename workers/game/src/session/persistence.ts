@@ -1,4 +1,5 @@
-import { isVersion4Lowering, version4LoweringNotes } from "./version4-reader.js";
+import { liftVersion3 } from "./version4-lift.js";
+import { isVersion4Lowering } from "./version4-reader.js";
 import type {
   CardData,
   GameEventType,
@@ -66,7 +67,10 @@ export class DurableObjectSessionStorage implements SessionStorage {
 
   async put(key: string, value: unknown): Promise<void>;
   async put(entries: Record<string, unknown>): Promise<void>;
-  async put(keyOrEntries: string | Record<string, unknown>, value?: unknown): Promise<void> {
+  async put(
+    keyOrEntries: string | Record<string, unknown>,
+    value?: unknown
+  ): Promise<void> {
     if (typeof keyOrEntries === "string") {
       await this.storage.put(keyOrEntries, value);
       return;
@@ -128,10 +132,10 @@ export class SessionPersistenceLimitError extends Error {
   constructor(
     readonly valueName: "session" | "cardDb" | "undoHistory",
     readonly bytes: number,
-    readonly limitBytes: number,
+    readonly limitBytes: number
   ) {
     super(
-      `${valueName} persistence payload is ${bytes} bytes; limit is ${limitBytes} bytes`,
+      `${valueName} persistence payload is ${bytes} bytes; limit is ${limitBytes} bytes`
     );
     this.name = "SessionPersistenceLimitError";
   }
@@ -164,7 +168,7 @@ export class SessionRepository {
     const compacted = compactSessionHistory(
       promptedState,
       snapshot.undoHistory,
-      this.historySummary,
+      this.historySummary
     );
     const stored: PersistedSession = {
       formatVersion: SESSION_STORAGE_FORMAT_VERSION,
@@ -176,7 +180,8 @@ export class SessionRepository {
     };
     const sessionBytes = serializedByteLength(stored);
     assertWithinValueLimit("session", sessionBytes);
-    const persistedUndoHistory = compacted.undoHistory.map(toPersistedGameState);
+    const persistedUndoHistory =
+      compacted.undoHistory.map(toPersistedGameState);
     const undoHistoryBytes = serializedByteLength(persistedUndoHistory);
     assertWithinValueLimit("undoHistory", undoHistoryBytes);
 
@@ -245,15 +250,19 @@ export class SessionRepository {
     const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
     const restoredState = restoreIdCounterInvariant(
       ensureExecutionContext(stored.state),
-      "state",
+      "state"
     );
-    const restoredUndoHistory = (stored.undoHistory ?? []).map((snapshot, index) =>
-      restoreIdCounterInvariant(ensureExecutionContext(snapshot), `undoHistory[${index}]`),
+    const restoredUndoHistory = (stored.undoHistory ?? []).map(
+      (snapshot, index) =>
+        restoreIdCounterInvariant(
+          ensureExecutionContext(snapshot),
+          `undoHistory[${index}]`
+        )
     );
     const compacted = compactSessionHistory(
       restoredState,
       restoredUndoHistory,
-      stored.historySummary,
+      stored.historySummary
     );
     this.historySummary = compacted.historySummary;
     this.persistedGameId = embeddedCardDb ? null : stored.state.id;
@@ -360,22 +369,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isKnownEvent(value: unknown): boolean {
-  return isKnownPendingEvent(value) &&
+  return (
+    isKnownPendingEvent(value) &&
     value.playerIndex !== undefined &&
     (value.playerIndex === 0 || value.playerIndex === 1) &&
     typeof value.timestamp === "number" &&
     Number.isFinite(value.timestamp) &&
-    value.payload !== undefined;
+    value.payload !== undefined
+  );
 }
 
 function isKnownPendingEvent(value: unknown): value is Record<string, unknown> {
-  if (!isRecord(value) || typeof value.type !== "string" || !isKnownEventType(value.type)) {
+  if (
+    !isRecord(value) ||
+    typeof value.type !== "string" ||
+    !isKnownEventType(value.type)
+  ) {
     return false;
   }
-  if (value.playerIndex !== undefined && value.playerIndex !== 0 && value.playerIndex !== 1) {
+  if (
+    value.playerIndex !== undefined &&
+    value.playerIndex !== 0 &&
+    value.playerIndex !== 1
+  ) {
     return false;
   }
-  return value.payload === undefined || hasValidEventPayload(value.type, value.payload);
+  return (
+    value.payload === undefined ||
+    hasValidEventPayload(value.type, value.payload)
+  );
 }
 
 function isKnownAction(value: unknown): boolean {
@@ -548,15 +570,17 @@ function hasValidStackFrame(value: unknown): boolean {
       triggerOrderingGroup.resolvedTriggerIds.some(
         (id) => typeof id !== "string"
       ))
-  ) return false;
+  )
+    return false;
   return (
     Array.isArray(value.accumulatedEvents) &&
     value.accumulatedEvents.every(isKnownPendingEvent) &&
     (value.eventActivationCompletion === undefined ||
       (value.phase === "INTERRUPTED_BY_TRIGGERS" &&
-       isKnownPendingEvent(value.eventActivationCompletion) &&
-       (value.eventActivationCompletion.type === "EVENT_ACTIVATED_FROM_HAND" ||
-        value.eventActivationCompletion.type === "EVENT_MAIN_RESOLVED_FROM_TRASH")))
+        isKnownPendingEvent(value.eventActivationCompletion) &&
+        (value.eventActivationCompletion.type === "EVENT_ACTIVATED_FROM_HAND" ||
+          value.eventActivationCompletion.type ===
+            "EVENT_MAIN_RESOLVED_FROM_TRASH")))
   );
 }
 
@@ -576,9 +600,11 @@ function hasValidPrompt(value: unknown): boolean {
           !isRecord(choice) ||
           typeof choice.id !== "string" ||
           typeof choice.label !== "string" ||
-          (choice.disabled !== undefined && typeof choice.disabled !== "boolean")
+          (choice.disabled !== undefined &&
+            typeof choice.disabled !== "boolean")
       ))
-  ) return false;
+  )
+    return false;
   const resume = value.resumeContext;
   if (!isRecord(resume)) return typeof resume === "string" || resume === null;
   if (
@@ -616,7 +642,9 @@ function hasValidPrompt(value: unknown): boolean {
         (isRecord(resume.causingSource) &&
           typeof resume.causingSource.instanceId === "string" &&
           typeof resume.causingSource.cardId === "string" &&
-          ["Leader", "Character", "Event", "Stage"].includes(String(resume.causingSource.cardType)))) &&
+          ["Leader", "Character", "Event", "Stage"].includes(
+            String(resume.causingSource.cardType)
+          ))) &&
       (resume.returnToDeckPosition === undefined ||
         resume.returnToDeckPosition === "TOP" ||
         resume.returnToDeckPosition === "BOTTOM")
@@ -643,7 +671,9 @@ function hasValidPrompt(value: unknown): boolean {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+  return (
+    Array.isArray(value) && value.every((entry) => typeof entry === "string")
+  );
 }
 
 function hasValidResultRefEntries(value: unknown): boolean {
@@ -671,15 +701,23 @@ function parseStoredGameState(raw: unknown, location: string): GameState {
   if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
   const coreError = validatePersistedGameStateCore(raw);
   if (coreError) {
-    throw new SessionLoadError(location, `has an invalid core shape at ${coreError}`);
+    throw new SessionLoadError(
+      location,
+      `has an invalid core shape at ${coreError}`
+    );
   }
   if (!hasValidPrompt(raw.pendingPrompt ?? null)) {
     throw new SessionLoadError(location, "has an invalid prompt continuation");
   }
-  if (raw.pendingEventActivationEvents !== undefined &&
-      (!Array.isArray(raw.pendingEventActivationEvents) ||
-       !raw.pendingEventActivationEvents.every(isKnownPendingEvent))) {
-    throw new SessionLoadError(location, "contains an invalid pending Event activation");
+  if (
+    raw.pendingEventActivationEvents !== undefined &&
+    (!Array.isArray(raw.pendingEventActivationEvents) ||
+      !raw.pendingEventActivationEvents.every(isKnownPendingEvent))
+  ) {
+    throw new SessionLoadError(
+      location,
+      "contains an invalid pending Event activation"
+    );
   }
   if (!Array.isArray(raw.eventLog) || !raw.eventLog.every(isKnownEvent)) {
     throw new SessionLoadError(location, "contains an unknown event variant");
@@ -690,13 +728,19 @@ function parseStoredGameState(raw: unknown, location: string): GameState {
       (entry) => isRecord(entry) && isKnownAction(entry.action)
     )
   ) {
-    throw new SessionLoadError(location, "contains an unknown scheduled action variant");
+    throw new SessionLoadError(
+      location,
+      "contains an unknown scheduled action variant"
+    );
   }
   if (
     !Array.isArray(raw.effectStack) ||
     !raw.effectStack.every(hasValidStackFrame)
   ) {
-    throw new SessionLoadError(location, "contains an invalid effect-stack action or event");
+    throw new SessionLoadError(
+      location,
+      "contains an invalid effect-stack action or event"
+    );
   }
   if (
     !Array.isArray(raw.triggerRegistry) ||
@@ -704,7 +748,10 @@ function parseStoredGameState(raw: unknown, location: string): GameState {
       (entry) => isRecord(entry) && hasValidEffectBlock(entry.effectBlock)
     )
   ) {
-    throw new SessionLoadError(location, "contains an invalid registered trigger");
+    throw new SessionLoadError(
+      location,
+      "contains an invalid registered trigger"
+    );
   }
   if (
     !Array.isArray(raw.activeEffects) ||
@@ -714,7 +761,10 @@ function parseStoredGameState(raw: unknown, location: string): GameState {
     !Array.isArray(raw.prohibitions) ||
     !raw.prohibitions.every(hasValidProhibition)
   ) {
-    throw new SessionLoadError(location, "contains an invalid runtime effect variant");
+    throw new SessionLoadError(
+      location,
+      "contains an invalid runtime effect variant"
+    );
   }
   if (isVersion4Lowering(raw)) validateVersion4EmbeddedPayloads(raw, location);
   // The durable snapshot root, event discriminants, and every persisted action
@@ -725,24 +775,41 @@ function parseStoredGameState(raw: unknown, location: string): GameState {
 /** Version 4 closes executable payload holes in embedded carriers. Earlier
  * versions retain their historical parser behavior; this is a reader contract,
  * not a migration that changes existing pending work. */
-function validateVersion4EmbeddedPayloads(raw: Record<string, unknown>, location: string): void {
+function validateVersion4EmbeddedPayloads(
+  raw: Record<string, unknown>,
+  location: string
+): void {
   const frames = raw.effectStack as Record<string, unknown>[];
-  const validQueue = (value: unknown): boolean => value === undefined ||
-    (Array.isArray(value) && value.every(trigger => isRecord(trigger) &&
-      hasValidEffectBlock(trigger.effectBlock) && isKnownPendingEvent(trigger.triggeringEvent)));
+  const validQueue = (value: unknown): boolean =>
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every(
+        (trigger) =>
+          isRecord(trigger) &&
+          hasValidEffectBlock(trigger.effectBlock) &&
+          isKnownPendingEvent(trigger.triggeringEvent)
+      ));
   frames.forEach((frame, index) => {
-    const overflow = isRecord(frame.ruleTrashForPlay) && isRecord(frame.ruleTrashForPlay.batch)
-      ? frame.ruleTrashForPlay.batch.queuedTriggers : undefined;
+    const overflow =
+      isRecord(frame.ruleTrashForPlay) && isRecord(frame.ruleTrashForPlay.batch)
+        ? frame.ruleTrashForPlay.batch.queuedTriggers
+        : undefined;
     const distribution = isRecord(frame.stateDistributionForPlay)
-      ? frame.stateDistributionForPlay.queuedTriggers : undefined;
+      ? frame.stateDistributionForPlay.queuedTriggers
+      : undefined;
     if (!validQueue(overflow) || !validQueue(distribution)) {
-      throw new SessionLoadError(location, `effectStack[${index}] contains an invalid embedded queued trigger action or event`);
+      throw new SessionLoadError(
+        location,
+        `effectStack[${index}] contains an invalid embedded queued trigger action or event`
+      );
     }
     const staged = frame.costTransactionState;
     if (!isRecord(staged)) return;
     const validators: Record<string, (entry: unknown) => boolean> = {
-      scheduledActions: entry => isRecord(entry) && isKnownAction(entry.action),
-      triggerRegistry: entry => isRecord(entry) && hasValidEffectBlock(entry.effectBlock),
+      scheduledActions: (entry) =>
+        isRecord(entry) && isKnownAction(entry.action),
+      triggerRegistry: (entry) =>
+        isRecord(entry) && hasValidEffectBlock(entry.effectBlock),
       activeEffects: hasValidActiveEffect,
       prohibitions: hasValidProhibition,
       oneTimeModifiers: hasValidOneTimeModifier,
@@ -750,7 +817,10 @@ function validateVersion4EmbeddedPayloads(raw: Record<string, unknown>, location
     for (const [key, valid] of Object.entries(validators)) {
       const entries = staged[key];
       if (!Array.isArray(entries) || !entries.every(valid)) {
-        throw new SessionLoadError(location, `effectStack[${index}].costTransactionState.${key} contains an unknown executable variant`);
+        throw new SessionLoadError(
+          location,
+          `effectStack[${index}].costTransactionState.${key} contains an unknown executable variant`
+        );
       }
     }
   });
@@ -765,14 +835,40 @@ function validateVersion4EmbeddedPayloads(raw: Record<string, unknown>, location
  * `location`; nothing is written and nothing is partially applied.
  * Contract: docs/game-engine/SAVED-STATE-COMPATIBILITY.md.
  */
-export function convertPersistedGameState(raw: unknown, location: string): GameState {
+/** Validate a native graph through the historical compatibility projection.
+ * Only the validation copy is lowered; the type predicate refines the original.
+ */
+function isValidNativeVersion4(
+  raw: unknown,
+  location: string
+): raw is GameState {
+  if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
+  const projected = convertToCurrentShape(
+    { ...raw, schemaVersion: 4 },
+    location
+  );
+  const validated = parseStoredGameState(projected, location);
+  validateContinuationReferences(validated, location);
+  return true;
+}
+
+export function convertPersistedGameState(
+  raw: unknown,
+  location: string
+): GameState {
+  if (isRecord(raw) && raw.schemaVersion === 4) {
+    const native = { ...raw };
+    delete native.schemaVersion;
+    if (isValidNativeVersion4(native, location)) {
+      const migrated = migrateLegacyTriggerRegistry(native);
+      logLegacyShapes(migrated, location);
+      return migrated;
+    }
+  }
   const converted = convertToCurrentShape(raw, location);
   const validated = parseStoredGameState(converted, location);
   validateContinuationReferences(validated, location);
-  for (const shape of version4LoweringNotes(converted)) {
-    log("session.legacy_shape", { gameId: validated.id, location, shape });
-  }
-  const migrated = migrateLegacyTriggerRegistry(validated);
+  const migrated = migrateLegacyTriggerRegistry(liftVersion3(validated));
   logLegacyShapes(migrated, location);
   return migrated;
 }
@@ -780,7 +876,7 @@ export function convertPersistedGameState(raw: unknown, location: string): GameS
 export function parseStoredSession(
   raw: unknown,
   separateCardDb?: unknown,
-  separateUndoHistory?: unknown,
+  separateUndoHistory?: unknown
 ): StoredSession {
   if (!isRecord(raw)) {
     throw new Error("Stored session must be an object");
@@ -866,7 +962,7 @@ function parseEventHistorySummary(raw: unknown): EventHistorySummary {
   const byPlayer: [number, number] = [raw.byPlayer[0], raw.byPlayer[1]];
   const summarizedByType = Object.values(byType).reduce(
     (total, count) => total + (count ?? 0),
-    0,
+    0
   );
   if (
     summarizedByType !== raw.compactedEventCount ||
@@ -874,7 +970,7 @@ function parseEventHistorySummary(raw: unknown): EventHistorySummary {
     !hasValidSummaryTimestampRange(
       raw.compactedEventCount,
       raw.firstCompactedTimestamp,
-      raw.lastCompactedTimestamp,
+      raw.lastCompactedTimestamp
     )
   ) {
     throw new Error("Stored session historySummary is invalid");
@@ -892,7 +988,7 @@ function parseEventHistorySummary(raw: unknown): EventHistorySummary {
 function hasValidSummaryTimestampRange(
   count: number,
   first: number | null,
-  last: number | null,
+  last: number | null
 ): boolean {
   if (count === 0) return first === null && last === null;
   return first !== null && last !== null && first <= last;
@@ -907,7 +1003,9 @@ function isKnownEventType(value: string): value is GameEventType {
 }
 
 function isNullableFiniteNumber(value: unknown): value is number | null {
-  return value === null || (typeof value === "number" && Number.isFinite(value));
+  return (
+    value === null || (typeof value === "number" && Number.isFinite(value))
+  );
 }
 
 function isPriorityRollSequence(value: unknown): value is number[] | null {
@@ -930,7 +1028,10 @@ function isPriorityRollSequence(value: unknown): value is number[] | null {
  * snapshot it wrote; a lower counter (corrupt or hand-edited storage) is
  * raised and logged rather than allowed to collide later.
  */
-function restoreIdCounterInvariant(state: GameState, location: string): GameState {
+function restoreIdCounterInvariant(
+  state: GameState,
+  location: string
+): GameState {
   const restored = reconcileExecutionContextIdCounter(state);
   if (restored !== state) {
     log("session.id_counter_repaired", {
@@ -961,19 +1062,19 @@ function serializedByteLength(value: unknown): number {
 
 function assertWithinValueLimit(
   valueName: "session" | "cardDb" | "undoHistory",
-  bytes: number,
+  bytes: number
 ): void {
   if (bytes > SESSION_VALUE_HARD_LIMIT_BYTES) {
     throw new SessionPersistenceLimitError(
       valueName,
       bytes,
-      SESSION_VALUE_HARD_LIMIT_BYTES,
+      SESSION_VALUE_HARD_LIMIT_BYTES
     );
   }
 }
 
 function cloneHistorySummary(
-  summary: EventHistorySummary,
+  summary: EventHistorySummary
 ): EventHistorySummary {
   return {
     ...summary,

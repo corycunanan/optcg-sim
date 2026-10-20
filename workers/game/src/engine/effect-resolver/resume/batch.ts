@@ -153,7 +153,7 @@ export function reenterBatchResume(
         pendingTriggers: [],
         simultaneousTriggers: [],
         accumulatedEvents: events,
-        ruleTrashForPlay: context.ruleTrashForPlay,
+        playOverflow: context.ruleTrashForPlay,
         stateDistributionForPlay: context.stateDistributionForPlay,
       };
       nextState = pushFrame(generated.state, promptFrame);
