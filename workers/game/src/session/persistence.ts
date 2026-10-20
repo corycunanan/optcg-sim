@@ -1,3 +1,4 @@
+import { isVersion4Lowering, version4LoweringNotes } from "./version4-reader.js";
 import type {
   CardData,
   GameEventType,
@@ -715,9 +716,44 @@ function parseStoredGameState(raw: unknown, location: string): GameState {
   ) {
     throw new SessionLoadError(location, "contains an invalid runtime effect variant");
   }
+  if (isVersion4Lowering(raw)) validateVersion4EmbeddedPayloads(raw, location);
   // The durable snapshot root, event discriminants, and every persisted action
   // carrier have now been checked. Internal code only receives this refined type.
   return raw as unknown as GameState;
+}
+
+/** Version 4 closes executable payload holes in embedded carriers. Earlier
+ * versions retain their historical parser behavior; this is a reader contract,
+ * not a migration that changes existing pending work. */
+function validateVersion4EmbeddedPayloads(raw: Record<string, unknown>, location: string): void {
+  const frames = raw.effectStack as Record<string, unknown>[];
+  const validQueue = (value: unknown): boolean => value === undefined ||
+    (Array.isArray(value) && value.every(trigger => isRecord(trigger) &&
+      hasValidEffectBlock(trigger.effectBlock) && isKnownPendingEvent(trigger.triggeringEvent)));
+  frames.forEach((frame, index) => {
+    const overflow = isRecord(frame.ruleTrashForPlay) && isRecord(frame.ruleTrashForPlay.batch)
+      ? frame.ruleTrashForPlay.batch.queuedTriggers : undefined;
+    const distribution = isRecord(frame.stateDistributionForPlay)
+      ? frame.stateDistributionForPlay.queuedTriggers : undefined;
+    if (!validQueue(overflow) || !validQueue(distribution)) {
+      throw new SessionLoadError(location, `effectStack[${index}] contains an invalid embedded queued trigger action or event`);
+    }
+    const staged = frame.costTransactionState;
+    if (!isRecord(staged)) return;
+    const validators: Record<string, (entry: unknown) => boolean> = {
+      scheduledActions: entry => isRecord(entry) && isKnownAction(entry.action),
+      triggerRegistry: entry => isRecord(entry) && hasValidEffectBlock(entry.effectBlock),
+      activeEffects: hasValidActiveEffect,
+      prohibitions: hasValidProhibition,
+      oneTimeModifiers: hasValidOneTimeModifier,
+    };
+    for (const [key, valid] of Object.entries(validators)) {
+      const entries = staged[key];
+      if (!Array.isArray(entries) || !entries.every(valid)) {
+        throw new SessionLoadError(location, `effectStack[${index}].costTransactionState.${key} contains an unknown executable variant`);
+      }
+    }
+  });
 }
 
 /**
@@ -733,6 +769,9 @@ export function convertPersistedGameState(raw: unknown, location: string): GameS
   const converted = convertToCurrentShape(raw, location);
   const validated = parseStoredGameState(converted, location);
   validateContinuationReferences(validated, location);
+  for (const shape of version4LoweringNotes(converted)) {
+    log("session.legacy_shape", { gameId: validated.id, location, shape });
+  }
   const migrated = migrateLegacyTriggerRegistry(validated);
   logLegacyShapes(migrated, location);
   return migrated;
