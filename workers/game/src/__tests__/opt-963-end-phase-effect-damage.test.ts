@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { frameKindOf } from "../engine/frame-kinds.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { SessionRepository } from "../session/persistence.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { endPhaseRig, synSchema } from "./opt-962-rig.js";
@@ -62,12 +63,12 @@ describe("OPT-963: effect damage inside an End Phase wave parks beneath the PHAS
     // The repository stamps the stored prompt with an id (one allocation); everything else is identical.
     const comparable = (state: typeof r.state) =>
       JSON.parse(JSON.stringify({
-        ...state,
+        ...toPersistedGameState(state),
         executionContext: { ...state.executionContext, idCounter: 0 },
         pendingPrompt: state.pendingPrompt ? { ...state.pendingPrompt, promptId: undefined } : null,
       }));
     expect(comparable(loaded.state)).toEqual(comparable(r.state));
-    expect(loaded.state.effectStack).toEqual(r.state.effectStack);
+    expect(toPersistedGameState(loaded.state).effectStack).toEqual(toPersistedGameState(r.state).effectStack);
     r.state = loaded.state;
 
     r.act({ type: "REVEAL_TRIGGER", reveal: false });

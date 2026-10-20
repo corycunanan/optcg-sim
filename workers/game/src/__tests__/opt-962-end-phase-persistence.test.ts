@@ -34,7 +34,7 @@ async function roundTrip(r: EndPhaseRig): Promise<void> {
   const repo = new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" });
   await repo.save({ state: r.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [] });
   const written = storage.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-  expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+  expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
   r.state = (await new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" }).load())!.state;
 }
 
@@ -118,12 +118,12 @@ describe("OPT-962 End Phase: continuous, reloaded and undo paths agree", () => {
     const storage = new MemorySessionStorage();
     const repo = new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" });
     await repo.save({ state: attached.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: attached.undoHistory });
-    // Both persisted objects are version 3 (the OPT-963 writer), not v1 bytes.
+    // Both persisted objects are version 4 (the OPT-964 writer), not v1 bytes.
     const stored = storage.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(stored.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    expect(stored.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
     const storedUndo = storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Array<Record<string, unknown>>;
     expect(storedUndo).toHaveLength(1);
-    expect(storedUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(3);
+    expect(storedUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
     const loaded = (await new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" }).load())!;
     expect(loaded.undoHistory).toHaveLength(1);
     const undone = coordinator.executeAction(loaded.state, loaded.undoHistory, 0, { type: "UNDO" }, r.db);

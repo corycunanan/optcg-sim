@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 /**
  * OPT-799 — action-level optional ("Then, you may…") through the real action
  * pipeline with the registered authored schemas.
@@ -139,7 +140,7 @@ function fixture() {
     persist() {
       state = parseStoredSession(
         JSON.parse(
-          JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+          JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })
         )
       ).state;
     },

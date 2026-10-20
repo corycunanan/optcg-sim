@@ -47,7 +47,13 @@ export function executeRedirectAttack(
     needsPlayerTargetSelection(action.target, allValidIds)
   ) {
     return buildSelectTargetPrompt(
-      state,
+      {
+        ...state,
+        turn: {
+          ...state.turn,
+          battle: { ...state.turn.battle, redirectWindow: true },
+        },
+      },
       action,
       allValidIds,
       sourceCardInstanceId,
@@ -57,10 +63,26 @@ export function executeRedirectAttack(
     );
   }
   const targetIds = autoSelectTargets(action.target, allValidIds);
-  if (targetIds.length === 0) return { state, events, succeeded: false };
+  if (targetIds.length === 0)
+    return {
+      state: {
+        ...state,
+        turn: {
+          ...state.turn,
+          battle: { ...state.turn.battle, redirectWindow: false },
+        },
+      },
+      events,
+      succeeded: false,
+    };
 
   const newTarget = targetIds[0];
-  const newBattle = { ...state.turn.battle, targetInstanceId: newTarget };
+  const newBattle = {
+    ...state.turn.battle,
+    targetInstanceId: newTarget,
+    redirectWindow: false,
+    targetLocked: true,
+  };
   const newTurn = { ...state.turn, battle: newBattle };
 
   events.push({

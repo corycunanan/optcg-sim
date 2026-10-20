@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 /**
  * OPT-869 — GIVE_DON (action and cost) honors CANNOT_ATTACH_DON.
  *
@@ -110,7 +111,7 @@ function fixture() {
       respond({ type: "SELECT_TARGET", selectedInstanceIds: ids }, rejected),
     persist() {
       state = parseStoredSession(
-        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
+        JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })),
       ).state;
     },
     get state() {

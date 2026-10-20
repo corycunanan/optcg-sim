@@ -1380,7 +1380,21 @@ export function handleAwaitingCostSelection(
         events.push({
           type: "CARD_STATE_CHANGED",
           playerIndex: controller,
-          payload: { targetInstanceId: id, newState: "RESTED", cause: "EFFECT_COST", causingController: controller, causingSource: effectSourceIdentity(state, sourceCardInstanceId, cardDb, accumulatedCostRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot) },
+          payload: {
+            targetInstanceId: id,
+            newState: "RESTED",
+            cause: "EFFECT_COST",
+            causingController: controller,
+            causingSource: effectSourceIdentity(
+              state,
+              sourceCardInstanceId,
+              cardDb,
+              accumulatedCostRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)
+                ?.sourceIdentity ??
+                accumulatedCostRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)
+                  ?.sourceCardSnapshot
+            ),
+          },
         });
       }
     }

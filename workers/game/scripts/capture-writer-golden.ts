@@ -1,7 +1,7 @@
 /**
  * Capture the persistence writer's exact output for the OPT-940 synthetic
- * states into src/__tests__/fixtures/opt-963-writer-golden.synthetic.json
- * (the current, version 3 writer; OPT-963). Set GOLDEN_OUTPUT to write
+ * states into src/__tests__/fixtures/opt-964-writer-golden.synthetic.json
+ * (the current, version 4 writer; OPT-964). Set GOLDEN_OUTPUT to write
  * elsewhere. opt-940-writer-golden.synthetic.json (version 1, base writer
  * 03071b69) and opt-962-writer-golden.synthetic.json (version 2, OPT-924)
  * are frozen reader inputs; never re-capture them with a newer writer.
@@ -37,7 +37,8 @@ import {
 
 const outputPath = resolve(
   process.cwd(),
-  process.env.GOLDEN_OUTPUT ?? "src/__tests__/fixtures/opt-963-writer-golden.synthetic.json"
+  process.env.GOLDEN_OUTPUT ??
+    "src/__tests__/fixtures/opt-964-writer-golden.synthetic.json"
 );
 
 async function main(): Promise<void> {

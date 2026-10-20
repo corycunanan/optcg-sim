@@ -85,6 +85,12 @@ export function scanEventsForTriggers(
     for (const match of ordered) {
       triggers.push({
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
+        sourceSnapshot: queuedSourceSnapshot(
+          nextState,
+          match.trigger.sourceCardInstanceId,
+          match.trigger.controller,
+          match.effectBlock.id
+        ),
         ...(groupSourceInstanceId ? { groupSourceInstanceId } : {}),
         controller: match.trigger.controller,
         effectBlock: match.effectBlock,
@@ -243,4 +249,10 @@ export function withStableOrderingIds(triggers: QueuedTrigger[]): QueuedTrigger[
       orderingId: `${pair}:${occurrence}`,
     };
   });
+}
+
+/** Identity only; zone transitions allocate a new instance ID. */
+export function queuedSourceSnapshot(state: GameState, sourceId: string, controller: 0 | 1, effectBlockId: string): import("../types.js").QueuedSourceSnapshot | undefined {
+  const source = findCardInstance(state, sourceId);
+  return source ? { instanceId: sourceId, cardId: source.cardId, controller, effectBlockId } : undefined;
 }

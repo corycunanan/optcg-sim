@@ -71,3 +71,9 @@ export function getSyntheticStates(): SyntheticSessionState[] {
   syntheticStates ??= buildSyntheticSessionStates();
   return syntheticStates;
 }
+
+let v4WriterGolden: GoldenFixture | undefined;
+export function loadV4WriterGolden(): GoldenFixture {
+  v4WriterGolden ??= JSON.parse(readFileSync(resolve(__dirname, "opt-964-writer-golden.synthetic.json"), "utf8")) as GoldenFixture;
+  return v4WriterGolden;
+}

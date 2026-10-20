@@ -19,7 +19,11 @@ import {
 } from "./triggers.js";
 import { resolveEffect } from "./effect-resolver/index.js";
 import { findCardInstance } from "./state.js";
-import { scanEventsForTriggers, buildTriggerSelectionPrompt } from "./trigger-ordering.js";
+import {
+  scanEventsForTriggers,
+  buildTriggerSelectionPrompt,
+  queuedSourceSnapshot,
+} from "./trigger-ordering.js";
 import { takeEngineTimestamp } from "./execution-context.js";
 
 // ─── Step 5: Fire Events & Triggers ───────────────────────────────────────────
@@ -71,6 +75,12 @@ export function fireEventsAndTriggers(
     for (const match of ordered) {
       triggerQueue.push({
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
+        sourceSnapshot: queuedSourceSnapshot(
+          state,
+          match.trigger.sourceCardInstanceId,
+          match.trigger.controller,
+          match.effectBlock.id
+        ),
         controller: match.trigger.controller,
         effectBlock: match.effectBlock,
         triggeringEvent: pendingEvent,
@@ -149,6 +159,7 @@ function processTriggerQueuePipeline(
       getEventCardInstanceId(next.triggeringEvent) ?? null,
       undefined,
       next.triggeringEvent,
+      next.sourceSnapshot
     );
     nextState = result.state;
     if (isGameTerminated(nextState)) {

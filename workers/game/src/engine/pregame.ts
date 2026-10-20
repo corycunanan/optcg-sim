@@ -1,3 +1,4 @@
+import { continuationBoundary, prependFrame } from "./effect-stack.js";
 /**
  * OPT-366: Pre-game state machine.
  *
@@ -315,7 +316,26 @@ function advanceStartOfGameEffects(
     // A prompt stops this loop. findStartOfGameEffectRuleCountViolations
     // rejects later rules because no continuation metadata resumes them.
     if (result.pendingPrompt) {
-      return { ...nextState, pendingPrompt: result.pendingPrompt };
+      const child = nextState.effectStack[0];
+      if (!child)
+        throw new Error("Start-of-game prompt must have a child effect frame");
+      const boundary = continuationBoundary(
+        nextState,
+        leader.instanceId,
+        controller
+      );
+      const owned = prependFrame(boundary.state, {
+        ...boundary.frame,
+        kind: "PREGAME",
+        pregameContinuation: {
+          phase: "START_OF_GAME_FX",
+          effectFrameId: child.id,
+          controller,
+        },
+      });
+      return owned.status === "IN_PROGRESS"
+        ? { ...owned, pendingPrompt: result.pendingPrompt }
+        : owned;
     }
   }
   return nextState;

@@ -1,3 +1,4 @@
+import { liftVersion3 } from "../../session/version4-lift.js";
 /**
  * OPT-940 synthetic session states.
  *
@@ -711,5 +712,5 @@ export function buildSyntheticSessionStates(): SyntheticSessionState[] {
       ),
     },
   ];
-  return states;
+  return states.map(entry => ({ ...entry, snapshot: { ...entry.snapshot, state: liftVersion3(entry.snapshot.state), undoHistory: entry.snapshot.undoHistory.map(liftVersion3) } }));
 }

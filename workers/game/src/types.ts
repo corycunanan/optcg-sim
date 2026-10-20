@@ -387,7 +387,21 @@ export type BatchResumeMarker =
 
 // ─── Typed Effect Stack (worker-side, casts shared unknown fields) ────────────
 
+export interface EventActivationDebt {
+  publication: "AFTER_STACK" | "AFTER_EFFECT";
+  sourceZone: "HAND" | "TRASH";
+  sourceClass: "EVENT";
+  events: PendingEvent[];
+}
 export interface EffectStackFrame {
+  eventActivation?: EventActivationDebt;
+  playOverflow?: EffectStackFrame["ruleTrashForPlay"];
+  pregameContinuation?: {
+    phase: "START_OF_GAME_FX";
+    effectFrameId: string;
+    controller: 0 | 1;
+  };
+
   /**
    * OPT-940 frame-kind contract (docs/game-engine/SAVED-STATE-COMPATIBILITY.md
    * §2). Names the family of paused work; `phase` still names what the frame
@@ -502,7 +516,15 @@ export interface EffectStackFrame {
   namedPlayCostTargetId?: string;
 }
 
+export interface QueuedSourceSnapshot {
+  instanceId: string;
+  cardId: string;
+  controller: 0 | 1;
+  effectBlockId: string;
+}
+
 export interface QueuedTrigger {
+  sourceSnapshot?: QueuedSourceSnapshot;
   sourceCardInstanceId: string;
   orderingId?: string;
   groupSourceInstanceId?: string;

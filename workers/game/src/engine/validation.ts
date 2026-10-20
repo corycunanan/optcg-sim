@@ -225,7 +225,8 @@ function validateDeclareBlocker(
   if (state.turn.battleSubPhase !== "BLOCK_STEP") return "Blocker can only be declared during Block Step";
 
   // §7-1-2-1: Only one Blocker can be declared per battle
-  if (state.turn.battle?.blockerActivated) return "Only one Blocker can be declared per battle (§7-1-2-1)";
+  if (state.turn.battle?.blockerActivated || state.turn.battle?.blockerLocked)
+    return "Only one Blocker can be declared per battle (§7-1-2-1)";
 
   const inactiveIdx = state.turn.activePlayerIndex === 0 ? 1 : 0;
   const found = findCardInState(state, blockerInstanceId);

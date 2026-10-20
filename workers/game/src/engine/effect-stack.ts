@@ -72,3 +72,19 @@ export function updateTopFrame(
 export function generateFrameId(state: GameState): { state: GameState; id: string } {
   return allocateEngineId(state, "ef");
 }
+
+/** Empty lifecycle boundary; never owns executable actions or prompt identity. */
+export function continuationBoundary(state: GameState, sourceCardInstanceId: string, controller: 0 | 1): { state: GameState; frame: EffectStackFrame } {
+  const allocated = generateFrameId(state);
+  return { state: allocated.state, frame: { id: allocated.id, sourceCardInstanceId, controller,
+    effectBlock: CONTINUATION_EFFECT_BLOCK, phase: "INTERRUPTED_BY_TRIGGERS", pausedAction: null,
+    remainingActions: [], resultRefs: [], validTargets: [], costs: [], currentCostIndex: 0,
+    costsPaid: true, oncePerTurnMarked: true, costResultRefs: [], pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: [] } };
+}
+
+/** A root lifecycle barrier still counts against the stack's safety bound. */
+export function prependFrame(state: GameState, frame: EffectStackFrame): GameState {
+  const pushed = pushFrame(state, frame);
+  if (pushed.status !== "IN_PROGRESS") return pushed;
+  return { ...pushed, effectStack: [frame, ...pushed.effectStack.slice(0, -1)] };
+}

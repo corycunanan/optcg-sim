@@ -187,6 +187,28 @@ export function lowerVersion4(raw: Raw, fail: Fail): LoweredVersion4 {
   const removedIds = new Set<string>();
   const effectStack: Raw[] = [];
   state.effectStack.forEach((frame, index) => {
+    // Newly activated identity refs are strict too. Historical full-card refs
+    // keep their old representation; no dynamic characteristics enter this one.
+    const refCarriers: unknown[] = [frame.resultRefs, frame.costResultRefs];
+    if (
+      frame.simultaneousGroup &&
+      typeof frame.simultaneousGroup === "object" &&
+      "resultRefs" in frame.simultaneousGroup
+    )
+      refCarriers.push(frame.simultaneousGroup.resultRefs);
+    for (const carrier of refCarriers) {
+      if (!Array.isArray(carrier)) continue;
+      for (const entry of carrier) {
+        const value = Array.isArray(entry) ? entry[1] : undefined;
+        if (
+          value &&
+          typeof value === "object" &&
+          "sourceIdentity" in value &&
+          !Snapshot.safeParse(value.sourceIdentity).success
+        )
+          fail(`effectStack[${index}] has invalid activated sourceIdentity`);
+      }
+    }
     const { eventActivation, playOverflow, pregameContinuation, ...rest } =
       frame;
     const owners = [

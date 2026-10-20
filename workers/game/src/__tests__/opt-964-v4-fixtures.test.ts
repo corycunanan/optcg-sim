@@ -1,46 +1,30 @@
-/** Synthetic future v4 fixtures exercised through the production session parser. */
+/** Native v4 contract fixtures exercised through the production session parser. */
 import { describe, expect, it } from "vitest";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   parseStoredSession,
   convertPersistedGameState,
 } from "../session/persistence.js";
-import {
-  frameKindOf,
-  toPersistedGameState,
-} from "../session/game-state-schema.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { CONTINUATION_EFFECT_BLOCK } from "../engine/effect-stack.js";
 import { goldenV2Raw } from "./fixtures/opt-963-v3-states.js";
 import type { GameState, CardInstance } from "../types.js";
 import {
   CARDS,
-  createTestPayload,
   createTestCardDb,
   createBattleReadyState,
   padChars,
 } from "./helpers.js";
-import { prepareDecksAndLeaders } from "../engine/setup.js";
-import { advancePregame, startPregame } from "../engine/pregame.js";
 import { executeActionChain } from "../engine/effect-resolver/resolver.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
-import { resumeFromStack } from "../engine/effect-resolver/resume.js";
-// Intentional mutable JSON allows malformed fixtures outside runtime v3 types.
+// Intentional mutable JSON allows malformed fixtures outside runtime types.
 type Json = Record<string, any>;
-function future(runtime?: GameState): Json {
+function native(runtime?: GameState): Json {
   const state =
     runtime ??
     convertPersistedGameState(goldenV2Raw("battle-ready-with-undo"), "state");
   const raw = JSON.parse(JSON.stringify(toPersistedGameState(state)));
-  raw.schemaVersion = 4;
-  raw.effectStack.forEach((f: Json) => {
-    f.kind = frameKindOf(f as any);
-  });
-  if (raw.turn.battle)
-    Object.assign(raw.turn.battle, {
-      step: raw.turn.battleSubPhase,
-      redirectWindow: false,
-      blockerLocked: !!raw.turn.battle.blockerActivated,
-      targetLocked: false,
-    });
   return raw;
 }
 function frame(id = "v4-owner"): Json {
@@ -76,7 +60,7 @@ function event(zone = "HAND"): Json {
   };
 }
 function activation(publication = "AFTER_STACK", sourceZone = "HAND"): Json {
-  const raw = future();
+  const raw = native();
   raw.effectStack = [
     {
       ...frame(),
@@ -93,7 +77,7 @@ function activation(publication = "AFTER_STACK", sourceZone = "HAND"): Json {
   return raw;
 }
 function overflow(): Json {
-  const raw = future();
+  const raw = native();
   raw.effectStack = [
     {
       ...frame(),
@@ -165,7 +149,7 @@ function pregame(): Json {
 const locations = ["state", "undoHistory[0]"] as const;
 function read(raw: Json, location: (typeof locations)[number]) {
   const parsed = parseStoredSession({
-    state: location === "state" ? raw : future(),
+    state: location === "state" ? raw : native(),
     undoHistory: location === "state" ? [] : [raw],
     cardDb: {},
   });
@@ -179,24 +163,12 @@ const kinds = [
   ["PREGAME", pregame],
 ] as const;
 describe.each(locations)("OPT-964 session fixtures %s", (location) => {
-  it.each(kinds)("lowers %s and writes v3", (_name, build) => {
+  it.each(kinds)("preserves native %s and writes v4", (_name, build) => {
     const raw = build(),
       loaded = read(raw, location);
-    expect((toPersistedGameState(loaded) as any).schemaVersion).toBe(3);
-    if (raw.effectStack[0].playOverflow)
-      expect(loaded.effectStack[0].ruleTrashForPlay).toEqual(
-        raw.effectStack[0].playOverflow
-      );
-    if (raw.effectStack[0].eventActivation?.publication === "AFTER_EFFECT")
-      expect(loaded.effectStack[0].eventActivationCompletion).toEqual(
-        raw.effectStack[0].eventActivation.events[0]
-      );
-    if (raw.effectStack[0].eventActivation?.publication === "AFTER_STACK")
-      expect(loaded.pendingEventActivationEvents).toEqual(
-        raw.effectStack[0].eventActivation.events
-      );
-    if (raw.effectStack[0].pregameContinuation)
-      expect(loaded.effectStack.map((f) => f.id)).toEqual(["v4-child"]);
+    expect(toPersistedGameState(loaded)).toMatchObject({ schemaVersion: 4 });
+    expect(loaded.effectStack).toEqual(raw.effectStack);
+    expect(toPersistedGameState(loaded).effectStack).toEqual(raw.effectStack);
   });
   it.each(kinds)(
     "rejects missing kind/unknown frame field on %s",
@@ -367,7 +339,7 @@ describe.each(locations)("OPT-964 session fixtures %s", (location) => {
     mutate(raw);
     expect(() => read(raw, location)).toThrow();
   });
-  it("rejects a removed wrapper sharing its ID with a nonprompted frame", () => {
+  it("rejects a continuation boundary sharing its ID with a nonprompted frame", () => {
     const raw = activation();
     raw.effectStack.push(frame(raw.effectStack[0].id));
     expect(raw.pendingPrompt).toBeNull();
@@ -381,7 +353,7 @@ describe.each(locations)("OPT-964 session fixtures %s", (location) => {
       payload: { cardInstanceId: "prefix" },
     };
     raw.effectStack[0].eventActivation.events.unshift(prefix);
-    expect(read(raw, location).pendingEventActivationEvents).toEqual([
+    expect(read(raw, location).effectStack[0].eventActivation?.events).toEqual([
       prefix,
       event(),
     ]);
@@ -398,7 +370,7 @@ describe.each(locations)("OPT-964 session fixtures %s", (location) => {
     expect(() => read(raw, location)).toThrow();
   });
   it("preserves strict ledgers and scheduled action target bindings", () => {
-    const raw = future();
+    const raw = native();
     Object.assign(raw.turn, {
       oncePerTurnUsed: { source: ["effect"] },
       triggerStagingInstanceIds: ["staged"],
@@ -438,7 +410,7 @@ describe.each(locations)("OPT-964 session fixtures %s", (location) => {
   });
 });
 function queued(owner: string): { raw: Json; queued: Json } {
-  const raw = owner === "overflow.batch" ? overflow() : future();
+  const raw = owner === "overflow.batch" ? overflow() : native();
   if (owner !== "overflow.batch") {
     raw.effectStack = [frame()];
     raw.pendingPrompt = null;
@@ -480,9 +452,9 @@ const queues = [
   "stateDistributionForPlay",
 ];
 describe.each(locations)("OPT-964 snapshot matrix %s", (location) => {
-  it.each(queues)("lowers optional identity snapshot in %s", (owner) => {
+  it.each(queues)("preserves optional identity snapshot in %s", (owner) => {
     const { raw, queued: q } = queued(owner);
-    expect(JSON.stringify(read(raw, location))).not.toContain("sourceSnapshot");
+    expect(read(raw, location).effectStack).toEqual(raw.effectStack);
     delete q.sourceSnapshot;
     expect(() => read(raw, location)).not.toThrow();
   });
@@ -522,9 +494,10 @@ describe.each(locations)("OPT-964 snapshot matrix %s", (location) => {
     }
   );
   it("requires battle bookkeeping, mirrored step, and activated blocker lock", () => {
-    const raw = future(
+    const raw = native(
       convertPersistedGameState(goldenV2Raw("battle-trigger-window"), "state")
     );
+    expect(read(raw, location).turn.battle).toEqual(raw.turn.battle);
     expect(() => read(raw, location)).not.toThrow();
     for (const field of [
       "step",
@@ -545,74 +518,8 @@ describe.each(locations)("OPT-964 snapshot matrix %s", (location) => {
     expect(() => read(unlocked, location)).toThrow();
   });
 });
-it("reloads real Imu pregame live/undo and resumes into opening hands", () => {
-  const payload = createTestPayload();
-  payload.pregameMode = "HOST_FIRST";
-  const imu = {
-    ...CARDS.LEADER,
-    id: "OP13-079",
-    name: "Imu",
-    types: ["The Five Elders"],
-    effectText:
-      "Under the rules of this game, you cannot include Events with a cost of 2 or more in your deck and at the start of the game, play up to 1 {Mary Geoise} type Stage card from your deck.",
-  };
-  const mary = {
-    ...CARDS.STAGE,
-    id: "OP05-097",
-    name: "Mary Geoise",
-    types: ["Mary Geoise"],
-  };
-  payload.player1.leader = { cardId: imu.id, quantity: 1, cardData: imu };
-  payload.player1.deck = payload.player1.deck.map((entry) =>
-    entry.cardId === CARDS.STAGE.id
-      ? { cardId: mary.id, quantity: entry.quantity, cardData: mary }
-      : entry
-  );
-  const prepared = prepareDecksAndLeaders(payload),
-    prompted = advancePregame(
-      startPregame(prepared.state, "HOST_FIRST"),
-      prepared.cardDb,
-      []
-    ).state;
-  expect(prompted.pendingPrompt?.options.promptType).toBe("ARRANGE_TOP_CARDS");
-  const raw = future(prompted);
-  raw.effectStack.unshift({
-    ...frame(),
-    sourceCardInstanceId: prompted.players[0].leader.instanceId,
-    kind: "PREGAME",
-    pregameContinuation: {
-      phase: "START_OF_GAME_FX",
-      effectFrameId: raw.effectStack[0].id,
-      controller: 0,
-    },
-  });
-  for (const location of locations) {
-    const loaded = read(raw, location),
-      prompt = loaded.pendingPrompt!;
-    if (prompt.options.promptType !== "ARRANGE_TOP_CARDS")
-      throw new Error("Expected search");
-    const ids = prompt.options.cards.map((card) => card.instanceId),
-      resumed = resumeFromStack(
-        { ...loaded, pendingPrompt: null },
-        {
-          type: "ARRANGE_TOP_CARDS",
-          keptCardInstanceId: ids[0],
-          orderedInstanceIds: ids.slice(1),
-          destination: "bottom",
-        },
-        prepared.cardDb
-      );
-    expect(resumed.state.players[0].stage?.cardId).toBe(mary.id);
-    const dealt = advancePregame(
-      { ...resumed.state, pendingPrompt: resumed.pendingPrompt ?? null },
-      prepared.cardDb,
-      []
-    ).state;
-    expect(dealt.pregame?.phase).toBe("MULLIGAN_DECISIONS");
-    expect(dealt.players[0].hand).toHaveLength(5);
-    expect(dealt.players[1].hand).toHaveLength(5);
-  }
-});
+// Real Imu session reload, exact shuffle/RNG use, and opening-hand order are
+// covered in opt-964-pregame-shuffle.test.ts for live and undo state.
 
 it("reloads real mid-batch overflow live/undo and resumes the rule-trash pipeline", () => {
   const db = createTestCardDb(),
@@ -656,15 +563,30 @@ it("reloads real mid-batch overflow live/undo and resumes the rule-trash pipelin
     ])
   );
   expect(started.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-  const raw = future({
+  const paused = {
     ...started.state,
     pendingPrompt: started.pendingPrompt ?? null,
-  });
-  const owner = raw.effectStack.find((f: Json) => f.ruleTrashForPlay);
-  expect(owner.ruleTrashForPlay.batch.playedSoFar).toHaveLength(1);
-  owner.kind = "PLAY_OVERFLOW";
-  owner.playOverflow = owner.ruleTrashForPlay;
-  delete owner.ruleTrashForPlay;
+  };
+  const raw = JSON.parse(JSON.stringify(toPersistedGameState(paused)));
+  const owner = raw.effectStack.find((f: Json) => f.playOverflow);
+  expect(owner.kind).toBe("PLAY_OVERFLOW");
+  expect(owner.playOverflow.batch.playedSoFar).toHaveLength(1);
+  const corpusDir = process.env.OPT964_CORPUS_DIR;
+  if (corpusDir) {
+    mkdirSync(corpusDir, { recursive: true });
+    writeFileSync(
+      join(corpusDir, "play-overflow-mid-batch.json"),
+      JSON.stringify(
+        {
+          state: toPersistedGameState(paused),
+          undoHistory: [toPersistedGameState(paused)],
+          cardDb: Object.fromEntries(db),
+        },
+        null,
+        2
+      )
+    );
+  }
   for (const location of locations) {
     const loaded = read(raw, location);
     const result = resumePromptLifecycle(
@@ -717,7 +639,7 @@ it.each([
   "triggerRegistry",
 ])("rejects unknown executable variants in staged %s", (carrier) => {
   for (const location of locations) {
-    const raw = future();
+    const raw = native();
     const staged = Object.fromEntries(
       [
         "players",
@@ -779,7 +701,7 @@ it.each(
   }
 );
 
-// A finished snapshot must not revive work when its v4 owners are lowered.
+// A finished snapshot must not retain runnable v4 continuation owners.
 describe.each(locations)("v4 continuation safety at %s", (location) => {
   it.each(kinds)("rejects finished state retaining %s", (_name, make) => {
     const raw = make();
@@ -791,8 +713,8 @@ describe.each(locations)("v4 continuation safety at %s", (location) => {
     );
   });
 
-  it("rejects an effect damage parent owned by a removed activation boundary", () => {
-    const damageState = future(
+  it("rejects an effect damage parent owned by a non-executable activation boundary", () => {
+    const damageState = native(
       convertPersistedGameState(
         goldenV2Raw("effect-damage-trigger-window"),
         "state"
@@ -807,9 +729,9 @@ describe.each(locations)("v4 continuation safety at %s", (location) => {
     expect(() => read(raw, location)).toThrow();
   });
 
-  it("lowers staged battle bookkeeping without changing the saved transaction", () => {
-    const raw = future();
-    const battleState = future(
+  it("preserves staged battle bookkeeping without changing the saved transaction", () => {
+    const raw = native();
+    const battleState = native(
       convertPersistedGameState(goldenV2Raw("battle-trigger-window"), "state")
     );
     const staged = Object.fromEntries(
@@ -830,19 +752,8 @@ describe.each(locations)("v4 continuation safety at %s", (location) => {
     });
     raw.effectStack = [{ ...frame(), costTransactionState: staged }];
     const before = structuredClone(raw);
-    const expectedTurn = structuredClone(staged.turn);
-    for (const key of [
-      "step",
-      "redirectWindow",
-      "blockerLocked",
-      "targetLocked",
-    ])
-      delete expectedTurn.battle[key];
     const loaded = read(raw, location);
-    expect(loaded.effectStack[0].costTransactionState).toEqual({
-      ...staged,
-      turn: expectedTurn,
-    });
+    expect(loaded.effectStack[0].costTransactionState).toEqual(staged);
     expect(loaded.turn).toEqual(raw.turn);
     expect(raw).toEqual(before);
   });

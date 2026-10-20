@@ -603,7 +603,8 @@ export function isProhibitedForCard(
     causingController: 0 | 1;
     sourceCardInstanceId?: string;
     sourceCardSnapshot?: CardInstance;
-  },
+    sourceIdentity?: import("../types.js").QueuedSourceSnapshot;
+  }
 ): boolean {
   const prohibitions = state.prohibitions;
 
@@ -617,17 +618,62 @@ export function isProhibitedForCard(
     if (prohibitionType === "CANNOT_BE_RESTED" && restEffectContext) {
       const target = findCardOnField(state, targetInstanceId);
       if (!target) continue;
-      if (!scopeControllerMatches(p.controller, target.controller, p.scope?.controller)) continue;
-      if (!causeMatches(p.scope?.cause ?? "ANY", { ...restEffectContext, cause: restEffectContext.cause ?? "EFFECT" }, target.controller)) continue;
+      if (
+        !scopeControllerMatches(
+          p.controller,
+          target.controller,
+          p.scope?.controller
+        )
+      )
+        continue;
+      if (
+        !causeMatches(
+          p.scope?.cause ?? "ANY",
+          { ...restEffectContext, cause: restEffectContext.cause ?? "EFFECT" },
+          target.controller
+        )
+      )
+        continue;
       if (p.scope?.source_filter) {
-        if (restEffectContext.cause === "COST" || !restEffectContext.sourceCardInstanceId) continue;
+        if (
+          restEffectContext.cause === "COST" ||
+          !restEffectContext.sourceCardInstanceId
+        )
+          continue;
         const snapshot = restEffectContext.sourceCardSnapshot;
-        const source = findCardInState(state, restEffectContext.sourceCardInstanceId)?.card ??
-          (snapshot?.instanceId === restEffectContext.sourceCardInstanceId ? snapshot : undefined);
-        if (!source || !matchesFilter(source, p.scope.source_filter, cardDb, state)) continue;
+        const source =
+          findCardInState(state, restEffectContext.sourceCardInstanceId)
+            ?.card ??
+          (snapshot?.instanceId === restEffectContext.sourceCardInstanceId
+            ? snapshot
+            : undefined);
+        if (source) {
+          if (!matchesFilter(source, p.scope.source_filter, cardDb, state))
+            continue;
+        } else {
+          // The authored departed-source protection (OP15-024) asks only for
+          // printed card class. Identity is sufficient; do not invent live
+          // power/cost/attached DON or revive a departed card for queries.
+          const identity = restEffectContext.sourceIdentity;
+          const filter = p.scope.source_filter;
+          const data =
+            identity?.instanceId === restEffectContext.sourceCardInstanceId
+              ? cardDb.get(identity.cardId)
+              : undefined;
+          const classes = Array.isArray(filter.card_type)
+            ? filter.card_type
+            : [filter.card_type];
+          if (
+            !data ||
+            Object.keys(filter).some((key) => key !== "card_type") ||
+            !classes.some(
+              (type) => type?.toUpperCase() === data.type.toUpperCase()
+            )
+          )
+            continue;
+        }
       }
     }
-
 
     // Check if this prohibition applies to the target
     if (p.appliesTo && p.appliesTo.length > 0) {
@@ -635,7 +681,16 @@ export function isProhibitedForCard(
     } else if (p.target) {
       // Dynamic population target (OPT-451)
       const card = findCardOnField(state, targetInstanceId);
-      if (card && prohibitionTargetMatchesCard(p.target, card, p.controller, state, cardDb)) {
+      if (
+        card &&
+        prohibitionTargetMatchesCard(
+          p.target,
+          card,
+          p.controller,
+          state,
+          cardDb
+        )
+      ) {
         return true;
       }
     }
