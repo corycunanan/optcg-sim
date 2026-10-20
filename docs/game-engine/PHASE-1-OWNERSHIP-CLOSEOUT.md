@@ -266,3 +266,35 @@ repointed to another executor. Live/undo regressions cover this disposition. Sup
 structural OPTIONAL_EFFECT inputs lift to the ordinary action-choice frame, including
 acceptance and the historical skip/PASS rejection. Modern optional offers keep their
 existing semantics.
+
+### Mandatory entry and synchronous queue contract
+
+The bounded mandatory probe found the same missing-owner-at-substitute-entry root:
+`checkReplacementForKO` executed a mandatory chain before its caller created the
+battle frame. Six synthetic mandatory K.O./rest cases failed before the fix. The
+battle caller now wraps only the existing replacement execution service to insert
+the same resolved battle owner before that first chain action. Optional/no-match
+paths do not allocate this extra ID. A prompted chain keeps it; synchronous completion
+consumes it once; terminal completion keeps the shared terminal cleanup contract.
+
+The synchronous regression also exposed an accumulator adapter boundary: `executePass`
+formerly used only the outer events array. It now forwards the actual damage result
+and its transient `queuedTriggers` to the existing pipeline's deferred-queue argument.
+`ExecuteResult.queuedTriggers` is an in-memory result, not new stored state. The two
+production pipeline entry points consume it: normal `execute` dispatch and
+`continuePipelineFromExecution` (defaulting to this queue unless the caller explicitly
+provides its merged queue). Prompt lifecycle's damage adapter already passes the same
+queue explicitly. `fireScheduledEventsAndTriggers` builds an event-only result and
+has no retained owner queue; terminal paths intentionally discard pending work.
+Inventory commands: `rg -n 'fireEventsAndTriggers\(' workers/game/src --glob
+'!**/__tests__/**'` and `rg -n 'executePass\(|continueBattleDamageFrame\('
+workers/game/src --glob '!**/__tests__/**'`.
+
+Twenty-four bounded cases cover optional/mandatory × K.O./SET_REST × one/two targets
+× continuous/live/undo. They preserve scanned child events, retain all matched
+external watchers through a later hand prompt and fire each once. Synchronous
+mandatory SET_REST→hand-trash proves one watcher after END_OF_BATTLE; a mandatory
+draw-to-deck-out proves one GAME_OVER and no resurrected battle/frame/prompt. These
+are synthetic mechanics coverage, not claims of authored mandatory prompting cards
+or a general rule-6-2 scheduler rewrite. Existing unrelated multi-target batch suites
+remain the broader interleaving regression gate.

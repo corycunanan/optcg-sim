@@ -167,7 +167,7 @@ export function runPipeline(
 
   // Step 5: Fire Triggers — emit events, scan triggerRegistry, resolve effects
   log("pipeline.step", { ...logCtx, step: "triggers" });
-  nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb, actedCard);
+  nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb, actedCard, true, execResult.queuedTriggers);
 
   if (isGameTerminated(nextState)) {
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
@@ -220,7 +220,7 @@ export function continuePipelineFromExecution(
   execResult: ExecuteResult,
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
-  deferredTriggers: readonly QueuedTrigger[] = [],
+  deferredTriggers: readonly QueuedTrigger[] = execResult.queuedTriggers ?? [],
 ): PipelineResult {
   const continuationAction: GameAction = { type: "REVEAL_TRIGGER", reveal: true };
   // Checkpoint for the resumed execution's lethal damage determination

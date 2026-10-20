@@ -122,6 +122,8 @@ export type PendingEvent = PendingGameEvent;
 export interface ExecuteResult {
   state: GameState;
   events: PendingEvent[];
+  /** Already matched work released by a synchronous continuation owner. Never persisted here. */
+  queuedTriggers?: QueuedTrigger[];
   /**
    * Set only when the rules determined that a Leader took damage while its
    * player had 0 Life (9-2-1-1; battle: 7-1-4-1-1-1). Rule processing reads

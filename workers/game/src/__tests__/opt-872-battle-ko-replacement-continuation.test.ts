@@ -529,6 +529,58 @@ describe("a mandatory replacement whose substitute asks for input", () => {
   });
 });
 
+describe("OPT-965 mandatory substitute owner completion", () => {
+  for (const terminal of [false, true]) {
+    it(`cleans the synchronous owner once${terminal ? " on terminal outcome" : " without a prompt"}`, () => {
+      const f = fixture();
+      const schema = structuredClone(getEffectSchema("EB03-001")!);
+      const block = schema.effects[0];
+      if (block.category !== "replacement") throw new Error("shape");
+      block.flags = { ...block.flags, optional: false };
+      block.replacement_actions = terminal
+        ? [{ type: "DRAW", params: { amount: 1 } }]
+        : [
+          { type: "SET_REST", target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 }, filter: { cost_max: 1 } } },
+          { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+        ];
+      f.data("EB03-001", { type: "Leader", cost: null, power: 5000, counter: null, life: 4, effectSchema: schema });
+      f.put("EB03-001", 0, "LEADER");
+      const target = vanAugur(f);
+      handCards(f, 0, 1);
+      if (!terminal) {
+        f.data("SYNC-VICTIM", { cost: 1 });
+        f.put("SYNC-VICTIM", 0);
+        f.data("SYNC-WATCHER", { effectSchema: {
+          card_id: "SYNC-WATCHER", card_name: "Watcher", card_type: "Character",
+          effects: [{ id: "draw", category: "auto",
+            trigger: { event: "CHARACTER_BECOMES_RESTED", filter: { controller: "SELF" } },
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          }],
+        } as NonNullable<CardData["effectSchema"]> });
+        f.put("SYNC-WATCHER", 0);
+      }
+      if (terminal) f.state.players[0].deck = f.state.players[0].deck.slice(0, 1);
+      f.battle(target, f.attacker());
+      expect(f.onField(target)).toBe(true);
+      expect(f.state.pendingPrompt).toBeNull();
+      expect(f.state.effectStack).toEqual([]);
+      expect(f.state.turn.battle).toBeNull();
+      expect(f.events("CARD_KO")).toHaveLength(0);
+      if (terminal) {
+        expect(f.state.status).toBe("FINISHED");
+        expect(f.events("GAME_OVER")).toHaveLength(1);
+        expect(f.events("END_OF_BATTLE")).toHaveLength(0);
+      } else {
+        expect(f.events("CARD_TRASHED")).toHaveLength(1);
+        expect(f.events("CARD_DRAWN")).toHaveLength(1);
+        const types = f.state.eventLog.map(event => event.type);
+        expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));
+        expectBattleClosedOnce(f);
+      }
+    });
+  }
+});
+
 // ─── Two replacements for one battle K.O. (Franky + EB03-001) ────────────────
 
 describe("two optional replacements cover the same battle K.O.", () => {
@@ -1021,21 +1073,26 @@ describe("OPT-965 scoped battle recovery and substitute ordering", () => {
 
 
 describe("OPT-965 deferred substitute scan propagation", () => {
+  for (const targetCount of [1, 2]) {
+  for (const mandatory of [false, true]) {
   for (const actionType of ["KO", "SET_REST"] as const) {
     for (const location of [null, "state", "undoHistory[0]"] as const) {
-      it(`${actionType} ${location ?? "continuous"}: a surviving watcher fires exactly once after a later hand prompt`, () => {
+      it(`${targetCount} targets ${mandatory ? "mandatory" : "optional"} ${actionType} ${location ?? "continuous"}: a surviving watcher fires exactly once after a later hand prompt`, () => {
         const f = fixture();
         const schema = structuredClone(getEffectSchema("EB03-001")!);
         const block = schema.effects[0];
         if (block.category !== "replacement") throw new Error("shape");
+        block.flags = { ...block.flags, optional: !mandatory };
         block.replacement_actions = [
-          { type: actionType, target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 }, filter: { cost_max: 1 } } },
+          { type: actionType, target: { type: "CHARACTER", controller: "SELF", count: { exact: targetCount }, filter: { cost_max: 1 } } },
           { type: "TRASH_FROM_HAND", params: { amount: 1 } },
         ];
         f.data("EB03-001", { type: "Leader", cost: null, power: 5000, counter: null, life: 4, effectSchema: schema });
         f.put("EB03-001", 0, "LEADER");
         f.data("VICTIM", { cost: 1 });
         const victim = f.put("VICTIM", 0);
+        const victims = [victim];
+        if (targetCount === 2) victims.push(f.put("VICTIM", 0));
         f.data("SURVIVING-WATCHER", { cost: 2, effectSchema: {
           card_id: "SURVIVING-WATCHER", card_name: "Watcher", card_type: "Character",
           effects: [{ id: "draw", category: "auto",
@@ -1047,24 +1104,30 @@ describe("OPT-965 deferred substitute scan propagation", () => {
         const target = vanAugur(f);
         const hand = handCards(f, 0, 3);
         f.battle(target, f.attacker());
-        f.accept();
+        if (!mandatory) f.accept();
         if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET" && f.state.pendingPrompt.options.validTargets.includes(victim.instanceId)) {
-          f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: [victim.instanceId] });
+          f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: victims.map(card => card.instanceId) });
         }
         expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
         const owner = f.state.effectStack.find(frame => frame.battleDamage)!;
-        expect(owner.pendingTriggers).toHaveLength(1);
+        expect(owner.pendingTriggers).toHaveLength(targetCount);
         expect(f.events("CARD_DRAWN")).toHaveLength(0);
         const childEvents = f.state.effectStack.flatMap(frame => frame.accumulatedEvents);
         expect(childEvents.filter(event => event.type === (actionType === "KO" ? "CARD_KO" : "CARD_STATE_CHANGED")))
           .toEqual(expect.arrayContaining([expect.objectContaining({ propagation: expect.objectContaining({ triggerScanned: true }) })]));
         if (location) f.state = convertPersistedGameState(toPersistedGameState(f.state), location);
         f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: [hand[0].instanceId] });
+        for (let remaining = targetCount; f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE" && remaining > 0; remaining--) {
+          const choice = f.state.pendingPrompt.options.choices.find(choice => !choice.disabled)!;
+          f.ok(0, { type: "PLAYER_CHOICE", choiceId: choice.id });
+        }
         expect(f.state.pendingPrompt).toBeNull();
-        expect(f.events("CARD_DRAWN")).toHaveLength(1);
+        expect(f.events("CARD_DRAWN")).toHaveLength(targetCount);
         expect(f.state.effectStack).toEqual([]);
         expectBattleClosedOnce(f);
       });
     }
+  }
+  }
   }
 });
