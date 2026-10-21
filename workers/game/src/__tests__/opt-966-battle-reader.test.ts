@@ -1,3 +1,6 @@
+import battleImmediate from "./fixtures/opt-966-battle-immediate-writer.json";
+import lifeImmediate from "./fixtures/opt-966-life-immediate-writer.json";
+import restJson from "./fixtures/opt-966-battle-rest-writer.json";
 import { withStableOrderingIds } from "../engine/trigger-ordering.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { expect, it } from "vitest";
@@ -14,13 +17,13 @@ type Corpus = {
   cases: { index: number; stored: Record<string, unknown>; replies: GameAction[] }[];
   expected: GameState;
 };
-const scenarios = [["battle substitute", battleJson, "crossbuild"], ["terminal battle substitute", terminalJson, "crossbuild"]] as const;
+const scenarios = [["battle substitute", battleJson, "crossbuild"], ["terminal battle substitute", terminalJson, "crossbuild"], ["Morley rest", restJson, "crossbuild"], ["battle immediate", battleImmediate, "crossbuild"], ["Life immediate", lifeImmediate, "crossbuild"]] as const;
 const cases = scenarios.flatMap(([name, json, promptPrefix]) => {
   const corpus = json as unknown as Corpus;
   return corpus.cases.map(entry => ({ ...entry, name, expected: corpus.expected, promptPrefix, corpus }));
 });
 
-it.each(cases)("resumes writer $name pause $index through later work in live and undo", async ({ index, stored, replies, expected, promptPrefix, corpus }) => {
+it.each(cases)("resumes writer $name pause $index through later work in live and undo", async ({ index, stored, replies, expected, promptPrefix, corpus, name }) => {
   const storage = new MemorySessionStorage();
   await storage.put(structuredClone(stored));
   const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
@@ -32,6 +35,11 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       actual.pendingPrompt!.promptId = `${promptPrefix}-${index + offset}`;
       // No hidden mode survives a save: every re-park must carry its v5 owner.
       expect(actual.effectStack.some(frame => frame.triggerExecution)).toBe(true);
+      if (name === "Morley rest") {
+        expect(actual.effectStack.some(frame => frame.phase === "AWAITING_BATCH_RESUME")).toBe(false);
+        if (actual.turn.battle) expect(actual.eventLog.some(event => event.type === "CARD_DRAWN")).toBe(false);
+      }
+
       const writerPrompt = (corpus.cases[index + offset].stored.session as { state: GameState }).state.pendingPrompt;
       expect(actual.pendingPrompt?.options).toEqual(writerPrompt?.options);
       expect(actual.pendingPrompt?.respondingPlayer).toEqual(writerPrompt?.respondingPlayer);
@@ -53,9 +61,17 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
     expect(actual.executionContext).toEqual(expected.executionContext);
     expect(actual).toEqual(expected);
     const types = actual.eventLog.map(event => event.type);
-    expect(types.filter(type => type === "CARD_TRASHED")).toHaveLength(2);
+    if (name.includes("immediate")) {
+      expect(types.filter(type => type === "CARD_DRAWN")).toHaveLength(2);
+      const prefix = name === "battle immediate" ? "END_OF_BATTLE" : "CARD_REMOVED_FROM_LIFE";
+      expect(types.filter(type => type === prefix)).toHaveLength(1);
+      expect(types.indexOf(prefix)).toBeLessThan(types.indexOf("CARD_DRAWN"));
+      continue;
+    }
+
+    expect(types.filter(type => type === "CARD_TRASHED")).toHaveLength(name === "Morley rest" ? 1 : 2);
     expect(types.filter(type => type === "POWER_MODIFIED")).toHaveLength(1);
-    expect(types.filter(type => type === "CARD_DRAWN")).toHaveLength(1);
+    expect(types.filter(type => type === "CARD_DRAWN")).toHaveLength(name === "Morley rest" ? 2 : 1);
     expect(types.indexOf("COMBAT_VICTORY")).toBeLessThan(types.indexOf("CARD_TRASHED"));
     expect(types.indexOf("POWER_MODIFIED")).toBeLessThan(types.indexOf("END_OF_BATTLE"));
     expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));

@@ -196,7 +196,8 @@ function resumePromptLifecycleUnreleased(
       kind === "BATTLE_DAMAGE"
         ? resumeBattleDamageFrame(state, action.reveal, cardDb)
         : resumeEffectDamageFrame(state, action.reveal, cardDb);
-    const applied = applyDamageResult(state, revealed, cardDb, respondingPlayer);
+    const applied = applyDamageResult(state, revealed, cardDb, respondingPlayer,
+      stateBeforeResume.effectStack.some(frame => frame.triggerExecution !== undefined));
     state = applied.state;
     gameOver = applied.gameOver;
   } else if (state.effectStack.length > 0) {
@@ -304,7 +305,8 @@ function applyDamageResult(
   state: GameState,
   result: BattleDamageResult | EffectDamageResult,
   cardDb: Map<string, CardData>,
-  actingPlayer: 0 | 1
+  actingPlayer: 0 | 1,
+  triggerExecutionMode: boolean
 ): { state: GameState; gameOver?: GameOver } {
   state = result.state;
   if (isGameTerminated(state)) {
@@ -315,7 +317,7 @@ function applyDamageResult(
   if (result.events.length === 0 && deferred.length === 0 && result.lethalDamagePlayerIndex === undefined) {
     return { state };
   }
-  const pipeline = continuePipelineFromExecution(state, result, cardDb, actingPlayer, deferred);
+  const pipeline = continuePipelineFromExecution(state, result, cardDb, actingPlayer, deferred, triggerExecutionMode);
   return { state: pipeline.state, gameOver: pipeline.gameOver };
 }
 
@@ -373,7 +375,7 @@ function resumeContinuations(
         kind === "BATTLE_DAMAGE"
           ? continueBattleDamageFrame(state, cardDb)
           : continueEffectDamageFrame(state, cardDb);
-      const applied = applyDamageResult(state, continued, cardDb, actingPlayer);
+      const applied = applyDamageResult(state, continued, cardDb, actingPlayer, triggerExecutionMode);
       state = applied.state;
       gameOver = applied.gameOver;
       continue;
@@ -481,7 +483,8 @@ function answerReplacementOffer(
     // A substitute that resolved without a prompt: publish its events in the
     // same batch as the rest of the Damage Step, as the synchronous path does.
     const continued = continueBattleDamageFrame(state, cardDb, replacement.events);
-    return applyDamageResult(state, continued, cardDb, actingPlayer);
+    return applyDamageResult(state, continued, cardDb, actingPlayer,
+      initialState.effectStack.some(frame => frame.triggerExecution !== undefined));
   }
 
   // A cost-exit replacement (OPT-864): the COST frame that parked its

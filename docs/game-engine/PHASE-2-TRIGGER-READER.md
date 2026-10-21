@@ -224,3 +224,41 @@ These rearranged graphs are progress probes, not evidence of a rule-correct
 activation window; the unchanged actual-writer corpus remains the chronology
 oracle. The previous full gate at 2328944b is historical evidence; this runtime
 correction requires fresh review and full verification before readiness.
+
+### Post-damage ordering boundary correction
+
+External comment 4340528672 proposed a stranded SET_REST batch after Morley's
+battle substitute. The actual supported path does not produce that batch:
+`scanEventsForTriggers` moves matched triggers onto the matching battle frame
+and returns an empty trigger list. The PLAY_CARD, KO and SET_REST batch producers
+all depend on a nonempty returned match list. Actual OP16-033 replacement-choice,
+two-target rest, post-choice hand prompt and power-suffix replay confirms damage
+finishes before its two rest watchers. No speculative batch-executor or outer
+session-loop change was retained. This refutes that producer path, not arbitrary
+fabricated saved batch graphs.
+
+The same expanded replay exposed a different real BATTLE_POST_BOUNDARY gap.
+`applyDamageResult` omitted the already-established invocation-local v5 mode when
+calling `continuePipelineFromExecution`. The legacy path offered two deferred
+watchers while the v5 owner's first generation remained empty; the next save/load
+correctly rejected the inconsistent ordering selection. No ordering IDs or
+validator were changed. The correction carries the existing mode through all
+three damage-result call sites: reveal reply, damage unwind, and synchronous
+replacement-offer completion. Ordinary v4 invocations still pass false.
+
+Additional actual writer corpora:
+- `ae736062fa9033965ba166fbb8797a498dea92d5`: five Morley pauses, with a synthetic
+  post-choice suffix added to the registered OP16-033 schema via the fixture's
+  explicit schema override. The source's original replacement-choice actions
+  remain intact. Both rested cards, suffix publication, no ordinary watcher
+  before battle completion, and exact two draws are independently asserted.
+- `9f3c66df2163a7ae72d9ca392e713903c950275c`: immediate battle-decline and Life-decline
+  completion, two pauses each, explicitly exercising the other entry paths.
+
+All nine new snapshots replay live and undo with full GameState equality and
+repeated real session saves. Disabling the mode propagation fails five cases
+(four Morley prefixes and the immediate battle entry); the Life case is positive
+path coverage, not a decisive mutation guard. The focused compatibility run
+passes 146 tests with one existing expected failure; types pass. Previous full
+results remain historical: this substantive correction needs fresh independent
+review and full verification. The main writer is still incomplete and held.
