@@ -43,6 +43,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays every End Phase pause from l
         const nextStorage = new MemorySessionStorage();
         await new ReaderRepository(nextStorage, options).save({ ...loaded, state: actual, undoHistory: [actual] });
         actual = (await new ReaderRepository(nextStorage, options).load())!.state;
+        expect(actual).toEqual(snapshots[index + offset]);
         const result = readerResume(actual, action, rig.db, {
           drainPregame: (s) => s, advanceStartOfTurn: (s) => s,
         });

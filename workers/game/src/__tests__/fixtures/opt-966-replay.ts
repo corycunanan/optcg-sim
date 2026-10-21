@@ -7,6 +7,7 @@ import { MemorySessionStorage } from "./opt-940-synthetic-states.js";
 import type { EndPhaseRig } from "../opt-962-rig.js";
 
 export function writerProducer() {
+  execFileSync("git", ["diff", "--exit-code", "HEAD", "--", "workers/game/src"], { stdio: "pipe" });
   return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 }
 
@@ -48,6 +49,7 @@ export async function replayPauses(rig: Pick<EndPhaseRig, "state" | "db" | "act"
         const nextStorage = new MemorySessionStorage();
         await new ReaderRepository(nextStorage, options).save({ ...loaded, state: actual, undoHistory: [actual] });
         actual = (await new ReaderRepository(nextStorage, options).load())!.state;
+        expect(actual).toEqual(pauses[index + offset]);
         expect(actual.pendingPrompt?.options).toEqual(pauses[index + offset].pendingPrompt?.options);
         expect(actual.pendingPrompt?.respondingPlayer).toEqual(pauses[index + offset].pendingPrompt?.respondingPlayer);
         const result = readerResume(actual, action, rig.db, { drainPregame: s => s, advanceStartOfTurn: s => s });
