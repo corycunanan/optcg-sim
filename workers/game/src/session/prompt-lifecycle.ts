@@ -353,7 +353,8 @@ function resumeContinuations(
           state,
           resumed,
           cardDb,
-          frame.phaseBoundaryContinuation!.endingPlayerIndex
+          frame.phaseBoundaryContinuation!.endingPlayerIndex,
+          resumed.queuedTriggers
         );
         state = pipeline.state;
         gameOver = pipeline.gameOver;
