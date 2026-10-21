@@ -1327,9 +1327,9 @@ export function executeActionChain(
 
     // OPT-172: rule 6-2 — handler paused mid-batch because a frame's events
     // queued ON_PLAY (or sibling) triggers. Push an AWAITING_BATCH_RESUME
-    // frame carrying the marker + remaining chain actions, then drain the
-    // triggers; reenterBatchResume re-invokes the handler with the
-    // remaining-batch state once the drain completes.
+    // frame carrying the marker + remaining chain actions, then report fresh
+    // triggers to their owner. The shared executor resumes this same-effect
+    // batch and suffix before releasing the newly fulfilled ordinary work.
     if (result.pendingBatchTriggers) {
       const { triggers, marker } = result.pendingBatchTriggers;
       const stateWithFrame = pushBatchResumeFrame(

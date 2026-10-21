@@ -115,8 +115,8 @@ export function fireEventsAndTriggers(
 
 /**
  * Publish End Phase events and resolve the auto effects they fulfil with the
- * pipeline's own Step 5 policy (OPT-924): turn player's group first, nested
- * triggers LIFO. The End Phase calls this after each stage action so its
+ * shared executor: turn player's group first, older generations before newly
+ * fulfilled ordinary triggers. The End Phase calls this after each stage action so its
  * triggered work finishes before the next rule step, while the ending player
  * is still the turn player. A prompt is left on `state.pendingPrompt`.
  */

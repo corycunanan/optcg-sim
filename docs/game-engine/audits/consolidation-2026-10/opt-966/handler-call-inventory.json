@@ -1,0 +1,675 @@
+{
+  "counts": {
+    "advanceLifeTriggerExecution": 2,
+    "advanceTriggerExecution": 6,
+    "continueBattleDamageFrame": 3,
+    "continueEffectDamageFrame": 1,
+    "continueEffectDamageSequence": 2,
+    "continueEndPhase": 2,
+    "continueHandler": 1,
+    "continueLeaderDamageSequence": 3,
+    "continueLegacyScheduledActions": 1,
+    "continueReplacementBatchAfterSubstitute": 1,
+    "processBatchReplacements": 4,
+    "processPlayerTriggerGroup": 3,
+    "reenterBatchResume": 1,
+    "reportTriggers": 29,
+    "reportTriggerWork": 5,
+    "resumeBattleDamageFrame": 1,
+    "resumeEffectChain": 1,
+    "resumeEffectChainCore": 1,
+    "resumeEffectDamageFrame": 1,
+    "resumeFromStack": 3,
+    "resumeFromStackCore": 1,
+    "resumePhaseBoundary": 1,
+    "resumeReplacement": 1,
+    "resumeReplacementBatch": 1,
+    "scanEventsForTriggers": 17
+  },
+  "rows": [
+    {
+      "symbol": "advanceLifeTriggerExecution",
+      "file": "workers/game/src/engine/battle.ts",
+      "line": 555,
+      "owner": "resumeBattleDamageFrame",
+      "expression": "advanceLifeTriggerExecution"
+    },
+    {
+      "symbol": "advanceLifeTriggerExecution",
+      "file": "workers/game/src/engine/effect-damage.ts",
+      "line": 392,
+      "owner": "resumeEffectDamageFrame",
+      "expression": "advanceLifeTriggerExecution"
+    },
+    {
+      "symbol": "advanceTriggerExecution",
+      "file": "workers/game/src/engine/effect-resolver/resolver.ts",
+      "line": 378,
+      "owner": "resolveEffect",
+      "expression": "advanceTriggerExecution"
+    },
+    {
+      "symbol": "advanceTriggerExecution",
+      "file": "workers/game/src/engine/effect-resolver/resume.ts",
+      "line": 121,
+      "owner": "advanceHandler",
+      "expression": "advanceTriggerExecution"
+    },
+    {
+      "symbol": "advanceTriggerExecution",
+      "file": "workers/game/src/engine/effect-resolver/resume.ts",
+      "line": 124,
+      "owner": "advanceHandler",
+      "expression": "advanceTriggerExecution"
+    },
+    {
+      "symbol": "advanceTriggerExecution",
+      "file": "workers/game/src/engine/effect-resolver/resume.ts",
+      "line": 127,
+      "owner": "advanceHandler",
+      "expression": "advanceTriggerExecution"
+    },
+    {
+      "symbol": "advanceTriggerExecution",
+      "file": "workers/game/src/engine/trigger-executor.ts",
+      "line": 472,
+      "owner": "advanceLifeTriggerExecution",
+      "expression": "advanceTriggerExecution"
+    },
+    {
+      "symbol": "advanceTriggerExecution",
+      "file": "workers/game/src/engine/trigger-queue.ts",
+      "line": 231,
+      "owner": "processPlayerTriggerGroup",
+      "expression": "advanceTriggerExecution"
+    },
+    {
+      "symbol": "continueBattleDamageFrame",
+      "file": "workers/game/src/engine/battle.ts",
+      "line": 1214,
+      "owner": "executeDamageStep",
+      "expression": "continueBattleDamageFrame"
+    },
+    {
+      "symbol": "continueBattleDamageFrame",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 373,
+      "owner": "resumeContinuations",
+      "expression": "continueBattleDamageFrame"
+    },
+    {
+      "symbol": "continueBattleDamageFrame",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 482,
+      "owner": "answerReplacementOffer",
+      "expression": "continueBattleDamageFrame"
+    },
+    {
+      "symbol": "continueEffectDamageFrame",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 374,
+      "owner": "resumeContinuations",
+      "expression": "continueEffectDamageFrame"
+    },
+    {
+      "symbol": "continueEffectDamageSequence",
+      "file": "workers/game/src/engine/effect-damage.ts",
+      "line": 463,
+      "owner": "finishEffectDamagePoints",
+      "expression": "continueEffectDamageSequence"
+    },
+    {
+      "symbol": "continueEffectDamageSequence",
+      "file": "workers/game/src/engine/effect-resolver/actions/battle-actions.ts",
+      "line": 129,
+      "owner": "executeDealDamage",
+      "expression": "continueEffectDamageSequence"
+    },
+    {
+      "symbol": "continueEndPhase",
+      "file": "workers/game/src/engine/phases.ts",
+      "line": 210,
+      "owner": "runEndPhase",
+      "expression": "continueEndPhase"
+    },
+    {
+      "symbol": "continueEndPhase",
+      "file": "workers/game/src/engine/phases.ts",
+      "line": 231,
+      "owner": "resumePhaseBoundary",
+      "expression": "continueEndPhase"
+    },
+    {
+      "symbol": "continueHandler",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 727,
+      "owner": "resumeFromStack",
+      "expression": "services.continueHandler"
+    },
+    {
+      "symbol": "continueLeaderDamageSequence",
+      "file": "workers/game/src/engine/battle.ts",
+      "line": 653,
+      "owner": "resumeBattleDamageFrame",
+      "expression": "continueLeaderDamageSequence"
+    },
+    {
+      "symbol": "continueLeaderDamageSequence",
+      "file": "workers/game/src/engine/battle.ts",
+      "line": 993,
+      "owner": "continueBattleDamageFrame",
+      "expression": "continueLeaderDamageSequence"
+    },
+    {
+      "symbol": "continueLeaderDamageSequence",
+      "file": "workers/game/src/engine/battle.ts",
+      "line": 1162,
+      "owner": "executeDamageStep",
+      "expression": "continueLeaderDamageSequence"
+    },
+    {
+      "symbol": "continueLegacyScheduledActions",
+      "file": "workers/game/src/engine/phases.ts",
+      "line": 262,
+      "owner": "continueEndPhase",
+      "expression": "continueLegacyScheduledActions"
+    },
+    {
+      "symbol": "continueReplacementBatchAfterSubstitute",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 385,
+      "owner": "resumeContinuations",
+      "expression": "continueReplacementBatchAfterSubstitute"
+    },
+    {
+      "symbol": "processBatchReplacements",
+      "file": "workers/game/src/engine/effect-resolver/actions/play.ts",
+      "line": 473,
+      "owner": "executeSetRest",
+      "expression": "processBatchReplacements"
+    },
+    {
+      "symbol": "processBatchReplacements",
+      "file": "workers/game/src/engine/effect-resolver/actions/removal.ts",
+      "line": 96,
+      "owner": "executeKO",
+      "expression": "processBatchReplacements"
+    },
+    {
+      "symbol": "processBatchReplacements",
+      "file": "workers/game/src/engine/effect-resolver/actions/removal.ts",
+      "line": 166,
+      "owner": "executeReturnToHand",
+      "expression": "processBatchReplacements"
+    },
+    {
+      "symbol": "processBatchReplacements",
+      "file": "workers/game/src/engine/effect-resolver/actions/removal.ts",
+      "line": 331,
+      "owner": "executeReturnToDeck",
+      "expression": "processBatchReplacements"
+    },
+    {
+      "symbol": "processPlayerTriggerGroup",
+      "file": "workers/game/src/engine/damage-frames.ts",
+      "line": 297,
+      "owner": "openBattleTriggerWindow",
+      "expression": "processPlayerTriggerGroup"
+    },
+    {
+      "symbol": "processPlayerTriggerGroup",
+      "file": "workers/game/src/engine/phases.ts",
+      "line": 379,
+      "owner": "runWave",
+      "expression": "processPlayerTriggerGroup"
+    },
+    {
+      "symbol": "processPlayerTriggerGroup",
+      "file": "workers/game/src/engine/trigger-queue.ts",
+      "line": 97,
+      "owner": "fireEventsAndTriggers",
+      "expression": "processPlayerTriggerGroup"
+    },
+    {
+      "symbol": "reenterBatchResume",
+      "file": "workers/game/src/engine/trigger-executor.ts",
+      "line": 339,
+      "owner": "advanceTriggerExecution",
+      "expression": "reenterBatchResume"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/cost/replaced.ts",
+      "line": 60,
+      "owner": "finishReplacedLifeCost",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resolver.ts",
+      "line": 1348,
+      "owner": "executeActionChain",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 645,
+      "owner": "resumeFromStack",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 654,
+      "owner": "resumeFromStack",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 704,
+      "owner": "resumeFromStack",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 714,
+      "owner": "resumeFromStack",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/batch.ts",
+      "line": 192,
+      "owner": "reenterBatchResume",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/batch.ts",
+      "line": 212,
+      "owner": "reenterBatchResume",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/batch.ts",
+      "line": 257,
+      "owner": "reenterBatchResume",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 194,
+      "owner": "handlePlayerChoiceStateDistribution",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 570,
+      "owner": "handleAwaitingOptionalResponse",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 614,
+      "owner": "handleAwaitingOptionalResponse",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 699,
+      "owner": "handleAwaitingOptionalResponse",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 753,
+      "owner": "handleAwaitingOptionalResponse",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 764,
+      "owner": "handleAwaitingOptionalResponse",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 864,
+      "owner": "handleAwaitingOptionalActionResponse",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 874,
+      "owner": "handleAwaitingOptionalActionResponse",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 144,
+      "owner": "abortReplacedCost",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 261,
+      "owner": "finishCostsAndRunActions",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 312,
+      "owner": "finishCostsAndRunActions",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 322,
+      "owner": "finishCostsAndRunActions",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 381,
+      "owner": "resumeAfterBranchPick",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 477,
+      "owner": "handleAwaitingCostSelection",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 499,
+      "owner": "handleAwaitingCostSelection",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 554,
+      "owner": "handleAwaitingCostSelection",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 752,
+      "owner": "handleAwaitingCostSelection",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 1497,
+      "owner": "handleAwaitingCostSelection",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/target.ts",
+      "line": 363,
+      "owner": "handleSelectTargetRuleTrashForPlay",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/target.ts",
+      "line": 588,
+      "owner": "handleSelectTarget",
+      "expression": "services.reportTriggers"
+    },
+    {
+      "symbol": "reportTriggerWork",
+      "file": "workers/game/src/engine/effect-resolver/resolver.ts",
+      "line": 342,
+      "owner": "createResolverServices",
+      "expression": "reportTriggerWork"
+    },
+    {
+      "symbol": "reportTriggerWork",
+      "file": "workers/game/src/engine/effect-resolver/resume.ts",
+      "line": 173,
+      "owner": "processRemainingTriggers",
+      "expression": "reportTriggerWork"
+    },
+    {
+      "symbol": "reportTriggerWork",
+      "file": "workers/game/src/engine/trigger-executor.ts",
+      "line": 329,
+      "owner": "advanceTriggerExecution",
+      "expression": "reportTriggerWork"
+    },
+    {
+      "symbol": "reportTriggerWork",
+      "file": "workers/game/src/engine/trigger-executor.ts",
+      "line": 455,
+      "owner": "advanceTriggerExecution",
+      "expression": "reportTriggerWork"
+    },
+    {
+      "symbol": "reportTriggerWork",
+      "file": "workers/game/src/engine/trigger-queue.ts",
+      "line": 223,
+      "owner": "processPlayerTriggerGroup",
+      "expression": "reportTriggerWork"
+    },
+    {
+      "symbol": "resumeBattleDamageFrame",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 197,
+      "owner": "resumePromptLifecycleUnreleased",
+      "expression": "resumeBattleDamageFrame"
+    },
+    {
+      "symbol": "resumeEffectChain",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 525,
+      "owner": "resumeFromStack",
+      "expression": "resumeEffectChain"
+    },
+    {
+      "symbol": "resumeEffectChainCore",
+      "file": "workers/game/src/engine/effect-resolver/resume.ts",
+      "line": 139,
+      "owner": "resumeEffectChain",
+      "expression": "resumeEffectChainCore"
+    },
+    {
+      "symbol": "resumeEffectDamageFrame",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 198,
+      "owner": "resumePromptLifecycleUnreleased",
+      "expression": "resumeEffectDamageFrame"
+    },
+    {
+      "symbol": "resumeFromStack",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 203,
+      "owner": "resumePromptLifecycleUnreleased",
+      "expression": "resumeFromStack"
+    },
+    {
+      "symbol": "resumeFromStack",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 398,
+      "owner": "resumeContinuations",
+      "expression": "resumeFromStack"
+    },
+    {
+      "symbol": "resumeFromStack",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 496,
+      "owner": "answerReplacementOffer",
+      "expression": "resumeFromStack"
+    },
+    {
+      "symbol": "resumeFromStackCore",
+      "file": "workers/game/src/engine/effect-resolver/resume.ts",
+      "line": 156,
+      "owner": "resumeFromStack",
+      "expression": "resumeFromStackCore"
+    },
+    {
+      "symbol": "resumePhaseBoundary",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 345,
+      "owner": "resumeContinuations",
+      "expression": "resumePhaseBoundary"
+    },
+    {
+      "symbol": "resumeReplacement",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 457,
+      "owner": "answerReplacementOffer",
+      "expression": "resumeReplacement"
+    },
+    {
+      "symbol": "resumeReplacementBatch",
+      "file": "workers/game/src/session/prompt-lifecycle.ts",
+      "line": 529,
+      "owner": "answerReplacementBatchOffer",
+      "expression": "resumeReplacementBatch"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/actions/play.ts",
+      "line": 336,
+      "owner": "executePlayCard",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/actions/play.ts",
+      "line": 504,
+      "owner": "executeSetRest",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/actions/removal.ts",
+      "line": 117,
+      "owner": "executeKO",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/cost/replaced.ts",
+      "line": 58,
+      "owner": "finishReplacedLifeCost",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 632,
+      "owner": "resumeFromStack",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume-core.ts",
+      "line": 700,
+      "owner": "resumeFromStack",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/batch.ts",
+      "line": 203,
+      "owner": "reenterBatchResume",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/batch.ts",
+      "line": 244,
+      "owner": "reenterBatchResume",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 673,
+      "owner": "handleAwaitingOptionalResponse",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 739,
+      "owner": "handleAwaitingOptionalResponse",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/choice.ts",
+      "line": 860,
+      "owner": "handleAwaitingOptionalActionResponse",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 236,
+      "owner": "finishCostsAndRunActions",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/cost.ts",
+      "line": 298,
+      "owner": "finishCostsAndRunActions",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/target.ts",
+      "line": 265,
+      "owner": "handleSelectTargetRuleTrashForPlay",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/effect-resolver/resume/target.ts",
+      "line": 369,
+      "owner": "handleSelectTargetRuleTrashForPlay",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/trigger-executor.ts",
+      "line": 320,
+      "owner": "advanceTriggerExecution",
+      "expression": "scanEventsForTriggers"
+    },
+    {
+      "symbol": "scanEventsForTriggers",
+      "file": "workers/game/src/engine/trigger-executor.ts",
+      "line": 446,
+      "owner": "advanceTriggerExecution",
+      "expression": "scanEventsForTriggers"
+    }
+  ]
+}

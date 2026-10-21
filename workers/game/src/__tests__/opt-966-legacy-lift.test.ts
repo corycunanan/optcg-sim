@@ -40,6 +40,12 @@ it.each(["live", "undo"] as const)("legacy ordering above battle preserves graph
   expect(complete.state.turn.battle).toBeNull();
   expect(complete.state.eventLog.filter(event => event.type === "END_OF_BATTLE")).toHaveLength(1);
   expect(complete.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(3);
+  const publication = complete.state.eventLog.map(event => event.type);
+  const draws = publication.flatMap((type, index) => type === "CARD_DRAWN" ? [index] : []);
+  const battleEnd = publication.indexOf("END_OF_BATTLE");
+  expect(draws[0]).toBeLessThan(battleEnd);
+  expect(draws[1]).toBeLessThan(battleEnd);
+  expect(draws[2]).toBeGreaterThan(battleEnd);
 });
 
 it.each(["live", "undo"] as const)("legacy lifting at the stack budget returns terminal without replaying work: %s", location => {
