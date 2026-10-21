@@ -1,4 +1,4 @@
-import { projectVersion5 } from "./version5-reader.js";
+import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
 /**
  * Game-state schema version, frame-kind contract, continuation-reference
  * integrity, and legacy-shape classification (OPT-940).
@@ -573,7 +573,8 @@ function frameInvariantViolation(
   }
   switch (kind) {
     case "TRIGGER_EXECUTION": {
-      if (frame.phase !== "INTERRUPTED_BY_TRIGGERS" || frame.remainingActions.length || frame.pausedAction || frame.pendingTriggers.length || frame.simultaneousTriggers.length || frame.costs.length || frame.batchResumeMarker || frame.triggerOrderingGroup || frame.eventActivation || frame.phaseBoundaryContinuation || frame.replacement || frame.replacementBatch || frame.battleDamage || frame.effectDamage || frame.playOverflow || frame.pregameContinuation) return "is TRIGGER_EXECUTION but carries unrelated continuation work";
+      const violation = triggerExecutionOwnerViolation(frame);
+      if (violation) return violation;
       const index = state.effectStack.indexOf(frame);
       if (frame.triggerExecution!.selectedTrigger && index !== state.effectStack.length - 1) return "has selectedTrigger while an activated child is already present";
       return null;

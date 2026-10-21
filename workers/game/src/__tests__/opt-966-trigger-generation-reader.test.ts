@@ -460,6 +460,132 @@ describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
     expect(final.effectStack).toEqual([]);
   });
 
+  it.each(["effect", "controller", "event", "source", "snapshot", "identity"])(
+    "rejects selected work with altered %s despite a matching history ID",
+    (field) => {
+      const { state, trigger, a, x } = fixture();
+      const original = withStableOrderingIds([
+        trigger("A", 0, a),
+        trigger("A", 0, x),
+      ]);
+      const selected = structuredClone(original[0]);
+      const work = state.effectStack[0].triggerExecution!;
+      work.generations = [
+        {
+          triggers: [original[1]],
+          orderingGroup: {
+            triggers: original,
+            resolvedTriggerIds: [original[0].orderingId!],
+          },
+        },
+      ];
+      work.selectedTrigger = selected;
+      expect(() => restore(state)).not.toThrow();
+      if (field === "effect") selected.effectBlock.actions = [];
+      if (field === "controller") selected.controller = 1;
+      if (
+        field === "event" &&
+        selected.triggeringEvent.type === "ATTACK_DECLARED"
+      )
+        selected.triggeringEvent.payload = {
+          attackerInstanceId: "A",
+          targetInstanceId: state.players[1].leader.instanceId,
+          attackerPower: 9000,
+        };
+      if (field === "source") selected.sourceCardInstanceId = "X";
+      if (field === "snapshot") selected.sourceSnapshot!.cardId = "X";
+      if (field === "identity") selected.orderingId = "foreign";
+      expect(() => restore(state)).toThrow(
+        "selected trigger disagrees with its ordering history"
+      );
+    }
+  );
+
+  it.each([
+    ["simultaneousGroup", {}],
+    [
+      "stateDistributionForPlay",
+      {
+        pendingTargetId: "A",
+        remainingTargetIds: [],
+        remaining: { ACTIVE: 0, RESTED: 0 },
+        playedSoFar: [],
+      },
+    ],
+    ["costTransactionState", {}],
+    ["resultRefs", [["foreign", { targetInstanceIds: [], count: 0 }]]],
+    ["validTargets", ["A"]],
+    ["costReplacementAction", { type: "PASS" }],
+    ["costReplacementChecked", false],
+    ["costArrangeStage", false],
+    ["namedPlayCostTargetId", "A"],
+    ["remainingActionsController", 1],
+    ["priorActionSucceeded", false],
+    ["currentCostIndex", 1],
+    ["costsPaid", false],
+    ["oncePerTurnMarked", false],
+    ["costResultRefs", [["foreign", { targetInstanceIds: [], count: 0 }]]],
+    ["eventActivation", {}],
+    ["playOverflow", {}],
+    ["pregameContinuation", {}],
+    ["eventActivationCompletion", {}],
+    ["returnToDeckArrangement", {}],
+    ["fieldToLifeTargetIds", []],
+    ["giveDonIdentity", { owner: 0, recipient: "A" }],
+    ["phaseBoundaryContinuation", {}],
+    ["replacement", {}],
+    ["replacementBatch", {}],
+    ["battleDamage", {}],
+    ["effectDamage", {}],
+    ["triggerOrderingGroup", { triggers: [], resolvedTriggerIds: [] }],
+    ["ruleTrashForPlay", { playTargetId: "A" }],
+    ["batchResumeMarker", {}],
+    ["remainingActions", [{ type: "DRAW", count: 1 }]],
+    ["pausedAction", { type: "DRAW", count: 1 }],
+    ["costs", [{ type: "REST_SELF" }]],
+    ["pendingTriggers", [{}]],
+    ["simultaneousTriggers", [{}]],
+    ["phase", "AWAITING_TARGET_SELECTION"],
+    ["effectBlock", { id: "foreign", category: "auto" }],
+  ])(
+    "rejects foreign continuation field %s on an execution owner",
+    (field, value) => {
+      const { state } = fixture();
+      const raw = toPersistedGameState(state);
+      Object.assign(raw.effectStack[0], { [String(field)]: value });
+      expect(() => convertPersistedGameState(raw, "state")).toThrow(
+        "unrelated continuation work"
+      );
+      expect(() => convertPersistedGameState(raw, "undoHistory[0]")).toThrow(
+        "unrelated continuation work"
+      );
+    }
+  );
+
+  it("rejects repeated selection choices even when every payload matches a current trigger", () => {
+    const { state, db, trigger, a, x } = fixture();
+    state.effectStack[0].triggerExecution!.generations[0].triggers =
+      withStableOrderingIds([trigger("A", 0, a), trigger("A", 0, x)]);
+    const raw = toPersistedGameState(start(restore(state), db));
+    const selection = raw.effectStack.at(-1)!;
+    selection.simultaneousTriggers[1] = structuredClone(
+      selection.simultaneousTriggers[0]
+    );
+    expect(() => convertPersistedGameState(raw, "state")).toThrow(
+      "selection disagrees with its generation"
+    );
+  });
+
+  it("requires a generation anchor for selected work", () => {
+    const { state } = fixture();
+    const work = state.effectStack[0].triggerExecution!;
+    work.selectedTrigger = work.generations[0].triggers[0];
+    work.generations = [];
+    expect(() => restore(state)).toThrow(
+      "selected trigger has no current generation"
+    );
+  });
+
   it("rejects a selected trigger that is still queued", () => {
     const { state } = fixture();
     const work = state.effectStack[0].triggerExecution!;

@@ -1,6 +1,8 @@
 /** Strict v5 trigger-generation reader. The projection is only a validation
  * copy; execution retains the original frame and generation boundaries. */
 import { z } from "zod";
+import type { EffectStackFrame } from "../types.js";
+import { CONTINUATION_EFFECT_BLOCK } from "../engine/effect-stack.js";
 import { Trigger } from "./version4-reader.js";
 
 const OrderingGroup = z.strictObject({
@@ -44,6 +46,76 @@ function sameValue(left: unknown, right: unknown): boolean {
   );
 }
 
+// Every frame field must declare whether this owner may retain it. New frame
+// continuations therefore require an explicit compatibility decision here.
+const ownerFields = {
+  triggerExecution: "retain",
+  accumulatedEvents: "retain",
+  kind: "retain",
+  id: "retain",
+  sourceCardInstanceId: "retain",
+  controller: "retain",
+  effectDescription: "retain",
+  effectBlock: "block",
+  phase: "phase",
+  pausedAction: "null",
+  remainingActions: "empty",
+  resultRefs: "empty",
+  validTargets: "empty",
+  costs: "empty",
+  costResultRefs: "empty",
+  pendingTriggers: "empty",
+  simultaneousTriggers: "empty",
+  currentCostIndex: "zero",
+  costsPaid: "true",
+  oncePerTurnMarked: "true",
+  eventActivation: "absent",
+  playOverflow: "absent",
+  pregameContinuation: "absent",
+  eventActivationCompletion: "absent",
+  remainingActionsController: "absent",
+  returnToDeckArrangement: "absent",
+  fieldToLifeTargetIds: "absent",
+  giveDonIdentity: "absent",
+  priorActionSucceeded: "absent",
+  simultaneousGroup: "absent",
+  phaseBoundaryContinuation: "absent",
+  replacement: "absent",
+  replacementBatch: "absent",
+  battleDamage: "absent",
+  effectDamage: "absent",
+  costTransactionState: "absent",
+  costReplacementAction: "absent",
+  costReplacementChecked: "absent",
+  triggerOrderingGroup: "absent",
+  ruleTrashForPlay: "absent",
+  stateDistributionForPlay: "absent",
+  batchResumeMarker: "absent",
+  costArrangeStage: "absent",
+  namedPlayCostTargetId: "absent",
+} satisfies Record<
+  keyof EffectStackFrame,
+  "retain" | "block" | "phase" | "null" | "empty" | "zero" | "true" | "absent"
+>;
+
+export function triggerExecutionOwnerViolation(frame: object): string | null {
+  for (const [field, policy] of Object.entries(ownerFields)) {
+    const value: unknown = Reflect.get(frame, field);
+    const valid =
+      policy === "retain" ||
+      (policy === "absent" && value === undefined) ||
+      (policy === "empty" && Array.isArray(value) && value.length === 0) ||
+      (policy === "zero" && value === 0) ||
+      (policy === "true" && value === true) ||
+      (policy === "null" && value === null) ||
+      (policy === "phase" && value === "INTERRUPTED_BY_TRIGGERS") ||
+      (policy === "block" && sameValue(value, CONTINUATION_EFFECT_BLOCK));
+    if (!valid)
+      return `is TRIGGER_EXECUTION but carries unrelated continuation work in ${field}`;
+  }
+  return null;
+}
+
 export function projectVersion5(
   raw: Record<string, unknown>,
   fail: (reason: string) => never
@@ -60,6 +132,8 @@ export function projectVersion5(
     const parsed = Execution.safeParse(frame.triggerExecution);
     if (!parsed.success)
       fail(`effectStack[${index}].triggerExecution: ${parsed.error.message}`);
+    const violation = triggerExecutionOwnerViolation(frame);
+    if (violation) fail(`effectStack[${index}] ${violation}`);
     const work = parsed.data!;
     scopes.set(index, work);
     if (frame.kind !== "TRIGGER_EXECUTION")
@@ -115,6 +189,26 @@ export function projectVersion5(
       )
     )
       fail(`effectStack[${index}] selected trigger is still queued`);
+    if (work.selectedTrigger) {
+      const current = work.generations[0];
+      if (!current)
+        fail(
+          `effectStack[${index}] selected trigger has no current generation`
+        );
+      const history = current.orderingGroup;
+      if (
+        history &&
+        (!history.resolvedTriggerIds.includes(
+          work.selectedTrigger.orderingId
+        ) ||
+          !history.triggers.some((entry) =>
+            sameValue(entry, work.selectedTrigger)
+          ))
+      )
+        fail(
+          `effectStack[${index}] selected trigger disagrees with its ordering history`
+        );
+    }
     const { triggerExecution: _work, ...projected } = frame;
     // Validate every stored trigger's action/event content through the existing
     // strict v4 reader, without executing this flattened validation copy.
@@ -154,6 +248,8 @@ export function projectVersion5(
     if (
       !Array.isArray(choices) ||
       choices.length !== current.length ||
+      new Set(choices.map((trigger) => trigger?.orderingId)).size !==
+        choices.length ||
       choices.some(
         (trigger) => !current.some((entry) => sameValue(entry, trigger))
       )
