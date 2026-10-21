@@ -187,7 +187,12 @@ describe("hydrateToGameState", () => {
     );
     expect(result.valid).toBe(true);
     const played = result.state.players[0].characters.find((c) => c !== null);
-    expect(played?.instanceId).toBe("card_00000003");
+    // OPT-966 allocates ordinary execution owner ef_00000003 before the
+    // play action. The card must use the next identity, never the hydrated
+    // hand or leader identities; the completed owner leaves no continuation.
+    expect(played?.instanceId).toBe("card_00000004");
+    expect(result.state.executionContext.idCounter).toBe(4);
+    expect(result.state.effectStack).toEqual([]);
     expect(result.state.players[0].leader.instanceId).toBe("card_00000002");
   });
 });
