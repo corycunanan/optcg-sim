@@ -79,7 +79,7 @@ async function replayPauses(rig: EndPhaseRig, choose: (state: GameState) => Game
     pauses.push(structuredClone(rig.state));
     const reply = choose(rig.state);
     actions.push(reply);
-    rig.act(reply, rig.state.pendingPrompt.respondingPlayer);
+    rig.act(reply, rig.state.pendingPrompt!.respondingPlayer);
   }
   expect(pauses.length).toBeGreaterThan(0);
   const corpus: unknown[] = [];
