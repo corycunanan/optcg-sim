@@ -135,7 +135,7 @@ describe("OPT-820 replacement continuation chronology", () => {
       effectDescription: replacementDescription,
     });
     // OPT-963: the chain continuation, the REPLACEMENT_BATCH frame, then the substitute's prompt frame.
-    expect(first.state.effectStack).toHaveLength(3);
+    expect(first.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(3);
     expect(first.state.effectStack.at(-2)?.replacementBatch).toBeDefined();
     expect(
       findCardInstance(first.state, protectedTarget.instanceId)?.zone
@@ -166,7 +166,7 @@ describe("OPT-820 replacement continuation chronology", () => {
       testPriorityRolls: null,
     });
     const restored = await new SessionRepository(storage, config).load();
-    expect(restored!.state.effectStack).toHaveLength(3);
+    expect(restored!.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(3);
     const rejected = new SessionCoordinator().routePromptResponse(
       restored!.state,
       1,
@@ -476,13 +476,14 @@ it.each([true, false])(
     ).toEqual([
       ["CARD_DRAWN", 0],
       ["CARD_PLAYED", 1],
+      // Rule 8-6-3: finish the outer effect before the new On Play.
+      ["CARD_DRAWN", 0],
       ...(pay
         ? [
             ["CARD_TRASHED", 1],
             ["CARD_DRAWN", 1],
           ]
         : []),
-      ["CARD_DRAWN", 0],
     ]);
     expect(next.players[1].hand).toHaveLength(state.players[1].hand.length - 1);
   }
