@@ -188,3 +188,23 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays scheduled draw watcher promp
   expect(rig.state.eventLog.filter(e => e.type === "POWER_MODIFIED")).toHaveLength(2);
   expect(rig.state.eventLog.filter(e => e.type === "CARD_DRAWN")).toHaveLength(1);
 });
+
+it.skipIf(!process.env.OPT966_READER_ROOT)("replays a prompted Start of Turn watcher reached in the same End Phase resume", async () => {
+  const rig = endPhaseRig();
+  rig.putSyn("ENDING-WAVE", synSchema("ENDING-WAVE", "Character", [{
+    id: "wave", category: "auto", trigger: { keyword: "END_OF_YOUR_TURN" }, flags: { optional: true },
+    actions: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_TURN" } }],
+  }]), 0, "CHARACTER");
+  rig.putSyn("START-WATCHER", synSchema("START-WATCHER", "Character", [{
+    id: "start", category: "auto", trigger: { keyword: "START_OF_TURN" }, flags: { optional: true },
+    actions: [{ type: "DRAW", params: { amount: 1 } }],
+  }]), 1, "CHARACTER");
+  rig.act({ type: "ADVANCE_PHASE" });
+  const pauses = await replayPauses(rig, () => ({ type: "PLAYER_CHOICE", choiceId: "accept" }), "opt966-handoff-writer-corpus");
+  expect(pauses.map(s => s.pendingPrompt!.options.promptType)).toEqual(["OPTIONAL_EFFECT", "OPTIONAL_EFFECT"]);
+  expect(pauses.map(s => s.pendingPrompt!.respondingPlayer)).toEqual([0, 1]);
+  expect(pauses.every(s => s.effectStack.some(frame => frame.triggerExecution))).toBe(true);
+  expect(rig.state.eventLog.filter(e => e.type === "CARD_DRAWN")).toHaveLength(1);
+  expect(rig.state.eventLog.filter(e => e.type === "TURN_STARTED")).toHaveLength(1);
+  expect(rig.state.players[1].hand).toHaveLength(3);
+});
