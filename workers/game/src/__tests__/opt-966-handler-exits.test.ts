@@ -72,6 +72,7 @@ it.each([false, true])("only a standalone completion avoids scope allocation (le
   };
   const parent: EffectStackFrame = { ...completion, id: "legacy-parent", eventActivation: undefined,
     pendingTriggers: [{ sourceCardInstanceId: state.players[0].leader.instanceId, controller: 0,
+      triggeringEvent: { type: "TURN_STARTED", playerIndex: 0, payload: {} },
       effectBlock: { id: "older-B", category: "auto", actions: [{ type: "DRAW", params: { amount: 1 } }] } }],
   };
   state.effectStack = [...(legacyParent ? [parent] : []), completion];
