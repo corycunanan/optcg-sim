@@ -40,7 +40,7 @@ Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coo
 - Deferred findings, by ticket/PR:
 - Linear audit trail: <issue, operation, before/after, reason, required comment URL(s), verified/pending>
 - Follow-up origins: <new ticket → original ticket → original-ticket comment URL>
-- Tracker drift/pending updates or comments:
+- Tracker drift/pending updates or comments: <include integration-set Done with merged/verification-pending state, merge SHA, active check/monitor IDs; reconcile failures or interrupted monitoring>
 ```
 
 ## Dispatch brief
@@ -51,10 +51,13 @@ Embed the full resolved ticket and necessary comments/requirements, rather than 
 - Track, workspace/branch, base branch/full SHA, prerequisites and their verified state.
 - Owned surfaces, sibling owners, excluded scope, and existing in-flight work to preserve.
 - Relevant rules/scenario packet or design brief; name the one or two safety assumptions to prove.
-- Public testing boundary, baseline/check expectations, regression evidence and known environment limitations.
+- Public testing boundary, exact commands and working directory, explicit test paths/selectors and intended selection, regression evidence and known environment limitations.
+- For broad execution-ownership refactors: short before/after reporting, advancement, wait/completion/terminal and cleanup contract, plus the representative handoff to prove before sweeping callers.
 - Deliverables: implementation commits, pushed PR, honest validation baseline/results, Follow-ups and next-ticket handoff; no merge, no Linear writes.
 
 Dispatches name the selected model/effort, bounded responsibility, stopping condition and expected output. Reviewers receive the same intent and source packet plus the actual head/base diff, with distinct spec and high-risk correctness hunt briefs when both are required. They independently examine the code and expected behavior; implementer conclusions are claims to check. Request `clean`, `findings`, or `incomplete`, with commands, results, scenarios, missing coverage, and full reviewed SHA.
+
+Chore replies use a short decision-relevant summary (aim for 300 words or less), blockers/uncertainty, revision and evidence path. Store detailed inventories/tables in the artifact rather than returning them inline. Never truncate a material finding to fit the summary.
 
 ## Readiness receipt
 
