@@ -132,7 +132,8 @@ export function runPipeline(
 
   if (execResult.pendingPrompt) {
     const battleDebt = nextState.effectStack.find(frame =>
-      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT"
+      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+      frame.battleDamage.battleId === nextState.turn.battle?.battleId
     );
     if (battleDebt) nextState = createEffectExecutionScope(
       nextState, battleDebt.sourceCardInstanceId, battleDebt.controller

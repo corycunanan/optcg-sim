@@ -1,3 +1,4 @@
+import { replayPauses } from "./fixtures/opt-966-replay.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { expect, it } from "vitest";
 import type {
@@ -193,6 +194,7 @@ function fixture() {
     get state() {
       return state;
     },
+    set state(next: GameState) { state = next; },
   };
 }
 it.each([0, 1] as const)(
@@ -483,8 +485,12 @@ it("nested hand Main keeps its parent's source and suffix after a persisted prom
   expect(
     getEffectivePower(f.state.players[0].leader, f.db.get("OP12-041")!, f.state)
   ).toBe(5000);
-  await f.reload();
-  f.select([target.instanceId]);
+  if (process.env.OPT966_READER_ROOT) {
+    await replayPauses(f, () => ({ type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] }), "opt966-event-prefix-writer-corpus");
+  } else {
+    await f.reload();
+    f.select([target.instanceId]);
+  }
   expect(
     getEffectivePower(f.state.players[0].leader, f.db.get("OP12-041")!, f.state)
   ).toBe(6000);
@@ -808,8 +814,10 @@ it.each(["SELECTED", "AUTOMATIC"])(
         frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" &&
         frame.phase === "INTERRUPTED_BY_TRIGGERS"
     )!;
-    expect(parent.pendingTriggers).toHaveLength(2);
-    expect(parent.triggerOrderingGroup?.resolvedTriggerIds).toEqual([
+    expect(parent.pendingTriggers).toHaveLength(0);
+    const generation = f.state.effectStack.find(frame => frame.triggerExecution)!.triggerExecution!.generations[0];
+    expect(generation.triggers).toHaveLength(2);
+    expect(generation.orderingGroup?.resolvedTriggerIds).toEqual([
       chosen.orderingId,
     ]);
     expect(f.state.effectStack.at(-1)?.pendingTriggers).toHaveLength(0);

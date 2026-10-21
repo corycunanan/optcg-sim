@@ -43,6 +43,32 @@ export function retainEventsOnFrame(
       ...pendingPropagationEvents(frame.accumulatedEvents),
     ]),
   ].filter((event) => !nestedEvents.has(event));
+  // A nested Event's committed parent prefix precedes its child output. Give
+  // the nearest publication owner that debt while keeping the future Event
+  // activation notification on its separate completion frame. Battle damage
+  // remains the owner when it lies between the scope and this continuation.
+  const isEventParent = frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
+    frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH";
+  let publicationIndex = -1;
+  if (isEventParent) {
+    for (let index = frameIndex - 1; index >= 0; index--) {
+      const candidate = state.effectStack[index];
+      if (candidate.triggerExecution ||
+        (candidate.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+          candidate.battleDamage.battleId === state.turn.battle?.battleId)) {
+        publicationIndex = index;
+        break;
+      }
+    }
+  }
+  if (publicationIndex >= 0) return {
+    ...state,
+    effectStack: state.effectStack.map((existing, index) =>
+      index === publicationIndex ? { ...existing,
+        accumulatedEvents: [...new Set([...existing.accumulatedEvents, ...accumulatedEvents])],
+      } : index === frameIndex ? { ...existing, accumulatedEvents: [] } : existing
+    ),
+  };
   return {
     ...state,
     effectStack: state.effectStack.map((existing, index) =>
