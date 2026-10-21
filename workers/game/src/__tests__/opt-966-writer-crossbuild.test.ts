@@ -208,3 +208,46 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays a prompted Start of Turn wat
   expect(rig.state.eventLog.filter(e => e.type === "TURN_STARTED")).toHaveLength(1);
   expect(rig.state.players[1].hand).toHaveLength(3);
 });
+
+it.skipIf(!process.env.OPT966_READER_ROOT).each([false, true])("reparks legacy scheduled work below every new child, explicit stage=%s", async explicitStage => {
+  const rig = endPhaseRig();
+  rig.putSyn("LEGACY-WAVE", synSchema("LEGACY-WAVE", "Character", [{
+    id: "wave", category: "auto", trigger: { keyword: "END_OF_YOUR_TURN" }, flags: { optional: true },
+    actions: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 100 }, duration: { type: "THIS_TURN" } }],
+  }]), 0, "CHARACTER");
+  const child = rig.putSyn("LEGACY-CHILD", synSchema("LEGACY-CHILD", "Character", [{
+    id: "child", category: "auto", trigger: { keyword: "ON_PLAY" }, flags: { optional: true },
+    actions: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_TURN" } }],
+  }]), 0, "HAND");
+  rig.act({ type: "ADVANCE_PHASE" });
+  // The bootstrap wave is already activated; omit its registration from this
+  // historical fixture so the legacy handoff window has no second wave.
+  rig.state.triggerRegistry = rig.state.triggerRegistry.filter(trigger => !trigger.sourceCardInstanceId.startsWith("LEGACY-WAVE"));
+  // Supported mixed saved graph: loaded legacy phase continuation below a v5
+  // owner. Subsequent scopes and re-parks are produced by the actual writer.
+  const phase = rig.state.effectStack.find(frame => frame.phaseBoundaryContinuation)!.phaseBoundaryContinuation!;
+  delete phase.activatedWaveEffects;
+  if (explicitStage) phase.stage = "LEGACY_SCHEDULED_ACTIONS";
+  else delete phase.stage;
+  phase.remainingScheduledActions = [
+    { sourceEffectId: "legacy-play", controller: 0,
+      action: { type: "PLAY_CARD", target: { type: "CHARACTER_CARD", controller: "SELF", source_zone: "HAND", filter: { name: "LEGACY-CHILD" }, count: { up_to: 1 } }, params: { source_zone: "HAND", cost_override: "FREE" } } },
+    { sourceEffectId: "later-marker", controller: 0, action: { type: "DRAW", params: { amount: 1 } } },
+  ];
+  const pauses = await replayPauses(rig, state => {
+    expect(state.turn.activePlayerIndex).toBe(0);
+    expect(state.effectStack.findIndex(frame => frame.phaseBoundaryContinuation)).toBeLessThan(state.effectStack.findIndex(frame => frame.triggerExecution));
+    return state.pendingPrompt!.options.promptType === "SELECT_TARGET"
+      ? { type: "SELECT_TARGET", selectedInstanceIds: [child.instanceId] }
+      : { type: "PLAYER_CHOICE", choiceId: "accept" };
+  }, `opt966-legacy-${explicitStage ? "explicit" : "absent"}-writer-corpus`);
+  expect(pauses.map(state => state.pendingPrompt!.options.promptType)).toEqual(["OPTIONAL_EFFECT", "SELECT_TARGET", "OPTIONAL_EFFECT"]);
+  expect(pauses.map(state => state.turn.activePlayerIndex)).toEqual([0, 0, 0]);
+  const parked = pauses[1].effectStack;
+  expect(parked.findIndex(frame => frame.phaseBoundaryContinuation)).toBeLessThan(parked.findIndex(frame => frame.triggerExecution));
+  const types = rig.state.eventLog.map(event => event.type);
+  const childPower = rig.state.eventLog.findIndex(event => event.type === "POWER_MODIFIED" && event.payload?.amount === 1000);
+  expect(childPower).toBeGreaterThan(-1);
+  expect(childPower).toBeLessThan(types.indexOf("CARD_DRAWN"));
+  expect(childPower).toBeLessThan(types.indexOf("TURN_ENDED"));
+});

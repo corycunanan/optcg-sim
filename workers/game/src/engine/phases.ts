@@ -512,6 +512,9 @@ function continueLegacyScheduledActions(
   events: PendingEvent[]
 ): ExecuteResult {
   let state = initialState;
+  // Keep the phase below every child created by this scheduled resolution,
+  // including an execution owner beneath the visible prompt.
+  const parkDepth = initialState.effectStack.length;
   const scheduledActions = continuation.remainingScheduledActions;
 
   for (let index = 0; index < scheduledActions.length; index += 1) {
@@ -540,14 +543,13 @@ function continueLegacyScheduledActions(
         continuation.endingPlayerIndex
       );
       state = parkEndPhaseAt(
-        popFrame(state),
+        state,
         {
           ...continuation,
           stage: "LEGACY_SCHEDULED_ACTIONS",
           remainingScheduledActions: scheduledActions.slice(index + 1),
         },
-        state.effectStack.length - 1,
-        peekFrame(state)
+        parkDepth
       );
       return {
         state,
