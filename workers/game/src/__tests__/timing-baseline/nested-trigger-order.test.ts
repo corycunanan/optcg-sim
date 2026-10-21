@@ -202,21 +202,23 @@ function pickC(state: GameState): GameAction {
 describe("F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.md:206-210)", () => {
   // Engine: C's CARD_PLAYED and POWER_MODIFIED land before X's CARD_DRAWN (A -> C -> X).
   // Rule 8-6-1 (line 858): the non-turn player's X resolves before the turn player's C.
-  it.fails("F1a continuous: A's play of C resolves, then X, then C's On Play (ratchet OPT-966)", () => {
+  it("F1a continuous: A's play of C resolves, then X, then C's On Play (ratchet OPT-966)", () => {
     const { b, attacker } = f1Setup(false);
     attack(b, attacker);
     expect(order(b.state, F1_TYPES)).toEqual(F1_EXPECTED);
+    expect(b.state.eventLog.filter((event) => F1_TYPES.includes(event.type)).map((event) => `${event.type}:p${event.playerIndex}`)).toEqual(F1_EXPECTED);
   });
 
-  it.fails("F1b prompt inside A answered immediately (ratchet OPT-966)", () => {
+  it("F1b prompt inside A answered immediately (ratchet OPT-966)", () => {
     const { b, attacker } = f1Setup(true);
     attack(b, attacker);
     expect(b.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     b.state = reply(b.state, b.cardDb, pickC(b.state));
     expect(order(b.state, F1_TYPES)).toEqual(F1_EXPECTED);
+    expect(b.state.eventLog.filter((event) => F1_TYPES.includes(event.type)).map((event) => `${event.type}:p${event.playerIndex}`)).toEqual(F1_EXPECTED);
   });
 
-  it.fails("F1c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
+  it("F1c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
     const { b, attacker } = f1Setup(true);
     attack(b, attacker);
     expect(b.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
@@ -224,6 +226,7 @@ describe("F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.
     expect(loaded.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     loaded.state = reply(loaded.state, loaded.cardDb, pickC(loaded.state));
     expect(order(loaded.state, F1_TYPES)).toEqual(F1_EXPECTED);
+    expect(loaded.state.eventLog.filter((event) => F1_TYPES.includes(event.type)).map((event) => `${event.type}:p${event.playerIndex}`)).toEqual(F1_EXPECTED);
   });
 });
 

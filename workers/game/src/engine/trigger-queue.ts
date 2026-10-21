@@ -6,22 +6,20 @@
  * behaviour change; there is still exactly one pipeline-side policy.
  */
 
-import { updateEffectContinuation } from "./effect-resolver/event-activation.js";
-import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
+import { isGameTerminated } from "./terminal.js";
 import type { CardData, GameAction, GameEvent, GameState, ExecuteResult, PendingPromptState, QueuedTrigger } from "../types.js";
 import { recalculateBattlePowers } from "./battle.js";
-import { emitPendingEvent, getEventCardInstanceId } from "./events.js";
+import { emitPendingEvent } from "./events.js";
 import {
   matchTriggersForEvent,
   orderMatchedTriggers,
   registerCardEnteredField,
   deregisterDepartedSources,
 } from "./triggers.js";
-import { resolveEffect } from "./effect-resolver/index.js";
+import { resolverExecutionServices } from "./effect-resolver/resolver.js";
+import { advanceTriggerExecution, createTriggerExecution } from "./trigger-executor.js";
 import { findCardInstance } from "./state.js";
 import {
-  scanEventsForTriggers,
-  buildTriggerSelectionPrompt,
   queuedSourceSnapshot,
 } from "./trigger-ordering.js";
 import { takeEngineTimestamp } from "./execution-context.js";
@@ -134,64 +132,6 @@ export function fireEndPhaseEvents(
 }
 
 /**
- * Process a queue of triggers with LIFO semantics.
- * When a resolved trigger emits events that match new triggers,
- * those new triggers are inserted at the FRONT of the queue (LIFO).
- */
-function processTriggerQueuePipeline(
-  state: GameState,
-  queue: QueuedTrigger[],
-  cardDb: Map<string, CardData>,
-): { state: GameState; pendingPrompt?: PendingPromptState } {
-  let nextState = state;
-
-  while (queue.length > 0) {
-    const next = queue.shift();
-    if (!next) break;
-
-    const stackDepth = nextState.effectStack.length;
-    const result = resolveEffect(
-      nextState,
-      next.effectBlock,
-      next.sourceCardInstanceId,
-      next.controller,
-      cardDb,
-      getEventCardInstanceId(next.triggeringEvent) ?? null,
-      undefined,
-      next.triggeringEvent,
-      next.sourceSnapshot
-    );
-    nextState = result.state;
-    if (isGameTerminated(nextState)) {
-      return { state: publishBeforeGameOver(nextState, result.events, next.controller) };
-    }
-
-    if (result.pendingPrompt) {
-      nextState = updateEffectContinuation(nextState, stackDepth, frame => ({
-        pendingTriggers: [...frame.pendingTriggers, ...queue],
-      }));
-      return { state: nextState, pendingPrompt: result.pendingPrompt };
-    }
-
-    // Emit events from this trigger's resolution
-    for (const event of result.events) {
-      nextState = emitPendingEvent(nextState, event, next.controller);
-    }
-
-    // LIFO: scan result events for new triggers and insert at front
-    if (result.events.length > 0) {
-      const scanResult = scanEventsForTriggers(nextState, result.events, next.controller, cardDb);
-      nextState = scanResult.state;
-      if (scanResult.triggers.length > 0) {
-        queue.unshift(...scanResult.triggers);
-      }
-    }
-  }
-
-  return { state: nextState };
-}
-
-/**
  * Printed-property snapshot of the card a PLAY_CARD / USE_COUNTER_EVENT /
  * DECLARE_BLOCKER action acted on (OPT-443). Captured pre-execute in
  * runPipeline; attached to the recorded PerformedAction entry so
@@ -280,28 +220,17 @@ export function processPlayerTriggerGroup(
   afterTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
 ): { state: GameState; pendingPrompt?: PendingPromptState } {
-  if (triggers.length === 0) {
-    // No triggers for this player — process the other player's group
-    if (afterTriggers.length === 0) return { state };
-    return processPlayerTriggerGroup(state, afterTriggers, [], cardDb);
+  const reported = createTriggerExecution(state, [...triggers, ...afterTriggers]);
+  switch (reported.kind) {
+    case "completed":
+    case "terminal":
+      return { state: reported.state };
+    case "queued":
+      return advanceTriggerExecution(reported, cardDb, resolverExecutionServices);
+    case "waiting":
+    case "continued":
+      throw new Error("A new trigger scope must be queued, completed, or terminal");
   }
-
-  if (triggers.length === 1) {
-    // Single trigger — auto-resolve, no prompt needed
-    const result = processTriggerQueuePipeline(state, [...triggers], cardDb);
-    if (result.pendingPrompt) {
-      result.state = updateEffectContinuation(result.state, state.effectStack.length, frame => ({
-        pendingTriggers: [...frame.pendingTriggers, ...afterTriggers],
-      }));
-      return result;
-    }
-    // Single trigger done — process the other player's group
-    if (afterTriggers.length === 0) return { state: result.state };
-    return processPlayerTriggerGroup(result.state, afterTriggers, [], cardDb);
-  }
-
-  // 2+ triggers — prompt the player to choose the order
-  return buildTriggerSelectionPrompt(state, triggers, afterTriggers, cardDb);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
