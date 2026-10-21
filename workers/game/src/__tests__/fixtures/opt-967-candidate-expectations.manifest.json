@@ -1,7 +1,7 @@
 {
   "provenance": "synthetic, separate candidate expectations; historical inputs frozen",
   "base": "a38be3a10cca8138e627fc4b7be23c9717893039",
-  "producerRevision": "6faaf6071746d0e4c79eb7390d3eb9c49f4315dd",
+  "producerRevision": "117e7e46bd76d627a808c5128c1a53b270100006",
   "inputSha256": {
     "opt-966-final-writer-corpus.json.gz": "ea977b60ec55723a56eb1bfbbe6c2d492850474b7be20f47bc7680eccd01ac8c",
     "opt-966-end-phase-states.synthetic.json": "ddf09b04e1e71958ec76de078a59caf33651ab2ddd8703bb4e3b03543d1f65ef",
