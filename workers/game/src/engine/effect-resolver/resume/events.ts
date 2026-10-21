@@ -91,9 +91,26 @@ export function retainPropagationBeforePrompt(
 ): GameState {
   const pending = pendingPropagationEvents(events);
   if (pending.length === 0) return state;
-  const ownerIndex = state.effectStack.findIndex(
-    (frame) => frame.phase === "INTERRUPTED_BY_TRIGGERS"
-  );
+  let ownerIndex = -1;
+  if (state.effectStack.some(frame => frame.triggerExecution)) {
+    // Loaded v5 work owns propagation independently of completion-only Event
+    // boundaries. Prefer its nearest owner or a live descendant battle debt;
+    // a stale damage frame cannot acquire debt for another battle.
+    for (let index = state.effectStack.length - 1; index >= 0; index--) {
+      const frame = state.effectStack[index];
+      if (frame.triggerExecution ||
+        (frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+          frame.battleDamage.battleId === state.turn.battle?.battleId)) {
+        ownerIndex = index;
+        break;
+      }
+    }
+  } else {
+    // Preserve the ordinary v1-v4 reader path; this amendment creates no owner.
+    ownerIndex = state.effectStack.findIndex(
+      frame => frame.phase === "INTERRUPTED_BY_TRIGGERS"
+    );
+  }
   if (ownerIndex >= 0) return retainEventsOnFrame(state, ownerIndex, pending);
   const child = state.effectStack.at(-1);
   if (
