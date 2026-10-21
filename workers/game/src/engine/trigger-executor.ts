@@ -51,10 +51,22 @@ export function createEffectExecutionScope(
 ): GameState {
   if (triggerExecutionOwner(state) || isGameTerminated(state)) return state;
   const boundary = continuationBoundary(state, sourceCardInstanceId, controller);
-  return pushFrame(boundary.state, {
+  const scoped = pushFrame(boundary.state, {
     ...boundary.frame,
     triggerExecution: { generations: [{ triggers: [] }] },
   });
+  const damageIndex = state.effectStack.findIndex(frame =>
+    frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+    frame.battleDamage.battleId === state.turn.battle?.battleId
+  );
+  if (damageIndex < 0 || isGameTerminated(scoped)) return scoped;
+  // Ordinary work raised by a battle substitute belongs after damage. Keep
+  // its owner below the damage boundary, never above the substitute's suffix.
+  const owner = scoped.effectStack.at(-1)!;
+  return { ...scoped, effectStack: [
+    ...state.effectStack.slice(0, damageIndex), owner,
+    ...state.effectStack.slice(damageIndex),
+  ] };
 }
 
 /** Start a persisted scope at a cross-effect boundary. Domain handlers only
@@ -251,6 +263,21 @@ export function advanceTriggerExecution(
         events,
         resolved: true,
       };
+    const battleDebt = state.effectStack.find(frame =>
+      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+      frame.battleDamage.battleId === state.turn.battle?.battleId
+    );
+    if (battleDebt && triggerExecutionOwner(state) && !stopAtFrameId) {
+      // Damage completion owns both the battle prefix and substitute events.
+      // Retain publication debt without detaching/scanning the older prefix;
+      // ordinary reports already queued on the owner remain below this frame.
+      state = { ...state, effectStack: state.effectStack.map(frame =>
+        frame.id === battleDebt.id ? { ...frame,
+          accumulatedEvents: [...new Set([...frame.accumulatedEvents, ...events])],
+        } : frame
+      ) };
+      return { kind: "continued", state, events: [], resolved: true };
+    }
     if (
       stopAtFrameId &&
       !state.effectStack.some((frame) => frame.id === stopAtFrameId)

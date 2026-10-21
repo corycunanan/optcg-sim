@@ -131,6 +131,12 @@ export function runPipeline(
   }
 
   if (execResult.pendingPrompt) {
+    const battleDebt = nextState.effectStack.find(frame =>
+      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT"
+    );
+    if (battleDebt) nextState = createEffectExecutionScope(
+      nextState, battleDebt.sourceCardInstanceId, battleDebt.controller
+    );
     // Main/Counter execution owns its activation notification. Resolver frame
     // accumulators own their own prefixes and may scan them before the Event's
     // suffix finishes, so keep only the outer debt in a separate root barrier.

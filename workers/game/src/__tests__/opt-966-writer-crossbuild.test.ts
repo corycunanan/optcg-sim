@@ -251,3 +251,46 @@ it.skipIf(!process.env.OPT966_READER_ROOT).each([false, true])("reparks legacy s
   expect(childPower).toBeLessThan(types.indexOf("CARD_DRAWN"));
   expect(childPower).toBeLessThan(types.indexOf("TURN_ENDED"));
 });
+
+
+it.skipIf(!process.env.OPT966_READER_ROOT)("replays a prompted battle substitute and its surviving KO watcher", async () => {
+  const rig = endPhaseRig();
+  rig.state.turn.activePlayerIndex = 1;
+  rig.putSyn("BATTLE-REPLACER", synSchema("BATTLE-REPLACER", "Leader", [{
+    id: "replace", category: "replacement", replaces: { event: "WOULD_BE_KO", target_filter: { controller: "SELF", base_cost_min: 4 } },
+    flags: { optional: true, once_per_turn: true }, replacement_actions: [
+      { type: "KO", target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 }, filter: { cost_max: 1 } } },
+      { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+      { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+      { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_TURN" } },
+    ],
+  }]), 0, "LEADER");
+  rig.putSyn("VICTIM", null, 0, "CHARACTER", { cost: 1 });
+  rig.putSyn("SURVIVING-WATCHER", synSchema("SURVIVING-WATCHER", "Character", [{
+    id: "watch", category: "auto", trigger: { event: "ANY_CHARACTER_KO", filter: { controller: "SELF" } },
+    actions: [{ type: "DRAW", params: { amount: 1 } }],
+  }]), 0, "CHARACTER", { cost: 5 });
+  rig.putSyn("EXTRA-HAND-A", null, 0, "HAND");
+  rig.putSyn("EXTRA-HAND-B", null, 0, "HAND");
+  const target = rig.put("OP09-083", 0, "CHARACTER", { cost: 5, power: 6000 });
+  target.state = "RESTED";
+  const attacker = rig.putSyn("ATTACKER", null, 1, "CHARACTER", { cost: 5, power: 7000 });
+  rig.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId }, 1);
+  for (let n = 0; !rig.state.pendingPrompt && rig.state.turn.battle; n++) {
+    expect(n).toBeLessThan(6);
+    rig.act({ type: "PASS" }, rig.state.turn.battleSubPhase === "ATTACK_STEP" ? 1 : 0);
+  }
+  const pauses = await replayPauses(rig, state => state.pendingPrompt!.options.promptType === "SELECT_TARGET"
+    ? { type: "SELECT_TARGET", selectedInstanceIds: [state.players[0].hand[0].instanceId] }
+    : { type: "PLAYER_CHOICE", choiceId: "accept" }, "opt966-battle-debt-writer-corpus");
+  expect(pauses.map(state => state.pendingPrompt!.options.promptType)).toEqual(["OPTIONAL_EFFECT", "SELECT_TARGET", "SELECT_TARGET"]);
+  expect(pauses.every(state => state.effectStack.some(frame => frame.triggerExecution))).toBe(true);
+  const types = rig.state.eventLog.map(event => event.type);
+  expect(types.filter(type => type === "CARD_DRAWN")).toHaveLength(1);
+  expect(types.filter(type => type === "CARD_TRASHED")).toHaveLength(2);
+  expect(types.filter(type => type === "POWER_MODIFIED")).toHaveLength(1);
+  expect(types.indexOf("POWER_MODIFIED")).toBeLessThan(types.indexOf("END_OF_BATTLE"));
+  expect(types.indexOf("COMBAT_VICTORY")).toBeLessThan(types.indexOf("CARD_TRASHED"));
+  expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));
+  expect(rig.state.players[0].characters.some(card => card?.instanceId === target.instanceId)).toBe(true);
+});

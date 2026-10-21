@@ -26,11 +26,16 @@ function ownLegacyResume(state: GameState): GameState {
     const waiting = state.effectStack.findIndex((frame) =>
       frame.phase !== "AWAITING_BATCH_RESUME" && frame.pendingTriggers.length > 0
     );
-    const index = top.phase === "AWAITING_TRIGGER_ORDER_SELECTION" || waiting < 0
-      ? state.effectStack.length - 1 : waiting;
+    const damageIndex = state.effectStack.findIndex(frame =>
+      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+      frame.battleDamage.battleId === state.turn.battle?.battleId
+    );
+    const index = damageIndex >= 0 ? damageIndex
+      : top.phase === "AWAITING_TRIGGER_ORDER_SELECTION" || waiting < 0
+        ? state.effectStack.length - 1 : waiting;
     const frame = state.effectStack[index];
     const scoped = createEffectExecutionScope(state, frame.sourceCardInstanceId, frame.controller);
-    let owner = scoped.effectStack.at(-1)!;
+    let owner = triggerExecutionOwner(scoped)!;
     let child = frame;
     if (top.phase === "AWAITING_TRIGGER_ORDER_SELECTION") {
       const choices = withStableOrderingIds(top.simultaneousTriggers);
