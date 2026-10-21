@@ -1,3 +1,4 @@
+import { isGameTerminated } from "../terminal.js";
 import { advanceTriggerExecution, createEffectExecutionScope, createTriggerExecution, reportTriggerWork, selectTriggerForExecution, triggerExecutionOwner } from "../trigger-executor.js";
 import type {
   CardData,
@@ -33,11 +34,15 @@ function ownLegacyResume(state: GameState): GameState {
       frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
       frame.battleDamage.battleId === state.turn.battle?.battleId
     );
-    const index = damageIndex >= 0 ? damageIndex
-      : top.phase === "AWAITING_TRIGGER_ORDER_SELECTION" || waiting < 0
-        ? state.effectStack.length - 1 : waiting;
+    // An already offered choice needs its owner directly below that choice.
+    // Never replace a lower damage frame with a copy of the top selection.
+    const index = top.phase === "AWAITING_TRIGGER_ORDER_SELECTION"
+      ? state.effectStack.length - 1
+      : damageIndex >= 0 ? damageIndex
+        : waiting < 0 ? state.effectStack.length - 1 : waiting;
     const frame = state.effectStack[index];
     const scoped = createEffectExecutionScope(state, frame.sourceCardInstanceId, frame.controller);
+    if (isGameTerminated(scoped)) return scoped;
     let owner = triggerExecutionOwner(scoped)!;
     let child = frame;
     if (top.phase === "AWAITING_TRIGGER_ORDER_SELECTION") {
