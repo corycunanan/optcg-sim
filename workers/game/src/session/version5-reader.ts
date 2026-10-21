@@ -16,6 +16,7 @@ const Execution = z.strictObject({
       orderingGroup: OrderingGroup.optional(),
     })
   ),
+  collectingGenerationIndex: z.number().int().positive().optional(),
   selectedTrigger: Trigger.extend({ orderingId: z.string().min(1) }).optional(),
 });
 
@@ -135,6 +136,14 @@ export function projectVersion5(
     const violation = triggerExecutionOwnerViolation(frame);
     if (violation) fail(`effectStack[${index}] ${violation}`);
     const work = parsed.data!;
+    const collector = work.collectingGenerationIndex;
+    if (
+      collector !== undefined &&
+      (collector >= work.generations.length ||
+        work.generations[collector].triggers.length === 0 ||
+        work.generations[collector].orderingGroup !== undefined)
+    )
+      fail(`effectStack[${index}] has an invalid open trigger collector`);
     scopes.set(index, work);
     if (frame.kind !== "TRIGGER_EXECUTION")
       fail(`effectStack[${index}] trigger execution kind disagrees`);

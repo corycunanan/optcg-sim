@@ -7,6 +7,8 @@ import type {
 } from "../types.js";
 import type { EffectBlock } from "../engine/effect-types.js";
 import { continuationBoundary, pushFrame } from "../engine/effect-stack.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
+import { reportTriggerWork } from "../engine/trigger-executor.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { withStableOrderingIds } from "../engine/trigger-ordering.js";
@@ -197,7 +199,345 @@ function sequence(state: GameState) {
   }));
 }
 
+function collectorFixture(siblings: boolean, prompted: boolean) {
+  const f = fixture(prompted);
+  const d = { ...structuredClone(f.c), id: "d" };
+  f.db.set("D", {
+    ...f.db.get("C")!,
+    id: "D",
+    name: "D",
+    effectSchema: {
+      card_id: "D",
+      card_name: "D",
+      card_type: "Character",
+      effects: [d],
+    },
+  });
+  f.state.players[0].hand.push({
+    ...f.state.players[0].hand[0],
+    instanceId: "D",
+    cardId: "D",
+  });
+  const playD = structuredClone(f.a.actions![0]);
+  if (playD.target) playD.target.filter = { name: "D" };
+  if (siblings) {
+    f.x.actions = [playD];
+    f.state.effectStack[0].triggerExecution!.generations[0].triggers =
+      withStableOrderingIds([f.trigger("A", 0, f.a), f.trigger("A", 0, f.x)]);
+  } else f.a.actions!.push(playD);
+  return f;
+}
+
 describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
+  it.each([false, true])(
+    "coalesces same-effect reports; prompted=%s",
+    (prompted) => {
+      const run = (reload: boolean) => {
+        const { state, db } = collectorFixture(false, prompted);
+        let current = start(restore(state), db);
+        while (current.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+          if (reload) current = restore(current);
+          const options = current.pendingPrompt!.options;
+          if (options.promptType !== "SELECT_TARGET") throw new Error("target");
+          current = answer(current, db, {
+            type: "SELECT_TARGET",
+            selectedInstanceIds: options.validTargets.slice(0, 1),
+          });
+        }
+        expect(current.effectStack.at(-1)?.phase).toBe(
+          "AWAITING_TRIGGER_ORDER_SELECTION"
+        );
+        const choices = current.effectStack.at(-1)!.simultaneousTriggers;
+        expect(choices.map((t) => t.effectBlock.id)).toEqual(["c", "d"]);
+        expect(current.eventLog.map((e) => e.type)).toEqual([
+          "CARD_PLAYED",
+          "CARD_PLAYED",
+          "CARD_DRAWN",
+          "DRAW_OUTSIDE_DRAW_PHASE",
+        ]);
+        if (reload) current = restore(current);
+        return answer(current, db, {
+          type: "PLAYER_CHOICE",
+          choiceId: choices[1].orderingId!,
+        });
+      };
+      const continuous = run(false),
+        reloaded = run(true);
+      expect(reloaded.eventLog).toEqual(continuous.eventLog);
+      expect(reloaded.players).toEqual(continuous.players);
+      expect(continuous.eventLog.slice(-2).map((e) => e.payload)).toEqual([
+        {
+          targetInstanceId: continuous.players[0].characters.find(
+            (c) => c?.cardId === "D"
+          )!.instanceId,
+          amount: 1000,
+        },
+        {
+          targetInstanceId: continuous.players[0].characters.find(
+            (c) => c?.cardId === "C"
+          )!.instanceId,
+          amount: 1000,
+        },
+      ]);
+      expect(continuous.effectStack).toEqual([]);
+    }
+  );
+
+  it("matches complete final traces and next-choice options across continuous, prompted and reloaded paths", () => {
+    const traces = [false, true].flatMap((prompted) =>
+      [false, true].map((reload) => {
+        const { state, db } = collectorFixture(false, prompted);
+        let current = start(restore(state), db);
+        while (current.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+          if (reload) current = restore(current);
+          const options = current.pendingPrompt!.options;
+          if (options.promptType !== "SELECT_TARGET") throw new Error("target");
+          current = answer(current, db, {
+            type: "SELECT_TARGET",
+            selectedInstanceIds: options.validTargets.slice(0, 1),
+          });
+        }
+        const prompt = current.pendingPrompt!;
+        const choice = current.effectStack.at(-1)!.simultaneousTriggers[1];
+        if (reload) current = restore(current);
+        const final = answer(current, db, {
+          type: "PLAYER_CHOICE",
+          choiceId: choice.orderingId!,
+        });
+        let trace = JSON.stringify({
+          events: final.eventLog,
+          players: final.players,
+          promptOptions: prompt.options,
+          respondingPlayer: prompt.respondingPlayer,
+          stack: final.effectStack,
+        });
+        // Prompt frames allocate IDs. Normalize only the two played and one drawn identities,
+        // including their ordering IDs; every event field and gameplay value remains.
+        for (const cardId of ["C", "D"]) {
+          const id = final.players[0].characters.find(
+            (c) => c?.cardId === cardId
+          )!.instanceId;
+          trace = trace.replaceAll(id, `${cardId}-played`);
+        }
+        trace = trace.replaceAll(
+          final.players[1].hand.at(-1)!.instanceId,
+          "X-drawn"
+        );
+        return JSON.parse(trace);
+      })
+    );
+    for (const trace of traces) expect(trace).toEqual(traces[0]);
+  });
+
+  it("collects C from A and D from older sibling B into one later choice across reload", () => {
+    const { state, db } = collectorFixture(true, true);
+    let current = start(restore(state), db);
+    current = answer(restore(current), db, {
+      type: "PLAYER_CHOICE",
+      choiceId: "A:a:0",
+    });
+    while (current.pendingPrompt?.options.promptType === "SELECT_TARGET") {
+      const raw = structuredClone(toPersistedGameState(current));
+      const undo = convertPersistedGameState(
+        structuredClone(raw),
+        "undoHistory[0]"
+      );
+      current = convertPersistedGameState(raw, "state");
+      expect(undo).toEqual(current);
+      const options = current.pendingPrompt!.options;
+      if (options.promptType !== "SELECT_TARGET") throw new Error("target");
+      current = answer(current, db, {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: options.validTargets.slice(0, 1),
+      });
+    }
+    expect(
+      current.effectStack
+        .at(-1)
+        ?.simultaneousTriggers.map((t) => t.effectBlock.id)
+    ).toEqual(["c", "d"]);
+    expect(current.eventLog.map((e) => e.type)).toEqual([
+      "CARD_PLAYED",
+      "CARD_PLAYED",
+    ]);
+    const final = answer(restore(current), db, {
+      type: "PLAYER_CHOICE",
+      choiceId: current.effectStack.at(-1)!.simultaneousTriggers[0].orderingId!,
+    });
+    expect(final.eventLog.map((e) => e.type)).toEqual([
+      "CARD_PLAYED",
+      "CARD_PLAYED",
+      "POWER_MODIFIED",
+      "POWER_MODIFIED",
+    ]);
+    expect(final.effectStack).toEqual([]);
+  });
+
+  it.each([false, true])(
+    "combines repeated source/effect reports with distinct stable identities; assigned=%s",
+    (assigned) => {
+      const { state, trigger, c } = fixture();
+      const incoming = [trigger("C", 0, c)];
+      if (assigned) incoming[0].orderingId = "C:c:0";
+      const first = reportTriggerWork(state, incoming).state;
+      const second = reportTriggerWork(first, incoming).state;
+      expect(
+        second.effectStack[0].triggerExecution!.generations[1].triggers[0]
+      ).toEqual(
+        first.effectStack[0].triggerExecution!.generations[1].triggers[0]
+      );
+      const work = second.effectStack[0].triggerExecution!;
+      expect(work.generations).toHaveLength(2);
+      expect(
+        new Set(work.generations[1].triggers.map((t) => t.orderingId)).size
+      ).toBe(2);
+      expect(() => restore(second)).not.toThrow();
+    }
+  );
+
+  it.each([0, -1, 1.5, 9])(
+    "rejects invalid collector index %s in live and undo",
+    (index) => {
+      const { state, trigger, c } = fixture();
+      const next = reportTriggerWork(state, [trigger("C", 0, c)]).state;
+      next.effectStack[0].triggerExecution!.collectingGenerationIndex = index;
+      const raw = toPersistedGameState(next);
+      for (const location of ["state", "undoHistory[0]"])
+        expect(() =>
+          convertPersistedGameState(structuredClone(raw), location)
+        ).toThrow();
+    }
+  );
+
+  it.each(["empty", "history"])("rejects %s collector work", (invalid) => {
+    const { state, trigger, c } = fixture();
+    const next = reportTriggerWork(state, [trigger("C", 0, c)]).state;
+    const collector = next.effectStack[0].triggerExecution!.generations[1];
+    if (invalid === "empty") collector.triggers = [];
+    else
+      collector.orderingGroup = {
+        triggers: collector.triggers,
+        resolvedTriggerIds: [],
+      };
+    expect(() => restore(next)).toThrow("invalid open trigger collector");
+  });
+
+  it("preserves the collector through an older ordering choice and automatic sibling prompt", () => {
+    const { state, db, trigger, a, x, c } = fixture(true);
+    state.effectStack[0].triggerExecution!.generations = [
+      {
+        triggers: withStableOrderingIds([
+          trigger("A", 0, a),
+          trigger("A", 0, x),
+        ]),
+      },
+    ];
+    const reported = reportTriggerWork(state, [trigger("C", 0, c)]).state;
+    let current = start(restore(reported), db);
+    expect(
+      current.effectStack[0].triggerExecution!.collectingGenerationIndex
+    ).toBe(1);
+    current = answer(restore(current), db, {
+      type: "PLAYER_CHOICE",
+      choiceId: "A:x:0",
+    });
+    expect(current.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+    expect(
+      restore(current).effectStack[0].triggerExecution!
+        .collectingGenerationIndex
+    ).toBe(1);
+  });
+
+  it("does not infer an open collector from old closed generations or supplied history", () => {
+    const { state, trigger, x, c } = fixture();
+    const work = state.effectStack[0].triggerExecution!;
+    const closed = withStableOrderingIds([trigger("X", 1, x)]);
+    work.generations.push(
+      { triggers: closed },
+      { triggers: structuredClone(closed) }
+    );
+    const first = reportTriggerWork(state, [trigger("C", 0, c)]).state;
+    const group = { triggers: closed, resolvedTriggerIds: [] };
+    const second = reportTriggerWork(first, closed, [], group).state;
+    const secondWork = second.effectStack[0].triggerExecution!;
+    expect(secondWork.collectingGenerationIndex).toBe(3);
+    expect(secondWork.generations.slice(0, 3)).toEqual(work.generations);
+    expect(secondWork.generations[4]).toEqual({
+      triggers: closed,
+      orderingGroup: group,
+    });
+    expect(() => restore(second)).not.toThrow();
+  });
+
+  it("routes reports to the inner scope without merging its parent's collector", () => {
+    const { state, trigger, x, c } = fixture();
+    const outer = reportTriggerWork(state, [trigger("C", 0, c)]).state;
+    const boundary = continuationBoundary(outer, "X", 1);
+    const nested = pushFrame(boundary.state, {
+      ...boundary.frame,
+      triggerExecution: {
+        generations: [
+          { triggers: withStableOrderingIds([trigger("X", 1, x)]) },
+        ],
+      },
+    });
+    const reported = reportTriggerWork(nested, [trigger("X", 1, x)]).state;
+    expect(reported.effectStack[0]).toEqual(outer.effectStack[0]);
+    expect(
+      reported.effectStack[1].triggerExecution!.collectingGenerationIndex
+    ).toBe(1);
+    expect(() => restore(reported)).not.toThrow();
+  });
+
+  it("retains the authored Moria active/rested On Play choice across live and undo reload", () => {
+    const { state, db, trigger } = collectorFixture(false, false);
+    const block = getEffectSchema("OP06-086")!.effects.find(
+      (b) =>
+        b.trigger && "keyword" in b.trigger && b.trigger.keyword === "ON_PLAY"
+    )!;
+    for (const id of ["C", "D"]) db.set(id, { ...db.get(id)!, cost: 2 });
+    state.players[0].trash = state.players[0].hand.map((card) => ({
+      ...card,
+      zone: "TRASH",
+    }));
+    state.players[0].hand = [];
+    db.set("A", { ...db.get("A")!, effectSchema: getEffectSchema("OP06-086") });
+    state.effectStack[0].triggerExecution!.generations = [
+      { triggers: withStableOrderingIds([trigger("A", 0, block)]) },
+    ];
+    let current = start(restore(state), db);
+    current = answer(restore(current), db, {
+      type: "SELECT_TARGET",
+      selectedInstanceIds: ["C", "D"],
+    });
+    const prompt = current.pendingPrompt!;
+    expect(prompt.options.promptType).toBe("PLAYER_CHOICE");
+    if (prompt.options.promptType !== "PLAYER_CHOICE")
+      throw new Error("state choice");
+    current = answer(restore(current), db, {
+      type: "PLAYER_CHOICE",
+      choiceId: prompt.options.choices[0].id,
+    });
+    const raw = toPersistedGameState(current);
+    expect(
+      convertPersistedGameState(structuredClone(raw), "undoHistory[0]")
+    ).toEqual(restore(current));
+    expect(
+      current.effectStack
+        .at(-1)!
+        .simultaneousTriggers.map((t) => t.effectBlock.id)
+    ).toEqual(["c", "d"]);
+    expect(
+      current.players[0].characters
+        .filter((c) => c?.cardId === "C" || c?.cardId === "D")
+        .map((c) => c!.state)
+    ).toEqual(["ACTIVE", "RESTED"]);
+    expect(current.eventLog.map((e) => e.type)).toEqual([
+      "CARD_PLAYED",
+      "CARD_PLAYED",
+    ]);
+  });
+
   it("keeps normal states on v4 and preserves a loaded v5 scope through save/load", () => {
     expect(GAME_STATE_SCHEMA_VERSION).toBe(4);
     const { state } = fixture();
@@ -321,55 +661,78 @@ describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
     ).toHaveLength(1);
   });
 
-  it("loads live and undo generation scopes and resumes both without losing the parent", async () => {
-    class MemoryStorage implements SessionStorage {
-      readonly data = new Map<string, unknown>();
-      async get<T>(key: string): Promise<T | undefined> {
-        return this.data.get(key) as T | undefined;
+  it.each([false, true])(
+    "loads live and undo generation scopes and resumes both without losing the parent; collector=%s",
+    async (collector) => {
+      class MemoryStorage implements SessionStorage {
+        readonly data = new Map<string, unknown>();
+        async get<T>(key: string): Promise<T | undefined> {
+          return this.data.get(key) as T | undefined;
+        }
+        async put(key: string, value: unknown): Promise<void>;
+        async put(entries: Record<string, unknown>): Promise<void>;
+        async put(key: string | Record<string, unknown>, value?: unknown) {
+          for (const [k, v] of Object.entries(
+            typeof key === "string" ? { [key]: value } : key
+          ))
+            this.data.set(k, structuredClone(v));
+        }
+        async setAlarm() {}
+        async deleteAlarm() {}
       }
-      async put(key: string, value: unknown): Promise<void>;
-      async put(entries: Record<string, unknown>): Promise<void>;
-      async put(key: string | Record<string, unknown>, value?: unknown) {
-        for (const [k, v] of Object.entries(
-          typeof key === "string" ? { [key]: value } : key
-        ))
-          this.data.set(k, structuredClone(v));
+      const { state, db } = collector
+        ? collectorFixture(false, true)
+        : fixture(true);
+      let paused = start(restore(state), db);
+      if (collector) {
+        paused = answer(paused, db, {
+          type: "SELECT_TARGET",
+          selectedInstanceIds: ["C"],
+        });
+        expect(
+          paused.effectStack[0].triggerExecution!.collectingGenerationIndex
+        ).toBe(1);
       }
-      async setAlarm() {}
-      async deleteAlarm() {}
+      // Fix the same prompt identity in live and undo snapshots; save assigns
+      // missing live IDs only, which would otherwise consume an extra engine ID.
+      paused = {
+        ...paused,
+        pendingPrompt: {
+          ...paused.pendingPrompt!,
+          promptId: "collector-save-prompt",
+        },
+      };
+      const repository = new SessionRepository(new MemoryStorage(), {
+        nextJsUrl: "https://example.test",
+        workerSecret: "secret",
+      });
+      await repository.save({
+        state: paused,
+        cardDb: db,
+        mode: "PVP",
+        pregameMode: "PRIORITY_ROLL",
+        testPriorityRolls: null,
+        undoHistory: [paused],
+      });
+      const loaded = (await repository.load())!;
+      expect(loaded.state.effectStack[0].triggerExecution).toEqual(
+        paused.effectStack[0].triggerExecution
+      );
+      expect(loaded.undoHistory[0].effectStack[0].triggerExecution).toEqual(
+        paused.effectStack[0].triggerExecution
+      );
+      const liveFinal = answer(loaded.state, db, {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: [collector ? "D" : "C"],
+      });
+      const undoFinal = answer(loaded.undoHistory[0], db, {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: [collector ? "D" : "C"],
+      });
+      expect(sequence(liveFinal)).toEqual(sequence(undoFinal));
+      expect(liveFinal.players).toEqual(undoFinal.players);
     }
-    const { state, db } = fixture(true);
-    const paused = start(restore(state), db);
-    const repository = new SessionRepository(new MemoryStorage(), {
-      nextJsUrl: "https://example.test",
-      workerSecret: "secret",
-    });
-    await repository.save({
-      state: paused,
-      cardDb: db,
-      mode: "PVP",
-      pregameMode: "PRIORITY_ROLL",
-      testPriorityRolls: null,
-      undoHistory: [paused],
-    });
-    const loaded = (await repository.load())!;
-    expect(loaded.state.effectStack[0].triggerExecution).toEqual(
-      paused.effectStack[0].triggerExecution
-    );
-    expect(loaded.undoHistory[0].effectStack[0].triggerExecution).toEqual(
-      paused.effectStack[0].triggerExecution
-    );
-    const liveFinal = answer(loaded.state, db, {
-      type: "SELECT_TARGET",
-      selectedInstanceIds: ["C"],
-    });
-    const undoFinal = answer(loaded.undoHistory[0], db, {
-      type: "SELECT_TARGET",
-      selectedInstanceIds: ["C"],
-    });
-    expect(sequence(liveFinal)).toEqual(sequence(undoFinal));
-    expect(liveFinal.players).toEqual(undoFinal.players);
-  });
+  );
 
   it("clears a selected activation before its child prompt can be saved", () => {
     const { state, db } = fixture(true);

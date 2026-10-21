@@ -395,7 +395,7 @@ export interface EventActivationDebt {
   sourceClass: "EVENT";
   events: PendingEvent[];
 }
-/** A FIFO generation is one simultaneous activation timing (rules 8-6-1/1-1). */
+/** A FIFO resolution cohort; an explicitly open cohort collects future work. */
 export interface TriggerGeneration {
   triggers: QueuedTrigger[];
   orderingGroup?: { triggers: QueuedTrigger[]; resolvedTriggerIds: string[] };
@@ -403,6 +403,9 @@ export interface TriggerGeneration {
 
 export interface TriggerExecution {
   generations: TriggerGeneration[];
+  /** Open cohort collecting reports until the current older generation finishes.
+   * Missing means every stored generation is closed; never infer from position. */
+  collectingGenerationIndex?: number;
   /** Removed from its generation before selection; cleared before activation. */
   selectedTrigger?: QueuedTrigger;
 }

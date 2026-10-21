@@ -72,16 +72,41 @@ export function reportTriggerWork(
   if (!owner?.triggerExecution)
     throw new Error("Trigger work has no execution owner");
   if (triggers.length) {
-    state = updateOwner(state, owner.id, {
-      ...owner.triggerExecution,
-      generations: [
-        ...owner.triggerExecution.generations,
-        {
-          triggers: withStableOrderingIds(triggers),
-          ...(orderingGroup ? { orderingGroup } : {}),
-        },
-      ],
-    });
+    const work = owner.triggerExecution;
+    // An explicit historical group is closed work, not a newly fulfilled report.
+    if (orderingGroup || work.generations.length === 0) {
+      state = updateOwner(state, owner.id, {
+        ...work,
+        generations: [
+          ...work.generations,
+          {
+            triggers: withStableOrderingIds(triggers),
+            ...(orderingGroup ? { orderingGroup } : {}),
+          },
+        ],
+      });
+    } else {
+      const index = work.collectingGenerationIndex ?? work.generations.length;
+      const existing = work.generations[index]?.triggers ?? [];
+      const used = new Set(existing.map((trigger) => trigger.orderingId));
+      // A later report may contain the same source/effect again. Allocate only
+      // new occurrence IDs; identities already saved in the collector stay fixed.
+      const appended = triggers.map((trigger) => {
+        const pair = `${trigger.sourceCardInstanceId}:${trigger.effectBlock.id}`;
+        let occurrence = 0;
+        let orderingId = trigger.orderingId ?? `${pair}:0`;
+        while (used.has(orderingId)) orderingId = `${pair}:${++occurrence}`;
+        used.add(orderingId);
+        return { ...trigger, orderingId };
+      });
+      const generations = [...work.generations];
+      generations[index] = { triggers: [...existing, ...appended] };
+      state = updateOwner(state, owner.id, {
+        ...work,
+        generations,
+        collectingGenerationIndex: index,
+      });
+    }
   }
   return {
     kind: triggers.length ? "queued" : "continued",
@@ -147,6 +172,7 @@ export function selectTriggerForExecution(
   };
   state = { ...state, effectStack: state.effectStack.slice(0, -1) };
   state = updateOwner(state, owner.id, {
+    ...owner.triggerExecution,
     generations: [
       nextGeneration,
       ...owner.triggerExecution.generations.slice(1),
@@ -230,7 +256,11 @@ export function advanceTriggerExecution(
     let work = owner.triggerExecution!;
     // Empty generations can exist while their selected effect is suspended.
     if (!work.selectedTrigger && work.generations[0]?.triggers.length === 0) {
-      work = { ...work, generations: work.generations.slice(1) };
+      // User-approved resolution-gate policy: reports raised by any older
+      // sibling join one cohort. Seal only after that whole generation and
+      // every active child have finished. Existing closed cohorts stay separate.
+      const { collectingGenerationIndex: _collector, ...sealed } = work;
+      work = { ...sealed, generations: work.generations.slice(1) };
       state = updateOwner(state, owner.id, work);
       continue;
     }
