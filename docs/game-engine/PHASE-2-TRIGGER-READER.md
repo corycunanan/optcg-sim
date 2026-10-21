@@ -142,7 +142,10 @@ actual pipeline-produced v5 owner. The bootstrap wave registration is omitted
 from this historical fixture to isolate the legacy list from a second wave at
 its original handoff window. Actual writer commit `a578d8a6` then produces a
 prompted scheduled play, its optional On Play child, and later scheduled draw.
-Each of the three starting pauses is saved/reloaded through the session API
+Saving canonicalizes an absent stage to the explicit legacy stage. The missing-
+stage reader variant therefore removes that field from live and undo inputs
+before loading, without modifying the immutable corpus. Each of the three
+starting pauses is saved/reloaded through the session API
 and replayed from live and undo. These are six additional pauses (18 total),
 not production captures or a claim that ordinary new writers create legacy
 phase frames. Independent assertions require phase below owner, ending player

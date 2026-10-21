@@ -32,7 +32,17 @@ const cases = scenarios.flatMap(([name, json, promptPrefix]) => {
 
 it.each(cases)("resumes writer $name pause $index through later work in live and undo", async ({ index, stored, replies, expected, promptPrefix, corpus, name }) => {
   const storage = new MemorySessionStorage();
-  await storage.put(structuredClone(stored));
+  const raw = structuredClone(stored);
+  if (name === "absent legacy stage") {
+    // The writer canonicalizes missing stages while saving. Exercise the
+    // supported historical spelling explicitly without rewriting the corpus.
+    const states = [(raw.session as { state: GameState }).state,
+      ...(raw["session:undo-history"] as GameState[])];
+    for (const state of states) for (const frame of state.effectStack) {
+      if (frame.phaseBoundaryContinuation) delete frame.phaseBoundaryContinuation.stage;
+    }
+  }
+  await storage.put(raw);
   const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
   const loaded = (await new SessionRepository(storage, options).load())!;
   for (const initial of [loaded.state, loaded.undoHistory[0]]) {
