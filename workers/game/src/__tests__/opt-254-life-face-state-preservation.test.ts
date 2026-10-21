@@ -23,6 +23,7 @@
  * — is caught immediately.
  */
 
+import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 import { describe, it, expect } from "vitest";
 import type {
   CardInstance,
@@ -99,7 +100,8 @@ function buildMinimalState(overrides: Partial<GameState> = {}): GameState {
   });
 
   return {
-    gameId: "test-opt-254",
+    ...createBattleReadyState(createTestCardDb()),
+    id: "test-opt-254",
     status: "IN_PROGRESS",
     winner: null,
     players: [makePlayer(0), makePlayer(1)],

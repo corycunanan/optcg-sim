@@ -309,15 +309,17 @@ it("retains native identity without logging rollback degradation", () => {
       effectBlockId: "queued-effect",
     },
   };
-  raw.effectStack[1].pendingTriggers = [queued];
+  const continuationIndex = raw.effectStack.findIndex(frame => frame.phase === "AWAITING_TARGET_SELECTION");
+  expect(continuationIndex).toBeGreaterThanOrEqual(0);
+  raw.effectStack[continuationIndex].pendingTriggers = [queued];
   const spy = vi.spyOn(logger, "log");
   try {
     const loaded = convertPersistedGameState(raw, "undoHistory[0]");
     expect(spy).not.toHaveBeenCalledWith("session.legacy_shape", expect.objectContaining({ shape: "lowered.v4_source_snapshot" }));
-    expect(loaded.effectStack[1].pendingTriggers[0].sourceSnapshot).toEqual(queued.sourceSnapshot);
+    expect(loaded.effectStack[continuationIndex].pendingTriggers[0].sourceSnapshot).toEqual(queued.sourceSnapshot);
     spy.mockClear();
     const bad = structuredClone(raw);
-    bad.effectStack[1].remainingActions = [{ type: "NOT_AN_ACTION" }];
+    bad.effectStack[continuationIndex].remainingActions = [{ type: "NOT_AN_ACTION" }];
     expect(() => convertPersistedGameState(bad, "state")).toThrow();
     expect(spy).not.toHaveBeenCalled();
   } finally {
