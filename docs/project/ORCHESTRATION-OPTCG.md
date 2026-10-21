@@ -33,6 +33,16 @@ For each changed behavior, cover a normal execution, its closest illegal/negativ
 
 Do not assert a universal answer from this question table. Derive each expected outcome from the exact supported rules and card text.
 
+## Persisted-state migration preflight
+
+Before the first reader release for a writer migration, inventory supported producer and continuation families, not just the initial failing path. Map each to its owner, ingress/resume path, live/undo conversion, later suspension boundaries and deployed rollback reader. Include affected phase/scheduled work, damage/Life windows, replacements/batches and event-publication owners. Select representative supported cases; this is not a demand for an exhaustive Cartesian product.
+
+Use an isolated, non-deployed writer candidate to produce the compatibility corpus before freezing the reader. Replay each selected starting pause through subsequent pauses and completion on the proposed reader through the real session/persistence boundary. Derive gameplay expectations independently; cross-build equality alone can preserve a shared bug. Pin producer and reader revisions, preserve historical inputs, and compare complete relevant state/events/prompts without broad identity normalization. If allocation intentionally changes, retain the old fixtures and document a separately derived new expectation rather than rewriting history.
+
+For changed ownership or legacy lifting, include supported non-top owners with child frames and terminal/stack-depth exhaustion: creating an owner may terminate execution instead of returning one. Confirm that recovery preserves other live work and event publication order. These late findings in OPT-966 belong in the initial risk matrix for similar migrations.
+
+Uncovered required families block reader readiness. Newly discovered families trigger the charter's design checkpoint and matrix update before another piecemeal reader release. Deploy the verified reader before enabling the writer; preserve required capture and rollout gates. Synthetic writer-generated fixtures are not production captures. Derive reported corpus totals from its manifest under [run records](./ORCHESTRATION-RECORDS.md).
+
 ## Test at the boundary that owns the behavior
 
 - Engine/card execution: exercise the actual action pipeline with registered authored schemas and complete pending selections/costs. Assert final zones, resources, identities, events and prompts against independently derived expectations. Helper tests alone do not establish playable behavior.

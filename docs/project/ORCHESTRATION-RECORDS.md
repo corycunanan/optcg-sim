@@ -2,7 +2,11 @@
 
 Use with the [charter](./ORCHESTRATION-CHARTER.md). These are records of observed work and user authorization, not an alternative policy or an executable merge gate.
 
-## Durable ledger
+## Current checkpoint and durable ledger
+
+Keep current state at the top, aiming for roughly 500 words plus references. Update it at state transitions; keep chronological decisions below or in a linked history file. Workers receive only their bounded stage packet and necessary source evidence, never the entire ledger or coordinator conversation. Reuse source packets by reference and send changed facts for deltas.
+
+The checkpoint names scope/permissions, workspaces and owners, current head/base, unresolved findings, completed evidence, active job IDs, and the exact next action. Raw logs belong in artifacts rather than repeated ledger entries.
 
 Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coordinator owns this file; parallel implementers do not edit it. Record its absolute workspace path in progress/handoff messages. Keep it locally during the run; include a stable snapshot in an authorized ticket PR only when it can be reviewed before readiness. Do not append a post-review commit and reuse the old receipt. Preserve the live ledger during workspace cleanup even if its final snapshot is not committed; report its path.
 
@@ -24,13 +28,15 @@ Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coo
 
 ## Decisions and evidence
 - <decision, source, why it changes scheduling or implementation>
-- <baseline command, exit/result, tested revision, log/artifact path>
+- <evidence ID, command/environment, exit/result, tested revision, affected surfaces, log/artifact path; reuse assessment against current delta>
+- <parent issue/stage; actual models/efforts; full/delta reviews, diagnostic probes and repair cycles; finding → detecting reviewer; design checkpoint and bounded exit criterion>
 - <readiness receipts or links>
 
 ## Recovery and follow-ups
 - Active agent/thread IDs and ownership:
 - Durable uncommitted/unpushed work:
 - Next runnable frontier:
+- Usage/outcomes: <elapsed time to verified delivery; token/usage source and parent/child coverage if available, otherwise unavailable>
 - Deferred findings, by ticket/PR:
 - Linear audit trail: <issue, operation, before/after, reason, required comment URL(s), verified/pending>
 - Follow-up origins: <new ticket → original ticket → original-ticket comment URL>
@@ -48,7 +54,7 @@ Embed the full resolved ticket and necessary comments/requirements, rather than 
 - Public testing boundary, baseline/check expectations, regression evidence and known environment limitations.
 - Deliverables: implementation commits, pushed PR, honest validation baseline/results, Follow-ups and next-ticket handoff; no merge, no Linear writes.
 
-Reviewers receive the same intent and source packet plus the actual head/base diff. They independently examine the code and expected behavior; implementer conclusions are claims to check. Request `clean`, `findings`, or `incomplete`, with commands, results, scenarios, missing coverage, and full reviewed SHA.
+Dispatches name the selected model/effort, bounded responsibility, stopping condition and expected output. Reviewers receive the same intent and source packet plus the actual head/base diff, with distinct spec and high-risk correctness hunt briefs when both are required. They independently examine the code and expected behavior; implementer conclusions are claims to check. Request `clean`, `findings`, or `incomplete`, with commands, results, scenarios, missing coverage, and full reviewed SHA.
 
 ## Readiness receipt
 
@@ -61,7 +67,7 @@ Create one per PR. Every field must contain observed evidence, an explicit appli
 - Assessed at: <timestamp>
 - Scope and acceptance: <criterion → hunk/behavior → evidence>
 - Coordinator review: <head, outcome, evidence location>
-- Models: <implementer model; Claude reviewer model; Codex lens model or not run>
+- Models: <actual coordinator, implementer, spec/correctness reviewer models and efforts; provider diversity and fallback reasons>
 - Independent review: <reviewer, head, required passes and each outcome>
 - Findings: <scenario/root cause, severity, evidence, resolution or blocker>
 - Baseline/final validation: <commands, exit/results, revisions, logs; carried-forward checks and why>
@@ -79,3 +85,7 @@ Create one per PR. Every field must contain observed evidence, an explicit appli
 Never transform `incomplete` into `merge-ready` because no findings were returned. Merge authorization is independent of readiness: an assessed PR can be merge-ready with permission off, and a permitted PR can remain blocked.
 
 For `verified-no-change`, record the acceptance criteria, current code/delivered PR proving each is already satisfied, verification command/results and revision, and any remaining uncertainty. No PR or merge receipt fields need be invented for an issue that needs no change.
+
+## Artifact provenance
+
+Derive scenario, pause, test and inventory totals from the source manifest or test report with a command; distinguish scenarios, starting pauses, later replay pauses and test executions. Reuse that result in the PR body, ledger and tracker. Pin corpus producer/reader SHAs and artifact hashes. When only metadata changes, verify payload identity before carrying evidence forward. Correct reporting errors explicitly without treating a corrected count as missing coverage or regenerating historical evidence.

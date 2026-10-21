@@ -7,9 +7,9 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 ## Dispatch and sandbox
 
 - Permission-rule matching is prefix-based: `codex exec` and `gh pr merge` commands must START with those words. Use `-C <clone>`, never a `cd && ` prefix (merge fails the allow rule with any prefix; `codex exec resume` tolerates a bare `cd <clone> && `).
-- `~/.codex/config.toml` has changed model and effort more than once (`model_reasoning_effort = "low"` until 2026-10; `gpt-6-astra` at `high` on 2026-10-12). A dispatch that omits `-m` or `-c model_reasoning_effort=...` inherits whatever is there silently (2026-08-22). Valid efforts: none/low/medium/high/xhigh; `minimal` is rejected. Catalog as of 2026-10-12 (`~/.codex/models_cache.json`): `gpt-6-astra` frontier, `gpt-6.1-sol` workhorse, `gpt-6-sol` previous workhorse, `gpt-6-luna` fast, `gpt-reserve` fast agentic; the `gpt-5.6-*` family still resolves but is marked older generation. Commit/push/PR from inside the sandbox was validated only on `gpt-5.6-sol`; prove it in preflight before relying on any GPT-6 model as a fallback implementer.
+- A CLI dispatch that omits `-m` or `-c model_reasoning_effort=...` silently inherits local configuration. Use charter §4's explicit role routing and verify supported efforts in the current runtime; historical model catalogs are not dispatch policy. Native full-history forks may likewise inherit the parent model: use a fresh bounded brief when selecting a different model. Preflight only the filesystem/network capabilities the assigned role needs.
 - Adversarial reviews run with `--sandbox workspace-write` plus "do NOT modify tracked files; delete scratch files; prove `git status --porcelain` is empty". Under `--sandbox read-only` vitest cannot mkdir its temp dir, every suite dies with `EPERM … mkdir '…/ssr'`, and the reviewer returns no verdict (2026-07-25).
-- A codex session that writes nothing to its output file for >1h is hung: TaskStop it and re-dispatch fresh with a priority-ordered prompt.
+- Silence alone does not prove a worker is hung. Inspect process and working-tree progress before recovery; preserve partial work and follow charter §7 rather than automatically redispatching.
 - **macOS tmp reaper deletes `/private/tmp` clone files untouched for ~3 days** (2026-09-03): it kills in-flight resumed sessions and destroys uncommitted work, and the harness reports it as a "killed" task. For runs spanning days push WIP daily; recover by rebuilding the clone from the origin branch and dispatching fresh — resume cannot recover a deleted working tree.
 - A clone with `node_modules` measures ~2 GB (1.9 GB on 2026-09-06 with pnpm hardlinks). Check `df -h /private/tmp` in preflight; Codex crashes on ENOSPC leaving uncommitted work in the clone. Re-dispatch with "inventory `git diff` first, do not discard". Never `git restore` agent work (hook-enforced: `.claude/hooks/block-dangerous-git.sh`).
 - If a git operation is denied, inspect and preserve completed work, then follow the current approval flow. Do not dispatch another process outside the sandbox to bypass the denial.
@@ -17,11 +17,7 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 - Environment for Codex validation: `CI=true` + `XDG_CACHE_HOME` + `COREPACK_HOME` (seed from `~/.cache/node/corepack`; an empty dir yields pnpm 11). Put both cache dirs OUTSIDE the clone (`/private/tmp/optcg-cache-<NNN>/{xdg,corepack}`): in-clone `.cache`/`.corepack` dirs are traversed by root ESLint and fail `pnpm lint` with "could not find plugin react-hooks" (2026-09-09). Postgres cannot start in-sandbox; host it outside.
 - Sandboxed Codex has no network and no Linear: embed the full ticket text in the prompt and state that missing external access is not grounds to stop. A review task that tries its own Linear MCP and fails will refuse to issue a verdict (2026-08-04).
 - Background Codex tasks cannot escalate permissions; never instruct them to (the classifier blocks the prompt too).
-- Codex fallback implementer dispatch (use it when Claude quota is exhausted, or for wide Small batches):
-
-  ```sh
-  codex exec -m gpt-6-astra -c model_reasoning_effort="<low|medium>" -C <clone> --sandbox workspace-write -o <out.md> - < <brief.txt>
-  ```
+- Codex dispatch models now follow charter §4 (2026-10-21): Sol 6.1 implementation, Luna 6 bounded chores, Astra high-risk review. Use the skill's parameterized CLI example; historical quota-fallback recipes do not select today's model.
 
   In Codex follow-up sessions, `.git/index.lock` writes were denied 4 of 6 times (2026-09-15). The coordinator read the diff and committed on the implementer's behalf.
 
@@ -62,8 +58,8 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 - Root `npx tsc --noEmit` misses the worker: run it inside `workers/game` too. Schema lint: `node workers/game/src/engine/schemas/lint-schemas.sh <file>` (a node script despite the name). Worker vitest: `pnpm --dir workers/game exec vitest run src/...`.
 - Use pnpm for all validation; the canonical lint baseline is measured under the pnpm-locked tree and npm totals differ.
 - Baseline is green (schema lint 0 errors, worker tsc 0 errors). Never tell an agent to expect pre-existing lint errors — on a green baseline that invites it to dismiss its own violations as inherited.
-- Gate specs name the FULL vitest suite before push; a scoped gate let a stale API route test through to review (OPT-618, 2026-08-09).
-- Self-reported mutation matrices and coverage claims are rung 1 on the evidence ladder (`.claude/reference/evidence-ladder.md`). The delta-review prompt says "do not trust the PR body; re-run every mutation yourself", and the orchestrator mutates a few guards directly (~1 min each).
+- OPT-618 exposed a stale API route test missed by a scoped check (2026-08-09). Current validation follows charter §3/§4: focused local checks plus required CI for Small/Medium; local full gate plus CI for Large. Select affected consumers rather than imposing a full local suite on every push.
+- Self-reported mutation matrices and coverage claims need independent evidence (`.claude/reference/evidence-ladder.md`). Verify decisive changed guards and claims; carry unaffected evidence with a delta assessment under charter §4/§6 instead of asking every role to repeat every mutation.
 - A mutation-survival criterion unfairly flags positive "accepts X" tests, which cannot fail when a rejection guard is neutered; discount those rather than deleting them.
 - Grep-based acceptance invites guard deletion: Sol removed a negative assertion to reach grep-zero (2026-08-10). For mechanical sweeps, pair-check `git diff -U0` (normalize minus-lines by the intended substitution, compare to plus-lines) and treat any impure hunk as a finding.
 - Audit line numbers go stale when sibling tickets rewrite files. Briefs say locate-by-content; the orchestrator re-derives what an element IS before accepting a role change (OPT-641).
@@ -72,13 +68,13 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 
 ## Review and merge
 
-- Review cap is real: 1 full + 1 delta. A fresh MAJOR in the delta round stops the merge and goes to the user. Precedent (2026-08-23): the user authorized one bounded extra delta three times and each converged; when no authored card exercises the shape, recommend merge + follow-up ticket.
+- Review-budget behavior follows charter §5: consolidate failure families and change the approach at a design checkpoint. A new PR or diagnostic label does not reset cumulative work. Missing authored examples alone do not refute supported-state defects; preserve independent reachability evidence.
 - The spec-pass fork and the Codex adversarial reviewer run concurrently, so the fork never edits the ticket clone. For mutation runs it clones the clone and symlinks both `node_modules` dirs (root and `workers/game`), runs vitest there, then removes the copy. A fork's revert-and-restore inside the reviewer's window left a spurious `M` in the shared tree (2026-09-09).
 - Triage findings by reachability and root cause before looping them back. Reviewers have returned real MAJORs rooted in pre-existing `main` behavior unreachable through any authored card (OPT-613); a review can also disprove the ticket's premise (OPT-638) — then land the salvageable part and correct the ticket.
 - Always resolve the full 40-char head SHA for `--match-head-commit` via `gh pr view --json headRefOid`; a short SHA fails with a GraphQL coercion error.
 - A PR whose `ci` check never appears is almost certainly CONFLICTING — GitHub cannot build the test-merge commit, so `pull_request` workflows never trigger. Check `gh pr view --json mergeable,mergeStateStatus` before suspecting slow CI. After merging any PR that touches a shared file (handoff docs collide constantly), re-check every open sibling PR.
 - Codex has converted its own PR to draft; check `isDraft` at the merge gate and `gh pr ready <N>` if needed.
-- GitHub occasionally drops webhook events for one branch; an empty commit retriggers, and the post-merge `main` push run is the authoritative fallback signal.
+- Missing CI events require investigation of the exact head and workflow trigger. Prefer rerunning an eligible workflow; any retrigger that changes the head requires a renewed receipt and required checks. Post-merge CI never substitutes for missing required pre-merge checks.
 - The GitHub token lacks `workflow` scope: pushes touching `.github/workflows/` fail. Chain CI-adjacent checks onto scripts CI already runs (e.g. `lint`).
 - Merging to `main` auto-runs `prisma migrate deploy` against PROD via the Vercel build and auto-deploys Cloudflare workers. `vercel ls` (CLI 52) hangs non-interactively — check the prod deploy via `gh api repos/<owner>/<repo>/commits/<sha>/status`. A failed prod migration (P3009) blocks all deploys until `prisma migrate resolve --rolled-back` + re-apply.
 
