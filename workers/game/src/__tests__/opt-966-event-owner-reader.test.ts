@@ -1,3 +1,4 @@
+import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
 import { SessionRepository } from "../session/persistence.js";
@@ -21,30 +22,36 @@ it.each(corpus.cases)("replays actual Counter pause $index through every subsequ
       const storage = new MemorySessionStorage();
       await new SessionRepository(storage, options).save({ ...loaded, state: actual, undoHistory: [actual] });
       actual = (await new SessionRepository(storage, options).load())!.state;
-      expect(actual).toEqual((await loadCase(index + offset)).state);
-      const completion = actual.effectStack.find(frame => frame.eventActivation)!;
+      expect(actual).toEqual(
+          candidateExpected(`event-owner/${index}/pause/${offset}`)
+        );
+      const completion = actual.effectStack.find(
+          (frame) => frame.eventActivation)!;
       expect(completion.accumulatedEvents).toEqual([]);
       expect(actual.pendingPrompt!.respondingPlayer).toBe(index + offset === 2 ? 0 : 1);
       const result = resumePromptLifecycle(actual, action as GameAction, loaded.cardDb, {
-        drainPregame: state => state, advanceStartOfTurn: state => state,
+        drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
       });
       expect(result.responseRejected).toBe(false);
       actual = result.state;
     }
-    expect(actual).toEqual(corpus.expected);
+    expect(actual).toEqual(candidateExpected(`event-owner/${index}/final`));
     expect(actual.effectStack).toEqual([]);
     expect(actual.pendingPrompt).toBeNull();
     for (const type of ["POWER_MODIFIED", "EVENT_ACTIVATED_FROM_HAND", "COUNTER_USED"])
-      expect(actual.eventLog.filter(event => event.type === type)).toHaveLength(1);
-    expect(actual.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(2);
+      expect(actual.eventLog.filter((event) => event.type === type)).toHaveLength(1);
+    expect(actual.eventLog.filter((event) => event.type === "CARD_DRAWN")).toHaveLength(2);
   }
 });
 
 it.skipIf(!process.env.OPT966_READER_ROOT)("preserves normal v4 Counter pipeline bytes at every pause", async () => {
   const root = process.env.OPT966_READER_ROOT!;
-  const baselinePipeline = await import(`${root}/workers/game/src/engine/pipeline.ts`) as typeof import("../engine/pipeline.js");
-  const baselineResume = await import(`${root}/workers/game/src/session/prompt-lifecycle.ts`) as typeof import("../session/prompt-lifecycle.js");
-  const { SessionRepository: BaselineRepository } = await import(`${root}/workers/game/src/session/persistence.ts`) as typeof import("../session/persistence.js");
+  const baselinePipeline = (await import(`${root}/workers/game/src/engine/pipeline.ts`
+    )) as typeof import("../engine/pipeline.js");
+  const baselineResume = (await import(`${root}/workers/game/src/session/prompt-lifecycle.ts`
+    )) as typeof import("../session/prompt-lifecycle.js");
+  const { SessionRepository: BaselineRepository } = (await import(`${root}/workers/game/src/session/persistence.ts`
+    )) as typeof import("../session/persistence.js");
   const { runPipeline } = await import("../engine/pipeline.js");
   const { endPhaseRig } = await import("./opt-962-rig.js");
   const { getEffectSchema } = await import("../engine/schema-registry.js");
@@ -69,7 +76,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("preserves normal v4 Counter pipeline
     expected = expected.pendingPrompt ? baselineResume.resumePromptLifecycle(expected, action, rig.db, services).state : baselinePipeline.runPipeline(expected, action, rig.db, player).state;
     if (actual.pendingPrompt) {
       actual.pendingPrompt.promptId = expected.pendingPrompt!.promptId = `v4-counter-${pauses++}`;
-      expect(actual.effectStack.some(frame => frame.triggerExecution)).toBe(false);
+      expect(actual.effectStack.some((frame) => frame.triggerExecution)).toBe(false);
       const storages = [new MemorySessionStorage(), new MemorySessionStorage()];
       await new SessionRepository(storages[0], options).save({ state: actual, cardDb: rig.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [actual] });
       await new BaselineRepository(storages[1], options).save({ state: expected, cardDb: rig.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [expected] });
@@ -81,21 +88,22 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("preserves normal v4 Counter pipeline
   }
   expect(pauses).toBe(3);
   expect(actual.pendingPrompt).toBeNull();
-  expect(actual.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(2);
+  expect(actual.eventLog.filter((event) => event.type === "CARD_DRAWN")).toHaveLength(2);
 });
 
-it.each(["owner", "inner", "battle", "stale"] as const)("retains independent propagation flags on nearest eligible %s owner", async topology => {
+it.each(["owner", "inner", "battle", "stale"] as const)("retains independent propagation flags on nearest eligible %s owner", async (topology) => {
   const { retainPropagationBeforePrompt } = await import("../engine/effect-resolver/resume/events.js");
   const { default: battle } = await import("./fixtures/opt-966-battle-debt-writer.json");
   const state = (await loadCase(2)).state;
-  const completion = state.effectStack.find(frame => frame.eventActivation)!;
-  const owner = state.effectStack.find(frame => frame.triggerExecution)!;
+  const completion = state.effectStack.find(
+      (frame) => frame.eventActivation)!;
+  const owner = state.effectStack.find((frame) => frame.triggerExecution)!;
   owner.accumulatedEvents = [];
   const prompt = state.effectStack.at(-1)!;
   const storage = new MemorySessionStorage();
   await storage.put(structuredClone(battle.cases[2].stored));
   const battleState = (await new SessionRepository(storage, options).load())!.state;
-  const damage = battleState.effectStack.find(frame => frame.battleDamage)!;
+  const damage = battleState.effectStack.find((frame) => frame.battleDamage)!;
   damage.accumulatedEvents = [];
   state.turn.battle = battleState.turn.battle;
   const inner = { ...structuredClone(owner), id: "inner-owner" };
@@ -106,12 +114,14 @@ it.each(["owner", "inner", "battle", "stale"] as const)("retains independent pro
   const complete = { ...event, propagation: { eventLogEmitted: true as const, triggerScanned: true as const } };
   const result = retainPropagationBeforePrompt(state, [event, event, equalPayload, complete]);
   const expectedId = topology === "inner" ? inner.id : topology === "battle" ? damage.id : owner.id;
-  const retained = result.effectStack.find(frame => frame.id === expectedId)!.accumulatedEvents;
+  const retained = result.effectStack.find(
+      (frame) => frame.id === expectedId)!.accumulatedEvents;
   expect(retained).toHaveLength(2);
   expect(retained[0]).toBe(event);
   expect(retained[1]).toBe(equalPayload);
-  expect(retained.every(item => item.propagation?.eventLogEmitted && !item.propagation?.triggerScanned)).toBe(true);
-  expect(result.effectStack.find(frame => frame.eventActivation)!.accumulatedEvents).toEqual([]);
+  expect(retained.every(
+        (item) => item.propagation?.eventLogEmitted && !item.propagation?.triggerScanned)).toBe(true);
+  expect(result.effectStack.find((frame) => frame.eventActivation)!.accumulatedEvents).toEqual([]);
   expect(result.eventLog).toBe(state.eventLog);
   expect(result.executionContext).toBe(state.executionContext);
 });

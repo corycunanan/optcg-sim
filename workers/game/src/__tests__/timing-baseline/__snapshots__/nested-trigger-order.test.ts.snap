@@ -30,7 +30,7 @@ exports[`F1 full traces and final gameplay agree across continuous, prompted and
       ],
       "sourceCardInstanceId": "card_00000043",
       "sourceEffectBlockId": "",
-      "timestamp": 12,
+      "timestamp": 10,
     },
   ],
   "players": [
@@ -1276,7 +1276,7 @@ exports[`F1 full traces and final gameplay agree across continuous, prompted and
       ],
       "sourceCardInstanceId": "card_00000044",
       "sourceEffectBlockId": "",
-      "timestamp": 13,
+      "timestamp": 11,
     },
   ],
   "players": [
@@ -2462,7 +2462,7 @@ exports[`F1 full traces and final gameplay agree across continuous, prompted and
     "actionsPerformedThisTurn": [
       {
         "actionType": "DECLARE_ATTACK",
-        "timestamp": 6,
+        "timestamp": 4,
       },
     ],
     "activePlayerIndex": 0,
@@ -2522,7 +2522,7 @@ exports[`F1 full traces and final gameplay agree across continuous, prompted and
       ],
       "sourceCardInstanceId": "card_00000044",
       "sourceEffectBlockId": "",
-      "timestamp": 13,
+      "timestamp": 11,
     },
   ],
   "players": [
@@ -3708,7 +3708,7 @@ exports[`F1 full traces and final gameplay agree across continuous, prompted and
     "actionsPerformedThisTurn": [
       {
         "actionType": "DECLARE_ATTACK",
-        "timestamp": 6,
+        "timestamp": 4,
       },
     ],
     "activePlayerIndex": 0,
@@ -3761,15 +3761,6 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
   },
   {
     "payload": {
-      "from": "ATTACK_STEP",
-      "to": "BLOCK_STEP",
-    },
-    "playerIndex": 0,
-    "timestamp": 2,
-    "type": "PHASE_CHANGED",
-  },
-  {
-    "payload": {
       "cardId": "SYN-C-ONPLAY",
       "cardInstanceId": "card_00000043",
       "playedRested": false,
@@ -3778,7 +3769,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "zone": "CHARACTER",
     },
     "playerIndex": 0,
-    "timestamp": 7,
+    "timestamp": 5,
     "type": "CARD_PLAYED",
   },
   {
@@ -3786,7 +3777,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "cardId": "CHAR-BANISH",
     },
     "playerIndex": 1,
-    "timestamp": 8,
+    "timestamp": 6,
     "type": "CARD_DRAWN",
   },
   {
@@ -3794,7 +3785,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "count": 1,
     },
     "playerIndex": 1,
-    "timestamp": 9,
+    "timestamp": 7,
     "type": "DRAW_OUTSIDE_DRAW_PHASE",
   },
   {
@@ -3803,8 +3794,17 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "targetInstanceId": "card_00000043",
     },
     "playerIndex": 0,
-    "timestamp": 13,
+    "timestamp": 11,
     "type": "POWER_MODIFIED",
+  },
+  {
+    "payload": {
+      "from": "ATTACK_STEP",
+      "to": "BLOCK_STEP",
+    },
+    "playerIndex": 0,
+    "timestamp": 13,
+    "type": "PHASE_CHANGED",
   },
 ]
 `;
@@ -3832,15 +3832,6 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
   },
   {
     "payload": {
-      "from": "ATTACK_STEP",
-      "to": "BLOCK_STEP",
-    },
-    "playerIndex": 0,
-    "timestamp": 2,
-    "type": "PHASE_CHANGED",
-  },
-  {
-    "payload": {
       "cardId": "SYN-C-ONPLAY",
       "cardInstanceId": "card_00000044",
       "playedRested": false,
@@ -3849,7 +3840,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "zone": "CHARACTER",
     },
     "playerIndex": 0,
-    "timestamp": 8,
+    "timestamp": 6,
     "type": "CARD_PLAYED",
   },
   {
@@ -3857,7 +3848,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "cardId": "CHAR-BANISH",
     },
     "playerIndex": 1,
-    "timestamp": 9,
+    "timestamp": 7,
     "type": "CARD_DRAWN",
   },
   {
@@ -3865,7 +3856,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "count": 1,
     },
     "playerIndex": 1,
-    "timestamp": 10,
+    "timestamp": 8,
     "type": "DRAW_OUTSIDE_DRAW_PHASE",
   },
   {
@@ -3874,8 +3865,17 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "targetInstanceId": "card_00000044",
     },
     "playerIndex": 0,
-    "timestamp": 14,
+    "timestamp": 12,
     "type": "POWER_MODIFIED",
+  },
+  {
+    "payload": {
+      "from": "ATTACK_STEP",
+      "to": "BLOCK_STEP",
+    },
+    "playerIndex": 0,
+    "timestamp": 14,
+    "type": "PHASE_CHANGED",
   },
 ]
 `;
@@ -3903,15 +3903,6 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
   },
   {
     "payload": {
-      "from": "ATTACK_STEP",
-      "to": "BLOCK_STEP",
-    },
-    "playerIndex": 0,
-    "timestamp": 2,
-    "type": "PHASE_CHANGED",
-  },
-  {
-    "payload": {
       "cardId": "SYN-C-ONPLAY",
       "cardInstanceId": "card_00000045",
       "playedRested": false,
@@ -3920,7 +3911,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "zone": "CHARACTER",
     },
     "playerIndex": 0,
-    "timestamp": 8,
+    "timestamp": 6,
     "type": "CARD_PLAYED",
   },
   {
@@ -3928,7 +3919,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "cardId": "CHAR-BANISH",
     },
     "playerIndex": 1,
-    "timestamp": 9,
+    "timestamp": 7,
     "type": "CARD_DRAWN",
   },
   {
@@ -3936,7 +3927,7 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "count": 1,
     },
     "playerIndex": 1,
-    "timestamp": 10,
+    "timestamp": 8,
     "type": "DRAW_OUTSIDE_DRAW_PHASE",
   },
   {
@@ -3945,8 +3936,17 @@ exports[`F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.m
       "targetInstanceId": "card_00000045",
     },
     "playerIndex": 0,
-    "timestamp": 14,
+    "timestamp": 12,
     "type": "POWER_MODIFIED",
+  },
+  {
+    "payload": {
+      "from": "ATTACK_STEP",
+      "to": "BLOCK_STEP",
+    },
+    "playerIndex": 0,
+    "timestamp": 14,
+    "type": "PHASE_CHANGED",
   },
 ]
 `;

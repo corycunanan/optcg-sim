@@ -1,5 +1,8 @@
 # Leg 5 — Rules map, prior audit, Doc 08, baseline drift
 
+**OPT-967 closure:** this remains the historical audit. The full Doc08/rules-map claim checklist is reconciled against the implemented runtime in [OPT-967 evidence](../../OPT-967-DRAIN-EVIDENCE.md#full-parent-doc08-audit-disposition); [Doc08](../../08-ENGINE-ARCHITECTURE.md) now describes current scheduling. Deferred replacement, loop, visibility, and capture gates remain explicit.
+
+
 ORCHESTRATOR CORRECTION: this leg read local HEAD 41f12cd0 (104 commits behind origin/main). Orchestrator re-verified against origin/main = 4fe26c6a (the proposal's baseline). All §3 friction claims still hold on main (phases.ts:182 M4 comment, :186 expire before :189 scheduled; validation.ts:361 costs.every; replacements.ts:168 stub; pipeline.ts:181 zero-power comment). The CANNOT_DRAW finding is STALE: prohibitions.ts:860+ on main enforces it (OPT-876). Engine commits since baseline: 0.
 
 ## Verdict

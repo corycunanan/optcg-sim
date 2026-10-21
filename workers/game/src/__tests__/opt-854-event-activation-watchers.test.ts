@@ -480,7 +480,11 @@ describe("OPT-854 inline Main completion: activated vs never activated", () => {
       resolverExecutionServices
     );
     expect(result.pendingPrompt).toBeUndefined();
-    expect(result.state.effectStack).toHaveLength(0);
+    // Domain services return work; only the external boundary drains it.
+    expect(result.state.effectStack.every(
+        (frame) => frame.triggerExecution || frame.eventActivation
+      )
+    ).toBe(true);
     expect(
       result.events.filter((e) => e.type === "EVENT_MAIN_RESOLVED_FROM_TRASH")
     ).toHaveLength(Number(published));
@@ -499,7 +503,11 @@ describe("OPT-854 inline Main completion: activated vs never activated", () => {
       ["evt-854"],
       resolverExecutionServices
     );
-    expect(result.state.effectStack).toHaveLength(0);
+    // Domain services return work; only the external boundary drains it.
+    expect(result.state.effectStack.every(
+        (frame) => frame.triggerExecution || frame.eventActivation
+      )
+    ).toBe(true);
     expect(
       result.events.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
     ).toHaveLength(1);

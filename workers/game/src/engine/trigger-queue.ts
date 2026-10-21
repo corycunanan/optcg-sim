@@ -1,25 +1,15 @@
-/**
- * Pipeline event scanning and explicit rules-window entry points. All queued
- * work is reported to the shared trigger executor; ordinary reports join the
- * existing owner while damage and End Phase windows retain their boundaries.
- */
-
-import { isGameTerminated } from "./terminal.js";
-import type { CardData, GameAction, GameEvent, GameState, ExecuteResult, PendingPromptState, QueuedTrigger } from "../types.js";
+import { holdBattleStepTransitions } from "./battle-step-boundary.js";
+import { replaceRetainedEventReferences } from "./events.js";
+/** Event scans publish and report work; they never run the drain. */
+import type { CardData, GameAction,
+  GameState, ExecuteResult, PendingPromptState, QueuedTrigger } from "../types.js";
+import { scanEventsForTriggers } from "./trigger-ordering.js";
+import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import { recalculateBattlePowers } from "./battle.js";
-import { emitPendingEvent } from "./events.js";
+import { registerCardEnteredField } from "./triggers.js";
 import {
-  matchTriggersForEvent,
-  orderMatchedTriggers,
-  registerCardEnteredField,
-  deregisterDepartedSources,
-} from "./triggers.js";
-import { resolverExecutionServices } from "./effect-resolver/resolver.js";
-import { advanceTriggerExecution, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "./trigger-executor.js";
+  createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "./trigger-executor.js";
 import { findCardInstance } from "./state.js";
-import {
-  queuedSourceSnapshot,
-} from "./trigger-ordering.js";
 import { takeEngineTimestamp } from "./execution-context.js";
 
 // ─── Step 5: Fire Events & Triggers ───────────────────────────────────────────
@@ -33,92 +23,48 @@ export function fireEventsAndTriggers(
   recordPerformedAction = true,
   deferredTriggers: readonly QueuedTrigger[] = [],
 ): GameState {
-  const pi = state.turn.activePlayerIndex;
-
-  // Emit all events from execution
-  for (const event of execResult.events) {
-    if (!event.propagation?.eventLogEmitted) state = emitPendingEvent(state, event, pi);
-  }
-
-  // Register triggers for newly played cards BEFORE matching
-  state = registerNewCardTriggers(state, execResult, cardDb);
-
-  // Collect ALL matched triggers from ALL events, ordered per rule §8-6.
-  // OPT-963: triggers a damage frame deferred until its damage processing
-  // completed (rule 8-6-2) were matched from earlier events, so they head
-  // the queue with the same grouping as if matched here.
-  const triggerQueue: QueuedTrigger[] = [...deferredTriggers];
-
-  for (const pendingEvent of execResult.events) {
-    // Resolver-side per-frame drains mark events after matching them. They
-    // still need event-log publication and zone cleanup above/below, but must
-    // not enqueue the same triggers a second time here.
-    if (pendingEvent.propagation?.triggerScanned) continue;
-
-    const timed = takeEngineTimestamp(state);
-    state = timed.state;
-    const gameEvent = {
-      type: pendingEvent.type,
-      playerIndex: pendingEvent.playerIndex ?? pi,
-      payload: pendingEvent.payload ?? {},
-      timestamp: timed.timestamp,
-    } as GameEvent;
-
-    const matched = matchTriggersForEvent(state, gameEvent, cardDb);
-    if (matched.length === 0) continue;
-
-    const ordered = orderMatchedTriggers(matched, state.turn.activePlayerIndex);
-    for (const match of ordered) {
-      triggerQueue.push({
-        sourceCardInstanceId: match.trigger.sourceCardInstanceId,
-        sourceSnapshot: queuedSourceSnapshot(
-          state,
-          match.trigger.sourceCardInstanceId,
-          match.trigger.controller,
-          match.effectBlock.id
-        ),
-        controller: match.trigger.controller,
-        effectBlock: match.effectBlock,
-        triggeringEvent: pendingEvent,
-      });
-    }
-  }
-
-  // Deregister triggers for cards that left the field AFTER matching
-  state = deregisterDepartedSources(state, execResult.events);
-
-  // Group triggers by controller — turn player resolves first (§8-6),
-  // and within each group the player chooses the order.
-  if (triggerQueue.length > 0 || triggerExecutionOwner(state)) {
-    const activePI = state.turn.activePlayerIndex;
-    const turnPlayerTriggers = triggerQueue.filter(t => t.controller === activePI);
-    const nonTurnPlayerTriggers = triggerQueue.filter(t => t.controller !== activePI);
-
-    const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb, "ordinary");
-    state = result.state;
-    if (isGameTerminated(state)) return state;
-
-    if (result.pendingPrompt) {
-      state = recalculateBattlePowers(state, cardDb);
-      state = { ...state, pendingPrompt: result.pendingPrompt };
+  state = reportExecutionEvents(state, execResult, cardDb,
+    deferredTriggers
+  ).state;
       if (recordPerformedAction) state = recordAction(state, action, actedCard);
-      return state;
-    }
-
-    state = recalculateBattlePowers(state, cardDb);
+      return recalculateBattlePowers(state, cardDb);
   }
 
-  // Record the action performed
-  if (recordPerformedAction) state = recordAction(state, action, actedCard);
-  return state;
+/** Event scans publish and enqueue work; only the pending-work drain advances it. */
+export function reportExecutionEvents(
+  state: GameState,
+  execution: ExecuteResult,
+  cardDb: Map<string, CardData>,
+  deferredTriggers: readonly QueuedTrigger[] = execution.queuedTriggers ?? []
+): { state: GameState; events: ExecuteResult["events"] } {
+  const events = [...execution.events];
+  state = holdBattleStepTransitions(state, events);
+  state = publishCommittedEvents(state, events);
+  state = registerNewCardTriggers(state, execution, cardDb);
+  const scanned = scanEventsForTriggers(
+    state,
+    events,
+    state.turn.activePlayerIndex,
+    cardDb
+  );
+  state = replaceRetainedEventReferences(
+    scanned.state,
+    execution.events,
+    scanned.events
+  );
+  const triggers = [...deferredTriggers, ...scanned.triggers];
+  if (triggers.length || triggerExecutionOwner(state)) {
+    const reported = triggerExecutionOwner(state)
+      ? reportTriggerWork(state, triggers)
+      : createTriggerExecution(state, triggers);
+    state = reported.state;
+}
+  return { state, events: scanned.events };
 }
 
 /**
- * Publish End Phase events and resolve the auto effects they fulfil with the
- * shared executor: turn player's group first, older generations before newly
- * fulfilled ordinary triggers. The End Phase calls this after each stage action so its
- * triggered work finishes before the next rule step, while the ending player
- * is still the turn player. A prompt is left on `state.pendingPrompt`.
+ * Publish and report End Phase events without activation. The common drain
+ * completes the reported children before advancing the next phase stage.
  */
 export function fireEndPhaseEvents(
   state: GameState,
@@ -209,7 +155,7 @@ function registerNewCardTriggers(
 
 /**
  * Process a player's group of simultaneous triggers.
- * If 0–1 triggers, resolve directly. If 2+, prompt the player to pick order.
+ * Report a closed window, or append ordinary work to its existing owner.
  * `afterTriggers` are the other player's triggers, stored as pendingTriggers.
  */
 export function processPlayerTriggerGroup(
@@ -228,7 +174,7 @@ export function processPlayerTriggerGroup(
       return { state: reported.state };
     case "queued":
     case "continued":
-      return advanceTriggerExecution(reported, cardDb, resolverExecutionServices);
+      return { state: reported.state };
     case "waiting":
       throw new Error("A new trigger scope must be queued, completed, or terminal");
   }

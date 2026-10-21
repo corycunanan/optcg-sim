@@ -469,7 +469,7 @@ export function executeSetRest(
   // OPT-222: scan for WOULD_BE_RESTED replacements (e.g. PRB02-006 Zoro)
   // across the batch of targets. One prompt per matching replacement; cost
   // paid once. Protected targets drop out of the rest loop; unprotected ones
-  // proceed through the per-frame ON_REST drain below.
+  // proceed through the ON_REST work-report boundary below.
   const batch = processBatchReplacements(
     state,
     targetIds,

@@ -27,6 +27,13 @@ export function validate(
   actingPlayerIndex: 0 | 1,
 ): string | null {
   if (state.status === "FINISHED") return "Game is already over";
+  if (
+    state.pendingPrompt &&
+    ["DECLARE_BLOCKER", "USE_COUNTER", "USE_COUNTER_EVENT"].includes(
+      action.type
+    )
+  )
+    return "A player decision must finish before another game action";
 
   switch (action.type) {
     case "ADVANCE_PHASE":

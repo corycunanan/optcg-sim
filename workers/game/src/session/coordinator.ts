@@ -1,3 +1,5 @@
+import { drainPendingWork } from "../engine/pending-work-drain.js";
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import type {
   CardData,
   GameAction,
@@ -6,7 +8,6 @@ import type {
   PromptType,
 } from "../types.js";
 import { isStartOfTurnAutoPhase } from "../engine/phases.js";
-import { surfaceDamageFramePrompt } from "../engine/damage-frames.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { setPlayerConnected } from "../engine/state.js";
 import { boundUndoHistory } from "./history.js";
@@ -309,7 +310,15 @@ export class SessionCoordinator {
     state: GameState,
     cardDb: Map<string, CardData>
   ): GameState {
-    return surfaceDamageFramePrompt(state, cardDb);
+    if (state.pendingPrompt) return state;
+    const result = drainPendingWork(
+      { state, events: [], resolved: true },
+      cardDb,
+      resolverExecutionServices
+    );
+    return result.pendingPrompt
+      ? { ...result.state, pendingPrompt: result.pendingPrompt }
+      : result.state;
   }
 
   setPlayerPresence(

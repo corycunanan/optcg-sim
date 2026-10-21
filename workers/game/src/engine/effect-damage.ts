@@ -1,4 +1,4 @@
-import { advanceLifeTriggerExecution, triggerExecutionOwner } from "./trigger-executor.js";
+import { triggerExecutionOwner } from "./trigger-executor.js";
 import type {
   CardData,
   EffectDamageContinuation,
@@ -16,7 +16,7 @@ import { transitionDetachedCard } from "./zone-transition.js";
 import { generateFrameId, popFrame, pushFrame } from "./effect-stack.js";
 import { continuationFrame, revealTriggerPromptFor, updateFrameById } from "./damage-frames.js";
 import { emitPendingEvent, withEventLogEmitted } from "./events.js";
-import { resolveEffect, resolverExecutionServices } from "./effect-resolver/index.js";
+import { resolveEffectWork } from "./effect-resolver/resolver.js";
 import { isGameTerminated } from "./terminal.js";
 import { retainEventsOnFrame } from "./effect-resolver/resume/events.js";
 import type { EffectResult } from "./effect-types.js";
@@ -388,11 +388,8 @@ export function resumeEffectDamageFrame(
     payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
   };
   if (block) {
-    const resolved = resolveEffect(nextState, block, triggerInstanceId, damagedPlayerIndex, cardDb);
-    const effectResult = advanceLifeTriggerExecution(
-      { ...resolved, events: [...events, ...resolved.events] },
-      frame.id, cardDb, resolverExecutionServices
-    );
+    const resolved = resolveEffectWork(nextState, block, triggerInstanceId, damagedPlayerIndex, cardDb);
+    const effectResult = { ...resolved, events: [...events, ...resolved.events] };
     nextState = effectResult.state;
     events.splice(0, events.length, ...effectResult.events);
     nextState = restoreTriggerStaging(nextState, stagingBaseline);

@@ -1,15 +1,18 @@
+import { drainPendingWork } from "./pending-work-drain.js";
+import { resolverExecutionServices } from "./effect-resolver/resolver.js";
 import { createEffectExecutionScope } from "./trigger-executor.js";
 import { continuationBoundary, prependFrame } from "./effect-stack.js";
 /**
  * 7-Step Action Pipeline
  *
- * Every game mutation flows through here — no exceptions.
+ * Player commands enter here; nested effects and replies use work-only
+ * resolver/session boundaries and the same pending-work drain.
  *
  * 1. Validate
  * 2. Check Prohibitions  (M4: scans active prohibitions)
- * 3. Check Replacements  (M4: substitutes actions)
+ * 3. Check Replacements  (generic entry remains a stub)
  * 4. Execute
- * 5. Fire Triggers       (M4: event bus → trigger registry → effect resolver)
+ * 5. Report events/triggers, then drain ready work
  * 6. Recalculate Modifiers (M4: expire effects, recompute layers)
  * 7. Rule Processing     (defeat checks)
  */
@@ -115,7 +118,18 @@ export function runPipeline(
     );
   }
   const stateBeforeExecute = nextState;
-  const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
+  let execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
+  if (
+    actionToExecute.type === "PASS" &&
+    execResult.state.turn.battleSubPhase === "DAMAGE_STEP"
+  ) {
+    const advanced = drainPendingWork(
+      { ...execResult, resolved: true },
+      cardDb,
+      resolverExecutionServices
+    );
+    execResult = advanced;
+  }
   // Rule 3-1-6-1: DON!! moved by a game action (attach, DON!! phase, …)
   // shed their effects. Effect actions and cost payments release per step.
   nextState = releaseMovedDonEffects(stateBeforeExecute, execResult.state);
@@ -131,7 +145,8 @@ export function runPipeline(
   }
 
   if (execResult.pendingPrompt) {
-    const battleDebt = nextState.effectStack.find(frame =>
+    const battleDebt = nextState.effectStack.find(
+      (frame) =>
       frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
       frame.battleDamage.battleId === nextState.turn.battle?.battleId
     );
@@ -141,8 +156,9 @@ export function runPipeline(
     // Main/Counter execution owns its activation notification. Resolver frame
     // accumulators own their own prefixes and may scan them before the Event's
     // suffix finishes, so keep only the outer debt in a separate root barrier.
-    if (execResult.events.some(event => event.type === "EVENT_ACTIVATED_FROM_HAND")) {
-      const frameOwned = new Set(nextState.effectStack.flatMap(frame => frame.accumulatedEvents));
+    if (execResult.events.some(
+        (event) => event.type === "EVENT_ACTIVATED_FROM_HAND")) {
+      const frameOwned = new Set(nextState.effectStack.flatMap((frame) => frame.accumulatedEvents));
       const activation = execResult.events.find(
         (event) => event.type === "EVENT_ACTIVATED_FROM_HAND"
       )!;
@@ -180,9 +196,32 @@ export function runPipeline(
     return { state: nextState, valid: true, pendingPrompt: execResult.pendingPrompt };
   }
 
-  // Step 5: Fire Triggers — emit events, scan triggerRegistry, resolve effects
+  // Preserve the public history contract of an End Phase action that parks
+  // before execution completes. Moving its work to the drain must not make
+  // ADVANCE_PHASE newly visible to ACTION_PERFORMED_THIS_TURN conditions.
+  const phaseExecutionPending =
+    actionToExecute.type === "ADVANCE_PHASE" &&
+    nextState.effectStack.some((frame) => frame.phaseBoundaryContinuation);
+
+  // Step 5: report events, then drain the work they make ready.
   log("pipeline.step", { ...logCtx, step: "triggers" });
-  nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb, actedCard, true, execResult.queuedTriggers);
+  nextState = fireEventsAndTriggers(nextState, execResult, actionToExecute, cardDb, actedCard,
+    false,
+    execResult.queuedTriggers
+  );
+  const drained = drainPendingWork(
+    { state: nextState, events: [], resolved: true },
+    cardDb,
+    resolverExecutionServices
+  );
+  nextState = drained.pendingPrompt
+    ? { ...drained.state, pendingPrompt: drained.pendingPrompt }
+    : drained.state;
+  if (
+    !isGameTerminated(nextState) &&
+    !(phaseExecutionPending && drained.pendingPrompt)
+  )
+    nextState = recordAction(nextState, actionToExecute, actedCard);
 
   if (isGameTerminated(nextState)) {
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
@@ -255,6 +294,14 @@ export function continuePipelineFromExecution(
     false,
     deferredTriggers,
   );
+  const drained = drainPendingWork(
+    { state: nextState, events: [], resolved: true },
+    cardDb,
+    resolverExecutionServices
+  );
+  nextState = drained.pendingPrompt
+    ? { ...drained.state, pendingPrompt: drained.pendingPrompt }
+    : drained.state;
 
   if (isGameTerminated(nextState)) {
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
@@ -385,4 +432,3 @@ function finishPipeline(
 
   return { state, valid: true };
 }
-

@@ -1061,7 +1061,7 @@ export interface BatchResumeResult {
   /**
    * Targets still eligible for KO / return after all replacements resolved.
    * Populated when the caller is responsible for finalization (so the action
-   * handler can run its own per-frame trigger drain loop).
+   * handler can report this work to the common pending-work drain).
    */
   unprotectedIds: string[];
   pendingPrompt?: PendingPromptState;
@@ -1316,7 +1316,7 @@ export function processBatchReplacements(
  * current match without protecting its targets. After all replacements are
  * resolved and no prompt is pending, finalizes the unprotected targets inline.
  *
- * NOTE: the resume path does NOT run the per-frame ON_KO drain. Callers that
+ * NOTE: the resume path does NOT run the ON_KO work report. Callers that
  * need drain semantics (executeKO for non-resume flows) call
  * `processBatchReplacements` directly and loop over `unprotectedIds`
  * themselves. In practice, the resume path is only reached when the player

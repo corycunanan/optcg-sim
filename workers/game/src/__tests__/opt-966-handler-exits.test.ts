@@ -8,7 +8,8 @@ import { terminateGame } from "../engine/terminal.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 
 it.each<GameAction>([{ type: "PASS" }, { type: "PLAYER_CHOICE", choiceId: "skip" }])(
-  "a frameless optional skip completes without leaving an idle owner: %j", action => {
+  "a frameless optional skip completes without leaving an idle owner: %j",
+  (action) => {
     const db = createTestCardDb();
     const state = createBattleReadyState(db);
     const context: ResumeContext = {
@@ -56,10 +57,11 @@ it("a lethal batch suffix reports terminal and does not continue its remaining a
   expect(result.kind).toBe("terminal");
   expect(result.state.status).toBe("FINISHED");
   expect(result.state.effectStack).toEqual([]);
-  expect(result.events.some(event => event.type === "POWER_MODIFIED")).toBe(false);
+  expect(result.events.some((event) => event.type === "POWER_MODIFIED")).toBe(false);
 });
 
-it.each([false, true])("only a standalone completion avoids scope allocation (legacy parent %s)", legacyParent => {
+it.each([false, true])("only a standalone completion avoids scope allocation (legacy parent %s)",
+  (legacyParent) => {
   const db = createTestCardDb();
   const state = createBattleReadyState(db);
   const completion: EffectStackFrame = {
@@ -78,9 +80,14 @@ it.each([false, true])("only a standalone completion avoids scope allocation (le
   state.effectStack = [...(legacyParent ? [parent] : []), completion];
   const result = resumeFromStack(state, { type: "PASS" }, db);
   if (legacyParent) {
-    const owner = result.state.effectStack.find(frame => frame.triggerExecution)!;
-    expect(owner.triggerExecution!.generations[0].triggers.map(trigger => trigger.effectBlock.id)).toEqual(["older-B"]);
-    expect(result.state.effectStack.find(frame => frame.id === parent.id)?.pendingTriggers).toEqual([]);
+      // Public resume reaches quiescence, rather than exposing a queued parent.
+      expect(result.state.effectStack).toEqual([]);
+    expect(result.state.players[0].hand).toHaveLength(
+        state.players[0].hand.length + 1
+      );
+      expect(
+        result.events.filter((event) => event.type === "CARD_DRAWN")
+      ).toHaveLength(1);
   } else {
     expect(result.state.executionContext.idCounter).toBe(state.executionContext.idCounter);
     expect(result.state.effectStack).toEqual([]);

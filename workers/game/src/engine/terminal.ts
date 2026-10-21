@@ -1,3 +1,4 @@
+import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
 /**
  * The one terminal writer (OPT-949 / OPT-925, Game Engine Consolidation Phase 0).
  *
@@ -154,7 +155,9 @@ export function publishBeforeGameOver(
   events: readonly PendingEvent[],
   defaultPlayerIndex: 0 | 1,
 ): GameState {
-  const pending = events.filter((event) => !event.propagation?.eventLogEmitted);
+  const pending = events.filter((event) => !event.propagation?.eventLogEmitted &&
+      !isPendingBattleStepTransition(event)
+  );
   if (pending.length === 0) return state;
   let gameOverIndex = -1;
   for (let i = state.eventLog.length - 1; i >= 0; i--) {

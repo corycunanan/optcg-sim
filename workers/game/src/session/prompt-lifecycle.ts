@@ -1,3 +1,4 @@
+import { drainPendingWork } from "../engine/pending-work-drain.js";
 import { takeInterruptedEvents } from "../engine/effect-resolver/resume/events.js";
 import type {
   CardData,
@@ -15,23 +16,19 @@ import {
   type BattleDamageResult,
 } from "../engine/battle.js";
 import {
-  continueEffectDamageFrame,
   resumeEffectDamageFrame,
   type EffectDamageResult,
 } from "../engine/effect-damage.js";
-import { surfaceDamageFramePrompt, updateFrameById } from "../engine/damage-frames.js";
-import {
-  resumeFromStack,
-} from "../engine/effect-resolver/index.js";
+import { updateFrameById } from "../engine/damage-frames.js";
+import { resumeFromStackWork as resumeFromStack,
+} from "../engine/effect-resolver/resume.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
 import { continuePipelineFromExecution } from "../engine/pipeline.js";
 import { popFrame } from "../engine/effect-stack.js";
-import { resumePhaseBoundary } from "../engine/phases.js";
 import { resumePregameFromPrompt } from "../engine/pregame.js";
 import {
   batchContextOf,
-  continueReplacementBatchAfterSubstitute,
   openReplacementBatchFrame,
   resumeReplacement,
   resumeReplacementBatch,
@@ -200,7 +197,11 @@ function resumePromptLifecycleUnreleased(
     state = applied.state;
     gameOver = applied.gameOver;
   } else if (state.effectStack.length > 0) {
-    const resumed = resumeFromStack(state, action, cardDb);
+    const resumed = drainPendingWork(
+      resumeFromStack(state, action, cardDb),
+      cardDb,
+      resolverExecutionServices
+    );
     if (resumed.rejected && !resumed.reprompted && !isGameTerminated(resumed.state))
       return { state: stateBeforeResume, responseRejected: true };
     state = resumed.state;
@@ -290,7 +291,8 @@ function withPendingPrompt(
 }
 
 /** The result every terminal writer recorded (winner may be a player or null). */
-function terminalOutcome(state: GameState): { winner: 0 | 1 | null; reason: string } {
+function terminalOutcome(state: GameState): { winner: 0 | 1 | null; reason: string;
+} {
   return { winner: state.winner, reason: state.winReason ?? "Game over" };
 }
 
@@ -333,94 +335,13 @@ function resumeContinuations(
 ): { state: GameState; gameOver?: GameOver } {
   let state = initialState;
   let gameOver = initialGameOver;
-  // A finished game has no frames to unwind: terminateGame, the only terminal
-  // writer, clears the effect stack (pinned by the terminal suites), so the
-  // loop stops on the empty stack; it needs no status guard of its own.
-  while (!state.pendingPrompt) {
-    const frame = state.effectStack.at(-1);
-    if (!frame) break;
-    const kind = frameKindOf(frame);
-
-    if (kind === "PHASE_BOUNDARY") {
-      const resumed = resumePhaseBoundary(state, cardDb);
-      state = resumed.state;
-      if (resumed.pendingPrompt) {
-        state = { ...state, pendingPrompt: resumed.pendingPrompt };
-        break;
-      }
-      if (resumed.events.length > 0) {
-        const pipeline = continuePipelineFromExecution(
-          state,
-          resumed,
-          cardDb,
-          frame.phaseBoundaryContinuation!.endingPlayerIndex,
-          resumed.queuedTriggers
-        );
-        state = pipeline.state;
-        gameOver = pipeline.gameOver;
-      }
-      continue;
-    }
-
-    if (kind === "BATTLE_DAMAGE" || kind === "EFFECT_DAMAGE") {
-      if (frame.phase === "AWAITING_TRIGGER_REVEAL") {
-        // The attacker's per-point effect has unwound: the defender's turn.
-        state = surfaceDamageFramePrompt(state, cardDb);
-        break;
-      }
-      const continued =
-        kind === "BATTLE_DAMAGE"
-          ? continueBattleDamageFrame(state, cardDb)
-          : continueEffectDamageFrame(state, cardDb);
-      const applied = applyDamageResult(state, continued, cardDb, actingPlayer);
-      state = applied.state;
-      gameOver = applied.gameOver;
-      continue;
-    }
-
-    if (kind === "REPLACEMENT_BATCH") {
-      if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") break;
-      // The accepted substitute finished: continue the batch from the frame.
-      const context = batchContextOf(frame);
-      const batch = continueReplacementBatchAfterSubstitute(
-        popFrame(state),
-        context,
-        cardDb,
-        resolverExecutionServices
-      );
-      const finished = finishReplacementBatch(batch.state, batch, context, cardDb);
-      state = finished.state;
-      gameOver = finished.gameOver;
-      continue;
-    }
-
-    if (frame.phase === "INTERRUPTED_BY_TRIGGERS" || frame.phase === "AWAITING_BATCH_RESUME") {
-      const resumed = resumeFromStack(state, action, cardDb);
-      state = resumed.state;
-      if (isGameTerminated(state)) {
-        state = publishBeforeGameOver(state, resumed.events, actingPlayer);
-        gameOver = terminalOutcome(state);
-        break;
-      }
-      if (resumed.pendingPrompt) {
-        state = { ...state, pendingPrompt: resumed.pendingPrompt };
-        break;
-      }
-      if (resumed.events.length > 0) {
-        const pipeline = continuePipelineFromExecution(
-          state,
-          { state, events: resumed.events },
-          cardDb,
-          actingPlayer
-        );
-        state = pipeline.state;
-        gameOver = pipeline.gameOver;
-      }
-      continue;
-    }
-
-    break;
-  }
+  const drained = drainPendingWork(
+    { state, events: [], resolved: true },
+    cardDb,
+    resolverExecutionServices
+  );
+      state = withPendingPrompt(drained.state, drained.pendingPrompt);
+      if (isGameTerminated(state)) gameOver = terminalOutcome(state);
   return { state, gameOver };
 }
 

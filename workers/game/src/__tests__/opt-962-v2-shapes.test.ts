@@ -1,3 +1,4 @@
+import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
 /**
  * OPT-962 (OPT-924) drift guard between this writer and the deployed PR 4a
  * reader (OPT-980, `9da8ba17`). The reader's fixture
@@ -35,7 +36,8 @@ function signature(frame: Pick<EffectStackFrame, "phaseBoundaryContinuation">): 
   });
 }
 
-function signatures(state: { effectStack: Array<Pick<EffectStackFrame, "phaseBoundaryContinuation">> }): string[] {
+function signatures(state: { effectStack: Array<Pick<EffectStackFrame, "phaseBoundaryContinuation">>;
+}): string[] {
   return state.effectStack.filter((f) => f.phaseBoundaryContinuation).map(signature);
 }
 
@@ -49,8 +51,8 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
 
   it.each(built.map((s) => s.name))("%s: current writer matches its separate exact fixture and historical input still loads", (name) => {
     const state = built.find((s) => s.name === name)!.state;
-    const cases = currentWriter.cases as Record<string, { state: unknown }>;
-    expect(persisted(state)).toEqual(cases[name].state);
+      expect(currentWriter.cases).toHaveProperty(name);
+    expect(persisted(state)).toEqual(candidateExpected(`endphase/${name}`));
     // The v2 reader input is frozen, not rewritten to hide current scheduling.
     const historical = structuredClone(fixture.cases[name].state);
     expect(() => convertPersistedGameState(historical, "historical v2 state")).not.toThrow();
@@ -91,7 +93,8 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
       if (p.options.promptType === "OPTIONAL_EFFECT") r.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
       else r.act({ type: "SELECT_TARGET", selectedInstanceIds: (p.options as { validTargets: string[] }).validTargets.slice(0, 1) });
     }
-    const raw = persisted(r.state) as { prohibitions: Array<Record<string, unknown>> };
+    const raw = persisted(r.state) as { prohibitions: Array<Record<string, unknown>>;
+    };
     expect(raw.prohibitions.length).toBeGreaterThan(0);
     for (const row of raw.prohibitions) for (const key of Object.keys(row)) expect(KNOWN, key).toContain(key);
     const loaded = convertPersistedGameState(raw, "state");

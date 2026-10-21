@@ -1,3 +1,4 @@
+import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
 /**
  * Simultaneous trigger ordering — helpers shared by pipeline.ts and resume.ts.
  *
@@ -39,7 +40,9 @@ export function scanEventsForTriggers(
 ): { triggers: QueuedTrigger[]; state: GameState; events: PendingEvent[] } {
   const triggers: QueuedTrigger[] = [];
   let nextState = state;
-  const scannedEvents = events.map(withTriggerScanned);
+  const scannedEvents = events.map((event) =>
+    isPendingBattleStepTransition(event) ? event : withTriggerScanned(event)
+  );
 
   // Register every field-entry effect before matching simultaneous triggers.
   for (let index = 0; index < events.length; index++) {
@@ -64,7 +67,9 @@ export function scanEventsForTriggers(
     // scanned via its `pendingBatchTriggers` drain. Without this guard, the
     // pipeline's outer LIFO scan re-matches the same events and queues the
     // same triggers a second time.
-    if (event.propagation?.triggerScanned) continue;
+    if (event.propagation?.triggerScanned ||
+      isPendingBattleStepTransition(event)
+    ) continue;
 
     const timed = takeEngineTimestamp(nextState);
     nextState = timed.state;

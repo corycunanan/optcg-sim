@@ -100,3 +100,33 @@ describe("OPT-478 resolver architecture contract", () => {
     ]);
   });
 });
+
+it("OPT-967 domain handlers report work and production boundaries name the common drain", () => {
+  for (const file of ["battle.ts", "effect-damage.ts", "execute.ts"]) {
+    const text = source(join(ENGINE_ROOT, file));
+    expect(text, file).not.toMatch(
+      /import\s*\{[^}]*\bresolveEffect\b[^}]*\}\s*from/
+    );
+    expect(text, file).not.toMatch(
+      /\b(?:advanceTriggerExecution|advanceLifeTriggerExecution|drainPendingWork)\s*\(/
+    );
+  }
+  const scans = source(join(ENGINE_ROOT, "trigger-queue.ts"));
+  expect(scans).not.toMatch(
+    /\b(?:advanceTriggerExecution|drainPendingWork|resolveEffect)\s*\(/
+  );
+  expect(scans).toContain("reportTriggerWork");
+  const services = source(join(ENGINE_ROOT, "effect-resolver", "resolver.ts"));
+  expect(services.indexOf("function createResolverServices")).toBeGreaterThanOrEqual(0);
+  expect(
+    services.slice(
+      services.indexOf("function createResolverServices"),
+      services.indexOf("/** Public convenience")
+    )
+  ).not.toMatch(/\b(?:drainPendingWork|resolveEffect)\s*\(/);
+  const session = source(
+    join(ENGINE_ROOT, "..", "session", "prompt-lifecycle.ts")
+  );
+  expect(session).toContain("resumeFromStackWork as resumeFromStack");
+  expect(session).toContain("drainPendingWork");
+});

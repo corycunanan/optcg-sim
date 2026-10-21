@@ -1,0 +1,1800 @@
+{
+  "golden-decoded/fresh-setup": [],
+  "golden-decoded/pregame-priority-roll": [],
+  "golden-decoded/battle-ready-with-undo": [],
+  "golden-decoded/effect-frame-prompt": [],
+  "golden-decoded/structural-resume-context": [],
+  "golden-decoded/legacy-cost-transaction-frame": [],
+  "golden-decoded/trigger-order-prompt": [],
+  "golden-decoded/batch-resume-frame": [],
+  "golden-decoded/end-phase-parked": [
+    {
+      "path": "sessionJson/state/pendingPrompt/resumeContext",
+      "before": "ef_00000040",
+      "after": "ef_00000041"
+    },
+    {
+      "path": "sessionJson/state/effectStack/0/id",
+      "before": "ef_00000041",
+      "after": "ef_0000003z"
+    },
+    {
+      "path": "sessionJson/state/effectStack/1/id",
+      "before": "ef_0000003z",
+      "after": "ef_00000040"
+    },
+    {
+      "path": "sessionJson/state/effectStack/2/id",
+      "before": "ef_00000040",
+      "after": "ef_00000041"
+    }
+  ],
+  "golden-decoded/battle-trigger-window": [
+    {
+      "path": "sessionJson/state/executionContext/idCounter",
+      "before": 145,
+      "after": 147
+    },
+    {
+      "path": "sessionJson/state/pendingPrompt/resumeContext",
+      "before": "ef_00000040",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "sessionJson/state/pendingPrompt/promptId",
+      "before": "prompt_00000041",
+      "after": "prompt_00000043"
+    },
+    {
+      "path": "sessionJson/state/effectStack/0/id",
+      "before": "ef_00000040",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "sessionJson/state/eventLog/2/timestamp",
+      "before": 2,
+      "after": 4
+    },
+    {
+      "path": "sessionJson/state/eventLog/4/timestamp",
+      "before": 8,
+      "after": 9
+    }
+  ],
+  "golden-decoded/both-trigger-windows": [
+    {
+      "path": "sessionJson/state/executionContext/idCounter",
+      "before": 153,
+      "after": 155
+    },
+    {
+      "path": "sessionJson/state/players/1/trash/0/instanceId",
+      "before": "card_00000045",
+      "after": "card_00000047"
+    },
+    {
+      "path": "sessionJson/state/pendingPrompt/resumeContext",
+      "before": "ef_00000047",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "sessionJson/state/pendingPrompt/promptId",
+      "before": "prompt_00000049",
+      "after": "prompt_0000004b"
+    },
+    {
+      "path": "sessionJson/state/effectStack/0/id",
+      "before": "ef_00000042",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "sessionJson/state/effectStack/1/id",
+      "before": "ef_00000043",
+      "after": "ef_00000045"
+    },
+    {
+      "path": "sessionJson/state/effectStack/2/id",
+      "before": "ef_00000048",
+      "after": "ef_0000004a"
+    },
+    {
+      "path": "sessionJson/state/effectStack/2/sourceCardInstanceId",
+      "before": "card_00000045",
+      "after": "card_00000047"
+    },
+    {
+      "path": "sessionJson/state/effectStack/2/resultRefs/0/1/sourceIdentity/instanceId",
+      "before": "card_00000045",
+      "after": "card_00000047"
+    },
+    {
+      "path": "sessionJson/state/effectStack/3/id",
+      "before": "ef_00000047",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "sessionJson/state/effectStack/3/sourceCardInstanceId",
+      "before": "card_00000045",
+      "after": "card_00000047"
+    },
+    {
+      "path": "sessionJson/state/effectStack/3/effectDamage/sourceCardInstanceId",
+      "before": "card_00000045",
+      "after": "card_00000047"
+    },
+    {
+      "path": "sessionJson/state/effectStack/3/effectDamage/parentFrameId",
+      "before": "ef_00000048",
+      "after": "ef_0000004a"
+    },
+    {
+      "path": "sessionJson/state/eventLog/2/timestamp",
+      "before": 2,
+      "after": 4
+    },
+    {
+      "path": "sessionJson/state/eventLog/4/timestamp",
+      "before": 8,
+      "after": 9
+    },
+    {
+      "path": "sessionJson/state/eventLog/8/payload/newCardInstanceId",
+      "before": "card_00000045",
+      "after": "card_00000047"
+    }
+  ],
+  "golden-decoded/effect-damage-trigger-window": [],
+  "golden-decoded/replacement-prompt": [],
+  "golden-decoded/replacement-batch-prompt": [],
+  "golden-decoded/stuck-damage-step": [],
+  "golden-decoded/finished": [],
+  "endphase/wave1-select-target": [
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_00000042",
+      "after": "ef_00000043"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000043",
+      "after": "ef_00000041"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000041",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_00000042",
+      "after": "ef_00000043"
+    }
+  ],
+  "endphase/wave1-nested-opponent-prompt": [
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000043",
+      "after": "ef_00000041"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000041",
+      "after": "ef_00000042"
+    }
+  ],
+  "endphase/wave1-trigger-order": [
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_00000042",
+      "after": "ef_00000043"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000043",
+      "after": "ef_00000041"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000041",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_00000042",
+      "after": "ef_00000043"
+    }
+  ],
+  "endphase/wave2-optional": [
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_00000042",
+      "after": "card_00000043"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_00000044",
+      "after": "ef_00000045"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000045",
+      "after": "ef_00000041"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000043",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_00000044",
+      "after": "ef_00000045"
+    }
+  ],
+  "endphase/step1-scheduled-prompt": [
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_00000041",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000042",
+      "after": "ef_00000040"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000040",
+      "after": "ef_00000041"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_00000041",
+      "after": "ef_00000042"
+    }
+  ],
+  "endphase/step2-scheduled-prompt": [
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_00000041",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000042",
+      "after": "ef_00000040"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000040",
+      "after": "ef_00000041"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_00000041",
+      "after": "ef_00000042"
+    }
+  ],
+  "endphase/legacy-reparked": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 150,
+      "after": 149
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000041"
+    }
+  ],
+  "endphase/turn-completed": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 145,
+      "after": 146
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_00000041",
+      "after": "card_00000042"
+    }
+  ],
+  "final/opt966-battle-immediate-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/effectStack/0/triggerExecution/generations/0/triggers/0/triggeringEvent/propagation",
+      "after": {
+        "eventLogEmitted": true,
+        "triggerScanned": true
+      }
+    },
+    {
+      "path": "/effectStack/0/triggerExecution/generations/0/triggers/1/triggeringEvent/propagation",
+      "after": {
+        "eventLogEmitted": true,
+        "triggerScanned": true
+      }
+    },
+    {
+      "path": "/effectStack/1/simultaneousTriggers/0/triggeringEvent/propagation",
+      "after": {
+        "eventLogEmitted": true,
+        "triggerScanned": true
+      }
+    },
+    {
+      "path": "/effectStack/1/simultaneousTriggers/1/triggeringEvent/propagation",
+      "after": {
+        "eventLogEmitted": true,
+        "triggerScanned": true
+      }
+    },
+    {
+      "path": "/effectStack/1/triggerOrderingGroup/triggers/0/triggeringEvent/propagation",
+      "after": {
+        "eventLogEmitted": true,
+        "triggerScanned": true
+      }
+    },
+    {
+      "path": "/effectStack/1/triggerOrderingGroup/triggers/1/triggeringEvent/propagation",
+      "after": {
+        "eventLogEmitted": true,
+        "triggerScanned": true
+      }
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/executionContext/clockCounter",
+      "before": 19,
+      "after": 20
+    },
+    {
+      "path": "/effectStack/1/accumulatedEvents/0",
+      "before": {
+        "type": "POWER_MODIFIED",
+        "playerIndex": 1,
+        "payload": {
+          "targetInstanceId": "ST02-001-1-LEADER-",
+          "amount": 4000
+        },
+        "propagation": {
+          "eventLogEmitted": true
+        }
+      }
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/1/pause/1": [
+    {
+      "path": "/executionContext/clockCounter",
+      "before": 19,
+      "after": 20
+    },
+    {
+      "path": "/effectStack/1/accumulatedEvents/0",
+      "before": {
+        "type": "POWER_MODIFIED",
+        "playerIndex": 1,
+        "payload": {
+          "targetInstanceId": "ST02-001-1-LEADER-",
+          "amount": 4000
+        },
+        "propagation": {
+          "eventLogEmitted": true
+        }
+      }
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 155,
+      "after": 154
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004b",
+      "after": "ef_00000044"
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/3": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 159,
+      "after": 157
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004f",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004d",
+      "after": "ef_0000004c"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/4": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 161
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004i",
+      "after": "ef_0000004g"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    }
+  ],
+  "final/opt966-endphase.json/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 163
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004j"
+    }
+  ],
+  "final/opt966-endphase.json/1/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 155,
+      "after": 154
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004b",
+      "after": "ef_00000044"
+    }
+  ],
+  "final/opt966-endphase.json/1/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 159,
+      "after": 157
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004f",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004d",
+      "after": "ef_0000004c"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    }
+  ],
+  "final/opt966-endphase.json/1/pause/3": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 161
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004i",
+      "after": "ef_0000004g"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    }
+  ],
+  "final/opt966-endphase.json/1/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 163
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004j"
+    }
+  ],
+  "final/opt966-endphase.json/2/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 159,
+      "after": 158
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004f",
+      "after": "ef_0000004b"
+    }
+  ],
+  "final/opt966-endphase.json/2/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 162
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004g"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004j",
+      "after": "ef_0000004i"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_0000004b"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004i",
+      "after": "ef_0000004h"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004j",
+      "after": "ef_0000004i"
+    }
+  ],
+  "final/opt966-endphase.json/2/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 164
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004g"
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004k"
+    }
+  ],
+  "final/opt966-endphase.json/3/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 163
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_0000004f"
+    }
+  ],
+  "final/opt966-endphase.json/3/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 165
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004l"
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 150,
+      "after": 149
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 154,
+      "after": 153
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/options/cards/0/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/2/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/0/1/sourceIdentity/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/1/1/targetInstanceIds/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 157,
+      "after": 156
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004d",
+      "after": "card_0000004c"
+    },
+    {
+      "path": "/activeEffects/1/id",
+      "before": "active-effect_0000004b",
+      "after": "active-effect_0000004a"
+    },
+    {
+      "path": "/activeEffects/1/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/activeEffects/1/appliesTo/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/3/payload/targetInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/1/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/2/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 150,
+      "after": 149
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 154,
+      "after": 153
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/options/cards/0/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/2/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/0/1/sourceIdentity/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/1/1/targetInstanceIds/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 157,
+      "after": 156
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004d",
+      "after": "card_0000004c"
+    },
+    {
+      "path": "/activeEffects/1/id",
+      "before": "active-effect_0000004b",
+      "after": "active-effect_0000004a"
+    },
+    {
+      "path": "/activeEffects/1/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/activeEffects/1/appliesTo/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/3/payload/targetInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/1/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/2/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "final/opt966-scheduled-watcher-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 153,
+      "after": 151
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_00000048",
+      "after": "ef_00000047"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000049",
+      "after": "ef_00000043"
+    },
+    {
+      "path": "/effectStack/0/sourceCardInstanceId",
+      "before": "WATCHER-0-CHARACTER-1",
+      "after": "draw-source"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000047",
+      "after": "ef_00000045"
+    },
+    {
+      "path": "/effectStack/1/sourceCardInstanceId",
+      "before": "WATCHER-0-CHARACTER-1",
+      "after": "draw-source"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_00000048",
+      "after": "ef_00000047"
+    }
+  ],
+  "final/opt966-scheduled-watcher-writer-corpus.json/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 154,
+      "after": 152
+    }
+  ],
+  "future/absent legacy stage/0/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 150,
+      "after": 149
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    }
+  ],
+  "future/absent legacy stage/0/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 154,
+      "after": 153
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/options/cards/0/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/2/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/0/1/sourceIdentity/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/1/1/targetInstanceIds/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    }
+  ],
+  "future/absent legacy stage/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 157,
+      "after": 156
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004d",
+      "after": "card_0000004c"
+    },
+    {
+      "path": "/activeEffects/1/id",
+      "before": "active-effect_0000004b",
+      "after": "active-effect_0000004a"
+    },
+    {
+      "path": "/activeEffects/1/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/activeEffects/1/appliesTo/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/3/payload/targetInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "future/absent legacy stage/1/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "future/absent legacy stage/2/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "future/explicit legacy stage/0/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 150,
+      "after": 149
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    }
+  ],
+  "future/explicit legacy stage/0/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 154,
+      "after": 153
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/options/cards/0/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000046",
+      "after": "ef_00000042"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004a",
+      "after": "ef_00000049"
+    },
+    {
+      "path": "/effectStack/2/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/0/1/sourceIdentity/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/effectStack/2/resultRefs/1/1/targetInstanceIds/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    }
+  ],
+  "future/explicit legacy stage/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 157,
+      "after": 156
+    },
+    {
+      "path": "/players/0/characters/1/instanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004d",
+      "after": "card_0000004c"
+    },
+    {
+      "path": "/activeEffects/1/id",
+      "before": "active-effect_0000004b",
+      "after": "active-effect_0000004a"
+    },
+    {
+      "path": "/activeEffects/1/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/activeEffects/1/appliesTo/0",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/triggerRegistry/0/id",
+      "before": "trigger_00000048",
+      "after": "trigger_00000047"
+    },
+    {
+      "path": "/triggerRegistry/0/sourceCardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/2/payload/cardInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/3/payload/targetInstanceId",
+      "before": "card_00000047",
+      "after": "card_00000046"
+    },
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "future/explicit legacy stage/1/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "future/explicit legacy stage/2/final": [
+    {
+      "path": "/eventLog/6/timestamp",
+      "before": 13,
+      "after": 15
+    },
+    {
+      "path": "/eventLog/7/timestamp",
+      "before": 14,
+      "after": 16
+    },
+    {
+      "path": "/eventLog/8/timestamp",
+      "before": 15,
+      "after": 17
+    }
+  ],
+  "future/phase/0/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 155,
+      "after": 154
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004b",
+      "after": "ef_00000044"
+    }
+  ],
+  "future/phase/0/pause/3": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 159,
+      "after": 157
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004f",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004d",
+      "after": "ef_0000004c"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    }
+  ],
+  "future/phase/0/pause/4": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 161
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004i",
+      "after": "ef_0000004g"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    }
+  ],
+  "future/phase/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 163
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004j"
+    }
+  ],
+  "future/phase/1/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 155,
+      "after": 154
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004b",
+      "after": "ef_00000044"
+    }
+  ],
+  "future/phase/1/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 159,
+      "after": 157
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004f",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004d",
+      "after": "ef_0000004c"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004e",
+      "after": "ef_0000004d"
+    }
+  ],
+  "future/phase/1/pause/3": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 161
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_00000044"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004i",
+      "after": "ef_0000004g"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004j",
+      "after": "ef_0000004h"
+    }
+  ],
+  "future/phase/1/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 163
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004f"
+    },
+    {
+      "path": "/players/1/hand/2/instanceId",
+      "before": "card_0000004c",
+      "after": "card_0000004b"
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004j"
+    }
+  ],
+  "future/phase/2/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 159,
+      "after": 158
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004f",
+      "after": "ef_0000004b"
+    }
+  ],
+  "future/phase/2/pause/2": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 162
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004g"
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_0000004j",
+      "after": "ef_0000004i"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_0000004b"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_0000004i",
+      "after": "ef_0000004h"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_0000004j",
+      "after": "ef_0000004i"
+    }
+  ],
+  "future/phase/2/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 164
+    },
+    {
+      "path": "/players/0/hand/2/instanceId",
+      "before": "card_0000004h",
+      "after": "card_0000004g"
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004k"
+    }
+  ],
+  "future/phase/3/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 164,
+      "after": 163
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_0000004k",
+      "after": "ef_0000004f"
+    }
+  ],
+  "future/phase/3/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 166,
+      "after": 165
+    },
+    {
+      "path": "/players/1/hand/3/instanceId",
+      "before": "card_0000004m",
+      "after": "card_0000004l"
+    }
+  ],
+  "future/scheduled watcher/0/pause/1": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 153,
+      "after": 151
+    },
+    {
+      "path": "/pendingPrompt/resumeContext",
+      "before": "ef_00000048",
+      "after": "ef_00000047"
+    },
+    {
+      "path": "/effectStack/0/id",
+      "before": "ef_00000049",
+      "after": "ef_00000043"
+    },
+    {
+      "path": "/effectStack/0/sourceCardInstanceId",
+      "before": "WATCHER-0-CHARACTER-1",
+      "after": "draw-source"
+    },
+    {
+      "path": "/effectStack/1/id",
+      "before": "ef_00000047",
+      "after": "ef_00000045"
+    },
+    {
+      "path": "/effectStack/1/sourceCardInstanceId",
+      "before": "WATCHER-0-CHARACTER-1",
+      "after": "draw-source"
+    },
+    {
+      "path": "/effectStack/2/id",
+      "before": "ef_00000048",
+      "after": "ef_00000047"
+    }
+  ],
+  "future/scheduled watcher/0/final": [
+    {
+      "path": "/executionContext/idCounter",
+      "before": 154,
+      "after": 152
+    }
+  ],
+  "event-owner/0/pause/2": [
+    {
+      "path": "/executionContext/clockCounter",
+      "before": 19,
+      "after": 20
+    },
+    {
+      "path": "/effectStack/1/accumulatedEvents/0",
+      "before": {
+        "type": "POWER_MODIFIED",
+        "playerIndex": 1,
+        "payload": {
+          "targetInstanceId": "ST02-001-1-LEADER-",
+          "amount": 4000
+        },
+        "propagation": {
+          "eventLogEmitted": true
+        }
+      }
+    }
+  ],
+  "event-owner/1/pause/1": [
+    {
+      "path": "/executionContext/clockCounter",
+      "before": 19,
+      "after": 20
+    },
+    {
+      "path": "/effectStack/1/accumulatedEvents/0",
+      "before": {
+        "type": "POWER_MODIFIED",
+        "playerIndex": 1,
+        "payload": {
+          "targetInstanceId": "ST02-001-1-LEADER-",
+          "amount": 4000
+        },
+        "propagation": {
+          "eventLogEmitted": true
+        }
+      }
+    }
+  ]
+}

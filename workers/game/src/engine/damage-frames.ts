@@ -183,7 +183,9 @@ export function surfaceDamageFramePrompt(state: GameState, cardDb: Map<string, C
 /** The attacker's per-point class (Decision 2 step 2): "when this attack deals damage" effects. */
 function isAttackDamageClass(trigger: QueuedTrigger): boolean {
   const authored = trigger.effectBlock.trigger;
-  return !!authored && "event" in authored && authored.event === "ATTACK_DEALS_DAMAGE";
+  return (
+    !!authored && "event" in authored && authored.event === "ATTACK_DEALS_DAMAGE"
+  );
 }
 
 export interface BattleTriggerWindowResult {
@@ -302,7 +304,7 @@ export function openBattleTriggerWindow(
     );
     nextState = result.state;
     if (isGameTerminated(nextState)) return { state: nextState };
-    if (result.pendingPrompt) return { state: nextState, pendingPrompt: result.pendingPrompt };
+    return { state: nextState };
   }
 
   const frame = nextState.effectStack.find((candidate) => candidate.id === id)!;

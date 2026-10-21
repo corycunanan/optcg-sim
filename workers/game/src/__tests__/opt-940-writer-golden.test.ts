@@ -1,3 +1,4 @@
+import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
 /**
  * OPT-940 historical inputs and OPT-966 current writer byte proof.
  *
@@ -10,8 +11,9 @@
  * re-serializes the same synthetic states through the current writer and
  * compares the exact JSON of every stored value.
  *
- * Re-capture the fixture only in a PR that deliberately changes the writer
- * (a game-state schema version bump).
+ * OPT-967 preserves every prior fixture and compares separate candidate values.
+ * The schema is unchanged; scheduling changes reachable contents. Exact deltas
+ * are recorded in opt-967-candidate-deltas.json, without normalizing identities.
  *
  * OPT-924 (PR 4b of OPT-962) raised the writer to version 2; OPT-963 (PR 5b)
  * raises it to version 3: the replacement and damage continuations are typed
@@ -67,7 +69,9 @@ describe("OPT-940 writer golden: persisted bytes match the current conditional v
   it.each(Object.keys(fixture.cases))(
     "%s: session, card DB, and undo history bytes match the writer golden",
     async (name) => {
-      const golden = fixture.cases[name];
+      const golden = candidateExpected<(typeof fixture.cases)[string]>(
+        `golden/${name}`
+      );
       const current = await writeThroughCurrentWriter(name);
       expect(current.sessionJson).toBe(golden.sessionJson);
       expect(current.cardDbJson).toBe(golden.cardDbJson);
@@ -84,8 +88,9 @@ describe("OPT-940 writer golden: persisted bytes match the current conditional v
       const undo = JSON.parse(current.undoHistoryJson) as Array<Record<string, unknown>>;
       for (const snapshot of undo) expect(Object.keys(snapshot)[0], name).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
       for (const snapshot of undo) {
-        const frames = snapshot.effectStack as Array<{ triggerExecution?: unknown }>;
-        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(frames.some(frame => frame.triggerExecution) ? 5 : 4);
+        const frames = snapshot.effectStack as Array<{ triggerExecution?: unknown;
+        }>;
+        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(frames.some((frame) => frame.triggerExecution) ? 5 : 4);
       }
     }
   });
@@ -119,7 +124,8 @@ describe("OPT-940 writer golden: persisted bytes match the current conditional v
   );
 
   it.each([...FRAME_CASES])("%s: the version 3 object holds frames and none of the version 2 records", (name) => {
-    const state = (JSON.parse(v3.cases[name].sessionJson) as { state: Record<string, unknown> }).state;
+    const state = (JSON.parse(v3.cases[name].sessionJson) as { state: Record<string, unknown>;
+        }).state;
     const frames = state.effectStack as Array<Record<string, unknown>>;
     expect(frames.some((frame) => frame.battleDamage || frame.effectDamage || frame.replacement || frame.replacementBatch)).toBe(true);
     expect(JSON.stringify(state)).not.toMatch(/pendingTriggerLifeCard|pendingTriggerFromEffect|pendingBattleDamageContinuation|replacementBatchContinuation/);
