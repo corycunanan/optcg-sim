@@ -20,6 +20,9 @@ import {
 function ownLegacyResume(state: GameState): GameState {
   const top = state.effectStack.at(-1);
   if (!top) return state;
+  // A completion-only Event boundary has no effect body to suspend. Its
+  // notification scan reports any matches through the shared queue service.
+  if (top.eventActivation && state.effectStack.length === 1) return state;
   if (!triggerExecutionOwner(state)) {
     // Preserve an already offered legacy ordering decision as its active
     // cohort. Otherwise own the deepest waiting cohort before any child runs.
