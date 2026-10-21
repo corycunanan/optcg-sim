@@ -297,3 +297,47 @@ it.skipIf(!process.env.OPT966_READER_ROOT).each([false, true])("replays a prompt
   expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));
   expect(rig.state.players[0].characters.some(card => card?.instanceId === target.instanceId)).toBe(true);
 });
+
+it.skipIf(!process.env.OPT966_READER_ROOT)("replays Morley's multi-target rest substitute through a prompted suffix", async () => {
+  const { getEffectSchema } = await import("../engine/schema-registry.js");
+  const rig = endPhaseRig({ deckSize: 10 });
+  rig.state.turn.activePlayerIndex = 1;
+  const schema = structuredClone(getEffectSchema("OP16-033")!);
+  schema.effects[0].replacement_actions!.push(
+    { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+    { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_TURN" } },
+  );
+  const target = rig.putSyn("OP16-033", schema, 0, "CHARACTER", { cost: 5, power: 6000 });
+  target.state = "RESTED";
+  const first = rig.putSyn("REST-FIRST", null, 0, "CHARACTER");
+  const second = rig.putSyn("REST-WATCHER", synSchema("REST-WATCHER", "Character", [{
+    id: "rest-watch", category: "auto", trigger: { event: "CHARACTER_BECOMES_RESTED", filter: { controller: "SELF" } },
+    actions: [{ type: "DRAW", params: { amount: 1 } }],
+  }]), 0, "CHARACTER");
+  const attacker = rig.putSyn("ATTACKER", null, 1, "CHARACTER", { power: 7000 });
+  rig.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId }, 1);
+  for (let n = 0; !rig.state.pendingPrompt && rig.state.turn.battle; n++) {
+    expect(n).toBeLessThan(6);
+    rig.act({ type: "PASS" }, rig.state.turn.battleSubPhase === "ATTACK_STEP" ? 1 : 0);
+  }
+  const pauses = await replayPauses(rig, state => {
+    const prompt = state.pendingPrompt!.options;
+    if (prompt.promptType === "SELECT_TARGET") return { type: "SELECT_TARGET", selectedInstanceIds:
+      prompt.validTargets.includes(first.instanceId) ? [first.instanceId, second.instanceId] : [state.players[0].hand[0].instanceId] };
+    if (prompt.promptType === "PLAYER_CHOICE") return { type: "PLAYER_CHOICE", choiceId:
+      (prompt.choices.find(choice => choice.label === "Rest 2 of your field cards") ?? prompt.choices[0]).id };
+    return { type: "PLAYER_CHOICE", choiceId: "accept" };
+  }, "opt966-battle-rest-writer-corpus");
+  expect(pauses.map(state => state.pendingPrompt!.options.promptType)).toEqual([
+    "OPTIONAL_EFFECT", "PLAYER_CHOICE", "SELECT_TARGET", "SELECT_TARGET", "PLAYER_CHOICE",
+  ]);
+  const types = rig.state.eventLog.map(event => event.type);
+  expect(rig.state.players[0].characters.find(card => card?.instanceId === first.instanceId)?.state).toBe("RESTED");
+  expect(rig.state.players[0].characters.find(card => card?.instanceId === second.instanceId)?.state).toBe("RESTED");
+  expect(types.filter(type => type === "CARD_DRAWN")).toHaveLength(2);
+  expect(types.filter(type => type === "CARD_TRASHED")).toHaveLength(1);
+  expect(types.filter(type => type === "POWER_MODIFIED")).toHaveLength(1);
+  expect(types.indexOf("COMBAT_VICTORY")).toBeLessThan(types.indexOf("CARD_TRASHED"));
+  expect(types.indexOf("POWER_MODIFIED")).toBeLessThan(types.indexOf("END_OF_BATTLE"));
+  expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));
+});
