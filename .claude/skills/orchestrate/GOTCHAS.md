@@ -40,7 +40,7 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 
   Pre-approve those three files in the brief, and list `pnpm pipeline:sync-facets` as a post-merge user action.
 - The Codex review lens needs the two Codex environment entries under "Dispatch and sandbox" pasted into its brief: the cache env vars and the no-network sentence. With `--sandbox workspace-write` it ran vitest probes, then restored tracked files and deleted its scratch copies on all five PRs.
-- The GitHub integration moves the Linear issue to Done when its PR merges. Read the issue state before writing a status after a merge. A blind "In Review" write regressed OPT-827 and needed an audit note.
+- The GitHub integration moves Linear issues to Done on merge. Under charter §1, record merged/verification-pending while checks are actively monitored instead of cycling Done → In Review → Done. Required-check failure or interrupted monitoring requires prompt audited reconciliation; successful delivery gets a final audit without a redundant status write. Read current state/comments before mutating.
 - The automated Codex GitHub reviewer (`chatgpt-codex-connector`) posts inline PR comments within minutes. Read `gh api repos/<o>/<r>/pulls/<n>/comments` in the final recheck and disposition each comment before merging. On #683 it raised a real (latent) P2.
 - Hot-path feasibility code needs a scale test. OPT-798's upfront cost check eagerly enumerated C(28,20) states and ran out of heap, and its own mutation table could not see it. Whenever a brief touches enumeration, ask for a timing test with large zones (for example, 30 trash cards).
 
@@ -56,6 +56,7 @@ Disclosed reference for `/orchestrate` and `/orchestrate-frontend`. Read the sec
 ## Validation
 
 - Root `npx tsc --noEmit` misses the worker: run it inside `workers/game` too. Schema lint: `node workers/game/src/engine/schemas/lint-schemas.sh <file>` (a node script despite the name). Worker vitest: `pnpm --dir workers/game exec vitest run src/...`.
+- A package-script filter can accidentally select the full suite (OPT-967). Verify working directory, argument forwarding and explicit test selection; distinguish zero tests from a pass. Follow the charter selection check before costly runs.
 - Use pnpm for all validation; the canonical lint baseline is measured under the pnpm-locked tree and npm totals differ.
 - Baseline is green (schema lint 0 errors, worker tsc 0 errors). Never tell an agent to expect pre-existing lint errors — on a green baseline that invites it to dismiss its own violations as inherited.
 - OPT-618 exposed a stale API route test missed by a scoped check (2026-08-09). Current validation follows charter §3/§4: focused local checks plus required CI for Small/Medium; local full gate plus CI for Large. Select affected consumers rather than imposing a full local suite on every push.
