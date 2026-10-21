@@ -7,6 +7,13 @@ import { SessionRepository } from "../session/persistence.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import { endPhaseRig, synSchema, type EndPhaseRig, fullEndPhaseScenario, fullEndPhaseReply } from "./opt-962-rig.js";
 
+async function writerRoundTrip(state: GameState, cardDb: EndPhaseRig["db"]) {
+  const storage = new MemorySessionStorage();
+  const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
+  await new SessionRepository(storage, options).save({ state, cardDb, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [state] });
+  return (await new SessionRepository(storage, options).load())!.state;
+}
+
 it.skipIf(!process.env.OPT966_READER_ROOT)("replays every End Phase pause from live and undo on deployed reader", async () => {
   const root = process.env.OPT966_READER_ROOT!;
   const { SessionRepository: ReaderRepository } = await import(`${root}/workers/game/src/session/persistence.ts`) as typeof import("../session/persistence.js");
@@ -18,6 +25,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays every End Phase pause from l
   for (let n = 0; rig.state.pendingPrompt; n++) {
     expect(n).toBeLessThan(12);
     rig.state.pendingPrompt.promptId = `crossbuild-phase-${n}`;
+    rig.state = await writerRoundTrip(rig.state, rig.db);
     snapshots.push(structuredClone(rig.state));
     const reply = fullEndPhaseReply(rig, n);
     replies.push(reply.action);
@@ -35,7 +43,11 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays every End Phase pause from l
     const loaded = (await new ReaderRepository(storage, options).load())!;
     for (const initial of [loaded.state, loaded.undoHistory[0]]) {
       let actual = initial;
-      for (const action of replies.slice(index)) {
+      for (const [offset, action] of replies.slice(index).entries()) {
+        actual.pendingPrompt!.promptId = `crossbuild-phase-${index + offset}`;
+        const nextStorage = new MemorySessionStorage();
+        await new ReaderRepository(nextStorage, options).save({ ...loaded, state: actual, undoHistory: [actual] });
+        actual = (await new ReaderRepository(nextStorage, options).load())!.state;
         const result = readerResume(actual, action, rig.db, {
           drainPregame: (s) => s, advanceStartOfTurn: (s) => s,
         });
@@ -54,7 +66,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays every End Phase pause from l
 });
 
 
-async function replayPauses(rig: EndPhaseRig, choose: (state: GameState) => GameAction) {
+async function replayPauses(rig: EndPhaseRig, choose: (state: GameState) => GameAction, name: string) {
   const root = process.env.OPT966_READER_ROOT!;
   const { SessionRepository: ReaderRepository } = await import(`${root}/workers/game/src/session/persistence.ts`) as typeof import("../session/persistence.js");
   const { resumePromptLifecycle: readerResume } = await import(`${root}/workers/game/src/session/prompt-lifecycle.ts`) as typeof import("../session/prompt-lifecycle.js");
@@ -63,21 +75,28 @@ async function replayPauses(rig: EndPhaseRig, choose: (state: GameState) => Game
   while (rig.state.pendingPrompt) {
     expect(pauses.length).toBeLessThan(12);
     rig.state.pendingPrompt.promptId = `crossbuild-${pauses.length}`;
+    rig.state = await writerRoundTrip(rig.state, rig.db);
     pauses.push(structuredClone(rig.state));
     const reply = choose(rig.state);
     actions.push(reply);
     rig.act(reply, rig.state.pendingPrompt.respondingPlayer);
   }
   expect(pauses.length).toBeGreaterThan(0);
+  const corpus: unknown[] = [];
   for (const [index, state] of pauses.entries()) {
     const storage = new MemorySessionStorage();
     const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
     await new SessionRepository(storage, options).save({ state, cardDb: rig.db,
       mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [state] });
+    corpus.push({ index, stored: Object.fromEntries(storage.data), replies: actions.slice(index) });
     const loaded = (await new ReaderRepository(storage, options).load())!;
     for (const initial of [loaded.state, loaded.undoHistory[0]]) {
       let actual = initial;
       for (const [offset, action] of actions.slice(index).entries()) {
+        actual.pendingPrompt!.promptId = `crossbuild-${index + offset}`;
+        const nextStorage = new MemorySessionStorage();
+        await new ReaderRepository(nextStorage, options).save({ ...loaded, state: actual, undoHistory: [actual] });
+        actual = (await new ReaderRepository(nextStorage, options).load())!.state;
         expect(actual.pendingPrompt?.options).toEqual(pauses[index + offset].pendingPrompt?.options);
         expect(actual.pendingPrompt?.respondingPlayer).toEqual(pauses[index + offset].pendingPrompt?.respondingPlayer);
         const result = readerResume(actual, action, rig.db, { drainPregame: s => s, advanceStartOfTurn: s => s });
@@ -92,6 +111,8 @@ async function replayPauses(rig: EndPhaseRig, choose: (state: GameState) => Game
       expect(actual.executionContext).toEqual(rig.state.executionContext);
     }
   }
+  if (process.env.OPT966_WRITE_ADDITIONAL_CORPUS) writeFileSync(`${process.env.OPT966_WRITE_ADDITIONAL_CORPUS}/${name}.json`, JSON.stringify({ writerBase: "dfe08838", cases: corpus, expected: rig.state }, null, 2) + "\n");
+  return pauses;
 }
 
 it.skipIf(!process.env.OPT966_READER_ROOT)("replays Life reveal and prompted Trigger child from actual writer live and undo", async () => {
@@ -117,9 +138,12 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays Life reveal and prompted Tri
     { instanceId: "life-last", cardId: "CHAR-VANILLA", face: "DOWN" },
   ];
   rig.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "deal" });
-  await replayPauses(rig, state => state.pendingPrompt!.options.promptType === "REVEAL_TRIGGER"
+  const pauses = await replayPauses(rig, state => state.pendingPrompt!.options.promptType === "REVEAL_TRIGGER"
     ? { type: "REVEAL_TRIGGER", reveal: true }
-    : { type: "SELECT_TARGET", selectedInstanceIds: [child.instanceId] });
+    : { type: "SELECT_TARGET", selectedInstanceIds: [child.instanceId] }, "opt966-life-writer-corpus");
+  expect(pauses.map(s => s.pendingPrompt!.options.promptType)).toEqual(["REVEAL_TRIGGER", "SELECT_TARGET"]);
+  expect(rig.state.eventLog.filter(e => e.type === "CARD_DRAWN")).toHaveLength(3);
+  expect(rig.state.players[1].life).toHaveLength(0);
 });
 
 it.skipIf(!process.env.OPT966_READER_ROOT)("replays replacement offer and own suffix from actual writer live and undo", async () => {
@@ -141,5 +165,26 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays replacement offer and own su
     controller: 1, appliesTo: [protectedTarget.instanceId], timestamp: 1,
   }];
   rig.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "ko" });
-  await replayPauses(rig, () => ({ type: "PLAYER_CHOICE", choiceId: "accept" }));
+  const pauses = await replayPauses(rig, () => ({ type: "PLAYER_CHOICE", choiceId: "accept" }), "opt966-replacement-writer-corpus");
+  expect(pauses.map(s => s.pendingPrompt!.options.promptType)).toEqual(["OPTIONAL_EFFECT"]);
+  expect(rig.state.eventLog.filter(e => e.type === "CARD_KO")).toHaveLength(1);
+  expect(rig.state.eventLog.filter(e => e.type === "CARD_DRAWN")).toHaveLength(1);
+});
+
+it.skipIf(!process.env.OPT966_READER_ROOT)("replays scheduled draw watcher prompts after the loaded wave owner drains", async () => {
+  const rig = endPhaseRig();
+  rig.putSyn("WAVE", synSchema("WAVE", "Character", [{
+    id: "wave", category: "auto", trigger: { keyword: "END_OF_YOUR_TURN" }, flags: { optional: true },
+    actions: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_TURN" } }],
+  }]), 0, "CHARACTER");
+  rig.putSyn("WATCHER", synSchema("WATCHER", "Character", [{
+    id: "watch", category: "auto", trigger: { event: "DRAW_OUTSIDE_DRAW_PHASE", filter: { controller: "SELF" } }, flags: { optional: true },
+    actions: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_TURN" } }],
+  }]), 0, "CHARACTER");
+  rig.state.scheduledActions = [{ id: "draw", timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } }, boundToInstanceId: null, sourceEffectId: "draw-source", controller: 0 }];
+  rig.act({ type: "ADVANCE_PHASE" });
+  const pauses = await replayPauses(rig, () => ({ type: "PLAYER_CHOICE", choiceId: "accept" }), "opt966-scheduled-watcher-writer-corpus");
+  expect(pauses.map(s => s.pendingPrompt!.options.promptType)).toEqual(["OPTIONAL_EFFECT", "OPTIONAL_EFFECT"]);
+  expect(rig.state.eventLog.filter(e => e.type === "POWER_MODIFIED")).toHaveLength(2);
+  expect(rig.state.eventLog.filter(e => e.type === "CARD_DRAWN")).toHaveLength(1);
 });
