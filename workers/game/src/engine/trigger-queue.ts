@@ -1,9 +1,7 @@
 /**
- * The pipeline's Step 5 trigger executor (rule 8-6), shared by the action
- * pipeline and the End Phase (OPT-924). Moved verbatim out of pipeline.ts so
- * phases.ts can resolve End Phase waves and obligations with the same policy
- * without an import cycle (pipeline → execute → phases → pipeline). No
- * behaviour change; there is still exactly one pipeline-side policy.
+ * Pipeline event scanning and explicit rules-window entry points. All queued
+ * work is reported to the shared trigger executor; ordinary reports join the
+ * existing owner while damage and End Phase windows retain their boundaries.
  */
 
 import { isGameTerminated } from "./terminal.js";

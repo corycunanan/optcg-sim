@@ -309,7 +309,7 @@ export function handleFieldToLifePosition(
   );
   if (pausedAction.result_ref && result.result)
     resultRefs.set(pausedAction.result_ref, result.result);
-  return { kind: "completed", ...result, resolved: true };
+  return { ...result, kind: isGameTerminated(result.state) ? "terminal" : result.pendingPrompt ? "waiting" : "completed", resolved: true };
 }
 
 /**

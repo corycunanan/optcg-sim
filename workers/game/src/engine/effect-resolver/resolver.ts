@@ -331,6 +331,8 @@ function createResolverServices(
     continueSimultaneousGroup: (...args) =>
       continueSimultaneousGroup(...args, services),
     reportTriggers: (state, triggers, _cardDb, events = [], group) => {
+      if (isGameTerminated(state))
+        return { kind: "terminal", state, events, resolved: false };
       if (!triggerExecutionOwner(state)) {
         if (!triggers.length)
           return { kind: "continued", state, events, resolved: true };

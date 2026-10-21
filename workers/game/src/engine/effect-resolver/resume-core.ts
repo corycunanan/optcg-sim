@@ -115,10 +115,10 @@ export function resumeEffectChain(
 
   // Player skipped the optional effect
   if (action.type === "PASS") {
-    return { kind: "waiting", state, events, resolved: false };
+    return { kind: isGameTerminated(state) ? "terminal" : "completed", state, events, resolved: false };
   }
   if (action.type === "PLAYER_CHOICE" && action.choiceId === "skip") {
-    return { kind: "waiting", state, events, resolved: false };
+    return { kind: isGameTerminated(state) ? "terminal" : "completed", state, events, resolved: false };
   }
 
   // ── ARRANGE_TOP_CARDS branches ────────────────────────────────────────────
@@ -386,7 +386,7 @@ export function resumeFromStack(
 ): HandlerResult {
   const topFrame = peekFrame(state);
   if (!topFrame) {
-    return { kind: "completed", state, events: [], resolved: true };
+    return { kind: isGameTerminated(state) ? "terminal" : "completed", state, events: [], resolved: true };
   }
 
   const { sourceCardInstanceId, controller, phase } = topFrame;

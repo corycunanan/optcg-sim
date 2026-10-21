@@ -404,7 +404,7 @@ export function handleSelectTargetRuleTrashForPlay(
   }
   return {
     kind: "handled",
-    result: { kind: "completed", state: nextState, events, resolved: true },
+    result: { kind: isGameTerminated(nextState) ? "terminal" : "completed", state: nextState, events, resolved: true },
   };
 }
 

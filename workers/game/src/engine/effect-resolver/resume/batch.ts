@@ -1,6 +1,6 @@
 /**
- * OPT-172 batch-resume re-entry: after a mid-batch trigger drain (rule 6-2)
- * completes, re-invokes the original multi-target action handler with the
+ * Batch continuation: the shared executor re-invokes the original
+ * multi-target action handler with the
  * remaining-batch state carried on the frame's batchResumeMarker.
  */
 
@@ -36,9 +36,8 @@ import { generateFrameId } from "../../effect-stack.js";
 import { insertFrameAt } from "../../damage-frames.js";
 
 /**
- * Loop in case the re-entered handler completes cleanly (no prompt, no new
- * triggers, no further batch pause) while another AWAITING_BATCH_RESUME frame
- * sits underneath it on the stack.
+ * Perform one batch continuation step. Return its progress to the shared
+ * executor, which owns any further child or trigger advancement.
  */
 export function reenterBatchResume(
   state: GameState,
