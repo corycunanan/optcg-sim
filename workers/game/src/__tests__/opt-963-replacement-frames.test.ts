@@ -132,8 +132,8 @@ describe("OPT-941 battle K.O. replacement: a REPLACEMENT frame above the BATTLE_
     const target = franky(f);
     f.battle(target, f.attacker());
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect(kinds(f.state)).toEqual(["BATTLE_DAMAGE", "REPLACEMENT"]);
-    const offer = f.state.effectStack[1];
+    expect(kinds(f.state)).toEqual(["TRIGGER_EXECUTION", "BATTLE_DAMAGE", "REPLACEMENT"]);
+    const offer = f.state.effectStack.find(frame => frame.replacement)!;
     expect(f.state.pendingPrompt?.resumeContext).toBe(offer.id);
     expect(offer.replacement).toMatchObject({ targetInstanceId: target.instanceId, event: "WOULD_BE_KO" });
     expect(battleContinuation(f.state)).toMatchObject({ stage: "CHARACTER_KO_REPLACEMENT", targetInstanceId: target.instanceId, replacementEffectId: offer.replacement!.effectId });
@@ -157,8 +157,8 @@ describe("OPT-941 battle K.O. replacement: a REPLACEMENT frame above the BATTLE_
     const target = franky(f);
     f.battle(target, f.attacker());
     await f.reload();
-    expect(kinds(f.state)).toEqual(["BATTLE_DAMAGE", "REPLACEMENT"]);
-    expect(f.state.pendingPrompt?.resumeContext).toBe(f.state.effectStack[1].id);
+    expect(kinds(f.state)).toEqual(["TRIGGER_EXECUTION", "BATTLE_DAMAGE", "REPLACEMENT"]);
+    expect(f.state.pendingPrompt?.resumeContext).toBe(f.state.effectStack.find(frame => frame.replacement)!.id);
     const reply = { type: "PLAYER_CHOICE", choiceId: "accept", promptId: f.state.pendingPrompt!.promptId } as GameAction;
     expect(f.send(0, reply).kind).toBe("resume");
     expectBattleClosedOnce(f);
@@ -175,10 +175,10 @@ describe("OPT-941 battle K.O. replacement: a REPLACEMENT frame above the BATTLE_
     f.put(CARDS.VANILLA.id, 0, "HAND");
     f.put(CARDS.VANILLA.id, 0, "HAND");
     f.battle(target, f.attacker());
-    expect(kinds(f.state)).toEqual(["BATTLE_DAMAGE", "REPLACEMENT"]);
+    expect(kinds(f.state)).toEqual(["TRIGGER_EXECUTION", "BATTLE_DAMAGE", "REPLACEMENT"]);
     f.ok(f.responder(), { type: "PLAYER_CHOICE", choiceId: "accept" });
     expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    expect(kinds(f.state)[0]).toBe("BATTLE_DAMAGE");
+    expect(kinds(f.state).slice(0, 2)).toEqual(["TRIGGER_EXECUTION", "BATTLE_DAMAGE"]);
     expect(battleContinuation(f.state)).toMatchObject({ resolution: "REPLACED" });
     await f.reload();
     const choice = (f.state.pendingPrompt!.options as { validTargets: string[] }).validTargets[0];
@@ -203,7 +203,7 @@ describe("OPT-941 battle K.O. replacement: a REPLACEMENT frame above the BATTLE_
     f.battle(target, f.attacker());
     const storage = await f.reload();
     const stored = storage.data.get("session") as { state: Record<string, unknown> };
-    const broken = toPersistedGameState({ ...(stored.state as unknown as GameState), effectStack: [f.state.effectStack[0]] }) as unknown as Record<string, unknown>;
+    const broken = toPersistedGameState({ ...(stored.state as unknown as GameState), effectStack: [f.state.effectStack.find(frame => !frame.triggerExecution)!] }) as unknown as Record<string, unknown>;
     storage.data.set("session", { ...stored, state: broken });
     await expect(new SessionRepository(storage, { nextJsUrl: "https://x.test", workerSecret: "s" }).load()).rejects.toMatchObject({
       name: "SessionLoadError",
@@ -262,8 +262,8 @@ describe("OPT-941 batch replacement: a REPLACEMENT_BATCH frame below the chain's
   it("the offer is a REPLACEMENT_BATCH frame on top of the chain's continuation and the prompt names it", () => {
     const { f, block, source, protectedTarget } = batchState();
     raiseOffer(f, block, source);
-    expect(kinds(f.state)).toEqual(["TRIGGER_DRAIN", "REPLACEMENT_BATCH"]);
-    const [chain, offer] = f.state.effectStack;
+    expect(kinds(f.state)).toEqual(["TRIGGER_EXECUTION", "TRIGGER_DRAIN", "REPLACEMENT_BATCH"]);
+    const [, chain, offer] = f.state.effectStack;
     expect(chain.pausedAction?.type).toBe("KO");
     expect(chain.remainingActions.map((a) => a.type)).toEqual(["DRAW"]);
     expect(f.state.pendingPrompt?.resumeContext).toBe(offer.id);
@@ -274,7 +274,7 @@ describe("OPT-941 batch replacement: a REPLACEMENT_BATCH frame below the chain's
     const { f, block, source, protectedTarget, other } = batchState();
     raiseOffer(f, block, source);
     await f.reload();
-    expect(kinds(f.state)).toEqual(["TRIGGER_DRAIN", "REPLACEMENT_BATCH"]);
+    expect(kinds(f.state)).toEqual(["TRIGGER_EXECUTION", "TRIGGER_DRAIN", "REPLACEMENT_BATCH"]);
     const hand0 = f.state.players[0].hand.length;
     const life1 = f.state.players[1].life.length;
     f.ok(f.responder(), { type: "PLAYER_CHOICE", choiceId: choice });
@@ -292,7 +292,7 @@ describe("OPT-941 batch replacement: a REPLACEMENT_BATCH frame below the chain's
     raiseOffer(f, block, source);
     const storage = await f.reload();
     const stored = storage.data.get("session") as { state: Record<string, unknown> };
-    const broken = toPersistedGameState({ ...(stored.state as unknown as GameState), effectStack: [f.state.effectStack[0]] }) as unknown as Record<string, unknown>;
+    const broken = toPersistedGameState({ ...(stored.state as unknown as GameState), effectStack: [f.state.effectStack.find(frame => !frame.triggerExecution)!] }) as unknown as Record<string, unknown>;
     storage.data.set("session", { ...stored, state: broken });
     await expect(new SessionRepository(storage, { nextJsUrl: "https://x.test", workerSecret: "s" }).load()).rejects.toMatchObject({
       name: "SessionLoadError",

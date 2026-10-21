@@ -48,7 +48,7 @@ describe("OPT-963: effect damage inside an End Phase wave parks beneath the PHAS
 
     r.act({ type: "ADVANCE_PHASE" });
     expect(r.state.turn.phase).toBe("END");
-    expect(r.state.effectStack.map(frameKindOf)).toEqual(["PHASE_BOUNDARY", "TRIGGER_DRAIN", "EFFECT_DAMAGE"]);
+    expect(r.state.effectStack.map(frameKindOf)).toEqual(["PHASE_BOUNDARY", "TRIGGER_EXECUTION", "TRIGGER_DRAIN", "EFFECT_DAMAGE"]);
     expect(r.state.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
     expect(r.state.pendingPrompt?.respondingPlayer).toBe(1);
     // The first point is logged while the window is open; nothing after it yet.

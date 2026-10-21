@@ -655,8 +655,10 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     });
 
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    // OPT-963: the batch waits on its own frame below the substitute's prompt frames.
-    expect(session.gameState.effectStack.some((frame) => frame.replacementBatch)).toBe(true);
+    // Rule 8-6-3: finish the replacement batch and outer effect before
+    // the newly fulfilled ordinary watcher becomes eligible.
+    expect(session.gameState.effectStack.some((frame) => frame.replacementBatch)).toBe(false);
+    expect(session.gameState.effectStack.some((frame) => frame.triggerExecution)).toBe(true);
     expect(session.gameState.effectStack.at(-1)?.replacementBatch).toBeUndefined();
 
     await session.handleAction(player1 as unknown as WebSocket, 1, {

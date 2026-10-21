@@ -391,7 +391,9 @@ describe("OPT-854 unrelated declines keep an activated Main's completion", () =>
       await f.reload();
       f.select(kind === "KO" ? [target.instanceId] : [f.state.players[0].leader.instanceId]);
       expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-      expect(count(f.state, "EVENT_MAIN_RESOLVED_FROM_TRASH")).toBe(0);
+      // Rule 8-6-3: the activated Main has completed before the newly
+      // fulfilled ordinary watcher may be declined.
+      expect(count(f.state, "EVENT_MAIN_RESOLVED_FROM_TRASH")).toBe(1);
       await f.reload();
       f.choose("skip");
       expect(f.state.pendingPrompt).toBeNull();

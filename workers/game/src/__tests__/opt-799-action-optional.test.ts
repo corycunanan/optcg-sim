@@ -274,7 +274,7 @@ describe("OPT-799 OP14-079 Crocodile — Then, you may trash 2 from deck", () =>
     expect(f.optionalPrompt().options.effectDescription).toBe(
       "Then, you may trash 2 cards from the top of your deck."
     );
-    expect(f.state.effectStack).toHaveLength(1);
+    expect(f.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
     expect(f.accept()).toBe(false);
     expect(f.state.activeEffects).toHaveLength(modifiersBefore);
     expect(victimCost(f, victim)).toBe(0);

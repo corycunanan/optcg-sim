@@ -208,7 +208,7 @@ describe("OPT-431: the self half is fixed to the source card", () => {
     );
     expect(rejected.resolved).toBe(false);
     // Frame untouched — the cost is still awaiting a legal selection.
-    expect(rejected.state.effectStack).toHaveLength(1);
+    expect(rejected.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
     expect(rejected.state.players[0].characters.some((c) => c?.instanceId === SOURCE_ID)).toBe(true);
   });
 

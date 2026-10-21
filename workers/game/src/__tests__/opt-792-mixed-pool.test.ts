@@ -823,7 +823,7 @@ describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
       new Map(),
       []
     );
-    expect(result?.kind).toBe("fallthrough");
+    expect(result?.kind).toBe("continued");
     const next = result?.kind === "continued" ? result.state : f.state;
     expect(char({ ...f, state: next } as Fixture, c)?.attachedDon.map((d) => d.instanceId)).toContain(
       moving.instanceId

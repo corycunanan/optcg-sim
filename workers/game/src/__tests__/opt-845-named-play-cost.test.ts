@@ -218,8 +218,7 @@ it.each(["TOP", "BOTTOM"] as const)(
     expect(
       f.state.players[1].characters.some((c) => c?.instanceId === "ko-target")
     ).toBe(true);
-    f.state = JSON.parse(JSON.stringify(f.state));
-    expect(convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(f.state))), "test reload")).toBeDefined();
+    f.state = convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(f.state))), "test reload");
     const opts = f.state.pendingPrompt!.options;
     if (opts.promptType !== "PLAYER_CHOICE")
       throw new Error("Expected Life end");
@@ -310,8 +309,7 @@ it.each([false, true])(
     expect(f.state.players[0].hand.map((c) => c.instanceId)).toEqual([
       "kotori-0",
     ]);
-    f.state = JSON.parse(JSON.stringify(f.state));
-    expect(convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(f.state))), "test reload")).toBeDefined();
+    f.state = convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(f.state))), "test reload");
     f.act({
       type: "SELECT_TARGET",
       selectedInstanceIds: [trashSource ? hotori.instanceId : "own-0"],
