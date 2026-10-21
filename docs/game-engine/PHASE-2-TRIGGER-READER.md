@@ -121,3 +121,36 @@ legacy shape fixtures, End Phase persistence, and owner semantic tests. Disablin
 mode propagation at `resumePhaseBoundary` kills six of the original ten corpus cases;
 the mutation is restored. Full verification and independent reviews are still
 pending at this checkpoint.
+
+### Reassessment: legacy phase topology
+
+External review comment 4339971127 identified a separate `LEGACY_TOPOLOGY`
+failure family after the first full gate: the legacy scheduled-action re-park
+assumed that only the prompt had been pushed. With a v5 owner it placed the
+phase between owner and prompt, allowing later scheduled work and handoff
+before the current owner's ordinary child effects. The passing staged corpus
+did not exercise this graph; the earlier readiness claim was withdrawn.
+
+The fix records the original stack depth and inserts the legacy phase below
+all children created by that resolution. It applies universally, including the
+writer; the unused pop/reinsert shortcut is removed. Existing single-child v4
+writer goldens remain byte-identical. No converter or reader is retired.
+
+Two additional synthetic corpus families start with a supported mixed graph:
+a legacy phase (stage absent, or explicit LEGACY_SCHEDULED_ACTIONS) beneath an
+actual pipeline-produced v5 owner. The bootstrap wave registration is omitted
+from this historical fixture to isolate the legacy list from a second wave at
+its original handoff window. Actual writer commit `a578d8a6` then produces a
+prompted scheduled play, its optional On Play child, and later scheduled draw.
+Each of the three starting pauses is saved/reloaded through the session API
+and replayed from live and undo. These are six additional pauses (18 total),
+not production captures or a claim that ordinary new writers create legacy
+phase frames. Independent assertions require phase below owner, ending player
+still active at every prompt, and child work before the later draw/handoff.
+
+Both writer cases failed before the fix on phase index 1 versus owner index 0.
+Reintroducing the wrong insertion depth kills both initial legacy corpus cases
+(2/18), and the restored corpus plus v4 goldens/persistence suites pass 66 tests.
+This substantive reassessment requires fresh independent review and full
+verification; the earlier 4d406814 gate does not establish readiness of this
+correction.

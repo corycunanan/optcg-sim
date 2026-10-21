@@ -3,6 +3,8 @@ import type { GameAction, GameState } from "../types.js";
 import { SessionRepository } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
+import absentLegacyJson from "./fixtures/opt-966-legacy-absent-writer.json";
+import explicitLegacyJson from "./fixtures/opt-966-legacy-explicit-writer.json";
 import handoffJson from "./fixtures/opt-966-handoff-writer.json";
 import phaseJson from "./fixtures/opt-966-endphase-writer.json";
 import lifeJson from "./fixtures/opt-966-life-writer.json";
@@ -15,6 +17,8 @@ type Corpus = {
   expected: GameState;
 };
 const scenarios = [
+  ["absent legacy stage", absentLegacyJson, "crossbuild"],
+  ["explicit legacy stage", explicitLegacyJson, "crossbuild"],
   ["turn handoff", handoffJson, "crossbuild"],
   ["phase", phaseJson, "crossbuild-phase"],
   ["Life", lifeJson, "crossbuild"],
@@ -26,7 +30,7 @@ const cases = scenarios.flatMap(([name, json, promptPrefix]) => {
   return corpus.cases.map(entry => ({ ...entry, name, expected: corpus.expected, promptPrefix, corpus }));
 });
 
-it.each(cases)("resumes writer $name pause $index through later work in live and undo", async ({ index, stored, replies, expected, promptPrefix, corpus }) => {
+it.each(cases)("resumes writer $name pause $index through later work in live and undo", async ({ index, stored, replies, expected, promptPrefix, corpus, name }) => {
   const storage = new MemorySessionStorage();
   await storage.put(structuredClone(stored));
   const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
@@ -38,6 +42,11 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       actual.pendingPrompt!.promptId = `${promptPrefix}-${index + offset}`;
       // No hidden mode survives a save: every re-park must carry its v5 owner.
       expect(actual.effectStack.some(frame => frame.triggerExecution)).toBe(true);
+      if (name.includes("legacy")) {
+        expect(actual.turn.activePlayerIndex).toBe(0);
+        expect(actual.effectStack.findIndex(frame => frame.phaseBoundaryContinuation))
+          .toBeLessThan(actual.effectStack.findIndex(frame => frame.triggerExecution));
+      }
       const writerPrompt = (corpus.cases[index + offset].stored.session as { state: GameState }).state.pendingPrompt;
       expect(actual.pendingPrompt?.options).toEqual(writerPrompt?.options);
       expect(actual.pendingPrompt?.respondingPlayer).toEqual(writerPrompt?.respondingPlayer);

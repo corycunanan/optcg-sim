@@ -42,7 +42,6 @@ import {
   generateFrameId,
   peekFrame,
   popFrame,
-  pushFrame,
 } from "./effect-stack.js";
 import { applyRefreshProhibitions } from "./prohibitions.js";
 import { transitionCard } from "./zone-transition.js";
@@ -524,6 +523,9 @@ function continueLegacyScheduledActions(
   triggerExecutionMode = false
 ): ExecuteResult {
   let state = initialState;
+  // Keep the phase below every child created by this scheduled resolution,
+  // including an execution owner beneath the visible prompt.
+  const parkDepth = initialState.effectStack.length;
   const scheduledActions = continuation.remainingScheduledActions;
 
   for (let index = 0; index < scheduledActions.length; index += 1) {
@@ -553,14 +555,13 @@ function continueLegacyScheduledActions(
         continuation.endingPlayerIndex
       );
       state = parkEndPhaseAt(
-        popFrame(state),
+        state,
         {
           ...continuation,
           stage: "LEGACY_SCHEDULED_ACTIONS",
           remainingScheduledActions: scheduledActions.slice(index + 1),
         },
-        state.effectStack.length - 1,
-        peekFrame(state)
+        parkDepth
       );
       return {
         state,
@@ -579,16 +580,13 @@ function continueLegacyScheduledActions(
 
 /**
  * Insert the End Phase frame at `depth`, below every frame pushed above it.
- * `reinsertTop`, when given, is pushed back on top (the legacy path pops the
- * prompt frame first, as the version 1 engine did).
  */
 function parkEndPhaseAt(
   state: GameState,
   continuation: PhaseBoundaryContinuation,
-  depth: number,
-  reinsertTop?: EffectStackFrame | null
+  depth: number
 ): GameState {
-  const anchor = reinsertTop ?? state.effectStack[depth];
+  const anchor = state.effectStack[depth];
   if (!anchor) return state;
   if (state.effectStack.length >= MAX_EFFECT_STACK_DEPTH) {
     return terminateForEngineLimit(state, {
@@ -619,7 +617,6 @@ function parkEndPhaseAt(
     simultaneousTriggers: [],
     accumulatedEvents: [],
   };
-  if (reinsertTop) return pushFrame(pushFrame(frameId.state, phaseFrame), reinsertTop);
   const stack = frameId.state.effectStack;
   return {
     ...frameId.state,
