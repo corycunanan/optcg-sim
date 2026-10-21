@@ -206,3 +206,21 @@ The main writer remains incomplete. These six synthetic snapshots establish the
 specified battle paths, not every possible future v5 graph. Missing production
 captures remain the inherited OPT-971 evidence gap; no capture or retirement gate
 is waived.
+
+### Battle topology progress correction
+
+External review comment 4340417923 identified that the first battle guard also
+matched a damage frame *below* the nearest v5 owner. For an accepted saved graph
+`[battle, owner]`, that guard returned continued without removing the owner;
+the session dispatcher would select the same owner repeatedly. The handoff now
+requires the matching damage frame to be above the nearest owner. An owner above
+battle finishes its own work, allowing the existing dispatcher to reach damage.
+
+Bounded tests first save/load accepted alternate graphs with empty, queued and
+nested owners, then assert progress from one direct resume before exercising the
+session drain. This fails safely on the old guard instead of hanging the suite.
+Live and undo variants complete with single publications and no stranded frames.
+These rearranged graphs are progress probes, not evidence of a rule-correct
+activation window; the unchanged actual-writer corpus remains the chronology
+oracle. The previous full gate at 2328944b is historical evidence; this runtime
+correction requires fresh review and full verification before readiness.

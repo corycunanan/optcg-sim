@@ -279,11 +279,14 @@ export function advanceTriggerExecution(
         events,
         resolved: true,
       };
-    const battleDebt = state.effectStack.find(frame =>
-      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+    const ownerIndex = state.effectStack.findIndex(frame => frame.id === owner!.id);
+    const battleDebt = state.effectStack.find((frame, index) =>
+      index > ownerIndex && frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
       frame.battleDamage.battleId === state.turn.battle?.battleId
     );
     if (battleDebt && !stopAtFrameId) {
+      // Only a descendant battle frame can receive this handoff. A nested
+      // owner above battle must finish itself so the dispatcher makes progress.
       // Loaded v5 ordinary work must not publish ahead of the battle prefix.
       // Damage completion retains both obligations; the session dispatcher
       // continues the substitute's own children before releasing this owner.

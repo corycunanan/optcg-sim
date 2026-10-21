@@ -1,3 +1,5 @@
+import { withStableOrderingIds } from "../engine/trigger-ordering.js";
+import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
 import { SessionRepository } from "../session/persistence.js";
@@ -73,5 +75,43 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("preserves the deployed reader's full
     const expected = baseline.resumePromptLifecycle(structuredClone(state), legacy.reply as GameAction, new Map(Object.entries(loaded.cardDb)), services);
     const actual = resumePromptLifecycle(structuredClone(state), legacy.reply as GameAction, new Map(Object.entries(loaded.cardDb)), services);
     expect(actual).toEqual(expected);
+  }
+});
+
+
+it.each([{ queued: false, nested: false }, { queued: true, nested: false }, { queued: true, nested: true }])("advances a loaded child owner above battle debt (queued $queued, nested $nested)", async ({ queued, nested }) => {
+  const storage = new MemorySessionStorage();
+  await storage.put(structuredClone(battleJson.cases[2].stored));
+  const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
+  const loaded = (await new SessionRepository(storage, options).load())!;
+  const [owner, damage, prompt] = loaded.state.effectStack;
+  if (queued) {
+    owner.triggerExecution!.generations[0].triggers = withStableOrderingIds(damage.pendingTriggers);
+    damage.pendingTriggers = [];
+  }
+  // Accepted alternate topology / progress probe, distinct from the writer's
+  // ordinary owner below damage. This is not a rule-correct timing fixture.
+  // Prove persistence accepts both live and undo first.
+  const outer = { ...structuredClone(owner), id: "outer-trigger-owner", triggerExecution: { generations: [{ triggers: [] }] } };
+  const state = { ...loaded.state, effectStack: [...(nested ? [outer] : []), damage, owner, prompt] };
+  await new SessionRepository(storage, options).save({ ...loaded, state, undoHistory: [state] });
+  const restored = (await new SessionRepository(storage, options).load())!;
+  for (const initial of [restored.state, restored.undoHistory[0]]) {
+    const action = battleJson.cases[2].replies[0] as GameAction;
+    // Bounded direct advance catches no-progress before entering the session
+    // drain. On the old guard this assertion fails instead of hanging Vitest.
+    const step = resumeFromStack({ ...initial, pendingPrompt: null }, action, restored.cardDb);
+    expect(step.state.effectStack.some(frame => frame.id === owner.id)).toBe(false);
+    expect(step.state.effectStack.at(-1)?.id).toBe(damage.id);
+    const result = resumePromptLifecycle(initial, action, restored.cardDb, {
+      drainPregame: state => state, advanceStartOfTurn: state => state,
+    });
+    expect(result.responseRejected).toBe(false);
+    expect(result.state.effectStack).toEqual([]);
+    expect(result.state.pendingPrompt).toBeNull();
+    expect(result.state.turn.battle).toBeNull();
+    for (const type of ["END_OF_BATTLE", "COMBAT_VICTORY", "CARD_DRAWN", "POWER_MODIFIED"])
+      expect(result.state.eventLog.filter(event => event.type === type)).toHaveLength(1);
+    expect(result.state.eventLog.filter(event => event.type === "CARD_TRASHED")).toHaveLength(2);
   }
 });
