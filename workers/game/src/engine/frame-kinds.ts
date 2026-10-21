@@ -15,6 +15,7 @@ export const EFFECT_STACK_FRAME_KINDS = [
   "COST",
   "TRIGGER_ORDER",
   "TRIGGER_DRAIN",
+  "TRIGGER_EXECUTION",
   "BATCH_RESUME",
   "PHASE_BOUNDARY",
   // OPT-963 (version 3): typed replacement and damage continuations (§8).
@@ -51,6 +52,7 @@ export type EffectStackFrameKind = (typeof EFFECT_STACK_FRAME_KINDS)[number];
 export function isHandlerOwnedFrame(
   frame: Pick<
     EffectStackFrame,
+    | "triggerExecution"
     | "eventActivation"
     | "playOverflow"
     | "pregameContinuation"
@@ -77,6 +79,7 @@ export function isHandlerOwnedFrame(
 export function frameKindOf(
   frame: Pick<
     EffectStackFrame,
+    | "triggerExecution"
     | "eventActivation"
     | "playOverflow"
     | "pregameContinuation"
@@ -88,6 +91,7 @@ export function frameKindOf(
     | "effectDamage"
   >
 ): EffectStackFrameKind {
+  if (frame.triggerExecution) return "TRIGGER_EXECUTION";
   if (frame.eventActivation) return "EVENT_ACTIVATION";
   if (frame.playOverflow) return "PLAY_OVERFLOW";
   if (frame.pregameContinuation) return "PREGAME";

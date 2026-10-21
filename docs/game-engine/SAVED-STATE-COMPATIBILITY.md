@@ -432,3 +432,9 @@ Structural lifting also corrects the old fallback dropping accepted action event
 
 
 PR7a reader deployed at `958fce9ddc729d3d571473ed7bb013dde62bda0b`: [successful Worker deployment](https://github.com/corycunanan/optcg-sim/actions/runs/39486222062). This is the minimum rollback build after PR7b activation.
+
+## Version 5 trigger-generation reader prerequisite (OPT-966)
+
+The Phase 2 prerequisite accepts and executes `TRIGGER_EXECUTION` frames with explicit FIFO generations, retained ordering histories, and selected-but-not-activated work. Normal producers and their writer remain version 4. Saving a loaded unfinished version 5 scope preserves version 5, including undo snapshots; once no such scope remains the state is representable as version 4. This native semantic reader does not execute a flattened/lowered queue. Strict generation, selection, and frame ownership checks apply before resume. See [Phase 2 trigger reader](PHASE-2-TRIGGER-READER.md) for the complete contract, evidence, and rollout boundary.
+
+Deploy and verify this prerequisite before enabling a version 5 producer. The older PR7 binary is not a supported rollback after version 5 writes. Versions 1–4 remain supported; no production capture or retirement gate is claimed complete, and OPT-971 remains open.

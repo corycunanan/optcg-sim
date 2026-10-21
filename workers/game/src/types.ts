@@ -395,7 +395,24 @@ export interface EventActivationDebt {
   sourceClass: "EVENT";
   events: PendingEvent[];
 }
+/** A FIFO resolution cohort; an explicitly open cohort collects future work. */
+export interface TriggerGeneration {
+  triggers: QueuedTrigger[];
+  orderingGroup?: { triggers: QueuedTrigger[]; resolvedTriggerIds: string[] };
+}
+
+export interface TriggerExecution {
+  generations: TriggerGeneration[];
+  /** Open cohort collecting reports until the current older generation finishes.
+   * Missing means every stored generation is closed; never infer from position. */
+  collectingGenerationIndex?: number;
+  /** Removed from its generation before selection; cleared before activation. */
+  selectedTrigger?: QueuedTrigger;
+}
+
 export interface EffectStackFrame {
+  /** Version 5 reader: owns generations independently of suspended effect children. */
+  triggerExecution?: TriggerExecution;
   eventActivation?: EventActivationDebt;
   playOverflow?: EffectStackFrame["ruleTrashForPlay"];
   pregameContinuation?: {

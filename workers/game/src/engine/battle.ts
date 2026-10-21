@@ -1,3 +1,4 @@
+import { advanceLifeTriggerExecution, triggerExecutionOwner } from "./trigger-executor.js";
 /**
  * Battle system
  *
@@ -544,15 +545,19 @@ export function resumeBattleDamageFrame(
       (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
     );
     if (triggerBlock) {
-      const effectResult = resolveEffect(
+      const resolved = resolveEffect(
         nextState,
         triggerBlock,
         triggerInstanceId,
         inactiveIdx,
         cardDb
       );
+      const effectResult = advanceLifeTriggerExecution(
+        { ...resolved, events: [...events, ...resolved.events] },
+        frame.id, cardDb, resolverExecutionServices
+      );
       nextState = effectResult.state;
-      events.push(...effectResult.events);
+      events.splice(0, events.length, ...effectResult.events);
       nextState = restoreTriggerStaging(nextState, stagingBaseline);
       // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
       // that already happened, then stop: no further damage, no endBattle.
@@ -564,11 +569,11 @@ export function resumeBattleDamageFrame(
         });
         return { state: nextState, events };
       }
-      // OPT-441: a prompt pauses the Trigger effect, not the damage sequence.
+      // OPT-441: a prompt or retained v5 child pauses the Trigger effect.
       // Publish the Life removal now and retain it on the frame, unscanned,
       // so its auto effects fire when the Trigger's frames unwind and the
       // frame continues the remaining damage.
-      if (effectResult.pendingPrompt) {
+      if (effectResult.pendingPrompt || (triggerExecutionOwner(nextState) && nextState.effectStack.at(-1)?.id !== frame.id)) {
         const removedEvent: PendingEvent = {
           type: "CARD_REMOVED_FROM_LIFE",
           playerIndex: inactiveIdx,

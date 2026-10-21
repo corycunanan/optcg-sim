@@ -1,3 +1,4 @@
+import { advanceTriggerExecution, selectTriggerForExecution, triggerExecutionOwner } from "../trigger-executor.js";
 import type {
   CardData,
   GameAction,
@@ -33,7 +34,13 @@ export function resumeFromStack(
   action: GameAction,
   cardDb: Map<string, CardData>
 ) {
-  return resumeFromStackCore(state, action, cardDb, resolverExecutionServices);
+  const owner = triggerExecutionOwner(state);
+  if (!owner) return resumeFromStackCore(state, action, cardDb, resolverExecutionServices);
+  const selected = selectTriggerForExecution(state, action);
+  const result = selected ?? (state.effectStack.at(-1)?.id === owner.id
+    ? { state, events: [], resolved: true }
+    : resumeFromStackCore(state, action, cardDb, resolverExecutionServices));
+  return advanceTriggerExecution(result, cardDb, resolverExecutionServices);
 }
 
 export function processRemainingTriggers(

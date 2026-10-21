@@ -1,3 +1,4 @@
+import { projectVersion5 } from "./version5-reader.js";
 import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
 import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
 import { liftVersion3 } from "./version4-lift.js";
@@ -854,10 +855,26 @@ function isValidNativeVersion4(
   return true;
 }
 
+function isValidNativeVersion5(raw: unknown, location: string): raw is GameState {
+  if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
+  const projected = projectVersion5(raw, reason => { throw new SessionLoadError(location, reason); });
+  return isValidNativeVersion4(projected, location);
+}
+
 export function convertPersistedGameState(
   raw: unknown,
   location: string
 ): GameState {
+  if (isRecord(raw) && raw.schemaVersion === 5) {
+    const native = { ...raw };
+    delete native.schemaVersion;
+    if (isValidNativeVersion5(native, location)) {
+      const state = migrateLegacyTriggerRegistry(liftLegacyPrompt(native, location));
+      validateContinuationReferences(state, location);
+      logLegacyShapes(state, location);
+      return isGameTerminated(state) ? clearTerminalPendingWork(state) : state;
+    }
+  }
   if (isRecord(raw) && raw.schemaVersion === 4) {
     const native = { ...raw };
     delete native.schemaVersion;

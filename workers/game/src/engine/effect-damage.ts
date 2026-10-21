@@ -1,3 +1,4 @@
+import { advanceLifeTriggerExecution, triggerExecutionOwner } from "./trigger-executor.js";
 import type {
   CardData,
   EffectDamageContinuation,
@@ -15,7 +16,7 @@ import { transitionDetachedCard } from "./zone-transition.js";
 import { generateFrameId, popFrame, pushFrame } from "./effect-stack.js";
 import { continuationFrame, revealTriggerPromptFor, updateFrameById } from "./damage-frames.js";
 import { emitPendingEvent, withEventLogEmitted } from "./events.js";
-import { resolveEffect } from "./effect-resolver/index.js";
+import { resolveEffect, resolverExecutionServices } from "./effect-resolver/index.js";
 import { isGameTerminated } from "./terminal.js";
 import { retainEventsOnFrame } from "./effect-resolver/resume/events.js";
 import type { EffectResult } from "./effect-types.js";
@@ -387,9 +388,13 @@ export function resumeEffectDamageFrame(
     payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
   };
   if (block) {
-    const effectResult = resolveEffect(nextState, block, triggerInstanceId, damagedPlayerIndex, cardDb);
+    const resolved = resolveEffect(nextState, block, triggerInstanceId, damagedPlayerIndex, cardDb);
+    const effectResult = advanceLifeTriggerExecution(
+      { ...resolved, events: [...events, ...resolved.events] },
+      frame.id, cardDb, resolverExecutionServices
+    );
     nextState = effectResult.state;
-    events.push(...effectResult.events);
+    events.splice(0, events.length, ...effectResult.events);
     nextState = restoreTriggerStaging(nextState, stagingBaseline);
     // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
     // that already happened, then stop: no further damage.
@@ -397,8 +402,8 @@ export function resumeEffectDamageFrame(
       events.push(removed);
       return { state: nextState, events, dealt };
     }
-    if (effectResult.pendingPrompt) {
-      // The Trigger's effect needs input: it resolves in the frames it pushed
+    if (effectResult.pendingPrompt || (triggerExecutionOwner(nextState) && nextState.effectStack.at(-1)?.id !== frame.id)) {
+      // The Trigger needs input or has retained child work: it resolves in frames
       // above this one. The remaining points and the Life removal wait here
       // (OPT-926: nothing is abandoned).
       nextState = updateFrameById(nextState, frame.id, (current) => ({

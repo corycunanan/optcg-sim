@@ -1,3 +1,4 @@
+import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
 /**
  * Game-state schema version, frame-kind contract, continuation-reference
  * integrity, and legacy-shape classification (OPT-940).
@@ -36,13 +37,13 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 4;
-/** The newest persisted version this build can read; v4 lowers to v3. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 4;
-/** The version of the runtime shape this build's engine executes. */
-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 4;
+/** The newest persisted version this build can read; v5 retains trigger generations. */
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 5;
+/** The newest runtime shape this build executes; normal producers remain v4. */
+export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 5;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4];
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
 
@@ -505,12 +506,13 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
-  if (version === 4) {
-    return rememberVersion4Lowering(lowerVersion4(raw, reason => {
+  const native = version === 5 ? projectVersion5(raw, reason => { throw new SessionLoadError(location, reason); }) : raw;
+  if (version === 4 || version === 5) {
+    return rememberVersion4Lowering(lowerVersion4(native, reason => {
       throw new SessionLoadError(location, reason);
     }));
   }
-  let converted = raw;
+  let converted = native;
   for (let step = version; step <= 3; step += 1) {
     const converter = CONVERTERS[step];
     if (!converter) {
@@ -544,7 +546,7 @@ export function toPersistedGameState(state: GameState): GameState {
       )
     : state.effectStack;
   return {
-    [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION,
+    [GAME_STATE_SCHEMA_VERSION_KEY]: state.effectStack.some(frame => frame.triggerExecution) ? 5 : GAME_STATE_SCHEMA_VERSION,
     ...state,
     effectStack: effectStack.map((frame) => ({
       ...frame,
@@ -570,6 +572,13 @@ function frameInvariantViolation(
     return `is ${kind} but carries ${frame.remainingActions.length} remainingActions; a continuation frame holds no chain suffix`;
   }
   switch (kind) {
+    case "TRIGGER_EXECUTION": {
+      const violation = triggerExecutionOwnerViolation(frame);
+      if (violation) return violation;
+      const index = state.effectStack.indexOf(frame);
+      if (frame.triggerExecution!.selectedTrigger && index !== state.effectStack.length - 1) return "has selectedTrigger while an activated child is already present";
+      return null;
+    }
     case "PHASE_BOUNDARY": {
       const continuation = frame.phaseBoundaryContinuation!;
       if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") {

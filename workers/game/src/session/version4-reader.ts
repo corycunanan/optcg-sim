@@ -18,7 +18,7 @@ const Snapshot = z.strictObject({
   controller: Seat,
   effectBlockId: z.string(),
 });
-const Trigger = z.strictObject({
+export const Trigger = z.strictObject({
   sourceCardInstanceId: z.string(),
   orderingId: z.string().optional(),
   groupSourceInstanceId: z.string().optional(),
