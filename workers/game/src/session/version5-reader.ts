@@ -14,7 +14,7 @@ const Execution = z.strictObject({
       orderingGroup: OrderingGroup.optional(),
     })
   ),
-  selectedTrigger: Trigger.optional(),
+  selectedTrigger: Trigger.extend({ orderingId: z.string().min(1) }).optional(),
 });
 
 function sameValue(left: unknown, right: unknown): boolean {

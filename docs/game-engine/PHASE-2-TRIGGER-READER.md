@@ -40,3 +40,9 @@ OPT-975's old duplicate publishers are baseline `engine/trigger-queue.ts:178` (u
 Before edits, timing fixtures: seven files, 31 passing and nine expected failures. Full `pnpm verify` passed lint, both type checks, worker bundle/schema gates, root/pipeline tests, and worker coverage. The final Next build failed fetching Geist Mono from `fonts.googleapis.com` with sandbox DNS `ENOTFOUND`; this is recorded separately from source validation.
 
 Follow-ups remain within OPT-966: enable the normal writer after deployment, finish every domain's explicit result contract, retire the alternate trigger executors, promote F1/F2 ratchets with full actual-pipeline traces, and run the authored End Phase/damage/substitute cases. PR9 drain consolidation, new event runtimes, card authoring, and retiring historical readers remain outside this prerequisite.
+
+### Reader review fixes and final validation
+
+The first review found two reader-only defects: automatic activation of the final sibling removed it from the queue without marking its ordering history, so reloading its prompt rejected; a loaded topmost owner could lose `accumulatedEvents` when removed. Both are covered by tests that failed before the fixes. Automatic activation now marks its history before executing. The executor transfers, scans, and publishes the owner's pending prefix before activating further work. Regression coverage includes the final sibling's target prompt under either active player and exact prefix publication order.
+
+Full `pnpm verify` on initial reader commit `484eba97` passed, including the network-enabled Next build (exit 0). After review fixes, the focused reader suite has 15 passing tests. The corrected head is subject to a fresh full verification and independent delta review before release.

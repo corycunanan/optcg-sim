@@ -171,9 +171,8 @@ export function advanceTriggerExecution(
 ): HandlerResult {
   let state = initial.state;
   const events = [...initial.events];
-  if (initial.rejected || initial.pendingPrompt)
+  if (!isGameTerminated(state) && (initial.rejected || initial.pendingPrompt))
     return { ...initial, kind: "waiting" };
-  state = publishCommittedEvents(state, events);
   while (true) {
     if (isGameTerminated(state))
       return {
@@ -186,10 +185,36 @@ export function advanceTriggerExecution(
         events,
         resolved: true,
       };
-    state = publishCommittedEvents(state, events);
-    const owner = triggerExecutionOwner(state);
+    let owner = triggerExecutionOwner(state);
     if (!owner?.triggerExecution)
-      return { kind: "completed", state, events, resolved: true };
+      return {
+        kind: "completed",
+        state: publishCommittedEvents(state, events),
+        events,
+        resolved: true,
+      };
+    if (owner.accumulatedEvents.length) {
+      const prefix = owner.accumulatedEvents;
+      events.splice(0, events.length, ...new Set([...prefix, ...events]));
+      state = {
+        ...state,
+        effectStack: state.effectStack.map((frame) =>
+          frame.id === owner!.id ? { ...frame, accumulatedEvents: [] } : frame
+        ),
+      };
+      const scanned = scanEventsForTriggers(
+        state,
+        prefix,
+        owner.controller,
+        cardDb
+      );
+      state = scanned.state;
+      replacePendingEventReferences(events, prefix, scanned.events);
+      if (scanned.triggers.length)
+        state = reportTriggerWork(state, scanned.triggers).state;
+      owner = triggerExecutionOwner(state)!;
+    }
+    state = publishCommittedEvents(state, events);
     const child = state.effectStack.at(-1);
     if (child?.id !== owner.id) {
       if (child?.phase !== "AWAITING_BATCH_RESUME") {
@@ -202,7 +227,7 @@ export function advanceTriggerExecution(
       if (resumed.pendingPrompt) return { ...resumed, kind: "waiting" };
       continue;
     }
-    let work = owner.triggerExecution;
+    let work = owner.triggerExecution!;
     // Empty generations can exist while their selected effect is suspended.
     if (!work.selectedTrigger && work.generations[0]?.triggers.length === 0) {
       work = { ...work, generations: work.generations.slice(1) };
@@ -251,6 +276,19 @@ export function advanceTriggerExecution(
           {
             ...generation,
             triggers: generation.triggers.filter((entry) => entry !== trigger),
+            ...(generation.orderingGroup?.triggers.some(
+              (entry) => entry.orderingId === trigger!.orderingId
+            )
+              ? {
+                  orderingGroup: {
+                    ...generation.orderingGroup,
+                    resolvedTriggerIds: [
+                      ...generation.orderingGroup.resolvedTriggerIds,
+                      trigger.orderingId!,
+                    ],
+                  },
+                }
+              : {}),
           },
           ...work.generations.slice(1),
         ],

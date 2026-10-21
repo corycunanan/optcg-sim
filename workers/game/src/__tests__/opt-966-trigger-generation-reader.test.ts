@@ -413,6 +413,53 @@ describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
     );
   });
 
+  it.each([0, 1] as const)(
+    "reloads a prompt inside the automatically activated final sibling for player %s",
+    (activePlayerIndex) => {
+      const { state, db, trigger, a, x } = fixture(true);
+      state.turn.activePlayerIndex = activePlayerIndex;
+      state.effectStack[0].triggerExecution!.generations[0].triggers =
+        withStableOrderingIds([trigger("A", 0, a), trigger("A", 0, x)]);
+      const choice = start(restore(state), db);
+      const paused = answer(choice, db, {
+        type: "PLAYER_CHOICE",
+        choiceId: "A:x:0",
+      });
+      expect(paused.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      const final = answer(restore(paused), db, {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: ["C"],
+      });
+      expect(final.eventLog.map((event) => event.type)).toEqual([
+        "CARD_DRAWN",
+        "DRAW_OUTSIDE_DRAW_PHASE",
+        "CARD_PLAYED",
+        "POWER_MODIFIED",
+      ]);
+      expect(final.effectStack).toEqual([]);
+    }
+  );
+
+  it("publishes a loaded owner's pending event debt before activating its generation", () => {
+    const { state, db } = fixture();
+    state.effectStack[0].accumulatedEvents = [
+      {
+        type: "POWER_MODIFIED",
+        playerIndex: 0,
+        payload: { targetInstanceId: "A", amount: 1000 },
+      },
+    ];
+    const final = start(restore(state), db);
+    expect(final.eventLog.map((event) => event.type)).toEqual([
+      "POWER_MODIFIED",
+      "CARD_PLAYED",
+      "CARD_DRAWN",
+      "DRAW_OUTSIDE_DRAW_PHASE",
+      "POWER_MODIFIED",
+    ]);
+    expect(final.effectStack).toEqual([]);
+  });
+
   it("rejects a selected trigger that is still queued", () => {
     const { state } = fixture();
     const work = state.effectStack[0].triggerExecution!;
