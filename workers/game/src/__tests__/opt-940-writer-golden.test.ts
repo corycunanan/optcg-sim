@@ -1,5 +1,8 @@
 /**
- * OPT-940 writer-unchanged proof.
+ * OPT-940 historical inputs and OPT-966 current writer byte proof.
+ *
+ * OPT-966 freezes all v1–v4 goldens and captures a separate current fixture.
+ * Live/undo states with trigger owners now use v5; owner-free states remain v4.
  *
  * The persistence writer must emit byte-identical output before and after
  * the reader-only PR 1. The golden fixture was captured through the writer
@@ -28,7 +31,7 @@ import {
 } from "../session/persistence.js";
 import { GAME_STATE_SCHEMA_VERSION_KEY } from "../session/game-state-schema.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
-import { getSyntheticStates, loadGoldenFixture, loadV2WriterGolden, loadWriterGolden, loadV4WriterGolden } from "./fixtures/opt-940-golden.js";
+import { getSyntheticStates, loadGoldenFixture, loadV2WriterGolden, loadWriterGolden, loadV5WriterGolden } from "./fixtures/opt-940-golden.js";
 
 async function writeThroughCurrentWriter(name: string) {
   const entry = getSyntheticStates().find((state) => state.name === name);
@@ -47,8 +50,8 @@ async function writeThroughCurrentWriter(name: string) {
   };
 }
 
-describe("OPT-940 writer golden: persisted bytes match the current (version 4) writer golden", () => {
-  const fixture = loadV4WriterGolden();
+describe("OPT-940 writer golden: persisted bytes match the current conditional version 4/5 writer golden", () => {
+  const fixture = loadV5WriterGolden();
   const v3 = loadWriterGolden();
   const v1 = loadGoldenFixture();
   const v2 = loadV2WriterGolden();
@@ -72,13 +75,18 @@ describe("OPT-940 writer golden: persisted bytes match the current (version 4) w
     }
   );
 
-  it("writes schemaVersion 4 first on the live state and every undo snapshot", async () => {
+  it("writes the owner-dependent schema version first on live state and undo snapshots", async () => {
     for (const name of Object.keys(fixture.cases)) {
       const current = await writeThroughCurrentWriter(name);
-      expect(current.sessionJson, name).toContain(`"state":{"${GAME_STATE_SCHEMA_VERSION_KEY}":4,`);
+      const state = JSON.parse(current.sessionJson).state;
+      const version = state.effectStack.some((frame: { triggerExecution?: unknown }) => frame.triggerExecution) ? 5 : 4;
+      expect(current.sessionJson, name).toContain(`"state":{"${GAME_STATE_SCHEMA_VERSION_KEY}":${version},`);
       const undo = JSON.parse(current.undoHistoryJson) as Array<Record<string, unknown>>;
       for (const snapshot of undo) expect(Object.keys(snapshot)[0], name).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
-      for (const snapshot of undo) expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(4);
+      for (const snapshot of undo) {
+        const frames = snapshot.effectStack as Array<{ triggerExecution?: unknown }>;
+        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(frames.some(frame => frame.triggerExecution) ? 5 : 4);
+      }
     }
   });
 

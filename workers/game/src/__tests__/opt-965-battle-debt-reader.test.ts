@@ -2,6 +2,7 @@
  * lose already matched watchers on rollback. All fixtures here are synthetic. */
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/opt-965-battle-debt.synthetic.json";
+import currentWriter from "./fixtures/opt-966-legacy-battle-result.synthetic.json";
 import type { CardData, GameAction, GameState } from "../types.js";
 import { convertPersistedGameState, parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
@@ -28,7 +29,11 @@ for (const location of ["state", "undoHistory[0]"]) {
       expect(state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
       const result = resumePromptLifecycle(state, fixture.reply as GameAction, cardDb, services);
       expect(result.responseRejected).toBe(false);
-      expect(result.state.players).toEqual(fixture.expected.players);
+      // OPT-966 creates an ordinary owner when resuming the legacy graph.
+      // Its frame allocation advances subsequent card IDs by one. Preserve
+      // the old reader fixture and pin the entire current result separately;
+      // do not normalize either identity sequence.
+      expect(result.state).toEqual(currentWriter.state);
       expect(result.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(1);
       expect(result.state.eventLog.filter(event => event.type === "END_OF_BATTLE")).toHaveLength(1);
       expect(result.state.pendingPrompt).toBeNull();

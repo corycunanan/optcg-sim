@@ -4,8 +4,9 @@
  * `fixtures/opt-962-v2-states.json` was produced from the PR 4b prototype by
  * `buildV2EndPhaseStates()`. Two checks:
  *
- * 1. The final engine still produces exactly those persisted objects (any new
- *    field, value or position fails here).
+ * 1. OPT-966 uses a separate exact current-writer fixture; historical v2
+ *    inputs remain frozen and must still load. New trigger owner shapes are
+ *    additionally covered by actual session replay on the deployed reader.
  * 2. Every End Phase frame the engine parks while running the full scenario
  *    (every stage, nested and reloaded) has a shape signature the fixture
  *    covers: the stage, the continuation's keys, each entry's keys and step.
@@ -17,7 +18,7 @@ import type { EffectStackFrame, GameState } from "../types.js";
 import { convertPersistedGameState } from "../session/persistence.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { buildV2EndPhaseStates } from "./fixtures/opt-962-v2-states.js";
-import { persistedV3 } from "./fixtures/opt-963-v3-states.js";
+import currentWriter from "./fixtures/opt-966-end-phase-states.synthetic.json";
 import { loadV2EndPhaseFixture } from "./fixtures/opt-962-v2-fixture.js";
 import { endPhaseRig, fullEndPhaseReply, fullEndPhaseScenario } from "./opt-962-rig.js";
 
@@ -46,29 +47,13 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
     expect(built.map((s) => s.name).sort()).toEqual(Object.keys(fixture.cases).sort());
   });
 
-  it.each(built.map((s) => s.name))("%s: the historical projection equals the fixture with version 3", (name) => {
+  it.each(built.map((s) => s.name))("%s: current writer matches its separate exact fixture and historical input still loads", (name) => {
     const state = built.find((s) => s.name === name)!.state;
+    const cases = currentWriter.cases as Record<string, { state: unknown }>;
+    expect(persisted(state)).toEqual(cases[name].state);
+    // The v2 reader input is frozen, not rewritten to hide current scheduling.
     const historical = structuredClone(fixture.cases[name].state);
-    // v4 deliberately retains only enqueue identity for activated queued sources.
-    // Pin that intentional difference while preserving every other historical field.
-    if (!Array.isArray(historical.effectStack)) throw new Error("fixture has no stack");
-    for (const frame of historical.effectStack) {
-      for (const [, result] of frame.resultRefs) {
-        if (result.sourceCardSnapshot) {
-          const source = result.sourceCardSnapshot;
-          delete result.sourceCardSnapshot;
-          result.sourceIdentity = {
-            instanceId: source.instanceId,
-            cardId: source.cardId,
-            controller: source.controller,
-            effectBlockId: source.cardId === "OP03-015" ? "on_ko_debuff"
-              : source.cardId === "OP04-034" ? "eot_conditional_ko"
-              : "SYN-EOOT-D-block",
-          };
-        }
-      }
-    }
-    expect(persistedV3(state)).toEqual({ ...historical, schemaVersion: 3 });
+    expect(() => convertPersistedGameState(historical, "historical v2 state")).not.toThrow();
   });
 
   it("every End Phase frame parked across the full scenario, live and reloaded, has a fixture-covered shape", () => {
