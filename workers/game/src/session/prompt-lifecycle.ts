@@ -315,10 +315,10 @@ function applyDamageResult(
   }
   if (result.pendingPrompt) return { state: withPendingPrompt(state, result.pendingPrompt) };
   const deferred: QueuedTrigger[] = "queuedTriggers" in result ? (result.queuedTriggers ?? []) : [];
-  if (result.events.length === 0 && deferred.length === 0 && result.lethalDamagePlayerIndex === undefined) {
+  if (result.events.length === 0 && deferred.length === 0 && result.lethalDamagePlayerIndex === undefined && !result.lifeTriggerStaging?.length) {
     return { state };
   }
-  const pipeline = continuePipelineFromExecution(state, result, cardDb, actingPlayer, deferred);
+  const pipeline = continuePipelineFromExecution(state, result, cardDb, actingPlayer, deferred, result.lifeTriggerStaging);
   return { state: pipeline.state, gameOver: pipeline.gameOver };
 }
 

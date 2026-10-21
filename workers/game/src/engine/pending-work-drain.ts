@@ -1,3 +1,4 @@
+import { finishLifeTriggerStaging, validateLifeTriggerStaging } from "./life-trigger-staging.js";
 import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
 /** One engine drain owns trigger generations and resumable domain boundaries. */
 import type { CardData, GameState } from "../types.js";
@@ -55,16 +56,32 @@ export function drainPendingWork(
 ): HandlerResult {
   let state = initial.state;
   const events = [...initial.events];
+  let stagingScopes = initial.lifeTriggerStaging ?? [];
+  // A true wait or stable public return is the end of every active Life
+  // staging scope in this invocation. Only exact owned slots are removed.
+  function expose(result: HandlerResult): HandlerResult {
+    const finished = finishLifeTriggerStaging(result.state, stagingScopes);
+    stagingScopes = finished.scopes;
+    const { lifeTriggerStaging: _handoff, ...published } = result;
+    return { ...published, state: finished.state, ...(isGameTerminated(finished.state) ? { kind: "terminal", resolved: true, pendingPrompt: undefined } : {}) };
+  }
   if (
     !isGameTerminated(state) &&
     (("kind" in initial && initial.kind === "waiting") ||
       initial.rejected ||
       initial.pendingPrompt)
   )
-    return { ...initial, kind: "waiting" };
+    return expose({ ...initial, kind: "waiting" });
   while (true) {
+    state = validateLifeTriggerStaging(state, stagingScopes);
+    const stagedOwner = state.effectStack.at(-1);
+    if (stagedOwner && stagingScopes.some(scope => scope.damageOwnerId === stagedOwner.id)) {
+      const finished = finishLifeTriggerStaging(state, stagingScopes, stagedOwner.id);
+      state = finished.state;
+      stagingScopes = finished.scopes;
+    }
     if (isGameTerminated(state))
-      return {
+      return expose({
         kind: "terminal",
         state: publishBeforeGameOver(
           state,
@@ -73,7 +90,7 @@ export function drainPendingWork(
         ),
         events: events.map(withEventLogEmitted),
         resolved: true,
-      };
+      });
     if (
       stopAtFrameId &&
       !state.effectStack.some((frame) => frame.id === stopAtFrameId)
@@ -88,12 +105,12 @@ export function drainPendingWork(
     // A Life Trigger temporarily interrupts damage. Finish only its children;
     // reaching its exact damage boundary must not select an outer sibling.
     if (stopAtFrameId && state.effectStack.at(-1)?.id === stopAtFrameId)
-      return {
+      return expose({
         kind: "continued",
         state: publishDrainEvents(state, events),
         events,
         resolved: true,
-      };
+      });
     const battleDebt = state.effectStack.find(
       (frame) =>
         frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
@@ -192,18 +209,18 @@ export function drainPendingWork(
         } else if (state.turn.battleSubPhase === "DAMAGE_STEP")
           result = executeDamageStep(state, cardDb, events);
         else
-          return {
+          return expose({
             kind: "completed",
             state: publishDrainEvents(state, events),
             events,
             resolved: true,
-          };
+          });
       } else if (kind === "PHASE_BOUNDARY")
         result = advancePhaseBoundary(state, cardDb);
       else if (kind === "BATTLE_DAMAGE" || kind === "EFFECT_DAMAGE") {
         if (top.phase === "AWAITING_TRIGGER_REVEAL") {
           state = surfaceDamageFramePrompt(state, cardDb);
-          return {
+          return expose({
             kind: state.pendingPrompt ? "waiting" : "continued",
             state,
             events,
@@ -211,7 +228,7 @@ export function drainPendingWork(
             ...(state.pendingPrompt
               ? { pendingPrompt: state.pendingPrompt }
               : {}),
-          };
+          });
         }
         result =
           kind === "BATTLE_DAMAGE"
@@ -227,12 +244,12 @@ export function drainPendingWork(
       else if (top.phase === "INTERRUPTED_BY_TRIGGERS")
         result = resumeFromStackWork(state, { type: "PASS" }, cardDb);
       else
-        return {
+        return expose({
           kind: "continued",
           state: publishDrainEvents(state, events),
           events,
           resolved: true,
-        };
+        });
       const before = state;
       const terminalPrefix = before.effectStack.flatMap((frame) =>
         frame.effectDamage || frame.battleDamage ? frame.accumulatedEvents : []
@@ -282,7 +299,7 @@ export function drainPendingWork(
       )
         events.length = 0;
       if (result.pendingPrompt)
-        return {
+        return expose({
           kind: "waiting",
           state: {
             ...retainPropagationBeforePrompt(state, events),
@@ -291,7 +308,7 @@ export function drainPendingWork(
           events,
           pendingPrompt: result.pendingPrompt,
           resolved: false,
-        };
+        });
       const retainedBattle = state.effectStack.find(
         (frame) =>
           frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
@@ -307,7 +324,7 @@ export function drainPendingWork(
       state = reported.state;
       replacePendingEventReferences(events, result.events, reported.events);
       if (state === before)
-        return { kind: "continued", state, events, resolved: true };
+        return expose({ kind: "continued", state, events, resolved: true });
       continue;
     }
     owner = triggerExecutionOwner(state)!;
@@ -349,13 +366,13 @@ export function drainPendingWork(
           history
         );
         state = retainPropagationBeforePrompt(prompt.state, events);
-        return {
+        return expose({
           kind: "waiting",
           state,
           events,
           resolved: false,
           pendingPrompt: prompt.pendingPrompt,
-        };
+        });
       }
       trigger = group[0];
       work = {
@@ -402,12 +419,12 @@ export function drainPendingWork(
       events.push(...result.events);
       if (isGameTerminated(state)) continue;
       if (result.pendingPrompt)
-        return {
+        return expose({
           ...result,
           state: retainPropagationBeforePrompt(state, events),
           events,
           kind: "waiting",
-        };
+        });
       const unpublished = [...result.events];
       state = publishCommittedEvents(state, result.events);
       replacePendingEventReferences(events, unpublished, result.events);

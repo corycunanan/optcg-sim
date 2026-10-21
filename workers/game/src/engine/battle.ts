@@ -1,3 +1,4 @@
+import { beginLifeTriggerStaging, finishLifeTriggerStaging, type LifeTriggerStagingWork } from "./life-trigger-staging.js";
 import { triggerExecutionOwner } from "./trigger-executor.js";
 /**
  * Battle system
@@ -31,7 +32,6 @@ import {
   getInactivePlayerIndex,
   findCardInState,
   restDonForCost,
-  pushTriggerStaging,
 } from "./state.js";
 import {
   getEffectivePower,
@@ -58,21 +58,6 @@ import {
   popLifeForDamage as popLifeForDamageQuery,
 } from "./effect-damage.js";
 
-function restoreTriggerStaging(
-  state: GameState,
-  baseline: readonly string[]
-): GameState {
-  const keep = new Set(baseline);
-  return {
-    ...state,
-    turn: {
-      ...state.turn,
-      triggerStagingInstanceIds: (
-        state.turn.triggerStagingInstanceIds ?? []
-      ).filter((id) => keep.has(id)),
-    },
-  };
-}
 
 // ─── Declare Attack ───────────────────────────────────────────────────────────
 
@@ -456,7 +441,7 @@ export function executeUseCounterEvent(
 // ─── Reveal Trigger (OPT-963: the BATTLE_DAMAGE frame's window) ─────────────
 
 /** A BATTLE_DAMAGE continuation releases retained watchers when its sequence completes. */
-export type BattleDamageResult = ExecuteResult & {
+export type BattleDamageResult = ExecuteResult & LifeTriggerStagingWork & {
   lethalDamagePlayerIndex?: 0 | 1;
   queuedTriggers?: QueuedTrigger[];
 };
@@ -509,10 +494,10 @@ export function resumeBattleDamageFrame(
     destinationInstanceId = triggerInstanceId;
     // OPT-257 (F4): mark the just-trashed Life card as staging so trash-targeting
     // effects (PLAY_CARD source_zone TRASH, TRASH_COUNT, etc.) don't see it
-    // during this Trigger's resolution. Cleared after resolveEffectWork returns —
-    // any pending prompt's candidate list is already built/locked at that point.
-    const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
-    nextState = pushTriggerStaging(nextState, triggerInstanceId);
+    // during this Trigger's runnable work. A transient owner/slot cursor is
+    // handed to the common drain; genuine prompt candidates are locked first.
+    const staging = beginLifeTriggerStaging(nextState, frame.id, triggerInstanceId);
+    nextState = staging.state;
     events.push({
       type: "TRIGGER_ACTIVATED",
       playerIndex: inactiveIdx,
@@ -542,7 +527,7 @@ export function resumeBattleDamageFrame(
       const effectResult = { ...resolved, events: [...events, ...resolved.events] };
       nextState = effectResult.state;
       events.splice(0, events.length, ...effectResult.events);
-      nextState = restoreTriggerStaging(nextState, stagingBaseline);
+      if (effectResult.pendingPrompt) nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
       // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
       // that already happened, then stop: no further damage, no endBattle.
       if (isGameTerminated(nextState)) {
@@ -584,10 +569,12 @@ export function resumeBattleDamageFrame(
           state: nextState,
           events,
           pendingPrompt: effectResult.pendingPrompt,
+          ...(!effectResult.pendingPrompt ? { lifeTriggerStaging: staging.scopes } : {}),
         };
       }
+      nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
     } else {
-      nextState = restoreTriggerStaging(nextState, stagingBaseline);
+      nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
     }
   } else {
     // Decline trigger — add to hand

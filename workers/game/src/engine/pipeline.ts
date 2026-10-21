@@ -1,3 +1,5 @@
+import type { LifeTriggerStagingScope } from "./life-trigger-staging.js";
+import { recalculateBattlePowers } from "./battle.js";
 import { drainPendingWork } from "./pending-work-drain.js";
 import { resolverExecutionServices } from "./effect-resolver/resolver.js";
 import { createEffectExecutionScope } from "./trigger-executor.js";
@@ -186,7 +188,7 @@ export function runPipeline(
         return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);
       nextState = recordAction(nextState, actionToExecute, actedCard);
     }
-    nextState = { ...nextState, pendingPrompt: execResult.pendingPrompt };
+    nextState = recalculateBattlePowers({ ...nextState, pendingPrompt: execResult.pendingPrompt }, cardDb);
     log("pipeline.end", {
       ...logCtx,
       outcome: "prompt_pending",
@@ -217,6 +219,8 @@ export function runPipeline(
   nextState = drained.pendingPrompt
     ? { ...drained.state, pendingPrompt: drained.pendingPrompt }
     : drained.state;
+  // Trigger work may change either combatant after the report boundary.
+  nextState = recalculateBattlePowers(nextState, cardDb);
   if (
     !isGameTerminated(nextState) &&
     !(phaseExecutionPending && drained.pendingPrompt)
@@ -275,6 +279,7 @@ export function continuePipelineFromExecution(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
   deferredTriggers: readonly QueuedTrigger[] = execResult.queuedTriggers ?? [],
+  lifeTriggerStaging: readonly LifeTriggerStagingScope[] = [],
 ): PipelineResult {
   const continuationAction: GameAction = { type: "REVEAL_TRIGGER", reveal: true };
   // Checkpoint for the resumed execution's lethal damage determination
@@ -295,13 +300,15 @@ export function continuePipelineFromExecution(
     deferredTriggers,
   );
   const drained = drainPendingWork(
-    { state: nextState, events: [], resolved: true },
+    { state: nextState, events: [], resolved: true, lifeTriggerStaging },
     cardDb,
     resolverExecutionServices
   );
   nextState = drained.pendingPrompt
     ? { ...drained.state, pendingPrompt: drained.pendingPrompt }
     : drained.state;
+  // Trigger work may change either combatant after the report boundary.
+  nextState = recalculateBattlePowers(nextState, cardDb);
 
   if (isGameTerminated(nextState)) {
     return finishPipeline(nextState, actingPlayerIndex, cardDb, execResult);

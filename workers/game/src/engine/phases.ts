@@ -50,7 +50,7 @@ import { hasDelayedDeckOutLoss, runRuleProcessing } from "./defeat.js";
 import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
 // The End Phase resolves its waves and obligations with the pipeline's own
 // Step 5 trigger policy (no third policy, OPT-924).
-import { fireEndPhaseEvents, processPlayerTriggerGroup } from "./trigger-queue.js";
+import { reportExecutionEvents, processPlayerTriggerGroup } from "./trigger-queue.js";
 
 /**
  * Returns true if the current phase should be auto-advanced without player input.
@@ -509,9 +509,9 @@ export function executeAdvancePhase(
   cardDb: Map<string, CardData>
 ): ExecuteResult {
   const result = executeAdvancePhaseWork(state, cardDb);
-  const scanned = fireEndPhaseEvents(result.state, result.events, cardDb);
+  const reported = reportExecutionEvents(result.state, result, cardDb);
   return drainPendingWork(
-    { ...result, state: scanned, resolved: true },
+    { ...result, state: reported.state, events: reported.events, resolved: true },
     cardDb,
     resolverExecutionServices
   );

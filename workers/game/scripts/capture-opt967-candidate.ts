@@ -17,6 +17,7 @@ import {
 import { buildV2EndPhaseStates } from "../src/__tests__/fixtures/opt-962-v2-states.js";
 import type { GameAction, GameState } from "../src/types.js";
 const dir = resolve(__dirname, "../src/__tests__/fixtures");
+const outputDir = process.env.OPT967_CANDIDATE_OUTPUT_DIR ?? dir;
 const config = {
   nextJsUrl: "https://app.example.test",
   workerSecret: "secret",
@@ -171,13 +172,13 @@ async function main() {
     "crossbuild"
   );
   const bytes = gzipSync(JSON.stringify(values));
-  writeFileSync(resolve(dir, "opt-967-candidate-expectations.json.gz"), bytes);
+  writeFileSync(resolve(outputDir, "opt-967-candidate-expectations.json.gz"), bytes);
   writeFileSync(
-    resolve(dir, "opt-967-candidate-deltas.json"),
+    resolve(outputDir, "opt-967-candidate-deltas.json"),
     JSON.stringify(deltas, null, 2) + "\n"
   );
   writeFileSync(
-    resolve(dir, "opt-967-candidate-expectations.manifest.json"),
+    resolve(outputDir, "opt-967-candidate-expectations.manifest.json"),
     JSON.stringify(
       {
         provenance:

@@ -109,7 +109,7 @@ export function clearTerminalPendingWork(state: GameState): GameState {
     ...kept,
     pendingPrompt: null,
     effectStack: [],
-    turn: { ...state.turn, battle: null, battleSubPhase: null },
+    turn: { ...state.turn, battle: null, battleSubPhase: null, ...(state.turn.triggerStagingInstanceIds?.length ? { triggerStagingInstanceIds: [] } : {}) },
   };
 }
 
