@@ -341,3 +341,41 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays Morley's multi-target rest s
   expect(types.indexOf("POWER_MODIFIED")).toBeLessThan(types.indexOf("END_OF_BATTLE"));
   expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));
 });
+
+it.skipIf(!process.env.OPT966_READER_ROOT).each(["battle", "Life"] as const)("replays immediate %s completion into deferred ordering", async mode => {
+  const rig = endPhaseRig({ deckSize: 10 });
+  const controller = mode === "battle" ? 0 : 1;
+  for (const id of ["WATCH-A", "WATCH-B"]) rig.putSyn(id, synSchema(id, "Character", [{
+    id: "watch", category: "auto", trigger: { event: mode === "battle" ? "ANY_CHARACTER_KO" : "CARD_REMOVED_FROM_LIFE", filter: { controller: "SELF" } },
+    actions: [{ type: "DRAW", params: { amount: 1 } }],
+  }]), controller, "CHARACTER");
+  if (mode === "battle") {
+    rig.state.turn.activePlayerIndex = 1;
+    const target = rig.put("OP16-033", 0, "CHARACTER", { power: 6000 });
+    target.state = "RESTED";
+    const attacker = rig.putSyn("ATTACKER", null, 1, "CHARACTER", { power: 7000 });
+    rig.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId }, 1);
+    for (let n = 0; !rig.state.pendingPrompt && rig.state.turn.battle; n++) {
+      expect(n).toBeLessThan(6);
+      rig.act({ type: "PASS" }, rig.state.turn.battleSubPhase === "ATTACK_STEP" ? 1 : 0);
+    }
+  } else {
+    const source = rig.putSyn("DEALER", synSchema("DEALER", "Character", [{
+      id: "deal", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" },
+      actions: [{ type: "DEAL_DAMAGE", target: { type: "PLAYER", controller: "OPPONENT" }, params: { amount: 1 } }],
+    }]), 0, "CHARACTER");
+    rig.putSyn("LIFE", synSchema("LIFE", "Character", [{ id: "life", category: "auto", trigger: { keyword: "TRIGGER" }, actions: [{ type: "DRAW", params: { amount: 1 } }] }]), 1, "HAND", {
+      triggerText: "Draw 1.", keywords: { ...rig.db.get("CHAR-VANILLA")!.keywords, trigger: true },
+    });
+    rig.state.players[1].life[0].cardId = "LIFE";
+    rig.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "deal" });
+  }
+  const pauses = await replayPauses(rig, state => {
+    const prompt = state.pendingPrompt!.options;
+    if (prompt.promptType === "REVEAL_TRIGGER") return { type: "REVEAL_TRIGGER", reveal: false };
+    return { type: "PLAYER_CHOICE", choiceId: prompt.promptType === "OPTIONAL_EFFECT" ? "skip" : prompt.promptType === "PLAYER_CHOICE" ? prompt.choices[0].id : "skip" };
+  }, `opt966-${mode.toLowerCase()}-immediate-writer-corpus`);
+  expect(pauses.map(state => state.pendingPrompt!.options.promptType)).toEqual([mode === "battle" ? "OPTIONAL_EFFECT" : "REVEAL_TRIGGER", "PLAYER_CHOICE"]);
+  expect(rig.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(2);
+  expect(rig.state.effectStack).toEqual([]);
+});
