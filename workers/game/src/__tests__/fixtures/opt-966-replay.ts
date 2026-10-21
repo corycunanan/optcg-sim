@@ -7,7 +7,8 @@ import { MemorySessionStorage } from "./opt-940-synthetic-states.js";
 import type { EndPhaseRig } from "../opt-962-rig.js";
 
 export function writerProducer() {
-  execFileSync("git", ["diff", "--exit-code", "HEAD", "--", "workers/game/src"], { stdio: "pipe" });
+  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+  execFileSync("git", ["diff", "--exit-code", "HEAD", "--", "workers/game/src"], { cwd: root, stdio: "pipe" });
   return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 }
 
