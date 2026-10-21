@@ -3,6 +3,7 @@ import type { GameAction, GameState } from "../types.js";
 import { SessionRepository } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
+import handoffJson from "./fixtures/opt-966-handoff-writer.json";
 import phaseJson from "./fixtures/opt-966-endphase-writer.json";
 import lifeJson from "./fixtures/opt-966-life-writer.json";
 import replacementJson from "./fixtures/opt-966-replacement-writer.json";
@@ -14,6 +15,7 @@ type Corpus = {
   expected: GameState;
 };
 const scenarios = [
+  ["turn handoff", handoffJson, "crossbuild"],
   ["phase", phaseJson, "crossbuild-phase"],
   ["Life", lifeJson, "crossbuild"],
   ["replacement", replacementJson, "crossbuild"],

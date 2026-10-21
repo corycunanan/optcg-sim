@@ -87,7 +87,8 @@ The reader followup retains an invocation-local execution-mode argument from
 the session resume's original stack. Only an existing v5 `triggerExecution`
 owner enables it. It follows the existing continuation dispatcher into later
 End Phase waves, scheduled effects, and their event publication boundary. Those
-entries create the already-supported owner shape and use the existing shared
+entries, including the turn-handoff events passed through the existing pipeline
+continuation, create the already-supported owner shape and use the existing shared
 executor. No extra drain loop, persisted flag, global mode, or new schema is
 introduced. Normal v4 entry points keep their old path and serialization. The
 loader removes schemaVersion, so runtime routing uses the explicit owner at
@@ -102,18 +103,21 @@ subsequent pause, require a retained execution owner at each re-park, compare
 prompt options/controllers, and compare complete final events, players, turn,
 and execution context without card-ID, RNG, or timestamp normalization.
 
-The bounded corpus comprises ten starting pauses across four scenarios: five
+The bounded corpus comprises twelve starting pauses across five scenarios: five
 End Phase stages, Life reveal and a prompted Trigger child, one replacement
-offer, and an initial End Phase wave followed by a scheduled-draw watcher. The
+offer, an initial End Phase wave followed by a scheduled-draw watcher, and an
+initial wave followed by a prompted Start of Turn watcher during the same resume.
+The handoff corpus producer is `7b8bd6d6`; the reader formerly omitted its new
+scope too (writer card_00000047 versus reader card_00000046). The
 producer independently asserts the intended prompt families and final outcomes
-for the latter three scenarios. This is not evidence for every possible future
+for these scenarios. This is not evidence for every possible future
 v5 continuation graph, nor a production capture corpus. OPT-971's inherited
 missing production-capture evidence and the prohibition on retiring supported
 readers remain unchanged. Final writer snapshots must be replayed again after
 its remaining migration work is complete.
 
-Focused validation: 152 tests passed, including the unchanged v4 writer golden,
+Focused validation before the handoff delta: 152 tests passed, including the unchanged v4 writer golden,
 legacy shape fixtures, End Phase persistence, and owner semantic tests. Disabling
-mode propagation at `resumePhaseBoundary` kills six of the ten corpus cases;
+mode propagation at `resumePhaseBoundary` kills six of the original ten corpus cases;
 the mutation is restored. Full verification and independent reviews are still
 pending at this checkpoint.
