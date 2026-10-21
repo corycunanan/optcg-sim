@@ -379,7 +379,7 @@ function handleFieldToLifeArrangement(
   );
   if (pausedAction.result_ref && result.result)
     resultRefs.set(pausedAction.result_ref, result.result);
-  return { kind: (!result.pendingPrompt) ? "completed" : "waiting", ...result, resolved: !result.pendingPrompt };
+  return { ...result, kind: isGameTerminated(result.state) ? "terminal" : result.pendingPrompt ? "waiting" : "completed", resolved: !result.pendingPrompt };
 }
 
 export function handleChooseValue(

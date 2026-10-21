@@ -1,3 +1,4 @@
+import { isGameTerminated } from "../../terminal.js";
 /**
  * Batch continuation: the shared executor re-invokes the original
  * multi-target action handler with the
@@ -47,6 +48,8 @@ export function reenterBatchResume(
 ): HandlerResult {
   let nextState = state;
   const events = [...priorEvents];
+  if (isGameTerminated(nextState))
+    return { kind: "terminal", state: nextState, events, resolved: false };
 
   {
     const top = peekFrame(nextState);
@@ -57,7 +60,7 @@ export function reenterBatchResume(
     ) {
       return { kind: "completed", state: nextState, events, resolved: true };
     }
-    // Triggers were drained by processRemainingTriggers (the only caller). The
+    // The shared executor owns queued triggers. The
     // frame's pendingTriggers snapshot is stale at this point; we pop and
     // re-invoke unconditionally.
 
@@ -88,6 +91,8 @@ export function reenterBatchResume(
     );
     nextState = actionResult.state;
     events.push(...actionResult.events);
+    if (isGameTerminated(nextState))
+      return { kind: "terminal", state: nextState, events, resolved: false };
     recordBatchResult(resultRefs, marker, actionResult.result);
 
     if (actionResult.pendingPrompt) {
@@ -192,9 +197,8 @@ export function reenterBatchResume(
       );
     }
 
-    // Scan events emitted by the re-entry. Any new triggers (e.g., the last
-    // frame's ON_PLAY) drain via the normal path before we check for another
-    // AWAITING_BATCH_RESUME frame underneath.
+    // Report events emitted by re-entry. Newly fulfilled ordinary triggers
+    // remain queued while this batch's remaining actions finish.
     if (actionResult.events.length > 0) {
       const scan = scanEventsForTriggers(
         nextState,
@@ -225,6 +229,8 @@ export function reenterBatchResume(
       );
       nextState = chainResult.state;
       events.push(...chainResult.events);
+      if (isGameTerminated(nextState))
+        return { kind: "terminal", state: nextState, events, resolved: false };
       if (chainResult.pendingPrompt) {
         nextState = retainEventsOnFrame(nextState, stackDepth, events);
         return { kind: "waiting",
