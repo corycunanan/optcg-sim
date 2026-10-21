@@ -279,6 +279,21 @@ export function advanceTriggerExecution(
         events,
         resolved: true,
       };
+    const battleDebt = state.effectStack.find(frame =>
+      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+      frame.battleDamage.battleId === state.turn.battle?.battleId
+    );
+    if (battleDebt && !stopAtFrameId) {
+      // Loaded v5 ordinary work must not publish ahead of the battle prefix.
+      // Damage completion retains both obligations; the session dispatcher
+      // continues the substitute's own children before releasing this owner.
+      state = { ...state, effectStack: state.effectStack.map(frame =>
+        frame.id === battleDebt.id ? { ...frame,
+          accumulatedEvents: [...new Set([...frame.accumulatedEvents, ...events])],
+        } : frame
+      ) };
+      return { kind: "continued", state, events: [], resolved: true };
+    }
     if (!stopAtFrameId && owner.accumulatedEvents.length) {
       const prefix = owner.accumulatedEvents;
       events.splice(0, events.length, ...new Set([...prefix, ...events]));

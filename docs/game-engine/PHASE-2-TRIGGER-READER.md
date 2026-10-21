@@ -159,3 +159,50 @@ Reintroducing the wrong insertion depth kills both initial legacy corpus cases
 This substantive reassessment requires fresh independent review and full
 verification; the earlier 4d406814 gate does not establish readiness of this
 correction.
+
+## Battle publication prerequisite (OPT-966, October 21)
+
+The final writer replay gate exposed another semantic reader gap on deployed
+reader `7230767fc692e33051cb46d1dde1533e1b80bcc6`: a loaded v5 scope could
+publish a battle substitute's K.O./hand-trash events before the damage frame's
+retained PHASE_CHANGED, CHARACTER_BATTLES and COMBAT_VICTORY prefix. This is a
+publication ownership defect, not an accepted trace change.
+
+The bounded reader correction applies only after finding an existing v5 owner
+and a CHARACTER_KO_REPLACEMENT frame matching the live battle ID. It retains
+returned events, with their propagation flags, on that damage frame and returns
+continued. The existing session dispatcher completes substitute children and
+damage; ordinary queued work remains deferred. Terminal handling still runs
+first. There is no new scope producer, schema field, reader retirement, or
+normal-v4 routing change.
+
+`opt-966-battle-reader.test.ts` consumes two synthetic actual-writer corpora from
+producer `281c0df01ab6e10fb8016a7eb384546dddd5a39e` (runtime checkpoint
+`f4c707572b8dce5cf47ef66f94f969345ee4a238`). Each has three saved pauses: the
+replacement offer and two successive hand selections. A later substitute power
+modification must finish before END_OF_BATTLE; a surviving K.O. watcher draws
+afterward. The second scenario ends the game on that draw. Every starting pause
+is replayed from both live and undo data, with a real session save/load before
+every subsequent response. Assertions compare prompt ownership/options and the
+entire final GameState, including event payloads, timestamps and allocation IDs.
+Explicit outcome/count guards supplement differential equality.
+
+All six corpus cases fail with the guard bypassed and pass restored. The prior
+replay corpus, OPT-872 and OPT-965 suites pass (99 passed, one existing expected
+failure). An opt-in comparison against the immutable deployed-reader-v2 checkout
+also preserves the complete normal-v4 battle response in live and undo; together
+with the existing writer goldens this passes 41 tests. Worker type checking
+passes. Full verification and independent review are delivery gates, not yet
+claimed here.
+
+Reproduction from the repository root:
+
+```sh
+pnpm --dir workers/game test src/__tests__/opt-966-battle-reader.test.ts
+OPT966_READER_ROOT=/absolute/path/to/reader-at-7230767 pnpm --dir workers/game test src/__tests__/opt-966-battle-reader.test.ts src/__tests__/opt-940-writer-golden.test.ts
+```
+
+The main writer remains incomplete. These six synthetic snapshots establish the
+specified battle paths, not every possible future v5 graph. Missing production
+captures remain the inherited OPT-971 evidence gap; no capture or retirement gate
+is waived.
