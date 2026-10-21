@@ -395,7 +395,21 @@ export interface EventActivationDebt {
   sourceClass: "EVENT";
   events: PendingEvent[];
 }
+/** A FIFO generation is one simultaneous activation timing (rules 8-6-1/1-1). */
+export interface TriggerGeneration {
+  triggers: QueuedTrigger[];
+  orderingGroup?: { triggers: QueuedTrigger[]; resolvedTriggerIds: string[] };
+}
+
+export interface TriggerExecution {
+  generations: TriggerGeneration[];
+  /** Removed from its generation before selection; cleared before activation. */
+  selectedTrigger?: QueuedTrigger;
+}
+
 export interface EffectStackFrame {
+  /** Version 5 reader: owns generations independently of suspended effect children. */
+  triggerExecution?: TriggerExecution;
   eventActivation?: EventActivationDebt;
   playOverflow?: EffectStackFrame["ruleTrashForPlay"];
   pregameContinuation?: {

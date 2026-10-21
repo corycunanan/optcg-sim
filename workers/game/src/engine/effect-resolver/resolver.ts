@@ -1,3 +1,4 @@
+import { reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
 import { getBattleOpponentInstanceId } from "../events.js";
 import { isGameTerminated } from "../terminal.js";
 import { runRuleProcessingAfterMove } from "../defeat.js";
@@ -332,7 +333,7 @@ function createResolverServices(
     continueSimultaneousGroup: (...args) =>
       continueSimultaneousGroup(...args, services),
     processRemainingTriggers: (state, triggers, cardDb, events, group) =>
-      processRemainingTriggers(
+      triggerExecutionOwner(state) ? reportTriggerWork(state, triggers, events, group) : processRemainingTriggers(
         state,
         triggers,
         cardDb,
@@ -341,7 +342,7 @@ function createResolverServices(
         group
       ),
     reenterBatchResume: (state, cardDb, events) =>
-      reenterBatchResume(state, cardDb, services, events),
+      triggerExecutionOwner(state) ? reportTriggerWork(state, [], events) : reenterBatchResume(state, cardDb, services, events),
   };
   return services;
 }
@@ -1326,11 +1327,10 @@ export function executeActionChain(
       );
       if (isGameTerminated(stateWithFrame))
         return { state: stateWithFrame, events };
-      const drain = processRemainingTriggers(
+      const drain = services.processRemainingTriggers(
         stateWithFrame,
         triggers,
         cardDb,
-        services,
         events
       );
       return {
