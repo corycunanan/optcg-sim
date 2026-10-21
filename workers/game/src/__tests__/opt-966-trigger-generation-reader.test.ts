@@ -7,8 +7,13 @@ import type {
 } from "../types.js";
 import type { EffectBlock } from "../engine/effect-types.js";
 import { continuationBoundary, pushFrame } from "../engine/effect-stack.js";
+import { withBattleTriggerWindow } from "./trigger-window-helpers.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
-import { reportTriggerWork } from "../engine/trigger-executor.js";
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
+import {
+  advanceLifeTriggerExecution,
+  reportTriggerWork,
+} from "../engine/trigger-executor.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { withStableOrderingIds } from "../engine/trigger-ordering.js";
@@ -977,4 +982,179 @@ describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
       )
     ).toThrow("surprise");
   });
+});
+
+it("fails closed instead of advancing outer triggers when a Life boundary is missing", () => {
+  const { state, db } = fixture();
+  const result = advanceLifeTriggerExecution(
+    { state, events: [], resolved: true },
+    "missing-damage",
+    db,
+    resolverExecutionServices
+  );
+  expect(result.state.engineOutcome?.type).toBe("ENGINE_ERROR_DRAW");
+  expect(result.state.effectStack).toEqual([]);
+  expect(result.state.eventLog.map((e) => e.type)).toEqual(["GAME_OVER"]);
+});
+
+describe("Life Trigger advancement within loaded trigger owners", () => {
+  const run = (
+    battle: boolean,
+    prompted: boolean,
+    reload: boolean,
+    terminal = false
+  ) => {
+    const { state, db, a } = fixture(prompted);
+    const lifeBlock: EffectBlock = {
+      id: "life-play",
+      category: "auto",
+      trigger: { keyword: "TRIGGER" },
+      actions: [
+        structuredClone(a.actions![0]),
+        terminal
+          ? { type: "WIN_GAME" }
+          : { type: "DRAW", params: { amount: 1 } },
+      ],
+    };
+    db.set("LIFE-PLAY", {
+      ...CARDS.TRIGGER,
+      id: "LIFE-PLAY",
+      name: "Life play",
+      effectSchema: {
+        card_id: "LIFE-PLAY",
+        card_name: "Life play",
+        card_type: "Character",
+        effects: [lifeBlock],
+      },
+    });
+    state.players[1].hand = [
+      { ...state.players[0].hand[0], controller: 1, owner: 1 },
+    ];
+    state.players[0].hand = [];
+    state.players[1].life = [
+      { instanceId: "life-play", cardId: "LIFE-PLAY", face: "DOWN" },
+      { instanceId: "life-second", cardId: CARDS.VANILLA.id, face: "DOWN" },
+    ];
+    let current: GameState;
+    if (battle) {
+      state.effectStack[0].triggerExecution!.generations[0].triggers.shift();
+      state.turn.battleSubPhase = "DAMAGE_STEP";
+      state.turn.battle = {
+        battleId: "reader-battle",
+        attackerInstanceId: "A",
+        targetInstanceId: state.players[1].leader.instanceId,
+        attackerPower: 5000,
+        defenderPower: 5000,
+        counterPowerAdded: 0,
+        blockerActivated: false,
+        damagesRemaining: 2,
+        step: "DAMAGE_STEP",
+        redirectWindow: false,
+        blockerLocked: true,
+        targetLocked: true,
+      };
+      const first = state.players[1].life.shift()!;
+      current = withBattleTriggerWindow(state, first, db);
+    } else {
+      a.actions = [
+        {
+          type: "DEAL_DAMAGE",
+          target: { type: "PLAYER", controller: "OPPONENT" },
+          params: { amount: 2 },
+        },
+        { type: "DRAW", params: { amount: 1 } },
+      ];
+      current = start(restore(state), db);
+    }
+    expect(current.pendingPrompt?.options.promptType).toBe("REVEAL_TRIGGER");
+    current = answer(reload ? restore(current) : current, db, {
+      type: "REVEAL_TRIGGER",
+      reveal: true,
+    });
+    if (prompted) {
+      expect(current.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      expect(current.players[1].life.map((card) => card.instanceId)).toEqual([
+        "life-second",
+      ]);
+      expect(current.pendingPrompt?.respondingPlayer).toBe(1);
+      if (reload) {
+        const raw = structuredClone(toPersistedGameState(current));
+        expect(
+          convertPersistedGameState(structuredClone(raw), "undoHistory[0]")
+        ).toEqual(convertPersistedGameState(raw, "state"));
+        current = restore(current);
+      }
+      current = answer(current, db, {
+        type: "SELECT_TARGET",
+        selectedInstanceIds: ["C"],
+      });
+    }
+    if (terminal) {
+      expect(current.status).toBe("FINISHED");
+      expect(current.winner).toBe(1);
+      expect(current.players[1].life.map((card) => card.instanceId)).toEqual([
+        "life-second",
+      ]);
+      expect(current.eventLog.at(-1)?.type).toBe("GAME_OVER");
+      expect(
+        current.eventLog.filter((e) => e.type === "CARD_PLAYED")
+      ).toHaveLength(1);
+      expect(
+        current.eventLog.some(
+          (e) => e.type === "POWER_MODIFIED" || e.type === "CARD_DRAWN"
+        )
+      ).toBe(false);
+      expect(current.effectStack).toEqual([]);
+      return current;
+    }
+    const nextLife = current.eventLog.findIndex(
+      (e) =>
+        e.type === "CARD_REMOVED_FROM_LIFE" &&
+        e.payload.cardInstanceId === "life-second"
+    );
+    const drawPositions = current.eventLog.flatMap((e, i) =>
+      e.type === "CARD_DRAWN" && e.playerIndex === 1 ? [i] : []
+    );
+    const onPlay = current.eventLog.findIndex(
+      (e) => e.type === "POWER_MODIFIED"
+    );
+    expect(drawPositions).toHaveLength(2); // Life suffix then older outer X.
+    expect(drawPositions[0]).toBeLessThan(nextLife);
+    expect(drawPositions[1]).toBeGreaterThan(nextLife);
+    expect(onPlay).toBeGreaterThan(drawPositions[1]);
+    expect(
+      current.eventLog.filter((e) => e.type === "CARD_PLAYED")
+    ).toHaveLength(1);
+    expect(
+      current.eventLog.filter((e) => e.type === "CARD_REMOVED_FROM_LIFE")
+    ).toHaveLength(2);
+    expect(current.effectStack).toEqual([]);
+    expect(current.pendingPrompt).toBeNull();
+    expect(() => restore(current)).not.toThrow();
+    return current;
+  };
+
+  it.each(
+    [false, true].flatMap((battle) =>
+      [false, true].map((prompted) => ({ battle, prompted }))
+    )
+  )(
+    "finishes own suffix before next point and defers ordinary work: %j",
+    ({ battle, prompted }) => {
+      const continuous = run(battle, prompted, false),
+        reloaded = run(battle, prompted, true);
+      expect(reloaded.eventLog).toEqual(continuous.eventLog);
+      expect(reloaded.players).toEqual(continuous.players);
+      expect(reloaded.turn).toEqual(continuous.turn);
+    }
+  );
+  it.each([false, true])(
+    "stops all damage and ordinary work when Life suffix terminates; battle=%s",
+    (battle) => {
+      const continuous = run(battle, false, false, true),
+        reloaded = run(battle, false, true, true);
+      expect(reloaded.eventLog).toEqual(continuous.eventLog);
+      expect(reloaded.players).toEqual(continuous.players);
+    }
+  );
 });

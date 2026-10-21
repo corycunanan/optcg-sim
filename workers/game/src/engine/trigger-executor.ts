@@ -19,6 +19,7 @@ import {
   scanEventsForTriggers,
   withStableOrderingIds,
 } from "./trigger-ordering.js";
+import { terminateForEngineContract } from "./engine-limits.js";
 import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
 import {
   getEventCardInstanceId,
@@ -193,7 +194,8 @@ export function selectTriggerForExecution(
 export function advanceTriggerExecution(
   initial: EffectResolverResult,
   cardDb: Map<string, CardData>,
-  services: EffectResolverServices
+  services: EffectResolverServices,
+  stopAtFrameId?: string
 ): HandlerResult {
   let state = initial.state;
   const events = [...initial.events];
@@ -211,6 +213,26 @@ export function advanceTriggerExecution(
         events,
         resolved: true,
       };
+    if (
+      stopAtFrameId &&
+      !state.effectStack.some((frame) => frame.id === stopAtFrameId)
+    ) {
+      state = terminateForEngineContract(state, {
+        kind: "ENGINE_CONTRACT",
+        contract: "ACTION_HANDLER",
+        message: `Life Trigger lost its damage boundary ${stopAtFrameId}`,
+      });
+      continue;
+    }
+    // A Life Trigger temporarily interrupts damage. Finish only its children;
+    // reaching its exact damage boundary must not select an outer sibling.
+    if (stopAtFrameId && state.effectStack.at(-1)?.id === stopAtFrameId)
+      return {
+        kind: "continued",
+        state: publishCommittedEvents(state, events),
+        events,
+        resolved: true,
+      };
     let owner = triggerExecutionOwner(state);
     if (!owner?.triggerExecution)
       return {
@@ -219,7 +241,7 @@ export function advanceTriggerExecution(
         events,
         resolved: true,
       };
-    if (owner.accumulatedEvents.length) {
+    if (!stopAtFrameId && owner.accumulatedEvents.length) {
       const prefix = owner.accumulatedEvents;
       events.splice(0, events.length, ...new Set([...prefix, ...events]));
       state = {
@@ -369,4 +391,16 @@ export function advanceTriggerExecution(
     state = publishCommittedEvents(state, events);
     state = { ...state, effectStack: state.effectStack.slice(0, -1) };
   }
+}
+
+/** Reader-only Life interruption entry. Ordinary fulfilled work still reports
+ * to its existing owner; only the Life Trigger's own children advance here. */
+export function advanceLifeTriggerExecution(
+  initial: EffectResolverResult,
+  damageFrameId: string,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices
+): EffectResolverResult {
+  if (!triggerExecutionOwner(initial.state)) return initial;
+  return advanceTriggerExecution(initial, cardDb, services, damageFrameId);
 }
