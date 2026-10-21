@@ -1,4 +1,4 @@
-import { reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
+import { advanceTriggerExecution, createEffectExecutionScope, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
 import { getBattleOpponentInstanceId } from "../events.js";
 import { isGameTerminated } from "../terminal.js";
 import { runRuleProcessingAfterMove } from "../defeat.js";
@@ -60,8 +60,6 @@ import {
 import { isCostSequencePayable, payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import {
   pushBatchResumeFrame,
-  processRemainingTriggers,
-  reenterBatchResume,
 } from "./resume-core.js";
 import { buildSelectTargetPrompt } from "./target-resolver.js";
 import {
@@ -332,17 +330,18 @@ function createResolverServices(
       ),
     continueSimultaneousGroup: (...args) =>
       continueSimultaneousGroup(...args, services),
-    processRemainingTriggers: (state, triggers, cardDb, events, group) =>
-      triggerExecutionOwner(state) ? reportTriggerWork(state, triggers, events, group) : processRemainingTriggers(
-        state,
-        triggers,
-        cardDb,
-        services,
-        events,
-        group
-      ),
-    reenterBatchResume: (state, cardDb, events) =>
-      triggerExecutionOwner(state) ? reportTriggerWork(state, [], events) : reenterBatchResume(state, cardDb, services, events),
+    reportTriggers: (state, triggers, _cardDb, events = [], group) => {
+      if (!triggerExecutionOwner(state)) {
+        if (!triggers.length)
+          return { kind: "continued", state, events, resolved: true };
+        const queued = createTriggerExecution(state, triggers, group);
+        return { ...queued, events };
+      }
+      return reportTriggerWork(state, triggers, events, group);
+    },
+    continueHandler: (state, _cardDb, events = []) => ({
+      kind: isGameTerminated(state) ? "terminal" : "continued", state, events, resolved: true,
+    }),
   };
   return services;
 }
@@ -364,7 +363,24 @@ export function battleTargetRefFor(
   return opposing ? [BATTLE_TARGET_REF, { targetInstanceIds: [opposing], count: 1 }] : null;
 }
 
-export function resolveEffect(
+/** Direct activation entry. Existing owners retain nested advancement. */
+export function resolveEffect(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
+  if (triggerExecutionOwner(args[0])) return resolveEffectCore(...args);
+  const initialState = args[0];
+  args[0] = createEffectExecutionScope(initialState, args[2], args[3]);
+  const result = resolveEffectCore(...args);
+  if (!isGameTerminated(result.state) && !result.pendingPrompt &&
+      !result.resolved && result.events.length === 0) {
+    return { ...result, state: initialState };
+  }
+  const advanced = advanceTriggerExecution(result, args[4], args[6] ?? resolverExecutionServices);
+  return {
+    ...advanced,
+    ...(result.effectNotActivated ? { effectNotActivated: true } : {}),
+  };
+}
+
+function resolveEffectCore(
   state: GameState,
   block: EffectBlock,
   sourceCardInstanceId: string,
@@ -1327,7 +1343,7 @@ export function executeActionChain(
       );
       if (isGameTerminated(stateWithFrame))
         return { state: stateWithFrame, events };
-      const drain = services.processRemainingTriggers(
+      const drain = services.reportTriggers(
         stateWithFrame,
         triggers,
         cardDb,

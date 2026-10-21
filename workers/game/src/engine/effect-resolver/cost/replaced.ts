@@ -57,7 +57,7 @@ export function finishReplacedLifeCost(
   );
   const scan = scanEventsForTriggers(state, scannable, controller, cardDb);
   replacePendingEventReferences(events, scannable, scan.events);
-  return services.processRemainingTriggers(
+  return services.reportTriggers(
     scan.state,
     [...pendingTriggers, ...scan.triggers],
     cardDb,

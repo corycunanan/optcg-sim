@@ -824,7 +824,7 @@ describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
       []
     );
     expect(result?.kind).toBe("fallthrough");
-    const next = result?.kind === "fallthrough" ? result.state : f.state;
+    const next = result?.kind === "continued" ? result.state : f.state;
     expect(char({ ...f, state: next } as Fixture, c)?.attachedDon.map((d) => d.instanceId)).toContain(
       moving.instanceId
     );
@@ -1015,7 +1015,7 @@ describe("OPT-792 DON!! areas follow the rules areas (review C)", () => {
       new Map(),
       []
     );
-    const next = result?.kind === "fallthrough" ? result.state : f.state;
+    const next = result?.kind === "continued" ? result.state : f.state;
     expect(char({ ...f, state: next } as Fixture, b)?.attachedDon.map((d) => d.instanceId)).toEqual([
       "moving-don",
     ]);

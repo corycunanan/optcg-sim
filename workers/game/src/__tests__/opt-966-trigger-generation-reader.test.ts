@@ -1223,3 +1223,34 @@ describe("Life Trigger advancement within loaded trigger owners", () => {
     }
   );
 });
+
+it.each([false, true])(
+  "lifts lower legacy siblings ahead of fresh reports with existing owner=%s",
+  (existingOwner) => {
+    const { state, db } = fixture(true);
+    const paused = start(restore(state), db);
+    const owner = paused.effectStack[0];
+    const oldSiblings = owner.triggerExecution!.generations[0].triggers;
+    const { triggerExecution: _work, ...legacy } = owner;
+    const legacyFrame = {
+      ...legacy, id: "legacy-older-siblings", kind: "TRIGGER_DRAIN" as const,
+      pendingTriggers: oldSiblings,
+    };
+    paused.effectStack = [
+      legacyFrame,
+      ...(existingOwner ? [{ ...owner, triggerExecution: {
+        generations: [{ triggers: [] }],
+      } }] : []),
+      ...paused.effectStack.slice(1),
+    ];
+    const loaded = restore(paused);
+    const final = answer(loaded, db, {
+      type: "SELECT_TARGET", selectedInstanceIds: ["C"],
+    });
+    expect(final.eventLog.map((event) => event.type)).toEqual([
+      "CARD_PLAYED", "CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "POWER_MODIFIED",
+    ]);
+    expect(final.effectStack).toEqual([]);
+    expect(final.pendingPrompt).toBeNull();
+  }
+);

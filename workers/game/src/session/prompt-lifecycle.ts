@@ -201,6 +201,8 @@ function resumePromptLifecycleUnreleased(
     gameOver = applied.gameOver;
   } else if (state.effectStack.length > 0) {
     const resumed = resumeFromStack(state, action, cardDb);
+    if (resumed.rejected && !resumed.reprompted && !isGameTerminated(resumed.state))
+      return { state: stateBeforeResume, responseRejected: true };
     state = resumed.state;
     if (isGameTerminated(state)) {
       state = publishBeforeGameOver(state, resumed.events, respondingPlayer);
@@ -391,7 +393,7 @@ function resumeContinuations(
       continue;
     }
 
-    if (frame.phase === "INTERRUPTED_BY_TRIGGERS") {
+    if (frame.phase === "INTERRUPTED_BY_TRIGGERS" || frame.phase === "AWAITING_BATCH_RESUME") {
       const resumed = resumeFromStack(state, action, cardDb);
       state = resumed.state;
       if (isGameTerminated(state)) {

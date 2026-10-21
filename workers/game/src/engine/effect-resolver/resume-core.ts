@@ -33,7 +33,7 @@ import {
 import { insertFrameAt } from "../damage-frames.js";
 import { frameKindOf } from "../frame-kinds.js";
 import { scanEventsForTriggers } from "../trigger-ordering.js";
-import type { EffectResolverResult, EffectResolverServices } from "./types.js";
+import type { HandlerResult, EffectResolverServices } from "./types.js";
 import {
   buildSelectTargetPrompt,
   validateTargetConstraints,
@@ -84,7 +84,6 @@ function isHandlerOwnedFrame(frame: EffectStackFrame | undefined): boolean {
 }
 
 // Re-export the stable public API so existing imports keep working.
-export { processRemainingTriggers } from "./resume/triggers.js";
 export { reenterBatchResume, pushBatchResumeFrame } from "./resume/batch.js";
 
 // ─── resumeEffectChain ───────────────────────────────────────────────────────
@@ -95,7 +94,7 @@ export function resumeEffectChain(
   action: GameAction,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
-): EffectResolverResult {
+): HandlerResult {
   const {
     effectSourceInstanceId,
     controller,
@@ -116,10 +115,10 @@ export function resumeEffectChain(
 
   // Player skipped the optional effect
   if (action.type === "PASS") {
-    return { state, events, resolved: false };
+    return { kind: "waiting", state, events, resolved: false };
   }
   if (action.type === "PLAYER_CHOICE" && action.choiceId === "skip") {
-    return { state, events, resolved: false };
+    return { kind: "waiting", state, events, resolved: false };
   }
 
   // ── ARRANGE_TOP_CARDS branches ────────────────────────────────────────────
@@ -183,7 +182,7 @@ export function resumeEffectChain(
     validTargets
   );
   if (deckScry?.rejected) {
-    return { state, events: [], resolved: false, rejected: true };
+    return { kind: "waiting", state, events: [], resolved: false, rejected: true };
   }
   if (deckScry) {
     nextState = deckScry.state;
@@ -210,7 +209,7 @@ export function resumeEffectChain(
       resultRefs.set(pausedAction.result_ref, returnToDeck.result);
     }
     if (returnToDeck.pendingPrompt) {
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -228,7 +227,7 @@ export function resumeEffectChain(
     // OPT-797: a position choice or one owner's Life order can open the next
     // owner's Rule 3-1-7 ordering prompt.
     if (fieldToLife.pendingPrompt) {
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -248,8 +247,8 @@ export function resumeEffectChain(
     events,
     services
   );
-  if (stateDist?.kind === "terminal") return stateDist.result;
-  if (stateDist?.kind === "fallthrough") {
+  if (stateDist?.kind === "handled") return stateDist.result;
+  if (stateDist?.kind === "continued") {
     nextState = stateDist.state;
   } else {
     const donReturn = handlePlayerChoiceDonReturn(
@@ -258,8 +257,8 @@ export function resumeEffectChain(
       resumeCtx,
       events
     );
-    if (donReturn?.kind === "terminal") return donReturn.result;
-    if (donReturn?.kind === "fallthrough") {
+    if (donReturn?.kind === "handled") return donReturn.result;
+    if (donReturn?.kind === "continued") {
       nextState = donReturn.state;
     } else {
       const chooseValue = handleChooseValue(
@@ -268,8 +267,8 @@ export function resumeEffectChain(
         resumeCtx,
         resultRefs
       );
-      if (chooseValue?.kind === "terminal") return chooseValue.result;
-      if (chooseValue?.kind === "fallthrough") {
+      if (chooseValue?.kind === "handled") return chooseValue.result;
+      if (chooseValue?.kind === "continued") {
         nextState = chooseValue.state;
       } else {
         const playerChoice = handlePlayerChoiceBranch(
@@ -281,8 +280,8 @@ export function resumeEffectChain(
           events,
           services
         );
-        if (playerChoice?.kind === "terminal") return playerChoice.result;
-        if (playerChoice?.kind === "fallthrough")
+        if (playerChoice?.kind === "handled") return playerChoice.result;
+        if (playerChoice?.kind === "continued")
           nextState = playerChoice.state;
       }
     }
@@ -296,8 +295,8 @@ export function resumeEffectChain(
     resultRefs,
     events
   );
-  if (redistribute?.kind === "terminal") return redistribute.result;
-  if (redistribute?.kind === "fallthrough") nextState = redistribute.state;
+  if (redistribute?.kind === "handled") return redistribute.result;
+  if (redistribute?.kind === "continued") nextState = redistribute.state;
 
   // ── SELECT_TARGET branches (GIVE_DON identity, rule-trash-for-play, then
   //    generic) ──────────────────────────────────────────────────────────────
@@ -307,8 +306,8 @@ export function resumeEffectChain(
     resumeCtx,
     events
   );
-  if (giveDonIdentity?.kind === "terminal") return giveDonIdentity.result;
-  if (giveDonIdentity?.kind === "fallthrough") {
+  if (giveDonIdentity?.kind === "handled") return giveDonIdentity.result;
+  if (giveDonIdentity?.kind === "continued") {
     // The identity choice completed the paused GIVE_DON; the generic
     // SELECT_TARGET branch must not re-run it with the DON!! id as a target.
     nextState = giveDonIdentity.state;
@@ -323,7 +322,7 @@ export function resumeEffectChain(
       events,
       services
     );
-    if (ruleTrash?.kind === "terminal") return ruleTrash.result;
+    if (ruleTrash?.kind === "handled") return ruleTrash.result;
     // ruleTrash always returns terminal or null — no fallthrough case
 
     const selectTarget = handleSelectTarget(
@@ -335,8 +334,8 @@ export function resumeEffectChain(
       events,
       services
     );
-    if (selectTarget?.kind === "terminal") return selectTarget.result;
-    if (selectTarget?.kind === "fallthrough") {
+    if (selectTarget?.kind === "handled") return selectTarget.result;
+    if (selectTarget?.kind === "continued") {
       nextState = selectTarget.state;
       pausedActionSucceeded = selectTarget.succeeded;
     }
@@ -346,7 +345,7 @@ export function resumeEffectChain(
   // Life reorder, field-to-Life), outside executeEffectAction's checkpoint.
   // Run rule processing on that move before the remaining chain (9-1-2).
   nextState = runRuleProcessingAfterMove(state, nextState, {}, cardDb);
-  if (isGameTerminated(nextState)) return { state: nextState, events, resolved: true };
+  if (isGameTerminated(nextState)) return { kind: "terminal", state: nextState, events, resolved: true };
 
   // ── Tail: execute remainingActions (also handles OPTIONAL_EFFECT resume
   //         where pausedAction is null) ────────────────────────────────────
@@ -365,7 +364,7 @@ export function resumeEffectChain(
     events.push(...chainResult.events);
 
     if (chainResult.pendingPrompt) {
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -374,7 +373,7 @@ export function resumeEffectChain(
     }
   }
 
-  return { state: nextState, events, resolved: true };
+  return { kind: isGameTerminated(nextState) ? "terminal" : "completed", state: nextState, events, resolved: true };
 }
 
 // ─── resumeFromStack ─────────────────────────────────────────────────────────
@@ -384,10 +383,10 @@ export function resumeFromStack(
   action: GameAction,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
-): EffectResolverResult {
+): HandlerResult {
   const topFrame = peekFrame(state);
   if (!topFrame) {
-    return { state, events: [], resolved: true };
+    return { kind: "completed", state, events: [], resolved: true };
   }
 
   const { sourceCardInstanceId, controller, phase } = topFrame;
@@ -423,7 +422,7 @@ export function resumeFromStack(
         cardDb,
         resultRefs
       );
-      return {
+      return { kind: "waiting",
         state,
         events: [],
         resolved: false,
@@ -461,7 +460,7 @@ export function resumeFromStack(
       nextState = prefix.state;
       events.unshift(...prefix.events);
     }
-    return {
+    return { kind: isGameTerminated(nextState) ? "terminal" : result.pendingPrompt ? "waiting" : "completed",
       state: nextState,
       events,
       resolved: !result.pendingPrompt && !isGameTerminated(nextState),
@@ -533,7 +532,7 @@ export function resumeFromStack(
       nextState = result.state;
       events.push(...result.events);
       if (isGameTerminated(nextState)) {
-        return { state: nextState, events, resolved: false };
+        return { kind: "terminal", state: nextState, events, resolved: false };
       }
 
       const replacementFrameWasPushed =
@@ -541,7 +540,7 @@ export function resumeFromStack(
       if (result.rejected) {
         nextState = pushFrame(nextState, topFrame);
         if (isGameTerminated(nextState)) {
-          return { state: nextState, events, resolved: false };
+          return { kind: "terminal", state: nextState, events, resolved: false };
         }
         if (!result.pendingPrompt) {
           return { ...result, state: nextState };
@@ -569,7 +568,7 @@ export function resumeFromStack(
           };
           nextState = insertFrameAt(nextState, stackDepthAfterPop, continuationFrame);
           if (isGameTerminated(nextState)) {
-            return { state: nextState, events, resolved: false };
+            return { kind: "terminal", state: nextState, events, resolved: false };
           }
           const damage = nextState.effectStack[stackDepthAfterPop + 1];
           if (damage?.effectDamage) {
@@ -605,7 +604,7 @@ export function resumeFromStack(
           };
           nextState = pushFrame(nextState, replacementFrame);
           if (isGameTerminated(nextState)) {
-            return { state: nextState, events, resolved: false };
+            return { kind: "terminal", state: nextState, events, resolved: false };
           }
           pendingPrompt = {
             ...pendingPrompt,
@@ -618,7 +617,7 @@ export function resumeFromStack(
             triggerOrderingGroup: topFrame.triggerOrderingGroup ?? frame.triggerOrderingGroup,
           }));
         }
-        return {
+        return { kind: "waiting",
           state: nextState,
           events,
           resolved: false,
@@ -643,7 +642,7 @@ export function resumeFromStack(
             ...chainScan.triggers,
             ...topFrame.pendingTriggers,
           ];
-          return services.processRemainingTriggers(
+          return services.reportTriggers(
             nextState,
             allTriggers,
             cardDb,
@@ -652,7 +651,7 @@ export function resumeFromStack(
         }
       }
 
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
@@ -686,7 +685,7 @@ export function resumeFromStack(
 
         if (chainResult.pendingPrompt) {
           nextState = retainEventsOnFrame(nextState, stackDepthAfterPop, events);
-          return {
+          return { kind: "waiting",
             state: nextState,
             events,
             resolved: false,
@@ -702,7 +701,7 @@ export function resumeFromStack(
         nextState = scan.state;
         events.splice(0, events.length, ...scan.events);
         if (scan.triggers.length > 0) {
-          return services.processRemainingTriggers(
+          return services.reportTriggers(
             nextState,
             [...scan.triggers, ...topFrame.pendingTriggers],
             cardDb,
@@ -712,7 +711,7 @@ export function resumeFromStack(
         }
       }
 
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
@@ -722,18 +721,12 @@ export function resumeFromStack(
     }
 
     case "AWAITING_TRIGGER_ORDER_SELECTION":
-      return handleAwaitingTriggerOrderSelection(
-        state,
-        action,
-        topFrame,
-        cardDb,
-        services
-      );
+      return handleAwaitingTriggerOrderSelection(state, action, cardDb);
 
     case "AWAITING_BATCH_RESUME":
-      return services.reenterBatchResume(state, cardDb);
+      return services.continueHandler(state, cardDb);
 
     default:
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
   }
 }

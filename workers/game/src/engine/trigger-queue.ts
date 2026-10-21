@@ -17,7 +17,7 @@ import {
   deregisterDepartedSources,
 } from "./triggers.js";
 import { resolverExecutionServices } from "./effect-resolver/resolver.js";
-import { advanceTriggerExecution, createTriggerExecution } from "./trigger-executor.js";
+import { advanceTriggerExecution, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "./trigger-executor.js";
 import { findCardInstance } from "./state.js";
 import {
   queuedSourceSnapshot,
@@ -91,12 +91,12 @@ export function fireEventsAndTriggers(
 
   // Group triggers by controller — turn player resolves first (§8-6),
   // and within each group the player chooses the order.
-  if (triggerQueue.length > 0) {
+  if (triggerQueue.length > 0 || triggerExecutionOwner(state)) {
     const activePI = state.turn.activePlayerIndex;
     const turnPlayerTriggers = triggerQueue.filter(t => t.controller === activePI);
     const nonTurnPlayerTriggers = triggerQueue.filter(t => t.controller !== activePI);
 
-    const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb);
+    const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb, "ordinary");
     state = result.state;
     if (isGameTerminated(state)) return state;
 
@@ -219,16 +219,19 @@ export function processPlayerTriggerGroup(
   triggers: QueuedTrigger[],
   afterTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
+  scope: "ordinary" | "window" = "window",
 ): { state: GameState; pendingPrompt?: PendingPromptState } {
-  const reported = createTriggerExecution(state, [...triggers, ...afterTriggers]);
+  const reported = scope === "ordinary" && triggerExecutionOwner(state)
+    ? reportTriggerWork(state, [...triggers, ...afterTriggers])
+    : createTriggerExecution(state, [...triggers, ...afterTriggers]);
   switch (reported.kind) {
     case "completed":
     case "terminal":
       return { state: reported.state };
     case "queued":
+    case "continued":
       return advanceTriggerExecution(reported, cardDb, resolverExecutionServices);
     case "waiting":
-    case "continued":
       throw new Error("A new trigger scope must be queued, completed, or terminal");
   }
 }

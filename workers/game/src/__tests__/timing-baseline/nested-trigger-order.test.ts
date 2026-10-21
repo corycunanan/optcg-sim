@@ -324,14 +324,14 @@ function pickRebecca(state: GameState): GameAction {
 describe("F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FAQ qa_op10.md:279-281)", () => {
   // Engine: Rebecca's POWER_MODIFIED lands before the Leader's CARD_DRAWN (A -> C -> B).
   // Rule 8-6-1-1 (line 860): A, then B, then C.
-  it.fails("F2a continuous (ratchet OPT-966)", () => {
+  it("F2a continuous (ratchet OPT-966)", () => {
     const { b, killer } = f2Setup(false);
     activate(b, killer);
     b.state = chooseFranky(b.state, b.cardDb);
     expect(order(b.state, F2_TYPES)).toEqual(F2_EXPECTED);
   });
 
-  it.fails("F2b prompt inside A answered immediately (ratchet OPT-966)", () => {
+  it("F2b prompt inside A answered immediately (ratchet OPT-966)", () => {
     const { b, killer } = f2Setup(true);
     activate(b, killer);
     b.state = chooseFranky(b.state, b.cardDb);
@@ -340,7 +340,7 @@ describe("F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; F
     expect(order(b.state, F2_TYPES)).toEqual(F2_EXPECTED);
   });
 
-  it.fails("F2c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
+  it("F2c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
     const { b, killer } = f2Setup(true);
     activate(b, killer);
     b.state = chooseFranky(b.state, b.cardDb);
@@ -350,3 +350,73 @@ describe("F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; F
     expect(order(loaded.state, F2_TYPES)).toEqual(F2_EXPECTED);
   });
 });
+
+it.skipIf(!process.env.OPT966_READER_ROOT)(
+  "replays actual writer cost, ordering and target pauses, live and undo, on the deployed reader",
+  async () => {
+    const root = process.env.OPT966_READER_ROOT!;
+    const { SessionRepository: ReaderRepository } = await import(
+      `${root}/workers/game/src/session/persistence.ts`
+    ) as typeof import("../../session/persistence.js");
+    const { resumePromptLifecycle: readerResume } = await import(
+      `${root}/workers/game/src/session/prompt-lifecycle.ts`
+    ) as typeof import("../../session/prompt-lifecycle.js");
+    const { b, killer } = f2Setup(true);
+    activate(b, killer);
+    const ordering = structuredClone(b.state);
+    b.state = chooseFranky(b.state, b.cardDb);
+    const target = structuredClone(b.state);
+    const costCase = f2Setup(true);
+    const costCard = costCase.b.cardDb.get(KILLER)!;
+    (costCard.effectSchema as EffectSchema).effects[0].costs = [
+      { type: "TRASH_FROM_HAND", amount: 1 },
+    ];
+    place(costCase.b, inst(CARDS.VANILLA.id, 0, "HAND"));
+    place(costCase.b, inst(CARDS.VANILLA.id, 0, "HAND"));
+    activate(costCase.b, costCase.killer);
+    expect(costCase.b.state.effectStack.at(-1)?.phase).toBe("AWAITING_COST_SELECTION");
+    for (const [paused, db] of [
+      [ordering, b.cardDb], [target, b.cardDb],
+      [costCase.b.state, costCase.b.cardDb],
+    ] as const) {
+      paused.pendingPrompt!.promptId = "crossbuild-fixed-prompt";
+      const storage = new MemoryStorage();
+      const writer = new SessionRepository(storage, {
+        nextJsUrl: "https://app.example.test", workerSecret: "secret",
+      });
+      await writer.save({ state: paused, cardDb: db, mode: "PVP",
+        pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [paused] });
+      const reader = new ReaderRepository(storage, {
+        nextJsUrl: "https://app.example.test", workerSecret: "secret",
+      });
+      const loaded = (await reader.load())!;
+      expect(loaded).not.toBeNull();
+      const finish = (initial: GameState, deployed: boolean) => {
+        let state = initial;
+        while (state.pendingPrompt) {
+          const options = promptOptions(state);
+          const action: GameAction = options.promptType === "PLAYER_CHOICE"
+            ? { type: "PLAYER_CHOICE", choiceId: options.choices!.find((o) => o.id.includes("franky"))!.id }
+            : state.effectStack.at(-1)?.phase === "AWAITING_COST_SELECTION"
+              ? { type: "SELECT_TARGET", selectedInstanceIds: [state.players[0].hand[0].instanceId] }
+              : pickRebecca(state);
+          state = deployed
+            ? readerResume(state, action, db, {
+                drainPregame: (s) => s, advanceStartOfTurn: (s) => s,
+              }).state
+            : reply(state, db, action);
+        }
+        return state;
+      };
+      const expected = finish(structuredClone(paused), false);
+      for (const replay of [loaded.state, loaded.undoHistory[0]]) {
+        const actual = finish(replay, true);
+        expect(actual.eventLog).toEqual(expected.eventLog);
+        expect(actual.players).toEqual(expected.players);
+        expect(actual.turn).toEqual(expected.turn);
+        expect(actual.effectStack).toEqual(expected.effectStack);
+        expect(actual.pendingPrompt).toEqual(expected.pendingPrompt);
+      }
+    }
+  }
+);

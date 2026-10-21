@@ -32,13 +32,8 @@ import {
 import { continuationBoundary, pushFrame } from "./effect-stack.js";
 import { reenterBatchResume } from "./effect-resolver/resume/batch.js";
 
-export type HandlerProgress =
-  | "completed"
-  | "waiting"
-  | "queued"
-  | "continued"
-  | "terminal";
-export type HandlerResult = EffectResolverResult & { kind: HandlerProgress };
+export type { HandlerProgress, HandlerResult } from "./effect-resolver/types.js";
+import type { HandlerResult } from "./effect-resolver/types.js";
 
 export function triggerExecutionOwner(
   state: GameState
@@ -46,6 +41,20 @@ export function triggerExecutionOwner(
   return [...state.effectStack]
     .reverse()
     .find((frame) => frame.triggerExecution !== undefined);
+}
+
+/** Own reports raised by a directly executed effect until its suffix finishes. */
+export function createEffectExecutionScope(
+  state: GameState,
+  sourceCardInstanceId: string,
+  controller: 0 | 1
+): GameState {
+  if (triggerExecutionOwner(state) || isGameTerminated(state)) return state;
+  const boundary = continuationBoundary(state, sourceCardInstanceId, controller);
+  return pushFrame(boundary.state, {
+    ...boundary.frame,
+    triggerExecution: { generations: [{ triggers: [] }] },
+  });
 }
 
 /** Start a persisted scope at a cross-effect boundary. Domain handlers only
@@ -144,7 +153,8 @@ export function reportTriggerWork(
 /** Consume only the choice; activation belongs to advanceTriggerExecution. */
 export function selectTriggerForExecution(
   state: GameState,
-  action: GameAction
+  action: GameAction,
+  cardDb: Map<string, CardData>
 ): HandlerResult | undefined {
   const owner = triggerExecutionOwner(state);
   const selection = state.effectStack.at(-1);
@@ -166,14 +176,18 @@ export function selectTriggerForExecution(
     action.type === "PLAYER_CHOICE" &&
     action.choiceId === "done" &&
     choices.every((trigger) => trigger.effectBlock.flags?.optional);
-  if (!generation || (!chosen && !done))
+  if (!generation || (!chosen && !done)) {
+    const offered = buildTriggerSelectionPrompt(
+      { ...state, effectStack: state.effectStack.slice(0, -1) },
+      choices, [], cardDb, selection.triggerOrderingGroup
+    );
     return {
-      kind: "waiting",
-      state,
-      events: [],
-      resolved: false,
-      rejected: true,
+      kind: "waiting", state, events: [], resolved: false, rejected: true,
+      ...(offered.pendingPrompt ? { pendingPrompt: {
+        ...offered.pendingPrompt, resumeContext: selection.id,
+      } } : {}),
     };
+  }
   const removedIds = new Set(
     done ? choices.map((trigger) => trigger.orderingId) : [chosen!.orderingId]
   );

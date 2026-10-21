@@ -90,7 +90,7 @@ function parseLifeDestinationChoiceId(
   }
 }
 import { postCostConditionsMet } from "../post-cost.js";
-import type { EffectResolverResult, EffectResolverServices } from "../types.js";
+import type { HandlerResult, EffectResolverServices } from "../types.js";
 import {
   checkReplacementForKO,
   checkReplacementForRemoval,
@@ -136,12 +136,12 @@ export function abortReplacedCost(
   cardDb: Map<string, CardData>,
   services: EffectResolverServices,
   frameOnStack = true
-): EffectResolverResult {
+): HandlerResult {
   const nextState = withdrawUnactivatedTrashMain(
     frameOnStack ? popFrame(state) : state,
     frame
   );
-  return services.processRemainingTriggers(
+  return services.reportTriggers(
     nextState,
     frame.pendingTriggers,
     cardDb,
@@ -193,7 +193,7 @@ function finishCostsAndRunActions(
   sourceCardInstanceId: string,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
-): EffectResolverResult {
+): HandlerResult {
   // OPT-862: rule-processing checkpoint once the costs are paid, before any
   // post-colon action, prompt or trigger drain. A cost that empties the deck
   // ends the game here (9-1-2, 9-2-1-2); the paid cost stands.
@@ -202,7 +202,7 @@ function finishCostsAndRunActions(
   state = topFrame.costTransactionState
     ? runRuleProcessingAfterMove(topFrame.costTransactionState, state, {}, cardDb)
     : runRuleProcessing(state, {}, cardDb);
-  if (isGameTerminated(state)) return { state, events, resolved: true };
+  if (isGameTerminated(state)) return { kind: "terminal", state, events, resolved: true };
   const block = topFrame.effectBlock;
   if (isOncePerTurnBlock(block) && !topFrame.oncePerTurnMarked) {
     state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
@@ -258,7 +258,7 @@ function finishCostsAndRunActions(
       cardDb
     )
   ) {
-    return services.processRemainingTriggers(
+    return services.reportTriggers(
       state,
       pendingTriggers,
       cardDb,
@@ -285,7 +285,7 @@ function finishCostsAndRunActions(
       state = updateEffectContinuation(state, stackDepth, () => ({
         pendingTriggers, triggerOrderingGroup: topFrame.triggerOrderingGroup,
       }));
-      return {
+      return { kind: "waiting",
         state,
         events,
         resolved: false,
@@ -309,7 +309,7 @@ function finishCostsAndRunActions(
       );
       if (chainScan.triggers.length > 0) {
         const allTriggers = [...chainScan.triggers, ...pendingTriggers];
-        return services.processRemainingTriggers(
+        return services.reportTriggers(
           state,
           allTriggers,
           cardDb,
@@ -319,7 +319,7 @@ function finishCostsAndRunActions(
     }
   }
 
-  return services.processRemainingTriggers(
+  return services.reportTriggers(
     state,
     pendingTriggers,
     cardDb,
@@ -343,7 +343,7 @@ function resumeAfterBranchPick(
   accumulatedCostRefs: Map<string, EffectResult>,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
-): EffectResolverResult {
+): HandlerResult {
   const events: PendingEvent[] = [...topFrame.accumulatedEvents];
   let nextState = popFrame(state);
 
@@ -378,7 +378,7 @@ function resumeAfterBranchPick(
   }
 
   if (resumeResult.cannotPay) {
-    return services.processRemainingTriggers(
+    return services.reportTriggers(
       withdrawUnactivatedTrashMain(resumeResult.state, topFrame),
       topFrame.pendingTriggers,
       cardDb,
@@ -399,7 +399,7 @@ function resumeAfterBranchPick(
         pendingTriggers: topFrame.pendingTriggers,
       });
     }
-    return {
+    return { kind: "waiting",
       state: nextState,
       events,
       resolved: false,
@@ -429,7 +429,7 @@ export function handleAwaitingCostSelection(
   topFrame: EffectStackFrame,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
-): EffectResolverResult {
+): HandlerResult {
   const { sourceCardInstanceId, controller } = topFrame;
   const cost = topFrame.costs[topFrame.currentCostIndex];
   const baselineState = state;
@@ -440,10 +440,10 @@ export function handleAwaitingCostSelection(
   const suspendCurrentFrame = (
     stateWithFrame: GameState,
     stagedEvents: PendingEvent[],
-    pendingPrompt: NonNullable<EffectResolverResult["pendingPrompt"]>,
+    pendingPrompt: NonNullable<HandlerResult["pendingPrompt"]>,
     stagedState: GameState = stateWithFrame,
     offer?: ReplacementOffer,
-  ): EffectResolverResult => {
+  ): HandlerResult => {
     const withTransaction = updateTopFrame(stateWithFrame, {
       accumulatedEvents: [...stagedEvents],
       costTransactionState: captureCostTransactionState(stagedState),
@@ -455,7 +455,7 @@ export function handleAwaitingCostSelection(
       pendingPrompt,
       offer,
     );
-    return {
+    return { kind: "waiting",
       state: offered.state,
       events: [],
       resolved: false,
@@ -474,7 +474,7 @@ export function handleAwaitingCostSelection(
     (cost.type === "REST_DON" || cost.type === "DON_REST") &&
     cost.amount === "ANY_NUMBER"
   ) {
-    return services.processRemainingTriggers(
+    return services.reportTriggers(
       withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
       topFrame.pendingTriggers,
       cardDb,
@@ -496,7 +496,7 @@ export function handleAwaitingCostSelection(
       sourceCardInstanceId
     );
     if (!paid) {
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
         topFrame.pendingTriggers,
         cardDb,
@@ -551,7 +551,7 @@ export function handleAwaitingCostSelection(
       }
 
       if (remaining.cannotPay) {
-        return services.processRemainingTriggers(
+        return services.reportTriggers(
           withdrawUnactivatedTrashMain(remaining.state, topFrame),
           topFrame.pendingTriggers,
           cardDb,
@@ -561,7 +561,7 @@ export function handleAwaitingCostSelection(
       nextState = remaining.state;
       events.push(...remaining.events);
       if (remaining.pendingPrompt) {
-        return {
+        return { kind: "waiting",
           state: nextState,
           events: remaining.events,
           resolved: false,
@@ -590,7 +590,7 @@ export function handleAwaitingCostSelection(
     const choiceIdx = Number(action.choiceId);
     const chosen = options[choiceIdx];
     if (!chosen) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
 
     const replacedCosts = [...topFrame.costs];
@@ -621,7 +621,7 @@ export function handleAwaitingCostSelection(
     // Only the two emitted ids are valid — a stale/malformed choiceId must
     // leave the prompt unresolved, not default to TOP.
     if (action.choiceId !== "0" && action.choiceId !== "1") {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
     const replacedCosts = [...topFrame.costs];
@@ -646,7 +646,7 @@ export function handleAwaitingCostSelection(
     const branchIdx = Number(action.choiceId);
     const branch = choiceCost.options[branchIdx];
     if (!branch) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
 
     const replacedCosts = [...topFrame.costs];
@@ -670,7 +670,7 @@ export function handleAwaitingCostSelection(
   let nextState = workingState;
 
   if (cost.type === "PLAY_NAMED_CARD_FROM_HAND") {
-    const reject = (): EffectResolverResult => ({ state, events: [], resolved: false, rejected: true });
+    const reject = (): HandlerResult => ({ kind: "waiting", state, events: [], resolved: false, rejected: true });
     if (action.type !== "SELECT_TARGET" || action.selectedInstanceIds?.length !== 1) return reject();
     const selected = action.selectedInstanceIds[0];
     if (!topFrame.validTargets.includes(selected)) return reject();
@@ -717,11 +717,11 @@ export function handleAwaitingCostSelection(
     cost.amount === "ANY_NUMBER"
   ) {
     if (!topFrame.validTargets.includes(action.choiceId)) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const amount = Number(action.choiceId.replace("don-rest:", ""));
     if (!Number.isInteger(amount) || amount <= 0) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const paid = payCosts(
       nextState,
@@ -731,7 +731,7 @@ export function handleAwaitingCostSelection(
       sourceCardInstanceId
     );
     if (!paid) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     nextState = paid.state;
     events.push(...paid.events);
@@ -742,14 +742,14 @@ export function handleAwaitingCostSelection(
     (cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE")
   ) {
     if (action.choiceId !== "0" && action.choiceId !== "1") {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const position = action.choiceId === "1" ? "BOTTOM" : "TOP";
     const paid = payCosts(
       nextState, [{ ...cost, position }], controller, cardDb, sourceCardInstanceId
     );
     if (!paid) {
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
         topFrame.pendingTriggers,
         cardDb,
@@ -784,7 +784,7 @@ export function handleAwaitingCostSelection(
     if (topFrame.costArrangeStage) {
       // Awaiting an arrange response — a select packet here could bypass
       // the ordering step. Ignore it.
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const valid = new Set(topFrame.validTargets ?? []);
     const amount =
@@ -795,7 +795,7 @@ export function handleAwaitingCostSelection(
       (id) => valid.has(id)
     );
     if (selected.length !== amount) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
 
     const needsArrange = amount > 1 && !blockShufflesDeck(topFrame.effectBlock);
@@ -843,7 +843,7 @@ export function handleAwaitingCostSelection(
     // Unless the block shuffles afterward, chain an arrange prompt covering
     // the WHOLE group (self + trash) per Comprehensive Rule 3-1-7.
     if (topFrame.costArrangeStage) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const valid = new Set(topFrame.validTargets ?? []);
     const amount =
@@ -854,7 +854,7 @@ export function handleAwaitingCostSelection(
       (id) => valid.has(id)
     );
     if (selected.length !== amount) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
 
     const group = [sourceCardInstanceId, ...selected];
@@ -934,7 +934,7 @@ export function handleAwaitingCostSelection(
     // Only cards staged at the select step (frame.validTargets) count; any
     // missing from the response are appended so the cost still pays in full.
     if (!topFrame.costArrangeStage) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const valid = topFrame.validTargets ?? [];
     const validSet = new Set(valid);
@@ -1014,7 +1014,7 @@ export function handleAwaitingCostSelection(
     if (!topFrame.costArrangeStage) {
       // Still on the select stage — validTargets holds every candidate, so
       // accepting an arrange packet here would move them all. Ignore it.
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const valid = topFrame.validTargets ?? [];
     const validSet = new Set(valid);
@@ -1050,7 +1050,7 @@ export function handleAwaitingCostSelection(
     // LIVE and staged payment states (as the named-play / GIVE_DON branches
     // do), so a stale, replayed or diverged reply can never move a Character
     // that left the field, stopped matching, or became protected.
-    const reject = (): EffectResolverResult => ({ state, events: [], resolved: false });
+    const reject = (): HandlerResult => ({ kind: "waiting", state, events: [], resolved: false });
     const eligibleIn = (candidateState: GameState, ids: string[]): boolean => {
       const candidates = computeCostTargets(candidateState, cost, controller, cardDb, sourceCardInstanceId);
       return ids.every((id) => candidates.includes(id));
@@ -1153,7 +1153,7 @@ export function handleAwaitingCostSelection(
     // validated against the frame's offer AND the live and staged payment
     // states, so a stale, replayed or diverged reply can never give a DON!!
     // that became active or left the cost area, or a departed Character.
-    const reject = (): EffectResolverResult => ({ state, events: [], resolved: false });
+    const reject = (): HandlerResult => ({ kind: "waiting", state, events: [], resolved: false });
     const selected = [...new Set(action.selectedInstanceIds ?? [])];
     const recipientEligibleIn = (candidateState: GameState, id: string): boolean =>
       computeCostTargets(candidateState, cost, controller, cardDb, sourceCardInstanceId).includes(id);
@@ -1248,11 +1248,11 @@ export function handleAwaitingCostSelection(
       !eligibleIn({ ...baselineState, prohibitions: [] }) ||
       !eligibleIn(stagedProhibitionView(baselineState, nextState))
     ) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const appliedGive = applyCostSelection(nextState, cost, [recipient], controller, cardDb, sourceCardInstanceId);
     if (appliedGive.events.length === 0) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     nextState = appliedGive.state;
     events.push(...appliedGive.events);
@@ -1282,7 +1282,7 @@ export function handleAwaitingCostSelection(
       (id) => valid.has(id)
     );
     if (selected.length !== amount) {
-      return { state, events: [], resolved: false };
+      return { kind: "waiting", state, events: [], resolved: false };
     }
     const fieldExitCosts = new Set<Cost["type"]>([
       "KO_OWN_CHARACTER",
@@ -1451,7 +1451,7 @@ export function handleAwaitingCostSelection(
       if (selected.length > 0) events.push(handTrashEvent(state, controller, selected.length, "COST", sourceCardInstanceId, controller, new Map(topFrame.resultRefs)));
     }
   } else {
-    return { state, events: [], resolved: false };
+    return { kind: "waiting", state, events: [], resolved: false };
   }
 
   const block = topFrame.effectBlock;
@@ -1494,7 +1494,7 @@ export function handleAwaitingCostSelection(
     }
 
     if (remainingCostResult.cannotPay) {
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         withdrawUnactivatedTrashMain(remainingCostResult.state, topFrame),
         topFrame.pendingTriggers,
         cardDb,
@@ -1520,7 +1520,7 @@ export function handleAwaitingCostSelection(
           pendingTriggers: topFrame.pendingTriggers,
         });
       }
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,

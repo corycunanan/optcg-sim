@@ -1,3 +1,4 @@
+import { createEffectExecutionScope } from "./trigger-executor.js";
 import { continuationBoundary, prependFrame } from "./effect-stack.js";
 /**
  * 7-Step Action Pipeline
@@ -106,6 +107,13 @@ export function runPipeline(
 
   // Step 4: Execute — produce new state snapshot
   log("pipeline.step", { ...logCtx, step: "execute" });
+  if (actionToExecute.type === "ACTIVATE_EFFECT" ||
+      actionToExecute.type === "PLAY_CARD" ||
+      actionToExecute.type === "USE_COUNTER_EVENT") {
+    nextState = createEffectExecutionScope(
+      nextState, actionToExecute.cardInstanceId, actingPlayerIndex
+    );
+  }
   const stateBeforeExecute = nextState;
   const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
   // Rule 3-1-6-1: DON!! moved by a game action (attach, DON!! phase, …)
