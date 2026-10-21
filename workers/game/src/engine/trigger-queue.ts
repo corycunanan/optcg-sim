@@ -1,31 +1,25 @@
 /**
- * The pipeline's Step 5 trigger executor (rule 8-6), shared by the action
- * pipeline and the End Phase (OPT-924). Moved verbatim out of pipeline.ts so
- * phases.ts can resolve End Phase waves and obligations with the same policy
- * without an import cycle (pipeline → execute → phases → pipeline). No
- * behaviour change; there is still exactly one pipeline-side policy.
+ * Pipeline event scanning and explicit rules-window entry points. All queued
+ * work is reported to the shared trigger executor; ordinary reports join the
+ * existing owner while damage and End Phase windows retain their boundaries.
  */
 
-import { updateEffectContinuation } from "./effect-resolver/event-activation.js";
-import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
+import { isGameTerminated } from "./terminal.js";
 import type { CardData, GameAction, GameEvent, GameState, ExecuteResult, PendingPromptState, QueuedTrigger } from "../types.js";
 import { recalculateBattlePowers } from "./battle.js";
-import { emitPendingEvent, getEventCardInstanceId } from "./events.js";
+import { emitPendingEvent } from "./events.js";
 import {
   matchTriggersForEvent,
   orderMatchedTriggers,
   registerCardEnteredField,
   deregisterDepartedSources,
 } from "./triggers.js";
-import { resolveEffect } from "./effect-resolver/index.js";
+import { resolverExecutionServices } from "./effect-resolver/resolver.js";
+import { advanceTriggerExecution, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "./trigger-executor.js";
 import { findCardInstance } from "./state.js";
 import {
-  scanEventsForTriggers,
-  buildTriggerSelectionPrompt,
   queuedSourceSnapshot,
 } from "./trigger-ordering.js";
-import { advanceTriggerExecution, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "./trigger-executor.js";
-import { resolverExecutionServices } from "./effect-resolver/resolver.js";
 import { takeEngineTimestamp } from "./execution-context.js";
 
 // ─── Step 5: Fire Events & Triggers ───────────────────────────────────────────
@@ -38,7 +32,6 @@ export function fireEventsAndTriggers(
   actedCard?: ActedCardSnapshot,
   recordPerformedAction = true,
   deferredTriggers: readonly QueuedTrigger[] = [],
-  triggerExecutionMode = false,
 ): GameState {
   const pi = state.turn.activePlayerIndex;
 
@@ -96,16 +89,12 @@ export function fireEventsAndTriggers(
 
   // Group triggers by controller — turn player resolves first (§8-6),
   // and within each group the player chooses the order.
-  if (triggerQueue.length > 0) {
+  if (triggerQueue.length > 0 || triggerExecutionOwner(state)) {
     const activePI = state.turn.activePlayerIndex;
     const turnPlayerTriggers = triggerQueue.filter(t => t.controller === activePI);
     const nonTurnPlayerTriggers = triggerQueue.filter(t => t.controller !== activePI);
 
-    const result = triggerExecutionMode
-      ? advanceTriggerExecution(triggerExecutionOwner(state)
-        ? reportTriggerWork(state, [...turnPlayerTriggers, ...nonTurnPlayerTriggers])
-        : createTriggerExecution(state, [...turnPlayerTriggers, ...nonTurnPlayerTriggers]), cardDb, resolverExecutionServices)
-      : processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb);
+    const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb, "ordinary");
     state = result.state;
     if (isGameTerminated(state)) return state;
 
@@ -126,8 +115,8 @@ export function fireEventsAndTriggers(
 
 /**
  * Publish End Phase events and resolve the auto effects they fulfil with the
- * pipeline's own Step 5 policy (OPT-924): turn player's group first, nested
- * triggers LIFO. The End Phase calls this after each stage action so its
+ * shared executor: turn player's group first, older generations before newly
+ * fulfilled ordinary triggers. The End Phase calls this after each stage action so its
  * triggered work finishes before the next rule step, while the ending player
  * is still the turn player. A prompt is left on `state.pendingPrompt`.
  */
@@ -135,68 +124,9 @@ export function fireEndPhaseEvents(
   state: GameState,
   events: ExecuteResult["events"],
   cardDb: Map<string, CardData>,
-  triggerExecutionMode = false,
 ): GameState {
   if (events.length === 0) return state;
-  return fireEventsAndTriggers(state, { state, events }, { type: "ADVANCE_PHASE" }, cardDb, undefined, false, [], triggerExecutionMode);
-}
-
-/**
- * Process a queue of triggers with LIFO semantics.
- * When a resolved trigger emits events that match new triggers,
- * those new triggers are inserted at the FRONT of the queue (LIFO).
- */
-function processTriggerQueuePipeline(
-  state: GameState,
-  queue: QueuedTrigger[],
-  cardDb: Map<string, CardData>,
-): { state: GameState; pendingPrompt?: PendingPromptState } {
-  let nextState = state;
-
-  while (queue.length > 0) {
-    const next = queue.shift();
-    if (!next) break;
-
-    const stackDepth = nextState.effectStack.length;
-    const result = resolveEffect(
-      nextState,
-      next.effectBlock,
-      next.sourceCardInstanceId,
-      next.controller,
-      cardDb,
-      getEventCardInstanceId(next.triggeringEvent) ?? null,
-      undefined,
-      next.triggeringEvent,
-      next.sourceSnapshot
-    );
-    nextState = result.state;
-    if (isGameTerminated(nextState)) {
-      return { state: publishBeforeGameOver(nextState, result.events, next.controller) };
-    }
-
-    if (result.pendingPrompt) {
-      nextState = updateEffectContinuation(nextState, stackDepth, frame => ({
-        pendingTriggers: [...frame.pendingTriggers, ...queue],
-      }));
-      return { state: nextState, pendingPrompt: result.pendingPrompt };
-    }
-
-    // Emit events from this trigger's resolution
-    for (const event of result.events) {
-      nextState = emitPendingEvent(nextState, event, next.controller);
-    }
-
-    // LIFO: scan result events for new triggers and insert at front
-    if (result.events.length > 0) {
-      const scanResult = scanEventsForTriggers(nextState, result.events, next.controller, cardDb);
-      nextState = scanResult.state;
-      if (scanResult.triggers.length > 0) {
-        queue.unshift(...scanResult.triggers);
-      }
-    }
-  }
-
-  return { state: nextState };
+  return fireEventsAndTriggers(state, { state, events }, { type: "ADVANCE_PHASE" }, cardDb, undefined, false);
 }
 
 /**
@@ -287,29 +217,21 @@ export function processPlayerTriggerGroup(
   triggers: QueuedTrigger[],
   afterTriggers: QueuedTrigger[],
   cardDb: Map<string, CardData>,
+  scope: "ordinary" | "window" = "window",
 ): { state: GameState; pendingPrompt?: PendingPromptState } {
-  if (triggers.length === 0) {
-    // No triggers for this player — process the other player's group
-    if (afterTriggers.length === 0) return { state };
-    return processPlayerTriggerGroup(state, afterTriggers, [], cardDb);
+  const reported = scope === "ordinary" && triggerExecutionOwner(state)
+    ? reportTriggerWork(state, [...triggers, ...afterTriggers])
+    : createTriggerExecution(state, [...triggers, ...afterTriggers]);
+  switch (reported.kind) {
+    case "completed":
+    case "terminal":
+      return { state: reported.state };
+    case "queued":
+    case "continued":
+      return advanceTriggerExecution(reported, cardDb, resolverExecutionServices);
+    case "waiting":
+      throw new Error("A new trigger scope must be queued, completed, or terminal");
   }
-
-  if (triggers.length === 1) {
-    // Single trigger — auto-resolve, no prompt needed
-    const result = processTriggerQueuePipeline(state, [...triggers], cardDb);
-    if (result.pendingPrompt) {
-      result.state = updateEffectContinuation(result.state, state.effectStack.length, frame => ({
-        pendingTriggers: [...frame.pendingTriggers, ...afterTriggers],
-      }));
-      return result;
-    }
-    // Single trigger done — process the other player's group
-    if (afterTriggers.length === 0) return { state: result.state };
-    return processPlayerTriggerGroup(result.state, afterTriggers, [], cardDb);
-  }
-
-  // 2+ triggers — prompt the player to choose the order
-  return buildTriggerSelectionPrompt(state, triggers, afterTriggers, cardDb);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

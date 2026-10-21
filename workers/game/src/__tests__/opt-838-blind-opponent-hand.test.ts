@@ -429,7 +429,7 @@ describe("OPT-838 blind reply authorization and persistence", () => {
   it("stored prompts keep the mapping server-side only", () => {
     const { f, opponent, hand } = playDrake(0, 3);
     const stored = JSON.parse(
-      JSON.stringify({ state: f.state, cardDb: Object.fromEntries(f.db), mode: "PVP" })
+      JSON.stringify({ state: toPersistedGameState(f.state), cardDb: Object.fromEntries(f.db), mode: "PVP" })
     );
     const restored = parseStoredSession(stored).state;
     expect(restored.pendingPrompt?.blindSlots).toEqual(f.state.pendingPrompt?.blindSlots);

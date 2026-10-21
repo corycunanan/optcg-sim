@@ -1,3 +1,4 @@
+import { selectTriggerForExecution } from "../../trigger-executor.js";
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect } from "../../hand-trash.js";
 import {
@@ -64,18 +65,18 @@ import {
   applyFieldDonReturn,
   decodeFieldDonReturnChoice,
 } from "../actions/don.js";
-import type { EffectResolverResult, EffectResolverServices } from "../types.js";
+import type { HandlerResult, EffectResolverServices } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
 import { releaseMovedDonEffects } from "../../don-area-effects.js";
 
 export interface ChoiceFallthrough {
-  kind: "fallthrough";
+  kind: "continued";
   state: GameState;
 }
 
 export interface ChoiceTerminal {
-  kind: "terminal";
-  result: EffectResolverResult;
+  kind: "handled";
+  result: HandlerResult;
 }
 
 export type ChoiceBranchResult = ChoiceFallthrough | ChoiceTerminal | null;
@@ -121,27 +122,27 @@ export function handlePlayerChoiceStateDistribution(
   const parts = action.choiceId.split(":");
   if (parts.length !== 3 || parts[0] !== "play-state") {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   const [, echoedId, chosenState] = parts;
   if (echoedId !== sd.pendingTargetId) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   if (chosenState !== "ACTIVE" && chosenState !== "RESTED") {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   if (sd.remaining[chosenState] <= 0) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
 
@@ -166,8 +167,8 @@ export function handlePlayerChoiceStateDistribution(
 
   if (actionResult.pendingPrompt) {
     return {
-      kind: "terminal",
-      result: {
+      kind: "handled",
+      result: { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -189,8 +190,8 @@ export function handlePlayerChoiceStateDistribution(
       resumeCtx.effectDescription,
     );
     return {
-      kind: "terminal",
-      result: services.processRemainingTriggers(
+      kind: "handled",
+      result: services.reportTriggers(
         nextWithFrame,
         triggers,
         cardDb,
@@ -203,7 +204,7 @@ export function handlePlayerChoiceStateDistribution(
   }
 
   // Fall through to remainingActions processing below.
-  return { kind: "fallthrough", state: nextState };
+  return { kind: "continued", state: nextState };
 }
 
 /**
@@ -237,15 +238,15 @@ export function handlePlayerChoiceDonReturn(
     !resumeCtx.validTargets.includes(action.choiceId)
   ) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   const decoded = decodeFieldDonReturnChoice(action.choiceId);
   if (!decoded) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
 
@@ -259,7 +260,7 @@ export function handlePlayerChoiceDonReturn(
   events.push(...applied.events);
   // Rule 3-1-6-1: DON!! returned to the deck shed their effects.
   return {
-    kind: "fallthrough",
+    kind: "continued",
     state: releaseMovedDonEffects(state, applied.state),
   };
 }
@@ -271,7 +272,7 @@ export function handleFieldToLifePosition(
   resumeCtx: ResumeContext,
   resultRefs: Map<string, EffectResult>,
   cardDb: Map<string, CardData>,
-): (EffectResolverResult & { succeeded?: boolean }) | null {
+): (HandlerResult & { succeeded?: boolean }) | null {
   const {
     pausedAction,
     fieldToLifeTargetIds,
@@ -287,7 +288,7 @@ export function handleFieldToLifePosition(
     action.type !== "PLAYER_CHOICE" ||
     !validTargets.includes(action.choiceId)
   ) {
-    return { state, events: [], resolved: false, rejected: true };
+    return { kind: "waiting", state, events: [], resolved: false, rejected: true };
   }
   const position =
     action.choiceId === `field-life:${JSON.stringify(fieldToLifeTargetIds)}:TOP`
@@ -296,7 +297,7 @@ export function handleFieldToLifePosition(
           `field-life:${JSON.stringify(fieldToLifeTargetIds)}:BOTTOM`
         ? "BOTTOM"
         : null;
-  if (!position) return { state, events: [], resolved: false, rejected: true };
+  if (!position) return { kind: "waiting", state, events: [], resolved: false, rejected: true };
   const result = executeAddToLifeFromField(
     state,
     { ...pausedAction, params: { ...pausedAction.params, position } },
@@ -308,7 +309,7 @@ export function handleFieldToLifePosition(
   );
   if (pausedAction.result_ref && result.result)
     resultRefs.set(pausedAction.result_ref, result.result);
-  return { ...result, resolved: true };
+  return { ...result, kind: isGameTerminated(result.state) ? "terminal" : result.pendingPrompt ? "waiting" : "completed", resolved: true };
 }
 
 /**
@@ -324,7 +325,7 @@ function handleFieldToLifeArrangement(
   resumeCtx: ResumeContext,
   resultRefs: Map<string, EffectResult>,
   cardDb: Map<string, CardData>,
-): EffectResolverResult & { succeeded?: boolean } {
+): HandlerResult & { succeeded?: boolean } {
   const {
     pausedAction,
     fieldToLifeTargetIds,
@@ -333,7 +334,7 @@ function handleFieldToLifeArrangement(
     controller,
     effectSourceInstanceId,
   } = resumeCtx;
-  const rejected = { state, events: [], resolved: false, rejected: true };
+  const rejected: HandlerResult = { kind: "waiting", state, events: [], resolved: false, rejected: true };
   const pendingOwner = arrangement?.remainingOwners[0];
   if (
     pausedAction?.type !== "ADD_TO_LIFE_FROM_FIELD" ||
@@ -378,7 +379,7 @@ function handleFieldToLifeArrangement(
   );
   if (pausedAction.result_ref && result.result)
     resultRefs.set(pausedAction.result_ref, result.result);
-  return { ...result, resolved: !result.pendingPrompt };
+  return { ...result, kind: isGameTerminated(result.state) ? "terminal" : result.pendingPrompt ? "waiting" : "completed", resolved: !result.pendingPrompt };
 }
 
 export function handleChooseValue(
@@ -397,16 +398,16 @@ export function handleChooseValue(
   }
   if (!validTargets?.includes(action.choiceId)) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   const match = /^choose-value:(-?\d+)$/.exec(action.choiceId);
   const value = match ? Number(match[1]) : Number.NaN;
   if (!Number.isSafeInteger(value) || !pausedAction.result_ref) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   resultRefs.set(pausedAction.result_ref, {
@@ -414,7 +415,7 @@ export function handleChooseValue(
     count: 1,
     value,
   });
-  return { kind: "fallthrough", state };
+  return { kind: "continued", state };
 }
 
 /**
@@ -448,8 +449,8 @@ export function handlePlayerChoiceBranch(
     !resumeCtx.validTargets.includes(action.choiceId)
   ) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
 
@@ -510,8 +511,8 @@ export function handlePlayerChoiceBranch(
         });
       }
       return {
-        kind: "terminal",
-        result: {
+        kind: "handled",
+        result: { kind: "waiting",
           state: nextState,
           events,
           resolved: false,
@@ -521,7 +522,7 @@ export function handlePlayerChoiceBranch(
     }
   }
 
-  return { kind: "fallthrough", state: nextState };
+  return { kind: "continued", state: nextState };
 }
 
 // ─── resumeFromStack cases ──────────────────────────────────────────────────
@@ -548,7 +549,7 @@ export function handleAwaitingOptionalResponse(
   topFrame: EffectStackFrame,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
-): EffectResolverResult {
+): HandlerResult {
   const { sourceCardInstanceId, controller } = topFrame;
   const events: PendingEvent[] = [];
   let nextState = state;
@@ -566,7 +567,7 @@ export function handleAwaitingOptionalResponse(
         sourceCardInstanceId
       );
     }
-    return services.processRemainingTriggers(
+    return services.reportTriggers(
       nextState,
       topFrame.pendingTriggers,
       cardDb,
@@ -610,7 +611,7 @@ export function handleAwaitingOptionalResponse(
         popFrame(costResult.state),
         topFrame
       );
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
@@ -623,7 +624,7 @@ export function handleAwaitingOptionalResponse(
     events.push(...costResult.events);
     // OPT-862: a cost that ended the game (EB01-051 MILL 2 on a 2-card deck)
     // leaves no action, prompt or trigger drain to run.
-    if (isGameTerminated(nextState)) return { state: nextState, events, resolved: true };
+    if (isGameTerminated(nextState)) return { kind: "terminal", state: nextState, events, resolved: true };
 
     if (costResult.costResult) {
       costRefs = costResultRefsFromEntries(
@@ -642,7 +643,7 @@ export function handleAwaitingOptionalResponse(
           effectDescription: topFrame.effectDescription,
         });
       }
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -695,7 +696,7 @@ export function handleAwaitingOptionalResponse(
       cardDb
     )
   ) {
-    return services.processRemainingTriggers(
+    return services.reportTriggers(
       nextState,
       pendingTriggers,
       cardDb,
@@ -725,7 +726,7 @@ export function handleAwaitingOptionalResponse(
       nextState = updateEffectContinuation(nextState, stackDepth, () => ({
         pendingTriggers, triggerOrderingGroup: topFrame.triggerOrderingGroup,
       }));
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -749,7 +750,7 @@ export function handleAwaitingOptionalResponse(
       );
       if (chainScan.triggers.length > 0) {
         const allTriggers = [...chainScan.triggers, ...pendingTriggers];
-        return services.processRemainingTriggers(
+        return services.reportTriggers(
           nextState,
           allTriggers,
           cardDb,
@@ -760,7 +761,7 @@ export function handleAwaitingOptionalResponse(
     }
   }
 
-  return services.processRemainingTriggers(
+  return services.reportTriggers(
     nextState,
     pendingTriggers,
     cardDb,
@@ -788,7 +789,7 @@ export function handleAwaitingOptionalActionResponse(
   topFrame: EffectStackFrame,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
-): EffectResolverResult {
+): HandlerResult {
   const declined =
     action.type === "PASS" ||
     (action.type === "PLAYER_CHOICE" && action.choiceId === "skip");
@@ -797,7 +798,7 @@ export function handleAwaitingOptionalActionResponse(
     (action.choiceId === "accept" || action.choiceId === "activate");
   const pausedAction = topFrame.pausedAction;
   if ((!declined && !accepted) || !pausedAction) {
-    return { state, events: [], resolved: false, rejected: true };
+    return { kind: "waiting", state, events: [], resolved: false, rejected: true };
   }
 
   const { sourceCardInstanceId, controller } = topFrame;
@@ -833,7 +834,7 @@ export function handleAwaitingOptionalActionResponse(
     nextState = chainResult.state;
     events.push(...chainResult.events);
     if (isGameTerminated(nextState)) {
-      return { state: nextState, events, resolved: false };
+      return { kind: "terminal", state: nextState, events, resolved: false };
     }
 
     if (chainResult.pendingPrompt) {
@@ -843,7 +844,7 @@ export function handleAwaitingOptionalActionResponse(
         triggerOrderingGroup:
           topFrame.triggerOrderingGroup ?? frame.triggerOrderingGroup,
       }));
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -860,7 +861,7 @@ export function handleAwaitingOptionalActionResponse(
     nextState = scan.state;
     events.splice(0, events.length, ...scan.events);
     if (scan.triggers.length > 0) {
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         nextState,
         [...scan.triggers, ...topFrame.pendingTriggers],
         cardDb,
@@ -870,7 +871,7 @@ export function handleAwaitingOptionalActionResponse(
     }
   }
 
-  return services.processRemainingTriggers(
+  return services.reportTriggers(
     nextState,
     topFrame.pendingTriggers,
     cardDb,
@@ -887,294 +888,9 @@ export function handleAwaitingOptionalActionResponse(
 export function handleAwaitingTriggerOrderSelection(
   state: GameState,
   action: GameAction,
-  topFrame: EffectStackFrame,
   cardDb: Map<string, CardData>,
-  services: EffectResolverServices
-): EffectResolverResult {
-  const events: PendingEvent[] = [];
-  let nextState = state;
-
-  const simultaneous = topFrame.simultaneousTriggers;
-  const savedPendingTriggers = topFrame.pendingTriggers;
-
-  // "Done" — player opted to skip remaining optional triggers
-  if (action.type === "PLAYER_CHOICE" && action.choiceId === "done") {
-    nextState = popFrame(nextState);
-    return services.processRemainingTriggers(
-      nextState,
-      savedPendingTriggers,
-      cardDb,
-      events
-    );
-  }
-
-  if (action.type !== "PLAYER_CHOICE" || action.choiceId == null) {
-    return { state, events, resolved: false };
-  }
-
-  const chosenTrigger = simultaneous.find(
-    (trigger) => trigger.orderingId === action.choiceId
-  );
-  if (!chosenTrigger) {
-    const normalizedSimultaneous = withStableOrderingIds(simultaneous);
-    const normalizedOrderingGroup = topFrame.triggerOrderingGroup
-      ? {
-          ...topFrame.triggerOrderingGroup,
-          triggers: withStableOrderingIds(
-            topFrame.triggerOrderingGroup.triggers
-          ),
-        }
-      : {
-          triggers: normalizedSimultaneous,
-          resolvedTriggerIds: [],
-        };
-    const needsNormalization =
-      simultaneous.some((trigger) => !trigger.orderingId) ||
-      topFrame.triggerOrderingGroup?.triggers.some(
-        (trigger) => !trigger.orderingId
-      );
-    const rejectionState = needsNormalization
-      ? updateTopFrame(state, {
-          simultaneousTriggers: normalizedSimultaneous,
-          triggerOrderingGroup: normalizedOrderingGroup,
-        })
-      : state;
-    const regenerated = buildTriggerSelectionPrompt(
-      popFrame(rejectionState),
-      normalizedSimultaneous,
-      savedPendingTriggers,
-      cardDb,
-      normalizedOrderingGroup
-    ).pendingPrompt;
-    return {
-      state: rejectionState,
-      events,
-      resolved: false,
-      rejected: true,
-      ...(regenerated
-        ? { pendingPrompt: { ...regenerated, resumeContext: topFrame.id } }
-        : {}),
-    };
-  }
-
-  // Remove chosen trigger from the remaining simultaneous set
-  const remaining = simultaneous.filter(
-    (trigger) =>
-      trigger.orderingId !== chosenTrigger.orderingId
-  );
-  const triggerOrderingGroup = topFrame.triggerOrderingGroup ?? {
-    triggers: simultaneous,
-    resolvedTriggerIds: [],
+): HandlerResult {
+  return selectTriggerForExecution(state, action, cardDb) ?? {
+    kind: "waiting", state, events: [], resolved: false, rejected: true,
   };
-  const nextTriggerOrderingGroup = {
-    ...triggerOrderingGroup,
-    resolvedTriggerIds: [
-      ...triggerOrderingGroup.resolvedTriggerIds,
-      chosenTrigger.orderingId!,
-    ],
-  };
-
-  // Pop the selection frame
-  nextState = popFrame(nextState);
-
-  // Resolve the chosen trigger
-  const chosenStackDepth = nextState.effectStack.length;
-  const result = services
-    .withCommittedEvents(events)
-    .resolveEffect(
-      nextState,
-      chosenTrigger.effectBlock,
-      chosenTrigger.sourceCardInstanceId,
-      chosenTrigger.controller,
-      cardDb,
-      (
-        chosenTrigger.triggeringEvent?.payload as
-          | { cardInstanceId?: string }
-          | undefined
-      )?.cardInstanceId ?? null,
-      chosenTrigger.triggeringEvent,
-      chosenTrigger.sourceSnapshot
-    );
-  nextState = result.state;
-  events.push(...result.events);
-
-  // If chosen trigger needs player input, carry forward remaining triggers.
-  // Merge simultaneousTriggers into pendingTriggers so processRemainingTriggers
-  // will re-detect the 2+ same-player group and re-prompt for ordering.
-  if (result.pendingPrompt) {
-    nextState = updateEffectContinuation(nextState, chosenStackDepth, () => ({
-      pendingTriggers: [...remaining, ...savedPendingTriggers],
-      triggerOrderingGroup: nextTriggerOrderingGroup,
-    }));
-    return {
-      state: nextState,
-      events,
-      resolved: false,
-      pendingPrompt: result.pendingPrompt,
-    };
-  }
-
-  // Emit events from the resolved trigger
-  for (let index = 0; index < result.events.length; index++) {
-    const event = result.events[index];
-    if (event.propagation?.eventLogEmitted) continue;
-    nextState = emitEvent(
-      nextState,
-      event.type,
-      event.playerIndex ?? chosenTrigger.controller,
-      event.payload ?? {}
-    );
-    const emittedEvent = withEventLogEmitted(event);
-    result.events[index] = emittedEvent;
-    replacePendingEventReferences(events, [event], [emittedEvent]);
-  }
-
-  // Scan for nested triggers (LIFO — resolve before returning to simultaneous set)
-  if (result.events.length > 0) {
-    const scanResult = scanEventsForTriggers(
-      nextState,
-      result.events,
-      chosenTrigger.controller,
-      cardDb
-    );
-    nextState = scanResult.state;
-    replacePendingEventReferences(events, result.events, scanResult.events);
-    if (scanResult.triggers.length > 0) {
-      // Process nested triggers first, then come back to remaining simultaneous
-      const nestedStackDepth = nextState.effectStack.length;
-      const nestedResult = services.processRemainingTriggers(
-        nextState,
-        scanResult.triggers,
-        cardDb,
-        events
-      );
-      nextState = nestedResult.state;
-      // nestedResult.events already includes our prior events (passed as priorEvents)
-      if (nestedResult.pendingPrompt) {
-        nextState = updateEffectContinuation(nextState, nestedStackDepth, () => ({
-          pendingTriggers: [...remaining, ...savedPendingTriggers],
-          triggerOrderingGroup: nextTriggerOrderingGroup,
-        }));
-        return {
-          state: nextState,
-          events: nestedResult.events,
-          resolved: false,
-          pendingPrompt: nestedResult.pendingPrompt,
-        };
-      }
-      // Push any new events from nested resolution
-      events.length = 0;
-      events.push(...nestedResult.events);
-    }
-  }
-
-  // Re-prompt for remaining simultaneous triggers
-  if (remaining.length > 1) {
-    const promptResult = buildTriggerSelectionPrompt(
-      nextState,
-      remaining,
-      savedPendingTriggers,
-      cardDb,
-      nextTriggerOrderingGroup
-    );
-    return {
-      state: promptResult.state,
-      events,
-      resolved: false,
-      pendingPrompt: promptResult.pendingPrompt,
-    };
-  }
-
-  if (remaining.length === 1) {
-    // Auto-resolve the last one
-    const lastStackDepth = nextState.effectStack.length;
-    const lastResult = services
-      .withCommittedEvents(events)
-      .resolveEffect(
-        nextState,
-        remaining[0].effectBlock,
-        remaining[0].sourceCardInstanceId,
-        remaining[0].controller,
-        cardDb,
-        getEventCardInstanceId(remaining[0].triggeringEvent) ?? null,
-        remaining[0].triggeringEvent,
-        remaining[0].sourceSnapshot
-      );
-    nextState = lastResult.state;
-    events.push(...lastResult.events);
-
-    if (lastResult.pendingPrompt) {
-      nextState = updateEffectContinuation(nextState, lastStackDepth, () => ({
-        pendingTriggers: savedPendingTriggers,
-      }));
-      return {
-        state: nextState,
-        events,
-        resolved: false,
-        pendingPrompt: lastResult.pendingPrompt,
-      };
-    }
-
-    // Emit events from the last trigger
-    for (let index = 0; index < lastResult.events.length; index++) {
-      const event = lastResult.events[index];
-      if (event.propagation?.eventLogEmitted) continue;
-      nextState = emitEvent(
-        nextState,
-        event.type,
-        event.playerIndex ?? remaining[0].controller,
-        event.payload ?? {}
-      );
-      const emittedEvent = withEventLogEmitted(event);
-      lastResult.events[index] = emittedEvent;
-      replacePendingEventReferences(events, [event], [emittedEvent]);
-    }
-
-    // Scan for nested triggers from last resolved trigger
-    if (lastResult.events.length > 0) {
-      const scanResult2 = scanEventsForTriggers(
-        nextState,
-        lastResult.events,
-        remaining[0].controller,
-        cardDb
-      );
-      nextState = scanResult2.state;
-      replacePendingEventReferences(
-        events,
-        lastResult.events,
-        scanResult2.events
-      );
-      if (scanResult2.triggers.length > 0) {
-        const nestedStackDepth = nextState.effectStack.length;
-        const nestedResult = services.processRemainingTriggers(
-          nextState,
-          scanResult2.triggers,
-          cardDb,
-          events
-        );
-        nextState = nestedResult.state;
-        if (nestedResult.pendingPrompt) {
-          nextState = updateEffectContinuation(nextState, nestedStackDepth, () => ({
-            pendingTriggers: savedPendingTriggers,
-          }));
-          return {
-            state: nextState,
-            events: nestedResult.events,
-            resolved: false,
-            pendingPrompt: nestedResult.pendingPrompt,
-          };
-        }
-        events.length = 0;
-        events.push(...nestedResult.events);
-      }
-    }
-  }
-
-  // All simultaneous triggers done — process remaining pending triggers
-  return services.processRemainingTriggers(
-    nextState,
-    savedPendingTriggers,
-    cardDb,
-    events
-  );
 }

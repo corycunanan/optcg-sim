@@ -1,3 +1,4 @@
+import { replayPauses } from "./fixtures/opt-966-replay.js";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -201,6 +202,7 @@ function fixture() {
     get state() {
       return state;
     },
+    set state(next: GameState) { state = next; },
   };
 }
 function attach(f: ReturnType<typeof fixture>, c: CardInstance) {
@@ -1058,6 +1060,16 @@ it("persists authored Punk Gibson Counter rest and Mr.3's trigger across the int
     1
   );
   expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  if (process.env.OPT966_READER_ROOT) {
+    const pauses = await replayPauses(f, state => {
+      const options = state.pendingPrompt!.options;
+      if (options.promptType === "OPTIONAL_EFFECT") return { type: "PLAYER_CHOICE", choiceId: "accept" };
+      if (options.promptType !== "SELECT_TARGET") throw Error("Punk Gibson target expected");
+      return { type: "SELECT_TARGET", selectedInstanceIds: [options.validTargets.includes(defender.instanceId) ? defender.instanceId : host.instanceId] };
+    }, "opt966-counter-prefix-writer-corpus");
+    expect(pauses.map(state => state.pendingPrompt!.options.promptType)).toEqual(["SELECT_TARGET", "SELECT_TARGET", "OPTIONAL_EFFECT"]);
+    expect(pauses.map(state => state.pendingPrompt!.respondingPlayer)).toEqual([1, 1, 0]);
+  } else {
   await f.reload();
   f.select([defender.instanceId]);
   await f.reload();
@@ -1072,6 +1084,7 @@ it("persists authored Punk Gibson Counter rest and Mr.3's trigger across the int
   expect(f.state.players[0].hand).toHaveLength(handBefore);
   await f.reload();
   f.choose("accept");
+  }
   expect(
     f.state.players[0].characters.some((c) => c?.cardId === "PRB02-009")
   ).toBe(false);

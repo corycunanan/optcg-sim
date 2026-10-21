@@ -1,3 +1,4 @@
+import { createEffectExecutionScope } from "./trigger-executor.js";
 import { continuationBoundary, prependFrame } from "./effect-stack.js";
 /**
  * 7-Step Action Pipeline
@@ -106,6 +107,13 @@ export function runPipeline(
 
   // Step 4: Execute — produce new state snapshot
   log("pipeline.step", { ...logCtx, step: "execute" });
+  if (actionToExecute.type === "ACTIVATE_EFFECT" ||
+      actionToExecute.type === "PLAY_CARD" ||
+      actionToExecute.type === "USE_COUNTER_EVENT") {
+    nextState = createEffectExecutionScope(
+      nextState, actionToExecute.cardInstanceId, actingPlayerIndex
+    );
+  }
   const stateBeforeExecute = nextState;
   const execResult = execute(nextState, actionToExecute, cardDb, actingPlayerIndex);
   // Rule 3-1-6-1: DON!! moved by a game action (attach, DON!! phase, …)
@@ -123,6 +131,13 @@ export function runPipeline(
   }
 
   if (execResult.pendingPrompt) {
+    const battleDebt = nextState.effectStack.find(frame =>
+      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+      frame.battleDamage.battleId === nextState.turn.battle?.battleId
+    );
+    if (battleDebt) nextState = createEffectExecutionScope(
+      nextState, battleDebt.sourceCardInstanceId, battleDebt.controller
+    );
     // Main/Counter execution owns its activation notification. Resolver frame
     // accumulators own their own prefixes and may scan them before the Event's
     // suffix finishes, so keep only the outer debt in a separate root barrier.
@@ -221,7 +236,6 @@ export function continuePipelineFromExecution(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
   deferredTriggers: readonly QueuedTrigger[] = execResult.queuedTriggers ?? [],
-  triggerExecutionMode = false,
 ): PipelineResult {
   const continuationAction: GameAction = { type: "REVEAL_TRIGGER", reveal: true };
   // Checkpoint for the resumed execution's lethal damage determination
@@ -240,7 +254,6 @@ export function continuePipelineFromExecution(
     undefined,
     false,
     deferredTriggers,
-    triggerExecutionMode,
   );
 
   if (isGameTerminated(nextState)) {

@@ -1,6 +1,7 @@
+import { isGameTerminated } from "../../terminal.js";
 /**
- * OPT-172 batch-resume re-entry: after a mid-batch trigger drain (rule 6-2)
- * completes, re-invokes the original multi-target action handler with the
+ * Batch continuation: the shared executor re-invokes the original
+ * multi-target action handler with the
  * remaining-batch state carried on the frame's batchResumeMarker.
  */
 
@@ -27,7 +28,7 @@ import { executePlayCard, executeSetRest } from "../actions/play.js";
 import { executeKO } from "../actions/removal.js";
 import { promptTypeToPhase } from "../cost-handler.js";
 import type {
-  EffectResolverResult,
+  HandlerResult,
   ActionResult,
   EffectResolverServices,
 } from "../types.js";
@@ -36,29 +37,30 @@ import { generateFrameId } from "../../effect-stack.js";
 import { insertFrameAt } from "../../damage-frames.js";
 
 /**
- * Loop in case the re-entered handler completes cleanly (no prompt, no new
- * triggers, no further batch pause) while another AWAITING_BATCH_RESUME frame
- * sits underneath it on the stack.
+ * Perform one batch continuation step. Return its progress to the shared
+ * executor, which owns any further child or trigger advancement.
  */
 export function reenterBatchResume(
   state: GameState,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices,
   priorEvents: PendingEvent[] = []
-): EffectResolverResult {
+): HandlerResult {
   let nextState = state;
   const events = [...priorEvents];
+  if (isGameTerminated(nextState))
+    return { kind: "terminal", state: nextState, events, resolved: false };
 
-  while (true) {
+  {
     const top = peekFrame(nextState);
     if (
       !top ||
       top.phase !== "AWAITING_BATCH_RESUME" ||
       !top.batchResumeMarker
     ) {
-      return { state: nextState, events, resolved: true };
+      return { kind: "completed", state: nextState, events, resolved: true };
     }
-    // Triggers were drained by processRemainingTriggers (the only caller). The
+    // The shared executor owns queued triggers. The
     // frame's pendingTriggers snapshot is stale at this point; we pop and
     // re-invoke unconditionally.
 
@@ -89,6 +91,8 @@ export function reenterBatchResume(
     );
     nextState = actionResult.state;
     events.push(...actionResult.events);
+    if (isGameTerminated(nextState))
+      return { kind: "terminal", state: nextState, events, resolved: false };
     recordBatchResult(resultRefs, marker, actionResult.result);
 
     if (actionResult.pendingPrompt) {
@@ -122,7 +126,7 @@ export function reenterBatchResume(
         // continuation goes directly below it, at the depth the batch frame
         // occupied, so the handler's work finishes before the suffix resumes.
         nextState = insertFrameAt(generated.state, stackDepth, continuationFrame);
-        return {
+        return { kind: "waiting",
           state: nextState,
           events,
           resolved: false,
@@ -157,7 +161,7 @@ export function reenterBatchResume(
         stateDistributionForPlay: context.stateDistributionForPlay,
       };
       nextState = pushFrame(generated.state, promptFrame);
-      return {
+      return { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -185,7 +189,7 @@ export function reenterBatchResume(
         resultRefs,
         top.effectDescription,
       );
-      return services.processRemainingTriggers(
+      return services.reportTriggers(
         nextState,
         triggers,
         cardDb,
@@ -193,9 +197,8 @@ export function reenterBatchResume(
       );
     }
 
-    // Scan events emitted by the re-entry. Any new triggers (e.g., the last
-    // frame's ON_PLAY) drain via the normal path before we check for another
-    // AWAITING_BATCH_RESUME frame underneath.
+    // Report events emitted by re-entry. Newly fulfilled ordinary triggers
+    // remain queued while this batch's remaining actions finish.
     if (actionResult.events.length > 0) {
       const scan = scanEventsForTriggers(
         nextState,
@@ -206,12 +209,9 @@ export function reenterBatchResume(
       nextState = scan.state;
       replacePendingEventReferences(events, actionResult.events, scan.events);
       if (scan.triggers.length > 0) {
-        return services.processRemainingTriggers(
-          nextState,
-          scan.triggers,
-          cardDb,
-          events
-        );
+        nextState = services.reportTriggers(
+          nextState, scan.triggers, cardDb, events
+        ).state;
       }
     }
 
@@ -229,9 +229,11 @@ export function reenterBatchResume(
       );
       nextState = chainResult.state;
       events.push(...chainResult.events);
+      if (isGameTerminated(nextState))
+        return { kind: "terminal", state: nextState, events, resolved: false };
       if (chainResult.pendingPrompt) {
         nextState = retainEventsOnFrame(nextState, stackDepth, events);
-        return {
+        return { kind: "waiting",
           state: nextState,
           events,
           resolved: false,
@@ -252,16 +254,15 @@ export function reenterBatchResume(
           chainScan.events
         );
         if (chainScan.triggers.length > 0) {
-          return services.processRemainingTriggers(
-            nextState,
-            chainScan.triggers,
-            cardDb,
-            events
-          );
+          nextState = services.reportTriggers(
+            nextState, chainScan.triggers, cardDb, events
+          ).state;
         }
       }
     }
-    // Loop: check for another AWAITING_BATCH_RESUME frame underneath.
+    // One batch step only. The shared executor decides whether the next
+    // state-owned continuation belongs to this effect or an older generation.
+    return { kind: "continued", state: nextState, events, resolved: true };
   }
 }
 
@@ -373,7 +374,7 @@ export function pushBatchResumeFrame(
   controller: 0 | 1,
   effectBlock: EffectBlock,
   marker: BatchResumeMarker,
-  triggers: QueuedTrigger[],
+  _triggers: QueuedTrigger[],
   remainingActions: Action[],
   resultRefs: Map<string, EffectResult>,
   effectDescription?: string,
@@ -395,7 +396,7 @@ export function pushBatchResumeFrame(
     costsPaid: true,
     oncePerTurnMarked: true,
     costResultRefs: [],
-    pendingTriggers: triggers,
+    pendingTriggers: [],
     simultaneousTriggers: [],
     accumulatedEvents: [],
     batchResumeMarker: marker,

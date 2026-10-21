@@ -43,6 +43,32 @@ export function retainEventsOnFrame(
       ...pendingPropagationEvents(frame.accumulatedEvents),
     ]),
   ].filter((event) => !nestedEvents.has(event));
+  // An Event or K.O. replacement's committed parent prefix precedes child output. Give
+  // the nearest publication owner that debt while keeping the future Event
+  // activation notification on its separate completion frame. Battle damage
+  // remains the owner when it lies between the scope and this continuation.
+  const hasNestedPublication = frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
+    frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH" || frame.pausedAction?.type === "KO";
+  let publicationIndex = -1;
+  if (hasNestedPublication) {
+    for (let index = frameIndex - 1; index >= 0; index--) {
+      const candidate = state.effectStack[index];
+      if (candidate.triggerExecution ||
+        (candidate.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+          candidate.battleDamage.battleId === state.turn.battle?.battleId)) {
+        publicationIndex = index;
+        break;
+      }
+    }
+  }
+  if (publicationIndex >= 0) return {
+    ...state,
+    effectStack: state.effectStack.map((existing, index) =>
+      index === publicationIndex ? { ...existing,
+        accumulatedEvents: [...new Set([...existing.accumulatedEvents, ...accumulatedEvents])],
+      } : index === frameIndex ? { ...existing, accumulatedEvents: [] } : existing
+    ),
+  };
   return {
     ...state,
     effectStack: state.effectStack.map((existing, index) =>
@@ -91,26 +117,22 @@ export function retainPropagationBeforePrompt(
 ): GameState {
   const pending = pendingPropagationEvents(events);
   if (pending.length === 0) return state;
+  // Completion-only boundaries cannot carry executable publication debt.
+  // Prefer the nearest ordinary owner or its live battle boundary.
   let ownerIndex = -1;
-  if (state.effectStack.some(frame => frame.triggerExecution)) {
-    // Loaded v5 work owns propagation independently of completion-only Event
-    // boundaries. Prefer its nearest owner or a live descendant battle debt;
-    // a stale damage frame cannot acquire debt for another battle.
-    for (let index = state.effectStack.length - 1; index >= 0; index--) {
-      const frame = state.effectStack[index];
-      if (frame.triggerExecution ||
-        (frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
-          frame.battleDamage.battleId === state.turn.battle?.battleId)) {
-        ownerIndex = index;
-        break;
-      }
+  for (let index = state.effectStack.length - 1; index >= 0; index--) {
+    const frame = state.effectStack[index];
+    if (frame.triggerExecution ||
+      (frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+        frame.battleDamage.battleId === state.turn.battle?.battleId)) {
+      ownerIndex = index;
+      break;
     }
-  } else {
-    // Preserve the ordinary v1-v4 reader path; this amendment creates no owner.
-    ownerIndex = state.effectStack.findIndex(
-      frame => frame.phase === "INTERRUPTED_BY_TRIGGERS"
-    );
   }
+  if (ownerIndex < 0) ownerIndex = state.effectStack.findIndex(
+    frame => frame.phase === "INTERRUPTED_BY_TRIGGERS" &&
+      !frame.eventActivation && !frame.eventActivationCompletion && !frame.phaseBoundaryContinuation
+  );
   if (ownerIndex >= 0) return retainEventsOnFrame(state, ownerIndex, pending);
   const child = state.effectStack.at(-1);
   if (

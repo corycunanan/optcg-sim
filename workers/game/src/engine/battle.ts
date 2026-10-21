@@ -957,7 +957,12 @@ export function continueBattleDamageFrame(
     // with no remaining work or prompt; otherwise preserve its live owner.
     const events: PendingEvent[] = [];
     return {
-      state: battle && state.turn.battleSubPhase === "DAMAGE_STEP" && withoutStale.effectStack.length === 0
+      state: battle && state.turn.battleSubPhase === "DAMAGE_STEP" && withoutStale.effectStack.every(frame =>
+        frame.triggerExecution !== undefined &&
+        !frame.triggerExecution.selectedTrigger &&
+        frame.triggerExecution.generations.every(generation => generation.triggers.length === 0) &&
+        frame.accumulatedEvents.every(event => event.propagation?.eventLogEmitted && event.propagation?.triggerScanned)
+      )
         ? endBattle(withoutStale, events, { aborted: true })
         : withoutStale,
       events,

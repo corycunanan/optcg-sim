@@ -113,7 +113,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
 
     const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    expect(pay.state.effectStack).toHaveLength(1);
+    expect(pay.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
 
     // First selection: bottom-deck char-0-b1. The consumed frame must be
     // replaced by the second cost's frame, not buried under it.
@@ -123,8 +123,8 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
       cardDb,
     );
     expect(second.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    expect(second.state.effectStack).toHaveLength(1);
-    expect(second.state.effectStack[0].currentCostIndex).toBe(1);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)[0].currentCostIndex).toBe(1);
 
     // Second selection: bottom-deck trash-a. Chain resolves; no stale frame.
     const handBefore = second.state.players[0].hand.length;
@@ -174,8 +174,9 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
       { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-b1"] } as GameAction,
       cardDb,
     );
-    expect(second.state.effectStack).toHaveLength(1);
-    expect(second.state.effectStack[0].pendingTriggers).toEqual([queuedTrigger]);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)[0].pendingTriggers).toEqual([]);
+    expect(second.state.effectStack.find(frame => frame.triggerExecution)!.triggerExecution!.generations[0].triggers).toMatchObject([queuedTrigger]);
 
     // Effect draw + queued trigger draw both land once the chain resolves.
     const handBefore = second.state.players[0].hand.length;
@@ -269,7 +270,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
 
     const prompt2 = session.gameState.pendingPrompt;
     expect(prompt2?.options.promptType).toBe("SELECT_TARGET");
-    expect(session.gameState.effectStack).toHaveLength(1);
+    expect(session.gameState.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
 
     await session.handleAction(ws as unknown as WebSocket, 0, {
       type: "SELECT_TARGET",

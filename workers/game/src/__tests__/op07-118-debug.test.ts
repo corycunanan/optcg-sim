@@ -108,7 +108,7 @@ describe("OP07-118 Sabo dual-target KO", () => {
     const step1 = resolveEffect(state, block, sabo.instanceId, 0, cardDb);
     expect(step1.pendingPrompt).toBeDefined();
     expect(step1.pendingPrompt!.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect(step1.state.effectStack.length).toBe(1);
+    expect(step1.state.effectStack.filter(frame => !frame.triggerExecution).length).toBe(1);
 
     // Step 2: Accept optional effect → should prompt for TRASH_FROM_HAND cost
     const step2 = resumeFromStack(

@@ -523,7 +523,7 @@ describe("OPT-487 RETURN_TO_DECK source-zone contract", () => {
       effectDescription: replacementDescription,
     });
     // OPT-963: the chain continuation, the REPLACEMENT_BATCH frame, then the substitute's prompt frame.
-    expect(first.state.effectStack).toHaveLength(3);
+    expect(first.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(3);
     expect(first.state.effectStack.at(-2)?.replacementBatch).toBeDefined();
     expect(findCardInstance(first.state, protectedTarget.instanceId)?.zone).toBe("CHARACTER");
     expect(first.state.players[1].trash).toEqual(trash);

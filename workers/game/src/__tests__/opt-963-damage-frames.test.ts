@@ -235,7 +235,7 @@ describe("OPT-926 (synthetic, latent): the remaining damage of a multi-damage ef
     expectWindow(r, "l-trig");
     await r.reload();
     expectWindow(r, "l-trig");
-    expect(effectDamageContinuation(r.state)?.parentFrameId).toBe(r.state.effectStack[0].id);
+    expect(effectDamageContinuation(r.state)?.parentFrameId).toBe(r.state.effectStack.find(frame => !frame.triggerExecution)!.id);
     reveal(r, false);
     expect(r.state.players[1].life).toEqual([]);
     expect(r.state.effectStack).toEqual([]);
@@ -327,7 +327,7 @@ describe("OPT-960 note: events retained on a suspended frame when a checkpoint e
     activate(r);
     expectWindow(r, "l-trig");
     // The point's LIFE_COUNT_BECOMES_ZERO and TRIGGER_ACTIVATED offer are retained on the parent chain.
-    const retained = r.state.effectStack[0].accumulatedEvents.map((e) => e.type);
+    const retained = r.state.effectStack.find(frame => !frame.triggerExecution)!.accumulatedEvents.map((e) => e.type);
     expect(retained).toContain("LIFE_COUNT_BECOMES_ZERO");
     expect(retained).toContain("TRIGGER_ACTIVATED");
     reveal(r, true);
@@ -445,7 +445,7 @@ describe("PR #758 F1: the actions after a choice branch survive a handler-owned 
     expect(r.state.pendingPrompt?.respondingPlayer).toBe(1);
     const batch = r.state.effectStack.find((frame) => frame.replacementBatch)!;
     expect(batch.remainingActions).toEqual([]);
-    expect(r.state.effectStack[0].remainingActions.map((a) => a.type)).toEqual(["DRAW"]);
+    expect(r.state.effectStack.find(frame => !frame.triggerExecution)!.remainingActions.map((a) => a.type)).toEqual(["DRAW"]);
     expect(r.act(1, { type: "PASS" })).toBeNull();
     expect(r.state.pendingPrompt).toBeNull();
     expect(r.state.effectStack).toEqual([]);
@@ -510,8 +510,10 @@ describe("PR #758 D-F1b: the actions after an OPPONENT_ACTION run as the effect'
     expect(r.state.pendingPrompt?.respondingPlayer).toBe(0);
     expect(effectTriggerWindow(r.state)?.lifeCard.instanceId).toBe("l0-trig");
     // Stack: the outer suffix (p0's) below the opponent's branch continuation, below the window.
-    const [outer, wrapped, window] = r.state.effectStack;
-    expect(r.state.effectStack).toHaveLength(3);
+    expect(r.state.effectStack.filter(frame => frame.triggerExecution)).toHaveLength(1);
+    const domainFrames = r.state.effectStack.filter(frame => !frame.triggerExecution);
+    const [outer, wrapped, window] = domainFrames;
+    expect(domainFrames).toHaveLength(3);
     expect([outer.controller, outer.remainingActions.map((a) => a.type)]).toEqual([0, ["DRAW"]]);
     expect(wrapped.controller).toBe(1);
     expect(window.effectDamage?.parentFrameId).toBe(wrapped.id);
@@ -605,7 +607,7 @@ describe("PR #758 D-F1b: the actions after an OPPONENT_ACTION run as the effect'
     expect(r.act(1, { type: "PLAYER_CHOICE", choiceId: "0" })).toBeNull();
     // The option ran as p0: the damage hit p0's opponent, p1.
     expectWindow(r, "l1-trig");
-    expect(r.state.effectStack[0].controller).toBe(0);
+    expect(r.state.effectStack.find(frame => !frame.triggerExecution)!.controller).toBe(0);
     reveal(r, false);
     expect(r.state.effectStack).toEqual([]);
     expect(draws(r, 0)).toBe(1);

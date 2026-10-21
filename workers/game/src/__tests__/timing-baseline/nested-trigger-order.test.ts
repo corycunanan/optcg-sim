@@ -5,10 +5,12 @@
  * F2: Rule 8-6-1-1 (rule_comprehensive.md:860); FAQ qa_op10.md:279-281 (OP10-042).
  */
 
+import { replayPauses } from "../fixtures/opt-966-replay.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../../types.js";
 import type { EffectSchema } from "../../engine/effect-types.js";
 import { runPipeline } from "../../engine/pipeline.js";
+import { getEffectivePower } from "../../engine/modifiers.js";
 import { registerCardEnteredField } from "../../engine/triggers.js";
 import { resumePromptLifecycle } from "../../session/prompt-lifecycle.js";
 import { SessionRepository, type SessionStorage } from "../../session/persistence.js";
@@ -60,6 +62,7 @@ interface Built {
 
 /** Fresh MAIN-phase state with empty boards/hands; callers place cards. */
 function base(cards: CardData[]): Built {
+  serial = 0;
   const cardDb = new Map(createTestCardDb());
   for (const c of cards) cardDb.set(c.id, c);
   const state = createBattleReadyState(cardDb);
@@ -109,19 +112,10 @@ async function reload(b: Built): Promise<Built> {
   return { state: loaded!.state, cardDb: loaded!.cardDb as Map<string, CardData> };
 }
 
-/**
- * Event order by first occurrence of each type+player. First occurrence keeps the
- * assertion on ordering only: the engine currently logs F1a's CARD_PLAYED and
- * POWER_MODIFIED twice, which is a separate defect.
- */
+/** Full relevant sequence, including repeated publications. */
 function order(state: GameState, types: string[]): string[] {
-  const seen: string[] = [];
-  for (const e of state.eventLog) {
-    if (!types.includes(e.type)) continue;
-    const key = `${e.type}:p${e.playerIndex}`;
-    if (!seen.includes(key)) seen.push(key);
-  }
-  return seen;
+  return state.eventLog.filter(event => types.includes(event.type))
+    .map(event => `${event.type}:p${event.playerIndex}`);
 }
 
 function promptOptions(state: GameState): { promptType: string; choices?: { id: string; label?: string }[] } {
@@ -200,23 +194,26 @@ function pickC(state: GameState): GameAction {
 }
 
 describe("F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.md:206-210)", () => {
-  // Engine: C's CARD_PLAYED and POWER_MODIFIED land before X's CARD_DRAWN (A -> C -> X).
   // Rule 8-6-1 (line 858): the non-turn player's X resolves before the turn player's C.
-  it.fails("F1a continuous: A's play of C resolves, then X, then C's On Play (ratchet OPT-966)", () => {
+  it("F1a continuous: A's play of C resolves, then X, then C's On Play (ratchet OPT-966)", () => {
     const { b, attacker } = f1Setup(false);
     attack(b, attacker);
     expect(order(b.state, F1_TYPES)).toEqual(F1_EXPECTED);
+    expect(b.state.eventLog).toMatchSnapshot();
+    expect(b.state.eventLog.filter((event) => F1_TYPES.includes(event.type)).map((event) => `${event.type}:p${event.playerIndex}`)).toEqual(F1_EXPECTED);
   });
 
-  it.fails("F1b prompt inside A answered immediately (ratchet OPT-966)", () => {
+  it("F1b prompt inside A answered immediately (ratchet OPT-966)", () => {
     const { b, attacker } = f1Setup(true);
     attack(b, attacker);
     expect(b.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     b.state = reply(b.state, b.cardDb, pickC(b.state));
     expect(order(b.state, F1_TYPES)).toEqual(F1_EXPECTED);
+    expect(b.state.eventLog).toMatchSnapshot();
+    expect(b.state.eventLog.filter((event) => F1_TYPES.includes(event.type)).map((event) => `${event.type}:p${event.playerIndex}`)).toEqual(F1_EXPECTED);
   });
 
-  it.fails("F1c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
+  it("F1c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
     const { b, attacker } = f1Setup(true);
     attack(b, attacker);
     expect(b.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
@@ -224,6 +221,8 @@ describe("F1 nested trigger order A -> X -> C (rule 8-6-1 line 858; FAQ qa_op07.
     expect(loaded.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     loaded.state = reply(loaded.state, loaded.cardDb, pickC(loaded.state));
     expect(order(loaded.state, F1_TYPES)).toEqual(F1_EXPECTED);
+    expect(loaded.state.eventLog).toMatchSnapshot();
+    expect(loaded.state.eventLog.filter((event) => F1_TYPES.includes(event.type)).map((event) => `${event.type}:p${event.playerIndex}`)).toEqual(F1_EXPECTED);
   });
 });
 
@@ -319,25 +318,26 @@ function pickRebecca(state: GameState): GameAction {
 }
 
 describe("F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; FAQ qa_op10.md:279-281)", () => {
-  // Engine: Rebecca's POWER_MODIFIED lands before the Leader's CARD_DRAWN (A -> C -> B).
   // Rule 8-6-1-1 (line 860): A, then B, then C.
-  it.fails("F2a continuous (ratchet OPT-966)", () => {
+  it("F2a continuous (ratchet OPT-966)", () => {
     const { b, killer } = f2Setup(false);
     activate(b, killer);
     b.state = chooseFranky(b.state, b.cardDb);
     expect(order(b.state, F2_TYPES)).toEqual(F2_EXPECTED);
+    expect(b.state.eventLog).toMatchSnapshot();
   });
 
-  it.fails("F2b prompt inside A answered immediately (ratchet OPT-966)", () => {
+  it("F2b prompt inside A answered immediately (ratchet OPT-966)", () => {
     const { b, killer } = f2Setup(true);
     activate(b, killer);
     b.state = chooseFranky(b.state, b.cardDb);
     expect(b.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     b.state = reply(b.state, b.cardDb, pickRebecca(b.state));
     expect(order(b.state, F2_TYPES)).toEqual(F2_EXPECTED);
+    expect(b.state.eventLog).toMatchSnapshot();
   });
 
-  it.fails("F2c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
+  it("F2c prompt inside A answered after a reload (ratchet OPT-966)", async () => {
     const { b, killer } = f2Setup(true);
     activate(b, killer);
     b.state = chooseFranky(b.state, b.cardDb);
@@ -345,5 +345,114 @@ describe("F2 same-player A, B, then A's C: A -> B -> C (rule 8-6-1-1 line 860; F
     const loaded = await reload(b);
     loaded.state = reply(loaded.state, loaded.cardDb, pickRebecca(loaded.state));
     expect(order(loaded.state, F2_TYPES)).toEqual(F2_EXPECTED);
+    expect(loaded.state.eventLog).toMatchSnapshot();
   });
 });
+
+/** Raw snapshots above preserve every timestamp and allocated identity. Across
+ * continuous versus prompted execution, the target-selection continuation
+ * consumes an extra frame ID and clock ticks. Only the played card's resulting
+ * allocated ID and event timestamps are mapped in this semantic comparison;
+ * fixed source identities and every other event payload remain exact. */
+function semanticEvents(state: GameState) {
+  const played = state.eventLog.find(event => event.type === "CARD_PLAYED");
+  const id = played?.payload.cardInstanceId;
+  return state.eventLog.map(({ timestamp: _timestamp, ...event }) =>
+    JSON.parse(JSON.stringify(event, (_key, value) => value === id ? "<played-card>" : value))
+  );
+}
+
+it.each(["F1", "F2"] as const)("%s full traces and final gameplay agree across continuous, prompted and reloaded paths", async family => {
+  const states: GameState[] = [];
+  for (const mode of ["continuous", "prompted", "reloaded"] as const) {
+    let b: Built;
+    let defenderDeckBefore: number;
+    if (family === "F1") {
+      const setup = f1Setup(mode !== "continuous");
+      b = setup.b;
+      defenderDeckBefore = b.state.players[1].deck.length;
+      attack(b, setup.attacker);
+    } else {
+      const setup = f2Setup(mode !== "continuous");
+      b = setup.b;
+      defenderDeckBefore = b.state.players[1].deck.length;
+      activate(b, setup.killer);
+      expect(b.state.pendingPrompt?.respondingPlayer).toBe(1);
+      b.state.pendingPrompt!.promptId = "fixed-ordering-prompt";
+      if (mode === "reloaded") b = await reload(b);
+      b.state = chooseFranky(b.state, b.cardDb);
+    }
+    if (mode !== "continuous") {
+      expect(b.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      expect(b.state.pendingPrompt?.respondingPlayer).toBe(family === "F1" ? 0 : 1);
+      b.state.pendingPrompt!.promptId = "fixed-target-prompt";
+      if (mode === "reloaded") b = await reload(b);
+      b.state = reply(b.state, b.cardDb, family === "F1" ? pickC(b.state) : pickRebecca(b.state));
+    }
+    expect(b.state.effectStack).toEqual([]);
+    expect(b.state.pendingPrompt).toBeNull();
+    // Independent expected gameplay, not inferred from captured snapshots.
+    const playedCardId = family === "F1" ? C_ID : REBECCA;
+    const playedController = family === "F1" ? 0 : 1;
+    const played = b.state.players[playedController].characters.filter(card => card?.cardId === playedCardId);
+    expect(played).toHaveLength(1);
+    expect(played[0]!.zone).toBe("CHARACTER");
+    expect(getEffectivePower(played[0]!, b.cardDb.get(playedCardId)!, b.state, b.cardDb)).toBe(b.cardDb.get(playedCardId)!.power! + 1000);
+    expect(b.state.players[playedController].hand.some(card => card.cardId === playedCardId)).toBe(false);
+    expect(b.state.players[1].hand).toHaveLength(1);
+    expect(b.state.players[1].deck).toHaveLength(defenderDeckBefore - 1);
+    expect(b.state.players[0].hand).toHaveLength(0);
+    expect(b.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(1);
+    expect(b.state.eventLog.filter(event => event.type === "POWER_MODIFIED")).toHaveLength(1);
+    if (family === "F2") {
+      expect(b.state.players[1].characters.some(card => card?.cardId === FRANKY)).toBe(false);
+      expect(b.state.players[1].trash.filter(card => card.cardId === FRANKY)).toHaveLength(1);
+    }
+    // Full gameplay evidence is retained separately for each allocation path.
+    expect({ players: b.state.players, activeEffects: b.state.activeEffects,
+      turn: b.state.turn, prohibitions: b.state.prohibitions }).toMatchSnapshot(mode);
+    states.push(b.state);
+  }
+  expect(states[2]).toEqual(states[1]);
+  expect(semanticEvents(states[1])).toEqual(semanticEvents(states[0]));
+  expect(semanticEvents(states[2])).toEqual(semanticEvents(states[0]));
+});
+
+it.skipIf(!process.env.OPT966_READER_ROOT)(
+  "replays actual writer cost, ordering and target pauses, live and undo, on the deployed reader",
+  async () => {
+    const { b, killer } = f2Setup(true);
+    activate(b, killer);
+    const ordering = structuredClone(b.state);
+    b.state = chooseFranky(b.state, b.cardDb);
+    const target = structuredClone(b.state);
+    const costCase = f2Setup(true);
+    const costCard = costCase.b.cardDb.get(KILLER)!;
+    (costCard.effectSchema as EffectSchema).effects[0].costs = [
+      { type: "TRASH_FROM_HAND", amount: 1 },
+    ];
+    place(costCase.b, inst(CARDS.VANILLA.id, 0, "HAND"));
+    place(costCase.b, inst(CARDS.VANILLA.id, 0, "HAND"));
+    activate(costCase.b, costCase.killer);
+    expect(costCase.b.state.effectStack.at(-1)?.phase).toBe("AWAITING_COST_SELECTION");
+    for (const [paused, db] of [
+      [ordering, b.cardDb], [target, b.cardDb],
+      [costCase.b.state, costCase.b.cardDb],
+    ] as const) {
+      const rig = {
+        state: structuredClone(paused), db,
+        act(action: GameAction) { this.state = reply(this.state, db, action); },
+      };
+      const pauses = await replayPauses(rig, state => {
+        const options = promptOptions(state);
+        return options.promptType === "PLAYER_CHOICE"
+          ? { type: "PLAYER_CHOICE", choiceId: options.choices!.find(o => o.id.includes("franky"))!.id }
+          : state.effectStack.at(-1)?.phase === "AWAITING_COST_SELECTION"
+            ? { type: "SELECT_TARGET", selectedInstanceIds: [state.players[0].hand[0].instanceId] }
+            : pickRebecca(state);
+      }, `opt966-order-cost-${paused.effectStack.at(-1)!.phase}`);
+      expect(pauses.length).toBe(paused.effectStack.at(-1)?.phase === "AWAITING_COST_SELECTION" ? 3 : paused === ordering ? 2 : 1);
+      expect(order(rig.state, F2_TYPES)).toEqual(F2_EXPECTED);
+    }
+  }
+);

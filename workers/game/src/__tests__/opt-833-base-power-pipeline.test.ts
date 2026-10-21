@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameEvent } from "../types.js";
 import { transitionCard } from "../engine/zone-transition.js";
@@ -169,7 +170,7 @@ describe("OPT-833 entry and batch boundaries", () => {
     expect(played.state.players[0].donCostArea.filter((d) => d.state === "ACTIVE")).toHaveLength(0);
     expect(played.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
     expect(matchesFilter(trigger, { base_power_exact: 8000 }, f.cardDb, played.state)).toBe(true);
-    const restored = parseStoredSession(JSON.parse(JSON.stringify({ state: played.state, cardDb: Object.fromEntries(f.cardDb), mode: "PVP" })));
+    const restored = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(played.state), cardDb: Object.fromEntries(f.cardDb), mode: "PVP" })));
     const chosen = resumeFromStack(restored.state, { type: "PLAYER_CHOICE", choiceId: "0" }, f.cardDb);
     // The up-to Life action may ask whether to take its one available card.
     let final = chosen;

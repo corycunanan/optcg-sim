@@ -196,12 +196,13 @@ function resumePromptLifecycleUnreleased(
       kind === "BATTLE_DAMAGE"
         ? resumeBattleDamageFrame(state, action.reveal, cardDb)
         : resumeEffectDamageFrame(state, action.reveal, cardDb);
-    const applied = applyDamageResult(state, revealed, cardDb, respondingPlayer,
-      stateBeforeResume.effectStack.some(frame => frame.triggerExecution !== undefined));
+    const applied = applyDamageResult(state, revealed, cardDb, respondingPlayer);
     state = applied.state;
     gameOver = applied.gameOver;
   } else if (state.effectStack.length > 0) {
     const resumed = resumeFromStack(state, action, cardDb);
+    if (resumed.rejected && !resumed.reprompted && !isGameTerminated(resumed.state))
+      return { state: stateBeforeResume, responseRejected: true };
     state = resumed.state;
     if (isGameTerminated(state)) {
       state = publishBeforeGameOver(state, resumed.events, respondingPlayer);
@@ -247,8 +248,7 @@ function resumePromptLifecycleUnreleased(
   } else if (!responseRejected) {
     // One unwind for every continuation that needs no input (OPT-963 §7):
     // parked End Phases, damage frames, replacement batches, interrupted chains.
-    const unwound = resumeContinuations(state, action, cardDb, respondingPlayer, gameOver,
-      stateBeforeResume.effectStack.some(frame => frame.triggerExecution !== undefined));
+    const unwound = resumeContinuations(state, action, cardDb, respondingPlayer, gameOver);
     state = unwound.state;
     gameOver = unwound.gameOver;
   }
@@ -305,8 +305,7 @@ function applyDamageResult(
   state: GameState,
   result: BattleDamageResult | EffectDamageResult,
   cardDb: Map<string, CardData>,
-  actingPlayer: 0 | 1,
-  triggerExecutionMode: boolean
+  actingPlayer: 0 | 1
 ): { state: GameState; gameOver?: GameOver } {
   state = result.state;
   if (isGameTerminated(state)) {
@@ -317,7 +316,7 @@ function applyDamageResult(
   if (result.events.length === 0 && deferred.length === 0 && result.lethalDamagePlayerIndex === undefined) {
     return { state };
   }
-  const pipeline = continuePipelineFromExecution(state, result, cardDb, actingPlayer, deferred, triggerExecutionMode);
+  const pipeline = continuePipelineFromExecution(state, result, cardDb, actingPlayer, deferred);
   return { state: pipeline.state, gameOver: pipeline.gameOver };
 }
 
@@ -330,8 +329,7 @@ function resumeContinuations(
   action: GameAction,
   cardDb: Map<string, CardData>,
   actingPlayer: 0 | 1,
-  initialGameOver: GameOver,
-  triggerExecutionMode: boolean
+  initialGameOver: GameOver
 ): { state: GameState; gameOver?: GameOver } {
   let state = initialState;
   let gameOver = initialGameOver;
@@ -344,7 +342,7 @@ function resumeContinuations(
     const kind = frameKindOf(frame);
 
     if (kind === "PHASE_BOUNDARY") {
-      const resumed = resumePhaseBoundary(state, cardDb, triggerExecutionMode);
+      const resumed = resumePhaseBoundary(state, cardDb);
       state = resumed.state;
       if (resumed.pendingPrompt) {
         state = { ...state, pendingPrompt: resumed.pendingPrompt };
@@ -356,8 +354,7 @@ function resumeContinuations(
           resumed,
           cardDb,
           frame.phaseBoundaryContinuation!.endingPlayerIndex,
-          resumed.queuedTriggers,
-          triggerExecutionMode
+          resumed.queuedTriggers
         );
         state = pipeline.state;
         gameOver = pipeline.gameOver;
@@ -375,7 +372,7 @@ function resumeContinuations(
         kind === "BATTLE_DAMAGE"
           ? continueBattleDamageFrame(state, cardDb)
           : continueEffectDamageFrame(state, cardDb);
-      const applied = applyDamageResult(state, continued, cardDb, actingPlayer, triggerExecutionMode);
+      const applied = applyDamageResult(state, continued, cardDb, actingPlayer);
       state = applied.state;
       gameOver = applied.gameOver;
       continue;
@@ -397,7 +394,7 @@ function resumeContinuations(
       continue;
     }
 
-    if (frame.phase === "INTERRUPTED_BY_TRIGGERS") {
+    if (frame.phase === "INTERRUPTED_BY_TRIGGERS" || frame.phase === "AWAITING_BATCH_RESUME") {
       const resumed = resumeFromStack(state, action, cardDb);
       state = resumed.state;
       if (isGameTerminated(state)) {
@@ -483,8 +480,7 @@ function answerReplacementOffer(
     // A substitute that resolved without a prompt: publish its events in the
     // same batch as the rest of the Damage Step, as the synchronous path does.
     const continued = continueBattleDamageFrame(state, cardDb, replacement.events);
-    return applyDamageResult(state, continued, cardDb, actingPlayer,
-      initialState.effectStack.some(frame => frame.triggerExecution !== undefined));
+    return applyDamageResult(state, continued, cardDb, actingPlayer);
   }
 
   // A cost-exit replacement (OPT-864): the COST frame that parked its

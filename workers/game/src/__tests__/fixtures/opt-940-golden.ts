@@ -77,3 +77,10 @@ export function loadV4WriterGolden(): GoldenFixture {
   v4WriterGolden ??= JSON.parse(readFileSync(resolve(__dirname, "opt-964-writer-golden.synthetic.json"), "utf8")) as GoldenFixture;
   return v4WriterGolden;
 }
+
+let v5WriterGolden: GoldenFixture | undefined;
+/** OPT-966 current writer output; historical version 1–4 inputs remain frozen. */
+export function loadV5WriterGolden(): GoldenFixture {
+  v5WriterGolden ??= JSON.parse(readFileSync(resolve(__dirname, "opt-966-writer-golden.synthetic.json"), "utf8")) as GoldenFixture;
+  return v5WriterGolden;
+}

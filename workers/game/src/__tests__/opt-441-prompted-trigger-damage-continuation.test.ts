@@ -150,12 +150,22 @@ describe("OPT-441 — prompted Life Trigger preserves damage continuation", () =
     // The watcher is queued behind the still-paused Trigger effect.
     expect(revealed.state.players[0].hand).toHaveLength(watcherHandBefore);
 
-    const final = finishPromptAndDamage(
+    let final = finishPromptAndDamage(
       revealed.state,
       cardDb,
       { type: "PLAYER_CHOICE", choiceId: "accept" },
     );
 
+    // Both damage points finish before ordinary watchers activate (8-6-2).
+    // Their distinct occurrences share the now-eligible ordering cohort.
+    const ordering = final.state.pendingPrompt;
+    expect(ordering?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(ordering?.respondingPlayer).toBe(0);
+    if (ordering?.options.promptType !== "PLAYER_CHOICE") throw Error("ordering prompt required");
+    expect(ordering.options.choices).toHaveLength(2);
+    expect(new Set(ordering.options.choices.map(choice => choice.id)).size).toBe(2);
+    expect(final.state.players[1].life).toHaveLength(0);
+    final = finishPromptAndDamage(final.state, cardDb, { type: "PLAYER_CHOICE", choiceId: ordering.options.choices[1].id });
     // The watcher observes both the prompted first Life removal and the
     // ordinary second Life removal.
     expect(final.state.players[0].hand).toHaveLength(watcherHandBefore + 2);

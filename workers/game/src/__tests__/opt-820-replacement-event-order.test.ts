@@ -1,3 +1,4 @@
+import { replayPauses } from "./fixtures/opt-966-replay.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { describe, expect, it } from "vitest";
 import {
@@ -135,7 +136,7 @@ describe("OPT-820 replacement continuation chronology", () => {
       effectDescription: replacementDescription,
     });
     // OPT-963: the chain continuation, the REPLACEMENT_BATCH frame, then the substitute's prompt frame.
-    expect(first.state.effectStack).toHaveLength(3);
+    expect(first.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(3);
     expect(first.state.effectStack.at(-2)?.replacementBatch).toBeDefined();
     expect(
       findCardInstance(first.state, protectedTarget.instanceId)?.zone
@@ -166,7 +167,7 @@ describe("OPT-820 replacement continuation chronology", () => {
       testPriorityRolls: null,
     });
     const restored = await new SessionRepository(storage, config).load();
-    expect(restored!.state.effectStack).toHaveLength(3);
+    expect(restored!.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(3);
     const rejected = new SessionCoordinator().routePromptResponse(
       restored!.state,
       1,
@@ -181,6 +182,19 @@ describe("OPT-820 replacement continuation chronology", () => {
     expect(rejected.kind).toBe("reject");
     expect(rejected.state).toBe(restored!.state);
     const arranged = [trash[1], trash[2], trash[0]];
+    if (process.env.OPT966_READER_ROOT) {
+      const replay = {
+        state: structuredClone(restored!.state), db: cardDb,
+        act(action: GameAction) {
+          const result = resumePromptLifecycle(this.state, action, cardDb, {
+            drainPregame: s => s, advanceStartOfTurn: s => s,
+          });
+          expect(result.responseRejected).toBeFalsy();
+          this.state = result.state;
+        },
+      };
+      await replayPauses(replay, () => ({ type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: arranged.map(card => card.instanceId), destination: "top" }), "opt966-replacement-prefix-writer-corpus");
+    }
     const resumed = resumePromptLifecycle(
       restored!.state,
       {
@@ -476,13 +490,14 @@ it.each([true, false])(
     ).toEqual([
       ["CARD_DRAWN", 0],
       ["CARD_PLAYED", 1],
+      // Rule 8-6-3: finish the outer effect before the new On Play.
+      ["CARD_DRAWN", 0],
       ...(pay
         ? [
             ["CARD_TRASHED", 1],
             ["CARD_DRAWN", 1],
           ]
         : []),
-      ["CARD_DRAWN", 0],
     ]);
     expect(next.players[1].hand).toHaveLength(state.players[1].hand.length - 1);
   }

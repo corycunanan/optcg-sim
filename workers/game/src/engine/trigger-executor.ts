@@ -1,5 +1,4 @@
-/** Version 5 semantic reader. Normal entry points do not create these frames
- * until the separate writer change lands. An existing frame owns every queue;
+/** Shared trigger execution. An existing persisted frame owns every queue;
  * return values describe progress and never retain executable work. */
 import type {
   CardData,
@@ -32,13 +31,8 @@ import {
 import { continuationBoundary, pushFrame } from "./effect-stack.js";
 import { reenterBatchResume } from "./effect-resolver/resume/batch.js";
 
-export type HandlerProgress =
-  | "completed"
-  | "waiting"
-  | "queued"
-  | "continued"
-  | "terminal";
-export type HandlerResult = EffectResolverResult & { kind: HandlerProgress };
+export type { HandlerProgress, HandlerResult } from "./effect-resolver/types.js";
+import type { HandlerResult } from "./effect-resolver/types.js";
 
 export function triggerExecutionOwner(
   state: GameState
@@ -56,10 +50,22 @@ export function createEffectExecutionScope(
 ): GameState {
   if (triggerExecutionOwner(state) || isGameTerminated(state)) return state;
   const boundary = continuationBoundary(state, sourceCardInstanceId, controller);
-  return pushFrame(boundary.state, {
+  const scoped = pushFrame(boundary.state, {
     ...boundary.frame,
     triggerExecution: { generations: [{ triggers: [] }] },
   });
+  const damageIndex = state.effectStack.findIndex(frame =>
+    frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+    frame.battleDamage.battleId === state.turn.battle?.battleId
+  );
+  if (damageIndex < 0 || isGameTerminated(scoped)) return scoped;
+  // Ordinary work raised by a battle substitute belongs after damage. Keep
+  // its owner below the damage boundary, never above the substitute's suffix.
+  const owner = scoped.effectStack.at(-1)!;
+  return { ...scoped, effectStack: [
+    ...state.effectStack.slice(0, damageIndex), owner,
+    ...state.effectStack.slice(damageIndex),
+  ] };
 }
 
 /** Start a persisted scope at a cross-effect boundary. Domain handlers only
@@ -158,7 +164,8 @@ export function reportTriggerWork(
 /** Consume only the choice; activation belongs to advanceTriggerExecution. */
 export function selectTriggerForExecution(
   state: GameState,
-  action: GameAction
+  action: GameAction,
+  cardDb: Map<string, CardData>
 ): HandlerResult | undefined {
   const owner = triggerExecutionOwner(state);
   const selection = state.effectStack.at(-1);
@@ -180,14 +187,18 @@ export function selectTriggerForExecution(
     action.type === "PLAYER_CHOICE" &&
     action.choiceId === "done" &&
     choices.every((trigger) => trigger.effectBlock.flags?.optional);
-  if (!generation || (!chosen && !done))
+  if (!generation || (!chosen && !done)) {
+    const offered = buildTriggerSelectionPrompt(
+      { ...state, effectStack: state.effectStack.slice(0, -1) },
+      choices, [], cardDb, selection.triggerOrderingGroup
+    );
     return {
-      kind: "waiting",
-      state,
-      events: [],
-      resolved: false,
-      rejected: true,
+      kind: "waiting", state, events: [], resolved: false, rejected: true,
+      ...(offered.pendingPrompt ? { pendingPrompt: {
+        ...offered.pendingPrompt, resumeContext: selection.id,
+      } } : {}),
     };
+  }
   const removedIds = new Set(
     done ? choices.map((trigger) => trigger.orderingId) : [chosen!.orderingId]
   );

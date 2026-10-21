@@ -29,8 +29,8 @@ describe("OPT-478 resolver architecture contract", () => {
       executeEffectAction: expect.any(Function),
       resolveEffect: expect.any(Function),
       continueSimultaneousGroup: expect.any(Function),
-      processRemainingTriggers: expect.any(Function),
-      reenterBatchResume: expect.any(Function),
+      reportTriggers: expect.any(Function),
+      continueHandler: expect.any(Function),
     });
 
     // Required service parameters are part of the runtime JS contract, not

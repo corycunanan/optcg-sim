@@ -256,7 +256,7 @@ describe("OPT-731 choose-fewer resource action contract", () => {
     const result = executeAdvancePhase(state, cardDb);
 
     expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
-    expect(result.state.effectStack).toHaveLength(2);
+    expect(result.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(2);
     expect(result.state.scheduledActions).toEqual([]);
     expect(result.state.players[0].donCostArea[0]?.state).toBe("RESTED");
     expect(result.state.turn).toMatchObject({

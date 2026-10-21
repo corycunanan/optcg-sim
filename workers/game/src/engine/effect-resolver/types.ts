@@ -86,19 +86,23 @@ export interface EffectResolverServices {
     events: PendingEvent[];
     pendingPrompt?: PendingPromptState;
   };
-  processRemainingTriggers(
+  reportTriggers(
     state: GameState,
     pendingTriggers: QueuedTrigger[],
     cardDb: Map<string, CardData>,
     priorEvents?: PendingEvent[],
     triggerOrderingGroup?: EffectStackFrame["triggerOrderingGroup"]
-  ): EffectResolverResult;
-  reenterBatchResume(
+  ): HandlerResult;
+  continueHandler(
     state: GameState,
     cardDb: Map<string, CardData>,
     priorEvents?: PendingEvent[]
-  ): EffectResolverResult;
+  ): HandlerResult;
 }
+
+/** Resume handlers report state-owned progress; only the dispatcher advances. */
+export type HandlerProgress = "completed" | "waiting" | "queued" | "continued" | "terminal";
+export type HandlerResult = EffectResolverResult & { kind: HandlerProgress };
 
 export interface EffectResolverResult {
   state: GameState;

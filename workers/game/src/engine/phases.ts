@@ -5,8 +5,6 @@
  * and turn handoff. Extracted from execute.ts for clarity.
  */
 
-import { advanceTriggerExecution, createEffectExecutionScope, createTriggerExecution } from "./trigger-executor.js";
-import { resolverExecutionServices } from "./effect-resolver/resolver.js";
 import { queuedSourceSnapshot } from "./trigger-ordering.js";
 import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
 import { releaseMovedDonEffects } from "./don-area-effects.js";
@@ -226,8 +224,7 @@ function runEndPhase(
 /** Resume end-phase work parked below a prompt frame. */
 export function resumePhaseBoundary(
   state: GameState,
-  cardDb: Map<string, CardData>,
-  triggerExecutionMode = false
+  cardDb: Map<string, CardData>
 ): ExecuteResult {
   const frame = peekFrame(state);
   if (!frame?.phaseBoundaryContinuation) return { state, events: [] };
@@ -235,8 +232,7 @@ export function resumePhaseBoundary(
     popFrame(state),
     frame.phaseBoundaryContinuation,
     cardDb,
-    [...frame.accumulatedEvents],
-    triggerExecutionMode
+    [...frame.accumulatedEvents]
   );
 }
 
@@ -259,12 +255,11 @@ function continueEndPhase(
   initialState: GameState,
   continuation: PhaseBoundaryContinuation,
   cardDb: Map<string, CardData>,
-  events: PendingEvent[],
-  triggerExecutionMode = false
+  events: PendingEvent[]
 ): ExecuteResult {
   const stage = continuation.stage ?? "LEGACY_SCHEDULED_ACTIONS";
   if (stage === "LEGACY_SCHEDULED_ACTIONS") {
-    return continueLegacyScheduledActions(initialState, continuation, cardDb, events, triggerExecutionMode);
+    return continueLegacyScheduledActions(initialState, continuation, cardDb, events);
   }
 
   const pi = continuation.endingPlayerIndex;
@@ -276,7 +271,7 @@ function continueEndPhase(
   // Events handed in (the MAIN → END phase change, or a parked frame's
   // accumulator) publish and fire before any End Phase work.
   if (events.length > 0) {
-    state = fireEndPhaseEvents(state, events, cardDb, triggerExecutionMode);
+    state = fireEndPhaseEvents(state, events, cardDb);
     events = events.map((event) => withTriggerScanned(withEventLogEmitted(event)));
     if (isGameTerminated(state)) return { state, events };
     if (state.pendingPrompt) {
@@ -290,7 +285,7 @@ function continueEndPhase(
   // End Phase back through step 1 and step 2. Each pass resolves at least one
   // obligation, which consumes the engine budget, so the loop is bounded.
   for (let index = STAGED_END_PHASE.indexOf(stage); ; index = STAGED_END_PHASE.indexOf("TURN_PLAYER_END_OF_TURN")) {
-    const outcome = runStagesFrom(state, current, index, cardDb, parkDepth, triggerExecutionMode);
+    const outcome = runStagesFrom(state, current, index, cardDb, parkDepth);
     state = outcome.state;
     current = outcome.continuation;
     if (isGameTerminated(state)) return { state, events };
@@ -313,16 +308,15 @@ function runStagesFrom(
   continuation: PhaseBoundaryContinuation,
   startIndex: number,
   cardDb: Map<string, CardData>,
-  parkDepth: number,
-  triggerExecutionMode = false
+  parkDepth: number
 ): StageOutcome {
   let state = initialState;
   let current = continuation;
   for (let index = startIndex; index < STAGED_END_PHASE.length; index += 1) {
     current = { ...current, stage: STAGED_END_PHASE[index] };
     const outcome = current.stage === "END_OF_YOUR_TURN_WAVE" || current.stage === "END_OF_OPPONENT_TURN_WAVE"
-      ? runWave(state, current, cardDb, parkDepth, triggerExecutionMode)
-      : runEndOfTurnStep(state, current, cardDb, parkDepth, triggerExecutionMode);
+      ? runWave(state, current, cardDb, parkDepth)
+      : runEndOfTurnStep(state, current, cardDb, parkDepth);
     state = outcome.state;
     current = outcome.continuation;
     // OPT-960 / OPT-962: nothing after a terminal outcome. No later stage,
@@ -368,8 +362,7 @@ function runWave(
   initialState: GameState,
   continuation: PhaseBoundaryContinuation,
   cardDb: Map<string, CardData>,
-  parkDepth: number,
-  triggerExecutionMode = false
+  parkDepth: number
 ): StageOutcome {
   let state = initialState;
   const pi = continuation.endingPlayerIndex;
@@ -383,9 +376,7 @@ function runWave(
       return { state, continuation: { ...continuation, activatedWaveEffects: activated } };
     }
     activated = [...activated, ...collected.triggers.map(waveEffectKey)];
-    const result = triggerExecutionMode
-      ? advanceTriggerExecution(createTriggerExecution(state, collected.triggers), cardDb, resolverExecutionServices)
-      : processPlayerTriggerGroup(state, collected.triggers, [], cardDb);
+    const result = processPlayerTriggerGroup(state, collected.triggers, [], cardDb);
     state = result.state;
     const next = { ...continuation, activatedWaveEffects: activated };
     if (isGameTerminated(state)) return { state, continuation: next };
@@ -452,8 +443,7 @@ function runEndOfTurnStep(
   initialState: GameState,
   continuation: PhaseBoundaryContinuation,
   cardDb: Map<string, CardData>,
-  parkDepth: number,
-  triggerExecutionMode = false
+  parkDepth: number
 ): StageOutcome {
   let state = initialState;
   const pi = continuation.endingPlayerIndex;
@@ -471,8 +461,7 @@ function runEndOfTurnStep(
       queue.push(...collected.entries);
     }
     const entry = queue.shift()!;
-    const result = resolveScheduledEffect(
-      triggerExecutionMode,
+    const result = resolveEffect(
       state,
       { id: "scheduled_" + entry.sourceEffectId, category: "auto", actions: [entry.action] },
       entry.sourceEffectId,
@@ -490,7 +479,7 @@ function runEndOfTurnStep(
       state = publishPhaseBoundaryEvents(state, result.events, pi);
       return parkStage({ ...state, pendingPrompt: result.pendingPrompt }, next, parkDepth);
     }
-    state = fireEndPhaseEvents(state, result.events, cardDb, triggerExecutionMode);
+    state = fireEndPhaseEvents(state, result.events, cardDb);
     if (isGameTerminated(state)) return { state, continuation: next };
     if (state.pendingPrompt) return parkStage(state, next, parkDepth);
   }
@@ -519,8 +508,7 @@ function continueLegacyScheduledActions(
   initialState: GameState,
   continuation: PhaseBoundaryContinuation,
   cardDb: Map<string, CardData>,
-  events: PendingEvent[],
-  triggerExecutionMode = false
+  events: PendingEvent[]
 ): ExecuteResult {
   let state = initialState;
   // Keep the phase below every child created by this scheduled resolution,
@@ -535,8 +523,7 @@ function continueLegacyScheduledActions(
       category: "auto" as const,
       actions: [entry.action],
     };
-    const result = resolveScheduledEffect(
-      triggerExecutionMode,
+    const result = resolveEffect(
       state,
       fakeBlock,
       entry.sourceEffectId,
@@ -681,21 +668,4 @@ function completeTurnHandoff(
   });
 
   return { state: nextState, events };
-}
-
-/** A loaded v5 scope commits to the same future stage entry semantics even
- * after its current owner drains. The session dispatcher carries that fact
- * only for this invocation; every later paused effect retains its own owner. */
-function resolveScheduledEffect(
-  triggerExecutionMode: boolean,
-  ...args: Parameters<typeof resolveEffect>
-): ReturnType<typeof resolveEffect> {
-  if (!triggerExecutionMode) return resolveEffect(...args);
-  const initial = args[0];
-  args[0] = createEffectExecutionScope(initial, args[2], args[3]);
-  const result = resolveEffect(...args);
-  if (!isGameTerminated(result.state) && !result.pendingPrompt &&
-      !result.resolved && result.events.length === 0) return { ...result, state: initial };
-  const advanced = advanceTriggerExecution(result, args[4], resolverExecutionServices);
-  return { ...advanced, ...(result.effectNotActivated ? { effectNotActivated: true } : {}) };
 }
