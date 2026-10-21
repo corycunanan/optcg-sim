@@ -43,14 +43,14 @@ export function retainEventsOnFrame(
       ...pendingPropagationEvents(frame.accumulatedEvents),
     ]),
   ].filter((event) => !nestedEvents.has(event));
-  // A nested Event's committed parent prefix precedes its child output. Give
+  // An Event or K.O. replacement's committed parent prefix precedes child output. Give
   // the nearest publication owner that debt while keeping the future Event
   // activation notification on its separate completion frame. Battle damage
   // remains the owner when it lies between the scope and this continuation.
-  const isEventParent = frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
-    frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH";
+  const hasNestedPublication = frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
+    frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH" || frame.pausedAction?.type === "KO";
   let publicationIndex = -1;
-  if (isEventParent) {
+  if (hasNestedPublication) {
     for (let index = frameIndex - 1; index >= 0; index--) {
       const candidate = state.effectStack[index];
       if (candidate.triggerExecution ||
