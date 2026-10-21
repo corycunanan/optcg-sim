@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../../types.js";
 import type { EffectSchema } from "../../engine/effect-types.js";
 import { runPipeline } from "../../engine/pipeline.js";
+import { getEffectivePower } from "../../engine/modifiers.js";
 import { registerCardEnteredField } from "../../engine/triggers.js";
 import { resumePromptLifecycle } from "../../session/prompt-lifecycle.js";
 import { SessionRepository, type SessionStorage } from "../../session/persistence.js";
@@ -365,13 +366,16 @@ it.each(["F1", "F2"] as const)("%s full traces and final gameplay agree across c
   const states: GameState[] = [];
   for (const mode of ["continuous", "prompted", "reloaded"] as const) {
     let b: Built;
+    let defenderDeckBefore: number;
     if (family === "F1") {
       const setup = f1Setup(mode !== "continuous");
       b = setup.b;
+      defenderDeckBefore = b.state.players[1].deck.length;
       attack(b, setup.attacker);
     } else {
       const setup = f2Setup(mode !== "continuous");
       b = setup.b;
+      defenderDeckBefore = b.state.players[1].deck.length;
       activate(b, setup.killer);
       expect(b.state.pendingPrompt?.respondingPlayer).toBe(1);
       b.state.pendingPrompt!.promptId = "fixed-ordering-prompt";
@@ -387,6 +391,23 @@ it.each(["F1", "F2"] as const)("%s full traces and final gameplay agree across c
     }
     expect(b.state.effectStack).toEqual([]);
     expect(b.state.pendingPrompt).toBeNull();
+    // Independent expected gameplay, not inferred from captured snapshots.
+    const playedCardId = family === "F1" ? C_ID : REBECCA;
+    const playedController = family === "F1" ? 0 : 1;
+    const played = b.state.players[playedController].characters.filter(card => card?.cardId === playedCardId);
+    expect(played).toHaveLength(1);
+    expect(played[0]!.zone).toBe("CHARACTER");
+    expect(getEffectivePower(played[0]!, b.cardDb.get(playedCardId)!, b.state, b.cardDb)).toBe(b.cardDb.get(playedCardId)!.power! + 1000);
+    expect(b.state.players[playedController].hand.some(card => card.cardId === playedCardId)).toBe(false);
+    expect(b.state.players[1].hand).toHaveLength(1);
+    expect(b.state.players[1].deck).toHaveLength(defenderDeckBefore - 1);
+    expect(b.state.players[0].hand).toHaveLength(0);
+    expect(b.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(1);
+    expect(b.state.eventLog.filter(event => event.type === "POWER_MODIFIED")).toHaveLength(1);
+    if (family === "F2") {
+      expect(b.state.players[1].characters.some(card => card?.cardId === FRANKY)).toBe(false);
+      expect(b.state.players[1].trash.filter(card => card.cardId === FRANKY)).toHaveLength(1);
+    }
     // Full gameplay evidence is retained separately for each allocation path.
     expect({ players: b.state.players, activeEffects: b.state.activeEffects,
       turn: b.state.turn, prohibitions: b.state.prohibitions }).toMatchSnapshot(mode);

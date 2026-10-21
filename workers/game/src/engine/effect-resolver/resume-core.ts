@@ -12,7 +12,7 @@ import { updateEffectContinuation } from "./event-activation.js";
  *                 AWAITING_TRIGGER_ORDER_SELECTION
  *   cost.ts     — AWAITING_COST_SELECTION
  *   batch.ts    — reenterBatchResume, dispatchBatchResume, pushBatchResumeFrame
- *   triggers.ts — processRemainingTriggers
+ *   Cross-effect results are consumed by resume.ts and the shared trigger executor.
  */
 
 import type { EffectResult } from "../effect-types.js";
