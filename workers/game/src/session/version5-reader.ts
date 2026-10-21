@@ -233,14 +233,23 @@ export function projectVersion5(
       ],
     };
   });
-  for (const [index, work] of scopes) {
-    const selection = frames.at(-1);
-    const lastScope = [...scopes.keys()].at(-1);
-    if (
-      lastScope !== index ||
-      selection?.phase !== "AWAITING_TRIGGER_ORDER_SELECTION"
-    )
-      continue;
+  for (const [selectionIndex, selection] of frames.entries()) {
+    if (selection.phase !== "AWAITING_TRIGGER_ORDER_SELECTION") continue;
+    // A selection belongs to the nearest owner below it. Historical selections
+    // below every v5 scope keep their existing reader contract.
+    const index = [...scopes.keys()]
+      .reverse()
+      .find((ownerIndex) => ownerIndex < selectionIndex);
+    if (index === undefined) continue;
+    const work = scopes.get(index)!;
+    if (selectionIndex !== frames.length - 1)
+      fail(
+        `effectStack[${selectionIndex}] owned ordering selection must be the top frame`
+      );
+    if (selectionIndex !== index + 1)
+      fail(
+        `effectStack[${selectionIndex}] selection must be directly above its trigger execution owner`
+      );
     const generation = work.generations[0];
     if (!generation || work.selectedTrigger)
       fail(`effectStack[${index}] selection has no current generation`);

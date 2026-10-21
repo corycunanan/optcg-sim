@@ -758,6 +758,71 @@ describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
     expect(final.effectStack).toEqual([]);
   });
 
+  it.each(["state", "undoHistory[0]"])(
+    "rejects an ordering selection separated from its owner in %s",
+    (location) => {
+      const { state, db, trigger, a, x } = fixture();
+      state.effectStack[0].triggerExecution!.generations[0].triggers =
+        withStableOrderingIds([trigger("A", 0, a), trigger("A", 0, x)]);
+      const choice = start(restore(state), db);
+      const boundary = continuationBoundary(choice, "A", 0);
+      const raw = structuredClone(toPersistedGameState(choice));
+      raw.effectStack.splice(1, 0, { ...boundary.frame, kind: "TRIGGER_DRAIN" });
+      expect(() => convertPersistedGameState(raw, location)).toThrow(
+        "selection must be directly above its trigger execution owner"
+      );
+    }
+  );
+
+  it.each([
+    ["state", "absent"], ["undoHistory[0]", "absent"],
+    ["state", "structural"], ["undoHistory[0]", "structural"],
+    ["state", "frame"], ["undoHistory[0]", "frame"],
+  ])(
+    "rejects a buried owned ordering selection in %s with %s prompt context",
+    (location, promptContext) => {
+      const { state, db, trigger, a, x } = fixture();
+      state.effectStack[0].triggerExecution!.generations[0].triggers =
+        withStableOrderingIds([trigger("A", 0, a), trigger("A", 0, x)]);
+      const choice = start(restore(state), db);
+      const boundary = continuationBoundary(choice, "A", 0);
+      const raw = structuredClone(toPersistedGameState(choice));
+      raw.effectStack.push({ ...boundary.frame, kind: "TRIGGER_DRAIN" });
+      if (promptContext === "absent") raw.pendingPrompt = null;
+      else raw.pendingPrompt!.resumeContext = promptContext === "frame"
+        ? boundary.frame.id
+        : { type: "PREGAME_PRIORITY_CHOICE" };
+      expect(() => convertPersistedGameState(raw, location)).toThrow(
+        "owned ordering selection must be the top frame"
+      );
+    }
+  );
+
+  it.each(["state", "undoHistory[0]"])(
+    "maps an adjacent nested ordering selection to the nearest owner in %s",
+    (location) => {
+      const { state, db, trigger, a, x } = fixture();
+      const outer = structuredClone(state.effectStack[0]);
+      const parent = continuationBoundary(state, "A", 0);
+      const withParent = pushFrame(parent.state, parent.frame);
+      const boundary = continuationBoundary(withParent, "A", 0);
+      const nested = pushFrame(boundary.state, {
+        ...boundary.frame,
+        triggerExecution: { generations: [{ triggers: withStableOrderingIds([
+          trigger("A", 0, a), trigger("A", 0, x),
+        ]) }] },
+      });
+      const choice = start(restore(nested), db);
+      const loaded = convertPersistedGameState(
+        structuredClone(toPersistedGameState(choice)), location
+      );
+      expect(loaded.effectStack[0]).toEqual({ ...outer, kind: "TRIGGER_EXECUTION" });
+      expect(loaded.effectStack.at(-2)!.id).toBe(boundary.frame.id);
+      const paused = answer(loaded, db, { type: "PLAYER_CHOICE", choiceId: "A:x:0" });
+      expect(() => restore(paused)).not.toThrow();
+    }
+  );
+
   it("rejects a selection copied from a different generation or with altered actions", () => {
     const { state, db, trigger, a, x } = fixture();
     state.effectStack[0].triggerExecution!.generations[0].triggers =
