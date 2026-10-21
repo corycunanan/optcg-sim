@@ -84,7 +84,7 @@ export function executeKO(
   // OPT-219: one batch scan for the whole target set — cost paid once per
   // replacement regardless of how many targets it protects. The batch does
   // NOT finalize; it hands back the subset still eligible for KO so this
-  // handler can run its own per-frame loop with rule 6-2 trigger drain.
+  // handler can report its batch boundary to the common pending-work drain.
   // KO-by-effect is also a removal from field, so the general removal/leave
   // replacements (e.g. OP16-014 Marco, OP15-090 Perona) intercept it too.
   // A prohibited removal never becomes a replaceable event. Filter before

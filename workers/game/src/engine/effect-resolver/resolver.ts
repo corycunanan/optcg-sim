@@ -1,4 +1,6 @@
-import { advanceTriggerExecution, createEffectExecutionScope, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
+import { drainPendingWork } from "../pending-work-drain.js";
+import {
+  createEffectExecutionScope, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
 import { getBattleOpponentInstanceId } from "../events.js";
 import { isGameTerminated } from "../terminal.js";
 import { runRuleProcessingAfterMove } from "../defeat.js";
@@ -33,15 +35,13 @@ import { evaluateCondition, type ConditionContext } from "../conditions.js";
 import { postCostConditionsMet } from "./post-cost.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
-  popFrame,
   pushFrame,
   generateFrameId,
   updateTopFrame,
 } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
-import { insertFrameAt, updateFrameById } from "../damage-frames.js";
+import { insertFrameAt } from "../damage-frames.js";
 import { isHandlerOwnedFrame } from "../frame-kinds.js";
-import { frameKindOf } from "../frame-kinds.js";
 import type {
   EffectResolverResult,
   ActionResult,
@@ -317,7 +317,7 @@ function createResolverServices(
       event,
       snapshot
     ) =>
-      resolveEffect(
+      resolveEffectWork(
         state,
         block,
         source,
@@ -365,8 +365,26 @@ export function battleTargetRefFor(
   return opposing ? [BATTLE_TARGET_REF, { targetInstanceIds: [opposing], count: 1 }] : null;
 }
 
-/** Direct activation entry. Existing owners retain nested advancement. */
-export function resolveEffect(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
+/** Public convenience boundary; engine handlers use resolveEffectWork. */
+export function resolveEffect(
+  ...args: Parameters<typeof resolveEffectCore>
+): EffectResolverResult {
+  const owned = triggerExecutionOwner(args[0]);
+  const result = resolveEffectWork(...args);
+  if (
+    owned ||
+    (!result.resolved && !result.pendingPrompt && !result.events.length)
+  )
+    return result;
+  return drainPendingWork(
+    result,
+    args[4],
+    args[6] ?? resolverExecutionServices
+  );
+}
+
+/** Execute one effect body and report its children to the common drain. */
+export function resolveEffectWork(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
   if (triggerExecutionOwner(args[0])) return resolveEffectCore(...args);
   const initialState = args[0];
   args[0] = createEffectExecutionScope(initialState, args[2], args[3]);
@@ -375,11 +393,7 @@ export function resolveEffect(...args: Parameters<typeof resolveEffectCore>): Ef
       !result.resolved && result.events.length === 0) {
     return { ...result, state: initialState };
   }
-  const advanced = advanceTriggerExecution(result, args[4], args[6] ?? resolverExecutionServices);
-  return {
-    ...advanced,
-    ...(result.effectNotActivated ? { effectNotActivated: true } : {}),
-  };
+  return result;
 }
 
 function resolveEffectCore(

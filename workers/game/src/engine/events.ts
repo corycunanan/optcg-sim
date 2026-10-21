@@ -38,6 +38,33 @@ export function replacePendingEventReferences(
   }
 }
 
+/** Transfer immutable occurrence markers to live retained accumulators.
+ * Staged cost snapshots are separate hypothetical state, not live aliases. */
+export function replaceRetainedEventReferences(
+  state: GameState,
+  originals: readonly PendingEvent[],
+  replacements: readonly PendingEvent[]
+): GameState {
+  const byOccurrence = new Map(
+    originals.map((event, index) => [event, replacements[index]])
+  );
+  let changed = false;
+  const effectStack = state.effectStack.map((frame) => {
+    const accumulatedEvents = frame.accumulatedEvents.map(
+      (event) => byOccurrence.get(event) ?? event
+    );
+    if (
+      accumulatedEvents.every(
+        (event, index) => event === frame.accumulatedEvents[index]
+      )
+    )
+      return frame;
+    changed = true;
+    return { ...frame, accumulatedEvents };
+  });
+  return changed ? { ...state, effectStack } : state;
+}
+
 /** Read an optional card identity without asserting a specific event payload. */
 export function getEventCardInstanceId(
   event: { payload?: unknown } | null | undefined,

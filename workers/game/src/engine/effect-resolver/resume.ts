@@ -1,5 +1,7 @@
+import { drainPendingWork } from "../pending-work-drain.js";
 import { isGameTerminated } from "../terminal.js";
-import { advanceTriggerExecution, createEffectExecutionScope, createTriggerExecution, reportTriggerWork, selectTriggerForExecution, triggerExecutionOwner } from "../trigger-executor.js";
+import {
+  createEffectExecutionScope, createTriggerExecution, reportTriggerWork, selectTriggerForExecution, triggerExecutionOwner } from "../trigger-executor.js";
 import type {
   CardData,
   GameAction,
@@ -30,7 +32,8 @@ function ownLegacyResume(state: GameState): GameState {
     const waiting = state.effectStack.findIndex((frame) =>
       frame.phase !== "AWAITING_BATCH_RESUME" && frame.pendingTriggers.length > 0
     );
-    const damageIndex = state.effectStack.findIndex(frame =>
+    const damageIndex = state.effectStack.findIndex(
+      (frame) =>
       frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
       frame.battleDamage.battleId === state.turn.battle?.battleId
     );
@@ -118,13 +121,13 @@ function advanceHandler(result: HandlerResult, cardDb: Map<string, CardData>): H
     case "waiting":
       return result;
     case "terminal":
-      return advanceTriggerExecution(result, cardDb, resolverExecutionServices);
+      return drainPendingWork(result, cardDb, resolverExecutionServices);
     case "completed":
       if (!triggerExecutionOwner(result.state)) return result;
-      return advanceTriggerExecution(result, cardDb, resolverExecutionServices);
+      return drainPendingWork(result, cardDb, resolverExecutionServices);
     case "queued":
     case "continued":
-      return advanceTriggerExecution(result, cardDb, resolverExecutionServices);
+      return drainPendingWork(result, cardDb, resolverExecutionServices);
   }
 }
 
@@ -135,6 +138,7 @@ export function resumeEffectChain(
   cardDb: Map<string, CardData>
 ): HandlerResult {
   const original = state;
+  state = { ...state, pendingPrompt: null };
   state = createEffectExecutionScope(state, resumeCtx.effectSourceInstanceId, resumeCtx.controller);
   const result = resumeEffectChainCore(state, resumeCtx, action, cardDb, resolverExecutionServices);
   if (result.rejected && !result.reprompted)
@@ -142,12 +146,13 @@ export function resumeEffectChain(
   return advanceHandler(result, cardDb);
 }
 
-export function resumeFromStack(
+export function resumeFromStackWork(
   state: GameState,
   action: GameAction,
   cardDb: Map<string, CardData>
 ): HandlerResult {
   const original = state;
+  state = { ...state, pendingPrompt: null };
   state = ownLegacyResume(state);
   const owner = triggerExecutionOwner(state);
   const selected = selectTriggerForExecution(state, action, cardDb);
@@ -159,7 +164,15 @@ export function resumeFromStack(
     (!oldChoice.triggerOrderingGroup || oldChoice.simultaneousTriggers.some((trigger) => !trigger.orderingId));
   if (result.rejected && !result.reprompted)
     return { ...result, state: normalizedLegacyChoice ? result.state : original };
-  return advanceHandler(result, cardDb);
+  return result;
+}
+
+export function resumeFromStack(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>
+): HandlerResult {
+  return advanceHandler(resumeFromStackWork(state, action, cardDb), cardDb);
 }
 
 export function processRemainingTriggers(

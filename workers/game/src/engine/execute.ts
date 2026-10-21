@@ -17,15 +17,15 @@ import {
   attachDon,
 } from "./state.js";
 import { getEffectiveCost, consumeOneTimeModifiers } from "./modifiers.js";
-import { executeAdvancePhase } from "./phases.js";
+import { executeAdvancePhaseWork as executeAdvancePhase } from "./phases.js";
 import {
   executeDeclareAttack,
   executeDeclareBlocker,
-  executePass,
+  executePassWork as executePass,
   executeUseCounter,
   executeUseCounterEvent,
 } from "./battle.js";
-import { resolveEffect } from "./effect-resolver/index.js";
+import { resolveEffectWork } from "./effect-resolver/resolver.js";
 import { isOncePerTurnBlock } from "./effect-types.js";
 import { transitionCard } from "./zone-transition.js";
 
@@ -144,7 +144,7 @@ function executePlayCard(
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
       );
       if (mainBlock) {
-        const result = resolveEffect(nextState, mainBlock, newEventInstanceId, pi, cardDb);
+        const result = resolveEffectWork(nextState, mainBlock, newEventInstanceId, pi, cardDb);
         nextState = result.state;
         events.push(...result.events);
         if (result.pendingPrompt) {
@@ -244,7 +244,8 @@ function executeActivateEffect(
 
   // Verify it has ACTIVATE_MAIN trigger
   if (!block.trigger || !("keyword" in block.trigger) ||
-      (block.trigger.keyword !== "ACTIVATE_MAIN")) {
+    block.trigger.keyword !== "ACTIVATE_MAIN"
+  ) {
     return { state, events };
   }
 
@@ -259,7 +260,7 @@ function executeActivateEffect(
   }
 
   // Resolve the effect through the effect resolver
-  const result = resolveEffect(state, block, cardInstanceId, actingPlayerIndex, cardDb);
+  const result = resolveEffectWork(state, block, cardInstanceId, actingPlayerIndex, cardDb);
 
   return {
     state: result.state,

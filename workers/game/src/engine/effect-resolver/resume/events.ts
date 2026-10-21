@@ -1,3 +1,4 @@
+import { isPendingBattleStepTransition } from "../../battle-step-boundary.js";
 import {
   generateFrameId,
   pushFrame,
@@ -87,8 +88,14 @@ export function takeInterruptedEvents(state: GameState): {
     // Battle substitute debt belongs to damage completion,
     // not to an unrelated child publication boundary (OPT-965 reader-first).
     if (frame.phase !== "INTERRUPTED_BY_TRIGGERS" || frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT") return frame;
-    events.push(...pendingPropagationEvents(frame.accumulatedEvents));
-    return { ...frame, accumulatedEvents: [] };
+    events.push(...pendingPropagationEvents(frame.accumulatedEvents.filter(
+          (event) => !isPendingBattleStepTransition(event)
+        )
+      ));
+    return { ...frame, accumulatedEvents: frame.accumulatedEvents.filter(
+        isPendingBattleStepTransition
+      ),
+    };
   });
   return { state: events.length ? { ...state, effectStack } : state, events };
 }
@@ -100,7 +107,9 @@ export function publishCommittedEvents(
 ): GameState {
   for (let index = 0; index < events.length; index++) {
     const event = events[index];
-    if (event.propagation?.eventLogEmitted) continue;
+    if (event.propagation?.eventLogEmitted ||
+      isPendingBattleStepTransition(event)
+    ) continue;
     state = emitPendingEvent(state, event, state.turn.activePlayerIndex);
     events[index] = withEventLogEmitted(event);
   }
@@ -130,7 +139,7 @@ export function retainPropagationBeforePrompt(
     }
   }
   if (ownerIndex < 0) ownerIndex = state.effectStack.findIndex(
-    frame => frame.phase === "INTERRUPTED_BY_TRIGGERS" &&
+      (frame) => frame.phase === "INTERRUPTED_BY_TRIGGERS" &&
       !frame.eventActivation && !frame.eventActivationCompletion && !frame.phaseBoundaryContinuation
   );
   if (ownerIndex >= 0) return retainEventsOnFrame(state, ownerIndex, pending);

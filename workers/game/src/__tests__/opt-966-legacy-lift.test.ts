@@ -10,10 +10,11 @@ import { createBattleReadyState, createTestCardDb } from "./helpers.js";
 import { continuationBoundary, pushFrame } from "../engine/effect-stack.js";
 import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
 
-it.each(["live", "undo"] as const)("legacy ordering above battle preserves graph, debt and completion: %s", location => {
+it.each(["live", "undo"] as const)("legacy ordering above battle preserves graph, debt and completion: %s",
+  (location) => {
   const db = new Map(Object.entries(fixture.cardDb)) as Map<string, CardData>;
   const loaded = convertPersistedGameState(structuredClone(fixture.state), "state");
-  const battle = loaded.effectStack.find(frame => frame.battleDamage)!;
+  const battle = loaded.effectStack.find((frame) => frame.battleDamage)!;
   const trigger = battle.pendingTriggers[0];
   // The same selection builder used by the old public trigger queue. Independent
   // review also reproduced this graph through the pinned reader's public group API.
@@ -27,20 +28,22 @@ it.each(["live", "undo"] as const)("legacy ordering above battle preserves graph
   expect(rejected.state).toEqual(state);
   const action = { type: "PLAYER_CHOICE" as const, choiceId: state.effectStack.at(-1)!.simultaneousTriggers[0].orderingId! };
   const result = resumeFromStack({ ...state, pendingPrompt: null }, action, db);
-  const retained = result.state.effectStack.filter(frame => frame.id === battle.id);
-  expect(retained).toHaveLength(1);
-  expect(retained[0]).toEqual(battle);
-  expect(result.state.players[0].hand).toHaveLength(state.players[0].hand.length + 2);
-  expect(result.events.filter(event => event.type === "CARD_DRAWN")).toHaveLength(2);
-  expect(new Set(result.state.effectStack.map(frame => frame.id)).size).toBe(result.state.effectStack.length);
-  const complete = resumePromptLifecycle(state, action, db, { drainPregame: s => s, advanceStartOfTurn: s => s });
+  const retained = result.state.effectStack.filter(
+      (frame) => frame.id === battle.id);
+  expect(retained).toHaveLength(0);
+  expect(result.state.turn.battle).toBeNull();
+  expect(result.state.players[0].hand).toHaveLength(state.players[0].hand.length + 3
+    );
+  expect(result.events.filter((event) => event.type === "CARD_DRAWN")).toHaveLength(3);
+  expect(new Set(result.state.effectStack.map((frame) => frame.id)).size).toBe(result.state.effectStack.length);
+  const complete = resumePromptLifecycle(state, action, db, { drainPregame: (s) => s, advanceStartOfTurn: (s) => s });
   expect(complete.responseRejected).toBeFalsy();
   expect(complete.state.pendingPrompt).toBeNull();
   expect(complete.state.effectStack).toEqual([]);
   expect(complete.state.turn.battle).toBeNull();
-  expect(complete.state.eventLog.filter(event => event.type === "END_OF_BATTLE")).toHaveLength(1);
-  expect(complete.state.eventLog.filter(event => event.type === "CARD_DRAWN")).toHaveLength(3);
-  const publication = complete.state.eventLog.map(event => event.type);
+  expect(complete.state.eventLog.filter((event) => event.type === "END_OF_BATTLE")).toHaveLength(1);
+  expect(complete.state.eventLog.filter((event) => event.type === "CARD_DRAWN")).toHaveLength(3);
+  const publication = complete.state.eventLog.map((event) => event.type);
   const draws = publication.flatMap((type, index) => type === "CARD_DRAWN" ? [index] : []);
   const battleEnd = publication.indexOf("END_OF_BATTLE");
   expect(draws[0]).toBeLessThan(battleEnd);
@@ -48,7 +51,8 @@ it.each(["live", "undo"] as const)("legacy ordering above battle preserves graph
   expect(draws[2]).toBeGreaterThan(battleEnd);
 });
 
-it.each(["live", "undo"] as const)("legacy lifting at the stack budget returns terminal without replaying work: %s", location => {
+it.each(["live", "undo"] as const)("legacy lifting at the stack budget returns terminal without replaying work: %s",
+  (location) => {
   const db = createTestCardDb();
   let state = createBattleReadyState(db);
   for (let n = 0; n < MAX_EFFECT_STACK_DEPTH; n++) {
@@ -64,5 +68,5 @@ it.each(["live", "undo"] as const)("legacy lifting at the stack budget returns t
   expect(result.state.effectStack).toEqual([]);
   expect(result.state.pendingPrompt).toBeNull();
   expect(result.state.players).toEqual(beforePlayers);
-  expect(result.state.eventLog.filter(event => event.type === "GAME_OVER")).toHaveLength(1);
+  expect(result.state.eventLog.filter((event) => event.type === "GAME_OVER")).toHaveLength(1);
 });

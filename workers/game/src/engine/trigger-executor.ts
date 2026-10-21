@@ -1,5 +1,4 @@
-/** Shared trigger execution. An existing persisted frame owns every queue;
- * return values describe progress and never retain executable work. */
+/** Durable trigger queue ownership and selection. Advancement belongs to pending-work-drain. */
 import type {
   CardData,
   EffectStackFrame,
@@ -12,27 +11,18 @@ import type {
 import type {
   EffectResolverResult,
   EffectResolverServices,
+  HandlerResult,
 } from "./effect-resolver/types.js";
 import {
   buildTriggerSelectionPrompt,
-  scanEventsForTriggers,
   withStableOrderingIds,
 } from "./trigger-ordering.js";
-import { terminateForEngineContract } from "./engine-limits.js";
-import { isGameTerminated, publishBeforeGameOver } from "./terminal.js";
-import {
-  getEventCardInstanceId,
-  replacePendingEventReferences,
-} from "./events.js";
-import {
-  publishCommittedEvents,
-  retainPropagationBeforePrompt,
-} from "./effect-resolver/resume/events.js";
+import { isGameTerminated } from "./terminal.js";
 import { continuationBoundary, pushFrame } from "./effect-stack.js";
-import { reenterBatchResume } from "./effect-resolver/resume/batch.js";
+import { drainPendingWork } from "./pending-work-drain.js";
 
-export type { HandlerProgress, HandlerResult } from "./effect-resolver/types.js";
-import type { HandlerResult } from "./effect-resolver/types.js";
+export type { HandlerProgress,
+  HandlerResult } from "./effect-resolver/types.js";
 
 export function triggerExecutionOwner(
   state: GameState
@@ -54,7 +44,8 @@ export function createEffectExecutionScope(
     ...boundary.frame,
     triggerExecution: { generations: [{ triggers: [] }] },
   });
-  const damageIndex = state.effectStack.findIndex(frame =>
+  const damageIndex = state.effectStack.findIndex(
+    (frame) =>
     frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
     frame.battleDamage.battleId === state.turn.battle?.battleId
   );
@@ -91,7 +82,7 @@ export function createTriggerExecution(
   return { kind: "queued", state, events: [], resolved: true };
 }
 
-function updateOwner(
+export function updateOwner(
   state: GameState,
   id: string,
   work: TriggerExecution
@@ -237,237 +228,14 @@ export function selectTriggerForExecution(
   };
 }
 
-/** The only executor for a loaded v5 scope. Generations finish FIFO; within a
- * generation the turn player chooses first, then the opponent. A child prompt
- * returns immediately, leaving both its parent and queue on the stack. */
-export function advanceTriggerExecution(
-  initial: EffectResolverResult,
-  cardDb: Map<string, CardData>,
-  services: EffectResolverServices,
-  stopAtFrameId?: string
-): HandlerResult {
-  let state = initial.state;
-  const events = [...initial.events];
-  if (!isGameTerminated(state) && (initial.rejected || initial.pendingPrompt))
-    return { ...initial, kind: "waiting" };
-  while (true) {
-    if (isGameTerminated(state))
-      return {
-        kind: "terminal",
-        state: publishBeforeGameOver(
-          state,
-          events,
-          state.turn.activePlayerIndex
-        ),
-        events,
-        resolved: true,
-      };
-    if (
-      stopAtFrameId &&
-      !state.effectStack.some((frame) => frame.id === stopAtFrameId)
-    ) {
-      state = terminateForEngineContract(state, {
-        kind: "ENGINE_CONTRACT",
-        contract: "ACTION_HANDLER",
-        message: `Life Trigger lost its damage boundary ${stopAtFrameId}`,
-      });
-      continue;
-    }
-    // A Life Trigger temporarily interrupts damage. Finish only its children;
-    // reaching its exact damage boundary must not select an outer sibling.
-    if (stopAtFrameId && state.effectStack.at(-1)?.id === stopAtFrameId)
-      return {
-        kind: "continued",
-        state: publishCommittedEvents(state, events),
-        events,
-        resolved: true,
-      };
-    let owner = triggerExecutionOwner(state);
-    if (!owner?.triggerExecution)
-      return {
-        kind: "completed",
-        state: publishCommittedEvents(state, events),
-        events,
-        resolved: true,
-      };
-    const ownerIndex = state.effectStack.findIndex(frame => frame.id === owner!.id);
-    const battleDebt = state.effectStack.find((frame, index) =>
-      index > ownerIndex && frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
-      frame.battleDamage.battleId === state.turn.battle?.battleId
-    );
-    if (battleDebt && !stopAtFrameId) {
-      // Only a descendant battle frame can receive this handoff. A nested
-      // owner above battle must finish itself so the dispatcher makes progress.
-      // Loaded v5 ordinary work must not publish ahead of the battle prefix.
-      // Damage completion retains both obligations; the session dispatcher
-      // continues the substitute's own children before releasing this owner.
-      state = { ...state, effectStack: state.effectStack.map(frame =>
-        frame.id === battleDebt.id ? { ...frame,
-          accumulatedEvents: [...new Set([...frame.accumulatedEvents, ...events])],
-        } : frame
-      ) };
-      return { kind: "continued", state, events: [], resolved: true };
-    }
-    if (!stopAtFrameId && owner.accumulatedEvents.length) {
-      const prefix = owner.accumulatedEvents;
-      events.splice(0, events.length, ...new Set([...prefix, ...events]));
-      state = {
-        ...state,
-        effectStack: state.effectStack.map((frame) =>
-          frame.id === owner!.id ? { ...frame, accumulatedEvents: [] } : frame
-        ),
-      };
-      const scanned = scanEventsForTriggers(
-        state,
-        prefix,
-        owner.controller,
-        cardDb
-      );
-      state = scanned.state;
-      replacePendingEventReferences(events, prefix, scanned.events);
-      if (scanned.triggers.length)
-        state = reportTriggerWork(state, scanned.triggers).state;
-      owner = triggerExecutionOwner(state)!;
-    }
-    state = publishCommittedEvents(state, events);
-    const child = state.effectStack.at(-1);
-    if (child?.id !== owner.id) {
-      if (child?.phase !== "AWAITING_BATCH_RESUME") {
-        // Other continuation families remain owned by their existing drain.
-        return { kind: "continued", state, events, resolved: true };
-      }
-      const resumed = reenterBatchResume(state, cardDb, services, events);
-      state = resumed.state;
-      events.splice(0, events.length, ...resumed.events);
-      if (resumed.pendingPrompt) return { ...resumed, kind: "waiting" };
-      continue;
-    }
-    let work = owner.triggerExecution!;
-    // Empty generations can exist while their selected effect is suspended.
-    if (!work.selectedTrigger && work.generations[0]?.triggers.length === 0) {
-      // User-approved resolution-gate policy: reports raised by any older
-      // sibling join one cohort. Seal only after that whole generation and
-      // every active child have finished. Existing closed cohorts stay separate.
-      const { collectingGenerationIndex: _collector, ...sealed } = work;
-      work = { ...sealed, generations: work.generations.slice(1) };
-      state = updateOwner(state, owner.id, work);
-      continue;
-    }
-    let trigger = work.selectedTrigger;
-    if (!trigger && work.generations.length) {
-      const generation = work.generations[0];
-      const active = state.turn.activePlayerIndex;
-      const player = generation.triggers.some(
-        (entry) => entry.controller === active
-      )
-        ? active
-        : active === 0
-          ? 1
-          : 0;
-      const group = generation.triggers.filter(
-        (entry) => entry.controller === player
-      );
-      if (group.length > 1) {
-        const history =
-          generation.orderingGroup?.triggers[0]?.controller === player
-            ? generation.orderingGroup
-            : undefined;
-        const prompt = buildTriggerSelectionPrompt(
-          state,
-          group,
-          [],
-          cardDb,
-          history
-        );
-        state = retainPropagationBeforePrompt(prompt.state, events);
-        return {
-          kind: "waiting",
-          state,
-          events,
-          resolved: false,
-          pendingPrompt: prompt.pendingPrompt,
-        };
-      }
-      trigger = group[0];
-      work = {
-        ...work,
-        generations: [
-          {
-            ...generation,
-            triggers: generation.triggers.filter((entry) => entry !== trigger),
-            ...(generation.orderingGroup?.triggers.some(
-              (entry) => entry.orderingId === trigger!.orderingId
-            )
-              ? {
-                  orderingGroup: {
-                    ...generation.orderingGroup,
-                    resolvedTriggerIds: [
-                      ...generation.orderingGroup.resolvedTriggerIds,
-                      trigger.orderingId!,
-                    ],
-                  },
-                }
-              : {}),
-          },
-          ...work.generations.slice(1),
-        ],
-      };
-    }
-    if (trigger) {
-      // Clear selected work BEFORE activation. A resumed child cannot replay it.
-      const { selectedTrigger: _selected, ...unselected } = work;
-      state = updateOwner(state, owner.id, unselected);
-      const result = services
-        .withCommittedEvents(events)
-        .resolveEffect(
-          state,
-          trigger.effectBlock,
-          trigger.sourceCardInstanceId,
-          trigger.controller,
-          cardDb,
-          getEventCardInstanceId(trigger.triggeringEvent) ?? null,
-          trigger.triggeringEvent,
-          trigger.sourceSnapshot
-        );
-      state = result.state;
-      events.push(...result.events);
-      if (isGameTerminated(state)) continue;
-      if (result.pendingPrompt)
-        return {
-          ...result,
-          state: retainPropagationBeforePrompt(state, events),
-          events,
-          kind: "waiting",
-        };
-      const unpublished = [...result.events];
-      state = publishCommittedEvents(state, result.events);
-      replacePendingEventReferences(events, unpublished, result.events);
-      state = publishCommittedEvents(state, events);
-      const scan = scanEventsForTriggers(
-        state,
-        result.events,
-        trigger.controller,
-        cardDb
-      );
-      state = scan.state;
-      replacePendingEventReferences(events, result.events, scan.events);
-      if (scan.triggers.length)
-        state = reportTriggerWork(state, scan.triggers).state;
-      continue;
-    }
-    state = publishCommittedEvents(state, events);
-    state = { ...state, effectStack: state.effectStack.slice(0, -1) };
-  }
-}
+export { drainPendingWork as advanceTriggerExecution } from "./pending-work-drain.js";
 
-/** Reader-only Life interruption entry. Ordinary fulfilled work still reports
- * to its existing owner; only the Life Trigger's own children advance here. */
+/** Compatibility entry for the supported bounded Life-reader fixtures. */
 export function advanceLifeTriggerExecution(
   initial: EffectResolverResult,
   damageFrameId: string,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
 ): EffectResolverResult {
-  if (!triggerExecutionOwner(initial.state)) return initial;
-  return advanceTriggerExecution(initial, cardDb, services, damageFrameId);
+  return drainPendingWork(initial, cardDb, services, damageFrameId);
 }

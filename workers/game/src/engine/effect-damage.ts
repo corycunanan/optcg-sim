@@ -1,4 +1,5 @@
-import { advanceLifeTriggerExecution, triggerExecutionOwner } from "./trigger-executor.js";
+import { beginLifeTriggerStaging, finishLifeTriggerStaging, type LifeTriggerStagingWork } from "./life-trigger-staging.js";
+import { triggerExecutionOwner } from "./trigger-executor.js";
 import type {
   CardData,
   EffectDamageContinuation,
@@ -8,7 +9,7 @@ import type {
   LifeCard,
   PendingEvent,
 } from "../types.js";
-import { removeTopLifeCard, pushTriggerStaging } from "./state.js";
+import { removeTopLifeCard } from "./state.js";
 import { hasTrigger } from "./keywords.js";
 import { isCostSequencePayable } from "./effect-resolver/cost-handler.js";
 import { lifeToHandDestination } from "./life-destination.js";
@@ -16,7 +17,7 @@ import { transitionDetachedCard } from "./zone-transition.js";
 import { generateFrameId, popFrame, pushFrame } from "./effect-stack.js";
 import { continuationFrame, revealTriggerPromptFor, updateFrameById } from "./damage-frames.js";
 import { emitPendingEvent, withEventLogEmitted } from "./events.js";
-import { resolveEffect, resolverExecutionServices } from "./effect-resolver/index.js";
+import { resolveEffectWork } from "./effect-resolver/resolver.js";
 import { isGameTerminated } from "./terminal.js";
 import { retainEventsOnFrame } from "./effect-resolver/resume/events.js";
 import type { EffectResult } from "./effect-types.js";
@@ -157,7 +158,7 @@ export function canOfferTrigger(
 
 // ─── EFFECT_DAMAGE frame (OPT-963 / OPT-926) ─────────────────────────────────
 
-export interface EffectDamageResult extends ExecuteResult {
+export interface EffectDamageResult extends ExecuteResult, LifeTriggerStagingWork {
   /** Points dealt so far by the instruction (its result count). */
   dealt: number;
 }
@@ -172,16 +173,6 @@ function triggerBlockOf(cardDb: Map<string, CardData>, cardId: string) {
   };
 }
 
-function restoreTriggerStaging(state: GameState, baseline: readonly string[]): GameState {
-  const keep = new Set(baseline);
-  return {
-    ...state,
-    turn: {
-      ...state.turn,
-      triggerStagingInstanceIds: (state.turn.triggerStagingInstanceIds ?? []).filter((id) => keep.has(id)),
-    },
-  };
-}
 
 /**
  * Deal effect damage one point at a time (4-6-2). `damageTaken` is true when
@@ -367,8 +358,8 @@ export function resumeEffectDamageFrame(
   const triggerInstanceId = moved.fact.newInstanceId;
   // OPT-257 (F4): the staging marker keeps the just-trashed Life card
   // invisible to trash-targeting effects during the Trigger's resolution.
-  const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
-  nextState = pushTriggerStaging(nextState, triggerInstanceId);
+  const staging = beginLifeTriggerStaging(nextState, frame.id, triggerInstanceId);
+  nextState = staging.state;
   events.push({
     type: "TRIGGER_ACTIVATED",
     playerIndex: damagedPlayerIndex,
@@ -388,14 +379,11 @@ export function resumeEffectDamageFrame(
     payload: { cardInstanceId: lifeCard.instanceId, newCardInstanceId: triggerInstanceId },
   };
   if (block) {
-    const resolved = resolveEffect(nextState, block, triggerInstanceId, damagedPlayerIndex, cardDb);
-    const effectResult = advanceLifeTriggerExecution(
-      { ...resolved, events: [...events, ...resolved.events] },
-      frame.id, cardDb, resolverExecutionServices
-    );
+    const resolved = resolveEffectWork(nextState, block, triggerInstanceId, damagedPlayerIndex, cardDb);
+    const effectResult = { ...resolved, events: [...events, ...resolved.events] };
     nextState = effectResult.state;
     events.splice(0, events.length, ...effectResult.events);
-    nextState = restoreTriggerStaging(nextState, stagingBaseline);
+    if (effectResult.pendingPrompt) nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
     // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
     // that already happened, then stop: no further damage.
     if (isGameTerminated(nextState)) {
@@ -421,10 +409,12 @@ export function resumeEffectDamageFrame(
         },
         accumulatedEvents: [...events, removed],
       }));
-      return { state: nextState, events: [], dealt, pendingPrompt: effectResult.pendingPrompt };
+      return { state: nextState, events: [], dealt, pendingPrompt: effectResult.pendingPrompt,
+        ...(!effectResult.pendingPrompt ? { lifeTriggerStaging: staging.scopes } : {}) };
     }
+    nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
   } else {
-    nextState = restoreTriggerStaging(nextState, stagingBaseline);
+    nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
   }
   // Accept path: emit REMOVED_FROM_LIFE after the trigger block resolves, per
   // OPT-240. Then resume the remaining damages.

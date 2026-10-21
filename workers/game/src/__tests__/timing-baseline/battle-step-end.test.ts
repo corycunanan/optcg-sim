@@ -46,9 +46,9 @@ const log = (s: GameState, from: number): readonly GameEvent[] => s.eventLog.sli
 const count = (events: readonly GameEvent[], type: string) => events.filter((e) => e.type === type).length;
 
 describe("F11a [Rule 7-1-1-4 line 640; FAQ qa_rules.md Basic Rules leg-7 R20] attacker K.O.'d in the Attack Step: no Block Step", () => {
-  // Engine: after the Attack Step K.O. the battle stays in BLOCK_STEP (events end CARD_KO, no END_OF_BATTLE).
+  // OPT-967 corrects the historical next-step notification before the zone checkpoint.
   // Rule 7-1-1-4 (line 640): a moved combatant sends the battle to End of Battle, not the Block Step.
-  it.fails("F11a battle ends at the end of the Attack Step (ratchet OPT-967)", () => {
+  it("F11a battle ends at the end of the Attack Step (corrected OPT-967)", () => {
     const db = new Map(createTestCardDb());
     // Stands in for a p1 Character with [On Your Opponent's Attack]: K.O. the attacker by name.
     const watcher = synChar("SYN-ON-OPP-ATTACK-KO", {
@@ -83,6 +83,14 @@ describe("F11a [Rule 7-1-1-4 line 640; FAQ qa_rules.md Basic Rules leg-7 R20] at
     expect(state.turn.battleSubPhase).toBeNull();
     expect(state.turn.battle).toBeNull();
     expect(state.pendingPrompt).toBeNull();
+    expect(
+      events.some(
+        (e) =>
+          e.type === "PHASE_CHANGED" &&
+          e.payload?.from === "ATTACK_STEP" &&
+          e.payload?.to === "BLOCK_STEP"
+      )
+    ).toBe(false);
     expect(count(events, "DAMAGE_DEALT")).toBe(0);
     const end = events.filter((e) => e.type === "END_OF_BATTLE");
     expect(end.length).toBe(1);
@@ -91,9 +99,9 @@ describe("F11a [Rule 7-1-1-4 line 640; FAQ qa_rules.md Basic Rules leg-7 R20] at
 });
 
 describe("F11b [Rule 7-1-2-3 line 648; FAQ qa_rules.md Basic Rules leg-7 R20] attacker K.O.'d inside a Block Step prompt: no Counter Step", () => {
-  // Engine: after the prompt resolves the battle continues into COUNTER_STEP (events end CARD_KO).
+  // OPT-967 holds the next-step notification until the prompted window finishes.
   // Rule 7-1-2-3 (line 648): a moved combatant sends the battle to End of Battle, not the Counter Step.
-  it.fails("F11b battle ends at the end of the Block Step (ratchet OPT-967)", () => {
+  it("F11b battle ends at the end of the Block Step (corrected OPT-967)", () => {
     const db = new Map(createTestCardDb());
     // Stands in for a p1 [Blocker] Character with [On Block]: K.O. up to 1 opponent Character (prompt).
     const blocker = synChar(

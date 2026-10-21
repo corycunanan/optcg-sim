@@ -1,3 +1,4 @@
+import type { LifeTriggerStagingWork } from "../life-trigger-staging.js";
 /**
  * Shared types for the effect-resolver module.
  */
@@ -104,7 +105,7 @@ export interface EffectResolverServices {
 export type HandlerProgress = "completed" | "waiting" | "queued" | "continued" | "terminal";
 export type HandlerResult = EffectResolverResult & { kind: HandlerProgress };
 
-export interface EffectResolverResult {
+export interface EffectResolverResult extends LifeTriggerStagingWork {
   state: GameState;
   events: PendingEvent[];
   resolved: boolean;

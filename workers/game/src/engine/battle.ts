@@ -1,4 +1,5 @@
-import { advanceLifeTriggerExecution, triggerExecutionOwner } from "./trigger-executor.js";
+import { beginLifeTriggerStaging, finishLifeTriggerStaging, type LifeTriggerStagingWork } from "./life-trigger-staging.js";
+import { triggerExecutionOwner } from "./trigger-executor.js";
 /**
  * Battle system
  *
@@ -31,7 +32,6 @@ import {
   getInactivePlayerIndex,
   findCardInState,
   restDonForCost,
-  pushTriggerStaging,
 } from "./state.js";
 import {
   getEffectivePower,
@@ -43,9 +43,9 @@ import { expireBattleEffects } from "./duration-tracker.js";
 import { hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
 import {
-  resolveEffect,
+  resolveEffectWork,
   resolverExecutionServices,
-} from "./effect-resolver/index.js";
+} from "./effect-resolver/resolver.js";
 import { koCharacter } from "./effect-resolver/card-mutations.js";
 import { isRemovalProhibited } from "./prohibitions.js";
 import { emitPendingEvent } from "./events.js";
@@ -58,21 +58,6 @@ import {
   popLifeForDamage as popLifeForDamageQuery,
 } from "./effect-damage.js";
 
-function restoreTriggerStaging(
-  state: GameState,
-  baseline: readonly string[]
-): GameState {
-  const keep = new Set(baseline);
-  return {
-    ...state,
-    turn: {
-      ...state.turn,
-      triggerStagingInstanceIds: (
-        state.turn.triggerStagingInstanceIds ?? []
-      ).filter((id) => keep.has(id)),
-    },
-  };
-}
 
 // ─── Declare Attack ───────────────────────────────────────────────────────────
 
@@ -260,7 +245,7 @@ export function executeDeclareBlocker(
 
 // ─── Pass (battle sub-phase transitions) ──────────────────────────────────────
 
-export function executePass(
+export function executePassWork(
   state: GameState,
   cardDb: Map<string, CardData>
 ): ExecuteResult {
@@ -324,19 +309,6 @@ export function executePass(
       playerIndex: pi,
       payload: { from: "COUNTER_STEP", to: "DAMAGE_STEP" },
     });
-    // Run damage resolution immediately. The Damage Step shares this
-    // accumulator: a Trigger window publishes it before prompting (OPT-963).
-    const dmgResult = executeDamageStep(nextState, cardDb, events);
-    nextState = dmgResult.state;
-    return {
-      state: nextState,
-      events: dmgResult.events,
-      ...(dmgResult.queuedTriggers?.length ? { queuedTriggers: dmgResult.queuedTriggers } : {}),
-      lethalDamagePlayerIndex: dmgResult.lethalDamagePlayerIndex,
-      ...(dmgResult.pendingPrompt && {
-        pendingPrompt: dmgResult.pendingPrompt,
-      }),
-    };
   }
 
   return { state: nextState, events };
@@ -457,7 +429,7 @@ export function executeUseCounterEvent(
       "keyword" in block.trigger && block.trigger.keyword === "COUNTER_EVENT"
   );
   if (counterBlock) {
-    const result = resolveEffect(nextState, counterBlock, moved.fact.newInstanceId, inactiveIdx, cardDb);
+    const result = resolveEffectWork(nextState, counterBlock, moved.fact.newInstanceId, inactiveIdx, cardDb);
     nextState = result.state;
     events.push(...result.events);
     if (result.pendingPrompt)
@@ -469,7 +441,7 @@ export function executeUseCounterEvent(
 // ─── Reveal Trigger (OPT-963: the BATTLE_DAMAGE frame's window) ─────────────
 
 /** A BATTLE_DAMAGE continuation releases retained watchers when its sequence completes. */
-export type BattleDamageResult = ExecuteResult & {
+export type BattleDamageResult = ExecuteResult & LifeTriggerStagingWork & {
   lethalDamagePlayerIndex?: 0 | 1;
   queuedTriggers?: QueuedTrigger[];
 };
@@ -522,10 +494,10 @@ export function resumeBattleDamageFrame(
     destinationInstanceId = triggerInstanceId;
     // OPT-257 (F4): mark the just-trashed Life card as staging so trash-targeting
     // effects (PLAY_CARD source_zone TRASH, TRASH_COUNT, etc.) don't see it
-    // during this Trigger's resolution. Cleared after resolveEffect returns —
-    // any pending prompt's candidate list is already built/locked at that point.
-    const stagingBaseline = nextState.turn.triggerStagingInstanceIds ?? [];
-    nextState = pushTriggerStaging(nextState, triggerInstanceId);
+    // during this Trigger's runnable work. A transient owner/slot cursor is
+    // handed to the common drain; genuine prompt candidates are locked first.
+    const staging = beginLifeTriggerStaging(nextState, frame.id, triggerInstanceId);
+    nextState = staging.state;
     events.push({
       type: "TRIGGER_ACTIVATED",
       playerIndex: inactiveIdx,
@@ -545,20 +517,17 @@ export function resumeBattleDamageFrame(
       (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "TRIGGER"
     );
     if (triggerBlock) {
-      const resolved = resolveEffect(
+      const resolved = resolveEffectWork(
         nextState,
         triggerBlock,
         triggerInstanceId,
         inactiveIdx,
         cardDb
       );
-      const effectResult = advanceLifeTriggerExecution(
-        { ...resolved, events: [...events, ...resolved.events] },
-        frame.id, cardDb, resolverExecutionServices
-      );
+      const effectResult = { ...resolved, events: [...events, ...resolved.events] };
       nextState = effectResult.state;
       events.splice(0, events.length, ...effectResult.events);
-      nextState = restoreTriggerStaging(nextState, stagingBaseline);
+      if (effectResult.pendingPrompt) nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
       // OPT-960: the Trigger ended the game (9-1-2). Publish the Life removal
       // that already happened, then stop: no further damage, no endBattle.
       if (isGameTerminated(nextState)) {
@@ -600,10 +569,12 @@ export function resumeBattleDamageFrame(
           state: nextState,
           events,
           pendingPrompt: effectResult.pendingPrompt,
+          ...(!effectResult.pendingPrompt ? { lifeTriggerStaging: staging.scopes } : {}),
         };
       }
+      nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
     } else {
-      nextState = restoreTriggerStaging(nextState, stagingBaseline);
+      nextState = finishLifeTriggerStaging(nextState, staging.scopes).state;
     }
   } else {
     // Decline trigger — add to hand
@@ -957,11 +928,14 @@ export function continueBattleDamageFrame(
     // with no remaining work or prompt; otherwise preserve its live owner.
     const events: PendingEvent[] = [];
     return {
-      state: battle && state.turn.battleSubPhase === "DAMAGE_STEP" && withoutStale.effectStack.every(frame =>
+      state: battle && state.turn.battleSubPhase === "DAMAGE_STEP" && withoutStale.effectStack.every(
+          (frame) =>
         frame.triggerExecution !== undefined &&
         !frame.triggerExecution.selectedTrigger &&
-        frame.triggerExecution.generations.every(generation => generation.triggers.length === 0) &&
-        frame.accumulatedEvents.every(event => event.propagation?.eventLogEmitted && event.propagation?.triggerScanned)
+        frame.triggerExecution.generations.every(
+              (generation) => generation.triggers.length === 0) &&
+        frame.accumulatedEvents.every(
+              (event) => event.propagation?.eventLogEmitted && event.propagation?.triggerScanned)
       )
         ? endBattle(withoutStale, events, { aborted: true })
         : withoutStale,
@@ -1069,7 +1043,7 @@ function isOnField(
   return { found, onField };
 }
 
-function executeDamageStep(
+export function executeDamageStep(
   state: GameState,
   cardDb: Map<string, CardData>,
   events: PendingEvent[]
@@ -1533,4 +1507,47 @@ function endBattle(
       battleSubPhase: null,
     },
   };
+}
+
+/** Rules 7-1-1-4, 7-1-2-3, 7-1-3-3. Called only by the drain once
+ * suspended work has popped, before exposing another battle command. */
+export function checkpointBattleStepEnd(state: GameState): ExecuteResult {
+  const battle = state.turn.battle;
+  const events: PendingEvent[] = [];
+  if (
+    !battle ||
+    !["BLOCK_STEP", "COUNTER_STEP", "DAMAGE_STEP"].includes(
+      state.turn.battleSubPhase ?? ""
+    )
+  )
+    return { state, events };
+  if (
+    isOnField(state, battle.attackerInstanceId).onField &&
+    isOnField(state, battle.targetInstanceId).onField
+  )
+    return { state, events };
+  events.push({
+    type: "BATTLE_ABORTED",
+    playerIndex: state.turn.activePlayerIndex,
+    payload: {
+      attackerInstanceId: battle.attackerInstanceId,
+      targetInstanceId: battle.targetInstanceId,
+      reason: !isOnField(state, battle.attackerInstanceId).onField
+        ? "ATTACKER_LEFT_FIELD"
+        : "TARGET_LEFT_FIELD",
+    },
+  });
+  return { state: endBattle(state, events, { aborted: true }), events };
+}
+
+/** Public battle helper; production action execution reports work to the pipeline. */
+export function executePass(
+  state: GameState,
+  cardDb: Map<string, CardData>
+): ExecuteResult {
+  const result = executePassWork(state, cardDb);
+  if (result.state.turn.battleSubPhase === "DAMAGE_STEP") {
+    return executeDamageStep(result.state, cardDb, result.events);
+  }
+  return result;
 }

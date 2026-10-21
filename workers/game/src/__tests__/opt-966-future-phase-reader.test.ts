@@ -1,3 +1,4 @@
+import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
 import { convertPersistedGameState, SessionRepository } from "../session/persistence.js";
@@ -13,7 +14,8 @@ import watcherJson from "./fixtures/opt-966-scheduled-watcher-writer.json";
 
 type Corpus = {
   producerCommit: string;
-  cases: { index: number; stored: Record<string, unknown>; replies: GameAction[] }[];
+  cases: { index: number; stored: Record<string, unknown>; replies: GameAction[];
+  }[];
   expected: GameState;
 };
 const scenarios = [
@@ -27,7 +29,7 @@ const scenarios = [
 ] as const;
 const cases = scenarios.flatMap(([name, json, promptPrefix]) => {
   const corpus = json as unknown as Corpus;
-  return corpus.cases.map(entry => ({ ...entry, name, expected: corpus.expected, promptPrefix, corpus }));
+  return corpus.cases.map((entry) => ({ ...entry, name, expected: corpus.expected, promptPrefix, corpus }));
 });
 
 it.each(cases)("resumes writer $name pause $index through later work in live and undo", async ({ index, stored, replies, expected, promptPrefix, corpus, name }) => {
@@ -41,13 +43,16 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       // The producer uses fixed prompt IDs to keep storage allocation identical.
       actual.pendingPrompt!.promptId = `${promptPrefix}-${index + offset}`;
       // No hidden mode survives a save: every re-park must carry its v5 owner.
-      expect(actual.effectStack.some(frame => frame.triggerExecution)).toBe(true);
+      expect(actual.effectStack.some((frame) => frame.triggerExecution)).toBe(true);
       if (name.includes("legacy")) {
         expect(actual.turn.activePlayerIndex).toBe(0);
-        expect(actual.effectStack.findIndex(frame => frame.phaseBoundaryContinuation))
-          .toBeLessThan(actual.effectStack.findIndex(frame => frame.triggerExecution));
+        expect(actual.effectStack.findIndex(
+              (frame) => frame.phaseBoundaryContinuation))
+          .toBeLessThan(actual.effectStack.findIndex((frame) => frame.triggerExecution));
       }
-      const writerPrompt = (corpus.cases[index + offset].stored.session as { state: GameState }).state.pendingPrompt;
+      const writerPrompt = candidateExpected<GameState>(
+          `future/${name}/${index}/pause/${offset}`
+        ).pendingPrompt;
       expect(actual.pendingPrompt?.options).toEqual(writerPrompt?.options);
       expect(actual.pendingPrompt?.respondingPlayer).toEqual(writerPrompt?.respondingPlayer);
       const nextStorage = new MemorySessionStorage();
@@ -63,12 +68,14 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
         }
       }
       const result = resumePromptLifecycle(actual, action, loaded.cardDb, {
-        drainPregame: state => state, advanceStartOfTurn: state => state,
+        drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
       });
       expect(result.responseRejected).toBe(false);
       actual = result.state;
     }
-    expect(actual.pendingPrompt).toBeNull();
+      expected = candidateExpected<GameState>(`future/${name}/${index}/final`);
+      expect(actual).toEqual(expected);
+      expect(actual.pendingPrompt).toBeNull();
     expect(actual.effectStack).toEqual([]);
     expect(actual.eventLog).toEqual(expected.eventLog);
     expect(actual.players).toEqual(expected.players);
@@ -78,7 +85,8 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
 });
 
 
-it.each(["state", "undoHistory[0]"])("keeps raw v5 missing-stage rejection in %s", location => {
+it.each(["state", "undoHistory[0]"])("keeps raw v5 missing-stage rejection in %s",
+  (location) => {
   const raw = structuredClone(absentLegacyJson.cases[0].stored.session.state) as unknown as GameState;
   for (const frame of raw.effectStack) {
     if (frame.phaseBoundaryContinuation) delete frame.phaseBoundaryContinuation.stage;

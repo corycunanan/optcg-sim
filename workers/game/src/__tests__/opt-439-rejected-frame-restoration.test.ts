@@ -71,7 +71,7 @@ describe("OPT-439 rejected response frame restoration", () => {
     expect(rejected.rejected).toBe(true);
     expect(rejected.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     expect(rejected.state.effectStack.map((entry) => entry.id)).toEqual(["outer", "inner"]);
-    expect(rejected.state.effectStack.filter(frame => !frame.triggerExecution)[1].remainingActions).toEqual(inner.remainingActions);
+    expect(rejected.state.effectStack.filter((frame) => !frame.triggerExecution)[1].remainingActions).toEqual(inner.remainingActions);
 
     const handBefore = rejected.state.players[0].hand.length;
     const accepted = resumeFromStack(
@@ -80,7 +80,8 @@ describe("OPT-439 rejected response frame restoration", () => {
       cardDb,
     );
 
-    expect(accepted.state.effectStack.map((entry) => entry.id)).toEqual(["outer"]);
+    // The public resume boundary now drains the interrupted outer completion.
+    expect(accepted.state.effectStack).toEqual([]);
     expect(accepted.state.players[1].characters.some((card) => card?.instanceId === target.instanceId)).toBe(false);
     expect(accepted.state.players[0].hand).toHaveLength(handBefore + 1);
   });
@@ -164,10 +165,11 @@ describe("OPT-439 rejected response frame restoration", () => {
     );
 
     expect(overflow.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    expect(overflow.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(2);
-    expect(overflow.state.effectStack.filter(frame => !frame.triggerExecution)[0].id).toBe("outer");
-    expect(overflow.state.effectStack.filter(frame => !frame.triggerExecution)[1].id).not.toBe("play-target");
-    const replacement = overflow.state.effectStack.filter(frame => !frame.triggerExecution)[1] as unknown as EffectStackFrame;
+    expect(overflow.state.effectStack.filter((frame) => !frame.triggerExecution)).toHaveLength(2);
+    expect(overflow.state.effectStack.filter((frame) => !frame.triggerExecution)[0].id).toBe("outer");
+    expect(overflow.state.effectStack.filter((frame) => !frame.triggerExecution)[1].id).not.toBe("play-target");
+    const replacement = overflow.state.effectStack.filter(
+      (frame) => !frame.triggerExecution)[1] as unknown as EffectStackFrame;
     expect(replacement.playOverflow?.playTargetId).toBe(playTarget.instanceId);
     expect(replacement.remainingActions).toEqual(pending.remainingActions);
 
@@ -180,7 +182,7 @@ describe("OPT-439 rejected response frame restoration", () => {
     );
 
     expect(completed.pendingPrompt).toBeUndefined();
-    expect(completed.state.effectStack.map((entry) => entry.id)).toEqual(["outer"]);
+    expect(completed.state.effectStack).toEqual([]);
     expect(completed.state.players[0].characters.filter(Boolean)).toHaveLength(5);
     expect(completed.state.players[0].hand).toHaveLength(handBefore);
   });
@@ -230,10 +232,11 @@ describe("OPT-439 rejected response frame restoration", () => {
 
     expect(nestedPrompt.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     expect(nestedPrompt.rejected).toBeUndefined();
-    const replacement = nestedPrompt.state.effectStack.filter(frame => !frame.triggerExecution)[0] as unknown as EffectStackFrame;
+    const replacement = nestedPrompt.state.effectStack.filter(
+      (frame) => !frame.triggerExecution)[0] as unknown as EffectStackFrame;
     expect(replacement.remainingActions).toEqual(pending.remainingActions);
     expect(replacement.pendingTriggers).toEqual([]);
-    expect(nestedPrompt.state.effectStack.find(frame => frame.triggerExecution)!.triggerExecution!.generations[0].triggers).toMatchObject([queuedTrigger]);
+    expect(nestedPrompt.state.effectStack.find((frame) => frame.triggerExecution)!.triggerExecution!.generations[0].triggers).toMatchObject([queuedTrigger]);
 
     const handBefore = nestedPrompt.state.players[0].hand.length;
     const completed = resumeFromStack(
