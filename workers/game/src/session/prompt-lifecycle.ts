@@ -246,7 +246,8 @@ function resumePromptLifecycleUnreleased(
   } else if (!responseRejected) {
     // One unwind for every continuation that needs no input (OPT-963 §7):
     // parked End Phases, damage frames, replacement batches, interrupted chains.
-    const unwound = resumeContinuations(state, action, cardDb, respondingPlayer, gameOver);
+    const unwound = resumeContinuations(state, action, cardDb, respondingPlayer, gameOver,
+      stateBeforeResume.effectStack.some(frame => frame.triggerExecution !== undefined));
     state = unwound.state;
     gameOver = unwound.gameOver;
   }
@@ -327,7 +328,8 @@ function resumeContinuations(
   action: GameAction,
   cardDb: Map<string, CardData>,
   actingPlayer: 0 | 1,
-  initialGameOver: GameOver
+  initialGameOver: GameOver,
+  triggerExecutionMode: boolean
 ): { state: GameState; gameOver?: GameOver } {
   let state = initialState;
   let gameOver = initialGameOver;
@@ -340,7 +342,7 @@ function resumeContinuations(
     const kind = frameKindOf(frame);
 
     if (kind === "PHASE_BOUNDARY") {
-      const resumed = resumePhaseBoundary(state, cardDb);
+      const resumed = resumePhaseBoundary(state, cardDb, triggerExecutionMode);
       state = resumed.state;
       if (resumed.pendingPrompt) {
         state = { ...state, pendingPrompt: resumed.pendingPrompt };
@@ -351,7 +353,9 @@ function resumeContinuations(
           state,
           resumed,
           cardDb,
-          frame.phaseBoundaryContinuation!.endingPlayerIndex
+          frame.phaseBoundaryContinuation!.endingPlayerIndex,
+          resumed.queuedTriggers,
+          triggerExecutionMode
         );
         state = pipeline.state;
         gameOver = pipeline.gameOver;

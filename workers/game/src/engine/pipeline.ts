@@ -221,6 +221,7 @@ export function continuePipelineFromExecution(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
   deferredTriggers: readonly QueuedTrigger[] = execResult.queuedTriggers ?? [],
+  triggerExecutionMode = false,
 ): PipelineResult {
   const continuationAction: GameAction = { type: "REVEAL_TRIGGER", reveal: true };
   // Checkpoint for the resumed execution's lethal damage determination
@@ -239,6 +240,7 @@ export function continuePipelineFromExecution(
     undefined,
     false,
     deferredTriggers,
+    triggerExecutionMode,
   );
 
   if (isGameTerminated(nextState)) {
