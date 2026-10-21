@@ -159,3 +159,106 @@ Reintroducing the wrong insertion depth kills both initial legacy corpus cases
 This substantive reassessment requires fresh independent review and full
 verification; the earlier 4d406814 gate does not establish readiness of this
 correction.
+
+## Battle publication prerequisite (OPT-966, October 21)
+
+The final writer replay gate exposed another semantic reader gap on deployed
+reader `7230767fc692e33051cb46d1dde1533e1b80bcc6`: a loaded v5 scope could
+publish a battle substitute's K.O./hand-trash events before the damage frame's
+retained PHASE_CHANGED, CHARACTER_BATTLES and COMBAT_VICTORY prefix. This is a
+publication ownership defect, not an accepted trace change.
+
+The bounded reader correction applies only after finding an existing v5 owner
+and a CHARACTER_KO_REPLACEMENT frame matching the live battle ID. It retains
+returned events, with their propagation flags, on that damage frame and returns
+continued. The existing session dispatcher completes substitute children and
+damage; ordinary queued work remains deferred. Terminal handling still runs
+first. There is no new scope producer, schema field, reader retirement, or
+normal-v4 routing change.
+
+`opt-966-battle-reader.test.ts` consumes two synthetic actual-writer corpora from
+producer `281c0df01ab6e10fb8016a7eb384546dddd5a39e` (runtime checkpoint
+`f4c707572b8dce5cf47ef66f94f969345ee4a238`). Each has three saved pauses: the
+replacement offer and two successive hand selections. A later substitute power
+modification must finish before END_OF_BATTLE; a surviving K.O. watcher draws
+afterward. The second scenario ends the game on that draw. Every starting pause
+is replayed from both live and undo data, with a real session save/load before
+every subsequent response. Assertions compare prompt ownership/options and the
+entire final GameState, including event payloads, timestamps and allocation IDs.
+Explicit outcome/count guards supplement differential equality.
+
+All six corpus cases fail with the guard bypassed and pass restored. The prior
+replay corpus, OPT-872 and OPT-965 suites pass (99 passed, one existing expected
+failure). An opt-in comparison against the immutable deployed-reader-v2 checkout
+also preserves the complete normal-v4 battle response in live and undo; together
+with the existing writer goldens this passes 41 tests. Worker type checking
+passes. Full verification and independent review are delivery gates, not yet
+claimed here.
+
+Reproduction from the repository root:
+
+```sh
+pnpm --dir workers/game test src/__tests__/opt-966-battle-reader.test.ts
+OPT966_READER_ROOT=/absolute/path/to/reader-at-7230767 pnpm --dir workers/game test src/__tests__/opt-966-battle-reader.test.ts src/__tests__/opt-940-writer-golden.test.ts
+```
+
+The main writer remains incomplete. These six synthetic snapshots establish the
+specified battle paths, not every possible future v5 graph. Missing production
+captures remain the inherited OPT-971 evidence gap; no capture or retirement gate
+is waived.
+
+### Battle topology progress correction
+
+External review comment 4340417923 identified that the first battle guard also
+matched a damage frame *below* the nearest v5 owner. For an accepted saved graph
+`[battle, owner]`, that guard returned continued without removing the owner;
+the session dispatcher would select the same owner repeatedly. The handoff now
+requires the matching damage frame to be above the nearest owner. An owner above
+battle finishes its own work, allowing the existing dispatcher to reach damage.
+
+Bounded tests first save/load accepted alternate graphs with empty, queued and
+nested owners, then assert progress from one direct resume before exercising the
+session drain. This fails safely on the old guard instead of hanging the suite.
+Live and undo variants complete with single publications and no stranded frames.
+These rearranged graphs are progress probes, not evidence of a rule-correct
+activation window; the unchanged actual-writer corpus remains the chronology
+oracle. The previous full gate at 2328944b is historical evidence; this runtime
+correction requires fresh review and full verification before readiness.
+
+### Post-damage ordering boundary correction
+
+External comment 4340528672 proposed a stranded SET_REST batch after Morley's
+battle substitute. The actual supported path does not produce that batch:
+`scanEventsForTriggers` moves matched triggers onto the matching battle frame
+and returns an empty trigger list. The PLAY_CARD, KO and SET_REST batch producers
+all depend on a nonempty returned match list. Actual OP16-033 replacement-choice,
+two-target rest, post-choice hand prompt and power-suffix replay confirms damage
+finishes before its two rest watchers. No speculative batch-executor or outer
+session-loop change was retained. This refutes that producer path, not arbitrary
+fabricated saved batch graphs.
+
+The same expanded replay exposed a different real BATTLE_POST_BOUNDARY gap.
+`applyDamageResult` omitted the already-established invocation-local v5 mode when
+calling `continuePipelineFromExecution`. The legacy path offered two deferred
+watchers while the v5 owner's first generation remained empty; the next save/load
+correctly rejected the inconsistent ordering selection. No ordering IDs or
+validator were changed. The correction carries the existing mode through all
+three damage-result call sites: reveal reply, damage unwind, and synchronous
+replacement-offer completion. Ordinary v4 invocations still pass false.
+
+Additional actual writer corpora:
+- `ae736062fa9033965ba166fbb8797a498dea92d5`: five Morley pauses, with a synthetic
+  post-choice suffix added to the registered OP16-033 schema via the fixture's
+  explicit schema override. The source's original replacement-choice actions
+  remain intact. Both rested cards, suffix publication, no ordinary watcher
+  before battle completion, and exact two draws are independently asserted.
+- `9f3c66df2163a7ae72d9ca392e713903c950275c`: immediate battle-decline and Life-decline
+  completion, two pauses each, explicitly exercising the other entry paths.
+
+All nine new snapshots replay live and undo with full GameState equality and
+repeated real session saves. Disabling the mode propagation fails five cases
+(four Morley prefixes and the immediate battle entry); the Life case is positive
+path coverage, not a decisive mutation guard. The focused compatibility run
+passes 146 tests with one existing expected failure; types pass. Previous full
+results remain historical: this substantive correction needs fresh independent
+review and full verification. The main writer is still incomplete and held.
