@@ -24,6 +24,8 @@ import {
   buildTriggerSelectionPrompt,
   queuedSourceSnapshot,
 } from "./trigger-ordering.js";
+import { advanceTriggerExecution, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "./trigger-executor.js";
+import { resolverExecutionServices } from "./effect-resolver/resolver.js";
 import { takeEngineTimestamp } from "./execution-context.js";
 
 // ─── Step 5: Fire Events & Triggers ───────────────────────────────────────────
@@ -36,6 +38,7 @@ export function fireEventsAndTriggers(
   actedCard?: ActedCardSnapshot,
   recordPerformedAction = true,
   deferredTriggers: readonly QueuedTrigger[] = [],
+  triggerExecutionMode = false,
 ): GameState {
   const pi = state.turn.activePlayerIndex;
 
@@ -98,7 +101,11 @@ export function fireEventsAndTriggers(
     const turnPlayerTriggers = triggerQueue.filter(t => t.controller === activePI);
     const nonTurnPlayerTriggers = triggerQueue.filter(t => t.controller !== activePI);
 
-    const result = processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb);
+    const result = triggerExecutionMode
+      ? advanceTriggerExecution(triggerExecutionOwner(state)
+        ? reportTriggerWork(state, [...turnPlayerTriggers, ...nonTurnPlayerTriggers])
+        : createTriggerExecution(state, [...turnPlayerTriggers, ...nonTurnPlayerTriggers]), cardDb, resolverExecutionServices)
+      : processPlayerTriggerGroup(state, turnPlayerTriggers, nonTurnPlayerTriggers, cardDb);
     state = result.state;
     if (isGameTerminated(state)) return state;
 
@@ -128,9 +135,10 @@ export function fireEndPhaseEvents(
   state: GameState,
   events: ExecuteResult["events"],
   cardDb: Map<string, CardData>,
+  triggerExecutionMode = false,
 ): GameState {
   if (events.length === 0) return state;
-  return fireEventsAndTriggers(state, { state, events }, { type: "ADVANCE_PHASE" }, cardDb, undefined, false);
+  return fireEventsAndTriggers(state, { state, events }, { type: "ADVANCE_PHASE" }, cardDb, undefined, false, [], triggerExecutionMode);
 }
 
 /**

@@ -71,3 +71,49 @@ Evidence limits: the historical three-plus-generation test checks preservation, 
 Fresh review reproduced an additional reader defect: an accepted Life Trigger with PLAY_CARD followed by DRAW could return queued work without a prompt, causing the damage driver to advance to its next point before that Trigger's own batch suffix. Both battle and effect damage now enter the same executor with the exact existing damage frame as the stop boundary. It advances the Life Trigger's children, preserves outer owner event debt, and returns at the damage boundary without selecting an older outer sibling. Newly fulfilled ordinary On Play work remains in the outer collector until damage finishes (8-6-2); this is not a new nested ordinary-trigger execution policy. Any retained child without input parks the existing TRIGGER_EFFECT continuation for the session dispatcher. No new persisted field or normal trigger-scope producer is added. A missing stop boundary terminates as an engine contract error instead of running unrelated outer work.
 
 The original effect-damage reproducer failed before the fix. Added effect/battle two-point fixtures cover an immediate or prompted Life play, exact full event and final gameplay equality across reload, Life suffix before the second point, older outer sibling and On Play after that point, single CARD_PLAYED and two Life removals, and terminal suffix stopping further damage/ordinary work. Battle's existing early publication of the accepted Life removal during a prompted Trigger remains unchanged; cross-reload comparisons do not pretend that the baseline prompted/unprompted battle removal publication is identical.
+
+## Followup: future End Phase entries after a loaded v5 scope
+
+The incomplete writer checkpoint `dfe08838` exposed a rollback replay gap in
+reader `f3924a47`: the current loaded scope resumed correctly, but later End
+Phase waves and scheduled effects entered the old execution path after that
+scope drained. Exact event logs matched in the first witness, while future card
+IDs diverged because five new writer scopes consumed IDs that the reader did
+not allocate. This was not normalized away. A second witness with a scheduled
+draw and prompted ordinary watcher identified the same gap at
+`fireEndPhaseEvents` after the scheduled effect's scope drained.
+
+The reader followup retains an invocation-local execution-mode argument from
+the session resume's original stack. Only an existing v5 `triggerExecution`
+owner enables it. It follows the existing continuation dispatcher into later
+End Phase waves, scheduled effects, and their event publication boundary. Those
+entries create the already-supported owner shape and use the existing shared
+executor. No extra drain loop, persisted flag, global mode, or new schema is
+introduced. Normal v4 entry points keep their old path and serialization. The
+loader removes schemaVersion, so runtime routing uses the explicit owner at
+resume ingress, before that owner can drain.
+
+The synthetic writer corpus in `workers/game/src/__tests__/fixtures/opt-966-*-writer.json`
+records its producer commit and actual SessionRepository saves. Producer commit
+`02054efe` contains the capture tests; runtime is the incomplete writer checkpoint
+`dfe08838`. Both sides save/load at every pause with the same fixed prompt IDs.
+The reader tests replay both live and undo snapshots, save/load again at every
+subsequent pause, require a retained execution owner at each re-park, compare
+prompt options/controllers, and compare complete final events, players, turn,
+and execution context without card-ID, RNG, or timestamp normalization.
+
+The bounded corpus comprises ten starting pauses across four scenarios: five
+End Phase stages, Life reveal and a prompted Trigger child, one replacement
+offer, and an initial End Phase wave followed by a scheduled-draw watcher. The
+producer independently asserts the intended prompt families and final outcomes
+for the latter three scenarios. This is not evidence for every possible future
+v5 continuation graph, nor a production capture corpus. OPT-971's inherited
+missing production-capture evidence and the prohibition on retiring supported
+readers remain unchanged. Final writer snapshots must be replayed again after
+its remaining migration work is complete.
+
+Focused validation: 152 tests passed, including the unchanged v4 writer golden,
+legacy shape fixtures, End Phase persistence, and owner semantic tests. Disabling
+mode propagation at `resumePhaseBoundary` kills six of the ten corpus cases;
+the mutation is restored. Full verification and independent reviews are still
+pending at this checkpoint.

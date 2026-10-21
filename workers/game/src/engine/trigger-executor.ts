@@ -29,6 +29,7 @@ import {
   publishCommittedEvents,
   retainPropagationBeforePrompt,
 } from "./effect-resolver/resume/events.js";
+import { continuationBoundary, pushFrame } from "./effect-stack.js";
 import { reenterBatchResume } from "./effect-resolver/resume/batch.js";
 
 export type HandlerProgress =
@@ -45,6 +46,43 @@ export function triggerExecutionOwner(
   return [...state.effectStack]
     .reverse()
     .find((frame) => frame.triggerExecution !== undefined);
+}
+
+/** Own reports raised by a directly executed effect until its suffix finishes. */
+export function createEffectExecutionScope(
+  state: GameState,
+  sourceCardInstanceId: string,
+  controller: 0 | 1
+): GameState {
+  if (triggerExecutionOwner(state) || isGameTerminated(state)) return state;
+  const boundary = continuationBoundary(state, sourceCardInstanceId, controller);
+  return pushFrame(boundary.state, {
+    ...boundary.frame,
+    triggerExecution: { generations: [{ triggers: [] }] },
+  });
+}
+
+/** Start a persisted scope at a cross-effect boundary. Domain handlers only
+ * report work once this owner exists; advancement remains at the dispatcher. */
+export function createTriggerExecution(
+  state: GameState,
+  triggers: QueuedTrigger[],
+  orderingGroup?: EffectStackFrame["triggerOrderingGroup"]
+): HandlerResult {
+  if (isGameTerminated(state))
+    return { kind: "terminal", state, events: [], resolved: true };
+  if (!triggers.length)
+    return { kind: "completed", state, events: [], resolved: true };
+  const first = triggers[0];
+  const boundary = continuationBoundary(state, first.sourceCardInstanceId, first.controller);
+  state = pushFrame(boundary.state, {
+    ...boundary.frame,
+    triggerExecution: { generations: [{
+      triggers: withStableOrderingIds(triggers),
+      ...(orderingGroup ? { orderingGroup } : {}),
+    }] },
+  });
+  return { kind: "queued", state, events: [], resolved: true };
 }
 
 function updateOwner(
