@@ -253,7 +253,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT).each([false, true])("reparks legacy s
 });
 
 
-it.skipIf(!process.env.OPT966_READER_ROOT)("replays a prompted battle substitute and its surviving KO watcher", async () => {
+it.skipIf(!process.env.OPT966_READER_ROOT).each([false, true])("replays a prompted battle substitute and its surviving KO watcher (terminal %s)", async terminal => {
   const rig = endPhaseRig();
   rig.state.turn.activePlayerIndex = 1;
   rig.putSyn("BATTLE-REPLACER", synSchema("BATTLE-REPLACER", "Leader", [{
@@ -270,6 +270,7 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays a prompted battle substitute
     id: "watch", category: "auto", trigger: { event: "ANY_CHARACTER_KO", filter: { controller: "SELF" } },
     actions: [{ type: "DRAW", params: { amount: 1 } }],
   }]), 0, "CHARACTER", { cost: 5 });
+  if (terminal) rig.state.players[0].deck = rig.state.players[0].deck.slice(0, 1);
   rig.putSyn("EXTRA-HAND-A", null, 0, "HAND");
   rig.putSyn("EXTRA-HAND-B", null, 0, "HAND");
   const target = rig.put("OP09-083", 0, "CHARACTER", { cost: 5, power: 6000 });
@@ -282,11 +283,13 @@ it.skipIf(!process.env.OPT966_READER_ROOT)("replays a prompted battle substitute
   }
   const pauses = await replayPauses(rig, state => state.pendingPrompt!.options.promptType === "SELECT_TARGET"
     ? { type: "SELECT_TARGET", selectedInstanceIds: [state.players[0].hand[0].instanceId] }
-    : { type: "PLAYER_CHOICE", choiceId: "accept" }, "opt966-battle-debt-writer-corpus");
+    : { type: "PLAYER_CHOICE", choiceId: "accept" }, `opt966-battle-${terminal ? "terminal" : "debt"}-writer-corpus`);
   expect(pauses.map(state => state.pendingPrompt!.options.promptType)).toEqual(["OPTIONAL_EFFECT", "SELECT_TARGET", "SELECT_TARGET"]);
   expect(pauses.every(state => state.effectStack.some(frame => frame.triggerExecution))).toBe(true);
   const types = rig.state.eventLog.map(event => event.type);
   expect(types.filter(type => type === "CARD_DRAWN")).toHaveLength(1);
+  expect(rig.state.status === "FINISHED").toBe(terminal);
+  expect(types.filter(type => type === "GAME_OVER")).toHaveLength(terminal ? 1 : 0);
   expect(types.filter(type => type === "CARD_TRASHED")).toHaveLength(2);
   expect(types.filter(type => type === "POWER_MODIFIED")).toHaveLength(1);
   expect(types.indexOf("POWER_MODIFIED")).toBeLessThan(types.indexOf("END_OF_BATTLE"));
