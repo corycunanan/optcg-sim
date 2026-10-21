@@ -117,8 +117,21 @@ export function retainPropagationBeforePrompt(
 ): GameState {
   const pending = pendingPropagationEvents(events);
   if (pending.length === 0) return state;
-  const ownerIndex = state.effectStack.findIndex(
-    (frame) => frame.phase === "INTERRUPTED_BY_TRIGGERS"
+  // Completion-only boundaries cannot carry executable publication debt.
+  // Prefer the nearest ordinary owner or its live battle boundary.
+  let ownerIndex = -1;
+  for (let index = state.effectStack.length - 1; index >= 0; index--) {
+    const frame = state.effectStack[index];
+    if (frame.triggerExecution ||
+      (frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+        frame.battleDamage.battleId === state.turn.battle?.battleId)) {
+      ownerIndex = index;
+      break;
+    }
+  }
+  if (ownerIndex < 0) ownerIndex = state.effectStack.findIndex(
+    frame => frame.phase === "INTERRUPTED_BY_TRIGGERS" &&
+      !frame.eventActivation && !frame.eventActivationCompletion && !frame.phaseBoundaryContinuation
   );
   if (ownerIndex >= 0) return retainEventsOnFrame(state, ownerIndex, pending);
   const child = state.effectStack.at(-1);
