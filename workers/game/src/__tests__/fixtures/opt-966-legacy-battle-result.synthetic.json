@@ -1,6 +1,6 @@
 {
   "provenance": "synthetic",
-  "writerProducer": "4c51aa215cdbd378f180cf8393979d4401257f89",
+  "writerProducer": "07efd668bb8dcb9f2cfbaf49d88caada716d0ccb",
   "inputFixture": "opt-965-battle-debt.synthetic.json",
   "note": "Current writer resumes immutable v4 input. Ordinary owner allocation consumes one frame ID before replacement-generated card IDs. No IDs normalized.",
   "state": {

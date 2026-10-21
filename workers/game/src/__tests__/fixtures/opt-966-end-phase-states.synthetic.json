@@ -1,7 +1,7 @@
 {
   "provenance": "synthetic",
-  "writerProducer": "4c51aa215cdbd378f180cf8393979d4401257f89",
-  "note": "Actual current writer End Phase pauses; historical v2 fixture remains frozen. Test-only changes pending at capture.",
+  "writerProducer": "07efd668bb8dcb9f2cfbaf49d88caada716d0ccb",
+  "note": "Actual current writer End Phase pauses. Historical v2 inputs remain frozen.",
   "cases": {
     "wave1-select-target": {
       "shape": "END_OF_YOUR_TURN_WAVE; OP04-034's SELECT_TARGET (p0) above the End Phase frame",
