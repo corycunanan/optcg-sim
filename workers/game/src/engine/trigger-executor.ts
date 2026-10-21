@@ -1,5 +1,4 @@
-/** Version 5 semantic reader. Normal entry points do not create these frames
- * until the separate writer change lands. An existing frame owns every queue;
+/** Shared trigger execution. An existing persisted frame owns every queue;
  * return values describe progress and never retain executable work. */
 import type {
   CardData,
@@ -263,21 +262,6 @@ export function advanceTriggerExecution(
         events,
         resolved: true,
       };
-    const battleDebt = state.effectStack.find(frame =>
-      frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
-      frame.battleDamage.battleId === state.turn.battle?.battleId
-    );
-    if (battleDebt && triggerExecutionOwner(state) && !stopAtFrameId) {
-      // Damage completion owns both the battle prefix and substitute events.
-      // Retain publication debt without detaching/scanning the older prefix;
-      // ordinary reports already queued on the owner remain below this frame.
-      state = { ...state, effectStack: state.effectStack.map(frame =>
-        frame.id === battleDebt.id ? { ...frame,
-          accumulatedEvents: [...new Set([...frame.accumulatedEvents, ...events])],
-        } : frame
-      ) };
-      return { kind: "continued", state, events: [], resolved: true };
-    }
     if (
       stopAtFrameId &&
       !state.effectStack.some((frame) => frame.id === stopAtFrameId)
