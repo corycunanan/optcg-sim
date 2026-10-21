@@ -1,7 +1,7 @@
 {
   "provenance": "synthetic, separate candidate expectations; historical inputs frozen",
   "base": "a38be3a10cca8138e627fc4b7be23c9717893039",
-  "producerRevision": "a38be3a10cca8138e627fc4b7be23c9717893039",
+  "producerRevision": "6faaf6071746d0e4c79eb7390d3eb9c49f4315dd",
   "inputSha256": {
     "opt-966-final-writer-corpus.json.gz": "ea977b60ec55723a56eb1bfbbe6c2d492850474b7be20f47bc7680eccd01ac8c",
     "opt-966-end-phase-states.synthetic.json": "ddf09b04e1e71958ec76de078a59caf33651ab2ddd8703bb4e3b03543d1f65ef",
@@ -15,7 +15,7 @@
     "opt-966-scheduled-watcher-writer.json": "2a592c61d8b0c3a0ce2304421fdbf5c4c6e79b5cc4d75f72b326c5a70829ddee",
     "opt-966-counter-prefix-writer.json": "1b762bd612dd1bc2ce9fcc36b7da1a648da6c5e1ef6e278d001a42f5ba2a5d01"
   },
-  "producerDiffSha256": "09c33e24d1f712f77b8c166fed424864e0b1a4f868bc11964c6c5beac184d214",
+  "producerDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "expectationSha256": "cff8b1982d7eec635ca19610c053cbc4014ca1865c9a2a77463131d1cfbf710f",
   "expectationCount": 220,
   "changedKeys": [
