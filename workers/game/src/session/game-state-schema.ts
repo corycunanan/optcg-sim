@@ -567,8 +567,8 @@ export function convertToCurrentShape(
 
 /**
  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
- * OPT-968 every live state and undo snapshot is written as version 6:
- * `schemaVersion: 6` first, every frame with its discriminant, every
+ * Ordinary producers remain version 6; native version 7 is retained per
+ * live state and undo snapshot. Every frame has its discriminant, every
  * End Phase frame with its stage. A runtime frame without a stage can only be
  * a version 1 frame, so it is written with the legacy stage, which is its
  * version 1 meaning.

@@ -287,6 +287,15 @@ describe("v7 DON identity picker with generic-choice fallback", () => {
     await act(async () => { renderer.update(<PlayerChoiceModal {...props} choices={identityChoices} />); });
     expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
   });
+  it("keeps Confirm disabled when the matching identity choice is disabled", async () => {
+    const onAction = vi.fn(); let renderer!: ReactTestRenderer;
+    const disabledChoices = identityChoices.map(choice => ({ ...choice, disabled: true }));
+    await act(async () => { renderer = create(<PlayerChoiceModal effectDescription="Return 2 DON!!" choices={disabledChoices} donIdentityReturn={picker} cardDb={{}} isHidden={false} onHide={vi.fn()} onAction={onAction} />); });
+    await act(async () => { renderer.root.findByProps({ "aria-label": "Add one from Rested DON!! in cost area" }).props.onClick(); });
+    await act(async () => { renderer.root.findByProps({ "aria-label": "Add one from Rested DON!! held by an effect" }).props.onClick(); });
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
+    expect(onAction).not.toHaveBeenCalled();
+  });
   it("keeps generic labeled choices answerable for clients without the optional picker", async () => {
     const onAction = vi.fn(); let renderer!: ReactTestRenderer;
     await act(async () => { renderer = create(<PlayerChoiceModal effectDescription="Return DON!!" choices={identityChoices} cardDb={{}} isHidden={false} onHide={vi.fn()} onAction={onAction} />); });

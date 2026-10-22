@@ -7,7 +7,7 @@ import { playerChoiceThreeOptionsScenario as base } from "./player-choice-3-opti
 const groups = [
   { donIds: ["p0-don-1", "p0-don-2"], label: "Rested DON!! in cost area" },
   { donIds: ["p0-don-3"], label: "Rested DON!! held by an effect" },
-  { donIds: ["p0-don-4"], label: "Attached to Luffy (Leader)" },
+  { donIds: ["p0-don-4"], label: "Attached to Zoro (Leader)" },
 ];
 const plans = [
   [1, 0, 0], [0, 1, 0], [0, 0, 1],

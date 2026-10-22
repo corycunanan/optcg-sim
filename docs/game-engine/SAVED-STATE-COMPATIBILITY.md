@@ -463,30 +463,61 @@ reader, including live and restored undo, all later prompts and allocator IDs.
 This exception does not claim captured production sessions or completion of the
 capture-dependent retirement gate.
 
-## OPT-997 semantic COST-outcome reader prerequisite
+## OPT-997 semantic version 7 reader prerequisite
 
-The reader accepts optional `costReplacementResolution: "REPLACED" |
-"NOT_REPLACED"` on a checked `COST`/`AWAITING_COST_SELECTION` frame that carries
-its validated replay action and an existing current cost. Supported replay
-families are `SELECT_TARGET`, `PLAYER_CHOICE` (including the fixed-cost sentinel
-and destination choices), and `ARRANGE_TOP_CARDS`. The shared drain consumes the
-explicit result only once that exact owner is topmost and no prompt remains.
-Replacement children retain their existing action, event and prompt ownership.
+Ordinary producers still write version 6. Native version 7 is retained through
+live state, every action and every undo save. Source versions 1–6 (including an
+absent version) reject `costReplacementResolution` and `donIdentityReturn`
+before conversion. Every incoming undo entry is validated before retention is
+bounded; mixed live/undo versions do not upgrade one another.
 
-`REPLACED` abandons the cost through the existing Decision10 policy: substitute
-stands, earlier staged costs roll back, no post-colon effect, activation use
-unconsumed. `NOT_REPLACED` resumes its saved payment through the existing checked
-path. A terminal game is never restored from a transaction baseline. Production
-outcome writers remain disabled in this prerequisite; rollout requires this
-semantic reader before any producer emits the field.
+Native7 accepts optional `costReplacementResolution: "REPLACED" |
+"NOT_REPLACED"` only on a checked `COST`/`AWAITING_COST_SELECTION` frame with its
+validated replay action and current cost. Replay families are `SELECT_TARGET`,
+`PLAYER_CHOICE` (fixed sentinel and destination choices), and
+`ARRANGE_TOP_CARDS`. Native7 answers capture the exact owner before substitute
+execution and record the final outcome on that owner, even below children.
+Mandatory payment inserts the owner below its actual child. The shared drain
+settles only a topmost owner with no pending prompt. Children retain prompt,
+action, trigger and event ownership; their events are not published again.
 
-Absent is waiting or legacy unknown, never an inferred acceptance. A parked
-cost with no explicit result and no offer above it is classified
-`legacy.cost_replacement_outcome_unknown`; its bytes and recoverable state are
-preserved. The reader does not claim to repair old accepted-child or orphaned
-sessions. Existing historical debt fixtures remain diagnostic controls.
+`REPLACED` uses existing Decision10 policy: substitute stands, earlier staged
+costs roll back, post-colon effects do not run and activation use is unconsumed.
+`NOT_REPLACED` removes its outcome and replay marker before checked payment.
+Terminal state dominates every insertion/update/rollback. An ordinary legal
+Main action after cleanup, followed by a legal Block-Step PASS, is tested; bare
+Main-phase PASS is not a valid acceptance probe.
+
+Native7 also generates subsequent RETURN_DON amount identity prompts through a
+shared grouped planner and real mutation executor. That semantic capability is
+needed when loading a still-unanswered offer whose substitute returns DON.
+Ordinary6 amount and legacy `until_count` bucket behavior stay unchanged.
+Native7 optional `donIdentityReturn` metadata has positive fixed/variable
+bounds and nonoverlapping labeled identity groups. Generic offered choices
+remain authoritative: older clients ignore metadata and use readable generic
+choices; newer clients confirm only an offered enabled exact-ID choice. Old
+`donReturn` metadata/grammar is unchanged. Frontend sandbox producers are
+non-authoritative preview fixtures.
+
+Absent outcome is unresolved or legacy unknown, never inferred acceptance.
+A checked parked cost without an outcome or an offer above it is diagnosed as
+`legacy.cost_replacement_outcome_unknown`, with recoverable bytes preserved.
+The future isolated writer upgrades a still-pending old offer to7 and a later
+answer records a fresh outcome. Upgrading an already-accepted child/orphan
+cannot recover its missing outcome and deliberately retains that debt.
+Historical v6 corpus payloads are unchanged; the separate v7 corpus distinguishes
+supported completion from diagnostic legacy debt.
+
+Reader deployment must precede the ordinary writer7 flip. After writer7 emits
+native7, the rollback floor is a semantic version7 reader; a version6-only build
+must reject rather than reinterpret those sessions. No reader retirement or
+production repair is claimed. See the checked-in OPT997 v7 corpus README for
+actual producer SHA, source patch, full hashes, commands and coverage matrix.
 
 The user authorized synthetic-only evidence for the DON choice rollout and then
-explicitly included this necessary OPT-997 prerequisite under the same gates.
-That evidence scope does not authorize production capture, reader retirement,
-legacy repair, or broader OPT-1006 changes.
+explicitly included the bounded OPT997 prerequisite under the same gates. This
+scope permits actual candidate-generated live/undo replay evidence, not
+production capture, retirement, old-session repair or broader OPT1006 changes.
+OPT958 remains open: the accepted rollback policy and its labeled deviation
+fixture remain; the next review condition is a policy decision backed by an
+applicable authoritative multi-cost ruling, not this owner-lifecycle correction.
