@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { SessionRepository, convertPersistedGameState } from "../session/persistence.js";
+import { SessionRepository, convertPersistedGameState, parseStoredSession } from "../session/persistence.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import type { GameState } from "../types.js";
@@ -21,11 +21,14 @@ it("preserves native7 in live and every mixed undo entry while ordinary v6 writi
   const old = structuredClone(state); old.schemaVersion = 6;
   if (old.pendingPrompt!.options.promptType === "PLAYER_CHOICE") delete old.pendingPrompt!.options.donIdentityReturn;
   stored["session:undo-history"] = [old, state, structuredClone(old)];
+  const parsed = parseStoredSession(stored.session, stored["session:card-db"], stored["session:undo-history"]);
+  expect(parsed.undoHistory.map(s => s.schemaVersion)).toEqual([6, 7, 6]);
   const storage = new MemorySessionStorage(); await storage.put(stored);
   const repo = new SessionRepository(storage, { nextJsUrl: "https://example.test", workerSecret: "secret" });
   const loaded = (await repo.load())!;
   expect(loaded.state.schemaVersion).toBe(7);
-  expect(loaded.undoHistory.map(s => s.schemaVersion)).toEqual([6, 7, 6]);
+  // Repository intentionally bounds retained undo to the latest entry after all entries validate.
+  expect(loaded.undoHistory.map(s => s.schemaVersion)).toEqual([6]);
   await repo.save(loaded);
   const again = (await repo.load())!;
   expect(again.state).toEqual(loaded.state);
