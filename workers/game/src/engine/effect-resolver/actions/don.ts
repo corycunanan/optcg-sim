@@ -720,7 +720,7 @@ export function executeRestDon(
 
   events.push({ type: "DON_RESTED", playerIndex: controller, payload: { count } });
 
-  return { state: { ...state, players: newPlayers }, events, succeeded: true, result: { targetInstanceIds: [], count } };
+  return { state: { ...state, players: newPlayers }, events, fullyExecuted: count === amount, succeeded: true, result: { targetInstanceIds: [], count } };
 }
 
 // ─── DISTRIBUTE_DON ──────────────────────────────────────────────────────────

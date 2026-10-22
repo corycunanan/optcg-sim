@@ -72,7 +72,7 @@ export function executePlaceHandToDeck(
   return {
     state: moved.state,
     events,
-    succeeded: true,
+    fullyExecuted: moved.transitions.length === amount, succeeded: true,
     result: {
       targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
       count: moved.transitions.length,

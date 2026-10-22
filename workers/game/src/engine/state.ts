@@ -624,6 +624,7 @@ export function filterStateForPlayer(
   // Root execution debt is private, just like effectStack; it can contain
   // resolver prefixes with hidden-zone identities and must not cross sockets.
   delete visible.pendingEventActivationEvents;
+  delete visible.schemaVersion;
   return visible;
 }
 

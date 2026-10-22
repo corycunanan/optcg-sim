@@ -1,3 +1,4 @@
+import type { ReplacementScanProgress } from "./engine/replacements.js";
 // Re-export all shared game types.
 // Worker-only types and engine-internal types are defined below.
 
@@ -105,6 +106,8 @@ export interface GameState extends Omit<
   | "pendingPrompt"
   | "effectStack"
 > {
+  /** Retained native v6 provenance: saves and later pauses may never downgrade. */
+  schemaVersion?: 6;
   activeEffects: RuntimeActiveEffect[];
   prohibitions: RuntimeProhibition[];
   scheduledActions: RuntimeScheduledAction[];
@@ -207,7 +210,7 @@ export interface PhaseBoundaryContinuation {
 // 8-6-2 defers until the damage processing completes.
 
 /** A single optional replacement offer (REPLACEMENT frame); pops when answered. */
-export interface ReplacementContinuation {
+export interface ReplacementContinuation extends ReplacementScanProgress {
   effectId: string;
   targetInstanceId: string;
   event: import("./engine/replacements.js").ReplacementEvent;
@@ -215,6 +218,10 @@ export interface ReplacementContinuation {
 
 /** The replacement batch state machine (REPLACEMENT_BATCH frame, OPT-219). */
 export interface ReplacementBatchContinuation {
+  visitedEffectIds?: string[];
+  events?: import("./engine/replacements.js").ReplacementEvent[];
+  cause?: "battle" | "effect";
+  orderingEffectIds?: string[];
   actionKind: import("./engine/replacements.js").BatchActionKind;
   event: import("./engine/replacements.js").ReplacementEvent;
   /** Every target the caller originally queued for this event. */
