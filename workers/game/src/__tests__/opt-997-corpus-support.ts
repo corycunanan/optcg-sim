@@ -41,6 +41,7 @@ export interface CostCorpus {
   initial: Record<string, unknown>;
   steps: { action: GameAction; expected: GameState; stored: Record<string, unknown> }[];
   sourceId: string;
+  activationSourceId?: string;
   owner: 0 | 1;
   decline: boolean;
   terminal: boolean;

@@ -10,7 +10,7 @@ it("native7 owner insertion respects terminal stack-depth failure after mandator
   const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
   for (let n = 0; n < 3; n++) r.put("OPT997-hand", 0, "HAND");
   const schema = synSchema("OPT997-depth", [
-    { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 2 } }], flags: { optional: false } },
+    { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 2 } }], flags: { optional: false, once_per_turn: true } },
     { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] },
   ]);
   const source = r.put("OPT997-depth", 0, "CHARACTER", { schema });
@@ -19,6 +19,10 @@ it("native7 owner insertion respects terminal stack-depth failure after mandator
   r.state.effectStack = Array.from({ length: 99 }, (_, i) => continuationFrame({ id: `caller-${i}`, kind: "EFFECT", sourceCardInstanceId: source.instanceId, controller: 0, phase: "AWAITING_TARGET_SELECTION" }));
   const block = schema.effects[1];
   const result = payCostsWithSelection(r.state, block.costs!, 0, 0, r.db, source.instanceId, block, resolverExecutionServices);
+  expect(result.state.players[0].deck).toHaveLength(4);
+  expect(result.state.players[0].hand).toHaveLength(4);
+  expect(result.state.activeEffects.some(effect => effect.sourceCardInstanceId === source.instanceId && effect.modifiers.some(modifier => modifier.params?.usedOnTurn === result.state.turn.number))).toBe(true);
+  expect(result.events.map(event => event.type)).toEqual(["CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE"]);
   expect(result.state.status).toBe("FINISHED");
   expect(result.state.engineOutcome).toMatchObject({ type: "ENGINE_LIMIT", diagnostic: { kind: "EFFECT_STACK_DEPTH", limit: 100, observed: 101 } });
   expect(result.state.effectStack).toHaveLength(0);

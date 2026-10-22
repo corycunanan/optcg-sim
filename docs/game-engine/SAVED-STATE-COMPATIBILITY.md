@@ -477,13 +477,22 @@ validated replay action and current cost. Replay families are `SELECT_TARGET`,
 `PLAYER_CHOICE` (fixed sentinel and destination choices), and
 `ARRANGE_TOP_CARDS`. Native7 answers capture the exact owner before substitute
 execution and record the final outcome on that owner, even below children.
-Mandatory payment inserts the owner below its actual child. The shared drain
+Mandatory payment inserts the owner below its actual child. A committed substitute
+prefix and its use marker remain on the live root during suspension; earlier
+staged payment remains only in the COST transaction for a no-replacement replay.
+The shared drain
 settles only a topmost owner with no pending prompt. Children retain prompt,
 action, trigger and event ownership; their events are not published again.
 
 `REPLACED` uses existing Decision10 policy: substitute stands, earlier staged
 costs roll back, post-colon effects do not run and activation use is unconsumed.
 `NOT_REPLACED` removes its outcome and replay marker before checked payment.
+Native7 executable replay data uses the shared strict GameAction schema and cost
+grammar, including fixed sentinel, bound Life destination and exact arrangement
+selection. Malformed payloads and wrong cost/action pairings are rejected on live
+and every undo ingress before retention. Pairing an accepted Stage exit uses its
+saved cost, since the substitute may already have moved the Stage. Ordinary6
+permissive legacy replay data remains non-executable without an explicit outcome.
 Terminal state dominates every insertion/update/rollback. An ordinary legal
 Main action after cleanup, followed by a legal Block-Step PASS, is tested; bare
 Main-phase PASS is not a valid acceptance probe.
@@ -495,15 +504,19 @@ Ordinary6 amount and legacy `until_count` bucket behavior stay unchanged.
 Native7 optional `donIdentityReturn` metadata has positive fixed/variable
 bounds and nonoverlapping labeled identity groups. Generic offered choices
 remain authoritative: older clients ignore metadata and use readable generic
-choices; newer clients confirm only an offered enabled exact-ID choice. Old
+choices; newer clients confirm only an offered enabled exact-ID choice. Readable labels identify duplicate-name Character board slots and meaningful
+hold source/duration. Source names come only from public field/trash zones; a
+source absent there receives a neutral prior-effect label. Old
 `donReturn` metadata/grammar is unchanged. Frontend sandbox producers are
 non-authoritative preview fixtures.
 
 Absent outcome is unresolved or legacy unknown, never inferred acceptance.
 A checked parked cost without an outcome or an offer above it is diagnosed as
 `legacy.cost_replacement_outcome_unknown`, with recoverable bytes preserved.
-The future isolated writer upgrades a still-pending old offer to7 and a later
-answer records a fresh outcome. Upgrading an already-accepted child/orphan
+The isolated candidate proves save7/load7 before answering a still-pending old
+offer, then records a fresh outcome. This does not prove final-writer first-load
+ordering: that writer must convert loaded live and every undo entry to7 before
+routing its first action, not merely save7 after a historical6 reply. Upgrading an already-accepted child/orphan
 cannot recover its missing outcome and deliberately retains that debt.
 Historical v6 corpus payloads are unchanged; the separate v7 corpus distinguishes
 supported completion from diagnostic legacy debt.
@@ -513,6 +526,8 @@ native7, the rollback floor is a semantic version7 reader; a version6-only build
 must reject rather than reinterpret those sessions. No reader retirement or
 production repair is claimed. See the checked-in OPT997 v7 corpus README for
 actual producer SHA, source patch, full hashes, commands and coverage matrix.
+The separate corrected corpus retains all original-v7 inputs unchanged and
+adds mandatory committed-prefix and distinct-label cases.
 
 The user authorized synthetic-only evidence for the DON choice rollout and then
 explicitly included the bounded OPT997 prerequisite under the same gates. This

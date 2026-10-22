@@ -30,7 +30,7 @@ import { playCharacterRestedScenario } from "./playground/play-character-rested"
 import { playCharacterScenario } from "./playground/play-character";
 import { playEventTransformScenario } from "./playground/play-event-transform";
 import { arrangeTopFourScenario } from "./prompts/arrange-top-4";
-import { donIdentityFixedScenario, donIdentityVariableScenario, donIdentityLongLabelsScenario } from "./prompts/don-identity-return";
+import { donIdentityFixedScenario, donIdentityVariableScenario, donIdentityLongLabelsScenario, donIdentityDuplicateHostsScenario, donIdentityDuplicateFallbackScenario } from "./prompts/don-identity-return";
 import { optionalEffectScenario } from "./prompts/optional-effect";
 import { playerChoiceThreeOptionsScenario } from "./prompts/player-choice-3-options";
 import { revealTriggerScenario } from "./prompts/reveal-trigger";
@@ -66,6 +66,8 @@ export const scenarios: Scenario[] = [
   donIdentityFixedScenario,
   donIdentityVariableScenario,
   donIdentityLongLabelsScenario,
+  donIdentityDuplicateHostsScenario,
+  donIdentityDuplicateFallbackScenario,
   optionalEffectScenario,
   revealTriggerScenario,
 ];

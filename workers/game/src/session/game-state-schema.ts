@@ -1,3 +1,4 @@
+import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { replacementEventsFor } from "../engine/replacement-events.js";
 import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
 /**
@@ -38,9 +39,9 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 6;
-/** The newest persisted version this build can read; v6 retains replacement scan progress. */
+/** The newest persisted version this build can read; v7 carries explicit cost outcomes. */
 export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
-/** The newest runtime shape this build executes; all producers emit v6. */
+/** The newest runtime shape this build executes; ordinary writers remain v6. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
@@ -878,6 +879,10 @@ export function validateContinuationReferences(
       !["SELECT_TARGET", "PLAYER_CHOICE", "ARRANGE_TOP_CARDS"].includes(frame.costReplacementAction.type)
     )) {
       throw new SessionLoadError(location, `${ref} has costReplacementResolution without a checked COST replay owner`);
+    }
+    if (state.schemaVersion === 7 && frame.costReplacementResolution !== undefined) {
+      const replayViolation = costReplacementReplayViolation(state, frame);
+      if (replayViolation) throw new SessionLoadError(location, `${ref} ${replayViolation}`);
     }
     const violation = frameInvariantViolation(frame, derived, state);
     if (violation) {
