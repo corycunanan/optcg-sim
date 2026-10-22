@@ -1,7 +1,7 @@
 /** Shared cost replay grammar and native7 executable-continuation validation. */
 import { GameActionSchema } from "../../../../../../shared/validators/client-message.js";
 import type { Cost, SimpleCost } from "../../effect-types.js";
-import type { EffectStackFrame, GameState } from "../../../types.js";
+import type { EffectStackFrame, GameState, GameAction } from "../../../types.js";
 import { costSelectionCount, isOpponentLifePlacement } from "./targets.js";
 const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
 /** OPT-828: a Life-end choice id bound to the Characters chosen to pay the cost. */
@@ -41,8 +41,11 @@ export function fixedCostExitTarget(state: GameState, cost: Cost, controller: 0 
   if (FIXED_STAGE_EXIT_COSTS.includes(cost.type)) return state.players[controller].stage?.instanceId;
   return undefined;
 }
-export function costReplacementReplayViolation(state: GameState, frame: EffectStackFrame): string | null {
-  const parsed = GameActionSchema.safeParse(frame.costReplacementAction);
+type ReplayContext = Pick<EffectStackFrame, "costs" | "currentCostIndex" | "validTargets" | "costArrangeStage" | "sourceCardInstanceId">;
+
+/** Strict parked grammar; never consults a board changed by substitute execution. */
+function replayViolation(frame: ReplayContext, input: unknown): string | null {
+  const parsed = GameActionSchema.safeParse(input);
   if (!parsed.success) return "malformed replacement replay action";
   const action = parsed.data;
   const cost = frame.costs[frame.currentCostIndex];
@@ -71,4 +74,38 @@ export function costReplacementReplayViolation(state: GameState, frame: EffectSt
       ? null : "invalid replacement arrangement replay";
   }
   return "unsupported replacement replay action";
+}
+
+/** One parser for captured semantic actions and strict native7 ingress. */
+export function parseCostReplacementReplay(frame: ReplayContext, input: unknown):
+  { action: GameAction; violation: null } | { action: null; violation: string } {
+  const violation = replayViolation(frame, input);
+  if (violation) return { action: null, violation };
+  return { action: GameActionSchema.parse(input) as GameAction, violation: null };
+}
+
+/** Construct only semantics already validated/computed by the payment handler.
+ * Historical unanswered offers may use this at explicit writer promotion, never at native7 ingress.
+ * No identities are removed, invented, deduplicated or reordered here.
+ */
+export function canonicalCostReplacementReplay(frame: ReplayContext, input: GameAction): GameAction {
+  const cost = frame.costs[frame.currentCostIndex];
+  let semantic = input;
+  if (input.type === "ARRANGE_TOP_CARDS" && cost) {
+    semantic = { ...input, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" };
+  } else if (input.type === "PLAYER_CHOICE" && cost?.type === "ADD_OWN_CHARACTER_TO_LIFE") {
+    const destination = parseLifeDestinationChoiceId(input.choiceId);
+    if (destination) semantic = { ...input, choiceId: lifeDestinationChoiceId(destination.ids, destination.position) };
+  }
+  const parsed = parseCostReplacementReplay(frame, semantic);
+  if (parsed.violation) throw new Error(`Invalid canonical COST replay: ${parsed.violation}`);
+  return parsed.action!;
+}
+
+/** Ownership is checked before an optional answer can execute any substitute. */
+export function costReplacementReplayViolation(_state: GameState, frame: EffectStackFrame): string | null {
+  if ((frame.kind !== undefined && frame.kind !== "COST") || frame.phase !== "AWAITING_COST_SELECTION" || frame.costReplacementChecked !== true || !frame.costReplacementAction) {
+    return "replacement replay lacks a checked COST owner";
+  }
+  return parseCostReplacementReplay(frame, frame.costReplacementAction).violation;
 }

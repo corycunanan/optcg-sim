@@ -1,3 +1,4 @@
+import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
 import { drainPendingWork } from "../engine/pending-work-drain.js";
 import { takeInterruptedEvents } from "../engine/effect-resolver/resume/events.js";
@@ -375,6 +376,10 @@ function answerReplacementOffer(
   let state = popFrame(initialState);
   const caller = state.effectStack.at(-1);
   const callerKind = caller ? frameKindOf(caller) : null;
+  if (state.schemaVersion === 7 && caller && callerKind === "COST") {
+    const violation = costReplacementReplayViolation(state, caller);
+    if (violation) throw new Error(`Invalid replacement caller: ${violation}`);
+  }
   // OPT-872: only the unanswered continuation for this exact effect and
   // target is resumed (rules §7-1-4-1-2).
   const pausedBattle =

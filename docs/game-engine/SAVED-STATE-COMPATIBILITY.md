@@ -489,8 +489,14 @@ costs roll back, post-colon effects do not run and activation use is unconsumed.
 `NOT_REPLACED` removes its outcome and replay marker before checked payment.
 Native7 executable replay data uses the shared strict GameAction schema and cost
 grammar, including fixed sentinel, bound Life destination and exact arrangement
-selection. Malformed payloads and wrong cost/action pairings are rejected on live
-and every undo ingress before retention. Pairing an accepted Stage exit uses its
+selection. Capture at all five payment sites constructs canonical semantic
+input before substitute execution; arrangements save computed full order and
+the printed destination, while Life choices preserve their actual chosen end.
+Every parked replay or checked replacement marker is validated before any
+outcome exists, and the exact caller is checked again before optional answer
+execution. A checked marker without its replay is invalid. Malformed payloads
+and wrong cost/action pairings are rejected on live and every embedded/separate
+undo ingress before retention. Pairing an accepted Stage exit uses its
 saved cost, since the substitute may already have moved the Stage. Ordinary6
 permissive legacy replay data remains non-executable without an explicit outcome.
 Terminal state dominates every insertion/update/rollback. An ordinary legal
@@ -513,11 +519,18 @@ non-authoritative preview fixtures.
 Absent outcome is unresolved or legacy unknown, never inferred acceptance.
 A checked parked cost without an outcome or an offer above it is diagnosed as
 `legacy.cost_replacement_outcome_unknown`, with recoverable bytes preserved.
-The isolated candidate proves save7/load7 before answering a still-pending old
-offer, then records a fresh outcome. This does not prove final-writer first-load
-ordering: that writer must convert loaded live and every undo entry to7 before
-routing its first action, not merely save7 after a historical6 reply. Upgrading an already-accepted child/orphan
-cannot recover its missing outcome and deliberately retains that debt.
+The canonical-stage isolated candidate proves actual repository first-load6
+promotion before the first answer, across live and all mixed undo entries.
+Only a demonstrably unanswered old offer can have its payment payload
+canonicalized with the same constructor. Outcomes stay absent until a real
+final answer. Valid accepted/orphan unknown outcomes remain diagnostic; no
+accept/decline history is inferred. Unprovable payloads, including missing
+checked replay metadata beyond the undo retention limit, fail atomically with
+an explicit legacy-debt SessionLoadError: original storage is unchanged, no
+partially promoted runtime is returned, and no undo entry is silently dropped.
+This is isolated evidence, not delivered writer conversion or production repair;
+ordinary reader6 remains the recovery floor for unprovable old data. The future
+ordinary writer must implement this boundary before routing any first action.
 Historical v6 corpus payloads are unchanged; the separate v7 corpus distinguishes
 supported completion from diagnostic legacy debt.
 
@@ -527,7 +540,14 @@ must reject rather than reinterpret those sessions. No reader retirement or
 production repair is claimed. See the checked-in OPT997 v7 corpus README for
 actual producer SHA, source patch, full hashes, commands and coverage matrix.
 The separate corrected corpus retains all original-v7 inputs unchanged and
-adds mandatory committed-prefix and distinct-label cases.
+adds mandatory committed-prefix and distinct-label cases. The separate
+`opt-997-v7-canonical` corpus preserves both earlier corpora, adds all five
+capture variants and actual first-load promotion, and separates supported
+completion, legacy unknown, and atomic rejection dispositions. Its ordering →
+optional decline → reoffer control exposed a historical transient `type`
+discriminator leaking into persisted offers. Native7 constructs only explicit
+persisted offer keys; ordinary6 retains the historical diagnostic failure.
+No scan, outcome, event scheduler or rollback policy changes follow.
 
 The user authorized synthetic-only evidence for the DON choice rollout and then
 explicitly included the bounded OPT997 prerequisite under the same gates. This

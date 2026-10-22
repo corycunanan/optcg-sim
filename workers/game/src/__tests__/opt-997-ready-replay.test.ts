@@ -8,9 +8,11 @@ function captured(family: string) {
 }
 for (const family of ["fixed-mandatory", "selected-mandatory", "compound-select", "compound-arrange", "opponent-life"]) it(`rejects malformed ready ${family} live and every undo ingress before retention`, () => {
   const good = captured(family);
-  for (const tamper of ["missing", "wrong-kind", "foreign", "duplicate", "destination"] as const) {
+  for (const early of [false, true]) for (const tamper of ["deleted", "missing", "wrong-kind", "foreign", "duplicate", "destination"] as const) {
     const raw = structuredClone(good);
     const owner = raw.effectStack.find(f => f.costReplacementResolution)!;
+    if (early) delete owner.costReplacementResolution;
+    if (tamper === "deleted") delete owner.costReplacementAction;
     if (tamper === "missing") owner.costReplacementAction = { type: owner.costReplacementAction!.type } as never;
     if (tamper === "wrong-kind") owner.costReplacementAction = { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" };
     if (tamper === "foreign") owner.costReplacementAction = { type: "SELECT_TARGET", selectedInstanceIds: ["foreign"] };

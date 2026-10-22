@@ -880,7 +880,7 @@ export function validateContinuationReferences(
     )) {
       throw new SessionLoadError(location, `${ref} has costReplacementResolution without a checked COST replay owner`);
     }
-    if (state.schemaVersion === 7 && frame.costReplacementResolution !== undefined) {
+    if (state.schemaVersion === 7 && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
       const replayViolation = costReplacementReplayViolation(state, frame);
       if (replayViolation) throw new SessionLoadError(location, `${ref} ${replayViolation}`);
     }

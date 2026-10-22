@@ -1,4 +1,4 @@
-import { fixedCostExitTarget } from "./replacement-replay.js";
+import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
 import { insertFrameAt } from "../../damage-frames.js";
 /** Iterative cost payment orchestration and suspension. */
 import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
@@ -666,6 +666,9 @@ export function payCostsWithSelection(
     // cost frame used by selectable payments so decline can resume exactly.
     const fixedExitTarget = fixedCostExitTarget(nextState, cost, controller, sourceCardInstanceId);
     if (fixedExitTarget) {
+      const replay = nextState.schemaVersion === 7 ? canonicalCostReplacementReplay({
+        costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId,
+      }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, baseline),
@@ -686,7 +689,7 @@ export function payCostsWithSelection(
           costs: workingCosts, currentCostIndex: i, costsPaid: false,
           oncePerTurnMarked: false, costResultRefs: [...costResultToEntries(costResult)],
           pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
-          costReplacementAction: { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
+          costReplacementAction: replay ?? { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
           costReplacementChecked: true,
           ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         };

@@ -1110,7 +1110,16 @@ export function materializeReplacementOffer(
     pendingTriggers: [],
     simultaneousTriggers: [],
     accumulatedEvents: [],
-    replacement: { ...offer, effectId, targetInstanceId, event },
+    // Native7 persists only the offer grammar, never transient resume-context
+    // discriminators carried through ordering/reoffer progress. Reader6 keeps
+    // its historical byte path for the staged rollout.
+    replacement: state.schemaVersion === 7 ? {
+      effectId, targetInstanceId, event,
+      ...(offer.visitedEffectIds !== undefined ? { visitedEffectIds: offer.visitedEffectIds } : {}),
+      ...(offer.cause !== undefined ? { cause: offer.cause } : {}),
+      ...(offer.causingController !== undefined ? { causingController: offer.causingController } : {}),
+      ...(offer.orderingEffectIds !== undefined ? { orderingEffectIds: offer.orderingEffectIds } : {}),
+    } : { ...offer, effectId, targetInstanceId, event },
   };
   const nextState = pushFrame(generated.state, frame);
   return { state: nextState, pendingPrompt: { ...pendingPrompt, resumeContext: frame.id } };

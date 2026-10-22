@@ -1,4 +1,4 @@
-import { lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
+import { canonicalCostReplacementReplay, lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
 import { updateFrameById } from "../../damage-frames.js";
 import { decodeDonReturnIds } from "../actions/don.js";
 import { finishReplacedLifeCost } from "../cost/replaced.js";
@@ -894,6 +894,8 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, transactionBaseline),
@@ -906,7 +908,7 @@ export function handleAwaitingCostSelection(
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
         nextState = updateCostOwner(nextState, {
-          costReplacementAction: {
+          costReplacementAction: replay ?? {
             type: "SELECT_TARGET",
             selectedInstanceIds: selected,
           },
@@ -968,6 +970,8 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ordered, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, transactionBaseline),
@@ -980,7 +984,7 @@ export function handleAwaitingCostSelection(
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
         nextState = updateCostOwner(nextState, {
-          costReplacementAction: {
+          costReplacementAction: replay ?? {
             type: "ARRANGE_TOP_CARDS",
             keptCardInstanceId: "",
             orderedInstanceIds: action.orderedInstanceIds,
@@ -1133,6 +1137,8 @@ export function handleAwaitingCostSelection(
     if (!topFrame.costReplacementChecked) {
       // Placing the Character is an effect-caused removal; a replacement means
       // the printed cost was not paid (rules 8-3-1-3-1 / 8-3-1-7).
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, cost.position === "TOP_OR_BOTTOM" ? { ...action, type: "PLAYER_CHOICE", choiceId: lifeDestinationChoiceId(placedIds, position) } : { type: "SELECT_TARGET", selectedInstanceIds: placedIds }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, transactionBaseline),
@@ -1145,7 +1151,7 @@ export function handleAwaitingCostSelection(
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
         nextState = updateCostOwner(nextState, {
-          costReplacementAction: action,
+          costReplacementAction: replay ?? action,
           costReplacementChecked: true,
           ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
@@ -1322,6 +1328,8 @@ export function handleAwaitingCostSelection(
       // Cost exits are still effect-caused removal events, but a replacement
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
       const replacementInput = applyCostTransactionState(
         nextState,
@@ -1363,7 +1371,7 @@ export function handleAwaitingCostSelection(
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
         nextState = updateCostOwner(nextState, {
-          costReplacementAction: {
+          costReplacementAction: replay ?? {
             type: "SELECT_TARGET",
             selectedInstanceIds: selected,
           },
