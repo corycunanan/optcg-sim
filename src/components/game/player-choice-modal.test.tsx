@@ -247,3 +247,51 @@ describe("PlayerChoiceModal confirmed selection mode", () => {
     expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
   });
 });
+
+describe("v7 DON identity picker with generic-choice fallback", () => {
+  const id = (ids: string[]) => `don-return-ids:${JSON.stringify(ids)}`;
+  const identityChoices = [
+    { id: id(["free-a", "free-b"]), label: "Return 2 free rested DON!!" },
+    { id: id(["held", "free-a"]), label: "Return 1 held and 1 free DON!!" },
+    { id: id(["leader", "free-a"]), label: "Return 1 from Leader and 1 free DON!!" },
+  ];
+  const picker = { countMin: 2, countMax: 2, groups: [
+    { donIds: ["free-a", "free-b"], label: "Rested DON!! in cost area" },
+    { donIds: ["held"], label: "Rested DON!! held by an effect" },
+    { donIds: ["leader"], label: "Attached to Leader" },
+  ] };
+  it("lets the player choose held/free and host groups, then submits the exact offered canonical ID", async () => {
+    const onAction = vi.fn(); let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<PlayerChoiceModal effectDescription="Return 2 DON!!" choices={identityChoices} donIdentityReturn={picker} cardDb={{}} isHidden={false} onHide={vi.fn()} onAction={onAction} />); });
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
+    await act(async () => { renderer.root.findByProps({ "aria-label": "Add one from Rested DON!! in cost area" }).props.onClick(); });
+    await act(async () => { renderer.root.findByProps({ "aria-label": "Add one from Rested DON!! held by an effect" }).props.onClick(); });
+    expect(onAction).not.toHaveBeenCalled();
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(false);
+    await act(async () => { findButton(renderer, "Confirm").props.onClick(); });
+    expect(onAction).toHaveBeenCalledWith({ type: "PLAYER_CHOICE", choiceId: id(["held", "free-a"]) });
+    await act(async () => { renderer.root.findByProps({ "aria-label": "Remove one from Rested DON!! held by an effect" }).props.onClick(); });
+    await act(async () => { renderer.root.findByProps({ "aria-label": "Add one from Attached to Leader" }).props.onClick(); });
+    await act(async () => { findButton(renderer, "Confirm").props.onClick(); });
+    expect(onAction).toHaveBeenLastCalledWith({ type: "PLAYER_CHOICE", choiceId: id(["leader", "free-a"]) });
+  });
+  it("allows positive variable counts and resets a stale selection when offered choices change", async () => {
+    const onAction = vi.fn(); let renderer!: ReactTestRenderer;
+    const options = [{ id: id(["free-a"]), label: "Return 1" }, ...identityChoices];
+    const props = { effectDescription: "Return 1 or more DON!!", donIdentityReturn: { ...picker, countMin: 1 }, cardDb: {}, isHidden: false, onHide: vi.fn(), onAction };
+    await act(async () => { renderer = create(<PlayerChoiceModal {...props} choices={options} />); });
+    await act(async () => { renderer.root.findByProps({ "aria-label": "Add one from Rested DON!! in cost area" }).props.onClick(); });
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(false);
+    await act(async () => { findButton(renderer, "Confirm").props.onClick(); });
+    expect(onAction).toHaveBeenCalledWith({ type: "PLAYER_CHOICE", choiceId: id(["free-a"]) });
+    await act(async () => { renderer.update(<PlayerChoiceModal {...props} choices={identityChoices} />); });
+    expect(findButton(renderer, "Confirm").props.disabled).toBe(true);
+  });
+  it("keeps generic labeled choices answerable for clients without the optional picker", async () => {
+    const onAction = vi.fn(); let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<PlayerChoiceModal effectDescription="Return DON!!" choices={identityChoices} cardDb={{}} isHidden={false} onHide={vi.fn()} onAction={onAction} />); });
+    await act(async () => { findButton(renderer, "Return 1 held and 1 free DON!!").props.onClick(); });
+    await act(async () => { findButton(renderer, "Confirm").props.onClick(); });
+    expect(onAction).toHaveBeenCalledWith({ type: "PLAYER_CHOICE", choiceId: id(["held", "free-a"]) });
+  });
+});

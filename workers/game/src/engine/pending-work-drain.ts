@@ -216,7 +216,7 @@ export function drainPendingWork(
             events,
             resolved: true,
           });
-      } else if (kind === "COST" && top.costReplacementResolution && !state.pendingPrompt)
+      } else if (kind === "COST" && state.schemaVersion === 7 && top.costReplacementResolution && !state.pendingPrompt)
         result = continueReadyCostReplacement(state, top, cardDb, services);
       else if (kind === "PHASE_BOUNDARY")
         result = advancePhaseBoundary(state, cardDb);

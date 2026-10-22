@@ -107,7 +107,7 @@ export interface GameState extends Omit<
   | "effectStack"
 > {
   /** Retained native v6 provenance: saves and later pauses may never downgrade. */
-  schemaVersion?: 6;
+  schemaVersion?: 6 | 7;
   activeEffects: RuntimeActiveEffect[];
   prohibitions: RuntimeProhibition[];
   scheduledActions: RuntimeScheduledAction[];

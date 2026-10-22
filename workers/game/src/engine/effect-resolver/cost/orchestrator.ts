@@ -1,3 +1,4 @@
+import { insertFrameAt } from "../../damage-frames.js";
 /** Iterative cost payment orchestration and suspension. */
 import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
 import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPromptState } from "../../../types.js";
@@ -84,13 +85,15 @@ export function payCostsWithSelection(
   const pushCostFrame = (
     frame: EffectStackFrame,
     stagedState: GameState = nextState,
+    ownerIndex?: number,
   ): void => {
-    nextState = pushFrame(nextState, {
+    const owned = {
       ...frame,
       effectDescription,
       accumulatedEvents: [...events],
       costTransactionState: captureCostTransactionState(stagedState),
-    });
+    };
+    nextState = ownerIndex === undefined ? pushFrame(nextState, owned) : insertFrameAt(nextState, ownerIndex, owned);
   };
   const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer): CostSelectionResult => {
     if (isGameTerminated(nextState)) return terminated();
@@ -690,8 +693,9 @@ export function payCostsWithSelection(
           pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
           costReplacementAction: { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         };
-        pushCostFrame(frame, stagedBeforeReplacement);
+        pushCostFrame(frame, stagedBeforeReplacement, nextState.schemaVersion === 7 ? stagedBeforeReplacement.effectStack.length : undefined);
         if (isGameTerminated(nextState)) return cannotPay();
         return suspend(replacement.pendingPrompt, replacement.offer);
       }

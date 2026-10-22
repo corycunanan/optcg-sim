@@ -1,3 +1,4 @@
+import { updateFrameById } from "../../damage-frames.js";
 import { decodeDonReturnIds } from "../actions/don.js";
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { isGameTerminated } from "../../terminal.js";
@@ -169,9 +170,9 @@ export function continueReadyCostReplacement(
     // path. Only the owner's legacy-payment event debt belongs to abandon.
     return abortReplacedCost(state, frame, [], cardDb, services);
   }
-  const { costReplacementResolution: _consumed, ...ready } = frame;
+  const { costReplacementResolution: _consumed, costReplacementAction: replay, ...ready } = frame;
   const nextState = { ...state, effectStack: [...state.effectStack.slice(0, -1), ready] };
-  return handleAwaitingCostSelection(nextState, ready.costReplacementAction!, ready, cardDb, services);
+  return handleAwaitingCostSelection(nextState, replay!, ready, cardDb, services);
 }
 
 /**
@@ -471,6 +472,10 @@ export function handleAwaitingCostSelection(
   const workingState = topFrame.costTransactionState
     ? applyCostTransactionState(baselineState, topFrame.costTransactionState)
     : baselineState;
+  const updateCostOwner = (candidate: GameState, partial: Partial<EffectStackFrame>): GameState =>
+    candidate.schemaVersion === 7
+      ? updateFrameById(candidate, topFrame.id, frame => ({ ...frame, ...partial }))
+      : updateTopFrame(candidate, partial);
   const suspendCurrentFrame = (
     stateWithFrame: GameState,
     stagedEvents: PendingEvent[],
@@ -478,7 +483,7 @@ export function handleAwaitingCostSelection(
     stagedState: GameState = stateWithFrame,
     offer?: ReplacementOffer,
   ): HandlerResult => {
-    const withTransaction = updateTopFrame(stateWithFrame, {
+    const withTransaction = updateCostOwner(stateWithFrame, {
       accumulatedEvents: [...stagedEvents],
       costTransactionState: captureCostTransactionState(stagedState),
     });
@@ -922,12 +927,13 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
+        nextState = updateCostOwner(nextState, {
           costReplacementAction: {
             type: "SELECT_TARGET",
             selectedInstanceIds: selected,
           },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,
@@ -994,7 +1000,7 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
+        nextState = updateCostOwner(nextState, {
           costReplacementAction: {
             type: "ARRANGE_TOP_CARDS",
             keptCardInstanceId: "",
@@ -1002,6 +1008,7 @@ export function handleAwaitingCostSelection(
             destination: action.destination,
           },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,
@@ -1157,9 +1164,10 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
+        nextState = updateCostOwner(nextState, {
           costReplacementAction: action,
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer);
       }
@@ -1382,12 +1390,13 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
+        nextState = updateCostOwner(nextState, {
           costReplacementAction: {
             type: "SELECT_TARGET",
             selectedInstanceIds: selected,
           },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,

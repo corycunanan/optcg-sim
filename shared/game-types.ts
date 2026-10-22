@@ -830,6 +830,13 @@ export interface PlayerChoicePrompt {
   source?: "PREGAME" | "EFFECT";
   /** Select a row first, then submit it from a Confirm/Skip footer. */
   confirmOrSkip?: boolean;
+  /** v7 optional enhancement. Old clients retain the generic choices below;
+   * old donReturn bucket metadata/grammar is never repurposed. */
+  donIdentityReturn?: {
+    countMin: number;
+    countMax: number;
+    groups: { donIds: string[]; label: string }[];
+  };
   donReturn?: {
     count: number;
     sources: Array<{

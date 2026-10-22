@@ -10,11 +10,11 @@ import { convertPersistedGameState } from "../session/persistence.js";
 import { classifyLegacyShapes, toPersistedGameState } from "../session/game-state-schema.js";
 import type { EffectStackFrame } from "../types.js";
 
-function fixture() {
-  const r = rig(); r.deck(0, 5);
+function fixture(version: 6 | 7 = 6, mandatory = false) {
+  const r = rig(); r.state.schemaVersion = version; r.deck(0, 5);
   for (let i = 0; i < 3; i++) r.put(`OPT997-hand-${i}`, 0, "HAND");
   const authored = getEffectSchema("OP17-043")!;
-  const source = r.put("OP17-043", 0, "CHARACTER", { schema: synSchema("OP17-043", [...authored.effects, { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { once_per_turn: true }, costs: [{ type: "REST_DON", amount: 1 }, { type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
+  const source = r.put("OP17-043", 0, "CHARACTER", { schema: synSchema("OP17-043", [...authored.effects.map(e => mandatory ? { ...e, flags: { ...e.flags, optional: false } } : e), { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { once_per_turn: true }, costs: [{ type: "REST_DON", amount: 1 }, { type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
   return { r, source };
 }
@@ -25,7 +25,7 @@ function setOutcome(frame: EffectStackFrame, outcome: string) {
 describe("OPT-997 explicit cost outcome reader, production writers disabled", () => {
   for (const reload of [false, true]) {
     it(`settles exact REPLACED owner after its child, preserving accepted rollback, reload=${reload}`, async () => {
-      const { r, source } = fixture(); r.accept();
+      const { r, source } = fixture(7); r.accept();
       const owner = r.state.effectStack.find(f => f.costReplacementAction)!;
       expect(r.state.effectStack.at(-1)!.id).not.toBe(owner.id);
       setOutcome(owner, "REPLACED");
@@ -49,7 +49,7 @@ describe("OPT-997 explicit cost outcome reader, production writers disabled", ()
     });
   }
   it("consumes NOT_REPLACED once and replays the saved fixed payment", async () => {
-    const { r, source } = fixture();
+    const { r, source } = fixture(7);
     // Isolated future producer: an exhausted decline finalizes the captured
     // COST owner, removes the offer and leaves no child or pending prompt.
     r.state.effectStack.pop(); r.state.pendingPrompt = null;
@@ -73,7 +73,7 @@ describe("OPT-997 explicit cost outcome reader, production writers disabled", ()
     expect(classifyLegacyShapes(r.state)).toContainEqual({ shape: "legacy.cost_replacement_outcome_unknown", frameId: r.state.effectStack.find(f => f.costReplacementAction)!.id });
   });
   it("strictly rejects wrong enum, absent pairing, invalid index and a non-COST owner", () => {
-    const { r } = fixture(); r.accept();
+    const { r } = fixture(7); r.accept();
     const raw = toPersistedGameState(r.state);
     for (const tamper of ["enum", "action", "checked", "index", "kind"] as const) {
       const state = structuredClone(raw);
@@ -87,4 +87,44 @@ describe("OPT-997 explicit cost outcome reader, production writers disabled", ()
       expect(() => convertPersistedGameState(state, "state")).toThrow();
     }
   });
+});
+
+
+it("native7 early offer survives reload, records its exact outcome and completes after child reload", async () => {
+  const { r, source } = fixture(7);
+  expect(r.promptType()).toBe("OPTIONAL_EFFECT");
+  expect(r.state.effectStack.find(f => f.costReplacementAction)!.costReplacementResolution).toBeUndefined();
+  await reloadLiveAndUndo(r);
+  r.accept();
+  expect(r.state.effectStack.find(f => f.costReplacementAction)!.costReplacementResolution).toBe("REPLACED");
+  expect(r.promptType()).toBe("SELECT_TARGET");
+  await reloadLiveAndUndo(r);
+  r.select(r.state.players[0].hand.slice(0, 2).map(c => c.instanceId));
+  expect(r.state.schemaVersion).toBe(7);
+  expect(r.state.effectStack).toHaveLength(0);
+  expect(r.state.pendingPrompt).toBeNull();
+  expect(r.state.players[0].characters.some(c => c?.instanceId === source.instanceId)).toBe(true);
+  expect(r.state.eventLog.filter(e => e.type === "CARD_TRASHED")).toHaveLength(1);
+  expect(r.state.eventLog.filter(e => e.type === "DON_RESTED")).toHaveLength(0);
+});
+
+it("native7 mandatory replacement inserts COST below its actual prompt-owning child", async () => {
+  const { r } = fixture(7, true);
+  expect(r.promptType()).toBe("SELECT_TARGET");
+  const owner = r.state.effectStack.findIndex(f => f.costReplacementAction !== undefined);
+  expect(owner).toBeLessThan(r.state.effectStack.length - 1);
+  expect(r.state.effectStack[owner].costReplacementResolution).toBe("REPLACED");
+  await reloadLiveAndUndo(r);
+  r.select(r.state.players[0].hand.slice(0, 2).map(c => c.instanceId));
+  expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toHaveLength(0);
+});
+
+it("rejects v7-only fields under every old source version before conversion", () => {
+  const { r } = fixture(7); r.accept();
+  const native = toPersistedGameState(r.state);
+  for (const schemaVersion of [undefined, 1, 2, 3, 4, 5, 6]) {
+    const raw = { ...native, schemaVersion };
+    if (schemaVersion === undefined) delete raw.schemaVersion;
+    expect(() => convertPersistedGameState(raw, "undoHistory[1]")).toThrow("requiring schemaVersion 7");
+  }
 });

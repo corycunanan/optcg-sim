@@ -206,6 +206,14 @@ const PromptOptions = z.discriminatedUnion("promptType", [
     sourceEffectDescription: z.string().optional(),
     source: z.enum(["PREGAME", "EFFECT"]).optional(),
     confirmOrSkip: z.boolean().optional(),
+    donIdentityReturn: z.strictObject({
+      countMin: z.number().int().positive(),
+      countMax: z.number().int().positive(),
+      groups: z.array(z.strictObject({
+        donIds: z.array(z.string().min(1)).min(1),
+        label: z.string().min(1),
+      })).min(1),
+    }).optional(),
     donReturn: z
       .strictObject({
         count: NonNegativeInteger,

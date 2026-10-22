@@ -39,12 +39,12 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 6;
 /** The newest persisted version this build can read; v6 retains replacement scan progress. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 6;
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
 /** The newest runtime shape this build executes; all producers emit v6. */
-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 6;
+export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6,
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7,
 ];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
@@ -510,6 +510,13 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
+  if (version < 7) {
+    const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
+    if (frames.some(frame => isRecord(frame) && "costReplacementResolution" in frame) ||
+        (isRecord(raw.pendingPrompt) && isRecord(raw.pendingPrompt.options) && "donIdentityReturn" in raw.pendingPrompt.options)) {
+      throw new SessionLoadError(location, "carries COST outcome or DON identity picker requiring schemaVersion 7");
+    }
+  }
   if (version < 6 && Array.isArray(raw.effectStack)) {
     for (const [index, frame] of raw.effectStack.entries()) {
       if (!isRecord(frame)) continue;
@@ -579,7 +586,9 @@ export function toPersistedGameState(state: GameState): GameState {
     : state.effectStack;
   const { schemaVersion: _schemaVersion, ...rest } = state;
   return {
-    [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION,
+    // Reader preserves a native-v7 session/undo entry; ordinary engine inputs
+    // still write v6 until the separately gated producer flips its version.
+    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
     ...rest,
     effectStack: effectStack.map((frame) => ({
       ...frame,
@@ -760,6 +769,23 @@ export function validateContinuationReferences(
   state: GameState,
   location: string
 ): void {
+  const options = state.pendingPrompt?.options;
+  if (options?.promptType === "PLAYER_CHOICE" && options.donIdentityReturn) {
+    const picker = options.donIdentityReturn;
+    const ids = picker.groups.flatMap(group => group.donIds);
+    const pool = new Set(ids);
+    if (pool.size !== ids.length || picker.countMin > picker.countMax || picker.countMax > ids.length || options.donReturn) {
+      throw new SessionLoadError(location, "has inconsistent DON identity picker groups/counts");
+    }
+    for (const choice of options.choices) {
+      let selected: unknown;
+      try { selected = choice.id.startsWith("don-return-ids:") ? JSON.parse(choice.id.slice("don-return-ids:".length)) : null; } catch { selected = null; }
+      if (!Array.isArray(selected) || selected.length < picker.countMin || selected.length > picker.countMax ||
+          new Set(selected).size !== selected.length || selected.some(id => typeof id !== "string" || !pool.has(id))) {
+        throw new SessionLoadError(location, "has DON identity picker choice outside its declared pool/counts");
+      }
+    }
+  }
   const frames = state.effectStack;
   const frameIds = new Map<string, EffectStackFrame>();
   frames.forEach((frame, index) => {
