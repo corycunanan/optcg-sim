@@ -4,7 +4,7 @@ Use with the [charter](./ORCHESTRATION-CHARTER.md). These are records of observe
 
 ## Current checkpoint and durable ledger
 
-Keep current state at the top, aiming for roughly 500 words plus references. Update it at state transitions; keep chronological decisions below or in a linked history file. Workers receive only their bounded stage packet and necessary source evidence, never the entire ledger or coordinator conversation. Reuse source packets by reference and send changed facts for deltas.
+Keep one readable current-state checkpoint at the top, aiming for roughly 500 words plus references. Replace it at state transitions; move superseded checkpoints and chronological detail into a linked history file. Retain normal spacing and prose; shorten by linking evidence, not by compressing words together. Workers receive only their bounded stage packet and necessary source evidence, never the entire ledger or coordinator conversation. Reuse source packets by reference and send changed facts for deltas.
 
 The checkpoint names scope/permissions, workspaces and owners, current head/base, unresolved findings, completed evidence, active job IDs, and the exact next action. Raw logs belong in artifacts rather than repeated ledger entries.
 
@@ -12,6 +12,10 @@ Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coo
 
 ```markdown
 # Run: <date / scope>
+
+## Current checkpoint
+<Current scope/permissions, owners, head/base, findings, evidence, active jobs and next action; replace in place.>
+- History: <linked chronological artifact; retrieve only as needed>
 
 ## Scope and permissions
 - Issues: <explicit IDs; exclusions and externally blocked dependencies>
@@ -21,6 +25,7 @@ Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coo
 - Linear writes: coordinator authorized by standing policy | <user-imposed restriction>
 - Runtime/resources: <available agent slots, isolated workspace policy, browser/DB ownership>
 - Coordinator ledger path: <absolute path>
+- External evidence: <required source, acquisition owner, access/result, affected gate, pending decision or explicitly approved exception and limitation>
 
 ## Tracks
 | Track | Issue | Dependencies and reasons | Owned surfaces | State | Workspace/branch | PR/base PR | Head/base SHA | Next action/blocker |
@@ -36,7 +41,7 @@ Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coo
 - Active agent/thread IDs and ownership:
 - Durable uncommitted/unpushed work:
 - Next runnable frontier:
-- Usage/outcomes: <elapsed time to verified delivery; token/usage source and parent/child coverage if available, otherwise unavailable>
+- Usage/outcomes: <elapsed time to verified delivery; observed approval, capacity and CI waits distinguished from active work where timestamps permit; token/usage source and parent/child coverage if available, otherwise unavailable>
 - Deferred findings, by ticket/PR:
 - Linear audit trail: <issue, operation, before/after, reason, required comment URL(s), verified/pending>
 - Follow-up origins: <new ticket → original ticket → original-ticket comment URL>
@@ -51,7 +56,7 @@ Embed the full resolved ticket and necessary comments/requirements, rather than 
 - Track, workspace/branch, base branch/full SHA, prerequisites and their verified state.
 - Owned surfaces, sibling owners, excluded scope, and existing in-flight work to preserve.
 - Relevant rules/scenario packet or design brief; name the one or two safety assumptions to prove.
-- Public testing boundary, exact commands and working directory, explicit test paths/selectors and intended selection, regression evidence and known environment limitations.
+- Public testing boundary, exact commands and working directory, explicit test paths/selectors and expected collected files/cases, regression evidence and known environment limitations.
 - For broad execution-ownership refactors: short before/after reporting, advancement, wait/completion/terminal and cleanup contract, plus the representative handoff to prove before sweeping callers.
 - Deliverables: implementation commits, pushed PR, honest validation baseline/results, Follow-ups and next-ticket handoff; no merge, no Linear writes.
 
