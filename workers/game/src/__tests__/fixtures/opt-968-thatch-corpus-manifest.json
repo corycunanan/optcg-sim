@@ -1,0 +1,21 @@
+{
+  "producer": "3b3fc8ce118a046b706d8b567e70ca9efa24bd5f",
+  "oldProducer": "085d64af31b730fe4db21c02a957e9f84f9309f8",
+  "readerBase": "4e082e56fa65f2c7c92aca145bc3ba0977ed193f",
+  "sha256": "0c462f1f2654d0a3da3daa2008b4fe8b4ab78898182162e4f1d45912a6967e61",
+  "scenarioCount": 7,
+  "startingPauseCount": 12,
+  "suffixReplyCount": 19,
+  "replayExecutionCount": 24,
+  "scenarioPauses": {
+    "authored-Rayleigh": 2,
+    "two-instances": 1,
+    "group-then-nested-payment": 3,
+    "nested-trash-watcher": 1,
+    "declined-prefix-trash-watcher": 3,
+    "old-offered-ko": 1,
+    "old-offered-removal": 1
+  },
+  "provenance": "Synthetic actual SessionRepository emitted bytes; source-generated prompts/save-returned allocation; no ID setters or normalization. Old ordering inputs are unmodified old-producer emissions, suffix expectations use amended nondeployed producer.",
+  "scope": "Synthetic-only exception approved. Actual writer SessionRepository emissions; restored undo is an actual second save of save-returned authoritative live state. No production captures. Seven scenarios include synthetic removal/prefix/watcher harnesses, authored Rayleigh and actual old ordering inputs; constructed helper probes are separate from these counts."
+}
