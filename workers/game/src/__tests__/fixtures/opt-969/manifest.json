@@ -1,0 +1,96 @@
+{
+  "producerSha": "46d28acb2511a8a34efb2568ec6cf544659c3f0f",
+  "producerBase": "cc53ba65d4497b36699191ceea3349727b03c5f5",
+  "immutableOldReaderSha": "7790f86ddb73f9c3f7d2c923000d9ab3e5932b6d",
+  "syntheticOnly": true,
+  "productionCaptures": false,
+  "scenarios": [
+    {
+      "file": "action-identity.json",
+      "sha256": "328e0d552e9f00c2fb8bef93ba3fdc687fca01ae30039fa77b9ea13a52e5a65d",
+      "answers": 1,
+      "replayStarts": [
+        "live",
+        "undo"
+      ],
+      "classification": "supported completion",
+      "knownDebt": null
+    },
+    {
+      "file": "cost-child-replacement.json",
+      "sha256": "8c95b73a9ba52fc18437685093271626ef2b3ea8d70098d04cc14f10d08eb9b7",
+      "answers": 1,
+      "replayStarts": [
+        "live",
+        "undo"
+      ],
+      "classification": "known-debt diagnostic; writer blocked",
+      "knownDebt": "OPT-997"
+    },
+    {
+      "file": "don-minus.json",
+      "sha256": "aa19c0320291b0493f3f5a04cb5115b9045f0a17c8dec1c9f38764d79198d66c",
+      "answers": 2,
+      "replayStarts": [
+        "live",
+        "undo"
+      ],
+      "classification": "supported completion",
+      "knownDebt": null
+    },
+    {
+      "file": "historical-bucket.json",
+      "sha256": "50d624d1d579fbd817765c9e6325838a1f6a5bf737e44da33d75bbf57c378b56",
+      "answers": 1,
+      "replayStarts": [
+        "live",
+        "undo"
+      ],
+      "classification": "supported completion",
+      "knownDebt": null
+    },
+    {
+      "file": "opponent-active-cost-area.json",
+      "sha256": "07a2ccba8dff8951165714bdaee24c1541fa3086b4e22730cad97efae1d59e88",
+      "answers": 1,
+      "replayStarts": [
+        "live",
+        "undo"
+      ],
+      "classification": "supported completion",
+      "knownDebt": null
+    },
+    {
+      "file": "replacement-identity.json",
+      "sha256": "7fb3c66012ab53229ba77bb33aa1614cfb32ec0fb94e6631ec3c3b99db698559",
+      "answers": 1,
+      "replayStarts": [
+        "live",
+        "undo"
+      ],
+      "classification": "supported completion",
+      "knownDebt": null
+    },
+    {
+      "file": "variable-three.json",
+      "sha256": "bc124805c8972d6c5e2fff43afaf572df55a8c631355c79099130ce6a0e52b84",
+      "answers": 2,
+      "replayStarts": [
+        "live",
+        "undo"
+      ],
+      "classification": "supported completion",
+      "knownDebt": null
+    }
+  ],
+  "totals": {
+    "families": 7,
+    "supportedCompletionFamilies": 6,
+    "knownDebtDiagnosticFamilies": 1,
+    "supportedLivePlusUndoReplays": 12,
+    "knownDebtLivePlusUndoReplays": 2,
+    "answersLivePlusUndo": 18
+  },
+  "historicalControl": "historical-bucket.json is byte-identical to output generated at immutableOldReaderSha; cmp exit0 recorded in parent evidence.",
+  "previousProducerSha": "e4a2f54ab91351a44e26fc818e6be9d9153e5027"
+}

@@ -250,8 +250,17 @@ export function handlePlayerChoiceDonReturn(
   // offered. Never interpret malformed/unoffered ids as a bucket plan.
   if (action.choiceId.startsWith("don-return-ids:")) {
     const ids = decodeDonReturnIds(action.choiceId);
-    const owner: 0 | 1 = pausedAction.type === "RETURN_DON_TO_DECK" ? controller : controller === 0 ? 1 : 0;
-    const applied = ids && resumeCtx.validTargets?.includes(action.choiceId)
+    const opponent: 0 | 1 = controller === 0 ? 1 : 0;
+    const owner = pausedAction.type === "RETURN_DON_TO_DECK"
+      ? pausedAction.target?.controller === "OPPONENT" ? opponent : controller
+      : opponent;
+    const restrictedToCostArea = pausedAction.type === "RETURN_DON_TO_DECK" &&
+      (pausedAction.target?.type === "DON_IN_COST_AREA" || pausedAction.target?.filter?.is_active === true || pausedAction.target?.filter?.state === "ACTIVE");
+    const activeOnly = pausedAction.type === "RETURN_DON_TO_DECK" &&
+      (pausedAction.target?.filter?.is_active === true || pausedAction.target?.filter?.state === "ACTIVE");
+    const eligible = !restrictedToCostArea || (ids && ids.every(id =>
+      state.players[owner].donCostArea.some(d => d.instanceId === id && !d.attachedTo && (!activeOnly || d.state === "ACTIVE"))));
+    const applied = ids && eligible && resumeCtx.validTargets?.includes(action.choiceId)
       ? applyDonReturnIds(state, owner, ids) : null;
     if (!applied) return { kind: "handled", result: { kind: "waiting", state, events: [], resolved: false, rejected: true } };
     events.push(...applied.events);

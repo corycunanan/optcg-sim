@@ -1,3 +1,4 @@
+import { decodeDonReturnIds } from "../actions/don.js";
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { isGameTerminated } from "../../terminal.js";
 import { runRuleProcessing, runRuleProcessingAfterMove } from "../../defeat.js";
@@ -432,6 +433,15 @@ export function handleAwaitingCostSelection(
 ): HandlerResult {
   const { sourceCardInstanceId, controller } = topFrame;
   const cost = topFrame.costs[topFrame.currentCostIndex];
+  // Reader-first identity-plan choices use the existing cost frame. The
+  // encoded choice must be bound to that frame, then follows the same exact
+  // amount, ownership and live/staged eligibility checks as SELECT_TARGET.
+  if (action.type === "PLAYER_CHOICE" && (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN")) {
+    const ids = topFrame.validTargets.includes(action.choiceId) ? decodeDonReturnIds(action.choiceId) : null;
+    if (!ids) return { kind: "waiting", state, events: [], resolved: false };
+    action = { type: "SELECT_TARGET", selectedInstanceIds: ids };
+  }
+
   const baselineState = state;
   const transactionBaseline = captureCostTransactionState(baselineState);
   const workingState = topFrame.costTransactionState

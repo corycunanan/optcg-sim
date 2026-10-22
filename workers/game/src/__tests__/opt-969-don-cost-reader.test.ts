@@ -94,3 +94,26 @@ it("variable reader accepts a positive selected count, and suffix terminal check
   expect(r.state.pendingPrompt).toBeNull();
   expect(r.gameOvers()).toHaveLength(1);
 });
+
+
+it("reads an offered PLAYER_CHOICE identity plan on the existing cost owner after live+undo reload", async () => {
+  const r = rig(); r.deck(0, 5);
+  const source = r.put("OPT969-plan", 0, "CHARACTER", { schema: synSchema("OPT969-plan", [{ id: "return", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "DON_MINUS", amount: 2 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "return" });
+  const ids = r.state.players[0].donCostArea.slice(0, 2).map(d => d.instanceId);
+  const choiceId = `don-return-ids:${JSON.stringify(ids)}`;
+  // Isolated synthetic producer shape; the checked-in corpus additionally
+  // proves payloads emitted by pinned actual writer code.
+  const frame = r.state.effectStack.at(-1)!;
+  frame.validTargets.push(choiceId);
+  r.state.pendingPrompt!.options = { promptType: "PLAYER_CHOICE", effectDescription: "Choose DON!! to return", choices: [{ id: choiceId, label: "Return 2 active DON!!" }] };
+  await reloadLiveAndUndo(r);
+  const before = structuredClone(r.state);
+  r.respond({ type: "PLAYER_CHOICE", choiceId: 'don-return-ids:["foreign"]' });
+  expect(r.state).toEqual(before);
+  r.act({ type: "PLAYER_CHOICE", choiceId });
+  expect(r.state.pendingPrompt).toBeNull();
+  expect(r.state.effectStack).toHaveLength(0);
+  expect(r.state.players[0].donCostArea).toHaveLength(6);
+  expect(r.state.players[0].deck).toHaveLength(4);
+});

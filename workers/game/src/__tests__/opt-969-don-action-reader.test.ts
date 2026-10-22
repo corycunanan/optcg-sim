@@ -67,3 +67,36 @@ describe("identity grammar rejects malformed ids", () => {
     for (const ids of ['[]', '["a","a"]', '[1]', '{', 'null']) expect(decodeDonReturnIds(`don-return-ids:${ids}`)).toBeNull();
   });
 });
+
+
+it("identity reader respects opponent actor and active cost-area eligibility on resume", async () => {
+  const { handlePlayerChoiceDonReturn } = await import("../engine/effect-resolver/resume/choice.js");
+  const r = rig();
+  const donor = r.state.players[1].donCostArea[0];
+  const choiceId = `don-return-ids:${JSON.stringify([donor.instanceId])}`;
+  const ctx: import("../types.js").ResumeContext = {
+    effectSourceInstanceId: r.state.players[0].leader.instanceId, controller: 0,
+    pausedAction: { type: "RETURN_DON_TO_DECK", target: { type: "DON_IN_COST_AREA", controller: "OPPONENT", filter: { is_active: true } }, params: { amount: 1 } },
+    remainingActions: [], resultRefs: [], validTargets: [choiceId],
+  };
+  const before = structuredClone(r.state);
+  const events: import("../types.js").PendingEvent[] = [];
+  const result = handlePlayerChoiceDonReturn(r.state, { type: "PLAYER_CHOICE", choiceId }, ctx, events);
+  expect(result?.kind).toBe("continued");
+  if (result?.kind !== "continued") throw new Error("reader did not continue");
+  expect(result.state.players[1].donCostArea).toHaveLength(before.players[1].donCostArea.length - 1);
+  expect(result.state.players[0]).toEqual(before.players[0]);
+  expect(events).toEqual([{ type: "DON_DETACHED", playerIndex: 1, payload: { count: 1 } }]);
+  for (const changed of ["RESTED", "ATTACHED"] as const) {
+    const state = structuredClone(before);
+    if (changed === "RESTED") state.players[1].donCostArea[0].state = "RESTED";
+    else {
+      state.players[1].donCostArea.shift();
+      state.players[1].leader.attachedDon.push({ ...donor, attachedTo: state.players[1].leader.instanceId });
+    }
+    const unchanged = structuredClone(state);
+    const rejected = handlePlayerChoiceDonReturn(state, { type: "PLAYER_CHOICE", choiceId }, ctx, []);
+    expect(rejected?.kind).toBe("handled");
+    expect(state).toEqual(unchanged);
+  }
+});
