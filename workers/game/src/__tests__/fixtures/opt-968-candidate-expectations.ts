@@ -1,6 +1,8 @@
-/** Exact, separately captured candidate values. Historic inputs remain frozen.
- * No allocation, timestamps, propagation flags, or event payloads normalized.
- * See opt-968-candidate-deltas.json and the acceptance evidence for rationale.
+/** Constructed legacy protocol-harness expectations. Historical inputs stay frozen.
+ * The inherited replay harness explicitly supplies old/prefixed prompt IDs.
+ * These values do not count as actual writer/prompt-allocation coverage.
+ * Full deltas against frozen OPT-967 values are captured separately; the
+ * independent final writer corpus retains actual allocator IDs unchanged.
  */
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";

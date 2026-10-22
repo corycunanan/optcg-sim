@@ -1,5 +1,7 @@
-/** Separate OPT-968 candidate expectations. Never overwrites historic inputs.
- * Run only after reviewing exact delta report against the scheduling contract.
+/** Constructed legacy protocol-harness expectations, not actual-writer corpus.
+ * Inherited tests explicitly supply historical/prefixed prompt IDs before saves.
+ * This preserves those test inputs; it does not prove prompt-ID allocation.
+ * Compare all values with frozen OPT-967 candidates, never overwrite them.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -34,6 +36,7 @@ function storageFor(stored: Record<string, unknown>) {
 }
 const read = (name: string) =>
   JSON.parse(readFileSync(resolve(dir, name), "utf8"));
+const priorValues = JSON.parse(gunzipSync(readFileSync(resolve(dir, "opt-967-candidate-expectations.json.gz"))).toString()) as Record<string, unknown>;
 const values: Record<string, unknown> = {};
 const deltas: Record<string, unknown> = {};
 function diff(a: unknown, b: unknown, path = ""): unknown[] {
@@ -52,7 +55,8 @@ function diff(a: unknown, b: unknown, path = ""): unknown[] {
 }
 function record(key: string, value: unknown, old: unknown) {
   values[key] = structuredClone(value);
-  const delta = diff(old, value);
+  if (!(key in priorValues)) throw new Error(`Missing frozen OPT-967 candidate ${key}`);
+  const delta = diff(priorValues[key], value);
   if (delta.length && !key.startsWith("golden/")) deltas[key] = delta;
 }
 async function main() {
@@ -64,7 +68,7 @@ async function main() {
       cardDbJson: JSON.stringify(storage.data.get("session:card-db")),
       undoHistoryJson: JSON.stringify(storage.data.get("session:undo-history")),
     };
-    const old = loadV5WriterGolden().cases[entry.name];
+    const old = priorValues[`golden/${entry.name}`] as typeof actual;
     record(`golden/${entry.name}`, actual, {
       sessionJson: old.sessionJson,
       cardDbJson: old.cardDbJson,
@@ -92,6 +96,8 @@ async function main() {
     }[];
     expected: GameState;
   };
+  // The promptPrefix/oldPauses assignments below are explicit inherited
+  // protocol inputs, not normalization of the final writer's allocation proof.
   async function replay(
     prefix: string,
     corpus: Corpus,
@@ -182,7 +188,7 @@ async function main() {
     JSON.stringify(
       {
         provenance:
-          "synthetic, separate candidate expectations; historical inputs frozen",
+          "synthetic constructed legacy protocol-harness expectations; explicit inherited prompt-ID input intervention; excluded from actual writer identity coverage; frozen OPT-967 comparison",
         base: "4e082e56fa65f2c7c92aca145bc3ba0977ed193f",
         producerRevision: process.env.OPT968_PRODUCER_REVISION ?? execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
         inputSha256: Object.fromEntries(["opt-966-final-writer-corpus.json.gz", "opt-966-end-phase-states.synthetic.json", "opt-966-writer-golden.synthetic.json", "opt-966-legacy-absent-writer.json", "opt-966-legacy-explicit-writer.json", "opt-966-handoff-writer.json", "opt-966-endphase-writer.json", "opt-966-life-writer.json", "opt-966-replacement-writer.json", "opt-966-scheduled-watcher-writer.json", "opt-966-counter-prefix-writer.json"].map(name => [name, createHash("sha256").update(readFileSync(resolve(dir, name))).digest("hex")])),
