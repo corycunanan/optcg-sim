@@ -86,11 +86,11 @@ function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
 const kindsOf = (state: GameState) => state.effectStack.map(frameKindOf);
 
 describe("OPT-963 version 3 runtime and writer (PR 5b)", () => {
-  it("reads 1–6, executes through 6 and normally writes 4", () => {
+  it("reads 1–6, executes through 6 and normally writes 6", () => {
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6]);
     expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(6);
     expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(6);
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(4);
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
     expect([...EFFECT_STACK_FRAME_KINDS]).toEqual(
       expect.arrayContaining(["REPLACEMENT", "REPLACEMENT_BATCH", "BATTLE_DAMAGE", "EFFECT_DAMAGE"])
     );
@@ -255,11 +255,11 @@ describe("OPT-963 v3 reader: every version 3 shape loads unchanged, live and as 
     expect(withoutVersion(persistedV3(loaded.undoHistory[0]))).toEqual(withoutVersion(raw));
   });
 
-  it.each(NAMES)("%s round-trips historical semantics through the version 4 writer", (name) => {
+  it.each(NAMES)("%s round-trips historical semantics through the version 6 writer", (name) => {
     const state = runtime(byName(name).state);
     const out = toPersistedGameState(state) as unknown as Record<string, unknown>;
     expect(Object.keys(out)[0]).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
-    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
+    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
     expect(persistedV3(convertPersistedGameState(JSON.parse(JSON.stringify(out)), "state"))).toEqual(persistedV3(state));
   });
 });
@@ -274,9 +274,9 @@ describe("OPT-963 mixed-version undo history", () => {
     const target = new MemorySessionStorage();
     const saved = await repository(target).save(first);
     const written = target.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
+    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
     const writtenUndo = target.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Record<string, unknown>[];
-    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(4);
+    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
     const second = (await repository(target).load())!;
     expect(toPersistedGameState(second.state)).toEqual(toPersistedGameState(saved.state));
     expect(second.undoHistory.map(toPersistedGameState)).toEqual(saved.undoHistory.map(toPersistedGameState));

@@ -163,10 +163,10 @@ const kinds = [
   ["PREGAME", pregame],
 ] as const;
 describe.each(locations)("OPT-964 session fixtures %s", (location) => {
-  it.each(kinds)("preserves native %s and writes v4", (_name, build) => {
+  it.each(kinds)("preserves native historical %s and writes v6", (_name, build) => {
     const raw = build(),
       loaded = read(raw, location);
-    expect(toPersistedGameState(loaded)).toMatchObject({ schemaVersion: 4 });
+    expect(toPersistedGameState(loaded)).toMatchObject({ schemaVersion: 6 });
     expect(loaded.effectStack).toEqual(raw.effectStack);
     expect(toPersistedGameState(loaded).effectStack).toEqual(raw.effectStack);
   });

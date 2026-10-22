@@ -145,7 +145,7 @@ describe.each(["attack", "block"] as const)(
           loaded.cardDb,
           lifecycle
         );
-        expect(actual).toEqual(expected);
+        expect(actual).toEqual({ ...expected, state: { ...expected.state, schemaVersion: 6 } });
         expect(actual.state.effectStack).toEqual([]);
         expect(actual.state.pendingPrompt).toBeNull();
         expect(

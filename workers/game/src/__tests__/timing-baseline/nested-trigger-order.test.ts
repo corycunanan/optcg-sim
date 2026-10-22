@@ -413,7 +413,7 @@ it.each(["F1", "F2"] as const)("%s full traces and final gameplay agree across c
       turn: b.state.turn, prohibitions: b.state.prohibitions }).toMatchSnapshot(mode);
     states.push(b.state);
   }
-  expect(states[2]).toEqual(states[1]);
+  expect(states[2]).toEqual({ ...states[1], schemaVersion: 6 });
   expect(semanticEvents(states[1])).toEqual(semanticEvents(states[0]));
   expect(semanticEvents(states[2])).toEqual(semanticEvents(states[0]));
 });

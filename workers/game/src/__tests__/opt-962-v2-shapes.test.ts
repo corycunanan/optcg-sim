@@ -1,4 +1,4 @@
-import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
+import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 /**
  * OPT-962 (OPT-924) drift guard between this writer and the deployed PR 4a
  * reader (OPT-980, `9da8ba17`). The reader's fixture

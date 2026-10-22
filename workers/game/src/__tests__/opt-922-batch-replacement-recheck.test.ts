@@ -91,6 +91,14 @@ function massKO(r: Rig) {
   });
   r.state.turn.activePlayerIndex = P1;
   r.act({ type: "PLAY_CARD", cardInstanceId: event.instanceId }, P1);
+  // Decision 7: the non-turn player chooses the order of competing replacements.
+  if (r.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+    const effect = r.state.activeEffects.find(
+      (candidate) =>
+        candidate.sourceCardInstanceId === r.state.players[P0].leader.instanceId
+    )!;
+    r.act({ type: "PLAYER_CHOICE", choiceId: effect.id }, P0);
+  }
 }
 
 const onField = (r: Rig, c: CardInstance) =>

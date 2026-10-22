@@ -531,13 +531,17 @@ describe("a mandatory replacement whose substitute asks for input", () => {
   });
 });
 
-it("preserves the battle prefix when optional owner insertion hits the stack limit", () => {
+for (const ordering of [false, true]) it(`preserves the battle prefix when ${ordering ? "ordering" : "optional"} owner insertion hits the stack limit`, () => {
   const f = fixture();
   vivi(f);
   const target = vanAugur(f);
   handCards(f, 0, 2);
   f.battle(target, f.attacker());
   const template = f.state.effectStack.find(frame => frame.battleDamage)!;
+  if (ordering) {
+    const replacement = f.state.activeEffects.find(effect => effect.modifiers.some(modifier => modifier.type === "REPLACEMENT_EFFECT"))!;
+    f.state.activeEffects.push({ ...replacement, id: `${replacement.id}-ordering-boundary` });
+  }
   const state: GameState = { ...f.state, pendingPrompt: null,
     effectStack: Array.from({ length: MAX_EFFECT_STACK_DEPTH - 1 }, (_, index) => ({
       ...template, id: `depth-owner-${index}`, kind: "TRIGGER_DRAIN", battleDamage: undefined,
@@ -637,7 +641,7 @@ describe("two optional replacements cover the same battle K.O.", () => {
     expectBattleClosedOnce(f);
   });
 
-  it("declining the first K.O.s Franky and ends the battle exactly once (engine offers no second replacement)", () => {
+  it("declining every replacement K.O.s Franky and ends the battle exactly once", () => {
     const f = fixture();
     vivi(f);
     const target = franky(f);
@@ -646,6 +650,8 @@ describe("two optional replacements cover the same battle K.O.", () => {
 
     f.battle(target, attacker);
     pendingBattleId(f);
+    f.decline();
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     f.decline();
 
     expect(f.inTrash(target)).toBe(true);
@@ -658,7 +664,7 @@ describe("two optional replacements cover the same battle K.O.", () => {
   // path (checkReplacementForKO) offers only the first match, so declining it
   // K.O.s Franky without offering the other. Changing that needs matching
   // changes in replacements.ts, outside OPT-872.
-  it.fails("declining the first offers the remaining replacement (§8-1-3-4-1/2)", () => {
+  it("declining the first offers the remaining replacement (§8-1-3-4-1/2)", () => {
     const f = fixture();
     vivi(f);
     const target = franky(f);
@@ -1022,7 +1028,6 @@ describe("a finished game never resumes the battle", () => {
   });
 });
 
-
 describe("OPT-965 scoped battle recovery and substitute ordering", () => {
   it("discarding a stale frame preserves a newer battle's live owner", () => {
     const f = fixture();
@@ -1101,7 +1106,6 @@ describe("OPT-965 scoped battle recovery and substitute ordering", () => {
     });
   }
 });
-
 
 describe("OPT-965 deferred substitute scan propagation", () => {
   for (const targetCount of [1, 2]) {

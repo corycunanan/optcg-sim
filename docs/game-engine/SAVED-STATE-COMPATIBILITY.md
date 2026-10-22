@@ -438,3 +438,27 @@ PR7a reader deployed at `958fce9ddc729d3d571473ed7bb013dde62bda0b`: [successful 
 The Phase 2 prerequisite accepts and executes `TRIGGER_EXECUTION` frames with explicit FIFO generations, retained ordering histories, and selected-but-not-activated work. Normal producers and their writer remain version 4. Saving a loaded unfinished version 5 scope preserves version 5, including undo snapshots; once no such scope remains the state is representable as version 4. This native semantic reader does not execute a flattened/lowered queue. Strict generation, selection, and frame ownership checks apply before resume. See [Phase 2 trigger reader](PHASE-2-TRIGGER-READER.md) for the complete contract, evidence, and rollout boundary.
 
 Deploy and verify this prerequisite before enabling a version 5 producer. The older PR7 binary is not a supported rollback after version 5 writes. Versions 1–4 remain supported; no production capture or retirement gate is claimed complete, and OPT-971 remains open.
+
+## Phase 3 version-6 writer and semantic rollback floor (OPT-968)
+
+Every live state and undo snapshot now serializes as version 6. Source version
+properties cannot override that label. Batch replacement pauses always emit the
+complete validated action event family, including imported pauses saved before
+answering; legacy runtime inference and explicit emitted bytes agree through
+subsequent pauses. Versions 1–5 and all converters remain supported. No format
+retirement or production repair is part of this rollout.
+
+The deployed semantic reader `eaa0917cc04def95cb4225e3f2c94cfbf3ff903a` is the
+rollback floor for this writer. It understands declared alternative predicates
+of one printed replacement ability, including Thatch's retained KO/removal
+blocks. The earlier 4e reader accepts version-6 syntax but ignores that identity
+and can recreate the erroneous ordering prompt. The catalog is a pure,
+nonserialized compatibility view of saved CardData: no group fields are added to
+schemas, active effects or continuation frames. This writer removes the temporary
+legacy producer module and flag. See [replacement scan contract](REPLACEMENT-SCAN-V6.md).
+
+The user explicitly approved synthetic-only evidence for this reader/writer
+rollout. Pinned actual writer/session outputs replay on the deployed semantic
+reader, including live and restored undo, all later prompts and allocator IDs.
+This exception does not claim captured production sessions or completion of the
+capture-dependent retirement gate.

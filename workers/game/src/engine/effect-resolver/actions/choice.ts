@@ -1,4 +1,3 @@
-import { usesReplacementScan } from "../../replacement-version.js";
 import { isReplacementSubstituteBranchFeasible } from "../../replacements.js";
 import { REPLACED_CARD_REF } from "../../effect-types.js";
 /**
@@ -66,7 +65,7 @@ export function executePlayerChoice(
       sourceCardInstanceId, controller, cardDb, resultRefs,
     }))
     .filter(({ branch }) =>
-      usesReplacementScan(state) && resultRefs.has(REPLACED_CARD_REF)
+      resultRefs.has(REPLACED_CARD_REF)
         ? isReplacementSubstituteBranchFeasible(state, branch, sourceCardInstanceId, controller, cardDb, resultRefs, services)
         : isActionBranchFeasible(state, branch, sourceCardInstanceId, controller, cardDb, resultRefs),
     );

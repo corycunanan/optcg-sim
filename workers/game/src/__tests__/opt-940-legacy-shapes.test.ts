@@ -361,7 +361,7 @@ describe("OPT-965 terminal and structural ownership on live/undo load", () => {
       expect(first).toEqual(convertPersistedGameState(structuredClone(raw), location));
       const written = toPersistedGameState(first);
       expect(typeof written.pendingPrompt?.resumeContext).toBe("string");
-      expect(convertPersistedGameState(written, location)).toEqual(first);
+      expect(convertPersistedGameState(written, location)).toEqual({ ...first, schemaVersion: 6 });
       expect(written.effectStack).toHaveLength(1);
     });
 
@@ -394,7 +394,7 @@ describe("OPT-965 historical structural optional effect", () => {
       expect(result.state.players[controller].hand).toHaveLength(before + 1);
       expect(result.state.pendingPrompt).toBeNull();
       expect(result.state.effectStack).toEqual([]);
-      expect(convertPersistedGameState(toPersistedGameState(state), location)).toEqual(state);
+      expect(convertPersistedGameState(toPersistedGameState(state), location)).toEqual({ ...state, schemaVersion: 6 });
     });
   }
 });

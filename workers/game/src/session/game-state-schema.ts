@@ -1,4 +1,4 @@
-import { usesReplacementScan } from "../engine/replacement-version.js";
+import { replacementEventsFor } from "../engine/replacement-events.js";
 import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
 /**
  * Game-state schema version, frame-kind contract, continuation-reference
@@ -37,10 +37,10 @@ import { log } from "../lib/log.js";
 import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
-export const GAME_STATE_SCHEMA_VERSION = 4;
-/** The newest persisted version this build can read; v5 retains trigger generations. */
+export const GAME_STATE_SCHEMA_VERSION = 6;
+/** The newest persisted version this build can read; v6 retains replacement scan progress. */
 export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 6;
-/** The newest runtime shape this build executes; normal producers remain v4. */
+/** The newest runtime shape this build executes; all producers emit v6. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 6;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
@@ -558,8 +558,8 @@ export function convertToCurrentShape(
 
 /**
  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
- * PR 6b (OPT-964) every live state and undo snapshot is written as version 4:
- * `schemaVersion: 4` first, every frame with its discriminant, every
+ * OPT-968 every live state and undo snapshot is written as version 6:
+ * `schemaVersion: 6` first, every frame with its discriminant, every
  * End Phase frame with its stage. A runtime frame without a stage can only be
  * a version 1 frame, so it is written with the legacy stage, which is its
  * version 1 meaning.
@@ -575,16 +575,17 @@ export function toPersistedGameState(state: GameState): GameState {
           : frame
       )
     : state.effectStack;
+  const { schemaVersion: _schemaVersion, ...rest } = state;
   return {
-    [GAME_STATE_SCHEMA_VERSION_KEY]:
-      state.schemaVersion ??
-      (usesReplacementScan(state)
-        ? 6
-        : state.effectStack.some(frame => frame.triggerExecution) ? 5 : GAME_STATE_SCHEMA_VERSION),
-    ...state,
+    [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION,
+    ...rest,
     effectStack: effectStack.map((frame) => ({
       ...frame,
       kind: frameKindOf(frame),
+      ...(frame.replacementBatch && { replacementBatch: {
+        ...frame.replacementBatch,
+        events: replacementEventsFor(frame.replacementBatch.actionKind, frame.replacementBatch.events),
+      } }),
     })),
   } as GameState;
 }
@@ -785,11 +786,7 @@ export function validateContinuationReferences(
       const batch = frame.replacementBatch!;
       // The KO, hand/deck return and rest producers supply these exact event
       // families in order. Missing events preserves historical inference.
-      const expectedEvents = batch.actionKind === "KO"
-        ? ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"]
-        : batch.actionKind === "SET_REST"
-          ? ["WOULD_BE_RESTED"]
-          : ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"];
+      const expectedEvents = replacementEventsFor(batch.actionKind);
       if (batch.event !== expectedEvents[0] || batchEvents.length !== expectedEvents.length ||
         batchEvents.some((event, index) => event !== expectedEvents[index])) {
         throw new SessionLoadError(location, `${ref} has inconsistent replacement batch events for ${batch.actionKind}`);

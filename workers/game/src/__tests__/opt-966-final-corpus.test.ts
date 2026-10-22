@@ -1,4 +1,4 @@
-import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
+import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { resolve } from "node:path";

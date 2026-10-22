@@ -15,14 +15,14 @@ export function version4Base(): Record<string, unknown> {
   );
 }
 
-describe("OPT-964 native v4 writer", () => {
-  it("reads and writes v4 live and undo", () => {
+describe("OPT-964 historical v4 input and current writer", () => {
+  it("reads v4 and promotes live and undo output to v6", () => {
     for (const location of ["state", "undoHistory[0]"]) {
       const loaded = convertPersistedGameState(version4Base(), location);
       expect(
         (toPersistedGameState(loaded) as unknown as { schemaVersion: number })
           .schemaVersion
-      ).toBe(4);
+      ).toBe(6);
     }
   });
 });
@@ -44,7 +44,7 @@ import {
 } from "../session/persistence.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 
-/** Actual v4 writer output from engine-produced runtime states. */
+/** Actual current writer output from engine-produced runtime states. */
 function lift(state: GameState): Record<string, unknown> {
   return JSON.parse(JSON.stringify(toPersistedGameState(state)));
 }
@@ -243,6 +243,7 @@ describe("OPT-964 actual pipeline debt survives native persistence", () => {
           JSON.parse(
             JSON.stringify({
               ...state,
+              schemaVersion: 6,
               effectStack: state.effectStack.map((f) => ({
                 ...f,
                 kind: frameKindOf(f),
@@ -255,7 +256,7 @@ describe("OPT-964 actual pipeline debt survives native persistence", () => {
           "state"
         );
         const resolved = reply(reloaded, db, action);
-        expect(resolved).toEqual(expected);
+        expect(resolved).toEqual({ ...expected, schemaVersion: 6 });
         expect(resolved.effectStack).toHaveLength(0);
         expect(resolved.pendingEventActivationEvents ?? []).toHaveLength(0);
         expect(

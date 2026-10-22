@@ -185,7 +185,7 @@ describe("OPT-481 bounded session persistence", () => {
     });
 
     const restored = await repository(storage).load();
-    expect(restored).toEqual(saved);
+    expect(restored).toEqual({ ...saved, state: { ...saved.state, schemaVersion: 6 }, undoHistory: saved.undoHistory.map((state) => ({ ...state, schemaVersion: 6 })) });
 
     const appended = {
       ...saved.state,
@@ -338,7 +338,7 @@ describe("OPT-481 bounded session persistence", () => {
 
     expect(storage.data.get(SESSION_STORAGE_KEY)).toEqual(storedBefore);
     expect(repo.getHistorySummary().compactedEventCount).toBe(0);
-    await expect(repository(storage).load()).resolves.toEqual(baseline);
+    await expect(repository(storage).load()).resolves.toEqual({ ...baseline, state: { ...baseline.state, schemaVersion: 6 }, undoHistory: baseline.undoHistory.map((state) => ({ ...state, schemaVersion: 6 })) });
   });
 
   it("leaves repository state unchanged when restore validation fails", async () => {

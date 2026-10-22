@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest";
 import { executeKO } from "../engine/effect-resolver/actions/removal.js";
 import {
   resumeReplacementBatch,
+  chooseBatchReplacementOrder,
   type ReplacementBatchResumeContext,
 } from "../engine/replacements.js";
 import { registerTriggersForCard } from "../engine/triggers.js";
@@ -155,11 +156,15 @@ describe("multiple replacement effects on the same KO batch", () => {
       [ids.aa, ids.ab], resolverExecutionServices
     );
 
-    // Both replacements are non-optional → no prompt.
-    expect(result.pendingPrompt).toBeUndefined();
+    // Decision 7 (assumed, no official ruling): mandatory replacements still
+    // require the owner to choose their order.
+    expect(result.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    const withoutOffer = { ...result.state, effectStack: result.state.effectStack.slice(0, -1), pendingPrompt: null };
+    const ordered = chooseBatchReplacementOrder(withoutOffer, batchOfferOf(result), "repl-A", cardDb, resolverExecutionServices);
+    expect(ordered.pendingPrompt).toBeUndefined();
 
     // Neither ally is KO'd; both survive.
-    const p0 = result.state.players[0];
+    const p0 = ordered.state.players[0];
     expect(p0.characters.some((c) => c?.instanceId === ids.aa)).toBe(true);
     expect(p0.characters.some((c) => c?.instanceId === ids.ab)).toBe(true);
 
@@ -170,7 +175,7 @@ describe("multiple replacement effects on the same KO batch", () => {
     expect(p0.trash.some((c) => c.instanceId === ids.gb)).toBe(false);
 
     // The KO action reports zero targets KO'd (everything was replaced).
-    expect(result.result?.targetInstanceIds ?? []).toEqual([]);
+    expect(ordered.finalizedIds).toEqual([]);
   });
 
   it("optional replacements chain prompts: accept-A then decline-B → only ally A survives", () => {
@@ -194,11 +199,14 @@ describe("multiple replacement effects on the same KO batch", () => {
     };
 
     // First prompt: effect A asking about ally A.
-    const first = executeKO(
+    const ordering = executeKO(
       optState, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(),
       [ids.aa, ids.ab], resolverExecutionServices
     );
-    expect(first.pendingPrompt).toBeDefined();
+    expect(ordering.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    const withoutOffer = { ...ordering.state, effectStack: ordering.state.effectStack.slice(0, -1), pendingPrompt: null };
+    const first = chooseBatchReplacementOrder(withoutOffer, batchOfferOf(ordering), "repl-A", cardDb, resolverExecutionServices);
+    expect(first.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     const ctx1 = batchOfferOf(first);
     expect(ctx1.pendingMatches).toHaveLength(2);
     expect(ctx1.currentMatchIndex).toBe(0);
@@ -209,7 +217,8 @@ describe("multiple replacement effects on the same KO batch", () => {
     const afterAccept = answerBatchOffer(first, true, cardDb);
     expect(afterAccept.pendingPrompt).toBeDefined();
     const ctx2 = batchOfferOf(afterAccept);
-    expect(ctx2.currentMatchIndex).toBe(1);
+    expect(ctx2.pendingMatches[ctx2.currentMatchIndex].effectId).toBe("repl-B");
+    expect(ctx2.visitedEffectIds).toContain("repl-A");
     // Ally A is already in the protected set.
     expect(ctx2.protectedIds).toContain(ids.aa);
 

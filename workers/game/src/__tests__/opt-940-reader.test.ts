@@ -79,7 +79,7 @@ function withLegacyStage(state: GameState): GameState {
 describe("OPT-940 game-state schema version", () => {
   it("defines version 1 and assigns it to a persisted object without the key", () => {
     // OPT-980 reads 1 and 2; OPT-924 (PR 4b) writes 2; OPT-963 reads 3 (PR 5a) and writes 3 (PR 5b).
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(4);
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
     expect(LEGACY_GAME_STATE_SCHEMA_VERSION).toBe(1);
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6]);
     expect(readGameStateSchemaVersion({}, "state")).toBe(1);

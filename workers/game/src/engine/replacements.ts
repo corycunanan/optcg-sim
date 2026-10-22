@@ -1,7 +1,6 @@
+import { replacementEventsFor } from "./replacement-events.js";
 import { expandReplacementVisits, replacementAbilitySiblings } from "./replacement-ability-identity.js";
 import { isGameTerminated } from "./terminal.js";
-import * as legacy from "./replacement-legacy.js";
-import { usesReplacementScan } from "./replacement-version.js";
 import { restFieldTarget } from "./field-rest.js";
 import type { EffectSourceIdentity } from "../../../../shared/game-types.js";
 /**
@@ -211,15 +210,6 @@ export function checkReplacementForKO(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices
 ): ReplacementCheckResult {
-  if (!usesReplacementScan(state))
-    return legacy.checkReplacementForKO(
-      state,
-      targetInstanceId,
-      cause,
-      causingController,
-      cardDb,
-      services
-    );
   return checkReplacementForEvent(
     state,
     targetInstanceId,
@@ -243,14 +233,6 @@ export function checkReplacementForRemoval(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices
 ): ReplacementCheckResult {
-  if (!usesReplacementScan(state))
-    return legacy.checkReplacementForRemoval(
-      state,
-      targetInstanceId,
-      causingController,
-      cardDb,
-      services
-    );
   // Check both specific WOULD_BE_REMOVED_FROM_FIELD and general WOULD_LEAVE_FIELD
   const result = checkReplacementForEvent(
     state,
@@ -544,16 +526,6 @@ export function scanReplacementsForBatch(
   services: ReplacementExecutionServices,
   causingSource?: EffectSourceIdentity
 ): ReplacementBatchMatch[] {
-  if (!usesReplacementScan(state))
-    return legacy.scanReplacementsForBatch(
-      state,
-      targetInstanceIds,
-      event,
-      cause,
-      causingController,
-      cardDb,
-      causingSource
-    );
   const effects = state.activeEffects;
   const matches: ReplacementBatchMatch[] = [];
 
@@ -602,14 +574,6 @@ export function applyBatchReplacement(
   services: ReplacementExecutionServices,
   replacedInstanceIds: string[] = []
 ): ReplacementCheckResult {
-  if (!usesReplacementScan(state))
-    return legacy.applyBatchReplacement(
-      state,
-      effectId,
-      cardDb,
-      services,
-      replacedInstanceIds
-    );
   const effects = state.activeEffects;
   const effect = effects.find((e) => e.id === effectId);
   if (!effect) return { replaced: false, state, events: [] };
@@ -1106,8 +1070,6 @@ export function materializeReplacementOffer(
   pendingPrompt: PendingPromptState,
   offer: ReplacementOffer | undefined
 ): { state: GameState; pendingPrompt: PendingPromptState } {
-  if (!usesReplacementScan(state))
-    return legacy.materializeReplacementOffer(state, pendingPrompt, offer);
   if (!offer) return { state, pendingPrompt };
   const { effectId, targetInstanceId, event } = offer;
   const effect = state.activeEffects.find((candidate) => candidate.id === effectId);
@@ -1161,8 +1123,6 @@ export function resumeReplacement(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices
 ): ReplacementCheckResult {
-  if (!usesReplacementScan(state))
-    return legacy.resumeReplacement(state, ctx, accepted, cardDb, services);
   const { cause, controller: causingController } = singleReplacementCause(state, ctx);
   const visitedEffectIds = expandReplacementVisits(state, [...(ctx.visitedEffectIds ?? []), ctx.effectId], cardDb);
   const effect = state.activeEffects.find((candidate) => candidate.id === ctx.effectId);
@@ -1300,14 +1260,6 @@ export function openReplacementBatchFrame(
   controller: 0 | 1,
   insertAt?: number
 ): { state: GameState; frameId: string } {
-  if (!usesReplacementScan(state))
-    return legacy.openReplacementBatchFrame(
-      state,
-      batch,
-      phase,
-      controller,
-      insertAt
-    );
   const { type: _type, ...replacementBatch } = batch;
   const generated = generateFrameId(state);
   const frame: EffectStackFrame = {
@@ -1362,7 +1314,7 @@ function stillFeasibleBatchTargets(
   services: ReplacementExecutionServices,
   context: ReplacementBatchResumeContext,
 ): string[] {
-  return scanReplacementCandidates(state, ids, context.events ?? [context.event],
+  return scanReplacementCandidates(state, ids, replacementEventsFor(context.actionKind, context.events),
     context.cause ?? "effect", context.causingController, cardDb, services,
     context.causingSource, context.visitedEffectIds, false)
     .find((match) => match.effectId === effectId)?.matchedTargetIds ?? [];
@@ -1392,7 +1344,7 @@ function stepBatch(
     const pendingMatches = scanReplacementCandidates(
       nextState,
       ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
-      ctx.events ?? [ctx.event],
+      replacementEventsFor(ctx.actionKind, ctx.events),
       ctx.cause ?? "effect",
       ctx.causingController,
       cardDb,
@@ -1524,19 +1476,6 @@ export function processBatchReplacements(
   returnToDeckPosition?: "TOP" | "BOTTOM",
   causingSource?: EffectSourceIdentity
 ): BatchResumeResult {
-  if (!usesReplacementScan(state))
-    return legacy.processBatchReplacements(
-      state,
-      targetIds,
-      actionKind,
-      event,
-      cause,
-      causingController,
-      cardDb,
-      services,
-      returnToDeckPosition,
-      causingSource
-    );
   // Multiple events: scan each in order (specific first, e.g. WOULD_BE_KO
   // before WOULD_BE_REMOVED_FROM_FIELD / WOULD_LEAVE_FIELD). A replacement
   // effect registers for exactly one trigger, so no match can duplicate.
@@ -1593,7 +1532,7 @@ export function chooseBatchReplacementOrder(
     return finishReplacementBatch(state, ctx, 0, [], cardDb, services);
   const { orderingEffectIds: _order, ...rest } = ctx;
   const eligible = scanReplacementCandidates(state, ctx.allTargetIds.filter((id) => !ctx.protectedIds.includes(id)),
-    ctx.events ?? [ctx.event], ctx.cause ?? "effect", ctx.causingController, cardDb, services, ctx.causingSource,
+    replacementEventsFor(ctx.actionKind, ctx.events), ctx.cause ?? "effect", ctx.causingController, cardDb, services, ctx.causingSource,
     ctx.visitedEffectIds, false).some((match) => match.effectId === effectId);
   if (!eligible) return finishReplacementBatch(state, { ...rest, visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] }, 0, [], cardDb, services);
   const selected = { ...rest, currentMatchIndex: index };
@@ -1631,14 +1570,6 @@ export function resumeReplacementBatch(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices
 ): BatchResumeResult {
-  if (!usesReplacementScan(state))
-    return legacy.resumeReplacementBatch(
-      state,
-      ctx,
-      accepted,
-      cardDb,
-      services
-    );
   let nextState = state;
   const events: PendingEvent[] = [];
   const protectedIds = new Set<string>(ctx.protectedIds);
@@ -1713,13 +1644,6 @@ export function continueReplacementBatchAfterSubstitute(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices
 ): BatchResumeResult {
-  if (!usesReplacementScan(state))
-    return legacy.continueReplacementBatchAfterSubstitute(
-      state,
-      ctx,
-      cardDb,
-      services
-    );
   const protectedIds = new Set(ctx.protectedIds);
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
   if (currentMatch) {
