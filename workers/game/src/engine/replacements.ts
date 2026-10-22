@@ -1,3 +1,4 @@
+import { expandReplacementVisits, replacementAbilitySiblings } from "./replacement-ability-identity.js";
 import { isGameTerminated } from "./terminal.js";
 import * as legacy from "./replacement-legacy.js";
 import { usesReplacementScan } from "./replacement-version.js";
@@ -440,9 +441,11 @@ function scanReplacementCandidates(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
   source?: EffectSourceIdentity,
-  visited: string[] = []
+  visited: string[] = [],
+  groupCandidates = true
 ): ReplacementBatchMatch[] {
-  const matches = events
+  const excluded = new Set(expandReplacementVisits(state, visited, cardDb));
+  const rawMatches = events
     .flatMap((event) =>
       scanReplacementsForBatch(
         state,
@@ -455,7 +458,16 @@ function scanReplacementCandidates(
         source
       )
     )
-    .filter((match) => !visited.includes(match.effectId));
+    .filter((match) => !excluded.has(match.effectId));
+  // Acceptance uses raw concrete IDs; only next-candidate discovery coalesces
+  // declared alternative predicates. Coverage is the union of matching branches.
+  const matches: ReplacementBatchMatch[] = [];
+  for (const match of rawMatches) {
+    const siblings = groupCandidates ? replacementAbilitySiblings(state, match.effectId, cardDb) : [match.effectId];
+    const existing = matches.find((candidate) => siblings.includes(candidate.effectId));
+    if (existing) existing.matchedTargetIds = [...new Set([...existing.matchedTargetIds, ...match.matchedTargetIds])];
+    else matches.push({ ...match, matchedTargetIds: [...match.matchedTargetIds] });
+  }
   const effects = new Map(
     state.activeEffects.map((effect) => [effect.id, effect])
   );
@@ -1152,7 +1164,7 @@ export function resumeReplacement(
   if (!usesReplacementScan(state))
     return legacy.resumeReplacement(state, ctx, accepted, cardDb, services);
   const { cause, controller: causingController } = singleReplacementCause(state, ctx);
-  const visitedEffectIds = [...(ctx.visitedEffectIds ?? []), ctx.effectId];
+  const visitedEffectIds = expandReplacementVisits(state, [...(ctx.visitedEffectIds ?? []), ctx.effectId], cardDb);
   const effect = state.activeEffects.find((candidate) => candidate.id === ctx.effectId);
   const eligible = scanReplacementCandidates(
     state,
@@ -1163,7 +1175,8 @@ export function resumeReplacement(
     cardDb,
     services,
     undefined,
-    ctx.visitedEffectIds
+    ctx.visitedEffectIds,
+    false
   ).some((match) => match.effectId === ctx.effectId);
   const params = effect?.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
   if (accepted && effect && eligible && isReplacementParams(params)) {
@@ -1194,7 +1207,7 @@ export function chooseReplacementOrder(
   const { orderingEffectIds: _order, ...progress } = ctx;
   const { cause, controller } = singleReplacementCause(state, ctx);
   const eligible = scanReplacementCandidates(state, [ctx.targetInstanceId], [ctx.event], cause, controller, cardDb, services,
-    undefined, ctx.visitedEffectIds).some((match) => match.effectId === effectId);
+    undefined, ctx.visitedEffectIds, false).some((match) => match.effectId === effectId);
   const params = effect?.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
   if (!effect || !eligible || !isReplacementParams(params)) return checkReplacementForEvent(state, ctx.targetInstanceId, ctx.event, cause, controller,
     cardDb, services, { visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] });
@@ -1351,7 +1364,7 @@ function stillFeasibleBatchTargets(
 ): string[] {
   return scanReplacementCandidates(state, ids, context.events ?? [context.event],
     context.cause ?? "effect", context.causingController, cardDb, services,
-    context.causingSource, context.visitedEffectIds)
+    context.causingSource, context.visitedEffectIds, false)
     .find((match) => match.effectId === effectId)?.matchedTargetIds ?? [];
 }
 
@@ -1373,11 +1386,8 @@ function stepBatch(
   const events: PendingEvent[] = [];
   const protectedIds = new Set<string>(ctx.protectedIds);
 
-  const visitedEffectIds = [...(ctx.visitedEffectIds ??
-      ctx.pendingMatches
-        .slice(0, startMatchIndex)
-        .map((match) => match.effectId)),
-  ];
+  const visitedEffectIds = expandReplacementVisits(state, ctx.visitedEffectIds ??
+      ctx.pendingMatches.slice(0, startMatchIndex).map((match) => match.effectId), cardDb);
   while (true) {
     const pendingMatches = scanReplacementCandidates(
       nextState,
@@ -1426,6 +1436,8 @@ function stepBatch(
     }
 
     // Non-optional: apply once, mark covered targets as protected.
+    // Capture all concrete siblings before the substitute can remove its source.
+    const completedIds = expandReplacementVisits(nextState, [match.effectId], cardDb);
     const depthBefore = nextState.effectStack.length;
     const applied = applyBatchReplacement(nextState, match.effectId, cardDb, services, applicable);
     nextState = applied.state;
@@ -1438,7 +1450,7 @@ function stepBatch(
       nextState = openReplacementBatchFrame(
         nextState,
         { ...ctx, pendingMatches,
-          visitedEffectIds,
+          visitedEffectIds: expandReplacementVisits(state, [...visitedEffectIds, ...(completedIds.length > 1 ? completedIds : [])], cardDb),
           protectedIds: [...protectedIds], currentMatchIndex: i,
         },
         "INTERRUPTED_BY_TRIGGERS",
@@ -1455,7 +1467,7 @@ function stepBatch(
       };
     }
     applicable.forEach((id) => protectedIds.add(id));
-    visitedEffectIds.push(match.effectId);
+    visitedEffectIds.push(...completedIds);
   }
 
   return {
@@ -1582,7 +1594,7 @@ export function chooseBatchReplacementOrder(
   const { orderingEffectIds: _order, ...rest } = ctx;
   const eligible = scanReplacementCandidates(state, ctx.allTargetIds.filter((id) => !ctx.protectedIds.includes(id)),
     ctx.events ?? [ctx.event], ctx.cause ?? "effect", ctx.causingController, cardDb, services, ctx.causingSource,
-    ctx.visitedEffectIds).some((match) => match.effectId === effectId);
+    ctx.visitedEffectIds, false).some((match) => match.effectId === effectId);
   if (!eligible) return finishReplacementBatch(state, { ...rest, visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] }, 0, [], cardDb, services);
   const selected = { ...rest, currentMatchIndex: index };
   const match = selected.pendingMatches[index];
@@ -1632,6 +1644,7 @@ export function resumeReplacementBatch(
   const protectedIds = new Set<string>(ctx.protectedIds);
 
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
+  const completedIds = expandReplacementVisits(state, currentMatch ? [currentMatch.effectId] : [], cardDb);
   // OPT-922: re-check before applying an accepted offer. A card whose
   // substitute is no longer feasible receives the original consequence, as
   // if the replacement had been declined (rule 8-1-3-4-5).
@@ -1663,7 +1676,9 @@ export function resumeReplacementBatch(
         finalizedIds: [],
         unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
         pendingPrompt: applied.pendingPrompt,
-        continuationContext: { ...ctx, pendingMatches },
+        continuationContext: { ...ctx, pendingMatches, ...(completedIds.length > 1
+          ? { visitedEffectIds: expandReplacementVisits(state, [...(ctx.visitedEffectIds ?? []), ...completedIds], cardDb) }
+          : {}) },
       };
     }
     applicable.forEach((id) => protectedIds.add(id));
@@ -1673,13 +1688,13 @@ export function resumeReplacementBatch(
   const nextCtx: ReplacementBatchResumeContext = {
     ...ctx,
     protectedIds: [...protectedIds],
-    visitedEffectIds: [
+    visitedEffectIds: expandReplacementVisits(state, [
       ...(ctx.visitedEffectIds ??
         ctx.pendingMatches
           .slice(0, ctx.currentMatchIndex)
           .map((match) => match.effectId)),
-      ...(currentMatch ? [currentMatch.effectId] : []),
-    ],
+      ...completedIds,
+    ], cardDb),
   };
   return finishReplacementBatch(
     nextState,
@@ -1713,13 +1728,13 @@ export function continueReplacementBatchAfterSubstitute(
   const nextCtx: ReplacementBatchResumeContext = {
     ...ctx,
     protectedIds: [...protectedIds],
-    visitedEffectIds: [
+    visitedEffectIds: expandReplacementVisits(state, [
       ...(ctx.visitedEffectIds ??
         ctx.pendingMatches
           .slice(0, ctx.currentMatchIndex)
           .map((match) => match.effectId)),
-      ...(currentMatch ? [currentMatch.effectId] : []),
-    ],
+      ...expandReplacementVisits(state, currentMatch ? [currentMatch.effectId] : [], cardDb),
+    ], cardDb),
   };
   return finishReplacementBatch(
     state,

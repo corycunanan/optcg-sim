@@ -39,6 +39,7 @@ import {
   targetPromptCountMin,
 } from "./effect-resolver/target-resolver.js";
 import { promptsFromTargetCount } from "./effect-resolver/target-prompt-actions.js";
+import { validateReplacementAbilityGroups } from "./replacement-ability-identity.js";
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
 import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
 import { derivePrintedKeywords } from "./printed-keywords.js";
@@ -291,6 +292,7 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
     );
   }
 
+  if (candidate.card_id) errors.push(...validateReplacementAbilityGroups(candidate as EffectSchema));
   const blockIds = new Set<string>();
 
   for (let i = 0; i < candidate.effects.length; i++) {

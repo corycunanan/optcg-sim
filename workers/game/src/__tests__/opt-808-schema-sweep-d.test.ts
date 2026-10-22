@@ -350,6 +350,7 @@ describe("OPT-808 authored pipeline", () => {
     "Thatch replaces %s K.O. exactly once, without a K.O. event",
     (cause) => {
       const f = fixture("OP08-045", { cost: 4, power: 6000 });
+      f.state.schemaVersion = 6; // Native-v6 reader path; one printed OR ability.
       const thatch = {
         ...card(f.data.id, "thatch", 0),
         state: "RESTED" as const,
