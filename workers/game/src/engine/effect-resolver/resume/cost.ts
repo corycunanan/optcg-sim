@@ -150,6 +150,30 @@ export function abortReplacedCost(
   );
 }
 
+/** Consume an explicit result only after all children have finished. The
+ * shared drain owns readiness; this helper never searches for another COST.
+ * Absent legacy outcomes remain parked and are not silently repaired. */
+export function continueReadyCostReplacement(
+  state: GameState,
+  frame: EffectStackFrame,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices,
+): HandlerResult {
+  if (state.pendingPrompt || state.effectStack.at(-1)?.id !== frame.id ||
+      !frame.costReplacementResolution || !frame.costReplacementAction) {
+    return { kind: "continued", state, events: [], resolved: false };
+  }
+  if (isGameTerminated(state)) return { kind: "terminal", state, events: [], resolved: true };
+  if (frame.costReplacementResolution === "REPLACED") {
+    // Child substitute events already follow their own existing publication
+    // path. Only the owner's legacy-payment event debt belongs to abandon.
+    return abortReplacedCost(state, frame, [], cardDb, services);
+  }
+  const { costReplacementResolution: _consumed, ...ready } = frame;
+  const nextState = { ...state, effectStack: [...state.effectStack.slice(0, -1), ready] };
+  return handleAwaitingCostSelection(nextState, ready.costReplacementAction!, ready, cardDb, services);
+}
+
 /**
  * Merge a new set of cost result refs (from a payCostsWithSelection call)
  * into an accumulated refs map. Concatenates targetInstanceIds and sums

@@ -65,6 +65,8 @@ export type LegacyShape =
   | "legacy.stage_less_phase_boundary"
   | "legacy.structural_resume_context"
   | "legacy.cost_transaction_frame"
+  /** Parked cost replacement has no final disposition and no remaining offer. No automatic repair is justified. */
+  | "legacy.cost_replacement_outcome_unknown"
   | "legacy.stuck_damage_step"
   /** A BATTLE_DAMAGE frame with no battle, another battle, or outside DAMAGE_STEP; continueBattleDamageFrame drops it (battle.ts, OPT-884). */
   | "legacy.orphan_battle_continuation"
@@ -843,6 +845,14 @@ export function validateContinuationReferences(
         }
       }
     }
+    if (frame.costReplacementResolution !== undefined && (
+      derived !== "COST" || frame.phase !== "AWAITING_COST_SELECTION" ||
+      !frame.costReplacementAction || frame.costReplacementChecked !== true ||
+      !frame.costs[frame.currentCostIndex] ||
+      !["SELECT_TARGET", "PLAYER_CHOICE", "ARRANGE_TOP_CARDS"].includes(frame.costReplacementAction.type)
+    )) {
+      throw new SessionLoadError(location, `${ref} has costReplacementResolution without a checked COST replay owner`);
+    }
     const violation = frameInvariantViolation(frame, derived, state);
     if (violation) {
       throw new SessionLoadError(location, `${ref} (frame ${JSON.stringify(frame.id)}) ${violation}`);
@@ -1039,6 +1049,11 @@ export function classifyLegacyShapes(state: GameState): LegacyShapeReport[] {
     }
     if (frameKindOf(frame) === "COST" && isLegacyCostTransactionFrame(frame)) {
       reports.push({ shape: "legacy.cost_transaction_frame", frameId: frame.id });
+    }
+    if (frameKindOf(frame) === "COST" && frame.costReplacementAction &&
+        frame.costReplacementResolution === undefined &&
+        !state.effectStack.slice(state.effectStack.indexOf(frame) + 1).some(child => frameKindOf(child) === "REPLACEMENT")) {
+      reports.push({ shape: "legacy.cost_replacement_outcome_unknown", frameId: frame.id });
     }
   }
   const resume = state.pendingPrompt?.resumeContext;

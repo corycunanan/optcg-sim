@@ -88,6 +88,7 @@ const ownerFields = {
   costTransactionState: "absent",
   costReplacementAction: "absent",
   costReplacementChecked: "absent",
+  costReplacementResolution: "absent",
   triggerOrderingGroup: "absent",
   ruleTrashForPlay: "absent",
   stateDistributionForPlay: "absent",

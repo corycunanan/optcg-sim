@@ -443,6 +443,7 @@ export const StackFrameCore = z.strictObject({
   costTransactionState: z.unknown().optional(),
   costReplacementAction: z.unknown().optional(),
   costReplacementChecked: z.boolean().optional(),
+  costReplacementResolution: z.enum(["REPLACED", "NOT_REPLACED"]).optional(),
   pendingTriggers: z.array(z.unknown()),
   simultaneousTriggers: z.array(z.unknown()),
   triggerOrderingGroup: z

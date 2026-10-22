@@ -462,3 +462,31 @@ rollout. Pinned actual writer/session outputs replay on the deployed semantic
 reader, including live and restored undo, all later prompts and allocator IDs.
 This exception does not claim captured production sessions or completion of the
 capture-dependent retirement gate.
+
+## OPT-997 semantic COST-outcome reader prerequisite
+
+The reader accepts optional `costReplacementResolution: "REPLACED" |
+"NOT_REPLACED"` on a checked `COST`/`AWAITING_COST_SELECTION` frame that carries
+its validated replay action and an existing current cost. Supported replay
+families are `SELECT_TARGET`, `PLAYER_CHOICE` (including the fixed-cost sentinel
+and destination choices), and `ARRANGE_TOP_CARDS`. The shared drain consumes the
+explicit result only once that exact owner is topmost and no prompt remains.
+Replacement children retain their existing action, event and prompt ownership.
+
+`REPLACED` abandons the cost through the existing Decision10 policy: substitute
+stands, earlier staged costs roll back, no post-colon effect, activation use
+unconsumed. `NOT_REPLACED` resumes its saved payment through the existing checked
+path. A terminal game is never restored from a transaction baseline. Production
+outcome writers remain disabled in this prerequisite; rollout requires this
+semantic reader before any producer emits the field.
+
+Absent is waiting or legacy unknown, never an inferred acceptance. A parked
+cost with no explicit result and no offer above it is classified
+`legacy.cost_replacement_outcome_unknown`; its bytes and recoverable state are
+preserved. The reader does not claim to repair old accepted-child or orphaned
+sessions. Existing historical debt fixtures remain diagnostic controls.
+
+The user authorized synthetic-only evidence for the DON choice rollout and then
+explicitly included this necessary OPT-997 prerequisite under the same gates.
+That evidence scope does not authorize production capture, reader retirement,
+legacy repair, or broader OPT-1006 changes.
