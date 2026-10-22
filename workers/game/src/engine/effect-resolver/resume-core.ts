@@ -255,7 +255,8 @@ export function resumeEffectChain(
       nextState,
       action,
       resumeCtx,
-      events
+      events,
+      resultRefs
     );
     if (donReturn?.kind === "handled") return donReturn.result;
     if (donReturn?.kind === "continued") {

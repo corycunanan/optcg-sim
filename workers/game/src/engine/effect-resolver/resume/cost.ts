@@ -1274,8 +1274,9 @@ export function handleAwaitingCostSelection(
     // validTargets, deduped, exact prompt count (countMin === countMax ===
     // amount in the generic cost prompt).
     const valid = new Set(topFrame.validTargets ?? []);
-    const amount =
-      typeof (cost as SimpleCost).amount === "number"
+    const amount = cost.type === "VARIABLE_DON_RETURN" && cost.amount === undefined
+      ? (action.selectedInstanceIds ?? []).length
+      : typeof (cost as SimpleCost).amount === "number"
         ? ((cost as SimpleCost).amount as number)
         : 1;
     const selected = [...new Set(action.selectedInstanceIds ?? [])].filter(
@@ -1283,6 +1284,15 @@ export function handleAwaitingCostSelection(
     );
     if (selected.length !== amount) {
       return { kind: "waiting", state, events: [], resolved: false };
+    }
+    // Reader-first DON!! selection must remain eligible in both the live
+    // baseline and staged payment. A stale reply cannot pay an absent DON!!.
+    if (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") {
+      const live = new Set(computeCostTargets(baselineState, cost, controller, cardDb, sourceCardInstanceId));
+      const staged = new Set(computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId));
+      if (amount < 1 || (action.selectedInstanceIds ?? []).length !== amount || selected.some(id => !live.has(id) || !staged.has(id))) {
+        return { kind: "waiting", state, events: [], resolved: false };
+      }
     }
     const fieldExitCosts = new Set<Cost["type"]>([
       "KO_OWN_CHARACTER",

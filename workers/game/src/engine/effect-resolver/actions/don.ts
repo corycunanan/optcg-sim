@@ -331,6 +331,40 @@ export function applyFieldDonReturn(
   return { state: { ...state, players: newPlayers }, events, returned: returned.length };
 }
 
+/** OPT-969 reader-first identity choice. Existing bucket plans keep their
+ * historical meaning; this separate grammar preserves DON-specific effects. */
+export function decodeDonReturnIds(choiceId: string): string[] | null {
+  if (!choiceId.startsWith("don-return-ids:")) return null;
+  try {
+    const ids: unknown = JSON.parse(choiceId.slice("don-return-ids:".length));
+    return Array.isArray(ids) && ids.length > 0 && ids.every(id => typeof id === "string") &&
+      new Set(ids).size === ids.length ? ids : null;
+  } catch { return null; }
+}
+
+/** Exact identities, shared by action-choice and cost readers. No prompting,
+ * advancement or publication: the existing caller owns those boundaries. */
+export function applyDonReturnIds(
+  state: GameState,
+  owner: 0 | 1,
+  ids: readonly string[],
+): { state: GameState; events: PendingEvent[]; returned: number } | null {
+  const p = state.players[owner];
+  const selected = new Set(ids);
+  const hosts = [p.leader, ...p.characters.filter((c): c is NonNullable<typeof c> => c !== null)];
+  const pool = [...p.donCostArea, ...hosts.flatMap(c => c.attachedDon)];
+  if (ids.length === 0 || selected.size !== ids.length || ids.some(id => !pool.some(d => d.instanceId === id))) return null;
+  const returned = pool.filter(d => selected.has(d.instanceId)).map(d => ({ ...d, state: "ACTIVE" as const, attachedTo: null }));
+  const detach = (card: typeof p.leader) => ({ ...card, attachedDon: card.attachedDon.filter(d => !selected.has(d.instanceId)) });
+  const players = [...state.players] as GameState["players"];
+  players[owner] = {
+    ...p, leader: detach(p.leader), characters: p.characters.map(c => c ? detach(c) : null),
+    donCostArea: p.donCostArea.filter(d => !selected.has(d.instanceId)),
+    donDeck: [...p.donDeck, ...returned],
+  };
+  return { state: { ...state, players }, events: [{ type: "DON_DETACHED", playerIndex: owner, payload: { count: ids.length } }], returned: ids.length };
+}
+
 /** Cards whose attached DON!! can be returned, in a stable order (Leader first). */
 function attachedDonSources(
   p: GameState["players"][0],
