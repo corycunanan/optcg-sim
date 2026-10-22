@@ -780,6 +780,21 @@ export function validateContinuationReferences(
         `${ref} (frame ${JSON.stringify(frame.id)}) declares kind ${frame.kind} but its content is ${derived}`
       );
     }
+    const batchEvents = frame.replacementBatch?.events;
+    if (batchEvents) {
+      const batch = frame.replacementBatch!;
+      // The KO, hand/deck return and rest producers supply these exact event
+      // families in order. Missing events preserves historical inference.
+      const expectedEvents = batch.actionKind === "KO"
+        ? ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"]
+        : batch.actionKind === "SET_REST"
+          ? ["WOULD_BE_RESTED"]
+          : ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"];
+      if (batch.event !== expectedEvents[0] || batchEvents.length !== expectedEvents.length ||
+        batchEvents.some((event, index) => event !== expectedEvents[index])) {
+        throw new SessionLoadError(location, `${ref} has inconsistent replacement batch events for ${batch.actionKind}`);
+      }
+    }
     const progress = frame.replacement ?? frame.replacementBatch;
     if (progress) {
       const visited = progress.visitedEffectIds ?? [];
@@ -805,18 +820,28 @@ export function validateContinuationReferences(
             location,
             `${ref} orders a replacement outside its candidate set`
           );
+        // A live candidate's owner must agree with the ordering owner. An
+        // absent/stale candidate is deliberately left for runtime recheck.
+        if (ordering.some((id) => {
+          const candidate = state.activeEffects.find((effect) => effect.id === id);
+          return candidate && candidate.controller !== frame.controller;
+        })) {
+          throw new SessionLoadError(location, `${ref} orders a replacement controlled by another player`);
+        }
         const prompt = state.pendingPrompt;
         if (
           prompt?.resumeContext === frame.id &&
-          (prompt.options.promptType !== "PLAYER_CHOICE" ||
+          (prompt.respondingPlayer !== frame.controller ||
+            prompt.options.promptType !== "PLAYER_CHOICE" ||
             prompt.options.choices.length !== ordering.length ||
+            new Set(prompt.options.choices.map((choice) => choice.id)).size !== ordering.length ||
             prompt.options.choices.some(
-              (choice) => !ordering.includes(choice.id)
+              (choice) => !ordering.includes(choice.id) || choice.disabled === true
             ))
         ) {
           throw new SessionLoadError(
             location,
-            `${ref} replacement ordering prompt disagrees with candidate ids`
+            `${ref} replacement ordering prompt disagrees with candidate ids or controller`
           );
         }
       }

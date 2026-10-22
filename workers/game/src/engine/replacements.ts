@@ -355,8 +355,8 @@ function checkReplacementForEvent(
   const effect = state.activeEffects.find(
     (candidate) => candidate.id === first.effectId
   )!;
-  const params = effect.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")!
-    .params as unknown as ReplacementParams;
+  const params = effect.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
+  if (!isReplacementParams(params)) return { replaced: false, state, events: [] };
   const nextProgress = { ...progress, cause, causingController };
   const orderingEffectIds = replacementOrderingGroup(state, matches);
     if (orderingEffectIds.length > 1) {
@@ -1165,8 +1165,8 @@ export function resumeReplacement(
     undefined,
     ctx.visitedEffectIds
   ).some((match) => match.effectId === ctx.effectId);
-  if (accepted && effect && eligible) {
-    const params = effect.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")!.params as unknown as ReplacementParams;
+  const params = effect?.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
+  if (accepted && effect && eligible && isReplacementParams(params)) {
     return applyReplacement(state, effect, params, [ctx.targetInstanceId], cardDb, services);
 }
   return checkReplacementForEvent(
@@ -1195,10 +1195,9 @@ export function chooseReplacementOrder(
   const { cause, controller } = singleReplacementCause(state, ctx);
   const eligible = scanReplacementCandidates(state, [ctx.targetInstanceId], [ctx.event], cause, controller, cardDb, services,
     undefined, ctx.visitedEffectIds).some((match) => match.effectId === effectId);
-  if (!effect || !eligible) return checkReplacementForEvent(state, ctx.targetInstanceId, ctx.event, cause, controller,
+  const params = effect?.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
+  if (!effect || !eligible || !isReplacementParams(params)) return checkReplacementForEvent(state, ctx.targetInstanceId, ctx.event, cause, controller,
     cardDb, services, { visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] });
-  const params = effect.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")!
-    .params as unknown as ReplacementParams;
   if (params.optional) {
     const result = buildReplacementPrompt(
       state,
@@ -1577,13 +1576,14 @@ export function chooseBatchReplacementOrder(
   const index = ctx.pendingMatches.findIndex(
     (match) => match.effectId === effectId
   );
+  // This is a resume boundary: an exhausted rescan must also finalize.
   if (!ctx.orderingEffectIds?.includes(effectId) || index < 0)
-    return stepBatch(state, ctx, 0, cardDb, services);
+    return finishReplacementBatch(state, ctx, 0, [], cardDb, services);
   const { orderingEffectIds: _order, ...rest } = ctx;
   const eligible = scanReplacementCandidates(state, ctx.allTargetIds.filter((id) => !ctx.protectedIds.includes(id)),
     ctx.events ?? [ctx.event], ctx.cause ?? "effect", ctx.causingController, cardDb, services, ctx.causingSource,
     ctx.visitedEffectIds).some((match) => match.effectId === effectId);
-  if (!eligible) return stepBatch(state, { ...rest, visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] }, 0, cardDb, services);
+  if (!eligible) return finishReplacementBatch(state, { ...rest, visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] }, 0, [], cardDb, services);
   const selected = { ...rest, currentMatchIndex: index };
   const match = selected.pendingMatches[index];
   if (!match.optional)

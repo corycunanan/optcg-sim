@@ -325,7 +325,7 @@ const ReplacementContinuation = z.strictObject({
 /** OPT-963 REPLACEMENT_BATCH frame (version 3). */
 const ReplacementBatchContinuation = z.strictObject({
   visitedEffectIds: StringArray.optional(),
-  events: z.array(ReplacementEvent).optional(),
+  events: z.array(ReplacementEvent).min(1).optional(),
   cause: z.enum(["battle", "effect"]).optional(),
   orderingEffectIds: StringArray.optional(),
   actionKind: z.enum(["KO", "RETURN_TO_HAND", "RETURN_TO_DECK", "SET_REST"]),
