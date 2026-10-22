@@ -1266,7 +1266,7 @@ describe("Replacement Effects", () => {
 
   // ─── Substitute action dispatcher (OPT-218) ────────────────────────────────
 
-  it("dispatches SET_REST substitute — Tashigi rests herself when accepting", () => {
+  it.each([0, 1] as const)("dispatches SET_REST substitute — Tashigi rechecks effect cause from P%i", (causingController) => {
     const TASHIGI: CardData = { ...NAMI_CARD, id: "TASHIGI", name: "Tashigi", color: ["Green"] };
     const GREEN_ALLY: CardData = { ...NAMI_CARD, id: "GREEN-ALLY", name: "Green Ally", color: ["Green"] };
 
@@ -1309,14 +1309,14 @@ describe("Replacement Effects", () => {
     // Player accepts the prompt; resumeReplacement applies the substitute.
     const result = resumeReplacement(
       state,
-      { type: "REPLACEMENT", effectId: "repl-tashigi", targetInstanceId: "ally-1", event: "WOULD_BE_REMOVED_FROM_FIELD" },
+      { type: "REPLACEMENT", effectId: "repl-tashigi", targetInstanceId: "ally-1", event: "WOULD_BE_REMOVED_FROM_FIELD", cause: "effect", causingController },
       true,
       cardDb, resolverExecutionServices
     );
 
-    expect(result.replaced).toBe(true);
+    expect(result.replaced).toBe(causingController === 1);
     const tashigiAfter = result.state.players[0].characters.find((c) => c?.instanceId === "tashigi-1");
-    expect(tashigiAfter?.state).toBe("RESTED");
+    expect(tashigiAfter?.state).toBe(causingController === 1 ? "RESTED" : "ACTIVE");
     // Ally remains untouched by the replacement itself (original removal is skipped by caller)
     const allyAfter = result.state.players[0].characters.find((c) => c?.instanceId === "ally-1");
     expect(allyAfter?.zone).toBe("CHARACTER");

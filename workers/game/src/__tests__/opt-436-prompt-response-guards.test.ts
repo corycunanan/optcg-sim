@@ -557,6 +557,9 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     const [target, unmatchedTarget] = base.players[1].characters.filter(
       (card): card is CardInstance => card !== null,
     );
+    // Both substitute branches must be payable (Decision 8). An empty
+    // branch is pruned and would auto-execute the sole remaining branch.
+    base.players[1].donCostArea.push({ instanceId: "opt439-choice-don", state: "ACTIVE", attachedTo: null });
     const replacement: RuntimeActiveEffect = {
       id: "opt439-nested-replacement",
       sourceCardInstanceId: target.instanceId,
@@ -571,10 +574,10 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
           replacement_actions: [{
             type: "PLAYER_CHOICE",
             params: {
-              labels: ["Rest this card", "Do nothing"],
+              labels: ["Rest this card", "Rest 1 DON!!"],
               options: [
                 [{ type: "SET_REST", target: { type: "SELF" } }],
-                [],
+                [{ type: "REST_DON", params: { amount: 1 } }],
               ],
             },
           }],
@@ -752,6 +755,15 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
       type: "SELECT_TARGET",
       selectedInstanceIds: [target.instanceId],
     });
+    // Two independently constructed effects share the affected source;
+    // Decision 7's assumed policy gives their owner an ordering choice.
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: outerReplacement.id,
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     await session.handleAction(player1 as unknown as WebSocket, 1, {
       type: "PLAYER_CHOICE",
       choiceId: "accept",

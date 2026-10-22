@@ -61,6 +61,10 @@ describe("OPT-961 batch re-check across a substitute's own prompt", () => {
       r.deck(P0, 5);
       r.deck(P1, 5);
       massKO(r);
+      // Assumed Decision 7 ordering: P0 chooses which own Ganzui to try first.
+      expect(r.promptType()).toBe("PLAYER_CHOICE");
+      const firstEffect = r.state.activeEffects.find((effect) => effect.sourceCardInstanceId === g1.instanceId)!;
+      r.act({ type: "PLAYER_CHOICE", choiceId: firstEffect.id });
       expect(r.promptType()).toBe("OPTIONAL_EFFECT");
       r.accept();
       // The substitute's own selection: trash 2 of 3.
@@ -115,6 +119,9 @@ describe("OPT-961 batch re-check across a substitute's own prompt", () => {
   it("narrowed before the offer: a mandatory substitute that prompts protects only the still-feasible card", () => {
     const { r, a, b, c } = divergence(false);
     massKO(r);
+    expect(r.promptType()).toBe("PLAYER_CHOICE");
+    const firstEffect = r.state.activeEffects.find((effect) => effect.sourceCardInstanceId === b.instanceId)!;
+    r.act({ type: "PLAYER_CHOICE", choiceId: firstEffect.id });
     // B rested itself to save C; D's substitute rests A, then asks for a hand card.
     expect(r.promptType()).toBe("SELECT_TARGET");
     r.select(selectable(r).slice(0, 1));
