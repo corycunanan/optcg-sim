@@ -1,4 +1,5 @@
 /** Mutations applied after a player answers a cost-selection prompt. */
+import { applyDonReturnIds } from "../actions/don.js";
 import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import type { Cost } from "../../effect-types.js";
 import type { CardData, CardInstance, GameState, PendingEvent } from "../../../types.js";
@@ -49,6 +50,18 @@ function applyCostSelectionUnreleased(
   const selectedSet = new Set(selectedIds);
 
   switch (cost.type) {
+    // OPT-969 reader-first: accept an exact DON!! selection on the existing
+    // cost frame. The writer remains independently gated by payability.ts.
+    case "DON_MINUS":
+    case "VARIABLE_DON_RETURN": {
+      const eligible = new Set(computeCostTargets(state, cost, controller, cardDb ?? new Map()));
+      const amount = typeof cost.amount === "number" ? cost.amount : cost.type === "VARIABLE_DON_RETURN" ? selectedIds.length : 1;
+      if (amount < 1 || selectedSet.size !== amount || selectedIds.length !== amount || selectedIds.some(id => !eligible.has(id))) {
+        return { state, events: [] };
+      }
+      const returned = applyDonReturnIds(state, controller, selectedIds);
+      return returned ?? { state, events: [] };
+    }
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": {
       const selectedStage = p.stage && selectedSet.has(p.stage.instanceId)
         ? p.stage

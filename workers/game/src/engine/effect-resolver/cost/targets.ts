@@ -265,6 +265,15 @@ export function computeCostTargets(
       : ids;
 
   switch (cost.type) {
+    case "DON_MINUS":
+    case "VARIABLE_DON_RETURN": {
+      const activeOnly = cost.filter?.is_active === true || cost.filter?.state === "ACTIVE";
+      const costArea = player.donCostArea.filter(d => !d.attachedTo && (!activeOnly || d.state === "ACTIVE"));
+      return [
+        ...costArea,
+        ...(!activeOnly ? [player.leader, ...player.characters.filter(isPresent)].flatMap(card => card.attachedDon) : []),
+      ].map(don => don.instanceId);
+    }
     case "PLAY_NAMED_CARD_FROM_HAND":
       return namedPlayCandidates(state, cost, controller, cardDb);
     case "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE": {

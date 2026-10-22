@@ -1,3 +1,4 @@
+import { decodeDonReturnIds } from "../actions/don.js";
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { isGameTerminated } from "../../terminal.js";
 import { runRuleProcessing, runRuleProcessingAfterMove } from "../../defeat.js";
@@ -432,6 +433,15 @@ export function handleAwaitingCostSelection(
 ): HandlerResult {
   const { sourceCardInstanceId, controller } = topFrame;
   const cost = topFrame.costs[topFrame.currentCostIndex];
+  // Reader-first identity-plan choices use the existing cost frame. The
+  // encoded choice must be bound to that frame, then follows the same exact
+  // amount, ownership and live/staged eligibility checks as SELECT_TARGET.
+  if (action.type === "PLAYER_CHOICE" && (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN")) {
+    const ids = topFrame.validTargets.includes(action.choiceId) ? decodeDonReturnIds(action.choiceId) : null;
+    if (!ids) return { kind: "waiting", state, events: [], resolved: false };
+    action = { type: "SELECT_TARGET", selectedInstanceIds: ids };
+  }
+
   const baselineState = state;
   const transactionBaseline = captureCostTransactionState(baselineState);
   const workingState = topFrame.costTransactionState
@@ -1274,8 +1284,9 @@ export function handleAwaitingCostSelection(
     // validTargets, deduped, exact prompt count (countMin === countMax ===
     // amount in the generic cost prompt).
     const valid = new Set(topFrame.validTargets ?? []);
-    const amount =
-      typeof (cost as SimpleCost).amount === "number"
+    const amount = cost.type === "VARIABLE_DON_RETURN" && cost.amount === undefined
+      ? (action.selectedInstanceIds ?? []).length
+      : typeof (cost as SimpleCost).amount === "number"
         ? ((cost as SimpleCost).amount as number)
         : 1;
     const selected = [...new Set(action.selectedInstanceIds ?? [])].filter(
@@ -1283,6 +1294,15 @@ export function handleAwaitingCostSelection(
     );
     if (selected.length !== amount) {
       return { kind: "waiting", state, events: [], resolved: false };
+    }
+    // Reader-first DON!! selection must remain eligible in both the live
+    // baseline and staged payment. A stale reply cannot pay an absent DON!!.
+    if (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") {
+      const live = new Set(computeCostTargets(baselineState, cost, controller, cardDb, sourceCardInstanceId));
+      const staged = new Set(computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId));
+      if (amount < 1 || (action.selectedInstanceIds ?? []).length !== amount || selected.some(id => !live.has(id) || !staged.has(id))) {
+        return { kind: "waiting", state, events: [], resolved: false };
+      }
     }
     const fieldExitCosts = new Set<Cost["type"]>([
       "KO_OWN_CHARACTER",
