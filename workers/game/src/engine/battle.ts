@@ -1154,6 +1154,7 @@ export function executeDamageStep(
           pi as 0 | 1,
           cardDb,
           {
+            executeEffectAction: resolverExecutionServices.executeEffectAction,
             executeActionChain: (substituteState, ...args) => {
               // Mandatory substitutes run before checkReplacementForKO returns.
               // Give their events/watchers the same owner as optional ones

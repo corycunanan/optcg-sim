@@ -173,7 +173,7 @@ it.each([1, 5])("OPT-986 batch recheck with %i authored matches and five targets
   const accepted = () => resumeReplacementBatch(r.state, ctx, true, r.db, resolverExecutionServices);
   expect(accepted().protectedIds).toHaveLength(5);
   for (const [name, work] of Object.entries({
-    scan: () => scanReplacementsForBatch(r.state, ids, "WOULD_BE_REMOVED_FROM_FIELD", "effect", 1, r.db),
+    scan: () => scanReplacementsForBatch(r.state, ids, "WOULD_BE_REMOVED_FROM_FIELD", "effect", 1, r.db, resolverExecutionServices),
     offer, accepted, expired,
   })) {
     const timed = (fn: () => unknown) => { const start = performance.now(); fn(); return performance.now() - start; };

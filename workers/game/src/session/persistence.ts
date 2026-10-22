@@ -843,11 +843,12 @@ function validateVersion4EmbeddedPayloads(
  */
 function isValidNativeVersion4(
   raw: unknown,
-  location: string
+  location: string,
+  replacementScan = false
 ): raw is GameState {
   if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
   const projected = convertToCurrentShape(
-    { ...raw, schemaVersion: 4 },
+    { ...raw, schemaVersion: replacementScan ? 6 : 4 },
     location
   );
   const validated = parseStoredGameState(projected, location);
@@ -855,16 +856,33 @@ function isValidNativeVersion4(
   return true;
 }
 
-function isValidNativeVersion5(raw: unknown, location: string): raw is GameState {
+function isValidNativeVersion5(
+  raw: unknown,
+  location: string,
+  replacementScan = false
+): raw is GameState {
   if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
   const projected = projectVersion5(raw, reason => { throw new SessionLoadError(location, reason); });
-  return isValidNativeVersion4(projected, location);
+  return isValidNativeVersion4(projected, location, replacementScan);
 }
 
 export function convertPersistedGameState(
   raw: unknown,
   location: string
 ): GameState {
+  if (isRecord(raw) && raw.schemaVersion === 6) {
+    const native = { ...raw };
+    delete native.schemaVersion;
+    if (isValidNativeVersion5(native, location, true)) {
+      const state = {
+        ...migrateLegacyTriggerRegistry(liftLegacyPrompt(native, location)),
+        schemaVersion: 6 as const,
+      };
+      validateContinuationReferences(state, location);
+      logLegacyShapes(state, location);
+      return isGameTerminated(state) ? clearTerminalPendingWork(state) : state;
+    }
+  }
   if (isRecord(raw) && raw.schemaVersion === 5) {
     const native = { ...raw };
     delete native.schemaVersion;

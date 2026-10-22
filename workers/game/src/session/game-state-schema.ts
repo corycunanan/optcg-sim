@@ -1,3 +1,4 @@
+import { usesReplacementScan } from "../engine/replacement-version.js";
 import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
 /**
  * Game-state schema version, frame-kind contract, continuation-reference
@@ -38,12 +39,13 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 4;
 /** The newest persisted version this build can read; v5 retains trigger generations. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 5;
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 6;
 /** The newest runtime shape this build executes; normal producers remain v4. */
-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 5;
+export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 6;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5];
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6,
+];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
 
@@ -506,8 +508,36 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
-  const native = version === 5 ? projectVersion5(raw, reason => { throw new SessionLoadError(location, reason); }) : raw;
-  if (version === 4 || version === 5) {
+  if (version < 6 && Array.isArray(raw.effectStack)) {
+    for (const [index, frame] of raw.effectStack.entries()) {
+      if (!isRecord(frame)) continue;
+      const single = isRecord(frame.replacement) ? frame.replacement : {};
+      const batch = isRecord(frame.replacementBatch)
+        ? frame.replacementBatch
+        : {};
+      if (
+        [
+          "visitedEffectIds",
+          "cause",
+          "causingController",
+          "orderingEffectIds",
+        ].some((field) => field in single) ||
+        ["visitedEffectIds", "events", "cause", "orderingEffectIds"].some(
+          (field) => field in batch
+        )
+      ) {
+        throw new SessionLoadError(
+          location,
+          `effectStack[${index}] carries replacement scan progress requiring schemaVersion 6`
+        );
+      }
+    }
+  }
+  const native =
+    version >= 5
+      ? projectVersion5(raw, reason => { throw new SessionLoadError(location, reason); })
+      : raw;
+  if (version >= 4) {
     return rememberVersion4Lowering(lowerVersion4(native, reason => {
       throw new SessionLoadError(location, reason);
     }));
@@ -546,7 +576,11 @@ export function toPersistedGameState(state: GameState): GameState {
       )
     : state.effectStack;
   return {
-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.effectStack.some(frame => frame.triggerExecution) ? 5 : GAME_STATE_SCHEMA_VERSION,
+    [GAME_STATE_SCHEMA_VERSION_KEY]:
+      state.schemaVersion ??
+      (usesReplacementScan(state)
+        ? 6
+        : state.effectStack.some(frame => frame.triggerExecution) ? 5 : GAME_STATE_SCHEMA_VERSION),
     ...state,
     effectStack: effectStack.map((frame) => ({
       ...frame,
@@ -746,6 +780,47 @@ export function validateContinuationReferences(
         `${ref} (frame ${JSON.stringify(frame.id)}) declares kind ${frame.kind} but its content is ${derived}`
       );
     }
+    const progress = frame.replacement ?? frame.replacementBatch;
+    if (progress) {
+      const visited = progress.visitedEffectIds ?? [];
+      const ordering = progress.orderingEffectIds;
+      if (
+        new Set(visited).size !== visited.length ||
+        (ordering &&
+          (ordering.length < 2 ||
+            new Set(ordering).size !== ordering.length ||
+            ordering.some((id) => visited.includes(id))))
+      ) {
+        throw new SessionLoadError(
+          location,
+          `${ref} has inconsistent replacement visited/order ids`
+        );
+      }
+      if (ordering) {
+        const matches = frame.replacementBatch?.pendingMatches.map(
+          (match) => match.effectId
+        );
+        if (matches && ordering.some((id) => !matches.includes(id)))
+          throw new SessionLoadError(
+            location,
+            `${ref} orders a replacement outside its candidate set`
+          );
+        const prompt = state.pendingPrompt;
+        if (
+          prompt?.resumeContext === frame.id &&
+          (prompt.options.promptType !== "PLAYER_CHOICE" ||
+            prompt.options.choices.length !== ordering.length ||
+            prompt.options.choices.some(
+              (choice) => !ordering.includes(choice.id)
+            ))
+        ) {
+          throw new SessionLoadError(
+            location,
+            `${ref} replacement ordering prompt disagrees with candidate ids`
+          );
+        }
+      }
+    }
     const violation = frameInvariantViolation(frame, derived, state);
     if (violation) {
       throw new SessionLoadError(location, `${ref} (frame ${JSON.stringify(frame.id)}) ${violation}`);
@@ -830,7 +905,13 @@ export function validateContinuationReferences(
     }
     if (
       (kind === "REPLACEMENT" || kind === "REPLACEMENT_BATCH") &&
-      (promptType !== "OPTIONAL_EFFECT" || target.phase !== "AWAITING_OPTIONAL_RESPONSE")
+      ((promptType !== "OPTIONAL_EFFECT" &&
+        !(
+          promptType === "PLAYER_CHOICE" &&
+          (target.replacement?.orderingEffectIds ||
+            target.replacementBatch?.orderingEffectIds)
+        )) ||
+        target.phase !== "AWAITING_OPTIONAL_RESPONSE")
     ) {
       throw new SessionLoadError(
         location,

@@ -1,3 +1,6 @@
+import { usesReplacementScan } from "../../replacement-version.js";
+import { isReplacementSubstituteBranchFeasible } from "../../replacements.js";
+import { REPLACED_CARD_REF } from "../../effect-types.js";
 import { selectTriggerForExecution } from "../../trigger-executor.js";
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect } from "../../hand-trash.js";
@@ -461,6 +464,10 @@ export function handlePlayerChoiceBranch(
   const options = getActionParams(pausedAction, pausedAction.type).options;
   const chosenIndex = parseInt(action.choiceId, 10);
   const chosenBranch = options[chosenIndex];
+  if (chosenBranch && usesReplacementScan(state) && resultRefs.has(REPLACED_CARD_REF) &&
+      !isReplacementSubstituteBranchFeasible(state, chosenBranch, effectSourceInstanceId, controller, cardDb, resultRefs, services)) {
+    return { kind: "handled", result: { kind: "waiting", state, events: [], resolved: false, rejected: true } };
+  }
   if (chosenBranch) {
     const branchResult = services.withCommittedEvents(events).executeActionChain(
       nextState,

@@ -519,7 +519,7 @@ export function mergePlayerViewsForSpectator(
     engineOutcome: stripped.engineOutcome,
     engineActionCount: stripped.engineActionCount,
   } satisfies GameState & Record<
-    keyof Omit<GameState, "effectAvailability" | "pendingEventActivationEvents">,
+    keyof Omit<GameState, "effectAvailability" | "pendingEventActivationEvents" | "schemaVersion">,
     unknown
   >;
 }

@@ -131,6 +131,8 @@ export interface ActionResult {
   state: GameState;
   events: PendingEvent[];
   succeeded: boolean;
+  /** Handler-owned full-instruction result for replacement substitutes; normal effects may resolve partially. */
+  fullyExecuted?: boolean;
   result?: EffectResult;
   pendingPrompt?: PendingPromptState;
   /**

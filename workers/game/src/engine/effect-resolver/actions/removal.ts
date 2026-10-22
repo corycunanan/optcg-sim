@@ -23,7 +23,7 @@ import { scanEventsForTriggers } from "../../trigger-ordering.js";
 import { isRemovalProhibited, type RemovalAction } from "../../prohibitions.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { reorderDeckCards, transitionCard, transitionCards } from "../../zone-transition.js";
-import type { EffectResolverServices } from "../services.js";
+import type { ReplacementExecutionServices, EffectResolverServices } from "../services.js";
 import { createBlindHandSlots } from "../blind-hand-slots.js";
 
 // OPT-251: filter targets that are protected by a "cannot be …" prohibition.
@@ -201,7 +201,7 @@ export function executeReturnToDeck(
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
   preselectedTargets: string[] | undefined,
-  services: EffectResolverServices,
+  services: ReplacementExecutionServices,
   arrangement?: ReturnToDeckArrangement,
 ): ActionResult {
   const events: PendingEvent[] = [];
@@ -597,7 +597,7 @@ export function executeTrashFromHand(
   return {
     state: moved.state,
     events,
-    succeeded: moved.transitions.length > 0,
+    fullyExecuted: optional || moved.transitions.length === amount, succeeded: moved.transitions.length > 0,
     result: {
       targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
       count: moved.transitions.length,

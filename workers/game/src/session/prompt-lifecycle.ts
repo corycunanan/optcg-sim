@@ -31,6 +31,9 @@ import {
   batchContextOf,
   openReplacementBatchFrame,
   resumeReplacement,
+  chooseReplacementOrder,
+  materializeReplacementOffer,
+  chooseBatchReplacementOrder,
   resumeReplacementBatch,
   type BatchResumeResult,
 } from "../engine/replacements.js";
@@ -176,6 +179,15 @@ function resumePromptLifecycleUnreleased(
   // top frame's kind says how the reply is consumed.
   const top = state.effectStack.at(-1);
   const kind = top ? frameKindOf(top) : null;
+  const ordering =
+    top?.replacement?.orderingEffectIds ??
+    top?.replacementBatch?.orderingEffectIds;
+  if (
+    ordering &&
+    (action.type !== "PLAYER_CHOICE" || !ordering.includes(action.choiceId))
+  ) {
+    return { state: stateBeforeResume, responseRejected: true };
+  }
 
   if (top && kind === "REPLACEMENT") {
     const answered = answerReplacementOffer(state, top, action, cardDb, respondingPlayer);
@@ -375,15 +387,41 @@ function answerReplacementOffer(
       ? caller
       : null;
 
-  const replacement = resumeReplacement(
+  const context = { type: "REPLACEMENT" as const, ...offer.replacement! };
+  const replacement =
+    context.orderingEffectIds && action.type === "PLAYER_CHOICE"
+      ? chooseReplacementOrder(
+          state,
+          context,
+          action.choiceId,
+          cardDb,
+          resolverExecutionServices
+        )
+      : resumeReplacement(
     state,
-    { type: "REPLACEMENT", effectId, targetInstanceId, event },
+          context,
     !isDeclineResponse(action),
     cardDb,
     resolverExecutionServices
   );
   state = replacement.state;
   let gameOver: GameOver;
+  if (replacement.offer && replacement.pendingPrompt) {
+    if (pausedBattle)
+      state = updateFrameById(state, pausedBattle.id, (frame) => ({
+        ...frame,
+        battleDamage: {
+          ...frame.battleDamage!,
+          replacementEffectId: replacement.offer!.effectId,
+        } as typeof frame.battleDamage,
+      }));
+    const offered = materializeReplacementOffer(
+      state,
+      replacement.pendingPrompt,
+      replacement.offer
+    );
+    return { state: withPendingPrompt(offered.state, offered.pendingPrompt) };
+  }
 
   if (pausedBattle) {
     state = updateFrameById(state, pausedBattle.id, (frame) => ({
@@ -447,7 +485,16 @@ function answerReplacementBatchOffer(
   const context = batchContextOf(offer);
   const depth = initialState.effectStack.length - 1;
   let state = popFrame(initialState);
-  const batch = resumeReplacementBatch(
+  const batch =
+    context.orderingEffectIds && action.type === "PLAYER_CHOICE"
+      ? chooseBatchReplacementOrder(
+          state,
+          context,
+          action.choiceId,
+          cardDb,
+          resolverExecutionServices
+        )
+      : resumeReplacementBatch(
     state,
     context,
     !isDeclineResponse(action),

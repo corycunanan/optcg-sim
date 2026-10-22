@@ -1,3 +1,6 @@
+import { usesReplacementScan } from "../../replacement-version.js";
+import { isReplacementSubstituteBranchFeasible } from "../../replacements.js";
+import { REPLACED_CARD_REF } from "../../effect-types.js";
 /**
  * Action handlers: PLAYER_CHOICE, OPPONENT_CHOICE, OPPONENT_ACTION, REUSE_EFFECT
  */
@@ -63,14 +66,9 @@ export function executePlayerChoice(
       sourceCardInstanceId, controller, cardDb, resultRefs,
     }))
     .filter(({ branch }) =>
-      isActionBranchFeasible(
-        state,
-        branch,
-        sourceCardInstanceId,
-        controller,
-        cardDb,
-        resultRefs,
-      ),
+      usesReplacementScan(state) && resultRefs.has(REPLACED_CARD_REF)
+        ? isReplacementSubstituteBranchFeasible(state, branch, sourceCardInstanceId, controller, cardDb, resultRefs, services)
+        : isActionBranchFeasible(state, branch, sourceCardInstanceId, controller, cardDb, resultRefs),
     );
   if (feasibleOptions.length === 0)
     return { state, events, succeeded: false };
