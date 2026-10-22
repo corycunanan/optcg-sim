@@ -1255,10 +1255,8 @@ describe("Feasibility gate — flip-Life-instead-of-removal declines without fac
     expect(result.state.players[0].life).toHaveLength(0);
   });
 
-  it("still prompts when only a bottom Life is face-down (global face-down predicate)", () => {
-    // Bandai's infeasibility wording is "all Life face-up" — a single face-down
-    // card anywhere in the pile keeps the replacement feasible, even if the
-    // substitute's position=TOP would flip an already face-up card.
+  it("does not prompt when the top Life is face-up even with a face-down bottom Life (FAQ)", () => {
+    // OP13-109 / ST29-008 FAQ: the printed top Life must be face-down.
     const cardDb = createTestCardDb();
     const { state, ids } = buildShirahoshiState(cardDb, { faceDownCount: 0, faceUpCount: 2 });
     const stateWithOneDown: GameState = {
@@ -1281,8 +1279,16 @@ describe("Feasibility gate — flip-Life-instead-of-removal declines without fac
     };
     const result = executeReturnToHand(stateWithOneDown, action, "opp-source", 1, cardDb, new Map<string, EffectResult>(), [ids.ally], resolverExecutionServices);
 
-    expect(result.pendingPrompt).toBeDefined();
-    expect(result.pendingPrompt?.respondingPlayer).toBe(0);
+    expect(result.pendingPrompt).toBeUndefined();
+    expect(
+      result.state.players[0].hand.some(
+        (card) =>
+          card.cardId ===
+          stateWithOneDown.players[0].characters.find(
+            (card) => card?.instanceId === ids.ally
+          )?.cardId
+      )
+    ).toBe(true);
   });
 });
 

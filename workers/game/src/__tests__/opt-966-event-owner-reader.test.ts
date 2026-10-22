@@ -1,4 +1,4 @@
-import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
+import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
 import { SessionRepository } from "../session/persistence.js";

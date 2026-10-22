@@ -1,27 +1,9 @@
-import { candidateExpected } from "./fixtures/opt-967-candidate-expectations.js";
+import currentV6 from "./fixtures/opt-968-writer-golden.synthetic.json";
 /**
- * OPT-940 historical inputs and OPT-966 current writer byte proof.
- *
- * OPT-966 freezes all v1–v4 goldens and captures a separate current fixture.
- * Live/undo states with trigger owners now use v5; owner-free states remain v4.
- *
- * The persistence writer must emit byte-identical output before and after
- * the reader-only PR 1. The golden fixture was captured through the writer
- * at the base commit by scripts/capture-writer-golden.ts; this test
- * re-serializes the same synthetic states through the current writer and
- * compares the exact JSON of every stored value.
- *
- * OPT-967 preserves every prior fixture and compares separate candidate values.
- * The schema is unchanged; scheduling changes reachable contents. Exact deltas
- * are recorded in opt-967-candidate-deltas.json, without normalizing identities.
- *
- * OPT-924 (PR 4b of OPT-962) raised the writer to version 2; OPT-963 (PR 5b)
- * raises it to version 3: the replacement and damage continuations are typed
- * frames. The version 1 and version 2 goldens stay frozen as reader input;
- * this test compares against opt-963-writer-golden.synthetic.json and pins
- * how it differs from the version 2 golden: the `schemaVersion: 3` key on the
- * live state and every undo snapshot, plus the six cases whose records are
- * now frames.
+ * Historical OPT-940..967 inputs remain frozen. OPT-968 compares separate
+ * current v6 writer bytes, including explicit complete batch event families.
+ * The historical version-transition assertions below still use old fixtures;
+ * they do not manufacture historical inputs through the current writer.
  */
 
 import { describe, expect, it } from "vitest";
@@ -52,7 +34,7 @@ async function writeThroughCurrentWriter(name: string) {
   };
 }
 
-describe("OPT-940 writer golden: persisted bytes match the current conditional version 4/5 writer golden", () => {
+describe("OPT-940 writer golden: persisted bytes match the current version 6 writer golden", () => {
   const fixture = loadV5WriterGolden();
   const v3 = loadWriterGolden();
   const v1 = loadGoldenFixture();
@@ -69,9 +51,7 @@ describe("OPT-940 writer golden: persisted bytes match the current conditional v
   it.each(Object.keys(fixture.cases))(
     "%s: session, card DB, and undo history bytes match the writer golden",
     async (name) => {
-      const golden = candidateExpected<(typeof fixture.cases)[string]>(
-        `golden/${name}`
-      );
+      const golden = currentV6.cases[name as keyof typeof currentV6.cases];
       const current = await writeThroughCurrentWriter(name);
       expect(current.sessionJson).toBe(golden.sessionJson);
       expect(current.cardDbJson).toBe(golden.cardDbJson);
@@ -79,18 +59,17 @@ describe("OPT-940 writer golden: persisted bytes match the current conditional v
     }
   );
 
-  it("writes the owner-dependent schema version first on live state and undo snapshots", async () => {
+  it("writes version 6 first regardless of owners on live state and undo snapshots", async () => {
     for (const name of Object.keys(fixture.cases)) {
       const current = await writeThroughCurrentWriter(name);
       const state = JSON.parse(current.sessionJson).state;
-      const version = state.effectStack.some((frame: { triggerExecution?: unknown }) => frame.triggerExecution) ? 5 : 4;
+      const version = 6;
+      expect(state.schemaVersion).toBe(version);
       expect(current.sessionJson, name).toContain(`"state":{"${GAME_STATE_SCHEMA_VERSION_KEY}":${version},`);
       const undo = JSON.parse(current.undoHistoryJson) as Array<Record<string, unknown>>;
       for (const snapshot of undo) expect(Object.keys(snapshot)[0], name).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
       for (const snapshot of undo) {
-        const frames = snapshot.effectStack as Array<{ triggerExecution?: unknown;
-        }>;
-        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(frames.some((frame) => frame.triggerExecution) ? 5 : 4);
+        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(6);
       }
     }
   });

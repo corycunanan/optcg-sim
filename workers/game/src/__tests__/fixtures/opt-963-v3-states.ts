@@ -1,5 +1,5 @@
 import { lowerVersion4 } from "../../session/version4-reader.js";
-import { toPersistedGameState } from "../../session/game-state-schema.js";
+import { frameKindOf } from "../../engine/frame-kinds.js";
 /**
  * OPT-963 version 3 fixtures.
  *
@@ -52,9 +52,21 @@ function continuationFrame(
   };
 }
 
-/** The version 3 persisted object of a runtime state (what this build's writer emits). */
+/** Explicit historical v3 projection for converter fixtures, independent of the current writer. */
 export function persistedV3(state: GameState): Record<string, unknown> {
-  const projected = lowerVersion4(toPersistedGameState(state) as unknown as Record<string, unknown>, message => { throw new Error(message); }).state;
+  // Construct historical input independently of the current writer. Routing
+  // through the v6 writer would add scan metadata and then mislabel it v3.
+  // This projection never changes prompt/frame identities or execution IDs.
+  const { schemaVersion: _version, ...runtime } = state;
+  const historical = { ...runtime, effectStack: state.effectStack.map((frame) => {
+    const projected = { ...frame, kind: frameKindOf(frame) };
+    if (frame.replacementBatch) {
+      const { events: _events, visitedEffectIds: _visited, cause: _cause, orderingEffectIds: _order, ...batch } = frame.replacementBatch;
+      projected.replacementBatch = batch;
+    }
+    return projected;
+  }) };
+  const projected = lowerVersion4(historical as unknown as Record<string, unknown>, message => { throw new Error(message); }).state;
   // V3's writer did not stamp optional kind tags on ordinary frames.
   const frames = projected.effectStack as Array<Record<string, unknown>>;
   return JSON.parse(JSON.stringify({ [GAME_STATE_SCHEMA_VERSION_KEY]: 3, ...projected,
