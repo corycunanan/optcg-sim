@@ -449,6 +449,7 @@ export const StackFrameCore = z.strictObject({
     ])
   ),
   costTransactionState: z.unknown().optional(),
+  costExpectedRoot: z.unknown().optional(),
   costReplacementAction: z.unknown().optional(),
   costReplacementChecked: z.boolean().optional(),
   costReplacementResolution: z.enum(["REPLACED", "NOT_REPLACED"]).optional(),

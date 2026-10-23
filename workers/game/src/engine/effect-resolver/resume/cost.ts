@@ -79,6 +79,8 @@ import { transitionCards } from "../../zone-transition.js";
 import {
   applyCostTransactionState,
   captureCostTransactionState,
+  captureCostExpectedRoot,
+  costRootMatches,
   stagedProhibitionView,
   type CostTransactionState,
 } from "../cost/transaction.js";
@@ -431,11 +433,17 @@ export function handleAwaitingCostSelection(
   cardDb: Map<string, CardData>,
   services: EffectResolverServices
 ): HandlerResult {
+  if (
+    topFrame.costExpectedRoot &&
+    !costRootMatches(state, topFrame.costExpectedRoot)
+  ) {
+    return { kind: "waiting", state, events: [], resolved: false };
+  }
   const { sourceCardInstanceId, controller } = topFrame;
   const cost = topFrame.costs[topFrame.currentCostIndex];
   // Reader-first identity-plan choices use the existing cost frame. The
   // encoded choice must be bound to that frame, then follows the same exact
-  // amount, ownership and live/staged eligibility checks as SELECT_TARGET.
+  // amount, ownership and transaction/eligibility checks as SELECT_TARGET.
   if (action.type === "PLAYER_CHOICE" && (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN")) {
     const ids = topFrame.validTargets.includes(action.choiceId) ? decodeDonReturnIds(action.choiceId) : null;
     if (!ids) return { kind: "waiting", state, events: [], resolved: false };
@@ -472,6 +480,11 @@ export function handleAwaitingCostSelection(
       pendingPrompt,
       offer,
     );
+    if (offered.state.schemaVersion === 7 && topFrame.costExpectedRoot) {
+      offered.state = updateCostOwner(offered.state, {
+        costExpectedRoot: captureCostExpectedRoot(offered.state),
+      });
+    }
     return { kind: "waiting",
       state: offered.state,
       events: [],
@@ -1313,18 +1326,22 @@ export function handleAwaitingCostSelection(
     if (selected.length !== amount) {
       return { kind: "waiting", state, events: [], resolved: false };
     }
-    // Reader-first DON!! selection must remain eligible in both the live
-    // baseline and staged payment. A stale reply cannot pay an absent DON!!.
+    // Evidence-bearing frames validated the whole published root before overlay;
+    // payment legality belongs to staged state. Older frames retain the
+    // conservative dual-eligibility guard without inventing historical evidence.
     if (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") {
-      const live = new Set(computeCostTargets(baselineState, cost, controller, cardDb, sourceCardInstanceId));
+      const live = topFrame.costExpectedRoot ? null : new Set(computeCostTargets(baselineState, cost, controller, cardDb, sourceCardInstanceId));
       const staged = new Set(computeCostTargets(nextState, cost, controller, cardDb, sourceCardInstanceId));
-      if (amount < 1 || (action.selectedInstanceIds ?? []).length !== amount || selected.some(id => !live.has(id) || !staged.has(id))) {
+      if (amount < 1 || (action.selectedInstanceIds ?? []).length !== amount || selected.some(id => (live !== null && !live.has(id)) || !staged.has(id))) {
         return { kind: "waiting", state, events: [], resolved: false };
       }
     }
     const selectedStage = state.players[controller].stage?.instanceId === selected[0];
     const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
-    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
+    // Rule 1-3-2-2: zero repetitions perform no removal. There is no target
+    // for a replacement scan or canonical replay; keep the closed reader grammar.
+    const zeroFieldPayment = nextState.schemaVersion === 7 && amount === 0 && selected.length === 0;
+    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !zeroFieldPayment && !topFrame.costReplacementChecked) {
       // Cost exits are still effect-caused removal events, but a replacement
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.

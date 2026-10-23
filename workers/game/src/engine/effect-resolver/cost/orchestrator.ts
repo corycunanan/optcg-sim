@@ -1,3 +1,5 @@
+import { buildDonIdentityPlans } from "../don-identity-plans.js";
+import { decodeDonReturnIds } from "../actions/don.js";
 import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
 import { insertFrameAt } from "../../damage-frames.js";
 /** Iterative cost payment orchestration and suspension. */
@@ -17,6 +19,7 @@ import { isCostSequencePayable } from "./feasibility.js";
 import {
   applyCostTransactionState,
   captureCostTransactionState,
+  captureCostExpectedRoot,
   type CostTransactionState,
 } from "./transaction.js";
 import { computeCostTargets, costSelectionCount, getCostCards, resolveAmount } from "./targets.js";
@@ -83,11 +86,13 @@ export function payCostsWithSelection(
     nextState = runRuleProcessingAfterMove(before, nextState, {}, cardDb);
     return isGameTerminated(nextState);
   };
+  let suspendedCostOwnerId: string | undefined;
   const pushCostFrame = (
     frame: EffectStackFrame,
     stagedState: GameState = nextState,
     ownerIndex?: number,
   ): void => {
+    suspendedCostOwnerId = frame.id;
     const owned = {
       ...frame,
       effectDescription,
@@ -107,6 +112,17 @@ export function payCostsWithSelection(
       pendingPrompt,
       offer,
     );
+    if (offered.state.schemaVersion === 7) {
+      const expected = captureCostExpectedRoot(offered.state);
+      offered.state = {
+        ...offered.state,
+        effectStack: offered.state.effectStack.map((frame) =>
+          frame.id === suspendedCostOwnerId
+            ? { ...frame, costExpectedRoot: expected }
+            : frame
+        ),
+      };
+    }
     return {
       state: offered.state,
       events: [],
@@ -560,7 +576,10 @@ export function payCostsWithSelection(
       continue;
     }
 
-    if (!autoPayTrashToDeck && costNeedsPlayerSelection(cost)) {
+    const nativeDonSelection = nextState.schemaVersion === 7 &&
+      (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
+      !(typeof cost.amount === "number" && cost.amount <= 0);
+    if (!autoPayTrashToDeck && (costNeedsPlayerSelection(cost) || nativeDonSelection)) {
       // Special handling for life costs with TOP_OR_BOTTOM — use PLAYER_CHOICE
       if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
           cost.position === "TOP_OR_BOTTOM") {
@@ -619,6 +638,23 @@ export function payCostsWithSelection(
         return cannotPay();
       }
 
+      // Positive native7 DON payments offer exact identity plans. Numeric zero
+      // stays on the no-action fixed path and never emits positive-bound metadata.
+      const donPlan = nativeDonSelection ? buildDonIdentityPlans(nextState, controller, validTargets, amount,
+        cost.type === "VARIABLE_DON_RETURN" && cost.amount === undefined ? validTargets.length : amount, cardDb) : null;
+      const donChoices = donPlan?.choices ?? [];
+      if (donChoices.length === 1) {
+        // The grouped planner proved a single semantic payment. Execute that
+        // exact plan; equivalent donor multiplicity alone is not a choice.
+        const beforePayment = nextState;
+        const ids = decodeDonReturnIds(donChoices[0].id)!;
+        const applied = applyCostSelection(nextState, cost, ids, controller, cardDb, sourceCardInstanceId);
+        if (applied.events.length === 0) return cannotPay();
+        nextState = applied.state;
+        events.push(...applied.events);
+        if (ruleProcessingAfterPayment(beforePayment)) return terminated();
+        continue;
+      }
       // Push stack frame for cost selection
       const frameId = generateFrameId(nextState);
       nextState = frameId.state;
@@ -631,7 +667,7 @@ export function payCostsWithSelection(
         pausedAction: null,
         remainingActions: effectBlock.actions ?? [],
         resultRefs: [],
-        validTargets,
+        validTargets: [...validTargets, ...donChoices.map(choice => choice.id)],
         costs: workingCosts,
         currentCostIndex: i,
         costsPaid: false,
@@ -646,7 +682,7 @@ export function payCostsWithSelection(
 
       const costLabel = getCostLabel(cost);
       const pendingPrompt: PendingPromptState = {
-        options: {
+        options: donPlan ? { promptType: "PLAYER_CHOICE", effectDescription: "Choose which DON!! to return", ...donPlan } : {
           promptType: "SELECT_TARGET",
           validTargets,
           countMin: amount,

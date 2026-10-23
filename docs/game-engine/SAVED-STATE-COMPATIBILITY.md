@@ -606,3 +606,80 @@ production capture, retirement, old-session repair or broader OPT1006 changes.
 OPT958 remains open: the accepted rollback policy and its labeled deviation
 fixture remain; the next review condition is a policy decision backed by an
 applicable authoritative multi-cost ruling, not this owner-lifecycle correction.
+
+### Native7 future cost producers (OPT-969 / OPT-997 amendment)
+
+Loading a native7 prompt also commits the reader to its future native7 producers: a later cost, branch, nested child, trigger, parent resume, new activation or restored undo must preserve meaningful donor choices. The original485 reader could accept the first DON identity reply then silently auto-pay a second DON cost and DRAW. Initial prompt parsing was insufficient compatibility evidence.
+
+The bounded amendment keeps ordinary creation/execution/writing at6. Only explicit7 cost orchestration uses identity plans for positive DON_MINUS/VARIABLE_DON_RETURN: execute a proven sole semantic plan through the real identity executor, otherwise emit the existing COST/PLAYER_CHOICE shape. Positive active/rested flags and exact state intersect; false flags are unrestricted, and state restrictions exclude attached donors. Numeric0 emits no positive-bound DON picker. Generic zero field payment skips removal scanning/capture rather than broadening the closed replay grammar. Setup, legacy promotion, writer constants, ordinary6 semantics and shared feasibility remain separate rollout work.
+
+The separately named `opt-969-native7-producers` corpus pins the isolated actual producer, a complete eight-file production patch from reachable485, source/generator/payload hashes,82 synthetic scenarios and every later pause. Mock-free public replay covers live/undo, suffix/branch/nested continuation and completion, including independent identity/power/events/terminal/rollback assertions. It is not a production capture or proof of authored multi-DON/zero prevalence. Historical corpora remain immutable. See [the source/acceptance handoff](../project/handoffs/opt969-native7-producers.md) for counts, negative controls and scope limits.
+
+After ordinary7 rollout, the verified amendment is the semantic rollback floor;485 is known unsafe for these future producers. Decision10 rollback remains an explicit known rules deviation. Deferred feasibility, forced-shuffle replacement, hand-TOP and authored DON-domain corrections are not resolved by this amendment.
+
+### PR778 optional COST expected-root evidence (OPT-969)
+
+Newly created native7 COST owners persist optional `costExpectedRoot`: an immutable
+snapshot of exactly the existing `CostTransactionState` projection (`players`,
+`turn`, `activeEffects`, `prohibitions`, `scheduledActions`, `oneTimeModifiers`,
+`triggerRegistry`). Strict shape and embedded executable validation cover the
+live state and every separate or embedded undo entry before retention. Evidence
+requires a staged COST owner; versions below7 reject it.
+
+Before any external prompt continuation, all evidence-bearing COST owners must
+match the published root structurally. Object property order is incidental;
+array order is retained. A mismatch rejects without events or prompt/frame
+consumption, before staged overlay or replacement processing. Matching owners
+use staged DON legality. Frames lacking evidence keep the previous conservative
+live-and-staged DON guard: the known REST_DON-prefix/rested-filter rejection
+remains for historical frames. Resuspending the same historical owner preserves
+field absence, including when its selection opens a replacement prompt. A new
+successor COST owner may capture evidence at its own sanctioned suspension.
+No historical baseline is reconstructed.
+
+Capture occurs after restoring the committed root at suspension. Initial
+SessionCoordinator publication finalizes newly created owners after pipeline
+cleanup. Successful, prevalidated prompt lifecycle transitions refresh surviving
+evidence owners after rule processing and moved-DON cleanup, so committed
+mandatory/optional replacement children survive while Decision10 abandonment
+still discards staged payment. Child prompts also validate ancestor evidence.
+This touches the shared prompt-lifecycle boundary; it does not change prompt,
+player, frame, count, exact-identity, or replacement-outcome guards.
+
+Player presence is an explicit sanctioned transport delta within `players`.
+`setPlayerPresence` updates only `connected`, `awayReason`, and
+`rejoinDeadlineAt` in both evidence and staged snapshots, and only when all
+existing evidence owners match before the presence change. If gameplay already
+diverged, normal presence updates continue but evidence stays invalid. This
+preserves reconnect behavior and prevents an overlay from restoring old presence.
+
+Ordinary default and explicit6 producers remain6. Only native7 producers emit
+new evidence, including the transitive continuations of already loaded7 work.
+Thus this amendment is both the evidence-aware reader prerequisite and part of
+that native7 producer closure; it is not an independently deployable ordinary7
+writer release. Deploy/verify this reader before any future ordinary7 rollout.
+The verified PR778 amendment becomes the semantic rollback floor for those
+future writers. Original485 remains unsafe: accepting the optional shape alone
+cannot reproduce the new staged eligibility semantics. Rolling back to older
+readers is unsupported once evidence-bearing7 snapshots are written.
+
+Historical corpus bytes and manifests remain unchanged. Current replay tests
+independently assert each new field equals the exact published projection,
+then omit only that field from a comparison copy before comparing all historical
+fields. This intentional metadata assertion is not the sole gameplay proof:
+new tests cover real persistence, staged prefix success, stale mutations,
+multiple pauses, replacement committed/decline paths, and reconnects. The
+self-pinned historical source `opt-969-native7-producers.test.ts` is archived
+byte-for-byte at
+`workers/game/src/__tests__/fixtures/opt-969-native7-producers/producer/opt-969-native7-producers.historical.test-source`.
+Its unchanged manifest entry resolves to that archive; reconstruct the original
+capture source by copying it back to its original test path. Other generator
+and payload hashes still resolve to their original files.
+
+The evidence rejects unexplained divergence across the entire overlay boundary;
+it does not authenticate arbitrary corruption of staged state or reconstruct
+changes that lead back to an identical snapshot. Snapshot cloning adds one
+projection per COST owner, with serialization cost proportional to that
+projection. Bounded regression measured 11,210 evidence bytes in a 36,943-byte published
+state (JSON string length, ASCII fixture);
+no production workload or broad performance claim follows.
