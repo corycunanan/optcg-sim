@@ -480,7 +480,7 @@ export function handleAwaitingCostSelection(
       pendingPrompt,
       offer,
     );
-    if (offered.state.schemaVersion === 7) {
+    if (offered.state.schemaVersion === 7 && topFrame.costExpectedRoot) {
       offered.state = updateCostOwner(offered.state, {
         costExpectedRoot: captureCostExpectedRoot(offered.state),
       });

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import type { ProducerScenario } from "./native7-producer-support.js";
 import { it, expect } from "vitest";
 import { rig, synSchema } from "./opt-960-rig.js";
 import { runtime, memory, save, command } from "./native7-producer-support.js";
@@ -488,7 +490,10 @@ for (const mutation of [
 ] as const)
   it(`new evidence preserves ${mutation} guard`, async () => {
     const f = await offered(true);
-    f.state = (await memory(f.rt, await save(f.rt, f.state, f.r.db)).repo.load())!.state;
+    f.state = (await memory(
+      f.rt,
+      await save(f.rt, f.state, f.r.db)
+    ).repo.load())!.state;
     const before = structuredClone(f.state);
     let action = { ...f.action, promptId: f.state.pendingPrompt!.promptId };
     if (action.type !== "PLAYER_CHOICE") throw Error("missing choice");
@@ -518,3 +523,38 @@ for (const mutation of [
     expect(result.state).toEqual(before);
     expect(f.state).toEqual(before);
   });
+
+it("historical COST owner stays evidence-free across replacement resuspension and reload", async () => {
+  const rt = await runtime();
+  const corpus = JSON.parse(
+    readFileSync(
+      new URL(
+        "./fixtures/opt-969-native7-producers/positive-ko-decline.json",
+        import.meta.url
+      ),
+      "utf8"
+    )
+  ) as ProducerScenario;
+  const loaded = (await memory(rt, corpus.steps[0].stored).repo.load())!;
+  const owner = loaded.state.effectStack.at(-1)!;
+  expect(owner.phase).toBe("AWAITING_COST_SELECTION");
+  expect(owner.costExpectedRoot).toBeUndefined();
+  const after = command(
+    rt,
+    loaded.state,
+    loaded.cardDb,
+    corpus.steps[1].action
+  );
+  expect(after.effectStack.at(-1)!.phase).toBe("AWAITING_OPTIONAL_RESPONSE");
+  const preserved = after.effectStack.find((frame) => frame.id === owner.id)!;
+  expect(preserved).toBeDefined();
+  expect(preserved.costExpectedRoot).toBeUndefined();
+  const persisted = (await memory(
+    rt,
+    await save(rt, after, loaded.cardDb)
+  ).repo.load())!;
+  expect(
+    persisted.state.effectStack.find((frame) => frame.id === owner.id)!
+      .costExpectedRoot
+  ).toBeUndefined();
+});

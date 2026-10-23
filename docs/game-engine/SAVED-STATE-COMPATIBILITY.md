@@ -619,7 +619,7 @@ After ordinary7 rollout, the verified amendment is the semantic rollback floor;4
 
 ### PR778 optional COST expected-root evidence (OPT-969)
 
-Native7 COST suspensions now persist optional `costExpectedRoot`: an immutable
+Newly created native7 COST owners persist optional `costExpectedRoot`: an immutable
 snapshot of exactly the existing `CostTransactionState` projection (`players`,
 `turn`, `activeEffects`, `prohibitions`, `scheduledActions`, `oneTimeModifiers`,
 `triggerRegistry`). Strict shape and embedded executable validation cover the
@@ -632,7 +632,10 @@ array order is retained. A mismatch rejects without events or prompt/frame
 consumption, before staged overlay or replacement processing. Matching owners
 use staged DON legality. Frames lacking evidence keep the previous conservative
 live-and-staged DON guard: the known REST_DON-prefix/rested-filter rejection
-remains for historical frames. No historical baseline is reconstructed.
+remains for historical frames. Resuspending the same historical owner preserves
+field absence, including when its selection opens a replacement prompt. A new
+successor COST owner may capture evidence at its own sanctioned suspension.
+No historical baseline is reconstructed.
 
 Capture occurs after restoring the committed root at suspension. Initial
 SessionCoordinator publication finalizes newly created owners after pipeline

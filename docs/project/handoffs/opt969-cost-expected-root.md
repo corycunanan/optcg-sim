@@ -7,7 +7,9 @@ Root owns the run handoff and final gate.
 
 Approved compatibility: new native7 suspended COST frames gain optional immutable
 `costExpectedRoot`. Historical no-field frames retain conservative dual DON
-eligibility, including the known rested-prefix rejection. No baseline migration.
+eligibility, including the known rested-prefix rejection. Resuspending the same
+older owner preserves evidence absence; only a newly created successor owner
+may capture at its own sanctioned suspension. No baseline migration.
 See SAVED-STATE-COMPATIBILITY.md for the durable contract and rollout dependency.
 
 Production boundaries: cost orchestrator and resumed cost suspension capture the
@@ -102,3 +104,37 @@ lint passed0 errors (2 existing unused-variable warnings). Root must run final p
 against the frozen reviewed candidate. Rollback floor
 is this verified amendment, not original485. The loaded7 producer closure and
 new evidence reader must ship together before future ordinary7 rollout.
+
+
+## Adjudicated compatibility delta after review
+
+Both independent reviewers reproduced one bounded policy mismatch: an existing
+historical no-field COST owner gained evidence when its validated field
+selection opened an optional replacement prompt. `suspendCurrentFrame` now
+refreshes evidence only when the incoming owner already has it. Orchestrator
+creation of new native7 owners still captures evidence. The unchanged
+`positive-ko-decline.json` public fixture proves the same owner remains
+field-free immediately and after save/reload. No historical source was changed.
+
+The session-boundary addition uses the existing real GameSession harness,
+without coordinator mocks: persist initial native7 state, instantiate the DO
+again, send ACTIVATE_EFFECT through `webSocketMessage`, inspect its persisted
+rest-prefix DON offer, instantiate again, and send the exact choice reply.
+Acceptance persists one returned donor and one DRAW; repeat reply is rejected
+without a second DRAW. A separately persisted root-state mutation rejects via
+the same message path, preserves the complete state/prompt and emits
+`action:rejected`. This is actual action handling and durable rehydration proof,
+not a UI or production deployment claim.
+
+
+Delta validation from `/private/tmp/pr778-followup`:
+`pnpm --filter optcg-game exec vitest list src/__tests__/opt-969-expected-root.test.ts src/__tests__/opt-554-session-authorization.test.ts src/__tests__/opt-969-native7-producers.test.ts src/__tests__/opt-997-canonical-corpus.test.ts src/__tests__/opt-997-corpus-replay.test.ts`
+preceded the same command with `run` instead of `list`: all 1,345 tests passed
+across five files, including all 38 expected-root regressions and both new
+GameSession WebSocket cases. Logs: `/private/tmp/pr778-delta-list.log` and
+`/private/tmp/pr778-delta.log`. `pnpm --filter optcg-game type-check` passed
+(`/private/tmp/pr778-delta-types.log`). `pnpm exec eslint` for the three changed
+TS files passed with zero errors and two existing unused-variable warnings
+(`/private/tmp/pr778-delta-lint.log`). `git diff --check` passed. No full verify,
+push, merge, or external messages were performed; the root run ledger was not
+edited.
