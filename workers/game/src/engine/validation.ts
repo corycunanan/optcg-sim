@@ -17,7 +17,7 @@ import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader, hasEffectiveKeyword } from "./keywords.js";
 import { isCostSequencePayable } from "./effect-resolver/cost-handler.js";
 import { activationProhibitionVeto } from "./prohibitions.js";
-import type { Cost } from "./effect-types.js";
+import { isOncePerTurnBlock, type Cost } from "./effect-types.js";
 import { evaluateCondition } from "./conditions.js";
 
 export function validate(
@@ -433,6 +433,14 @@ function validateActivateEffect(
     actingPlayerIndex,
   );
   if (prohibited) return prohibited;
+
+  // Rule 10-2-13-3: a used block cannot activate or pay its cost again.
+  if (
+    isOncePerTurnBlock(block) &&
+    state.turn.oncePerTurnUsed[block.id]?.includes(cardInstanceId)
+  ) {
+    return "Effect has already been used this turn";
+  }
 
   const controller = found.playerIndex;
   if (
