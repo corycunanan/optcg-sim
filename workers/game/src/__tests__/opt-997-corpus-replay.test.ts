@@ -1,3 +1,4 @@
+import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
 /** Actual candidate-produced bytes, resumed from every pause on live/undo ingress. */
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
@@ -35,7 +36,7 @@ for (const file of readdirSync(dir).filter(f => f.endsWith(".json") && f !== "ma
         const saved = await repo.save({ ...loaded, state, undoHistory: [] });
         await repo.save({ ...saved, undoHistory: [saved.state] });
         state = toPersistedGameState(saved.state);
-        expect(state).toEqual(step.expected);
+        expect(withoutAssertedCostEvidence(state)).toEqual(step.expected);
         const reloaded = (await repo.load())!;
         expect(reloaded.state).toEqual(state); expect(reloaded.undoHistory).toEqual([state]);
         expect(state.schemaVersion).toBe(7);
@@ -113,7 +114,7 @@ for (const file of readdirSync(originalDir).filter(f => f.endsWith(".json") && f
       state = command(state, old.steps[step].action, loaded.cardDb);
       const saved = await repo.save({ ...loaded, state, undoHistory: [] });
       state = toPersistedGameState(saved.state);
-      expect(state).toEqual(corrected.steps[step].expected);
+      expect(withoutAssertedCostEvidence(state)).toEqual(corrected.steps[step].expected);
     }
     if (!old.knownDebt) expect(state.effectStack).toHaveLength(0);
     else expect(state.effectStack.some(f => f.kind === "COST" && !f.costReplacementResolution)).toBe(true);

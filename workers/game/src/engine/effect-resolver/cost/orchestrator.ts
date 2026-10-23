@@ -19,6 +19,7 @@ import { isCostSequencePayable } from "./feasibility.js";
 import {
   applyCostTransactionState,
   captureCostTransactionState,
+  captureCostExpectedRoot,
   type CostTransactionState,
 } from "./transaction.js";
 import { computeCostTargets, costSelectionCount, getCostCards, resolveAmount } from "./targets.js";
@@ -85,11 +86,13 @@ export function payCostsWithSelection(
     nextState = runRuleProcessingAfterMove(before, nextState, {}, cardDb);
     return isGameTerminated(nextState);
   };
+  let suspendedCostOwnerId: string | undefined;
   const pushCostFrame = (
     frame: EffectStackFrame,
     stagedState: GameState = nextState,
     ownerIndex?: number,
   ): void => {
+    suspendedCostOwnerId = frame.id;
     const owned = {
       ...frame,
       effectDescription,
@@ -109,6 +112,17 @@ export function payCostsWithSelection(
       pendingPrompt,
       offer,
     );
+    if (offered.state.schemaVersion === 7) {
+      const expected = captureCostExpectedRoot(offered.state);
+      offered.state = {
+        ...offered.state,
+        effectStack: offered.state.effectStack.map((frame) =>
+          frame.id === suspendedCostOwnerId
+            ? { ...frame, costExpectedRoot: expected }
+            : frame
+        ),
+      };
+    }
     return {
       state: offered.state,
       events: [],

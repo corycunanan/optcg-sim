@@ -806,24 +806,26 @@ function validateVersion4EmbeddedPayloads(
         `effectStack[${index}] contains an invalid embedded queued trigger action or event`
       );
     }
-    const staged = frame.costTransactionState;
-    if (!isRecord(staged)) return;
-    const validators: Record<string, (entry: unknown) => boolean> = {
-      scheduledActions: (entry) =>
-        isRecord(entry) && isKnownAction(entry.action),
-      triggerRegistry: (entry) =>
-        isRecord(entry) && hasValidEffectBlock(entry.effectBlock),
-      activeEffects: hasValidActiveEffect,
-      prohibitions: hasValidProhibition,
-      oneTimeModifiers: hasValidOneTimeModifier,
-    };
-    for (const [key, valid] of Object.entries(validators)) {
-      const entries = staged[key];
-      if (!Array.isArray(entries) || !entries.every(valid)) {
-        throw new SessionLoadError(
-          location,
-          `effectStack[${index}].costTransactionState.${key} contains an unknown executable variant`
-        );
+    for (const field of ["costTransactionState", "costExpectedRoot"] as const) {
+      const staged = frame[field];
+      if (!isRecord(staged)) continue;
+      const validators: Record<string, (entry: unknown) => boolean> = {
+        scheduledActions: (entry) =>
+          isRecord(entry) && isKnownAction(entry.action),
+        triggerRegistry: (entry) =>
+          isRecord(entry) && hasValidEffectBlock(entry.effectBlock),
+        activeEffects: hasValidActiveEffect,
+        prohibitions: hasValidProhibition,
+        oneTimeModifiers: hasValidOneTimeModifier,
+      };
+      for (const [key, valid] of Object.entries(validators)) {
+        const entries = staged[key];
+        if (!Array.isArray(entries) || !entries.every(valid)) {
+          throw new SessionLoadError(
+            location,
+            `effectStack[${index}].${field}.${key} contains an unknown executable variant`
+          );
+        }
       }
     }
   });

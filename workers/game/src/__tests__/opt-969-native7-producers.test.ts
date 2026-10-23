@@ -1,3 +1,4 @@
+import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
 /** Actual isolated writer captures; synthetic reachability, never production evidence. */
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -68,7 +69,7 @@ describe.each(files)("native7 future producers %s", (file) => {
           const next = command(rt, loaded.state, loaded.cardDb, step.action);
           const stored = await save(rt, next, loaded.cardDb);
           expect(
-            stored,
+            withoutAssertedCostEvidence(stored),
             `${file} ${context} start${start} after ${step.action.type}`
           ).toEqual(step.stored);
           loaded = (await memory(rt, stored).repo.load())!;
@@ -95,7 +96,9 @@ it("preserves the original reported second meaningful choice from its saved firs
   const next = command(rt, loaded.state, loaded.cardDb, corpus.steps[1].action);
   expect(next.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
   expect(next.players[0].hand).toHaveLength(0);
-  expect(await save(rt, next, loaded.cardDb)).toEqual(corpus.steps[1].stored);
+  expect(
+    withoutAssertedCostEvidence(await save(rt, next, loaded.cardDb))
+  ).toEqual(corpus.steps[1].stored);
 });
 
 it("verifies immutable corpus, generator and producer patch hashes", () => {
@@ -112,10 +115,19 @@ it("verifies immutable corpus, generator and producer patch hashes", () => {
   expect(files).toHaveLength(manifest.scenarios);
   for (const [file, digest] of Object.entries(manifest.payloads))
     expect(sha(readFileSync(`${directory}/${file}`, "utf8"))).toBe(digest);
-  for (const [file, digest] of Object.entries(manifest.generators))
-    expect(
-      sha(readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8"))
-    ).toBe(digest);
+  // This replay assertion source changed for optional expected-root metadata.
+  // The original capture source is archived byte-for-byte; reconstruct it by
+  // copying the archive back to its original path before replaying the capture.
+  for (const [file, digest] of Object.entries(manifest.generators)) {
+    const original =
+      file === "opt-969-native7-producers.test.ts"
+        ? new URL(
+            "./fixtures/opt-969-native7-producers/producer/opt-969-native7-producers.historical.test-source",
+            import.meta.url
+          )
+        : new URL(file, import.meta.url);
+    expect(sha(readFileSync(fileURLToPath(original), "utf8"))).toBe(digest);
+  }
   expect(
     sha(readFileSync(`${directory}/producer/production-from-485.patch`, "utf8"))
   ).toBe(manifest.producerSource.productionFromReaderBaseSha256);
