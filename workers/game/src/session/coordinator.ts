@@ -250,7 +250,7 @@ export class SessionCoordinator {
       return {
         kind: "reject",
         state: stateBeforePipeline,
-        undoHistory: [],
+        undoHistory: [...initialUndoHistory],
         reason: pipeline.error ?? "Invalid action",
       };
     }
