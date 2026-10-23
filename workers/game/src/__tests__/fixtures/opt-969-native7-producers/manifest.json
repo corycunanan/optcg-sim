@@ -6,7 +6,7 @@
     "opt-969-native7-producer-matrix.test.ts": "07d3ea67277aff2b8c3e08e75c9d3770444df26670132c9f15c4b83b0350d37b",
     "native7-producer-cases.ts": "78c0650165cf29a852024baabe169e0e4b294e97684ec4aa7994da03ec8ffa59",
     "native7-producer-pairs.ts": "2baaaf4e04937e883e2298bd5037e98a4d5824776283ad15504f44555bd4b972",
-    "native7-producer-support.ts": "41e74fe33bda775af51c7fe881fd359cfb28b26772d8972198fcf13c7333343c"
+    "native7-producer-support.ts": "f4c2d62a3ecf5d257e7fbf935d3b45588096b86e2054862744f0569c043a9127"
   },
   "producerSource": {
     "base": "7ced33a0930886bac7fc3d16040486d48df774b1",

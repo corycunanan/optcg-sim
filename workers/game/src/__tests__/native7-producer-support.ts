@@ -53,9 +53,10 @@ export function command(
   raw: GameAction,
   actor = state.pendingPrompt?.respondingPlayer ?? state.turn.activePlayerIndex
 ) {
+  const hasPromptId = "promptId" in raw && raw.promptId !== undefined;
   const action = {
     ...raw,
-    ...(raw.promptId === undefined && state.pendingPrompt?.promptId
+    ...(!hasPromptId && state.pendingPrompt?.promptId
       ? { promptId: state.pendingPrompt.promptId }
       : {}),
   } as GameAction;
