@@ -179,3 +179,45 @@ describe("OPT-925 DEAL_DAMAGE pipeline regressions (rules 9-2-1-1 line 882, 9-1-
     expectTerminal(zero.state, { winner: 0, reason: "Player 2's life reached 0" });
   });
 });
+
+// OPT-993: authored Rindo ON_KO through the pipeline and session prompt lifecycle.
+describe("OPT-993 OP14-115 self-damage Trigger", () => {
+  it.each([false, true])("offers the owner a Trigger and resumes once after reload (accept %s)", async (reveal) => {
+    const r = rig();
+    r.life(1, 0);
+    r.put("OP14-116", 1, "LIFE", { data: { type: "Event", triggerText: "Draw 1 card.", keywords: { ...CARDS.VANILLA.keywords, trigger: true } } });
+    r.put("OP14-115", 1, "CHARACTER");
+    koOpponent(r, "Rindo")();
+    addNoLifeCard(r);
+    expect(r.promptType()).toBe("REVEAL_TRIGGER");
+    expect(r.state.pendingPrompt?.respondingPlayer).toBe(1);
+    expect(r.state.effectStack.find(f => f.effectDamage)?.effectDamage).toMatchObject({ damagedPlayerIndex: 1, controllerIndex: 1, dealt: 1, remainingDamages: 0 });
+    const hand = r.state.players[1].hand.length;
+    await r.reload();
+    r.act({ type: "REVEAL_TRIGGER", reveal }, 1);
+    expect(r.state.players[1].hand).toHaveLength(hand + 1);
+    expect(r.state.players[1].trash.filter(c => c.cardId === "OP14-116")).toHaveLength(reveal ? 1 : 0);
+    expect(r.state.players[1].hand.filter(c => c.cardId === "OP14-116")).toHaveLength(reveal ? 0 : 1);
+    expect(r.state.eventLog.filter(e => e.type === "CARD_REMOVED_FROM_LIFE")).toHaveLength(1);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+    expect(r.state.turn.triggerStagingInstanceIds ?? []).toEqual([]);
+    expect(r.state.status).toBe("IN_PROGRESS");
+  });
+
+  it("4-6-3-1: face-up Life replacement prevents offering its Trigger", () => {
+    const r = rig();
+    r.leader(1, "ST13-003");
+    r.life(1, 0);
+    r.put("OP14-116", 1, "LIFE", { data: { type: "Event", triggerText: "Draw 1 card.", keywords: { ...CARDS.VANILLA.keywords, trigger: true } } });
+    r.state.players[1].life[0].face = "UP";
+    r.put("OP14-115", 1, "CHARACTER");
+    koOpponent(r, "Rindo")();
+    addNoLifeCard(r);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.players[1].life).toEqual([]);
+    expect(r.state.players[1].deck.at(-1)?.cardId).toBe("OP14-116");
+    expect(r.state.eventLog.filter(e => e.type === "TRIGGER_ACTIVATED")).toEqual([]);
+    expect(r.state.effectStack).toEqual([]);
+  });
+});

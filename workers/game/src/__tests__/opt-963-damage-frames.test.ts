@@ -616,3 +616,29 @@ describe("PR #758 D-F1b: the actions after an OPPONENT_ACTION run as the effect'
     expect(r.state.players[1].hand).toHaveLength(hand1 + 1); // the declined Life card only
   });
 });
+
+// OPT-996: coordinator publication boundary; the first draw is committed before the window.
+describe("OPT-996 committed chain prefix", () => {
+  it("publishes DRAW → damage → reply → DRAW exactly once across reload, scanning only at parent completion", async () => {
+    const card = dealer("SYN-PREFIX", 1);
+    card.effectSchema!.effects[0].actions.unshift({ type: "DRAW", params: { amount: 1 } });
+    const r = rig({ p1Life: [life("prefix-trigger", TRIG_OPTIONAL.id)], dealer: card, p1Leader: ENEL });
+    activate(r);
+    expectWindow(r, "prefix-trigger");
+    expect(r.log().map(e => e.type)).toEqual(["CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED"]);
+    const retained = r.state.effectStack.flatMap(f => f.accumulatedEvents);
+    expect(retained).toHaveLength(4);
+    expect(retained.every(e => e.propagation?.eventLogEmitted && !e.propagation?.triggerScanned)).toBe(true);
+    expect(r.log().filter(e => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(0);
+    await r.reload();
+    reveal(r, false);
+    expect(r.log().map(e => [e.type, e.playerIndex])).toEqual([
+      ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["LIFE_COUNT_BECOMES_ZERO", 1], ["TRIGGER_ACTIVATED", 1],
+      ["CARD_ADDED_TO_HAND_FROM_LIFE", 1], ["CARD_REMOVED_FROM_LIFE", 1],
+      ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["CARD_DRAWN", 1], ["DRAW_OUTSIDE_DRAW_PHASE", 1],
+    ]);
+    expect(r.state.effectStack).toEqual([]);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.turn.triggerStagingInstanceIds ?? []).toEqual([]);
+  });
+});

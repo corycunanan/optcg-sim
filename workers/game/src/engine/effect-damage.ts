@@ -205,7 +205,8 @@ export function continueEffectDamageSequence(
   sourceCardInstanceId: string,
   controllerIndex: 0 | 1,
   damageTaken = false,
-  frame?: { id: string; dealt: number }
+  frame?: { id: string; dealt: number },
+  publishCommittedPrefix?: (state: GameState) => GameState
 ): EffectDamageResult {
   const events: PendingEvent[] = [];
   let nextState = state;
@@ -248,6 +249,9 @@ export function continueEffectDamageSequence(
         playerIndex: damagedPlayerIndex,
         payload: { cardId: lifeCard.cardId },
       });
+      // The caller owns earlier committed actions until this publication boundary.
+      // Publish that prefix first, log only; its parent still owns scanning.
+      nextState = publishCommittedPrefix?.(nextState) ?? nextState;
       // Publish the point now, log only, as the battle path does
       // (openBattleTriggerWindow): the log shows the damage while the window
       // is open and before the reply's own events. The watchers still wait
