@@ -512,6 +512,13 @@ may already have changed. Every unlisted combination is rejected at repository
 load (including every embedded/separate undo entry before retention) and again
 before an optional replacement answer can execute a substitute.
 
+The runtime check recognizes retained COST replay metadata and explicit COST
+kind as well as phase-derived COST kind. A corrupted in-memory phase must not
+hide the caller from validation before either accept or decline. Persisted
+ingress already rejects that phase mismatch; this guard covers the independent
+in-memory answer boundary, without changing legitimate non-COST callers or
+ordinary6 behavior.
+
 | Saved family/stage | Domain and canonical replay |
 | --- | --- |
 | TRASH_SELF, PLACE_SELF_TO_DECK, TRASH_OWN_STAGE, PLACE_STAGE_TO_DECK; no arrange flag | Empty domain; only PLAYER_CHOICE `__PAY_FIXED_COST__` |

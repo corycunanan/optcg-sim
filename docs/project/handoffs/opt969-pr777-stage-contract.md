@@ -57,3 +57,22 @@ shuffle guard, selection shuffle guard) were each killed by focused tests.
 Logs use `/private/tmp/opt969-20261023-impl-*.log`. Full readiness/CI and bounded
 independent assessments belong to the coordinator; this handoff claims neither
 merge readiness nor an ordinary writer rollout.
+
+## Bounded runtime guard repair delta
+
+Independent review of ee86b9a found that the in-memory optional-answer guard
+relied only on phase-derived kind: changing a retained COST owner's phase to
+AWAITING_TARGET_SELECTION skipped validation and allowed substitute DRAW work.
+This was a corrupted-memory-only boundary failure; persisted ingress already
+rejected the shape. The repair invokes the existing strict validator when the
+caller has derived COST kind, explicit COST kind, or retained replacement cost
+metadata. It does not expand general frame ownership semantics.
+
+`opt-997-optional-caller.test.ts` checks accept and skip with phase-only,
+kind-only, unchecked, missing replay and untyped phase corruption, requiring a
+rejection before effects and unchanged input. Valid ordinary6/native7 answers
+remain controls. The final 14-case file against ee86b9a fails 4 / passes 10;
+with the repair all 14 pass. Seven focused files / 1,110 tests pass, including
+actual canonical corpora and legitimate battle replacement callers. This delta
+is within the same bounded full-plus-delta assessment; no review budget reset
+or legal-producer save/load exploit is claimed.

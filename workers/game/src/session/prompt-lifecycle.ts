@@ -376,7 +376,13 @@ function answerReplacementOffer(
   let state = popFrame(initialState);
   const caller = state.effectStack.at(-1);
   const callerKind = caller ? frameKindOf(caller) : null;
-  if (state.schemaVersion === 7 && caller && callerKind === "COST") {
+  // A changed in-memory phase can derive EFFECT despite explicit COST kind
+  // or retained COST replay evidence. Validate that caller before effects.
+  if (state.schemaVersion === 7 && caller && (
+    callerKind === "COST" || caller.kind === "COST" ||
+    caller.costReplacementAction !== undefined || caller.costReplacementChecked !== undefined ||
+    caller.costReplacementResolution !== undefined
+  )) {
     const violation = costReplacementReplayViolation(state, caller);
     if (violation) throw new Error(`Invalid replacement caller: ${violation}`);
   }
