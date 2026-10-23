@@ -1,3 +1,4 @@
+import { promoteSessionToVersion7 } from "./version7-promotion.js";
 import { projectVersion5 } from "./version5-reader.js";
 import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
 import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
@@ -167,10 +168,24 @@ export class SessionRepository {
   }
 
   async save(snapshot: SessionSnapshot): Promise<SessionSnapshot> {
-    const promptedState = ensurePromptId(snapshot.state);
+    // Runtime objects without provenance are old runtime6 inputs, not stored
+    // version1 bytes. Validate them before promotion; new setup is explicit7.
+    const validateRuntime = (state: GameState, location: string): GameState => {
+      // The encoder supplies missing runtime discriminants, but must never hide
+      // an explicitly inconsistent owner or native7 replay before validation.
+      validateContinuationReferences(state, location);
+      return convertPersistedGameState(toPersistedGameState(state), location);
+    };
+    const validated = {
+      ...snapshot,
+      state: validateRuntime(snapshot.state, "state"),
+      undoHistory: snapshot.undoHistory.map((state, index) => validateRuntime(state, `undoHistory[${index}]`)),
+    };
+    const promoted = promoteSessionToVersion7(validated, convertPersistedGameState);
+    const promptedState = ensurePromptId(promoted.state);
     const compacted = compactSessionHistory(
       promptedState,
-      snapshot.undoHistory,
+      promoted.undoHistory,
       this.historySummary
     );
     const stored: PersistedSession = {
@@ -250,7 +265,7 @@ export class SessionRepository {
         ? Promise.resolve(undefined)
         : this.storage.get<unknown>(SESSION_UNDO_HISTORY_STORAGE_KEY),
     ]);
-    const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
+    const stored = promoteSessionToVersion7(parseStoredSession(raw, separateCardDb, separateUndoHistory), convertPersistedGameState);
     const restoredState = restoreIdCounterInvariant(
       ensureExecutionContext(stored.state),
       "state"

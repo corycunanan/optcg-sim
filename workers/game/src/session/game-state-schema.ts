@@ -38,10 +38,10 @@ import { log } from "../lib/log.js";
 import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
-export const GAME_STATE_SCHEMA_VERSION = 6;
+export const GAME_STATE_SCHEMA_VERSION = 7;
 /** The newest persisted version this build can read; v7 carries explicit cost outcomes. */
 export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
-/** The newest runtime shape this build executes; ordinary writers remain v6. */
+/** The newest runtime shape this build executes and ordinary producers emit. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
@@ -568,8 +568,8 @@ export function convertToCurrentShape(
 
 /**
  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
- * Ordinary producers remain version 6; native version 7 is retained per
- * live state and undo snapshot. Every frame has its discriminant, every
+ * Repository save proves/promotes ordinary inputs to version7 before this
+ * shape encoder. Explicit legacy runtime provenance is retained here. Every
  * End Phase frame with its stage. A runtime frame without a stage can only be
  * a version 1 frame, so it is written with the legacy stage, which is its
  * version 1 meaning.
@@ -587,9 +587,9 @@ export function toPersistedGameState(state: GameState): GameState {
     : state.effectStack;
   const { schemaVersion: _schemaVersion, ...rest } = state;
   return {
-    // Reader preserves a native-v7 session/undo entry; ordinary engine inputs
-    // still write v6 until the separately gated producer flips its version.
-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
+    // Shape encoding preserves explicit legacy provenance; repository save
+    // proves/promotes every runtime snapshot before calling this encoder.
+    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? GAME_STATE_SCHEMA_VERSION : 6,
     ...rest,
     effectStack: effectStack.map((frame) => ({
       ...frame,

@@ -16,7 +16,7 @@ function sample() {
   stored["session:undo-history"] = [structuredClone(state)];
   return { stored, state, options };
 }
-it("preserves native7 in live and every mixed undo entry while ordinary v6 writing stays6", async () => {
+it("preserves native7 and promotes legacy undo at the ordinary writer boundary", async () => {
   const { stored, state } = sample();
   const old = structuredClone(state); old.schemaVersion = 6;
   if (old.pendingPrompt!.options.promptType === "PLAYER_CHOICE") delete old.pendingPrompt!.options.donIdentityReturn;
@@ -28,7 +28,7 @@ it("preserves native7 in live and every mixed undo entry while ordinary v6 writi
   const loaded = (await repo.load())!;
   expect(loaded.state.schemaVersion).toBe(7);
   // Repository intentionally bounds retained undo to the latest entry after all entries validate.
-  expect(loaded.undoHistory.map(s => s.schemaVersion)).toEqual([6]);
+  expect(loaded.undoHistory.map(s => s.schemaVersion)).toEqual([7]);
   await repo.save(loaded);
   const again = (await repo.load())!;
   expect(again.state).toEqual(loaded.state);
