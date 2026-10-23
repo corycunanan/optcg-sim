@@ -1,3 +1,4 @@
+import { applyDonReturnIds, decodeDonReturnIds } from "./effect-resolver/actions/don.js";
 import { replacementEventsFor } from "./replacement-events.js";
 import { expandReplacementVisits, replacementAbilitySiblings } from "./replacement-ability-identity.js";
 import { isGameTerminated } from "./terminal.js";
@@ -729,7 +730,7 @@ function probeSubstituteChain(
   }
   if (!isActionFeasible(state, action, effect.sourceCardInstanceId, effect.controller, cardDb, refs)) return null;
   // Attached DON!! retains the established printed-domain gate until OPT-969.
-  if (action.type === "RETURN_DON_TO_DECK") {
+  if (state.schemaVersion !== 7 && action.type === "RETURN_DON_TO_DECK") {
     if (!canReturnDonToDeckSucceed(state, action, effect.controller, cardDb, refs)) return null;
   }
   const probeState = {
@@ -812,7 +813,21 @@ function probeSubstituteChain(
       continue;
     if (needed !== undefined && pool && pool.length < needed) continue;
     let result = selection ? invoke(selection) : initial;
-    if (action.type === "RETURN_DON_TO_DECK" && !result.pendingPrompt && action.params?.until_count === undefined) {
+    if (state.schemaVersion === 7 && action.type === "RETURN_DON_TO_DECK" && result.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+      const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? effect.controller === 0 ? 1 : 0 : effect.controller;
+      for (const choice of result.pendingPrompt.options.choices) {
+        if (choice.disabled) continue;
+        const ids = decodeDonReturnIds(choice.id);
+        const requested = substituteAmount(action.params?.amount, state, effect.controller, cardDb, refs);
+        const applied = ids && ids.length === requested ? applyDonReturnIds(probeState, owner, ids) : null;
+        if (!applied) continue;
+        const nextRefs = new Map(refs);
+        if (action.result_ref) nextRefs.set(action.result_ref, { targetInstanceIds: [], count: applied.returned });
+        const next = probeSubstituteChain(applied.state, rest, effect, cardDb, nextRefs, services);
+        if (next) return next;
+      }
+    }
+    if (state.schemaVersion !== 7 && action.type === "RETURN_DON_TO_DECK" && !result.pendingPrompt && action.params?.until_count === undefined) {
       // Preserve only OPT-969's printed-field/attached-DON underpayment exception.
       // The real executor's intermediate cost-area mutation still feeds later actions.
       result = { ...result, succeeded: true, fullyExecuted: true };
@@ -1095,7 +1110,16 @@ export function materializeReplacementOffer(
     pendingTriggers: [],
     simultaneousTriggers: [],
     accumulatedEvents: [],
-    replacement: { ...offer, effectId, targetInstanceId, event },
+    // Native7 persists only the offer grammar, never transient resume-context
+    // discriminators carried through ordering/reoffer progress. Reader6 keeps
+    // its historical byte path for the staged rollout.
+    replacement: state.schemaVersion === 7 ? {
+      effectId, targetInstanceId, event,
+      ...(offer.visitedEffectIds !== undefined ? { visitedEffectIds: offer.visitedEffectIds } : {}),
+      ...(offer.cause !== undefined ? { cause: offer.cause } : {}),
+      ...(offer.causingController !== undefined ? { causingController: offer.causingController } : {}),
+      ...(offer.orderingEffectIds !== undefined ? { orderingEffectIds: offer.orderingEffectIds } : {}),
+    } : { ...offer, effectId, targetInstanceId, event },
   };
   const nextState = pushFrame(generated.state, frame);
   return { state: nextState, pendingPrompt: { ...pendingPrompt, resumeContext: frame.id } };

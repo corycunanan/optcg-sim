@@ -1,3 +1,5 @@
+import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
+import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
 import { drainPendingWork } from "../engine/pending-work-drain.js";
 import { takeInterruptedEvents } from "../engine/effect-resolver/resume/events.js";
 import type {
@@ -23,7 +25,6 @@ import { updateFrameById } from "../engine/damage-frames.js";
 import { resumeFromStackWork as resumeFromStack,
 } from "../engine/effect-resolver/resume.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
-import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
 import { continuePipelineFromExecution } from "../engine/pipeline.js";
 import { popFrame } from "../engine/effect-stack.js";
 import { resumePregameFromPrompt } from "../engine/pregame.js";
@@ -375,6 +376,16 @@ function answerReplacementOffer(
   let state = popFrame(initialState);
   const caller = state.effectStack.at(-1);
   const callerKind = caller ? frameKindOf(caller) : null;
+  // A changed in-memory phase can derive EFFECT despite explicit COST kind
+  // or retained COST replay evidence. Validate that caller before effects.
+  if (state.schemaVersion === 7 && caller && (
+    callerKind === "COST" || caller.kind === "COST" ||
+    caller.costReplacementAction !== undefined || caller.costReplacementChecked !== undefined ||
+    caller.costReplacementResolution !== undefined
+  )) {
+    const violation = costReplacementReplayViolation(state, caller);
+    if (violation) throw new Error(`Invalid replacement caller: ${violation}`);
+  }
   // OPT-872: only the unanswered continuation for this exact effect and
   // target is resumed (rules §7-1-4-1-2).
   const pausedBattle =
@@ -442,19 +453,22 @@ function answerReplacementOffer(
     return applyDamageResult(state, continued, cardDb, actingPlayer);
   }
 
-  // A cost-exit replacement (OPT-864): the COST frame that parked its
-  // validated selection is the top frame unless the substitute pushed its
-  // own prompt frames above it, in which case the substitute's prompt is
-  // answered first and the cost frame stays parked beneath it.
-  const topAfter = state.effectStack.at(-1);
-  if (topAfter?.costReplacementAction && frameKindOf(topAfter) === "COST") {
-    if (replacement.replaced) {
-      const aborted = abortReplacedCost(state, topAfter, replacement.events, cardDb, resolverExecutionServices);
-      state = withPendingPrompt(aborted.state, aborted.pendingPrompt);
-    } else {
-      const resumed = resumeFromStack(state, { ...topAfter.costReplacementAction }, cardDb);
-      state = withPendingPrompt(resumed.state, resumed.pendingPrompt);
-    }
+  // Persist the final scan result on the exact COST caller captured before
+  // substitute execution. A prompting child may now be topmost; it owns its
+  // own completion/events, and the shared drain settles COST only afterward.
+  if (state.schemaVersion === 7 && caller?.costReplacementAction && callerKind === "COST") {
+    state = updateFrameById(state, caller.id, frame => ({
+      ...frame,
+      costReplacementResolution: replacement.replaced ? "REPLACED" : "NOT_REPLACED",
+    }));
+  } else if (state.schemaVersion !== 7 && state.effectStack.at(-1)?.costReplacementAction &&
+      frameKindOf(state.effectStack.at(-1)!) === "COST") {
+    // Historical-v6 behavior remains unchanged until the ordinary writer flips.
+    const topAfter = state.effectStack.at(-1)!;
+    const resumed = replacement.replaced
+      ? abortReplacedCost(state, topAfter, replacement.events, cardDb, resolverExecutionServices)
+      : resumeFromStack(state, { ...topAfter.costReplacementAction! }, cardDb);
+    state = withPendingPrompt(resumed.state, resumed.pendingPrompt);
   } else if (caller && callerKind === "TRIGGER_DRAIN") {
     state = recordReplacementContinuationResult(state, caller.id, !replacement.replaced, []);
   }

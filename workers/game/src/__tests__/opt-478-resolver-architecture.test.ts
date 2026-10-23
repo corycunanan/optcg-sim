@@ -94,6 +94,7 @@ describe("OPT-478 resolver architecture contract", () => {
       "payment",
       "prompts",
       "replaced",
+      "replacement-replay",
       "resume",
       "targets",
       "transaction",

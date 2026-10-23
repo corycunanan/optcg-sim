@@ -1,3 +1,4 @@
+import { continueReadyCostReplacement } from "./effect-resolver/resume/cost.js";
 import { finishLifeTriggerStaging, validateLifeTriggerStaging } from "./life-trigger-staging.js";
 import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
 /** One engine drain owns trigger generations and resumable domain boundaries. */
@@ -215,7 +216,9 @@ export function drainPendingWork(
             events,
             resolved: true,
           });
-      } else if (kind === "PHASE_BOUNDARY")
+      } else if (kind === "COST" && state.schemaVersion === 7 && top.costReplacementResolution && !state.pendingPrompt)
+        result = continueReadyCostReplacement(state, top, cardDb, services);
+      else if (kind === "PHASE_BOUNDARY")
         result = advancePhaseBoundary(state, cardDb);
       else if (kind === "BATTLE_DAMAGE" || kind === "EFFECT_DAMAGE") {
         if (top.phase === "AWAITING_TRIGGER_REVEAL") {

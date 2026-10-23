@@ -1,3 +1,4 @@
+import { buildDonIdentityPlans } from "../don-identity-plans.js";
 /**
  * Action handlers: GIVE_DON, ADD_DON_FROM_DECK, FORCE_OPPONENT_DON_RETURN,
  * SET_DON_ACTIVE, REST_OPPONENT_DON, RETURN_DON_TO_DECK,
@@ -685,6 +686,32 @@ export function executeReturnDonToDeck(
   const params = action.params ?? {};
   if (params.until_count !== undefined) {
     return returnDonUntilCount(state, action, params.until_count, sourceCardInstanceId, controller, cardDb, resultRefs);
+  }
+  if (state.schemaVersion === 7) {
+    const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
+    const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? controller === 0 ? 1 : 0 : controller;
+    const p = state.players[owner];
+    const filter = action.target?.filter;
+    // Match the shared target-state contract: positive flags and exact state
+    // intersect; false flags add no restriction. State-restricted returns use
+    // unattached cost-area DON!!, as the active-only domain already did.
+    const stateRestricted = filter?.is_active === true || filter?.is_rested === true || !!filter?.state;
+    const pool = [...p.donCostArea.filter(d => !d.attachedTo
+      && (filter?.is_active !== true || d.state === "ACTIVE")
+      && (filter?.is_rested !== true || d.state === "RESTED")
+      && (!filter?.state || d.state === filter.state)), ...(action.target?.type === "DON_IN_COST_AREA" || stateRestricted ? [] : [p.leader, ...p.characters.filter(c => c !== null)].flatMap(c => c.attachedDon))];
+    const count = Math.min(amount, pool.length);
+    if (count <= 0) return { state, events, succeeded: false, fullyExecuted: false };
+    const plan = buildDonIdentityPlans(state, owner, pool.map(d => d.instanceId), count, count, cardDb);
+    if (plan.choices.length === 1) {
+      const applied = applyDonReturnIds(state, owner, decodeDonReturnIds(plan.choices[0].id)!)!;
+      return { ...applied, succeeded: true, fullyExecuted: count === amount, result: { targetInstanceIds: [], count } };
+    }
+    return { state, events, succeeded: false, pendingPrompt: {
+      options: { promptType: "PLAYER_CHOICE", effectDescription: `Choose which ${count} DON!! to return`, ...plan },
+      respondingPlayer: owner,
+      resumeContext: { effectSourceInstanceId: sourceCardInstanceId, controller, pausedAction: action, remainingActions: [], resultRefs: [...resultRefs], validTargets: plan.choices.map(c => c.id) },
+    } };
   }
   const amount = resolveAmount(
     params.amount ?? 1,

@@ -111,8 +111,9 @@ export function rig(): Rig {
       else if (zone === "HAND") p.hand.push(card);
       else if (zone === "TRASH") p.trash.unshift(card);
       else if (zone === "LEADER") p.leader = card;
+      else if (zone === "STAGE") p.stage = card;
       else p.characters[p.characters.findIndex((slot) => !slot)] = card;
-      if (zone === "LEADER" || zone === "CHARACTER") {
+      if (zone === "LEADER" || zone === "CHARACTER" || zone === "STAGE") {
         state = registerCardEnteredField(state, card, db.get(id)!);
       }
       return card;

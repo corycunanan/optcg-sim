@@ -107,7 +107,7 @@ export interface GameState extends Omit<
   | "effectStack"
 > {
   /** Retained native v6 provenance: saves and later pauses may never downgrade. */
-  schemaVersion?: 6;
+  schemaVersion?: 6 | 7;
   activeEffects: RuntimeActiveEffect[];
   prohibitions: RuntimeProhibition[];
   scheduledActions: RuntimeScheduledAction[];
@@ -491,6 +491,10 @@ export interface EffectStackFrame {
   costReplacementAction?: GameAction;
   /** Prevents a declined replacement from being offered again on resume. */
   costReplacementChecked?: boolean;
+  /** Final result of this exact COST owner's replacement scan. Absent is
+   * waiting/legacy unknown, never implicit acceptance. Reader-first: producers
+   * remain disabled until the outcome-aware reader is deployed. */
+  costReplacementResolution?: "REPLACED" | "NOT_REPLACED";
 
   // Queued triggers waiting to resolve after this frame
   pendingTriggers: QueuedTrigger[];

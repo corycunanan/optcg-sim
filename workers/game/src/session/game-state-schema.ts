@@ -1,3 +1,4 @@
+import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { replacementEventsFor } from "../engine/replacement-events.js";
 import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
 /**
@@ -38,13 +39,13 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 6;
-/** The newest persisted version this build can read; v6 retains replacement scan progress. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 6;
-/** The newest runtime shape this build executes; all producers emit v6. */
-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 6;
+/** The newest persisted version this build can read; v7 carries explicit cost outcomes. */
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
+/** The newest runtime shape this build executes; ordinary writers remain v6. */
+export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6,
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7,
 ];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
@@ -65,6 +66,8 @@ export type LegacyShape =
   | "legacy.stage_less_phase_boundary"
   | "legacy.structural_resume_context"
   | "legacy.cost_transaction_frame"
+  /** Parked cost replacement has no final disposition and no remaining offer. No automatic repair is justified. */
+  | "legacy.cost_replacement_outcome_unknown"
   | "legacy.stuck_damage_step"
   /** A BATTLE_DAMAGE frame with no battle, another battle, or outside DAMAGE_STEP; continueBattleDamageFrame drops it (battle.ts, OPT-884). */
   | "legacy.orphan_battle_continuation"
@@ -508,6 +511,13 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
+  if (version < 7) {
+    const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
+    if (frames.some(frame => isRecord(frame) && "costReplacementResolution" in frame) ||
+        (isRecord(raw.pendingPrompt) && isRecord(raw.pendingPrompt.options) && "donIdentityReturn" in raw.pendingPrompt.options)) {
+      throw new SessionLoadError(location, "carries COST outcome or DON identity picker requiring schemaVersion 7");
+    }
+  }
   if (version < 6 && Array.isArray(raw.effectStack)) {
     for (const [index, frame] of raw.effectStack.entries()) {
       if (!isRecord(frame)) continue;
@@ -558,8 +568,8 @@ export function convertToCurrentShape(
 
 /**
  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
- * OPT-968 every live state and undo snapshot is written as version 6:
- * `schemaVersion: 6` first, every frame with its discriminant, every
+ * Ordinary producers remain version 6; native version 7 is retained per
+ * live state and undo snapshot. Every frame has its discriminant, every
  * End Phase frame with its stage. A runtime frame without a stage can only be
  * a version 1 frame, so it is written with the legacy stage, which is its
  * version 1 meaning.
@@ -577,7 +587,9 @@ export function toPersistedGameState(state: GameState): GameState {
     : state.effectStack;
   const { schemaVersion: _schemaVersion, ...rest } = state;
   return {
-    [GAME_STATE_SCHEMA_VERSION_KEY]: GAME_STATE_SCHEMA_VERSION,
+    // Reader preserves a native-v7 session/undo entry; ordinary engine inputs
+    // still write v6 until the separately gated producer flips its version.
+    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
     ...rest,
     effectStack: effectStack.map((frame) => ({
       ...frame,
@@ -758,6 +770,23 @@ export function validateContinuationReferences(
   state: GameState,
   location: string
 ): void {
+  const options = state.pendingPrompt?.options;
+  if (options?.promptType === "PLAYER_CHOICE" && options.donIdentityReturn) {
+    const picker = options.donIdentityReturn;
+    const ids = picker.groups.flatMap(group => group.donIds);
+    const pool = new Set(ids);
+    if (pool.size !== ids.length || picker.countMin > picker.countMax || picker.countMax > ids.length || options.donReturn) {
+      throw new SessionLoadError(location, "has inconsistent DON identity picker groups/counts");
+    }
+    for (const choice of options.choices) {
+      let selected: unknown;
+      try { selected = choice.id.startsWith("don-return-ids:") ? JSON.parse(choice.id.slice("don-return-ids:".length)) : null; } catch { selected = null; }
+      if (!Array.isArray(selected) || selected.length < picker.countMin || selected.length > picker.countMax ||
+          new Set(selected).size !== selected.length || selected.some(id => typeof id !== "string" || !pool.has(id))) {
+        throw new SessionLoadError(location, "has DON identity picker choice outside its declared pool/counts");
+      }
+    }
+  }
   const frames = state.effectStack;
   const frameIds = new Map<string, EffectStackFrame>();
   frames.forEach((frame, index) => {
@@ -842,6 +871,18 @@ export function validateContinuationReferences(
           );
         }
       }
+    }
+    if (frame.costReplacementResolution !== undefined && (
+      derived !== "COST" || frame.phase !== "AWAITING_COST_SELECTION" ||
+      !frame.costReplacementAction || frame.costReplacementChecked !== true ||
+      !frame.costs[frame.currentCostIndex] ||
+      !["SELECT_TARGET", "PLAYER_CHOICE", "ARRANGE_TOP_CARDS"].includes(frame.costReplacementAction.type)
+    )) {
+      throw new SessionLoadError(location, `${ref} has costReplacementResolution without a checked COST replay owner`);
+    }
+    if (state.schemaVersion === 7 && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
+      const replayViolation = costReplacementReplayViolation(state, frame);
+      if (replayViolation) throw new SessionLoadError(location, `${ref} ${replayViolation}`);
     }
     const violation = frameInvariantViolation(frame, derived, state);
     if (violation) {
@@ -1039,6 +1080,11 @@ export function classifyLegacyShapes(state: GameState): LegacyShapeReport[] {
     }
     if (frameKindOf(frame) === "COST" && isLegacyCostTransactionFrame(frame)) {
       reports.push({ shape: "legacy.cost_transaction_frame", frameId: frame.id });
+    }
+    if (frameKindOf(frame) === "COST" && frame.costReplacementAction &&
+        frame.costReplacementResolution === undefined &&
+        !state.effectStack.slice(state.effectStack.indexOf(frame) + 1).some(child => frameKindOf(child) === "REPLACEMENT")) {
+      reports.push({ shape: "legacy.cost_replacement_outcome_unknown", frameId: frame.id });
     }
   }
   const resume = state.pendingPrompt?.resumeContext;

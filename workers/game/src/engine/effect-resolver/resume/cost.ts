@@ -1,3 +1,5 @@
+import { canonicalCostReplacementReplay, lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
+import { updateFrameById } from "../../damage-frames.js";
 import { decodeDonReturnIds } from "../actions/don.js";
 import { finishReplacedLifeCost } from "../cost/replaced.js";
 import { isGameTerminated } from "../../terminal.js";
@@ -55,8 +57,6 @@ import {
   opponentRestedCostDon,
 } from "../cost/targets.js";
 
-const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
-
 /**
  * OPT-868: marker kept in a GIVE_OPPONENT_DON_TO_OPPONENT frame's
  * validTargets while the payer picks which rested DON!! to give. It binds the
@@ -66,30 +66,6 @@ const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
 const OPPONENT_DON_RECIPIENT_PREFIX = "cost-opp-don-recipient:";
 import { getCostCtaLabel } from "../cost/prompts.js";
 
-/** OPT-828: a Life-end choice id bound to the Characters chosen to pay the cost. */
-function lifeDestinationChoiceId(ids: string[], end: "TOP" | "BOTTOM"): string {
-  return `${LIFE_DESTINATION_CHOICE_PREFIX}${JSON.stringify(ids)}:${end}`;
-}
-
-function isLifeDestinationChoiceId(id: string): boolean {
-  return id.startsWith(LIFE_DESTINATION_CHOICE_PREFIX);
-}
-
-function parseLifeDestinationChoiceId(
-  id: string,
-): { ids: string[]; position: "TOP" | "BOTTOM" } | null {
-  if (!isLifeDestinationChoiceId(id)) return null;
-  const split = id.lastIndexOf(":");
-  const end = id.slice(split + 1);
-  if (end !== "TOP" && end !== "BOTTOM") return null;
-  try {
-    const ids: unknown = JSON.parse(id.slice(LIFE_DESTINATION_CHOICE_PREFIX.length, split));
-    if (!Array.isArray(ids) || !ids.every((value) => typeof value === "string")) return null;
-    return { ids, position: end };
-  } catch {
-    return null;
-  }
-}
 import { postCostConditionsMet } from "../post-cost.js";
 import type { HandlerResult, EffectResolverServices } from "../types.js";
 import {
@@ -148,6 +124,30 @@ export function abortReplacedCost(
     cardDb,
     eventsForCostAbandon(frame, events),
   );
+}
+
+/** Consume an explicit result only after all children have finished. The
+ * shared drain owns readiness; this helper never searches for another COST.
+ * Absent legacy outcomes remain parked and are not silently repaired. */
+export function continueReadyCostReplacement(
+  state: GameState,
+  frame: EffectStackFrame,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices,
+): HandlerResult {
+  if (state.pendingPrompt || state.effectStack.at(-1)?.id !== frame.id ||
+      !frame.costReplacementResolution || !frame.costReplacementAction) {
+    return { kind: "continued", state, events: [], resolved: false };
+  }
+  if (isGameTerminated(state)) return { kind: "terminal", state, events: [], resolved: true };
+  if (frame.costReplacementResolution === "REPLACED") {
+    // Child substitute events already follow their own existing publication
+    // path. Only the owner's legacy-payment event debt belongs to abandon.
+    return abortReplacedCost(state, frame, [], cardDb, services);
+  }
+  const { costReplacementResolution: _consumed, costReplacementAction: replay, ...ready } = frame;
+  const nextState = { ...state, effectStack: [...state.effectStack.slice(0, -1), ready] };
+  return handleAwaitingCostSelection(nextState, replay!, ready, cardDb, services);
 }
 
 /**
@@ -447,21 +447,28 @@ export function handleAwaitingCostSelection(
   const workingState = topFrame.costTransactionState
     ? applyCostTransactionState(baselineState, topFrame.costTransactionState)
     : baselineState;
+  const updateCostOwner = (candidate: GameState, partial: Partial<EffectStackFrame>): GameState =>
+    candidate.schemaVersion === 7
+      ? updateFrameById(candidate, topFrame.id, frame => ({ ...frame, ...partial }))
+      : updateTopFrame(candidate, partial);
   const suspendCurrentFrame = (
     stateWithFrame: GameState,
     stagedEvents: PendingEvent[],
     pendingPrompt: NonNullable<HandlerResult["pendingPrompt"]>,
     stagedState: GameState = stateWithFrame,
     offer?: ReplacementOffer,
+    committedReplacement = false,
   ): HandlerResult => {
-    const withTransaction = updateTopFrame(stateWithFrame, {
+    const withTransaction = updateCostOwner(stateWithFrame, {
       accumulatedEvents: [...stagedEvents],
       costTransactionState: captureCostTransactionState(stagedState),
     });
     // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
     // frame on top of this cost frame once the frame's bookkeeping is done.
+    // Accepted mandatory substitutes already execute on the root baseline.
+    // Their prefix and use marker are committed; staged payment stays on COST.
     const offered = materializeReplacementOffer(
-      applyCostTransactionState(withTransaction, transactionBaseline),
+      withTransaction.schemaVersion === 7 && committedReplacement ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
       pendingPrompt,
       offer,
     );
@@ -887,6 +894,8 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, transactionBaseline),
@@ -898,12 +907,13 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
-          costReplacementAction: {
+        nextState = updateCostOwner(nextState, {
+          costReplacementAction: replay ?? {
             type: "SELECT_TARGET",
             selectedInstanceIds: selected,
           },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,
@@ -911,6 +921,7 @@ export function handleAwaitingCostSelection(
           replacement.pendingPrompt,
           stagedBeforeReplacement,
           replacement.offer,
+          replacement.replaced,
         );
       }
       if (replacement.replaced)
@@ -959,6 +970,8 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ordered, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, transactionBaseline),
@@ -970,14 +983,15 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
-          costReplacementAction: {
+        nextState = updateCostOwner(nextState, {
+          costReplacementAction: replay ?? {
             type: "ARRANGE_TOP_CARDS",
             keptCardInstanceId: "",
             orderedInstanceIds: action.orderedInstanceIds,
             destination: action.destination,
           },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,
@@ -985,6 +999,7 @@ export function handleAwaitingCostSelection(
           replacement.pendingPrompt,
           stagedBeforeReplacement,
           replacement.offer,
+          replacement.replaced,
         );
       }
       if (replacement.replaced)
@@ -1122,6 +1137,8 @@ export function handleAwaitingCostSelection(
     if (!topFrame.costReplacementChecked) {
       // Placing the Character is an effect-caused removal; a replacement means
       // the printed cost was not paid (rules 8-3-1-3-1 / 8-3-1-7).
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, cost.position === "TOP_OR_BOTTOM" ? { ...action, type: "PLAYER_CHOICE", choiceId: lifeDestinationChoiceId(placedIds, position) } : { type: "SELECT_TARGET", selectedInstanceIds: placedIds }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, transactionBaseline),
@@ -1133,11 +1150,12 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
-          costReplacementAction: action,
+        nextState = updateCostOwner(nextState, {
+          costReplacementAction: replay ?? action,
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
-        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer);
+        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer, replacement.replaced);
       }
       if (replacement.replaced) {
         return abortReplacedCost(nextState, topFrame, replacement.events, cardDb, services);
@@ -1304,20 +1322,14 @@ export function handleAwaitingCostSelection(
         return { kind: "waiting", state, events: [], resolved: false };
       }
     }
-    const fieldExitCosts = new Set<Cost["type"]>([
-      "KO_OWN_CHARACTER",
-      "TRASH_OWN_CHARACTER",
-      "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE",
-      "RETURN_OWN_CHARACTER_TO_HAND",
-      "PLACE_OWN_CHARACTER_TO_DECK",
-      "ADD_OWN_CHARACTER_TO_LIFE",
-    ]);
     const selectedStage = state.players[controller].stage?.instanceId === selected[0];
     const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
-    if (fieldExitCosts.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
+    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
       // Cost exits are still effect-caused removal events, but a replacement
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.
+      const replay = nextState.schemaVersion === 7
+        ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
       const replacementInput = applyCostTransactionState(
         nextState,
@@ -1358,12 +1370,13 @@ export function handleAwaitingCostSelection(
       events.push(...replacement.events);
       nextState = replacement.state;
       if (replacement.pendingPrompt) {
-        nextState = updateTopFrame(nextState, {
-          costReplacementAction: {
+        nextState = updateCostOwner(nextState, {
+          costReplacementAction: replay ?? {
             type: "SELECT_TARGET",
             selectedInstanceIds: selected,
           },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,
@@ -1371,6 +1384,7 @@ export function handleAwaitingCostSelection(
           replacement.pendingPrompt,
           stagedBeforeReplacement,
           replacement.offer,
+          replacement.replaced,
         );
       }
       if (replacement.replaced) {

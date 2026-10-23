@@ -462,3 +462,147 @@ rollout. Pinned actual writer/session outputs replay on the deployed semantic
 reader, including live and restored undo, all later prompts and allocator IDs.
 This exception does not claim captured production sessions or completion of the
 capture-dependent retirement gate.
+
+## OPT-997 semantic version 7 reader prerequisite
+
+Ordinary producers still write version 6. Native version 7 is retained through
+live state, every action and every undo save. Source versions 1–6 (including an
+absent version) reject `costReplacementResolution` and `donIdentityReturn`
+before conversion. Every incoming undo entry is validated before retention is
+bounded; mixed live/undo versions do not upgrade one another.
+
+Native7 accepts optional `costReplacementResolution: "REPLACED" |
+"NOT_REPLACED"` only on a checked `COST`/`AWAITING_COST_SELECTION` frame with its
+validated replay action and current cost. Replay families are `SELECT_TARGET`,
+`PLAYER_CHOICE` (fixed sentinel and destination choices), and
+`ARRANGE_TOP_CARDS`. Native7 answers capture the exact owner before substitute
+execution and record the final outcome on that owner, even below children.
+Mandatory payment inserts the owner below its actual child. A committed substitute
+prefix and its use marker remain on the live root during suspension; earlier
+staged payment remains only in the COST transaction for a no-replacement replay.
+The shared drain
+settles only a topmost owner with no pending prompt. Children retain prompt,
+action, trigger and event ownership; their events are not published again.
+
+`REPLACED` uses existing Decision10 policy: substitute stands, earlier staged
+costs roll back, post-colon effects do not run and activation use is unconsumed.
+`NOT_REPLACED` removes its outcome and replay marker before checked payment.
+Native7 executable replay data uses the shared strict GameAction schema and cost
+grammar, including fixed sentinel, bound Life destination and exact arrangement
+selection. Capture at all five payment sites constructs canonical semantic
+input before substitute execution; arrangements save computed full order and
+the printed destination, while Life choices preserve their actual chosen end.
+Every parked replay or checked replacement marker is validated before any
+outcome exists, and the exact caller is checked again before optional answer
+execution. A checked marker without its replay is invalid. Malformed payloads
+and wrong cost/action pairings are rejected on live and every embedded/separate
+undo ingress before retention. Pairing an accepted Stage exit uses its
+saved cost, since the substitute may already have moved the Stage. Ordinary6
+permissive legacy replay data remains non-executable without an explicit outcome.
+Terminal state dominates every insertion/update/rollback. An ordinary legal
+Main action after cleanup, followed by a legal Block-Step PASS, is tested; bare
+Main-phase PASS is not a valid acceptance probe.
+
+### Native7 parked COST stage/action contract
+
+The replay parser classifies saved payment evidence before inspecting the action:
+current cost, `costArrangeStage`, offered `validTargets`, source ID and the saved
+`effectBlock` shuffle policy. It does not inspect a live board that a substitute
+may already have changed. Every unlisted combination is rejected at repository
+load (including every embedded/separate undo entry before retention) and again
+before an optional replacement answer can execute a substitute.
+
+The runtime check recognizes retained COST replay metadata and explicit COST
+kind as well as phase-derived COST kind. A corrupted in-memory phase must not
+hide the caller from validation before either accept or decline. Persisted
+ingress already rejects that phase mismatch; this guard covers the independent
+in-memory answer boundary, without changing legitimate non-COST callers or
+ordinary6 behavior.
+
+| Saved family/stage | Domain and canonical replay |
+| --- | --- |
+| TRASH_SELF, PLACE_SELF_TO_DECK, TRASH_OWN_STAGE, PLACE_STAGE_TO_DECK; no arrange flag | Empty domain; only PLAYER_CHOICE `__PAY_FIXED_COST__` |
+| Generic field exit, including named hand-or-Stage and fixed/default Life destination; no arrange flag | Unique nonempty candidate IDs; SELECT_TARGET of exactly the printed positive count, all offered |
+| Opponent Life TOP_OR_BOTTOM; no arrange flag | Exactly TOP and BOTTOM choices bound to the same ordered positive-count unique IDs; exact offered PLAYER_CHOICE |
+| Either self+hand/trash compound; no arrange flag, block shuffles | Unique secondary candidate IDs excluding source, more candidates than printed count; SELECT_TARGET of exactly the printed count, allowing zero |
+| Either compound; arrange flag, block does not shuffle | Unique group of source plus printed count; ARRANGE_TOP_CARDS exact permutation, empty singular kept ID, absent plural kept IDs, printed TOP as top and otherwise bottom |
+
+Compound selection without shuffle is intermediate, and arrangement with shuffle
+is unreachable; neither can own a captured replacement replay. Compound hand is
+never a fixed-sentinel family, even for amount zero. The legacy
+`fixedCostExitTarget` helper keeps its old membership because ordinary6 uses it;
+only native replay uses the four-family fixed set. All five capture sites pass
+saved producer evidence to this same parser. No new persisted field is required.
+
+This checks stage/action compatibility and domain structure. It does not
+authenticate coordinated identity rewrites against the saved payment snapshot or
+the replacement offer target, nor prove that a named candidate is the Stage
+rather than an identically named hand card. The actual named Stage/hand control
+is retained. Snapshot/offer target and zone binding are outside this revision.
+Numeric-zero activation feasibility with empty candidates, forced-candidate
+shuffle payment bypassing replacement capture, and compound-hand TOP payment
+mechanics also remain separate issues. Accepted Decision10 rollback is unchanged.
+Ordinary producers remain version6; historical corpora are preserved, with no
+production repair, capture campaign or reader retirement implied.
+
+Native7 amount DON returns intersect positive `is_active`, positive `is_rested`
+and exact `state` selectors. False flags impose no restriction. State-restricted
+or explicit DON_IN_COST_AREA pools exclude attached donors; unfiltered field
+returns retain their attached domain. The executor supplies both identity choices
+and replacement feasibility, so insufficient restricted pools cannot admit a
+replacement by counting active or attached donors. The general target resolver's
+separate exact-state handling is outside this native7 correction.
+
+Native7 also generates subsequent RETURN_DON amount identity prompts through a
+shared grouped planner and real mutation executor. That semantic capability is
+needed when loading a still-unanswered offer whose substitute returns DON.
+Ordinary6 amount and legacy `until_count` bucket behavior stay unchanged.
+Native7 optional `donIdentityReturn` metadata has positive fixed/variable
+bounds and nonoverlapping labeled identity groups. Generic offered choices
+remain authoritative: older clients ignore metadata and use readable generic
+choices; newer clients confirm only an offered enabled exact-ID choice. Readable labels identify duplicate-name Character board slots and meaningful
+hold source/duration. Source names come only from public field/trash zones; a
+source absent there receives a neutral prior-effect label. Old
+`donReturn` metadata/grammar is unchanged. Frontend sandbox producers are
+non-authoritative preview fixtures.
+
+Absent outcome is unresolved or legacy unknown, never inferred acceptance.
+A checked parked cost without an outcome or an offer above it is diagnosed as
+`legacy.cost_replacement_outcome_unknown`, with recoverable bytes preserved.
+The canonical-stage isolated candidate proves actual repository first-load6
+promotion before the first answer, across live and all mixed undo entries.
+Only a demonstrably unanswered old offer can have its payment payload
+canonicalized with the same constructor. Outcomes stay absent until a real
+final answer. Valid accepted/orphan unknown outcomes remain diagnostic; no
+accept/decline history is inferred. Unprovable payloads, including missing
+checked replay metadata beyond the undo retention limit, fail atomically with
+an explicit legacy-debt SessionLoadError: original storage is unchanged, no
+partially promoted runtime is returned, and no undo entry is silently dropped.
+This is isolated evidence, not delivered writer conversion or production repair;
+ordinary reader6 remains the recovery floor for unprovable old data. The future
+ordinary writer must implement this boundary before routing any first action.
+Historical v6 corpus payloads are unchanged; the separate v7 corpus distinguishes
+supported completion from diagnostic legacy debt.
+
+Reader deployment must precede the ordinary writer7 flip. After writer7 emits
+native7, the rollback floor is a semantic version7 reader; a version6-only build
+must reject rather than reinterpret those sessions. No reader retirement or
+production repair is claimed. See the checked-in OPT997 v7 corpus README for
+actual producer SHA, source patch, full hashes, commands and coverage matrix.
+The separate corrected corpus retains all original-v7 inputs unchanged and
+adds mandatory committed-prefix and distinct-label cases. The separate
+`opt-997-v7-canonical` corpus preserves both earlier corpora, adds all five
+capture variants and actual first-load promotion, and separates supported
+completion, legacy unknown, and atomic rejection dispositions. Its ordering →
+optional decline → reoffer control exposed a historical transient `type`
+discriminator leaking into persisted offers. Native7 constructs only explicit
+persisted offer keys; ordinary6 retains the historical diagnostic failure.
+No scan, outcome, event scheduler or rollback policy changes follow.
+
+The user authorized synthetic-only evidence for the DON choice rollout and then
+explicitly included the bounded OPT997 prerequisite under the same gates. This
+scope permits actual candidate-generated live/undo replay evidence, not
+production capture, retirement, old-session repair or broader OPT1006 changes.
+OPT958 remains open: the accepted rollback policy and its labeled deviation
+fixture remain; the next review condition is a policy decision backed by an
+applicable authoritative multi-cost ruling, not this owner-lifecycle correction.

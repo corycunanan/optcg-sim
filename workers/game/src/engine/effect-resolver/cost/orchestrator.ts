@@ -1,3 +1,5 @@
+import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
+import { insertFrameAt } from "../../damage-frames.js";
 /** Iterative cost payment orchestration and suspension. */
 import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
 import type { CardData, EffectStackFrame, GameState, PendingEvent, PendingPromptState } from "../../../types.js";
@@ -84,20 +86,24 @@ export function payCostsWithSelection(
   const pushCostFrame = (
     frame: EffectStackFrame,
     stagedState: GameState = nextState,
+    ownerIndex?: number,
   ): void => {
-    nextState = pushFrame(nextState, {
+    const owned = {
       ...frame,
       effectDescription,
       accumulatedEvents: [...events],
       costTransactionState: captureCostTransactionState(stagedState),
-    });
+    };
+    nextState = ownerIndex === undefined ? pushFrame(nextState, owned) : insertFrameAt(nextState, ownerIndex, owned);
   };
-  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer): CostSelectionResult => {
+  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer, committedReplacement = false): CostSelectionResult => {
     if (isGameTerminated(nextState)) return terminated();
     // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
     // frame on top of the cost frame pushed just before.
+    // Accepted mandatory substitutes already execute on the root baseline.
+    // Their prefix and use marker are committed; staged payment stays on COST.
     const offered = materializeReplacementOffer(
-      applyCostTransactionState(nextState, baseline),
+      nextState.schemaVersion === 7 && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
       pendingPrompt,
       offer,
     );
@@ -658,16 +664,11 @@ export function payCostsWithSelection(
     // Fixed-source field exits have no selection prompt, but replacement
     // effects may still suspend their payment (Rule 8-3-1-7). Park the same
     // cost frame used by selectable payments so decline can resume exactly.
-    const fixedExitTarget = (() => {
-      if (["TRASH_SELF", "PLACE_SELF_TO_DECK", "PLACE_SELF_AND_HAND_TO_DECK"].includes(cost.type)) {
-        return sourceCardInstanceId;
-      }
-      if (["PLACE_STAGE_TO_DECK", "TRASH_OWN_STAGE"].includes(cost.type)) {
-        return nextState.players[controller].stage?.instanceId;
-      }
-      return undefined;
-    })();
+    const fixedExitTarget = fixedCostExitTarget(nextState, cost, controller, sourceCardInstanceId);
     if (fixedExitTarget) {
+      const replay = nextState.schemaVersion === 7 ? canonicalCostReplacementReplay({
+        costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId, effectBlock,
+      }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
         applyCostTransactionState(nextState, baseline),
@@ -688,12 +689,13 @@ export function payCostsWithSelection(
           costs: workingCosts, currentCostIndex: i, costsPaid: false,
           oncePerTurnMarked: false, costResultRefs: [...costResultToEntries(costResult)],
           pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
-          costReplacementAction: { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
+          costReplacementAction: replay ?? { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
           costReplacementChecked: true,
+          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         };
-        pushCostFrame(frame, stagedBeforeReplacement);
+        pushCostFrame(frame, stagedBeforeReplacement, nextState.schemaVersion === 7 ? stagedBeforeReplacement.effectStack.length : undefined);
         if (isGameTerminated(nextState)) return cannotPay();
-        return suspend(replacement.pendingPrompt, replacement.offer);
+        return suspend(replacement.pendingPrompt, replacement.offer, replacement.replaced);
       }
       if (replacement.replaced) {
         return { state: nextState, events: replacement.events, cannotPay: true };
