@@ -901,11 +901,12 @@ export function validateContinuationReferences(
       }
       if (
         frameKindOf(parent) !== "TRIGGER_DRAIN" ||
-        parent.pausedAction?.type !== "DEAL_DAMAGE"
+        (parent.pausedAction?.type !== "DEAL_DAMAGE" &&
+          parent.pausedAction?.type !== "SELF_TAKE_DAMAGE")
       ) {
         throw new SessionLoadError(
           location,
-          `${parentRef} names frame ${JSON.stringify(parentId)}, which is not an effect chain paused on DEAL_DAMAGE`
+          `${parentRef} names frame ${JSON.stringify(parentId)}, which is not an effect chain paused on DEAL_DAMAGE or SELF_TAKE_DAMAGE`
         );
       }
     }
