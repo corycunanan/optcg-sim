@@ -1324,7 +1324,10 @@ export function handleAwaitingCostSelection(
     }
     const selectedStage = state.players[controller].stage?.instanceId === selected[0];
     const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
-    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
+    // Rule 1-3-2-2: zero repetitions perform no removal. There is no target
+    // for a replacement scan or canonical replay; keep the closed reader grammar.
+    const zeroFieldPayment = nextState.schemaVersion === 7 && amount === 0 && selected.length === 0;
+    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !zeroFieldPayment && !topFrame.costReplacementChecked) {
       // Cost exits are still effect-caused removal events, but a replacement
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.

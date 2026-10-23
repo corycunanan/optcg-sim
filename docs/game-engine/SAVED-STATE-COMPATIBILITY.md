@@ -606,3 +606,13 @@ production capture, retirement, old-session repair or broader OPT1006 changes.
 OPT958 remains open: the accepted rollback policy and its labeled deviation
 fixture remain; the next review condition is a policy decision backed by an
 applicable authoritative multi-cost ruling, not this owner-lifecycle correction.
+
+### Native7 future cost producers (OPT-969 / OPT-997 amendment)
+
+Loading a native7 prompt also commits the reader to its future native7 producers: a later cost, branch, nested child, trigger, parent resume, new activation or restored undo must preserve meaningful donor choices. The original485 reader could accept the first DON identity reply then silently auto-pay a second DON cost and DRAW. Initial prompt parsing was insufficient compatibility evidence.
+
+The bounded amendment keeps ordinary creation/execution/writing at6. Only explicit7 cost orchestration uses identity plans for positive DON_MINUS/VARIABLE_DON_RETURN: execute a proven sole semantic plan through the real identity executor, otherwise emit the existing COST/PLAYER_CHOICE shape. Positive active/rested flags and exact state intersect; false flags are unrestricted, and state restrictions exclude attached donors. Numeric0 emits no positive-bound DON picker. Generic zero field payment skips removal scanning/capture rather than broadening the closed replay grammar. Setup, legacy promotion, writer constants, ordinary6 semantics and shared feasibility remain separate rollout work.
+
+The separately named `opt-969-native7-producers` corpus pins the isolated actual producer, a complete eight-file production patch from reachable485, source/generator/payload hashes,82 synthetic scenarios and every later pause. Mock-free public replay covers live/undo, suffix/branch/nested continuation and completion, including independent identity/power/events/terminal/rollback assertions. It is not a production capture or proof of authored multi-DON/zero prevalence. Historical corpora remain immutable. See [the source/acceptance handoff](../project/handoffs/opt969-native7-producers.md) for counts, negative controls and scope limits.
+
+After ordinary7 rollout, the verified amendment is the semantic rollback floor;485 is known unsafe for these future producers. Decision10 rollback remains an explicit known rules deviation. Deferred feasibility, forced-shuffle replacement, hand-TOP and authored DON-domain corrections are not resolved by this amendment.
