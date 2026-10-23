@@ -84,6 +84,15 @@ const Pregame = z.strictObject({
   effectFrameId: z.string(),
   controller: Seat,
 });
+const CostTransaction = z.strictObject({
+  players: PersistedGameStateV3.shape.players,
+  turn: Turn,
+  activeEffects: PersistedGameStateV3.shape.activeEffects,
+  prohibitions: PersistedGameStateV3.shape.prohibitions,
+  scheduledActions: z.array(Scheduled),
+  oneTimeModifiers: PersistedGameStateV3.shape.oneTimeModifiers,
+  triggerRegistry: PersistedGameStateV3.shape.triggerRegistry,
+});
 const Frame = StackFrameCore.omit({
   ruleTrashForPlay: true,
   eventActivationCompletion: true,
@@ -103,17 +112,8 @@ const Frame = StackFrameCore.omit({
     .strictObject({ triggers: z.array(Trigger), resolvedTriggerIds: Strings })
     .optional(),
   stateDistributionForPlay: Distribution.optional(),
-  costTransactionState: z
-    .strictObject({
-      players: PersistedGameStateV3.shape.players,
-      turn: Turn,
-      activeEffects: PersistedGameStateV3.shape.activeEffects,
-      prohibitions: PersistedGameStateV3.shape.prohibitions,
-      scheduledActions: z.array(Scheduled),
-      oneTimeModifiers: PersistedGameStateV3.shape.oneTimeModifiers,
-      triggerRegistry: PersistedGameStateV3.shape.triggerRegistry,
-    })
-    .optional(),
+  costTransactionState: CostTransaction.optional(),
+  costExpectedRoot: CostTransaction.optional(),
 });
 const State = PersistedGameStateV3.omit({
   pendingEventActivationEvents: true,
@@ -260,6 +260,11 @@ export function lowerVersion4(raw: Raw, fail: Fail): LoweredVersion4 {
       mapped.costTransactionState = {
         ...frame.costTransactionState,
         turn: lowerTurn(frame.costTransactionState.turn),
+      };
+    if (frame.costExpectedRoot)
+      mapped.costExpectedRoot = {
+        ...frame.costExpectedRoot,
+        turn: lowerTurn(frame.costExpectedRoot.turn),
       };
     const boundary = () => {
       const block = z

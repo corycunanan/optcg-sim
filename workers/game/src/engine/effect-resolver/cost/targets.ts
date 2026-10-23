@@ -267,6 +267,17 @@ export function computeCostTargets(
   switch (cost.type) {
     case "DON_MINUS":
     case "VARIABLE_DON_RETURN": {
+      if (state.schemaVersion === 7) {
+        const filter = cost.filter;
+        const restricted = filter?.is_active === true || filter?.is_rested === true || !!filter?.state;
+        return [
+          ...player.donCostArea.filter(don => !don.attachedTo &&
+            (filter?.is_active !== true || don.state === "ACTIVE") &&
+            (filter?.is_rested !== true || don.state === "RESTED") &&
+            (!filter?.state || don.state === filter.state)),
+          ...(!restricted ? [player.leader, ...player.characters.filter(isPresent)].flatMap(card => card.attachedDon) : []),
+        ].map(don => don.instanceId);
+      }
       const activeOnly = cost.filter?.is_active === true || cost.filter?.state === "ACTIVE";
       const costArea = player.donCostArea.filter(d => !d.attachedTo && (!activeOnly || d.state === "ACTIVE"));
       return [

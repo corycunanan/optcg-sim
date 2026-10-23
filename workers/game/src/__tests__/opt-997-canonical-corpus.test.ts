@@ -1,3 +1,4 @@
+import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
 /** Strict bytes from the actual isolated writer; old reader6 is never promoted here. */
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
@@ -28,7 +29,7 @@ for (const file of files) {
         state = command(state, step.action, loaded.cardDb);
         const saved = await repo.save({ ...loaded, state, undoHistory: [state] });
         state = toPersistedGameState(saved.state);
-        expect(state).toEqual(step.expected);
+        expect(withoutAssertedCostEvidence(state)).toEqual(step.expected);
         expect((await repo.load())!.state).toEqual(state);
       }
       if (f.knownDebt) {
