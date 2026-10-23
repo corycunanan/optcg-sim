@@ -503,6 +503,49 @@ Terminal state dominates every insertion/update/rollback. An ordinary legal
 Main action after cleanup, followed by a legal Block-Step PASS, is tested; bare
 Main-phase PASS is not a valid acceptance probe.
 
+### Native7 parked COST stage/action contract
+
+The replay parser classifies saved payment evidence before inspecting the action:
+current cost, `costArrangeStage`, offered `validTargets`, source ID and the saved
+`effectBlock` shuffle policy. It does not inspect a live board that a substitute
+may already have changed. Every unlisted combination is rejected at repository
+load (including every embedded/separate undo entry before retention) and again
+before an optional replacement answer can execute a substitute.
+
+| Saved family/stage | Domain and canonical replay |
+| --- | --- |
+| TRASH_SELF, PLACE_SELF_TO_DECK, TRASH_OWN_STAGE, PLACE_STAGE_TO_DECK; no arrange flag | Empty domain; only PLAYER_CHOICE `__PAY_FIXED_COST__` |
+| Generic field exit, including named hand-or-Stage and fixed/default Life destination; no arrange flag | Unique nonempty candidate IDs; SELECT_TARGET of exactly the printed positive count, all offered |
+| Opponent Life TOP_OR_BOTTOM; no arrange flag | Exactly TOP and BOTTOM choices bound to the same ordered positive-count unique IDs; exact offered PLAYER_CHOICE |
+| Either self+hand/trash compound; no arrange flag, block shuffles | Unique secondary candidate IDs excluding source, more candidates than printed count; SELECT_TARGET of exactly the printed count, allowing zero |
+| Either compound; arrange flag, block does not shuffle | Unique group of source plus printed count; ARRANGE_TOP_CARDS exact permutation, empty singular kept ID, absent plural kept IDs, printed TOP as top and otherwise bottom |
+
+Compound selection without shuffle is intermediate, and arrangement with shuffle
+is unreachable; neither can own a captured replacement replay. Compound hand is
+never a fixed-sentinel family, even for amount zero. The legacy
+`fixedCostExitTarget` helper keeps its old membership because ordinary6 uses it;
+only native replay uses the four-family fixed set. All five capture sites pass
+saved producer evidence to this same parser. No new persisted field is required.
+
+This checks stage/action compatibility and domain structure. It does not
+authenticate coordinated identity rewrites against the saved payment snapshot or
+the replacement offer target, nor prove that a named candidate is the Stage
+rather than an identically named hand card. The actual named Stage/hand control
+is retained. Snapshot/offer target and zone binding are outside this revision.
+Numeric-zero activation feasibility with empty candidates, forced-candidate
+shuffle payment bypassing replacement capture, and compound-hand TOP payment
+mechanics also remain separate issues. Accepted Decision10 rollback is unchanged.
+Ordinary producers remain version6; historical corpora are preserved, with no
+production repair, capture campaign or reader retirement implied.
+
+Native7 amount DON returns intersect positive `is_active`, positive `is_rested`
+and exact `state` selectors. False flags impose no restriction. State-restricted
+or explicit DON_IN_COST_AREA pools exclude attached donors; unfiltered field
+returns retain their attached domain. The executor supplies both identity choices
+and replacement feasibility, so insufficient restricted pools cannot admit a
+replacement by counting active or attached donors. The general target resolver's
+separate exact-state handling is outside this native7 correction.
+
 Native7 also generates subsequent RETURN_DON amount identity prompts through a
 shared grouped planner and real mutation executor. That semantic capability is
 needed when loading a still-unanswered offer whose substitute returns DON.

@@ -667,7 +667,7 @@ export function payCostsWithSelection(
     const fixedExitTarget = fixedCostExitTarget(nextState, cost, controller, sourceCardInstanceId);
     if (fixedExitTarget) {
       const replay = nextState.schemaVersion === 7 ? canonicalCostReplacementReplay({
-        costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId,
+        costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId, effectBlock,
       }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(

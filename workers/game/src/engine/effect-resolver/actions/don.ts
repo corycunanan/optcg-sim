@@ -691,8 +691,15 @@ export function executeReturnDonToDeck(
     const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
     const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? controller === 0 ? 1 : 0 : controller;
     const p = state.players[owner];
-    const activeOnly = action.target?.filter?.is_active === true || action.target?.filter?.state === "ACTIVE";
-    const pool = [...p.donCostArea.filter(d => !d.attachedTo && (!activeOnly || d.state === "ACTIVE")), ...(action.target?.type === "DON_IN_COST_AREA" || activeOnly ? [] : [p.leader, ...p.characters.filter(c => c !== null)].flatMap(c => c.attachedDon))];
+    const filter = action.target?.filter;
+    // Match the shared target-state contract: positive flags and exact state
+    // intersect; false flags add no restriction. State-restricted returns use
+    // unattached cost-area DON!!, as the active-only domain already did.
+    const stateRestricted = filter?.is_active === true || filter?.is_rested === true || !!filter?.state;
+    const pool = [...p.donCostArea.filter(d => !d.attachedTo
+      && (filter?.is_active !== true || d.state === "ACTIVE")
+      && (filter?.is_rested !== true || d.state === "RESTED")
+      && (!filter?.state || d.state === filter.state)), ...(action.target?.type === "DON_IN_COST_AREA" || stateRestricted ? [] : [p.leader, ...p.characters.filter(c => c !== null)].flatMap(c => c.attachedDon))];
     const count = Math.min(amount, pool.length);
     if (count <= 0) return { state, events, succeeded: false, fullyExecuted: false };
     const plan = buildDonIdentityPlans(state, owner, pool.map(d => d.instanceId), count, count, cardDb);
