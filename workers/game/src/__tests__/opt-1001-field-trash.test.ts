@@ -85,17 +85,70 @@ it("OPT-1001 reader ordinary8 production path remains byte-compatible until writ
   const r = setup(); r.state = { ...r.state, schemaVersion: 8 }; const { targets } = prepare(r);
   beckman(r, [targets[0].instanceId]); expect(r.state.pendingPrompt).toBeNull(); expect(r.state.schemaVersion).toBe(8);
 });
+function activateNoMatch(r: Rig) {
+  prepare(r, false, 0, 1);
+  event(r, { type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } } });
+  expect(r.state.schemaVersion).toBe(9); expect(r.state.pendingPrompt).toBeNull();
+}
+it("OPT-1001 native9 successor trash after stable save still offers Ganzui", async () => {
+  const r = setup(); activateNoMatch(r); await r.reload();
+  const target = r.put("OP17-043", 0, "CHARACTER", { data: { power: 5000 } });
+  const hand = Array.from({ length: 3 }, (_, i) => r.put(`OPT1001-GANZUI-HAND-${i}`, 0, "HAND"));
+  beckman(r, [target.instanceId]); expect(r.promptType()).toBe("OPTIONAL_EFFECT");
+  r.accept(); expect(r.promptType()).toBe("SELECT_TARGET"); await r.reload(); r.select(hand.slice(0, 2).map(card => card.instanceId));
+  expect(alive(r, target.instanceId)).toBe(true); expect(r.state.players[0].hand).toHaveLength(1); expect(r.state.pendingPrompt).toBeNull();
+});
+for (const accept of [false, true]) it(`OPT-1001 native9 downstream mode8 COST keeps Decision10 debt accept=${accept}`, async () => {
+  const r = setup(); activateNoMatch(r); await r.reload(); r.leader(0, "OP01-060");
+  const source = r.put("ST22-005", 0, "CHARACTER", { state: "RESTED" });
+  const target = r.put("OP17-043", 0, "CHARACTER");
+  for (let i = 0; i < 3; i++) r.put(`OPT1001-POLICY-HAND-${i}`, 0, "HAND");
+  r.state.players[0].donCostArea = Array.from({ length: 3 }, (_, i) => ({ instanceId: `policy9-don-${i}`, state: "ACTIVE", attachedTo: null }));
+  r.state.turn.activePlayerIndex = 0;
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate_set_active" });
+  r.accept(); await r.reload(); r.select([target.instanceId]); expect(r.promptType()).toBe("OPTIONAL_EFFECT"); await r.reload();
+  if (accept) { r.accept(); const prompt = r.state.pendingPrompt!.options; if (prompt.promptType !== "SELECT_TARGET") throw new Error("hand payment"); await r.reload(); r.select(prompt.validTargets.slice(0, 2)); } else r.decline();
+  expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toEqual([]);
+  // OPT-958 retained known deviation: accepted substitute restores prior DON
+  // and leaves use unconsumed; rule-literal8-3-1-3-1 retains prior paid DON.
+  expect(r.state.players[0].donCostArea.filter(card => card.state === "RESTED")).toHaveLength(accept ? 0 : 3);
+  expect(r.state.turn.oncePerTurnUsed.activate_set_active?.includes(source.instanceId) ?? false).toBe(!accept);
+  expect(r.state.schemaVersion).toBe(9); expect(r.state.costSemanticsVersion).toBe(8);
+});
+it("OPT-1001 native9 downstream battle completion retains protection through EOB prompt", async () => {
+  const r = setup(); activateNoMatch(r); await r.reload();
+  const attacker = r.put("ST08-013", 1, "CHARACTER", { data: { power: 4000 } });
+  attacker.attachedDon = [{ instanceId: "native9-attack-don", state: "ACTIVE", attachedTo: attacker.instanceId }]; attacker.turnPlayed = 0;
+  const target = r.put("OPT1001-BATTLE-TARGET", 0, "CHARACTER", { state: "RESTED", data: { power: 1000 } });
+  const hand = r.put("OPT1001-BATTLE-PAYMENT", 0, "HAND");
+  const counter = r.put("OP02-118", 0, "HAND", { data: { type: "Event", cost: 0, power: null, counter: null, effectText: "[Counter] Protect a Character." } });
+  r.state.turn.activePlayerIndex = 1;
+  r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId }, 1); r.act({ type: "PASS" }, 0);
+  r.act({ type: "USE_COUNTER_EVENT", cardInstanceId: counter.instanceId, counterTargetInstanceId: target.instanceId }, 0);
+  r.accept(); r.select([hand.instanceId]); r.select([target.instanceId]); r.act({ type: "PASS" }, 0);
+  expect(r.state.effectStack.some(frame => frame.battleCompletion)).toBe(true); expect(r.state.prohibitions).toHaveLength(1); await r.reload(); r.accept();
+  expect(alive(r, target.instanceId)).toBe(true); expect(r.state.prohibitions).toHaveLength(0); expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toEqual([]);
+  expect(r.state.eventLog.filter(event => event.type === "BATTLE_RESOLVED")).toHaveLength(1); expect(r.state.schemaVersion).toBe(9);
+});
 afterEach(async () => {
   const folder = process.env.OPT1001_WRITE_CORPUS;
   for (const capture of captures.splice(0)) {
     if (!folder || !capture.starts.some(state => state.schemaVersion === 9)) continue;
-    const cases = [];
-    for (const [index, state] of capture.starts.entries()) {
+    const cases: { stored: Record<string, unknown>; replies: GameAction[] }[] = [];
+    const canonicalReplies: GameAction[] = [];
+    let authoritative = structuredClone(capture.starts[0]);
+    for (const [index, reply] of capture.replies.entries()) {
       const storage = new MemorySessionStorage(); const repo = new SessionRepository(storage, { nextJsUrl: "https://x.test", workerSecret: "s" });
-      await repo.save({ state, cardDb: capture.r.db, undoHistory: capture.history[index], mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null });
-      cases.push({ stored: Object.fromEntries(storage.data), replies: capture.replies.slice(index) });
+      await repo.save({ state: authoritative, cardDb: capture.r.db, undoHistory: capture.history[index], mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null });
+      const loaded = (await repo.load())!;
+      cases.push({ stored: Object.fromEntries(storage.data), replies: [] });
+      const canonicalReply = { ...reply, promptId: loaded.state.pendingPrompt!.promptId } as GameAction;
+      canonicalReplies.push(canonicalReply);
+      const resumed = resumePromptLifecycle(loaded.state, canonicalReply, loaded.cardDb, { drainPregame: state => state, advanceStartOfTurn: state => state });
+      expect(resumed.responseRejected).toBe(false); authoritative = resumed.state;
     }
+    cases.forEach((entry, index) => { entry.replies = canonicalReplies.slice(index); });
     mkdirSync(folder, { recursive: true }); const name = expect.getState().currentTestName!.replace(/[^a-zA-Z0-9]+/g, "-");
-    writeFileSync(`${folder}/${name}.json`, JSON.stringify({ producer: process.env.OPT1001_PRODUCER_SHA, cases, expected: toPersistedGameState(capture.r.state) }, null, 2) + "\n");
+    writeFileSync(`${folder}/${name}.json`, JSON.stringify({ producer: process.env.OPT1001_PRODUCER_SHA, cases, expected: toPersistedGameState(authoritative) }, null, 2) + "\n");
   }
 });
