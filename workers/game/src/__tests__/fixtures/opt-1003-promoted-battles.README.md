@@ -1,0 +1,25 @@
+# OPT-1003 current writer evidence
+
+These are synthetic sessions, not production captures. The user approved a scoped synthetic-only exception for this run.
+
+`opt-1003-writer-golden.synthetic.json` is the separately named 16-case current writer golden, captured at `6469e36650583fe745c7be2e283d10c2d9206c45` with explicit `GOLDEN_OUTPUT`. Compared with the frozen OPT-968 golden, only each game-state object's schema 8 envelope and cost mode 6 provenance differ; card DB and gameplay bytes remain exact. Every historical v1–v8 reader/prototype input and output remains frozen.
+
+The promoted battle corpus was produced by `7ba54dfd70f06b59939fcc7e6def0c946f3a0130`, including `workers/game/scripts/capture-opt1003-promoted-battles.ts`. Its manifest pins the source closure with 213 SHA-256 hashes, the unchanged frozen OPT-966 input gzip, and the output gzip. Reconstruct the source at that commit and install its frozen lockfile independently. Run from `workers/game`:
+
+```sh
+node --import tsx scripts/capture-opt1003-promoted-battles.ts
+```
+
+Manifest-derived totals are four families, 13 starting traces and 30 transitions. Each trace replays through live, separate undo and embedded undo, plus a manifest check: 40 tests. Every response passes through the real coordinator and prompt lifecycle. Each actual save-returned runtime feeds its successor, including real prompt-ID allocation. A second real save establishes an equivalent undo snapshot from that returned state before capturing a boundary. This symmetric corpus does not claim the pre-allocation undo snapshot is identical: `opt-1003-writer-activation.test.ts` separately proves that legitimate snapshot resumes with its original one-ID difference.
+
+There are no prompt-ID overrides or identity/event normalization. Tests compare every emitted state and storage object exactly, and independently assert mode preservation, root ownership, no early completion report, original gameplay card counts/identities, terminal cancellation, and allocator arithmetic. The only additional IDs versus each frozen original final counter are the one new completion owner (if that battle had not already ended) and genuinely new prompt IDs counted at actual save ingress. Terminal children suppress the two completion reports and four remaining clock ticks. Already-started legacy EOB pauses retain their committed historical event log and gain no completion owner.
+
+The original four OPT-966 final battle traces still exercise the historical low-level parser/serializer and legacy engine path against their unchanged exact expected outputs. The new corpus adds production activation/continuation coverage rather than replacing historical compatibility coverage. Other final-corpus families continue through the production repository with explicit expected schema 8 metadata.
+
+An isolated checkout of deployed reader `864bee2b9282004aa46476462447a0aa57b28686`, with its own frozen dependencies, reads every emitted boundary and produces the same exact continuation outputs. To repeat that focused compatibility check:
+
+```sh
+OPT1003_READER_ROOT=/absolute/path/to/deployed-reader-checkout pnpm --filter optcg-game exec vitest run src/__tests__/opt-1003-promoted-battle-replay.test.ts
+```
+
+This corpus covers legacy cost mode 6 promotion. Existing immutable native schema 8 replay and native cost mode 7 corpora supply mode 7 cost/replacement/expected-root coverage. Valid power-threshold and base-power controls in `opt-1003-power-visibility.test.ts` cover both modes. Frozen OPT-1007 power-condition cases remain ownership/replay evidence only because their original generator used an invalid array condition; the new positive/negative controls provide threshold evidence without modifying those old inputs.

@@ -197,3 +197,59 @@ it.each(["live", "undo"])(
     expect([...storage.data]).toEqual(before);
   }
 );
+
+it("resumes a real save-time undo snapshot from before live prompt-ID allocation", async () => {
+  const { synSchema } = await import("./opt-962-rig.js");
+  const r = endPhaseRig();
+  r.putSyn(
+    "PREALLOCATION-UNDO-1003",
+    synSchema("PREALLOCATION-UNDO-1003", "Character", [
+      {
+        id: "end-draw",
+        category: "auto",
+        trigger: { keyword: "END_OF_YOUR_TURN" },
+        flags: { optional: true },
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      },
+    ]),
+    0,
+    "CHARACTER"
+  );
+  r.act({ type: "ADVANCE_PHASE" });
+  expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+  expect(r.state.pendingPrompt?.promptId).toBeUndefined();
+  const storage = new MemorySessionStorage();
+  await new SessionRepository(storage, config).save({
+    state: r.state,
+    cardDb: r.db,
+    mode: "PVP",
+    pregameMode: "PRIORITY_ROLL",
+    testPriorityRolls: null,
+    undoHistory: [r.state],
+  });
+  const loaded = (await new SessionRepository(storage, config).load())!;
+  expect(loaded.state.pendingPrompt?.promptId).toMatch(/^prompt_/);
+  expect(loaded.undoHistory[0].pendingPrompt?.promptId).toBeUndefined();
+  expect(loaded.state.executionContext!.idCounter).toBe(
+    loaded.undoHistory[0].executionContext!.idCounter + 1
+  );
+  const outcomes: GameState[] = [];
+  for (const state of [loaded.state, loaded.undoHistory[0]]) {
+    r.state = state;
+    r.act({ type: "PLAYER_CHOICE", choiceId: "skip" });
+    expect(r.state).toMatchObject({
+      schemaVersion: 8,
+      costSemanticsVersion: 6,
+      pendingPrompt: null,
+      effectStack: [],
+    });
+    outcomes.push(r.state);
+  }
+  expect(outcomes[1]).toEqual({
+    ...outcomes[0],
+    executionContext: {
+      ...outcomes[0].executionContext!,
+      idCounter: outcomes[0].executionContext!.idCounter - 1,
+    },
+  });
+});
