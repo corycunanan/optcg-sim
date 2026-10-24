@@ -218,7 +218,6 @@ exports[`extractCardFacets > snapshots every distinct authored tag and rejects u
   "don:rest",
   "don:rest:opponent",
   "don:rest:self",
-  "don:return",
   "don:return:opponent",
   "don:return:self",
   "don:untap",

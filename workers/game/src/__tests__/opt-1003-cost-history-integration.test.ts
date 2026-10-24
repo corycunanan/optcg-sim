@@ -31,8 +31,9 @@ async function scenario(
   const writer = await runtime();
   const boundaries: string[] = [];
   const r = endPhaseRig();
-  expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
-  if (mode === 6) r.state = { ...r.state, costSemanticsVersion: 6 }; // Explicit already8 legacy control.
+  // Explicit recorded6/7 controls, selected before any action/save.
+  r.state.costSemanticsVersion = mode;
+  expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: mode });
   const condition = {
     type: "ACTION_PERFORMED_THIS_TURN",
     controller: "SELF",
@@ -240,7 +241,7 @@ async function scenario(
   return { state: r.state, boundaries };
 }
 for (const mode of [6, 7] as const) for (const context of ["live", "undo", "embedded"] as const)
-  it(`new8/mode7 or preserved8/mode${mode} Counter survives EOB cost via ${context}`, async () => {
+  it(`recorded8/mode${mode} Counter survives EOB cost via ${context}`, async () => {
     const writer = await runtime();
     const expected = await scenario("live", writer, mode);
     const reader = await runtime(process.env.OPT1003_HISTORY_READER_ROOT);

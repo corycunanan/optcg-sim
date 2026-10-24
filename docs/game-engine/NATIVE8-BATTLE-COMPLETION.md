@@ -104,3 +104,7 @@ Earlier failed writer reviews/design stops and subsequent968full/delta CLEAN are
 cumulative. This newly approved composition has one full and one delta per same
 SPEC/correctness reviewer; coordinator owns final review, full verification,
 exact-head CI, merge and deployment.
+
+## New-game cost mode8 writer (OPT-969)
+
+The mode8 writer changes new setup to schema8/mode8 after reader PR786 was verified deployed at `e14af35bad3a7189a40294f5d4ab3db5b5602f0e`. Historical source promotion remains7 and recorded modes6/7/8 retain their mode and saved definitions. That exact e14 reader is the minimum rollback floor for mode8; the c50 receipt above remains a historical mode7 delivery receipt. See [mode8 cost semantics](MODE8-COST-SEMANTICS.md) for the shared runtime, new authored definitions, source-equivalent forward corpus and OPT-958 debt.

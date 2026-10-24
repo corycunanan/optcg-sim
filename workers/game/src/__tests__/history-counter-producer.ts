@@ -10,7 +10,7 @@ import { runtime, save } from "./native7-producer-support.js";
 export async function generateCounter(
   root?: string,
   version?: 7 | 8,
-  mode: 6 | 7 = 7
+  mode: 6 | 7 | 8 = 7
 ) {
   if (root)
     expect(
@@ -33,7 +33,7 @@ export async function generateCounter(
   } else {
     // Combined writer proof begins from real setup, before any first action.
     expect(state.schemaVersion).toBe(8);
-    expect(state.costSemanticsVersion).toBe(7);
+    expect(state.costSemanticsVersion).toBe(8);
   }
   state.players[1].hand = [
     {

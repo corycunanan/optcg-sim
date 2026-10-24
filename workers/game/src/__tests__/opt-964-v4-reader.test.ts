@@ -245,7 +245,7 @@ describe("OPT-964 actual pipeline debt survives native persistence", () => {
             JSON.stringify({
               ...state,
               schemaVersion: 8,
-              costSemanticsVersion: 7,
+              costSemanticsVersion: state.costSemanticsVersion ?? 7,
               effectStack: state.effectStack.map((f) => ({
                 ...f,
                 kind: frameKindOf(f),
@@ -258,7 +258,7 @@ describe("OPT-964 actual pipeline debt survives native persistence", () => {
           "state"
         );
         const resolved = reply(reloaded, db, action);
-        expect(resolved).toEqual({ ...expected, schemaVersion: 8, costSemanticsVersion: 7 });
+        expect(resolved).toEqual({ ...expected, schemaVersion: 8, costSemanticsVersion: expected.costSemanticsVersion ?? 7 });
         expect(resolved.effectStack).toHaveLength(0);
         expect(resolved.pendingEventActivationEvents ?? []).toHaveLength(0);
         expect(

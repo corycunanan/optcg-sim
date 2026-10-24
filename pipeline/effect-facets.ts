@@ -183,6 +183,11 @@ function visitDonAction(action: Action, tags: Set<EffectFacetTag>): void {
       qualifier = "opponent";
       break;
     case "RETURN_DON_TO_DECK":
+      value = "return";
+      // The executor returns the acting player's DON unless the action
+      // explicitly targets OPPONENT. Field scope does not need a target node.
+      qualifier ??= "self";
+      break;
     case "RETURN_ATTACHED_DON_TO_COST":
       value = "return";
       break;

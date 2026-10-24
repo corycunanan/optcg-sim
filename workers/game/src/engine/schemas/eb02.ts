@@ -2327,7 +2327,7 @@ export const EB02_061_MONKEY_D_LUFFY: EffectSchema = {
       id: "when_attacking_untap_life",
       category: "auto",
       trigger: { keyword: "WHEN_ATTACKING" },
-      costs: [{ type: "DON_MINUS", amount: 2 }],
+      costs: [{ type: "DON_MINUS", amount: 2, filter: { is_active: true } }],
       flags: { optional: true, once_per_turn: true },
       actions: [
         {

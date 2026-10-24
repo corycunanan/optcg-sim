@@ -47,7 +47,7 @@ it("actual f19 Counter publication survives repository, Coordinator and two repl
 
 async function completeCounter(
   stored: Record<string, unknown>,
-  mode: 6 | 7 = 7,
+  mode: 6 | 7 | 8 = 7,
   context = "live"
 ) {
   const reader = await runtime(process.env.OPT969_HISTORY_READER_ROOT);
@@ -99,7 +99,7 @@ async function completeCounter(
   )!.instanceId;
   const originalDeck = first.state.players[1].donDeck.length;
   const next =
-    mode === 7
+    mode !== 6
       ? command(reader, first.state, first.cardDb, {
           type: "PLAYER_CHOICE",
           choiceId: `don-return-ids:${JSON.stringify([donId])}`,
@@ -136,9 +136,9 @@ async function completeCounter(
     1
   );
   expect(done.players[1].donDeck).toHaveLength(
-    originalDeck + (mode === 7 ? 1 : 0)
+    originalDeck + (mode !== 6 ? 1 : 0)
   );
-  if (mode === 7)
+  if (mode !== 6)
     expect(
       done.players[1].donDeck.filter((d) => d.instanceId === donId)
     ).toHaveLength(1);
@@ -188,13 +188,13 @@ it("Counter staged-entry history repair never blesses stale live history or reso
   }
 });
 
-it("ordinary setup and direct Repository writes own version7", async () => {
+it("ordinary setup and direct Repository writes own mode8", async () => {
   const rt = await runtime();
   const db = createTestCardDb();
   const state = createBattleReadyState(db);
-  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
   const loaded = (await memory(rt, await save(rt, state, db)).repo.load())!;
-  expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+  expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
 });
 
 for (const context of [
@@ -222,9 +222,9 @@ for (const [version, mode] of [
 }
 
 for (const context of ["live", "undo-first", "undo-later", "embedded-first", "embedded-later"]) {
-  it(`FINAL ordinary7 writer Counter preserves original activation/query/IDs on deployed reader from ${context}`, async () => {
+  it(`ordinary mode8 writer Counter preserves original activation/query/IDs on deployed reader from ${context}`, async () => {
     const state = createBattleReadyState(createTestCardDb());
-    expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
-    await completeCounter(await generateCounter(), 7, context);
+    expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    await completeCounter(await generateCounter(), 8, context);
   });
 }

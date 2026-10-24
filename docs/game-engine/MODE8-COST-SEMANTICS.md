@@ -1,6 +1,6 @@
-# Mode8 cost capability reader (OPT-969)
+# Mode8 cost semantics (OPT-969)
 
-Schema8 now reads explicit `costSemanticsVersion: 6 | 7 | 8`. This reader still creates new games in mode7. Historical promotion remains mode7; explicit6/7/8 live and every undo source retain their recorded mode. The future new-game mode8 writer is a separate rollout after this reader is verified deployed. No active-session migration, production capture, repair or reader retirement is included.
+Schema8 reads explicit `costSemanticsVersion: 6 | 7 | 8`. New games now start in mode8 before their first action or save. Historical promotion remains mode7; explicit6/7/8 live and every undo source retain their recorded mode. The prerequisite reader PR786 was deployed and verified at `e14af35bad3a7189a40294f5d4ab3db5b5602f0e` before this writer enablement. No active-session migration, production capture, repair or reader retirement is included.
 
 Mode8 is a game-wide capability: availability, validation, optional offers, Life Trigger gates, nonoptional effects, all COST resumes, fresh downstream triggers and later turns use the same structural printed-order search. Modes6/7 keep their delivered behavior. `hasNativeCostSemantics` recognizes7/8 for existing transaction/identity ownership; `hasStructuralCostSemantics` recognizes only8. There is no continuation ancestry flag, owner rewrite or parallel scheduler.
 
@@ -8,7 +8,7 @@ Mode8 is a game-wide capability: availability, validation, optional offers, Life
 | --- | --- |
 | Types / persisted validator / declared-version converter | Mode8 requires schema8; missing/unknown modes reject. Old envelopes cannot carry the field. |
 | Repository save/load and typed Coordinator | Prove live and all undo sources before retention, prompt-ID allocation, history/storage/metrics changes. No8→7 downgrade. |
-| Existing source promotions and setup | Historical sources still prove native7 conversion; already8 preserves mode. Ordinary reader setup remains8/7. |
+| Existing source promotions and setup | Historical sources still prove native7 conversion; already8 preserves mode. New writer setup is8/8. |
 | Search / real payment | One search, private immutable branches, shared payment/transition executors; errors remain distinct from infeasibility. |
 | Runtime replacement / drain | Existing shared scanner and execution-backed substitute probe, COST ownership/publication and terminal dominance unchanged. |
 | Saved card definitions | Repository parses saved cardDb plus the existing unrelated legacy migration, without bundled-schema rehydration. Saved blocks/active replacement parameters remain authoritative. |
@@ -31,4 +31,12 @@ Every first/later prompt resumes through actual Repository/Coordinator/prompt li
 
 OPT-958 / Decision10 remains known debt: authored Oden/Ganzui accepted substitution retains the substitute but restores3 prior DON and leaves use available for retry. Decline pays as printed. Rule-literal resource behavior retains paid DON; applying10-2-13-5 use consumption to replaced cost remains an assumed reading without an exact multicost ruling. Passing compatibility tests do not establish conformance or close958. Revisit on an applicable ruling or expanded authored reachability. Terminal processing must never be rolled back.
 
-c50/2ca intentionally reject mode8. They are unsafe rollback targets once mode8 games exist; never rewrite mode8 as7 to make them load. The exact verified deployed mode8 reader becomes the minimum future writer rollback floor. This document does not claim deployment, authorize writer enablement or close969/921/948/958 or the project.
+c50/2ca intentionally reject mode8. They are unsafe rollback targets once mode8 games exist; never rewrite mode8 as7 to make them load. The minimum rollback floor is verified deployed reader `e14af35bad3a7189a40294f5d4ab3db5b5602f0e` (deployment40139694972, post-CI40139694988, game-worker version `da55818d-565e-4743-890b-1c5af7c699bf`). This records the prerequisite deployment, not deployment of this writer or closure of969/921/948/958 or the project.
+
+## New-game writer enablement
+
+The writer changes only setup to mode8, EB02-061 to require two active DON, and OP12-070/OP15-069 to permit their printed field return domain, plus the generated registry. OP16-060 active8 and OP15-059 opponent active-only remain restricted. These bundled definitions enter new setup; recorded sessions retain their stored cardDb, including old6/7 definitions. Ordinary derived-schema dev/prod synchronization accompanies the normal game-worker deployment; no production data repair is part of this change.
+
+The production runtime is byte-identical to isolated producerd9a924, so its immutable33-family corpus is carried with an explicit source-equivalence proof. It replays on both the actual writer and fixed e14 floor, preserving complete saved states at all63 pauses in four live/undo contexts. Fresh default8 setup/public activation and DON→fresh Life watcher tests also run before any mode override. Same-build CI boundary tests are distinct from explicitly enabled cross-build runs.
+
+`fixtures/opt-969-writer-history` preserves nine hashed synthetic input/output/definition payloads captured with actual e14 runtime: untouched default7 setup output, explicitly seeded stable recorded6/7 sessions, embedded/separate cardDb forms and the old authored definitions. The exact generator and source/lock pins are retained. These are synthetic fixtures, not production captures or an actual new-default6 game. Historical golden builders explicitly select7 before their first action; recorded corpora and their expected outputs remain byte-identical. Legacy load/save/resume and a later fresh effect retain their mode and definitions after new bundles change.

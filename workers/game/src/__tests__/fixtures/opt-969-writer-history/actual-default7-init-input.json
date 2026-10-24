@@ -1,0 +1,859 @@
+{
+  "gameId": "opt969-reader-floor-historical-definitions",
+  "player1": {
+    "userId": "user-p1",
+    "leader": {
+      "cardId": "LEADER-T",
+      "quantity": 1,
+      "cardData": {
+        "id": "LEADER-T",
+        "name": "LEADER-T",
+        "type": "Leader",
+        "color": [
+          "Red"
+        ],
+        "cost": null,
+        "power": 5000,
+        "counter": null,
+        "life": 5,
+        "attribute": [],
+        "types": [],
+        "effectText": "",
+        "triggerText": null,
+        "keywords": {
+          "rush": false,
+          "rushCharacter": false,
+          "doubleAttack": false,
+          "banish": false,
+          "blocker": false,
+          "trigger": false,
+          "unblockable": false
+        },
+        "effectSchema": null,
+        "imageUrl": null
+      }
+    },
+    "deck": [
+      {
+        "cardId": "CHAR-VANILLA",
+        "quantity": 16,
+        "cardData": {
+          "id": "CHAR-VANILLA",
+          "name": "CHAR-VANILLA",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 3,
+          "power": 4000,
+          "counter": 1000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-RUSH",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-RUSH",
+          "name": "CHAR-RUSH",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": 3000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Rush]",
+          "triggerText": null,
+          "keywords": {
+            "rush": true,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-DATK",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-DATK",
+          "name": "CHAR-DATK",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 4,
+          "power": 5000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Double Attack]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": true,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-BLOCKER",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-BLOCKER",
+          "name": "CHAR-BLOCKER",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 3,
+          "power": 4000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Blocker]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": true,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-BANISH",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-BANISH",
+          "name": "CHAR-BANISH",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": 3000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Banish]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": true,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-TRIGGER",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-TRIGGER",
+          "name": "CHAR-TRIGGER",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 1,
+          "power": 2000,
+          "counter": 1000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": "[Trigger] Play this card.",
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": true,
+            "unblockable": false
+          },
+          "effectSchema": {
+            "effects": [
+              {
+                "id": "test_trigger",
+                "category": "auto",
+                "trigger": {
+                  "keyword": "TRIGGER"
+                },
+                "actions": [
+                  {
+                    "type": "DRAW",
+                    "params": {
+                      "amount": 0
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-UNBLK",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-UNBLK",
+          "name": "CHAR-UNBLK",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 4,
+          "power": 5000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Unblockable]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": true
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-COUNTER",
+        "quantity": 6,
+        "cardData": {
+          "id": "CHAR-COUNTER",
+          "name": "CHAR-COUNTER",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": 3000,
+          "counter": 2000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "EVENT-CTR",
+        "quantity": 2,
+        "cardData": {
+          "id": "EVENT-CTR",
+          "name": "EVENT-CTR",
+          "type": "Event",
+          "color": [
+            "Red"
+          ],
+          "cost": 1,
+          "power": null,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "STAGE-T",
+        "quantity": 2,
+        "cardData": {
+          "id": "STAGE-T",
+          "name": "STAGE-T",
+          "type": "Stage",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": null,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "EB02-061",
+        "quantity": 1,
+        "cardData": {
+          "id": "EB02-061",
+          "name": "EB02-061",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 3,
+          "power": 4000,
+          "counter": 1000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "OP12-070",
+        "quantity": 1,
+        "cardData": {
+          "id": "OP12-070",
+          "name": "OP12-070",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 3,
+          "power": 4000,
+          "counter": 1000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "OP15-069",
+        "quantity": 1,
+        "cardData": {
+          "id": "OP15-069",
+          "name": "OP15-069",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 3,
+          "power": 4000,
+          "counter": 1000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      }
+    ],
+    "testOrder": {
+      "life": [
+        "CHAR-VANILLA",
+        "CHAR-VANILLA",
+        "CHAR-VANILLA",
+        "CHAR-VANILLA",
+        "CHAR-VANILLA"
+      ],
+      "hand": [
+        "CHAR-VANILLA",
+        "CHAR-RUSH",
+        "CHAR-DATK",
+        "CHAR-BLOCKER",
+        "CHAR-COUNTER"
+      ]
+    }
+  },
+  "player2": {
+    "userId": "user-p2",
+    "leader": {
+      "cardId": "LEADER-T",
+      "quantity": 1,
+      "cardData": {
+        "id": "LEADER-T",
+        "name": "LEADER-T",
+        "type": "Leader",
+        "color": [
+          "Red"
+        ],
+        "cost": null,
+        "power": 5000,
+        "counter": null,
+        "life": 5,
+        "attribute": [],
+        "types": [],
+        "effectText": "",
+        "triggerText": null,
+        "keywords": {
+          "rush": false,
+          "rushCharacter": false,
+          "doubleAttack": false,
+          "banish": false,
+          "blocker": false,
+          "trigger": false,
+          "unblockable": false
+        },
+        "effectSchema": null,
+        "imageUrl": null
+      }
+    },
+    "deck": [
+      {
+        "cardId": "CHAR-VANILLA",
+        "quantity": 16,
+        "cardData": {
+          "id": "CHAR-VANILLA",
+          "name": "CHAR-VANILLA",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 3,
+          "power": 4000,
+          "counter": 1000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-RUSH",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-RUSH",
+          "name": "CHAR-RUSH",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": 3000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Rush]",
+          "triggerText": null,
+          "keywords": {
+            "rush": true,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-DATK",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-DATK",
+          "name": "CHAR-DATK",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 4,
+          "power": 5000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Double Attack]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": true,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-BLOCKER",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-BLOCKER",
+          "name": "CHAR-BLOCKER",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 3,
+          "power": 4000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Blocker]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": true,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-BANISH",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-BANISH",
+          "name": "CHAR-BANISH",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": 3000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Banish]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": true,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-TRIGGER",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-TRIGGER",
+          "name": "CHAR-TRIGGER",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 1,
+          "power": 2000,
+          "counter": 1000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": "[Trigger] Play this card.",
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": true,
+            "unblockable": false
+          },
+          "effectSchema": {
+            "effects": [
+              {
+                "id": "test_trigger",
+                "category": "auto",
+                "trigger": {
+                  "keyword": "TRIGGER"
+                },
+                "actions": [
+                  {
+                    "type": "DRAW",
+                    "params": {
+                      "amount": 0
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-UNBLK",
+        "quantity": 4,
+        "cardData": {
+          "id": "CHAR-UNBLK",
+          "name": "CHAR-UNBLK",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 4,
+          "power": 5000,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "[Unblockable]",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": true
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "CHAR-COUNTER",
+        "quantity": 6,
+        "cardData": {
+          "id": "CHAR-COUNTER",
+          "name": "CHAR-COUNTER",
+          "type": "Character",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": 3000,
+          "counter": 2000,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "EVENT-CTR",
+        "quantity": 2,
+        "cardData": {
+          "id": "EVENT-CTR",
+          "name": "EVENT-CTR",
+          "type": "Event",
+          "color": [
+            "Red"
+          ],
+          "cost": 1,
+          "power": null,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      },
+      {
+        "cardId": "STAGE-T",
+        "quantity": 2,
+        "cardData": {
+          "id": "STAGE-T",
+          "name": "STAGE-T",
+          "type": "Stage",
+          "color": [
+            "Red"
+          ],
+          "cost": 2,
+          "power": null,
+          "counter": null,
+          "life": null,
+          "attribute": [],
+          "types": [],
+          "effectText": "",
+          "triggerText": null,
+          "keywords": {
+            "rush": false,
+            "rushCharacter": false,
+            "doubleAttack": false,
+            "banish": false,
+            "blocker": false,
+            "trigger": false,
+            "unblockable": false
+          },
+          "effectSchema": null,
+          "imageUrl": null
+        }
+      }
+    ],
+    "testOrder": {
+      "life": [
+        "CHAR-VANILLA",
+        "CHAR-VANILLA",
+        "CHAR-VANILLA",
+        "CHAR-VANILLA",
+        "CHAR-VANILLA"
+      ],
+      "hand": [
+        "CHAR-VANILLA",
+        "CHAR-RUSH",
+        "CHAR-DATK",
+        "CHAR-BLOCKER",
+        "CHAR-COUNTER"
+      ]
+    }
+  },
+  "format": "standard",
+  "mode": "PVP",
+  "pregameMode": "PRIORITY_ROLL"
+}

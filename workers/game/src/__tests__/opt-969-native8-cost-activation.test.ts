@@ -59,11 +59,11 @@ for (const boundary of ["load", "save", "Coordinator"] as const) it(`unprovable 
 });
 it("mixed6/7/8 modes and discarded invalid undo validate before prompt allocation, metrics and typed action", async () => {
   const { state, cardDb } = setupGame();
-  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
   const six = { ...state, schemaVersion: 6 as const }; delete six.costSemanticsVersion;
   const seven = { ...six, schemaVersion: 7 as const };
   const oldEight = { ...state, costSemanticsVersion: 6 as const };
-  expect([six, seven, oldEight, state].map((source, i) => promoteGameStateForWriter(source, `undoHistory[${i}]`).costSemanticsVersion)).toEqual([7, 7, 6, 7]);
+  expect([six, seven, oldEight, state].map((source, i) => promoteGameStateForWriter(source, `undoHistory[${i}]`).costSemanticsVersion)).toEqual([7, 7, 6, 8]);
   const bad = { ...state }; delete bad.costSemanticsVersion;
   const undo = [six, seven, oldEight, bad]; const before = structuredClone({ state, undo });
   const m = memoryRepository({ sentinel: true });

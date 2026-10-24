@@ -68,7 +68,7 @@
 
 **Give.** `GIVE_DON`, `DISTRIBUTE_DON`, `REDISTRIBUTE_DON`, and `GIVE_OPPONENT_DON_TO_OPPONENT` produce `don:give`, `don:give:self`, or `don:give:opponent`.
 
-**Return.** `RETURN_DON_TO_DECK`, `FORCE_OPPONENT_DON_RETURN`, and `RETURN_ATTACHED_DON_TO_COST` produce `don:return`, `don:return:self`, or `don:return:opponent`.
+**Return.** `RETURN_DON_TO_DECK`, `FORCE_OPPONENT_DON_RETURN`, and `RETURN_ATTACHED_DON_TO_COST` produce `don:return`, `don:return:self`, or `don:return:opponent`. `RETURN_DON_TO_DECK` defaults to self when no controller qualifier is given, matching its executor; an explicit opponent target remains opponent. Omitting a target to allow field DON does not remove the self facet (OP12-070/OP15-069).
 
 **Rest.** `REST_DON` and `REST_OPPONENT_DON` produce `don:rest`, `don:rest:self`, or `don:rest:opponent`.
 
