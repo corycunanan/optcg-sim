@@ -126,7 +126,11 @@ it("OPT-1001 native9 downstream battle completion retains protection through EOB
   r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId }, 1); r.act({ type: "PASS" }, 0);
   r.act({ type: "USE_COUNTER_EVENT", cardInstanceId: counter.instanceId, counterTargetInstanceId: target.instanceId }, 0);
   r.accept(); r.select([hand.instanceId]); r.select([target.instanceId]); r.act({ type: "PASS" }, 0);
-  expect(r.state.effectStack.some(frame => frame.battleCompletion)).toBe(true); expect(r.state.prohibitions).toHaveLength(1); await r.reload(); r.accept();
+  expect(r.state.effectStack.some(frame => frame.battleCompletion)).toBe(true); expect(r.state.prohibitions).toHaveLength(1); await r.reload();
+  // This family captures the actual downstream EOB owner; earlier Counter
+  // setup/commands are exercised above and are not a contiguous reply suffix.
+  const capture = captures.find(entry => entry.r === r)!; capture.starts.length = 0; capture.replies.length = 0; capture.history.length = 0;
+  r.accept();
   expect(alive(r, target.instanceId)).toBe(true); expect(r.state.prohibitions).toHaveLength(0); expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toEqual([]);
   expect(r.state.eventLog.filter(event => event.type === "BATTLE_RESOLVED")).toHaveLength(1); expect(r.state.schemaVersion).toBe(9);
 });

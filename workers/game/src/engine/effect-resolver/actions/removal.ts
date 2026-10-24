@@ -392,10 +392,10 @@ export function executeTrashCard(
     const attemptableIds = filterProhibitedTargets(state, targetIds, "TRASH", "EFFECT", causingController, sourceCardInstanceId, cardDb);
     const batch = processBatchReplacements(state, attemptableIds, "TRASH_CARD", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", causingController, cardDb, services, undefined, causingSource);
     if (batch.pendingPrompt) return { state: batch.state, events: batch.events, succeeded: false, pendingPrompt: batch.pendingPrompt };
-    const trash = finalizeTrashCards(batch.state, batch.unprotectedIds, causingController, cardDb, causingSource, resultRefs);
+    const trash = finalizeTrashCards(batch.state, batch.unprotectedIds, causingController, cardDb, causingSource, resultRefs, sourceCardInstanceId);
     return { ...trash, events: [...batch.events, ...trash.events] };
   }
-  return finalizeTrashCards(state, targetIds, causingController, cardDb, causingSource, resultRefs);
+  return finalizeTrashCards(state, targetIds, causingController, cardDb, causingSource, resultRefs, sourceCardInstanceId);
 }
 
 /** Existing trash movement/event contract, shared by initial and resumed batches. */
@@ -406,9 +406,10 @@ export function finalizeTrashCards(
   cardDb: Map<string, CardData>,
   causingSource?: EffectSourceIdentity,
   resultRefs?: Map<string, EffectResult>,
+  originalSourceCardInstanceId?: string,
 ): ActionResult {
   const events: PendingEvent[] = [];
-  const sourceCardInstanceId = causingSource?.instanceId ?? "";
+  const sourceCardInstanceId = causingSource?.instanceId ?? originalSourceCardInstanceId ?? "";
   const controller = causingController;
   let nextState = state;
   const trashedIds: string[] = [];
