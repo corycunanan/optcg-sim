@@ -68,7 +68,7 @@ it("legacy runtime genuinely stage-less End Phase uses existing fallback without
   delete state.effectStack.find(f => f.phaseBoundaryContinuation)!.phaseBoundaryContinuation!.stage; state.schemaVersion = 6;
   const before = structuredClone(state); const { repo } = memoryRepository();
   const saved = await repo.save({ state, cardDb: new Map(Object.entries(JSON.parse(golden.cardDbJson))), mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [state] });
-  expect(state).toEqual(before); expect(saved.state.schemaVersion).toBe(7);
+  expect(state).toEqual(before); expect(saved.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
   expect(saved.state.effectStack.find(f => f.phaseBoundaryContinuation)!.phaseBoundaryContinuation!.stage).toBe("LEGACY_SCHEDULED_ACTIONS");
   expect((await repo.load())!.state).toEqual(saved.state);
 });

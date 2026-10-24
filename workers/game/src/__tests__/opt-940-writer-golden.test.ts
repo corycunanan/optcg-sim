@@ -55,9 +55,12 @@ describe("OPT-940 writer golden: persisted bytes match the current version 8 wri
     async (name) => {
       const golden = currentV8.cases[name as keyof typeof currentV8.cases];
       const current = await writeThroughCurrentWriter(name);
-      expect(current.sessionJson).toBe(golden.sessionJson);
+      const expectedSession = JSON.parse(golden.sessionJson);
+      expectedSession.state.costSemanticsVersion = 7; // New setup policy, not existing8 migration.
+      const expectedUndo = JSON.parse(golden.undoHistoryJson).map((state: Record<string, unknown>) => ({ ...state, costSemanticsVersion: 7 }));
+      expect(current.sessionJson).toBe(JSON.stringify(expectedSession));
       expect(current.cardDbJson).toBe(golden.cardDbJson);
-      expect(current.undoHistoryJson).toBe(golden.undoHistoryJson);
+      expect(current.undoHistoryJson).toBe(JSON.stringify(expectedUndo));
     }
   );
 
@@ -72,7 +75,7 @@ describe("OPT-940 writer golden: persisted bytes match the current version 8 wri
       for (const snapshot of undo) expect(Object.keys(snapshot)[0], name).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
       for (const snapshot of undo) {
         expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(8);
-        expect(snapshot.costSemanticsVersion, name).toBe(6);
+        expect(snapshot.costSemanticsVersion, name).toBe(7);
       }
     }
   });

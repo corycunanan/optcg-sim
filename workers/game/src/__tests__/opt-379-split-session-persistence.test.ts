@@ -218,7 +218,7 @@ describe("OPT-379 split session persistence", () => {
     expect(storage.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY)).toEqual(
       saved.undoHistory.map(toPersistedGameState)
     );
-    await expect(repository(storage).load()).resolves.toEqual({ ...saved, state: { ...saved.state, schemaVersion: 8, costSemanticsVersion: 6 }, undoHistory: saved.undoHistory.map((state) => ({ ...state, schemaVersion: 8, costSemanticsVersion: 6 })) });
+    await expect(repository(storage).load()).resolves.toEqual({ ...saved, state: { ...saved.state, schemaVersion: 8, costSemanticsVersion: 7 }, undoHistory: saved.undoHistory.map((state) => ({ ...state, schemaVersion: 8, costSemanticsVersion: 7 })) });
 
     const cardDbAfterInit = structuredClone(
       storage.data.get(SESSION_CARD_DB_STORAGE_KEY)
@@ -316,12 +316,12 @@ describe("OPT-379 split session persistence", () => {
       session.undoHistory.map(toPersistedGameState)
     );
     await expect(repository(storage).load()).resolves.toEqual({
-      state: { ...state, schemaVersion: 8, costSemanticsVersion: 6 },
+      state: { ...state, schemaVersion: 8, costSemanticsVersion: 7 },
       cardDb,
       mode: "SOLITAIRE",
       pregameMode: "HOST_FIRST",
       testPriorityRolls: [6, 1],
-      undoHistory: [{ ...legacyUndo, schemaVersion: 8, costSemanticsVersion: 6 }],
+      undoHistory: [{ ...legacyUndo, schemaVersion: 8, costSemanticsVersion: 7 }],
     });
   });
 

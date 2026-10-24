@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { rig, synSchema } from "./opt-960-rig.js";
 import { capture, command } from "./opt-997-corpus-support.js";
 for (const version of [6, 7] as const) for (const type of ["KO_OWN_CHARACTER", "TRASH_OWN_CHARACTER"] as const) it(`zero ${type} version${version} performs no removal or replacement`, async () => {
-  const r = rig(); r.state.schemaVersion = version; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = version; delete r.state.costSemanticsVersion; r.deck(0, 5);
   const source = r.put("zero-field", 0, "CHARACTER", { schema: synSchema("zero-field", [
     { id: "replace", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true }, replacement_actions: [{ type: "DRAW", params: { amount: 2 } }] },
     { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type, amount: 0 }], actions: [{ type: "DRAW", params: { amount: 1 } }] },

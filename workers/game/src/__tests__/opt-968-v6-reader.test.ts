@@ -23,9 +23,9 @@ describe("OPT-968 v6 actual-writer corpus: semantic reader continuation", () => 
       let loaded = (await new SessionRepository(storage, options).load())!;
       expect(loaded).not.toBeNull();
       expect(loaded.state.schemaVersion).toBe(8);
-      expect(loaded.state.costSemanticsVersion).toBe(6);
+      expect(loaded.state.costSemanticsVersion).toBe(7);
       expect(loaded.undoHistory).toHaveLength(1);
-      if (mode === "mixedUndo") expect(loaded.undoHistory[0]).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
+      if (mode === "mixedUndo") expect(loaded.undoHistory[0]).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
       else {
         expect(loaded.undoHistory[0].schemaVersion).toBe(8);
         if (mode === "undo") {
@@ -41,12 +41,12 @@ describe("OPT-968 v6 actual-writer corpus: semantic reader continuation", () => 
           drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
         });
         expect(resumed.responseRejected).toBeFalsy();
-        expect(resumed.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
+        expect(resumed.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
         const next = new MemorySessionStorage();
         await new SessionRepository(next, options).save({ ...loaded, state: resumed.state, undoHistory: loaded.undoHistory });
         loaded = (await new SessionRepository(next, options).load())!;
         expect(loaded.state.schemaVersion).toBe(8);
-      expect(loaded.state.costSemanticsVersion).toBe(6);
+      expect(loaded.state.costSemanticsVersion).toBe(7);
         const nextPause = scenario.cases[captured.index + replyIndex + 1];
         if (nextPause) {
           const expectedPause = (nextPause.stored.session as { state: unknown }).state;

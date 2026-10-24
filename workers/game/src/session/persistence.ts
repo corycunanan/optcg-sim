@@ -970,7 +970,7 @@ export function promoteGameStateForWriter(state: GameState, location: string): G
   // read as source1 by parseStoredSession. Preserve that decision before codec.
   const source = toPersistedGameState({ ...state, schemaVersion: state.schemaVersion ?? 6 });
   const validated = convertPersistedGameState(source, location);
-  if (validated.schemaVersion === 8) return validated;
+  if (state.schemaVersion === 8) return state; // Validated wire view is proof, not runtime normalization.
   const native = promoteStateToVersion7(validated, location, convertPersistedGameState);
   return convertPersistedGameState({ ...native, schemaVersion: 8, costSemanticsVersion: 7 }, location);
 }

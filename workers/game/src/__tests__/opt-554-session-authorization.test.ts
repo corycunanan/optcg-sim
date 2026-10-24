@@ -915,7 +915,7 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
   for (const firstDon of [false, true]) for (const staleRoot of [false, true])
     it(`first-action ${firstDon ? "DON" : "rest-prefix DON"} reply ${staleRoot ? "rejects persisted root drift" : "pays and draws once"}`, async () => {
       const r = rig();
-      r.state.schemaVersion = undefined;
+      r.state.schemaVersion = undefined; delete r.state.costSemanticsVersion;
       r.deck(0, 5);
       const donors = r.state.players[0].donCostArea;
       donors[1].state = "RESTED";
@@ -957,7 +957,7 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
       initial.gameState = r.state;
       initial.cardDb = r.db;
       await initial.persist();
-      expect(initial.gameState.schemaVersion).toBe(7);
+      expect(initial.gameState).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
       const socket = new MockWebSocket();
       const ws = socket as unknown as WebSocket;
       initial.transport.accept(0, ws);

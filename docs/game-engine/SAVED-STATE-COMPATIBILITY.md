@@ -687,9 +687,9 @@ state (JSON string length, ASCII fixture);
 no production workload or broad performance claim follows.
 
 
-### Ordinary version7 writer rollout (OPT-969)
+### Native cost writer rollout in schema8 (OPT-969)
 
-Ordinary setup now owns explicit7 before its first action/save. SessionRepository
+Ordinary setup now owns explicit8/costSemanticsVersion7 before its first action/save. SessionRepository
 validates runtime provenance before shape encoding and validates/promotes the
 live state and every undo snapshot atomically before history retention or any
 storage write. The low-level encoder preserves explicit6 for historical/direct
@@ -708,7 +708,7 @@ GameSession messages execute on that actual reader; equality is supplemental.
 
 Historical corpus bytes remain immutable. Evidence is synthetic under the
 explicit accepted exception; no production capture, repair or retirement is
-claimed. Native8 ordinary writing, final OPT921/948 domains/feasibility and the
+claimed. Final OPT921/948 domains/feasibility and the
 Decision10 policy decision are outside this rollout. See
 [the writer handoff](../project/handoffs/opt969-native7-writer.md) for ownership,
 reader selection, validation and remaining parent work. Earlier ordinary6
@@ -769,11 +769,15 @@ This release does not promote existing sessions, enable the ordinary8 writer,
 change End Phase stage bytes, infer old replacement outcomes, or claim production
 capture evidence. Deploy and verify this semantic8 reader before writer rollout.
 
-Ordinary7 rollout supersedes the prerequisite ordinary6 policy above. Already
-loaded8 live/undo entries retain schema8 and explicit costSemanticsVersion6|7;
-this writer never downgrades or cost-migrates them and does not create ordinary8.
+The user-approved schema8/mode7 composition supersedes the prerequisite writer
+policies above. New setup is8/mode7; historical source<=6 must prove the original
+native7 continuation migration before8 activation, and source7 activates8/mode7.
+Already loaded8 live/undo retain explicit costSemanticsVersion6|7, without downgrade
+or cost migration. Their strict validated wire view is not returned as runtime
+normalization: valid original8 objects retain identity, including absent derived
+kinds. All live/all-undo proof occurs before retention, prompt IDs or side effects.
 
-The repaired c50 reader floor applies to this ordinary7 rollout and preserved
+The repaired c50 reader floor applies to this schema8/mode7 rollout and preserved
 native8 inputs. No7-only rollback or envelope/mode downgrade of8 is supported.
 The original f19 writer full reviews returned P1 FINDINGS and stopped at the
 publication design checkpoint; the deployed reader repair permits writer

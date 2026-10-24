@@ -192,9 +192,9 @@ it("ordinary setup and direct Repository writes own version7", async () => {
   const rt = await runtime();
   const db = createTestCardDb();
   const state = createBattleReadyState(db);
-  expect(state.schemaVersion).toBe(7);
+  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
   const loaded = (await memory(rt, await save(rt, state, db)).repo.load())!;
-  expect(loaded.state.schemaVersion).toBe(7);
+  expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
 });
 
 for (const context of [
@@ -224,7 +224,7 @@ for (const [version, mode] of [
 for (const context of ["live", "undo-first", "undo-later", "embedded-first", "embedded-later"]) {
   it(`FINAL ordinary7 writer Counter preserves original activation/query/IDs on deployed reader from ${context}`, async () => {
     const state = createBattleReadyState(createTestCardDb());
-    expect(state.schemaVersion).toBe(7);
+    expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
     await completeCounter(await generateCounter(), 7, context);
   });
 }

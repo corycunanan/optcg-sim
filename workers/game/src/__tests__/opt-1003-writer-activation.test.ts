@@ -48,7 +48,7 @@ describe.each([
         expect(state).toEqual({
           ...original,
           schemaVersion: 8,
-          costSemanticsVersion: mode,
+          costSemanticsVersion: version === 8 ? mode : 7,
         });
       expect(wire).toEqual(original);
       const result = new SessionCoordinator().executeAction(
@@ -64,7 +64,7 @@ describe.each([
       );
       expect(result.kind).toBe("applied");
       expect(result.state.schemaVersion).toBe(8);
-      expect(result.state.costSemanticsVersion).toBe(mode);
+      expect(result.state.costSemanticsVersion).toBe(version === 8 ? mode : 7);
       const invalid = structuredClone(undo);
       invalid[2].schemaVersion = 8;
       delete invalid[2].costSemanticsVersion;
@@ -96,7 +96,7 @@ describe.each([
     expect(saved.state).toEqual({
       ...before,
       schemaVersion: 8,
-      costSemanticsVersion: mode,
+      costSemanticsVersion: version === 8 ? mode : 7,
     });
     expect(saved.undoHistory).toEqual([saved.state]);
     expect(
@@ -120,7 +120,7 @@ describe.each([
     expect(result.kind).toBe("applied");
     expect(result.state).toMatchObject({
       schemaVersion: 8,
-      costSemanticsVersion: mode,
+      costSemanticsVersion: version === 8 ? mode : 7,
     });
   });
 
@@ -239,7 +239,7 @@ it("resumes a real save-time undo snapshot from before live prompt-ID allocation
     r.act({ type: "PLAYER_CHOICE", choiceId: "skip" });
     expect(r.state).toMatchObject({
       schemaVersion: 8,
-      costSemanticsVersion: 6,
+      costSemanticsVersion: 7,
       pendingPrompt: null,
       effectStack: [],
     });

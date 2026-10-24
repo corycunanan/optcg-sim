@@ -7,13 +7,13 @@ import { memoryRepository, command, type CostCorpus } from "./opt-997-corpus-sup
 import { classifyLegacyShapes } from "../session/game-state-schema.js";
 import type { GameState } from "../types.js";
 
-it("new games own native7 before their first save and load", async () => {
-  const { state, cardDb } = setupGame(); expect(state.schemaVersion).toBe(7);
+it("new games own schema8/mode7 before their first save and load", async () => {
+  const { state, cardDb } = setupGame(); expect(state.schemaVersion).toBe(8);
   const { repo, values } = memoryRepository();
   const saved = await repo.save({ state, cardDb, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [state] });
-  expect(saved.state.schemaVersion).toBe(7);
-  expect((values.session as { state: GameState }).state.schemaVersion).toBe(7);
-  expect((await repo.load())!.undoHistory[0].schemaVersion).toBe(7);
+  expect(saved.state.schemaVersion).toBe(8);
+  expect((values.session as { state: GameState }).state.schemaVersion).toBe(8);
+  expect((await repo.load())!.undoHistory[0].schemaVersion).toBe(8);
 });
 function corpus(name: string) { return JSON.parse(readFileSync(new URL(`./fixtures/opt-997-v7-canonical/${name}.json`, import.meta.url), "utf8")) as CostCorpus & { promotionSource?: Record<string, unknown> }; }
 it("atomically promotes an unanswered6 offer and every mixed undo snapshot before its first reply", async () => {
@@ -21,7 +21,7 @@ it("atomically promotes an unanswered6 offer and every mixed undo snapshot befor
   const { repo, values } = memoryRepository(original); const before = structuredClone(values);
   const loaded = (await repo.load())!;
   for (const state of [loaded.state, ...loaded.undoHistory]) {
-    expect(state.schemaVersion).toBe(7);
+    expect(state.schemaVersion).toBe(8);
     const owner = state.effectStack.find(f => f.costReplacementAction)!;
     expect(owner.costReplacementResolution).toBeUndefined();
     expect(owner.costReplacementAction!.type === "ARRANGE_TOP_CARDS" && owner.costReplacementAction.destination).toBe("bottom");
@@ -31,17 +31,17 @@ it("atomically promotes an unanswered6 offer and every mixed undo snapshot befor
   expect(state.pendingPrompt).toBeNull(); expect(state.effectStack).toHaveLength(0);
   expect(state.players[0].hand).toHaveLength(4);
 });
-it("retains valid orphan legacy debt as a native7 diagnostic through load/action/save", async () => {
+it("retains valid orphan legacy debt as a native-cost7 diagnostic through load/action/save", async () => {
   const fixture: CostCorpus = JSON.parse(readFileSync(new URL("./fixtures/opt-997-v7/legacy-accepted6-unknown.json", import.meta.url), "utf8"));
   const values = fixture.steps.at(-1)?.stored ?? fixture.initial;
   const { repo } = memoryRepository(values); const loaded = (await repo.load())!;
-  expect(loaded.state.schemaVersion).toBe(7);
+  expect(loaded.state.schemaVersion).toBe(8);
   const owner = loaded.state.effectStack.find(f => f.costReplacementAction)!;
   expect(owner.costReplacementResolution).toBeUndefined();
   expect(classifyLegacyShapes(loaded.state).some(shape => shape.shape === "legacy.cost_replacement_outcome_unknown")).toBe(true);
   const { SessionCoordinator } = await import("../session/coordinator.js");
   const result = new SessionCoordinator().executeAction(loaded.state, loaded.undoHistory, 0, { type: "ATTACH_DON", targetInstanceId: loaded.state.players[0].leader.instanceId, count: 1 }, loaded.cardDb);
-  const control = new SessionCoordinator().executeAction({ ...loaded.state, schemaVersion: 6 }, loaded.undoHistory, 0, { type: "ATTACH_DON", targetInstanceId: loaded.state.players[0].leader.instanceId, count: 1 }, loaded.cardDb);
+  const control = new SessionCoordinator().executeAction({ ...loaded.state, schemaVersion: 8, costSemanticsVersion: 6 }, loaded.undoHistory, 0, { type: "ATTACH_DON", targetInstanceId: loaded.state.players[0].leader.instanceId, count: 1 }, loaded.cardDb);
   expect(result.kind).toBe(control.kind);
   expect(result.state.players).toEqual(control.state.players);
   expect(result.state.effectStack.find(f => f.costReplacementAction)!.costReplacementResolution).toBeUndefined();
@@ -61,12 +61,13 @@ for (const embedded of [false, true]) for (const index of [0, 3]) it(`unprovable
 
 for (const version of [undefined, 1, 2, 3, 4, 5, 6, 7] as const) it(`promotes supported source ${version ?? "absent"} and mixed history atomically`, async () => {
   const { state, cardDb } = setupGame(); const raw = structuredClone(state) as unknown as Record<string, unknown>;
+  delete raw.costSemanticsVersion;
   if (version === undefined) delete raw.schemaVersion; else raw.schemaVersion = version;
   const native = structuredClone(state);
   const original = { session: { state: raw, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null }, "session:card-db": Object.fromEntries(cardDb), "session:undo-history": [raw, native, raw] };
   const { repo, values } = memoryRepository(original); const before = structuredClone(values);
   const loaded = (await repo.load())!;
-  expect(loaded.state.schemaVersion).toBe(7); expect(loaded.undoHistory.map(s => s.schemaVersion)).toEqual([7]);
+  expect(loaded.state.schemaVersion).toBe(8); expect(loaded.undoHistory.map(s => s.schemaVersion)).toEqual([8]);
   expect(values).toEqual(before);
 });
 it("save validates unprovable undo before any compaction or storage write", async () => {

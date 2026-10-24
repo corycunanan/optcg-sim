@@ -16,6 +16,7 @@ import {
   parseStoredSession,
 } from "../session/persistence.js";
 import {
+  toPersistedGameState,
   GAME_STATE_SCHEMA_VERSION,
   GAME_STATE_SCHEMA_VERSION_KEY,
   LEGACY_GAME_STATE_SCHEMA_VERSION,
@@ -124,10 +125,10 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
     const loaded = await repository(goldenStorage(name)).load();
     expect(loaded).not.toBeNull();
     // OPT-980: the only conversion is the legacy stage on a stage-less End Phase frame.
-    expect(loaded!.state).toEqual(withLegacyStage(saved.state));
-    expect(loaded!.undoHistory).toEqual(saved.undoHistory.map(withLegacyStage));
+    expect(loaded!.state).toEqual(toPersistedGameState(withLegacyStage(saved.state)));
+    expect(loaded!.undoHistory).toEqual(saved.undoHistory.map(state => toPersistedGameState(withLegacyStage(state))));
     expect(loaded!.cardDb).toEqual(saved.cardDb);
-    expect(loaded!.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
+    expect(loaded!.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
   });
 
   it("accepts explicit schemaVersion 1 historically and promotes the live session", async () => {
@@ -137,7 +138,7 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
 
     const loaded = (await repository(storage).load())!;
     expect(loaded.state).toEqual(reference.state);
-    expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
+    expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
     expect(convertPersistedGameState(sessionValue(storage).state, "state")).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
   });
 
@@ -149,7 +150,7 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
     const loaded = (await repository(storage).load())!;
     expect(loaded.undoHistory).toHaveLength(1);
     expect(loaded.undoHistory[0]).toEqual(reference.undoHistory[0]);
-    expect(loaded.undoHistory[0]).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
+    expect(loaded.undoHistory[0]).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
     expect(convertPersistedGameState(undoValue(storage)[0], "undoHistory[0]")).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
   });
 

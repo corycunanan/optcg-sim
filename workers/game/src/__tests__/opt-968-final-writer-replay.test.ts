@@ -1,5 +1,3 @@
-import { current968BattleExpected } from "./opt-1003-battle-expectations.js";
-import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
@@ -27,18 +25,16 @@ for (const scenario of corpus.scenarios) for (const start of scenario.cases) for
       loaded = { ...saved, state: saved.undoHistory[0] };
     }
     for (const [offset, reply] of start.replies.entries()) {
-      expect(loaded.state.schemaVersion).toBe(8);
-      expect(loaded.state.costSemanticsVersion).toBe(6);
+      expect(loaded.state.schemaVersion).toBe(6);
       const expectedPause = (scenario.cases[start.index + offset].stored.session as { state: GameState }).state;
-      expect(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state)))).toEqual(writerEnvelope(expectedPause));
+      expect(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state)))).toEqual(expectedPause);
       const result = lifecycle.resumePromptLifecycle(loaded.state, reply, loaded.cardDb, { drainPregame: (state) => state, advanceStartOfTurn: (state) => state });
       expect(result.responseRejected).toBeFalsy();
       const next = new MemorySessionStorage();
       await new repository.SessionRepository(next, config).save({ ...loaded, state: result.state });
       loaded = (await new repository.SessionRepository(next, config).load())!;
     }
-    expect(loaded.state.schemaVersion).toBe(8);
-      expect(loaded.state.costSemanticsVersion).toBe(6);
-    expect(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state)))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
+    expect(loaded.state.schemaVersion).toBe(6);
+    expect(JSON.parse(JSON.stringify(writer.toPersistedGameState(loaded.state)))).toEqual(scenario.expected);
   });
 }

@@ -57,7 +57,7 @@ async function generate(id: string) {
   ) as ProducerScenario;
   const writer = await runtime();
   let loaded = (await memory(writer, recipe.initial).repo.load())!;
-  expect(loaded.state.schemaVersion).toBe(7);
+  expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
   const result: ProducerScenario = {
     ...recipe,
     initial: await save(writer, loaded.state, loaded.cardDb),
@@ -184,6 +184,7 @@ afterAll(async () => {
     "workers/game/src/__tests__/opt-969-writer-history-interop.test.ts",
     "workers/game/src/__tests__/history-counter-producer.ts",
     "workers/game/src/__tests__/opt-969-history-reader.test.ts",
+    "workers/game/src/__tests__/opt-1003-cost-history-integration.test.ts",
   ];
   const hashes = Object.fromEntries(
     sourceFiles.map((file) => [

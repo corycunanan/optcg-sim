@@ -289,7 +289,7 @@ describe("OPT-438: prompt identity and ARRANGE payload validation", () => {
 describe("OPT-436: rejected responses restore the pending prompt", () => {
   it("an invalid same-type selection is rejected and the prompt is restored", async () => {
     const { session, ws } = sessionWithSelectPrompt();
-    const stackBefore = session.gameState.effectStack.map(frame => ({ ...frame, kind: frame.kind ?? "COST" }));
+    const stackBefore = structuredClone(session.gameState.effectStack);
 
     await session.handleAction(ws as unknown as WebSocket, 0, {
       type: "SELECT_TARGET",

@@ -4,12 +4,14 @@ Rules source: Comprehensive Rules v1.2.0, `rule_comprehensive.md` §§7-1-5-2 th
 
 ## Runtime contract
 
-The reader prerequisite originally kept the ordinary writer at6. The OPT969
-rollout now creates ordinary7 and proves legacy promotion at its repository
-boundary; already loaded8 retains its envelope and explicit cost mode without
-that promotion. Native8 ordinary writing remains disabled. Only explicitly loaded8 executes the new completion contract and creates its future completion owners. This is the reader prerequisite; OPT-1003 activates the writer only after this reader is deployed and verified.
+The reader prerequisite originally kept ordinary writing at6. Main785 subsequently
+enabled8/mode6 with battle completion and Refresh ordering. The user-approved
+OPT969 composition now creates8/mode7 before first action and proves historical
+<=6 continuation migration before activating8/mode7; source7 activates8/mode7.
+Already8 inputs retain their explicit mode6|7 after strict validation. This does
+not retroactively invent completion owners for old ended battles.
 
-Native8 requires `costSemanticsVersion: 6 | 7`. No inference/default applies. Mode6 preserves deployed6 costs, including known legacy replacement debt; mode7 preserves native7 identity choices, outcome replay and expected-root evidence. Stable completed8 states retain their exact envelope and mode after their last completion frame disappears. Versions below8 reject the provenance field and new continuation. Mode6 rejects native7-only cost outcomes, expected-root evidence and DON identity picker metadata. The shared capability helper replaces exact7 cost predicates together, including session/coordinator publication and prompt evidence guards; no state is silently promoted by this release.
+Native8 requires `costSemanticsVersion: 6 | 7`. No inference/default applies. Mode6 preserves deployed6 costs, including known legacy replacement debt; mode7 preserves native7 identity choices, outcome replay and expected-root evidence. Stable completed8 states retain their exact envelope and mode after their last completion frame disappears. Versions below8 reject the provenance field and new continuation. Mode6 rejects native7-only cost outcomes, expected-root evidence and DON identity picker metadata. The shared capability helper replaces exact7 cost predicates together, including session/coordinator publication and prompt evidence guards; the low-level reader itself never promotes source envelopes. Production ingress applies the source-aware policy above.
 
 `BATTLE_COMPLETION` is one canonical root continuation boundary. Its metadata records exact battle ID, combatants, turn player, turn number and abort disposition. It owns no prompt, action suffix, cost state, trigger work or accumulated event debt. It must be unique, below the whole reused trigger execution owner and all descendants, with the live battle already cleared. This preserves payload-based combatant filters and prevents Damage Step replay. Strict validation applies independently to live state and every separate/embedded undo entry before retention; mixed modes are not converted.
 
@@ -36,6 +38,6 @@ One mode6 replacement family is diagnostic: existing REST_DON→TRASH_SELF→DON
 
 Deploy and verify this reader before OPT-1003 enables any native8 writer. Production capture access was unavailable at this implementation checkpoint; capture evidence or an explicit scoped synthetic-only exception remains a coordinator-owned rollout gate. Synthetic fixtures must not be described as production sessions.
 
-The future writer may promote6→8 with mode6 and7→8 with mode7 without turning on unrelated cost semantics. It must apply this to live and undo consistently before actions and retain historical meaning for already-started continuations. In particular, a legacy EOB prompt whose effects already expired has no completion obligation to invent; only subsequently ending battles create new boundaries. This reader performs no promotion or old-session repair. End Phase stage bytes are unchanged. Refresh ordering is still the separate OPT-1003 writer change.
+The prerequisite reader supported a future metadata-only6→8/mode6 writer; main785 delivered that policy. The subsequent user-approved OPT969 composition supersedes that source<=6 policy with proven native7 migration then8/mode7 activation. Existing8/mode6 remains unchanged. It must apply this to live and undo consistently before actions and retain historical meaning for already-started continuations. In particular, a legacy EOB prompt whose effects already expired has no completion obligation to invent; only subsequently ending battles create new boundaries. This reader performs no promotion or old-session repair. End Phase stage bytes are unchanged. Refresh ordering is still the separate OPT-1003 writer change.
 
 After native8 is written, the semantic rollback floor is this native8 reader; a7-only reader rejects8 and must not reinterpret it. No reader retirement, production repair, general cost migration or automatic outcome reconstruction is authorized here.

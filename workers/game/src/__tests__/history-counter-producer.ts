@@ -9,7 +9,7 @@ import { getEffectSchema } from "../engine/schema-registry.js";
 import { runtime, save } from "./native7-producer-support.js";
 export async function generateCounter(
   root?: string,
-  version: 7 | 8 = 7,
+  version?: 7 | 8,
   mode: 6 | 7 = 7
 ) {
   if (root)
@@ -26,8 +26,15 @@ export async function generateCounter(
     : await import("../engine/pipeline.js");
   const db = createTestCardDb();
   let state = createBattleReadyState(db);
-  state.schemaVersion = version;
-  if (version === 8) state.costSemanticsVersion = mode;
+  if (version !== undefined) {
+    state.schemaVersion = version;
+    if (version === 8) state.costSemanticsVersion = mode;
+    else delete state.costSemanticsVersion;
+  } else {
+    // Combined writer proof begins from real setup, before any first action.
+    expect(state.schemaVersion).toBe(8);
+    expect(state.costSemanticsVersion).toBe(7);
+  }
   state.players[1].hand = [
     {
       cardId: "ST04-016",

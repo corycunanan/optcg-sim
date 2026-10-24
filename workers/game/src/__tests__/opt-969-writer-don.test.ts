@@ -8,7 +8,7 @@ import { computeCostTargets } from "../engine/effect-resolver/cost/targets.js";
 import type { Cost, TargetFilter } from "../engine/effect-types.js";
 
 function fixture(cost: Cost, owner: 0 | 1 = 0, version: 6 | 7 = 7) {
-  const r = rig(); r.state.schemaVersion = version; r.state.turn.activePlayerIndex = owner; r.deck(owner, 5);
+  const r = rig(); r.state.schemaVersion = version; delete r.state.costSemanticsVersion; r.state.turn.activePlayerIndex = owner; r.deck(owner, 5);
   const source = r.put("writer-don-source", owner, "CHARACTER", { schema: synSchema("writer-don-source", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [cost], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
   return { r, source };
 }
@@ -108,7 +108,7 @@ it("public pipeline publishes new COST evidence once and rejects later root drif
 it("authored OP16-060 pays only active cost-area DON before its Admiral clause", async () => {
   // docs/cards/OP-16.md: return 8 active DON; given DON have no active/rested
   // state (rules v1.2.0 4-4-2), and cannot fill the printed active payment.
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   r.leader(0, "OP16-060");
   const leader = r.state.players[0].leader;
   const active = Array.from({ length: 8 }, (_, i) => ({ instanceId: `sengoku-active-${i}`, state: "ACTIVE" as const, attachedTo: null }));

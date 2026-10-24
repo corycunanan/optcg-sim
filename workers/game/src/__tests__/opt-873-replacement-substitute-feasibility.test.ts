@@ -371,7 +371,7 @@ describe("RETURN_DON_TO_DECK substitute (EB04-030)", () => {
   it.fails("explicit6 known debt: accepting with every DON!! attached fails to return it (OPT-921)", () => {
     const { f, card } = allAttached();
     const donDeckBefore = f.state.players[0].donDeck.length;
-    f.state.schemaVersion = 6;
+    f.state.schemaVersion = 6; delete f.state.costSemanticsVersion;
 
     f.opponentEffectKO(card);
     expect(f.replacementOffered()).toBe(true);
@@ -384,7 +384,7 @@ describe("RETURN_DON_TO_DECK substitute (EB04-030)", () => {
 
   for (const mixed of [false, true]) it(`native7 all-attached return ${mixed ? "chooses the exact donor" : "executes the sole plan"} on deployed reader once`, async () => {
     const { f, card } = allAttached();
-    expect(f.state.schemaVersion).toBe(7);
+    expect(f.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
     if (mixed) f.giveDon(0, 1);
     const donor = structuredClone(f.state.players[0].leader.attachedDon[0]);
     const area = structuredClone(f.state.players[0].donCostArea);

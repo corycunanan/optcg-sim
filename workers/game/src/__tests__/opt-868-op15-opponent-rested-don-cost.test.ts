@@ -717,7 +717,7 @@ describe("OPT-868 cost DON!! binding against live and staged state", () => {
   it.each([6, 7] as const)("version%s: legacy automatic payment excludes changed live DON; native7 rejects root drift", (version) => {
     const { f, source, foes } = setup("OP15-017", { oppActive: 2, oppRested: 2 });
     const [first, second] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
-    f.state.schemaVersion = version;
+    f.state.schemaVersion = version; delete f.state.costSemanticsVersion;
     activate(f, "OP15-017", source);
     f.accept();
     f.persist();
@@ -744,7 +744,7 @@ describe("OPT-868 cost DON!! binding against live and staged state", () => {
   it.each([6, 7] as const)("version%s: legacy live hold restores choice; native7 rejects root drift", (version) => {
     const { f, source, foes } = setup("OP15-017", { oppRested: 2 });
     const [held, free] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
-    f.state.schemaVersion = version;
+    f.state.schemaVersion = version; delete f.state.costSemanticsVersion;
     activate(f, "OP15-017", source);
     f.accept();
     f.persist();

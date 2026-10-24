@@ -1,4 +1,4 @@
-# OPT969 / OPT997 bounded ordinary7 writer, resumed after reader repair
+# OPT969 / OPT997 native cost writer in schema8
 
 Integration and rollback floor: verified deployed history reader
 `c50b1d037ea38c004aa3d29b6b2ee5b90b45574e` (PR784). Coordinator verified
@@ -6,16 +6,21 @@ postmerge CI40052762418 and game-worker40052762462/job120748880646, deployed
 version707e3d1d-84a1-4a3f-bca5-a088d2679895 before writer work resumed.
 Original485 and69125276 are known unsafe for published Counter history and are
 negative controls only. Preserved native8 inputs also use the newer c50 floor.
-No ordinary8 writer is enabled.
+The user-approved composition enables ordinary8/mode7 on deployed main785
+`067b216982675dde568ceeb3da69e155f67e080e`. Main's battle completion and Refresh
+ordering remain intact; c50 is the actual safe replay reader for these outputs.
 
 ## Scope and cumulative checkpoints
 
-New setup owns explicit7 before its first action/save. Repository validates
+New setup owns explicit8/costSemanticsVersion7 before its first action/save. Repository validates
 source provenance, proves/promotes every legacy live and separate/embedded undo
 snapshot before retention or any storage write, and returns retained promoted
 snapshots to GameSession. Unsupported or unprovable input leaves caller,
 storage and metrics unchanged, including invalid history beyond retention.
-Low-level explicit6 remains6. Native7/8 validate without outcome/root repair;
+Historical source<=6 first proves the native7 continuation migration, then activates
+schema8/mode7; source7 also activates8/mode7. Low-level explicit6 remains6.
+Existing8 validates fully but returns its original runtime object: strict wire
+validation is proof, not permission to normalize runtime kinds. Native7/8 validate without outcome/root repair;
 loaded8 retains required costSemanticsVersion6|7 through live/undo/action/save.
 
 Only an absent-outcome COST owner with an immediate matching REPLACEMENT offer
@@ -32,8 +37,10 @@ STOP. PR783 stayed draft; its CI40049077417 also failed seven worker cases.
 The reader-first adjudication produced PR784's separately reviewed/deployed
 ownership repair. That delivery permits this resumed writer stage; it does not
 erase original findings, reset the review budget, or claim final writer CLEAN.
-One full review per lens is spent; the existing reviewers retain only their
-remaining delta. Root owns those reviews, full verify, CI/freshness and delivery.
+The resumed968 full/delta reviews subsequently returned CLEAN. The newly approved
+main785 composition has one full and one delta per same SPEC/correctness reviewer;
+this explicit bounded stage does not erase earlier findings or design stops.
+Root owns reviews, full verify, CI/freshness and delivery.
 
 ## Reader ownership retained exactly
 
@@ -50,7 +57,7 @@ a documented public action boundary.
 
 ## Honest CI expectation repairs
 
-- OPT1005 still uses unchanged completed6 fixtures, explicitly expects current7
+- OPT1005 still uses unchanged completed6 fixtures, explicitly expects current8/mode7
   envelope only after repository promotion, and retains complete damage/resource/
   event/stack comparisons for live and undo.
 - OPT429 keeps genuine explicit6 unpayable-suffix/queued-trigger cleanup. Native7
@@ -98,7 +105,7 @@ writer pause on c50, recreates the DO, completes target and rejects duplication.
 Native8 modes6|7 retain their envelopes and separate cost behavior. Counter base
 cost1 is not a natural-reachability claim for OP15-002's base-cost3 condition.
 
-Bounded OPT997 proof captures the actual ordinary7 Ganzui-style COST owner,
+Bounded OPT997 proof captures the actual native-cost Ganzui-style COST owner,
 accepts its prompting substitute through real Repository/Coordinator/lifecycle,
 reloads child/live/undo, settles that same owner once, empties the stack and
 accepts a subsequent legal battle PASS. Duplicate child reply rejects unchanged.
@@ -123,3 +130,44 @@ under the explicit user-approved exception, with no production capture/repair/
 retirement claim. Parent OPT969 stays open for final OPT921/948 domain/feasibility,
 deferred authored EB02-061/OP12-070/OP15-069 corrections, historical recovery and
 OPT958 policy disposition. No parent/project closure is claimed.
+
+## Main785 composition and source ownership
+
+One source-aware ingress helper serves Repository load/save and direct typed
+Coordinator calls. It validates provenance before encoding, keeps preencoding
+native replay/stage guards and strictly parses the wire view. Every explicit8
+mode6|7 is validated and retains its original runtime reference; no fast path
+skips validation. Only historical<=7 proceeds through proof/activation. All live
+and ALL undo inputs prove before retention, prompt ID allocation, writes or
+metrics. Direct Coordinator rejects preserve the original source7/8 references.
+A separately called lifecycle operates on the already activated8 routed input;
+it does not promise a historical7 rollback across two public calls.
+
+The first composition sweep exposed an identity defect: returning the validator's
+projection added COST/trigger kinds before stale-root rejection. Implementation
+stopped for the same design consultant; the approved bounded fix retains the
+validated original8 runtime object. No evidence/history ownership repair or guard
+relaxation followed. Stored malformed kinds still reject in live and both undo
+forms. Save may subsequently compact history/allocate prompt IDs; wire encoding
+owns canonical kinds, separate from the valid returned runtime spelling.
+
+Frozen785's39 battle replay cases are explicitly already8/mode6 historical
+controls. Raw historical6/7 ingress activation is independently covered, without
+retagging those frozen traces. Actual newsetup8/mode7 Counter output also crosses
+c50, opens a subsequent EOB DON prompt, reloads live/separate/embedded undo and
+completes with exact IDs, history/query, resources, events and buff expiry. The
+preserved8/mode6 control remains separate. No frozen fixture/manifests or capture
+source hashes were rewritten. Composition evidence/counts and the final source
+pins are recorded in work/history-reader/writer-native8-integration-report.md
+in the coordinator chat; full verify remains coordinator-owned.
+
+Composition focused selection is89 explicit files. Its final broad invocation
+passed85files with3opt-in skips; one current-producer module failed329envelope
+comparisons because the invocation selected externalc50 through
+OPT969_REPLAY_ROOT. Correcting that module's current-runtime selection passed
+4files350tests; affected guards/final pinned provenance passed3files37tests.
+Other files' source and consumed environments are unchanged. Full verification
+is still coordinator-owned; these are focused convergence receipts, not a single
+full-suite green claim. Worker types pass, targeted lint has0errors17warnings,
+and diffcheck passes. All318 preexisting fixture files match main067 byte-for-byte;
+isolated originalf19 regeneration matches all13payloads, with manifests intact.

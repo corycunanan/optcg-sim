@@ -7,7 +7,7 @@ import { runtime, memory, command, save } from "./native7-producer-support.js";
 it("writer-produced first and subsequent DON pauses finish once through repository and coordinator", async () => {
   const writer = await runtime();
   const reader = await runtime(process.env.OPT969_WRITER_READER_ROOT);
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   r.state.players[0].donCostArea[0].state = "RESTED";
   const source = r.put("writer-two-don-costs", 0, "CHARACTER", { schema: synSchema("writer-two-don-costs", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "DON_MINUS", amount: 1 }, { type: "DON_MINUS", amount: 1 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
   r.state = command(writer, r.state, r.db, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });

@@ -158,7 +158,7 @@ describe("OPT-480 runtime type boundaries", () => {
     }
 
     expect(() => parseStoredSession(stored)).toThrow(
-      "Stored session state has invalid version 4 shape"
+      "Stored session state has an invalid core shape"
     );
   });
 
@@ -210,7 +210,7 @@ describe("OPT-480 runtime type boundaries", () => {
     };
 
     expect(() => parseStoredSession(malformed)).toThrow(
-      "scheduledActions"
+      "contains an unknown scheduled action variant"
     );
   });
 
