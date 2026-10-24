@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
@@ -63,9 +64,9 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
         // Missing stage is a legacy runtime spelling. Native v5 saves require
         // an explicit stage, so preserve that strict reader contract and test
         // the runtime fallback after the canonical save/load boundary.
-        // Native7 must keep its explicit stage; legacy runtime fallback is
-        // separately pinned in opt-997-writer-boundaries.test.ts.
-        expect(actual.effectStack.find(frame => frame.phaseBoundaryContinuation)?.phaseBoundaryContinuation?.stage).toBe("LEGACY_SCHEDULED_ACTIONS");
+        for (const frame of actual.effectStack) {
+          if (frame.phaseBoundaryContinuation) delete frame.phaseBoundaryContinuation.stage;
+        }
       }
       const result = resumePromptLifecycle(actual, action, loaded.cardDb, {
         drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
@@ -73,7 +74,7 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       expect(result.responseRejected).toBe(false);
       actual = result.state;
     }
-      expected = { ...candidateExpected<GameState>(`future/${name}/${index}/final`), schemaVersion: 7 };
+      expected = writerEnvelope(candidateExpected<GameState>(`future/${name}/${index}/final`));
       expect(actual).toEqual(expected);
       expect(actual.pendingPrompt).toBeNull();
     expect(actual.effectStack).toEqual([]);

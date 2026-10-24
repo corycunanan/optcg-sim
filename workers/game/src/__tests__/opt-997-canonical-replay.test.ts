@@ -6,7 +6,7 @@ import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/r
 
 for (const position of ["TOP", "BOTTOM"] as const) for (const accept of [false, true]) {
   it(`canonically parks printed ${position} despite opposite public destination, ${accept ? "accept" : "decline"}`, async () => {
-    const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5); r.deck(1, 5);
+    const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5); r.deck(1, 5);
     for (let n = 0; n < 3; n++) r.put(`canonical-hand-${n}`, 0, "HAND");
     const cost = { type: "PLACE_SELF_AND_TRASH_TO_DECK", amount: 1, position } as Cost;
     const source = r.put("canonical-source", 0, "CHARACTER", { schema: synSchema("canonical-source", [
@@ -62,7 +62,7 @@ for (const position of ["TOP", "BOTTOM"] as const) for (const accept of [false, 
 }
 
 for (const selectStage of [false, true]) it(`named hand-or-Stage offered domain, choosing ${selectStage ? "Stage" : "hand"}`, async () => {
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5); r.deck(1, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5); r.deck(1, 5);
   const stage = r.put("canonical-named-stage", 0, "STAGE", { data: { type: "Stage" }, schema: synSchema("canonical-named-stage", [
     { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 } }] },
   ], "Stage") });

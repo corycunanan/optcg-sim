@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 /** Reader-only prerequisite. Synthetic actual OP14-115 candidate writer output
  * dd3b17f5539ffa7449a18f11ed9a8113d7378d80; not a production capture. */
 import { readFileSync } from "node:fs";
@@ -39,9 +40,7 @@ describe("OPT-1005 reader-only self-damage parent compatibility", () => {
       expect(end.eventLog.filter(e => e.type === "CARD_REMOVED_FROM_LIFE")).toHaveLength(1);
       expect(end.players[1].trash.filter(c => c.cardId === "OP14-116")).toHaveLength(reveal ? 1 : 0);
       expect(end.players[1].hand).toHaveLength(state.players[1].hand.length + 1);
-      expect(corpus.completed.schemaVersion).toBe(6);
-      expect(end.schemaVersion).toBe(7);
-      if (reveal) expect(toPersistedGameState(end)).toEqual({ ...corpus.completed, schemaVersion: 7 });
+      if (reveal) expect(toPersistedGameState(end)).toEqual(writerEnvelope(corpus.completed));
     }
   });
   it.each(["DRAW", "KO", "MILL"])("rejects a %s parent", type => {
@@ -87,9 +86,7 @@ it("loads candidate child-prompt live and undo and finishes the existing damage 
     expect(state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     const result = resumePromptLifecycle(state, { type: "PASS" }, cards, { drainPregame: s => s, advanceStartOfTurn: s => s });
     expect(result.responseRejected).toBe(false);
-    expect(child.completed.schemaVersion).toBe(6);
-    expect(result.state.schemaVersion).toBe(7);
-    expect(toPersistedGameState(result.state)).toEqual({ ...child.completed, schemaVersion: 7 });
+    expect(toPersistedGameState(result.state)).toEqual(writerEnvelope(child.completed));
     expect(result.state.effectStack).toEqual([]);
     expect(result.state.pendingPrompt).toBeNull();
     expect(result.state.turn.triggerStagingInstanceIds ?? []).toEqual([]);

@@ -1,6 +1,6 @@
 import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
-import { promoteSessionToVersion7 } from "./version7-promotion.js";
+import { promoteStateToVersion7 } from "./version7-promotion.js";
 import { projectVersion5 } from "./version5-reader.js";
 import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
 import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
@@ -66,7 +66,7 @@ export interface SessionStorage extends TokenJtiStorage {
 
 /** Adapt Cloudflare storage to the narrower engine-owned session port. */
 export class DurableObjectSessionStorage implements SessionStorage {
-  constructor(private readonly storage: DurableObjectStorage) {}
+  constructor(private readonly storage: SessionStorage) {}
 
   get<T>(key: string): Promise<T | undefined> {
     return this.storage.get<T>(key);
@@ -171,36 +171,15 @@ export class SessionRepository {
   }
 
   async save(snapshot: SessionSnapshot): Promise<SessionSnapshot> {
-    // Runtime objects without provenance are old runtime6 inputs, not stored
-    // version1 bytes. Validate them before promotion; new setup is explicit7.
-    const validateRuntime = (state: GameState, location: string): GameState => {
-      readGameStateSchemaVersion({ schemaVersion: state.schemaVersion }, location);
-      // Runtime kind tags may lag phase transitions. The established encoder
-      // derives those tags, but cannot authorize changing native7 COST evidence
-      // or supplying a legacy End Phase stage to a native7 producer.
-      if (state.schemaVersion === 7 || state.schemaVersion === 8) {
-        for (const [index, frame] of state.effectStack.entries()) {
-          if (hasNativeCostSemantics(state) && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
-            const violation = costReplacementReplayViolation(state, frame);
-            if (violation) throw new SessionLoadError(location, `effectStack[${index}] ${violation}`);
-          }
-          if (frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined) {
-            throw new SessionLoadError(location, `effectStack[${index}] native7 End Phase continuation lacks stage`);
-          }
-        }
-      }
-      return convertPersistedGameState(toPersistedGameState(state), location);
-    };
-    const validated = {
-      ...snapshot,
-      state: validateRuntime(snapshot.state, "state"),
-      undoHistory: snapshot.undoHistory.map((state, index) => validateRuntime(state, `undoHistory[${index}]`)),
-    };
-    const promoted = promoteSessionToVersion7(validated, convertPersistedGameState);
-    const promptedState = ensurePromptId(promoted.state);
+    const state = promoteGameStateForWriter(snapshot.state, "state");
+    const undoHistory = snapshot.undoHistory.map((state, index) =>
+      promoteGameStateForWriter(state, `undoHistory[${index}]`)
+    );
+    // Prove every source before even allocating the live prompt ID or bounding history.
+    const promptedState = ensurePromptId(state);
     const compacted = compactSessionHistory(
       promptedState,
-      promoted.undoHistory,
+      undoHistory,
       this.historySummary
     );
     const stored: PersistedSession = {
@@ -280,7 +259,11 @@ export class SessionRepository {
         ? Promise.resolve(undefined)
         : this.storage.get<unknown>(SESSION_UNDO_HISTORY_STORAGE_KEY),
     ]);
-    const stored = promoteSessionToVersion7(parseStoredSession(raw, separateCardDb, separateUndoHistory), convertPersistedGameState);
+    const parsed = parseStoredSession(raw, separateCardDb, separateUndoHistory);
+    const stored = { ...parsed,
+      state: promoteGameStateForWriter(parsed.state, "state"),
+      undoHistory: parsed.undoHistory.map((state, index) => promoteGameStateForWriter(state, `undoHistory[${index}]`)),
+    };
     const restoredState = restoreIdCounterInvariant(
       ensureExecutionContext(stored.state),
       "state"
@@ -966,6 +949,30 @@ export function convertPersistedGameState(
   validateContinuationReferences(migrated, location);
   logLegacyShapes(migrated, location);
   return isGameTerminated(migrated) ? clearTerminalPendingWork(migrated) : migrated;
+}
+
+/** One source-aware production ingress for Repository and typed Coordinator calls.
+ * Explicit8 preserves its already activated cost mode. Only historical<=6 proof
+ * and source7 are eligible for native costs; no8->7 helper downgrade occurs. */
+export function promoteGameStateForWriter(state: GameState, location: string): GameState {
+  readGameStateSchemaVersion({ schemaVersion: state.schemaVersion }, location);
+  if (state.schemaVersion === 7 || state.schemaVersion === 8) {
+    for (const [index, frame] of state.effectStack.entries()) {
+      if (hasNativeCostSemantics(state) && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
+        const violation = costReplacementReplayViolation(state, frame);
+        if (violation) throw new SessionLoadError(location, `effectStack[${index}] ${violation}`);
+      }
+      if (frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined)
+        throw new SessionLoadError(location, `effectStack[${index}] native End Phase continuation lacks stage`);
+    }
+  }
+  // Absent runtime provenance means source6; absent stored bytes were already
+  // read as source1 by parseStoredSession. Preserve that decision before codec.
+  const source = toPersistedGameState({ ...state, schemaVersion: state.schemaVersion ?? 6 });
+  const validated = convertPersistedGameState(source, location);
+  if (validated.schemaVersion === 8) return validated;
+  const native = promoteStateToVersion7(validated, location, convertPersistedGameState);
+  return convertPersistedGameState({ ...native, schemaVersion: 8, costSemanticsVersion: 7 }, location);
 }
 
 export function parseStoredSession(

@@ -1,22 +1,36 @@
-/** Ordinary7 first-load promotion from frozen historical6 inputs; explicit generation only. */
+/** ISOLATED writer first-load conversion evidence, deliberately disabled in reader CI. */
 import { describe, expect, it } from "vitest";
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { rig } from "./opt-960-rig.js";
+import { rig, synSchema } from "./opt-960-rig.js";
 import { capture, command, memoryRepository, type CostCorpus } from "./opt-997-corpus-support.js";
-import { parseStoredSession } from "../session/persistence.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
+import type { Cost } from "../engine/effect-types.js";
 import type { GameState } from "../types.js";
 async function pending6(position: "TOP" | "BOTTOM") {
-  // Preserve the historical producer's exact source bytes. The ordinary7
-  // writer may not manufacture a new saved6 pause to prove its own migration.
-  const fixture = JSON.parse(readFileSync(new URL(`./fixtures/opt-997-v7-canonical/promotion-${position.toLowerCase()}-decline.json`, import.meta.url), "utf8")) as CostCorpus & { promotionSource: Record<string, unknown> };
-  const { repo, values } = memoryRepository(fixture.promotionSource);
-  const parsed = parseStoredSession(values.session, values["session:card-db"], values["session:undo-history"]);
-  const r = rig(); r.state = parsed.state; r.db = new Map(Object.entries(parsed.cardDb));
-  const source = r.state.players[0].characters.find(card => card?.instanceId === fixture.sourceId)!;
+  const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 5); r.deck(1, 5);
+  for (let n = 0; n < 3; n++) r.put(`promotion-hand-${n}`, 0, "HAND");
+  const source = r.put("promotion-source", 0, "CHARACTER", { schema: synSchema("promotion-source", [
+    { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true, once_per_turn: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 } }] },
+    { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "PLACE_SELF_AND_TRASH_TO_DECK", amount: 1, position } as Cost], actions: [{ type: "DRAW", params: { amount: 1 } }] },
+  ]) });
+  r.put("promotion-trash-a", 0, "TRASH"); r.put("promotion-trash-b", 0, "TRASH");
+  r.state = command(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" }, r.db);
+  const p = r.state.pendingPrompt!.options; if (p.promptType !== "SELECT_TARGET") throw new Error("missing selection");
+  r.state = command(r.state, { type: "SELECT_TARGET", selectedInstanceIds: p.validTargets.slice(0, 1) }, r.db);
+  const arrange = r.state.pendingPrompt!.options; if (arrange.promptType !== "ARRANGE_TOP_CARDS") throw new Error("missing arrangement");
+  r.state = command(r.state, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: arrange.cards.map(c => c.instanceId), destination: position === "TOP" ? "bottom" : "top" }, r.db);
+  const { repo, values } = memoryRepository();
+  const raw = toPersistedGameState(r.state); expect(raw.schemaVersion).toBe(6);
+  const valid7 = structuredClone(raw); valid7.schemaVersion = 7;
+  const owner7 = valid7.effectStack.find(f => f.kind === "COST")!;
+  if (owner7.costReplacementAction!.type !== "ARRANGE_TOP_CARDS") throw new Error("missing parked arrange");
+  owner7.costReplacementAction!.destination = position === "TOP" ? "top" : "bottom";
+  await repo.save({ state: raw, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [valid7, raw, valid7, raw] });
+  // Storage ingress corpus includes entries beyond runtime retention; all must validate before bounding.
+  values["session:undo-history"] = structuredClone([valid7, raw, valid7, raw]);
   return { r, source, repo, values };
 }
-
 describe.runIf(Boolean(process.env.OPT997_REGENERATE))("OPT997 actual first-load promotion", () => {
   for (const position of ["TOP", "BOTTOM"] as const) for (const decline of [false, true]) it(`${position} ${decline ? "decline" : "accept"}`, async () => {
     const { r, source, repo, values } = await pending6(position);

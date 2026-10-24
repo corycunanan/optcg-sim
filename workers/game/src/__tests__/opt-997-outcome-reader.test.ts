@@ -11,7 +11,7 @@ import { classifyLegacyShapes, toPersistedGameState } from "../session/game-stat
 import type { EffectStackFrame } from "../types.js";
 
 function fixture(version: 6 | 7 = 6, mandatory = false) {
-  const r = rig(); r.state.schemaVersion = version; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = version; delete r.state.costSemanticsVersion; r.deck(0, 5);
   for (let i = 0; i < 3; i++) r.put(`OPT997-hand-${i}`, 0, "HAND");
   const authored = getEffectSchema("OP17-043")!;
   const source = r.put("OP17-043", 0, "CHARACTER", { schema: synSchema("OP17-043", [...authored.effects.map(e => mandatory ? { ...e, flags: { ...e.flags, optional: false } } : e), { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { once_per_turn: true }, costs: [{ type: "REST_DON", amount: 1 }, { type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
@@ -100,7 +100,7 @@ it("native7 early offer survives reload, records its exact outcome and completes
   expect(r.promptType()).toBe("SELECT_TARGET");
   await reloadLiveAndUndo(r);
   r.select(r.state.players[0].hand.slice(0, 2).map(c => c.instanceId));
-  expect(r.state.schemaVersion).toBe(7);
+  expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
   expect(r.state.effectStack).toHaveLength(0);
   expect(r.state.pendingPrompt).toBeNull();
   expect(r.state.players[0].characters.some(c => c?.instanceId === source.instanceId)).toBe(true);

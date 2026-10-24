@@ -1,4 +1,5 @@
-import { LegacyReaderRepository } from "./legacy-reader-repository.js";
+import { current968BattleExpected } from "./opt-1003-battle-expectations.js";
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { describe, expect, it } from "vitest";
 import corpus from "./fixtures/opt-968-writer-corpus.json";
 import { SessionRepository } from "../session/persistence.js";
@@ -13,23 +14,24 @@ const fixtures = corpus as unknown as { scenarios: { name: string; cases: Captur
 
 const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
 
-describe("OPT-968 v6 corpus: current parser/runtime with legacy repository boundary", () => {
+describe("OPT-968 v6 actual-writer corpus: semantic reader continuation", () => {
   for (const scenario of fixtures.scenarios) for (const captured of scenario.cases) for (const mode of ["live", "undo", "mixedUndo"] as const) {
     it(`${scenario.name} / start pause ${captured.index} / ${mode}: live and mixed undo retain progress through every later reply`, async () => {
       const storage = new MemorySessionStorage();
       await storage.put(structuredClone(captured.stored));
       if (mode === "mixedUndo") storage.data.set("session:undo-history", [structuredClone(captured.legacyUndo)]);
-      let loaded = (await new LegacyReaderRepository(storage, options).load())!;
+      let loaded = (await new SessionRepository(storage, options).load())!;
       expect(loaded).not.toBeNull();
-      expect(loaded.state.schemaVersion).toBe(6);
+      expect(loaded.state.schemaVersion).toBe(8);
+      expect(loaded.state.costSemanticsVersion).toBe(6);
       expect(loaded.undoHistory).toHaveLength(1);
-      if (mode === "mixedUndo") expect(loaded.undoHistory[0].schemaVersion).toBeUndefined();
+      if (mode === "mixedUndo") expect(loaded.undoHistory[0]).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
       else {
-        expect(loaded.undoHistory[0].schemaVersion).toBe(6);
+        expect(loaded.undoHistory[0].schemaVersion).toBe(8);
         if (mode === "undo") {
           const restored = new MemorySessionStorage();
-          await new LegacyReaderRepository(restored, options).save({ ...loaded, state: loaded.undoHistory[0] });
-          const undoLoaded = (await new LegacyReaderRepository(restored, options).load())!;
+          await new SessionRepository(restored, options).save({ ...loaded, state: loaded.undoHistory[0] });
+          const undoLoaded = (await new SessionRepository(restored, options).load())!;
           expect(undoLoaded.state).toEqual(loaded.state);
           loaded = undoLoaded;
         }
@@ -39,18 +41,19 @@ describe("OPT-968 v6 corpus: current parser/runtime with legacy repository bound
           drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
         });
         expect(resumed.responseRejected).toBeFalsy();
-        expect(resumed.state.schemaVersion).toBe(6);
+        expect(resumed.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
         const next = new MemorySessionStorage();
-        await new LegacyReaderRepository(next, options).save({ ...loaded, state: resumed.state, undoHistory: loaded.undoHistory });
-        loaded = (await new LegacyReaderRepository(next, options).load())!;
-        expect(loaded.state.schemaVersion).toBe(6);
+        await new SessionRepository(next, options).save({ ...loaded, state: resumed.state, undoHistory: loaded.undoHistory });
+        loaded = (await new SessionRepository(next, options).load())!;
+        expect(loaded.state.schemaVersion).toBe(8);
+      expect(loaded.state.costSemanticsVersion).toBe(6);
         const nextPause = scenario.cases[captured.index + replyIndex + 1];
         if (nextPause) {
           const expectedPause = (nextPause.stored.session as { state: unknown }).state;
-          expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual(expectedPause);
+          expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual(writerEnvelope(expectedPause));
         }
       }
-      expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual(scenario.expected);
+      expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
     });
   }
 });
@@ -99,7 +102,7 @@ it("rejects malformed complete event families on real OP15-009 v6 pauses without
     drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
   });
   expect(resumed.responseRejected).toBeFalsy();
-  expect(JSON.parse(JSON.stringify(toPersistedGameState(resumed.state)))).toEqual({ ...(scenario.expected as object), schemaVersion: 7 });
+  expect(JSON.parse(JSON.stringify(toPersistedGameState(resumed.state)))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
   expect(resumed.state.eventLog.filter((event) => event.type === "CARD_KO")).toHaveLength(0);
 });
 
@@ -143,7 +146,7 @@ it("requires ordering prompt choices to be a unique bijection while allowing per
     await new SessionRepository(next, options).save({ ...loaded, state: resumed.state });
     loaded = (await new SessionRepository(next, options).load())!;
   }
-  expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual({ ...(scenario.expected as object), schemaVersion: 7 });
+  expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual(current968BattleExpected(scenario.name, scenario.expected));
 });
 
 const nativeOrderingPause = fixtures.scenarios.flatMap((scenario) => scenario.cases).find((captured) => {
@@ -216,7 +219,7 @@ for (const location of ["live", "undo"] as const) for (const stale of ["missingC
 
 for (const stale of ["missingCandidate", "allMissing", "changedResource"] as const) {
   it(`single battle ordering retains ${stale} recheck and exhausts its original consequence once`, async () => {
-    const r = rig(); r.state.schemaVersion = 6; r.deck(0, 10); r.deck(1, 10);
+    const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 10); r.deck(1, 10);
     const target = r.put("OPT968-SINGLE-STALE-TARGET", 0, "CHARACTER", { state: "RESTED", data: { power: 5000 } });
     for (const id of ["OPT968-SINGLE-REPLACER-A", "OPT968-SINGLE-REPLACER-B"]) r.put(id, 0, "CHARACTER", {
       data: { power: 9000 },

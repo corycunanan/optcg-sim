@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 /** Candidate-generated live+undo compatibility corpus. Exact states, IDs,
  * prompts and event logs are compared; COST debt is labeled, never completion. */
 import { describe, expect, it } from "vitest";
@@ -25,8 +26,8 @@ for (const family of families) for (const resumeUndo of [false, true]) {
       const repo = new SessionRepository(storage, { nextJsUrl: "https://example.test", workerSecret: "secret" });
       const loaded = (await repo.load())!;
       const stored = values.session as { state: GameState };
-      expect(loaded.state).toEqual(stored.state);
-      expect(loaded.undoHistory).toEqual([stored.state]);
+      expect(loaded.state).toEqual(writerEnvelope(stored.state));
+      expect(loaded.undoHistory).toEqual([writerEnvelope(stored.state)]);
       let state = resumeUndo ? loaded.undoHistory[0] : loaded.state;
       for (const step of fixture.steps) {
         expect(state.pendingPrompt).not.toBeNull();
@@ -36,10 +37,10 @@ for (const family of families) for (const resumeUndo of [false, true]) {
         expect(result.responseRejected).toBe(false);
         const saved = await repo.save({ ...loaded, state: result.state, undoHistory: [] });
         state = toPersistedGameState(saved.state);
-        expect(state).toEqual(step.expected);
+        expect(state).toEqual(writerEnvelope(step.expected));
         // Later pauses are persisted/reloaded too, not only the first one.
         state = (await repo.load())!.state;
-        expect(state).toEqual(step.expected);
+        expect(state).toEqual(writerEnvelope(step.expected));
       }
       if (family === "opponent-active-cost-area") {
         expect(state.players[0].donCostArea).toHaveLength(stored.state.players[0].donCostArea.length);

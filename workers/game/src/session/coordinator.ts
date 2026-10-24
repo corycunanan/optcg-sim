@@ -1,3 +1,4 @@
+import { promoteGameStateForWriter } from "./persistence.js";
 import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import {
   publishCostOwnerRoots,
@@ -161,6 +162,32 @@ export class SessionCoordinator {
   }
 
   executeAction(
+    initialState: GameState,
+    initialUndoHistory: readonly GameState[],
+    playerIndex: 0 | 1,
+    action: GameAction,
+    cardDb: Map<string, CardData>
+  ): SessionActionResult {
+    // Loaded/new-game sessions are already v8. Typed historical callers use the
+    // same validated ingress; a rejected action must retain its original bytes.
+    let state: GameState;
+    let history: readonly GameState[];
+    try {
+      const promote = promoteGameStateForWriter;
+      state = promote(initialState, "state");
+      history = initialUndoHistory.map((value, index) => promote(value, `undoHistory[${index}]`));
+    } catch (error) {
+      return { kind: "reject", state: initialState, undoHistory: boundUndoHistory(initialUndoHistory),
+        reason: error instanceof Error ? error.message : "Invalid game state" };
+    }
+    const result = this.executeWriterAction(state, history, playerIndex, action, cardDb);
+    return result.kind === "reject"
+      ? { ...result, state: initialState, undoHistory: result.undoHistory.length === initialUndoHistory.length
+          ? [...initialUndoHistory] : boundUndoHistory(initialUndoHistory) }
+      : result;
+  }
+
+  private executeWriterAction(
     initialState: GameState,
     initialUndoHistory: readonly GameState[],
     playerIndex: 0 | 1,

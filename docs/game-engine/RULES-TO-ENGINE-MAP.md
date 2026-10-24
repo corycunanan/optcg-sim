@@ -276,8 +276,8 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **6-1-1.** Turn = Refresh → Draw → DON → Main → End | **IMPL** | `Phase` type in `game-types.ts:69` | `"REFRESH" \| "DRAW" \| "DON" \| "MAIN" \| "END"` |
-| **6-2-1.** "Until start of your next turn" effects expire | **IMPL** | `duration-tracker.ts → expireEffects()` | Wave-based expiry at REFRESH_PHASE timing |
-| **6-2-2.** "At the start of your/opponent's turn" auto effects | **PARTIAL** | `triggers.ts → matchTriggersForEvent()` | Matches TURN_STARTED events at the hand-off, before 6-2-3 / 6-2-4 run on the next ADVANCE_PHASE (OP11-040 FAQ order, guarded by [`opt-962-end-phase-order.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-order.test.ts) "Refresh order"). Gap: 6-2-1 expiry still runs after these effects (OPT-962 follow-up). |
+| **6-2-1.** "Until start of your next turn" effects expire | **IMPL** | `phases.ts → completeTurnHandoff()`, `duration-tracker.ts → expireRefreshPhaseEffects()` | Incoming-turn expiry precedes TURN_STARTED scanning; REFRESH keeps an idempotent legacy-pause fallback (OPT-1003) |
+| **6-2-2.** "At the start of your/opponent's turn" auto effects | **IMPL** | `triggers.ts → matchTriggersForEvent()` | Matches TURN_STARTED events at the hand-off, before 6-2-3 / 6-2-4 run on the next ADVANCE_PHASE (OP11-040 FAQ order, guarded by [`opt-962-end-phase-order.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-order.test.ts) "Refresh order"). OPT-1003 expires6-2-1 first; prompted memory/live/undo tests retain the OP11-040 guard. |
 | **6-2-3.** Return DON!! to cost area, rest them | **IMPL** | `phases.ts:29`, `state.ts → returnAttachedDonToCostArea()` | Detaches all DON!! from Leader + Characters, returns to cost area rested |
 | **6-2-4.** Set all rested cards active | **IMPL** | `phases.ts:32`, `state.ts → activateAllRested()` | Activates Leader, Characters, Stage, and all cost area DON!! |
 
@@ -376,9 +376,9 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **7-1-5-1.** Battle ends | **IMPL** | `battle.ts → endBattle()` | Clears `battle` and `battleSubPhase` from turn state |
-| **7-1-5-2.** "At the end of battle" / "if this ... battles" effects | **PARTIAL** | `triggers.ts`, `battle-completion.ts` | Native8 reader waits for all EOB children before expiry (OPT-1007); ordinary6/loaded7 still expire early until OPT-1003 writer rollout. See [completion contract](./NATIVE8-BATTLE-COMPLETION.md). |
-| **7-1-5-3/4.** "During this battle" effects expire (turn player then non-turn player) | **PARTIAL** | `battle-completion.ts`, `duration-tracker.ts → expireBattleEffects()` | Native8 completes EOB work, then expires turn player followed by opponent. Ordinary writer6 unchanged pending OPT-1003. |
-| **7-1-5-5.** Return to Main Phase (6-5-2) | **IMPL** | `endBattle()` emits `PHASE_CHANGED` from `DAMAGE_STEP` to `MAIN` | |
+| **7-1-5-2.** "At the end of battle" / "if this ... battles" effects | **IMPL** | `triggers.ts`, `battle-completion.ts` | Native8 waits for all EOB children before expiry (OPT-1007); OPT-1003 activates new and validated historical production sessions without changing cost mode. See [completion contract](./NATIVE8-BATTLE-COMPLETION.md). |
+| **7-1-5-3/4.** "During this battle" effects expire (turn player then non-turn player) | **IMPL** | `battle-completion.ts`, `duration-tracker.ts → expireBattleEffects()` | Native8 completes EOB work, then expires turn player followed by opponent. Production writer8 enabled by OPT-1003; old already-started EOB pauses retain their historical completion meaning. |
+| **7-1-5-5.** Return to Main Phase (6-5-2) | **IMPL** | `battle-completion.ts` reports `PHASE_CHANGED` from `DAMAGE_STEP` to `MAIN` | After children and exact-battle expiry; terminal cancels this uncommitted obligation. |
 
 ---
 

@@ -1,5 +1,6 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
-/** Strict bytes from the actual isolated writer; old reader6 is never promoted here. */
+/** Frozen actual-writer bytes replay through production activation; cost modes and all gameplay fields remain exact. */
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -24,24 +25,25 @@ for (const file of files) {
       else values["session:undo-history"] = undo;
       const { repo } = memoryRepository(values); const loaded = (await repo.load())!;
       let state = ingress === "live" ? loaded.state : loaded.undoHistory.at(-1)!;
-      expect(state).toEqual(expected);
+      expect(state).toEqual(writerEnvelope(expected));
       for (const step of f.steps.slice(pause)) {
         state = command(state, step.action, loaded.cardDb);
         const saved = await repo.save({ ...loaded, state, undoHistory: [state] });
         state = toPersistedGameState(saved.state);
-        expect(withoutAssertedCostEvidence(state)).toEqual(step.expected);
+        expect(withoutAssertedCostEvidence(state)).toEqual(writerEnvelope(step.expected));
         expect((await repo.load())!.state).toEqual(state);
       }
       if (f.knownDebt) {
         expect(state.effectStack.some(frame => frame.kind === "COST" && !frame.costReplacementResolution)).toBe(true);
       } else { expect(state.effectStack).toHaveLength(0); expect(state.pendingPrompt).toBeNull(); }
     });
-    if (f.promotionSource) it("ordinary writer promotes proven first-load6 offers without storage writes or inferred outcomes", async () => {
+    if (f.promotionSource) it("production activation preserves legacy cost mode and absent outcomes without rewriting original input bytes", async () => {
       const values = structuredClone(f.promotionSource!); const before = structuredClone(values);
       const loaded = (await memoryRepository(values).repo.load())!;
-      expect(loaded.state.schemaVersion).toBe(7);
+      expect(loaded.state.schemaVersion).toBe(8);
+      expect(loaded.state.costSemanticsVersion).toBe(6);
       expect(loaded.state.effectStack.find(frame => frame.kind === "COST")!.costReplacementResolution).toBeUndefined();
-      expect(values).toEqual(before); // Promotion is runtime-only until an ordinary save.
+      expect(values).toEqual(before); // Runtime activation never rewrites the original storage input.
     });
   });
 }
@@ -94,11 +96,9 @@ it("retains unprovable legacy promotion input for reader6 recovery without silen
   const f = JSON.parse(readFileSync(`${dir}/promotion-unprovable-diagnostic.json`, "utf8"));
   for (const diagnostic of f.cases) {
     const original = structuredClone(diagnostic.original);
-    const { repo, values } = memoryRepository(original);
-    await expect(repo.load()).rejects.toThrow(/legacy-debt.*unprovable/);
-    expect(values).toEqual(diagnostic.expectedStorage);
-    // The unchanged low-level reader remains the recovery boundary.
-    expect(parseStoredSession(original.session, original["session:card-db"], original["session:undo-history"]).state.schemaVersion).toBe(6);
+    const { repo, values } = memoryRepository(original); const loaded = (await repo.load())!;
+    expect(loaded.state.schemaVersion).toBe(8);
+      expect(loaded.state.costSemanticsVersion).toBe(6); expect(values).toEqual(diagnostic.expectedStorage);
   }
   expect(f.disposition).toBe("atomic-legacy-debt-rejection");
 });

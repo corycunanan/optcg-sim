@@ -1,4 +1,4 @@
-import { LegacyReaderRepository } from "./legacy-reader-repository.js";
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
@@ -17,7 +17,7 @@ type Scenario = { name: string; cases: Capture[] };
 const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 
 function start(make: typeof rig, kind: string) {
-  const r = make(); r.state.schemaVersion = 6; r.deck(0, 8); r.deck(1, 8);
+  const r = make(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 8); r.deck(1, 8);
   const thatch = r.put("OP08-045", 0, "CHARACTER", { data: { power: 6000 } });
   if (kind === "rayleigh") {
     const rayleigh = r.put("OP08-118", 1, "HAND", { data: { cost: 0, type: "Character" } });
@@ -133,18 +133,18 @@ it.skipIf(captureMode)("pinned Thatch corpus is complete and unchanged", () => {
   expect(manifest.scenarioCount).toBeGreaterThan(0);
   expect(manifest.startingPauseCount).toBeGreaterThan(0);
 });
-describe.skipIf(corpus.scenarios.length === 0)("OPT-968 alias-reader corpus: current parser/runtime with legacy repository boundary", () => {
+describe.skipIf(corpus.scenarios.length === 0)("OPT-968 alias-reader actual writer corpus", () => {
   for (const scenario of corpus.scenarios) for (const [index, captured] of scenario.cases.entries()) for (const mode of ["live", "undo"] as const) {
     it(`${scenario.name} / pause ${index} / ${mode}: exact later states, prompts, events, allocator identities`, async () => {
       const storage = new MemorySessionStorage(); await storage.put(structuredClone(captured.stored));
-      let loaded = (await new LegacyReaderRepository(storage, options).load())!;
+      let loaded = (await new SessionRepository(storage, options).load())!;
       if (mode === "undo") loaded = { ...loaded, state: loaded.undoHistory[0] };
       for (const [i, action] of captured.replies.entries()) {
         const result = resumePromptLifecycle(loaded.state, action, loaded.cardDb, { drainPregame: (s) => s, advanceStartOfTurn: (s) => s });
         expect(result.responseRejected).toBeFalsy();
-        const next = new MemorySessionStorage(); await new LegacyReaderRepository(next, options).save({ ...loaded, state: result.state });
-        loaded = (await new LegacyReaderRepository(next, options).load())!;
-        expect(json(toPersistedGameState(loaded.state))).toEqual(captured.expected[i]);
+        const next = new MemorySessionStorage(); await new SessionRepository(next, options).save({ ...loaded, state: result.state });
+        loaded = (await new SessionRepository(next, options).load())!;
+        expect(json(toPersistedGameState(loaded.state))).toEqual(writerEnvelope(captured.expected[i]));
       }
       expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.effectStack).toEqual([]);
     });

@@ -12,6 +12,7 @@ async function ownerFixture() {
   const rt = await runtime();
   const r = rig();
   r.state.schemaVersion = 7;
+  delete r.state.costSemanticsVersion;
   r.deck(0, 5);
   r.state.turn.actionsPerformedThisTurn = [
     { actionType: "PASS", timestamp: 699 },
@@ -165,6 +166,7 @@ for (const version of [6, 8] as const) {
     const { state, owner } = await ownerFixture();
     state.schemaVersion = version;
     if (version === 8) state.costSemanticsVersion = 6;
+    else delete state.costSemanticsVersion;
     state.turn = {
       ...state.turn,
       actionsPerformedThisTurn: [

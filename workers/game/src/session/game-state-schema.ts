@@ -40,10 +40,10 @@ import { log } from "../lib/log.js";
 import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
-export const GAME_STATE_SCHEMA_VERSION = 7;
+export const GAME_STATE_SCHEMA_VERSION = 8;
 /** The newest readable envelope; native8 carries exact battle completion and cost provenance. */
 export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 8;
-/** The newest runtime shape; ordinary new sessions remain version7. */
+/** The deployed runtime and default production writer use v8. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
@@ -580,8 +580,8 @@ export function convertToCurrentShape(
 
 /**
  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
- * Repository save proves/promotes legacy inputs to version7 before this
- * shape encoder. Explicit legacy6 and native7/8 provenance are retained. Every
+ * Ordinary producers remain version 6; native versions 7/8 are retained per
+ * live state and undo snapshot. Every frame has its discriminant, every
  * End Phase frame with its stage. A runtime frame without a stage can only be
  * a version 1 frame, so it is written with the legacy stage, which is its
  * version 1 meaning.
@@ -599,10 +599,11 @@ export function toPersistedGameState(state: GameState): GameState {
     : state.effectStack;
   const { schemaVersion: _schemaVersion, ...rest } = state;
   return {
-    // Only the repository promotes legacy inputs. Loaded8 preserves both its
-    // envelope and explicit cost mode; low-level legacy controls remain6.
-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 8 ? 8 : state.schemaVersion === 7 ? 7 : 6,
+    // Explicit historical envelopes retain their reader semantics. Production
+    // session ingress activates v8 separately, after validating the old shape.
+    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion ?? GAME_STATE_SCHEMA_VERSION,
     ...rest,
+    ...(state.schemaVersion === undefined ? { costSemanticsVersion: 6 as const } : {}),
     effectStack: effectStack.map((frame) => ({
       ...frame,
       kind: frameKindOf(frame),
