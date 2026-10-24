@@ -39,6 +39,7 @@ import {
   getBattleDefenderPower,
 } from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
+import { parkBattleCompletion } from "./battle-completion.js";
 import { expireBattleEffects } from "./duration-tracker.js";
 import { hasEffectiveKeyword } from "./keywords.js";
 import { checkReplacementForKO } from "./replacements.js";
@@ -1435,7 +1436,7 @@ function endBattle(
   // Expire battle-scoped effects before clearing battle state
   const battleId = state.turn.battle?.battleId;
   const battle = state.turn.battle;
-  if (battleId) {
+  if (battleId && state.schemaVersion !== 8) {
     state = expireBattleEffects(state, battleId);
   }
 
@@ -1488,6 +1489,18 @@ function endBattle(
         ],
       },
     };
+  }
+
+  if (battle && state.schemaVersion === 8) {
+    state = { ...state, turn: { ...state.turn, battle: null, battleSubPhase: null } };
+    return parkBattleCompletion(state, {
+      battleId: battle.battleId,
+      attackerInstanceId: battle.attackerInstanceId,
+      targetInstanceId: battle.targetInstanceId,
+      turnPlayerIndex: state.turn.activePlayerIndex,
+      turnNumber: state.turn.number,
+      aborted: options.aborted === true,
+    });
   }
 
   events.push({

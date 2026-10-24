@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
 /** Candidate computation for player-selected costs. */
 import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
 import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../../../types.js";
@@ -267,7 +268,7 @@ export function computeCostTargets(
   switch (cost.type) {
     case "DON_MINUS":
     case "VARIABLE_DON_RETURN": {
-      if (state.schemaVersion === 7) {
+      if (hasNativeCostSemantics(state)) {
         const filter = cost.filter;
         const restricted = filter?.is_active === true || filter?.is_rested === true || !!filter?.state;
         return [

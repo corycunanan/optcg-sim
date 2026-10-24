@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import {
   captureCostExpectedRoot,
   costRootMatches,
@@ -271,7 +272,7 @@ export class SessionCoordinator {
     state = this.surfaceRevealTrigger(state, cardDb);
     // Initial pipeline cleanup has finished. Only newly created evidence owners
     // receive the actual published root; existing snapshots are never blessed.
-    if (state.schemaVersion === 7) {
+    if (hasNativeCostSemantics(state)) {
       const priorIds = new Set(
         stateBeforePipeline.effectStack.map((frame) => frame.id)
       );
@@ -360,7 +361,7 @@ export class SessionCoordinator {
     // Presence is a sanctioned exact transport delta, including under a cost
     // replacement child. Never bless an unrelated gameplay divergence.
     if (
-      state.schemaVersion !== 7 ||
+      !hasNativeCostSemantics(state) ||
       state.effectStack.some(
         (frame) =>
           frame.costExpectedRoot &&

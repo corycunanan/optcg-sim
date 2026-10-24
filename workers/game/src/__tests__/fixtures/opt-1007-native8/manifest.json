@@ -1,0 +1,194 @@
+{
+  "evidence": "synthetic isolated-writer actual session captures; never production captures",
+  "base": "69125276e1bb4a1eba7ea2170056cd392b02885b",
+  "producerCommit": "2b9f10cb8ed4d61648a81759c7142b7a31f4304f",
+  "generator": "workers/game/src/__tests__/opt-1007-producer.test.ts",
+  "generatorArchive": "producer/opt-1007-producer.test-source",
+  "productionPatch": "producer/production-from-69125276.patch",
+  "generatorCommand": "pnpm --filter optcg-game exec vitest run src/__tests__/opt-1007-producer.test.ts",
+  "replayCommand": "pnpm --filter optcg-game exec vitest run src/__tests__/opt-1007-native8-replay.test.ts",
+  "scenarioCount": 34,
+  "completedScenarios": 33,
+  "diagnosticLegacyDebtScenarios": 1,
+  "startingBoundariesIncludingFinal": 187,
+  "actionTransitions": 153,
+  "replayContexts": [
+    "live",
+    "undo",
+    "embedded-undo"
+  ],
+  "completionOwnerBoundaries": 42,
+  "families": [
+    "abort-attack",
+    "abort-block",
+    "abort-counter",
+    "both-players",
+    "character",
+    "cost",
+    "cost-replacement",
+    "leader",
+    "life-trigger",
+    "nested",
+    "power-condition",
+    "protected",
+    "replacement-accept",
+    "replacement-decline",
+    "source-leaves",
+    "stack-exhaustion",
+    "terminal"
+  ],
+  "files": {
+    "abort-attack-mode6.json": {
+      "sha256": "50645d540cc22fcf69851697f631378dcdfcceca91f696595affa3857c87c8f0",
+      "bytes": 97572
+    },
+    "abort-attack-mode7.json": {
+      "sha256": "77cd54cf986f93f9140635f6a678126bae4cc3d0298259b8683bf778992c93d9",
+      "bytes": 97572
+    },
+    "abort-block-mode6.json": {
+      "sha256": "6cb73989913df6ed240165003bc12e4e22171552a6e95e6388635b3ab86f1eff",
+      "bytes": 123500
+    },
+    "abort-block-mode7.json": {
+      "sha256": "aa6515f235d2e9165259da0f659ce75a35a86bc55fadd7f4481f5fe0a2bd35bf",
+      "bytes": 123500
+    },
+    "abort-counter-mode6.json": {
+      "sha256": "0c37217296b408d507c0197565985a610c3e1932b3c44d786128da8e4c03486b",
+      "bytes": 144315
+    },
+    "abort-counter-mode7.json": {
+      "sha256": "434c03899da41cc9d1f7b60ff0cf027c9f5d24eb6d6c01c43aa9c4539bbb2636",
+      "bytes": 144315
+    },
+    "both-players-mode6.json": {
+      "sha256": "dfbd82b6a3263b259a0d3599f23a5b59ec0a0dc5147bbe1f1ba275262ff5986f",
+      "bytes": 143483
+    },
+    "both-players-mode7.json": {
+      "sha256": "7e4f6eb7672a3eb0704683b00ced5eeb61011cee3327ea1c3873dd573130802c",
+      "bytes": 143483
+    },
+    "character-mode6.json": {
+      "sha256": "5a366f1bef02c53455944189a1af14076847e4d18663988f04d905aabcce7190",
+      "bytes": 109187
+    },
+    "character-mode7.json": {
+      "sha256": "eea9e9c89db0eaf61c671b17a5ccab4025dffc7e754233b97aa93426ebbe7fe6",
+      "bytes": 109187
+    },
+    "cost-mode6.json": {
+      "sha256": "c0556d4fe43853f7843e16397cff8ed2bd7654f7c55eb5ac546813baf859b053",
+      "bytes": 108815
+    },
+    "cost-mode7.json": {
+      "sha256": "98fd6e76973ba0c27a41ece817bc938a5c148e8071e7522df57eebedf352bcbc",
+      "bytes": 163488
+    },
+    "cost-replacement-mode6.json": {
+      "sha256": "f539355999ebdf8be564d72a45dad67d3fddea2a56b998a86f98a292aab2849e",
+      "bytes": 232859
+    },
+    "cost-replacement-mode7.json": {
+      "sha256": "5ca96f3a7af5019a8f0a903d27b7484211f48412639a57dc9d935c0539377e52",
+      "bytes": 243092
+    },
+    "leader-mode6.json": {
+      "sha256": "4184e60e8e98d6eb0e59f1bd3000c0c5694941c94772ec215e67d4d64373bfb1",
+      "bytes": 73159
+    },
+    "leader-mode7.json": {
+      "sha256": "d966485a3af8325934b0f385ffd1d44f85c8655a7310410b110c317cf41cb687",
+      "bytes": 73159
+    },
+    "life-trigger-mode6.json": {
+      "sha256": "4621b81f56a4818c63f3d0a1cbc3834ec9aa8b6715f2519b712fe51e40fa36a0",
+      "bytes": 138286
+    },
+    "life-trigger-mode7.json": {
+      "sha256": "2dcf54c6883c1409093d2c400b5d12a9fecd37c6a0ea88352e84f58bc86e8aa6",
+      "bytes": 138286
+    },
+    "nested-mode6.json": {
+      "sha256": "46ff9c702c1d776fe6ca15785981da19ff5b204faa59b629553f3c03b60ab32d",
+      "bytes": 147974
+    },
+    "nested-mode7.json": {
+      "sha256": "3d2010dd69f6133a507e45bc4736a603da49acbc28fae021e736697df8e66d3b",
+      "bytes": 147974
+    },
+    "power-condition-mode6.json": {
+      "sha256": "a7fa099f18c75effa2146753dd4e81cb8fd4046a6c3a3e0720ecc51b5ba4b4d9",
+      "bytes": 120737
+    },
+    "power-condition-mode7.json": {
+      "sha256": "c1b5088da36f5f3caf0c10e1bb94acf5312b59afda46b3a44464d8b509e72626",
+      "bytes": 120737
+    },
+    "protected-mode6.json": {
+      "sha256": "1ec4d879d0d1b33dd8c94aa1fd663f42955e31b70cb0fdd8037c2a367e7b6ef5",
+      "bytes": 261318
+    },
+    "protected-mode7.json": {
+      "sha256": "008525f10b7cddcab0378f43a9b4a5bc74c0ef03f50d59560c41da66f87a09a8",
+      "bytes": 275636
+    },
+    "replacement-accept-mode6.json": {
+      "sha256": "745bbcaf7661ebe2f1f965f75ca8256d6dc46798ee84066729825413e0329b78",
+      "bytes": 143751
+    },
+    "replacement-accept-mode7.json": {
+      "sha256": "be441a0d7651c693a3131ed552314d2bb9d377ea7730dc4d0092f063c9f69c64",
+      "bytes": 143751
+    },
+    "replacement-decline-mode6.json": {
+      "sha256": "1001c084cc5421fe91a8be1ce0268016f85910de8e43fc499325c2f547c0a6a2",
+      "bytes": 141551
+    },
+    "replacement-decline-mode7.json": {
+      "sha256": "26f85de0c7e90fe3ddc0acaae2d28899138387d57b7fd11a09f6a364e494df52",
+      "bytes": 141551
+    },
+    "source-leaves-mode6.json": {
+      "sha256": "7d85435dccb72df45feee06a472f1d336dc95ddb8671de8388d1edff39655742",
+      "bytes": 141908
+    },
+    "source-leaves-mode7.json": {
+      "sha256": "4303dcb294653659d0afe469cdda3d9d2bffbee033ae3ef75f41bc5b898b51d5",
+      "bytes": 141908
+    },
+    "stack-exhaustion-mode6.json": {
+      "sha256": "a51d692fbb8f0ce499dedf2419f5ad86698386f1dc50ae7fd2be978d8527b296",
+      "bytes": 126095
+    },
+    "stack-exhaustion-mode7.json": {
+      "sha256": "5bb6b46b7d6e5be89708cfbd9c9a498c96a509700bc38a2ed4d9f132912eedc7",
+      "bytes": 126095
+    },
+    "terminal-mode6.json": {
+      "sha256": "09790c5982379c49cfdfc2c1072f25986850b3730927a373636d2bf3bc00fbf2",
+      "bytes": 106174
+    },
+    "terminal-mode7.json": {
+      "sha256": "8d88ecbc614704f082572f7574a08c14dd19d2c0da8a6d5fb8ad16bacb58be1a",
+      "bytes": 106174
+    },
+    "producer/opt-1007-producer.test-source": {
+      "sha256": "cbfc54242d5798ad7b778f0343c9e95357b3e5dab2a58f8f476471158fbbb09f",
+      "bytes": 12107
+    },
+    "producer/production-from-69125276.patch": {
+      "sha256": "35d554e50457c24a7cf4051c92081d40f9be74d614785d3b1dbf2038fd58e4e8",
+      "bytes": 72386
+    },
+    "baseline/baseline-cost.test-source": {
+      "sha256": "9d475c0d0b007ed5f71f52093981b50f12e6418af66dc4e08839b5972b5d6bc0",
+      "bytes": 11272
+    },
+    "baseline/cost-replacement-mode6.json": {
+      "sha256": "186361401095198df40ec3e25ffabc495b78d48ae39c5505b38e44a38c4279b0",
+      "bytes": 228886
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
 import { canonicalCostReplacementReplay, lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
 import { updateFrameById } from "../../damage-frames.js";
 import { decodeDonReturnIds } from "../actions/don.js";
@@ -456,7 +457,7 @@ export function handleAwaitingCostSelection(
     ? applyCostTransactionState(baselineState, topFrame.costTransactionState)
     : baselineState;
   const updateCostOwner = (candidate: GameState, partial: Partial<EffectStackFrame>): GameState =>
-    candidate.schemaVersion === 7
+    hasNativeCostSemantics(candidate)
       ? updateFrameById(candidate, topFrame.id, frame => ({ ...frame, ...partial }))
       : updateTopFrame(candidate, partial);
   const suspendCurrentFrame = (
@@ -476,11 +477,11 @@ export function handleAwaitingCostSelection(
     // Accepted mandatory substitutes already execute on the root baseline.
     // Their prefix and use marker are committed; staged payment stays on COST.
     const offered = materializeReplacementOffer(
-      withTransaction.schemaVersion === 7 && committedReplacement ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
+      hasNativeCostSemantics(withTransaction) && committedReplacement ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
       pendingPrompt,
       offer,
     );
-    if (offered.state.schemaVersion === 7 && topFrame.costExpectedRoot) {
+    if (hasNativeCostSemantics(offered.state) && topFrame.costExpectedRoot) {
       offered.state = updateCostOwner(offered.state, {
         costExpectedRoot: captureCostExpectedRoot(offered.state),
       });
@@ -907,7 +908,7 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
-      const replay = nextState.schemaVersion === 7
+      const replay = hasNativeCostSemantics(nextState)
         ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
@@ -926,7 +927,7 @@ export function handleAwaitingCostSelection(
             selectedInstanceIds: selected,
           },
           costReplacementChecked: true,
-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,
@@ -983,7 +984,7 @@ export function handleAwaitingCostSelection(
     }
 
     if (!topFrame.costReplacementChecked) {
-      const replay = nextState.schemaVersion === 7
+      const replay = hasNativeCostSemantics(nextState)
         ? canonicalCostReplacementReplay(topFrame, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ordered, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
@@ -1004,7 +1005,7 @@ export function handleAwaitingCostSelection(
             destination: action.destination,
           },
           costReplacementChecked: true,
-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,
@@ -1150,7 +1151,7 @@ export function handleAwaitingCostSelection(
     if (!topFrame.costReplacementChecked) {
       // Placing the Character is an effect-caused removal; a replacement means
       // the printed cost was not paid (rules 8-3-1-3-1 / 8-3-1-7).
-      const replay = nextState.schemaVersion === 7
+      const replay = hasNativeCostSemantics(nextState)
         ? canonicalCostReplacementReplay(topFrame, cost.position === "TOP_OR_BOTTOM" ? { ...action, type: "PLAYER_CHOICE", choiceId: lifeDestinationChoiceId(placedIds, position) } : { type: "SELECT_TARGET", selectedInstanceIds: placedIds }) : null;
       const stagedBeforeReplacement = nextState;
       const replacement = checkReplacementForRemoval(
@@ -1166,7 +1167,7 @@ export function handleAwaitingCostSelection(
         nextState = updateCostOwner(nextState, {
           costReplacementAction: replay ?? action,
           costReplacementChecked: true,
-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer, replacement.replaced);
       }
@@ -1340,12 +1341,12 @@ export function handleAwaitingCostSelection(
     const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
     // Rule 1-3-2-2: zero repetitions perform no removal. There is no target
     // for a replacement scan or canonical replay; keep the closed reader grammar.
-    const zeroFieldPayment = nextState.schemaVersion === 7 && amount === 0 && selected.length === 0;
+    const zeroFieldPayment = hasNativeCostSemantics(nextState) && amount === 0 && selected.length === 0;
     if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !zeroFieldPayment && !topFrame.costReplacementChecked) {
       // Cost exits are still effect-caused removal events, but a replacement
       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
       // Park the already-validated selection on the existing cost frame.
-      const replay = nextState.schemaVersion === 7
+      const replay = hasNativeCostSemantics(nextState)
         ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
       const stagedBeforeReplacement = nextState;
       const replacementInput = applyCostTransactionState(
@@ -1393,7 +1394,7 @@ export function handleAwaitingCostSelection(
             selectedInstanceIds: selected,
           },
           costReplacementChecked: true,
-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         });
         return suspendCurrentFrame(
           nextState,

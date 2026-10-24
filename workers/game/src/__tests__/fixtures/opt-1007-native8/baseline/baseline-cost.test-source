@@ -1,0 +1,145 @@
+/** Isolated writer capture generator; never installed in the reader release. */
+import { it, expect } from "vitest";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { endPhaseRig, synSchema } from "./opt-962-rig.js";
+import { command, memory, runtime } from "./native7-producer-support.js";
+import { CARDS } from "./helpers.js";
+import type { GameAction, GameState } from "../types.js";
+import { continuationBoundary } from "../engine/effect-stack.js";
+import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
+import { executePass } from "../engine/battle.js";
+import { continuePipelineFromExecution } from "../engine/pipeline.js";
+
+it("captures actual native8 writer action/prompt boundaries", async () => {
+  const rt = await runtime();
+  const out = new URL("file:///tmp/opt1007-baseline-corpus/");
+  mkdirSync(out, { recursive: true });
+  const families: string[] = ["cost-replacement"];
+  for (const mode of [6] as const) for (const family of families) {
+    const r = endPhaseRig({ handSize: family === "protected" || family === "cost-replacement" ? 1 : 0 });
+    expect(r.state.schemaVersion).toBeUndefined();
+    r.state.schemaVersion = 6;
+
+    const steps: { action: GameAction; actor: 0 | 1; state: GameState }[] = [];
+    let sourceId = r.state.players[0].leader.instanceId;
+    let targetId = r.state.players[1].leader.instanceId;
+    let paymentId = "";
+    let eventId = "";
+    let victimId = "";
+    const attack = { type: "DECLARE_ATTACK", attackerInstanceId: sourceId, targetInstanceId: targetId } as GameAction;
+    const eob = (actions: any[], optional = false, costs?: any[]) => r.putSyn(`EOB-${family}`, synSchema(`EOB-${family}`, "Character", [...(family === "cost-replacement" ? [{ id: "replace-self", category: "replacement" as const, replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" as const }, flags: { optional: true, once_per_turn: true }, replacement_actions: [{ type: "DRAW" as const, params: { amount: 1 } }, { type: "TRASH_FROM_HAND" as const, params: { amount: 1 } }] }] : []), { id: "end", category: "auto", trigger: { event: "END_OF_BATTLE" }, ...(costs ? { costs } : {}), ...(optional ? { flags: { optional: true } } : {}), actions }]), 0, "CHARACTER", { power: 1000 });
+    if (family === "protected") {
+      const a = r.put("ST08-013", 0, "CHARACTER", { power: 4000 }, 1);
+      const t = r.putSyn("PROTECTED", null, 1, "CHARACTER", { power: 1000 });
+      t.state = "RESTED";
+      sourceId = a.instanceId; targetId = t.instanceId;
+      paymentId = r.state.players[1].hand[0].instanceId;
+      eventId = r.put("OP02-118", 1, "HAND", { type: "Event", cost: 0, power: null, counter: null, effectText: "[Counter] You may trash 1 card from your hand: Select up to 1 of your Characters. The selected Character cannot be K.O.'d during this battle." }).instanceId;
+    } else if (family === "character" || family.startsWith("replacement-")) {
+      const t = family === "character" ? r.putSyn("DEFENDER", null, 1, "CHARACTER", { power: 1000 }) : r.put("OP10-034", 1, "CHARACTER", { power: 1000 });
+      t.state = "RESTED"; targetId = t.instanceId;
+      eob([{ type: "DRAW", params: { amount: 1 } }], true);
+    } else if (family === "nested" || family === "source-leaves") {
+      const actions = family === "nested" ? [
+        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_BATTLE" } },
+        { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "BLOCKER" }, duration: { type: "THIS_BATTLE" } },
+      ] : [{ type: "RETURN_TO_HAND", target: { type: "SELF" } }];
+      const s = eob([...actions, { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }]);
+      sourceId = s.instanceId;
+      const v = r.putSyn("VICTIM", synSchema("VICTIM", "Character", [{ id: "ko", category: "auto", trigger: { keyword: "ON_KO" }, flags: { optional: true }, actions: [{ type: "DRAW", params: { amount: 1 } }] }]), 1, "CHARACTER", { power: 10000 });
+      v.state = "RESTED"; targetId = v.instanceId; victimId = v.instanceId;
+    } else if (family === "both-players") {
+      eob([{ type: "DRAW", params: { amount: 1 } }], true);
+      r.putSyn("OPPONENT-EOB", synSchema("OPPONENT-EOB", "Character", [{ id: "other-end", category: "auto", trigger: { event: "END_OF_BATTLE" }, flags: { optional: true }, actions: [{ type: "DRAW", params: { amount: 1 } }] }]), 1, "CHARACTER");
+    } else if (family === "power-condition") {
+      const s = r.putSyn("BATTLE-POWER", synSchema("BATTLE-POWER", "Character", [
+        { id: "attack-buff", category: "auto", trigger: { keyword: "WHEN_ATTACKING" }, actions: [
+          { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 2000 }, duration: { type: "THIS_BATTLE" } },
+          { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "BLOCKER" }, duration: { type: "THIS_BATTLE" } },
+        ] },
+        { id: "end-power", category: "auto", trigger: { event: "END_OF_BATTLE" }, conditions: [{ type: "SELF_POWER", operator: ">=", value: 6000 }], flags: { optional: true }, actions: [{ type: "DRAW", params: { amount: 1 } }] },
+      ]), 0, "CHARACTER", { power: 4000 }); sourceId = s.instanceId;
+    } else if (family === "terminal") {
+      eob([{ type: "DRAW", params: { amount: 1 } }, { type: "WIN_GAME", params: {} }], true);
+    } else if (family.startsWith("abort-")) {
+      const step = family.slice(6);
+      const a = r.putSyn("ABORT-ATTACKER", null, 0, "CHARACTER", { power: 5000 }); sourceId = a.instanceId;
+      const keyword = step === "attack" ? "ON_OPPONENT_ATTACK" : step === "block" ? "ON_BLOCK" : "COUNTER_EVENT";
+      const schema = synSchema(`REMOVER-${step}`, step === "counter" ? "Event" : "Character", [{ id: "remove", category: "auto", trigger: { keyword } as any, actions: [{ type: "TRASH_CARD", target: { type: "CHARACTER", controller: "EITHER", count: { up_to: 1 } } }] }]);
+      const remover = r.putSyn(`REMOVER-${step}`, schema, 1, step === "counter" ? "HAND" : "CHARACTER", step === "counter" ? { type: "Event", cost: 0, power: null, counter: null, effectText: "[Counter] Remove a Character." } : { keywords: { ...CARDS.BLOCKER.keywords } });
+      eventId = remover.instanceId;
+      eob([{ type: "DRAW", params: { amount: 1 } }], true);
+    } else if (family === "life-trigger") {
+      r.db.set(CARDS.TRIGGER.id, CARDS.TRIGGER);
+      r.state.players[1].life[0].cardId = CARDS.TRIGGER.id;
+      eob([{ type: "DRAW", params: { amount: 1 } }], true);
+    } else if (family === "cost" || family === "cost-replacement") {
+      const s = eob([{ type: "DRAW", params: { amount: 1 } }], true, [{ type: "REST_DON", amount: 1 }, ...(family === "cost-replacement" ? [{ type: "TRASH_SELF" }] : []), { type: "DON_MINUS", amount: 1 }]);
+      r.state.prohibitions.push({ id: "held-donor", sourceCardInstanceId: s.instanceId, sourceEffectBlockId: "end", prohibitionType: "CANNOT_REFRESH", scope: {}, duration: { type: "SKIP_NEXT_REFRESH" }, controller: 0, appliesTo: [r.state.players[0].donCostArea[0].instanceId], usesRemaining: null });
+
+    }
+    // Every path also carries a genuine battle modifier to the correct battle expiry.
+    let initial = structuredClone(r.state);
+    function act(action: GameAction, actor: 0 | 1 = r.state.pendingPrompt?.respondingPlayer ?? r.state.turn.activePlayerIndex) {
+      r.state = command(rt, r.state, r.db, action, actor);
+      steps.push({ action, actor, state: structuredClone(r.state) });
+    }
+    if (family === "stack-exhaustion") {
+      act({ type: "DECLARE_ATTACK", attackerInstanceId: sourceId, targetInstanceId: targetId });
+      act({ type: "PASS" }, 1);
+      const boundary = continuationBoundary(r.state, sourceId, 0);
+      r.state = { ...boundary.state, effectStack: Array.from({ length: MAX_EFFECT_STACK_DEPTH }, (_, i) => ({ ...boundary.frame, id: `limit-${i}` })) };
+      initial = structuredClone(r.state);
+      steps.length = 0;
+      const executed = executePass(r.state, r.db);
+      r.state = continuePipelineFromExecution(executed.state, executed, r.db, 1).state;
+      steps.push({ action: { type: "PASS" }, actor: 1, state: structuredClone(r.state) });
+      expect(r.state.status).toBe("FINISHED");
+    } else {
+    act({ type: "DECLARE_ATTACK", attackerInstanceId: sourceId, targetInstanceId: targetId });
+    if (family === "abort-attack") {
+      act({ type: "SELECT_TARGET", selectedInstanceIds: [sourceId] });
+    } else {
+      if (family === "abort-block") act({ type: "DECLARE_BLOCKER", blockerInstanceId: eventId }, 1);
+      else act({ type: "PASS" }, 1);
+      if (family === "abort-block") act({ type: "SELECT_TARGET", selectedInstanceIds: [sourceId] });
+      else {
+        if (family === "protected") {
+          act({ type: "USE_COUNTER_EVENT", cardInstanceId: eventId, counterTargetInstanceId: targetId }, 1);
+          act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+          act({ type: "SELECT_TARGET", selectedInstanceIds: [paymentId] });
+          act({ type: "SELECT_TARGET", selectedInstanceIds: [targetId] });
+        } else if (family === "abort-counter") {
+          act({ type: "USE_COUNTER_EVENT", cardInstanceId: eventId, counterTargetInstanceId: targetId }, 1);
+          act({ type: "SELECT_TARGET", selectedInstanceIds: [sourceId] });
+        }
+        if (family !== "abort-counter") act({ type: "PASS" }, 1);
+      }
+    }
+    }
+    let count = 0;
+    while (r.state.pendingPrompt && count++ < 20) {
+      const p = r.state.pendingPrompt.options;
+      if (p.promptType === "OPTIONAL_EFFECT") act({ type: "PLAYER_CHOICE", choiceId: family === "replacement-decline" && r.state.effectStack.some(f => f.battleDamage) ? "skip" : "accept" });
+      else if (p.promptType === "SELECT_TARGET") act({ type: "SELECT_TARGET", selectedInstanceIds: [victimId || p.validTargets[0]] });
+      else if (p.promptType === "PLAYER_CHOICE") act({ type: "PLAYER_CHOICE", choiceId: p.choices.find(c => !c.disabled && c.id !== "done")!.id });
+      else if (p.promptType === "REVEAL_TRIGGER") act({ type: "REVEAL_TRIGGER", reveal: true });
+      else throw Error(`Unhandled ${family} ${JSON.stringify(p)}`);
+    }
+    expect(count).toBeLessThan(20);
+    const diagnostic = family === "cost-replacement" && mode === 6;
+    if (diagnostic) {
+      expect(r.state.pendingPrompt).toBeNull();
+      expect(r.state.effectStack.at(-1)?.costReplacementChecked).toBe(true);
+      expect(r.state.effectStack.at(-1)?.costReplacementResolution).toBeUndefined();
+    } else expect(r.state.effectStack).toHaveLength(0);
+    async function capture(state: GameState) {
+      const m = memory(rt);
+      await m.repo.save({ state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [state] });
+      expect((await m.repo.load())!.state.schemaVersion).toBe(6);
+      return m.values;
+    }
+    const corpus = { disposition: diagnostic ? "legacy-cost-debt" : "completed", id: `${family}-mode${mode}`, family, mode, sourceId, targetId, victimId, initial: await capture(initial), steps: await Promise.all(steps.map(async step => ({ action: step.action, actor: step.actor, stored: await capture(step.state) }))) };
+    writeFileSync(new URL(`${corpus.id}.json`, out), JSON.stringify(corpus) + "\n");
+  }
+});

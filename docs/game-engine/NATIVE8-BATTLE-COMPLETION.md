@@ -1,0 +1,38 @@
+# Native8 End-of-Battle completion reader (OPT-1007)
+
+Rules source: Comprehensive Rules v1.2.0, `rule_comprehensive.md` §§7-1-5-2 through 7-1-5-5. End-of-Battle effects finish before the turn player's and then the non-turn player's during-this-battle effects become invalid. Card sources: ST08-013 (`docs/cards/ST-08.md:64`), OP02-118 (`docs/cards/OP-02.md:736`), ST01-002 (`docs/cards/ST-01.md`); existing removal-cause interpretation remains unchanged.
+
+## Runtime contract
+
+The ordinary writer remains6, and loaded6/7 retain their existing battle and cost behavior. Only explicitly loaded8 executes the new completion contract and creates its future completion owners. This is the reader prerequisite; OPT-1003 activates the writer only after this reader is deployed and verified.
+
+Native8 requires `costSemanticsVersion: 6 | 7`. No inference/default applies. Mode6 preserves deployed6 costs, including known legacy replacement debt; mode7 preserves native7 identity choices, outcome replay and expected-root evidence. Stable completed8 states retain their exact envelope and mode after their last completion frame disappears. Versions below8 reject the provenance field and new continuation. Mode6 rejects native7-only cost outcomes, expected-root evidence and DON identity picker metadata. The shared capability helper replaces exact7 cost predicates together, including session/coordinator publication and prompt evidence guards; no state is silently promoted by this release.
+
+`BATTLE_COMPLETION` is one canonical root continuation boundary. Its metadata records exact battle ID, combatants, turn player, turn number and abort disposition. It owns no prompt, action suffix, cost state, trigger work or accumulated event debt. It must be unique, below the whole reused trigger execution owner and all descendants, with the live battle already cleared. This preserves payload-based combatant filters and prevents Damage Step replay. Strict validation applies independently to live state and every separate/embedded undo entry before retention; mixed modes are not converted.
+
+End-of-Battle event publication and trigger reporting happen once while battle durations remain visible. Existing battle-result bookkeeping still records the completed attack at battle end; aborted battles do not gain ATTACKED history. The completion boundary waits until all generations, both players' effects and every nested child have finished. It then detaches itself, expires the exact battle's turn-player effects/prohibitions followed by the opponent's, and reports BATTLE_RESOLVED and DAMAGE_STEP→MAIN once. Prohibition ownership follows the existing ownerController fallback. Legacy prohibitions lacking an expiry stamp use the boundary's exact battle ID during cleanup. New THIS_BATTLE modifiers/prohibitions created by End-of-Battle children use the boundary as their duration context after `turn.battle` clears.
+
+BATTLE_RESOLVED and return-to-Main are uncommitted completion obligations, not early events retained in the generic publication accumulator. A terminal effect or engine-limit failure cancels them. Existing terminal handling clears all continuations and publishes committed prefixes before the single GAME_OVER. A missing/duplicate/stale owner or wrong turn fails clearly; no owner or outcome is reconstructed. Stack-limit failure during insertion cannot leave a partial owner.
+
+## Acceptance and evidence
+
+| Clause | Evaluation time / chooser | Observable result | Evidence |
+| --- | --- | --- | --- |
+| OP02-118 / ST08-013 | Defender pays counter hand cost, attacker accepts EOB option | Both Characters survive; failed protected KO skips IF_DO; protection expires after the option | Authored pipeline test through memory/live/undo; protected producer families |
+| Battle power and keyword duration | EOB conditions and nested target/On-KO child prompts | Existing battle buff satisfies EOB power condition; EOB-created power/Blocker grants carry exact battle ID and remain through children, then disappear | power-condition and nested producer families |
+| Turn-player then opponent expiry | After child stack quiesces | Seat-specific helper retains opponent effects until its step and preserves another battle's effects | Independent helper assertions plus completion implementation order |
+| Battle completion | Character/Leader damage, Life Trigger, battle KO replacement, aborted Attack/Block/Counter | One EOB and one completion; no damage replay; abortion retains its flag | Writer corpus and session replay |
+| Owner and publication | Source leaves, reused execution owner, nested/both-player children, terminal and stack limit | Completion remains below owner; no early BATTLE_RESOLVED; terminal cancels ordinary advancement | Writer corpus and strict/terminal unit tests |
+| Cost provenance | EOB ordinary payment and replacement child in both modes | Mode6 stays legacy; mode7 expected-root evidence survives later prompts; Decision10 replacement commits substitute and abandons staged costs | Cost families, legacy baseline probe and unchanged native7 suites |
+
+The corpus README/manifest pins the actual isolated writer commit, complete source patch, generator and JSON payload hashes, and derives all totals from its payloads. It is synthetic evidence, not production capture. Every action is routed through SessionCoordinator/prompt lifecycle and persisted/reloaded before its successor. Replay starts at every captured boundary, including later pauses and completion, through live storage, separate undo and embedded undo, preserving exact IDs, counters, events and state. JSON fixture encoding omits undefined properties only; no identity normalization is used. Stack-exhaustion input deliberately seeds a canonical full stack and calls the existing public battle facade plus pipeline continuation; it is an adversarial capacity case, not a naturally reached production capture.
+
+One mode6 replacement family is diagnostic: existing REST_DON→TRASH_SELF→DON_MINUS payment with a prompted self-removal substitute leaves a checked COST owner with no outcome and no prompt. The same controlled scenario on base69125276 exhibits that debt. Native8.mode6 preserves it losslessly and keeps completion parked; this is not a completion pass or an inferred payment outcome. Mode7 preserves existing Decision10: replacement child effects commit, staged costs roll back, remaining costs/post-colon effect do not execute, then EOB completes. This PR does not resolve the separately documented Decision10 rules deviation.
+
+## Rollout and rollback
+
+Deploy and verify this reader before OPT-1003 enables any native8 writer. Production capture access was unavailable at this implementation checkpoint; capture evidence or an explicit scoped synthetic-only exception remains a coordinator-owned rollout gate. Synthetic fixtures must not be described as production sessions.
+
+The future writer may promote6→8 with mode6 and7→8 with mode7 without turning on unrelated cost semantics. It must apply this to live and undo consistently before actions and retain historical meaning for already-started continuations. In particular, a legacy EOB prompt whose effects already expired has no completion obligation to invent; only subsequently ending battles create new boundaries. This reader performs no promotion or old-session repair. End Phase stage bytes are unchanged. Refresh ordering is still the separate OPT-1003 writer change.
+
+After native8 is written, the semantic rollback floor is this native8 reader; a7-only reader rejects8 and must not reinterpret it. No reader retirement, production repair, general cost migration or automatic outcome reconstruction is authorized here.
