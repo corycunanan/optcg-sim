@@ -345,10 +345,16 @@ describe("OPT-963 reference integrity for the new kinds, with a located reason",
     expectRejected(state, /effectStack\[1\]\.effectDamage\.parentFrameId names frame "elsewhere", which is not the frame directly below it/);
   });
 
+  it("accepts a same-shape self-damage parent in the v3 ingress", () => {
+    const state = raw("effect-window-with-parent-chain");
+    state.effectStack[0] = { ...state.effectStack[0], pausedAction: { type: "SELF_TAKE_DAMAGE", params: { amount: 1 } } };
+    expect(() => convertPersistedGameState(state, "state")).not.toThrow();
+  });
+
   it("rejects a parent frame that is not a chain paused on DEAL_DAMAGE", () => {
     const state = raw("effect-window-with-parent-chain");
     state.effectStack[0] = { ...state.effectStack[0], pausedAction: { type: "DRAW", params: { amount: 1 } } };
-    expectRejected(state, /parentFrameId names frame "v3-parent-chain", which is not an effect chain paused on DEAL_DAMAGE/);
+    expectRejected(state, /parentFrameId names frame "v3-parent-chain", which is not an effect chain paused on DEAL_DAMAGE or SELF_TAKE_DAMAGE/);
   });
 
   it("rejects a frame carrying two continuation families", () => {
