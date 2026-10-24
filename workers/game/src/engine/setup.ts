@@ -133,7 +133,7 @@ export function prepareDecksAndLeaders(
   let state: GameState = {
     id: payload.gameId,
     schemaVersion: 8,
-    costSemanticsVersion: 7,
+    costSemanticsVersion: 8,
     executionContext,
     players: [player0, player1],
     turn,

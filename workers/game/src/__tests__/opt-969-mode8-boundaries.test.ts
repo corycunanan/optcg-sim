@@ -1,4 +1,4 @@
-/** Mode8 capability reader. No setup/default or recorded6/7 migration. */
+/** Mode8 capability boundaries. New setup8; no recorded6/7 migration. */
 import { expect, it } from "vitest";
 import { rig, synSchema } from "./opt-960-rig.js";
 import { runtime, memory, save } from "./native7-producer-support.js";
@@ -17,8 +17,8 @@ function fixture(mode: 6 | 7 | 8) {
   r.deck(0, 5); r.deck(1, 5); r.leader(0, "ST13-003"); r.life(0, 1); r.state.players[0].life[0].face = "UP";
   return r;
 }
-it("reader ordinary setup remains mode7 and historical schema7 promotion stays7", () => {
-  const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+it("writer ordinary setup uses mode8 and historical schema7 promotion stays7", () => {
+  const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
   r.state.schemaVersion = 7; delete r.state.costSemanticsVersion;
   expect(promoteGameStateForWriter(r.state, "state")).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
 });

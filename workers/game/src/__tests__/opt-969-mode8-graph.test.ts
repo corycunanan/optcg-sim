@@ -2,9 +2,9 @@ import { expect, it } from "vitest";
 import { rig, synSchema } from "./opt-960-rig.js";
 import { command, capture } from "./opt-997-corpus-support.js";
 
-// Synthetic capability fixture, never a retagged forward producer corpus.
+// Synthetic new-game writer fixtures, never retagged recorded inputs.
 for (const reload of [false, true]) it(`mode8 DON payment starts and completes fresh Life watcher reload=${reload}`, async () => {
-  const r = rig(); r.state.schemaVersion = 8; r.state.costSemanticsVersion = 8;
+  const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
   r.deck(0, 5); r.deck(1, 5); r.leader(0, "ST13-003"); r.life(0, 1); r.state.players[0].life[0].face = "UP";
   const p = r.state.players[0]; const [active, donor, ...reserve] = p.donCostArea;
   p.donCostArea = [active]; p.donDeck.push(...reserve); p.leader.attachedDon = [{ ...donor, attachedTo: p.leader.instanceId }];
@@ -35,7 +35,7 @@ for (const reload of [false, true]) it(`mode8 DON payment starts and completes f
 it("mode8 EOB sees its THIS_BATTLE power through the cost option, then expires once", async () => {
   const { endPhaseRig, synSchema: endSchema } = await import("./opt-962-rig.js");
   const { getEffectivePower } = await import("../engine/modifiers.js");
-  const r = endPhaseRig(); r.state.costSemanticsVersion = 8;
+  const r = endPhaseRig(); expect(r.state.costSemanticsVersion).toBe(8);
   const source = r.putSyn("mode8-eob-power", endSchema("mode8-eob-power", "Character", [
     { id: "attack-buff", category: "auto", trigger: { keyword: "WHEN_ATTACKING" }, actions: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 2000 }, duration: { type: "THIS_BATTLE" } }] },
     { id: "eob-cost", category: "auto", trigger: { event: "END_OF_BATTLE" }, conditions: { type: "SELF_POWER", operator: ">=", value: 6000 }, flags: { optional: true }, costs: [{ type: "REST_DON", amount: 1 }], actions: [{ type: "DRAW", params: { amount: 1 } }] },
@@ -59,7 +59,7 @@ it("mode8 EOB sees its THIS_BATTLE power through the cost option, then expires o
 });
 
 it("mode8 EB04-030 insufficient field DON does not offer or save its replacement", () => {
-  const r = rig(); r.state.costSemanticsVersion = 8; r.deck(0, 5); r.deck(1, 5);
+  const r = rig(); expect(r.state.costSemanticsVersion).toBe(8); r.deck(0, 5); r.deck(1, 5);
   const target = r.put("EB04-030", 0, "CHARACTER");
   r.state.players[0].donDeck.push(...r.state.players[0].donCostArea); r.state.players[0].donCostArea = [];
   const source = r.put("mode8-remove-kaido", 1, "CHARACTER", { schema: synSchema("mode8-remove-kaido", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } } }] }]) });

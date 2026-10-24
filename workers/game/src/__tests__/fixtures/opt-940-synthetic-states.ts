@@ -38,11 +38,19 @@ import { registerTriggersForCard } from "../../engine/triggers.js";
 import { CONTINUATION_EFFECT_BLOCK } from "../../engine/effect-stack.js";
 import {
   CARDS,
-  createBattleReadyState,
+  createBattleReadyState as createCurrentBattleReadyState,
   createTestCardDb,
   padChars,
-  setupGame,
+  setupGame as setupCurrentGame,
 } from "../helpers.js";
+
+// These reconstruct historical golden inputs, independently of new-game defaults.
+function createBattleReadyState(db: Map<string, CardData>) {
+  const state = createCurrentBattleReadyState(db); state.costSemanticsVersion = 7; return state;
+}
+function setupGame() {
+  const result = setupCurrentGame(); result.state.costSemanticsVersion = 7; return result;
+}
 
 export interface SyntheticSessionState {
   /** Stable fixture name; also the key in the golden JSON. */

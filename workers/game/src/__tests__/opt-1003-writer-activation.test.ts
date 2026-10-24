@@ -239,7 +239,7 @@ it("resumes a real save-time undo snapshot from before live prompt-ID allocation
     r.act({ type: "PLAYER_CHOICE", choiceId: "skip" });
     expect(r.state).toMatchObject({
       schemaVersion: 8,
-      costSemanticsVersion: 7,
+      costSemanticsVersion: 8,
       pendingPrompt: null,
       effectStack: [],
     });

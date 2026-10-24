@@ -823,3 +823,7 @@ sources are archived non-executably before current writer assertions change.
 ### Explicit mode8 cost capability reader (OPT-969)
 
 The new reader accepts schema8/costSemanticsVersion8 while retaining ordinary setup8/7 and every existing6/7 promotion/behavior. Mode8 governs the entire effect graph, including fresh triggers after resumed work; the unsuccessful continuation-only mode7 split is not included. Unknown/misdeclared modes reject atomically. c50/2ca cannot read8 and are not a future mode8 rollback floor. See [the mode8 contract](MODE8-COST-SEMANTICS.md) for shared runtime ownership, immutable forward producer evidence, saved-definition preservation and the separate future new-game writer gate.
+
+### New-game mode8 writer after verified reader floor (OPT-969)
+
+New setup now chooses schema8/mode8 before its first action/save. Historical promotions remain7 and existing explicit6/7/8 retain their mode and stored cardDb. Reader PR786 at `e14af35bad3a7189a40294f5d4ab3db5b5602f0e` is the verified deployed minimum rollback floor (deployment40139694972, post-CI40139694988); c50/2ca reject8 and cannot be rollback targets. The prior reader-stage paragraph records its historical setup7 behavior. See [the current cost contract](MODE8-COST-SEMANTICS.md#new-game-writer-enablement) for the three new-game authored corrections, historical fixture preservation, carried source-equivalent corpus and retained OPT-958 debt. No active-session migration or production repair is included.

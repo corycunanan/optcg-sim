@@ -17,7 +17,7 @@ export function withoutAssertedCostEvidence<T>(value: T): T {
       for (const frame of state.effectStack) {
         if (frame.costExpectedRoot !== undefined) {
           expect([7, 8]).toContain(state.schemaVersion);
-          if (state.schemaVersion === 8) expect(state.costSemanticsVersion).toBe(7);
+          if (state.schemaVersion === 8) expect([7, 8]).toContain(state.costSemanticsVersion);
           expect(frame.phase).toBe("AWAITING_COST_SELECTION");
           expect(frame.costs[frame.currentCostIndex]).toBeDefined();
           if (frame.kind !== undefined) expect(frame.kind).toBe("COST");

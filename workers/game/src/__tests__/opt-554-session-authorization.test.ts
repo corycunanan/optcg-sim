@@ -1073,7 +1073,7 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
     });
 });
 
-for (const freshWriter of [false, true]) it(`OPT-969 ${freshWriter ? "FINAL ordinary7" : "actual f19"} Counter history survives deployed durable DON/target replies and recreation`, async () => {
+for (const freshWriter of [false, true]) it(`OPT-969 ${freshWriter ? "ordinary mode8" : "actual f19"} Counter history survives deployed durable DON/target replies and recreation`, async () => {
   const captured = freshWriter ? await generateCounter() : JSON.parse(readFileSync(resolve(__dirname, "fixtures/opt-969-history-reader/counter.json"), "utf8")) as Record<string, unknown>;
   const durableState = new MockDurableObjectState();
   await durableState.storage.put(captured);

@@ -384,6 +384,7 @@ describe("RETURN_DON_TO_DECK substitute (EB04-030)", () => {
 
   for (const mixed of [false, true]) it(`native7 all-attached return ${mixed ? "chooses the exact donor" : "executes the sole plan"} on deployed reader once`, async () => {
     const { f, card } = allAttached();
+    f.state.costSemanticsVersion = 7; // Recorded native7 control before first action/save.
     expect(f.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
     if (mixed) f.giveDon(0, 1);
     const donor = structuredClone(f.state.players[0].leader.attachedDon[0]);
