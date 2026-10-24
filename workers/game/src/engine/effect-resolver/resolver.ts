@@ -396,6 +396,22 @@ export function resolveEffectWork(...args: Parameters<typeof resolveEffectCore>)
   return result;
 }
 
+/** Execute an obligation whose creating effect already activated. A departed
+ * origin is provenance, unlike a queued trigger's activation eligibility.
+ */
+export function resolveScheduledEffectWork(
+  state: GameState,
+  entry: import("../../types.js").EndPhaseScheduledAction,
+  cardDb: Map<string, CardData>,
+): EffectResolverResult {
+  return resolveEffectWork(state, {
+    id: "scheduled_" + entry.sourceEffectId,
+    category: "auto",
+    actions: [entry.action],
+  }, entry.sourceEffectId, entry.controller, cardDb,
+  undefined, undefined, undefined, undefined, entry.sourceCardSnapshot);
+}
+
 function resolveEffectCore(
   state: GameState,
   block: EffectBlock,
@@ -405,7 +421,8 @@ function resolveEffectCore(
   triggeringCardInstanceId?: string | null,
   services: EffectResolverServices = resolverExecutionServices,
   triggeringEvent?: PendingEvent,
-  sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot
+  sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot,
+  activatedSource?: import("../../types.js").CardInstance
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -443,18 +460,20 @@ function resolveEffectCore(
   // Extract block-specific effect description for prompts
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = cardDb.get(
-    sourceSnapshot?.cardId ?? sourceCard?.cardId ?? ""
+    activatedSource?.cardId ?? sourceSnapshot?.cardId ?? sourceCard?.cardId ?? ""
   );
-  const sourceSnapshotRef: [string, EffectResult][] = sourceCard
+  const sourceSnapshotRef: [string, EffectResult][] = activatedSource || sourceCard
     ? [
         [
           EFFECT_SOURCE_SNAPSHOT_REF,
           {
             targetInstanceIds: [],
             count: 0,
-            ...(sourceSnapshot
-              ? { sourceIdentity: sourceSnapshot }
-              : { sourceCardSnapshot: structuredClone(sourceCard) }),
+            ...(activatedSource
+              ? { sourceCardSnapshot: activatedSource }
+              : sourceSnapshot
+                ? { sourceIdentity: sourceSnapshot }
+                : { sourceCardSnapshot: structuredClone(sourceCard!) }),
           },
         ],
       ]

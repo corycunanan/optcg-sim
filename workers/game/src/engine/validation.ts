@@ -10,6 +10,7 @@ import type { CardData, GameAction, GameState } from "../types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
 import {
   getEffectiveCost,
+  isCardNegated,
   hasGrantedKeyword,
   hasRemovedKeyword,
 } from "./modifiers.js";
@@ -419,6 +420,9 @@ function validateActivateEffect(
   ) {
     return "Card must be on the field to activate this effect";
   }
+
+  // Rule 8-2-1-1: an invalid effect cannot activate or pay its cost.
+  if (isCardNegated(found.card, state, cardDb)) return "Card effects are negated";
 
   if (!meetsAttachedDonRequirement(found.card, block.trigger)) {
     return "Attached DON!! requirement is not met";

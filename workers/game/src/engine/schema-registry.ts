@@ -242,8 +242,9 @@ const TARGET_CONTROLLER_MODES = {
 const CAUSE_FILTER_BY_VALUES = new Set<string>(ALL_CAUSE_FILTER_BY);
 
 // Walk nested action params as well as permanent prohibition entries. Other
-// prohibition families (draw, refresh) have their own cause vocabulary.
-function validateRemovalCauses(value: unknown, path: string): string[] {
+// prohibition families have their own cause vocabulary; DON activation
+// accepts Character effects only, in either existing authored spelling.
+function validateProhibitionScopes(value: unknown, path: string): string[] {
   if (!value || typeof value !== "object") return [];
   const record = value as Record<string, unknown>;
   const type = record.prohibition_type ?? record.type;
@@ -255,8 +256,16 @@ function validateRemovalCauses(value: unknown, path: string): string[] {
     && !(REMOVAL_PROHIBITION_CAUSES as readonly unknown[]).includes(scope.cause)) {
     errors.push(`${path}: unsupported removal scope.cause ${JSON.stringify(scope.cause)}`);
   }
+  if (type === "CANNOT_SET_DON_ACTIVE") {
+    if (scope?.cause !== undefined && scope.cause !== "BY_CHARACTER_EFFECT") {
+      errors.push(`${path}: unsupported CANNOT_SET_DON_ACTIVE scope.cause ${JSON.stringify(scope.cause)}`);
+    }
+    if (scope?.card_type_filter !== undefined && scope.card_type_filter !== "CHARACTER") {
+      errors.push(`${path}: CANNOT_SET_DON_ACTIVE card_type_filter must be CHARACTER`);
+    }
+  }
   for (const [key, child] of Object.entries(record)) {
-    errors.push(...validateRemovalCauses(child, `${path}.${key}`));
+    errors.push(...validateProhibitionScopes(child, `${path}.${key}`));
   }
   return errors;
 }
@@ -272,7 +281,7 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
     return [`${prefix} Schema must be an object`];
   }
-  errors.push(...validateRemovalCauses(schema, prefix));
+  errors.push(...validateProhibitionScopes(schema, prefix));
   const candidate = schema as Partial<EffectSchema>;
 
   if (!candidate.effects || !Array.isArray(candidate.effects)) {

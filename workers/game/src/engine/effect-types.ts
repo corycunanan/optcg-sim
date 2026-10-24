@@ -1923,6 +1923,8 @@ export interface RuntimeProhibition {
 }
 
 export interface RuntimeScheduledAction {
+  /** Immutable pre-cost origin; absent on historical obligations. */
+  sourceCardSnapshot?: import("../types.js").CardInstance;
   id: string;
   timing: ScheduleTiming;
   action: Action;

@@ -1079,3 +1079,25 @@ export function isDrawProhibitedByEffect(
   }
   return false;
 }
+
+/** Character effects cannot activate existing rested DON under EB04-016 /
+ * OP10-030. Leader, Event, Stage and phase procedures are outside this cause.
+ * The source identity is captured before costs and survives a zone change.
+ */
+export function isDonActivationProhibitedByEffect(
+  state: GameState,
+  player: 0 | 1,
+  source: import("../../../../shared/game-types.js").EffectSourceIdentity | undefined,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (source?.cardType.toUpperCase() !== "CHARACTER") return false;
+  return state.prohibitions.some((p) => {
+    if (p.prohibitionType !== "CANNOT_SET_DON_ACTIVE" || p.controller !== player) return false;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) return false;
+    if (!isProhibitionConditionMet(p, state, cardDb) || isProhibitionOverridden(p, state, cardDb)) return false;
+    // Both existing authored spellings describe the causing card category.
+    if (p.scope?.cause !== undefined && p.scope.cause !== "BY_CHARACTER_EFFECT") return false;
+    if (p.scope?.card_type_filter !== undefined && p.scope.card_type_filter !== "CHARACTER") return false;
+    return true;
+  });
+}

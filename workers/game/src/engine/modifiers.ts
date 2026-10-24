@@ -250,11 +250,13 @@ export function modifierAppliesToCard(
 }
 
 /**
- * OPT-253: Is this Character currently effect-negated?
+ * Is this card currently effect-negated by a resolved flag or permanent aura?
  *
  * True when any activeEffect carries a NEGATE_EFFECTS_FLAG modifier that lists
  * the card in its appliesTo set and whose duration condition (if any) currently
- * holds. The flag is source-independent: we deliberately skip the normal
+ * holds, or a live permanent NEGATE_EFFECTS modifier targets it. Permanent
+ * auras honor block/modifier gates and pause when their source is negated.
+ * The resolved flag is source-independent: we deliberately skip the normal
  * `isEffectConditionMet` path on the negation effect itself to avoid recursion
  * (and to prevent an attacker mutually-negating their way out of a negation).
  */
@@ -262,6 +264,15 @@ export function isCardNegated(
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>
+): boolean {
+  return isCardNegatedWithGuard(card, state, cardDb, new Set());
+}
+
+function isCardNegatedWithGuard(
+  card: CardInstance,
+  state: GameState,
+  cardDb: Map<string, CardDataType> | undefined,
+  visiting: Set<string>,
 ): boolean {
   const effects = state.activeEffects;
   for (const effect of effects) {
@@ -281,7 +292,31 @@ export function isCardNegated(
     }
     return true;
   }
-  return false;
+  if (!cardDb || visiting.has(card.instanceId)) return false;
+  visiting.add(card.instanceId);
+  try {
+    for (const effect of effects) {
+      if (effect.category !== "permanent") continue;
+      const source = findCardInstance(state, effect.sourceCardInstanceId);
+      if (!source) continue;
+      for (const modifier of effect.modifiers ?? []) {
+        if (modifier.type !== "NEGATE_EFFECTS") continue;
+        if (!modifierAppliesToCard(effect, modifier, card, state, cardDb)) continue;
+        if (!isModifierGateMet(effect, modifier, state, {
+          sourceCardInstanceId: effect.sourceCardInstanceId,
+          controller: effect.controller,
+          cardDb,
+        })) continue;
+        // Unlike a resolved flag, a permanent aura stops when its source is
+        // negated. Share the traversal guard so cyclic auras terminate.
+        if (isCardNegatedWithGuard(source, state, cardDb, visiting)) continue;
+        return true;
+      }
+    }
+    return false;
+  } finally {
+    visiting.delete(card.instanceId);
+  }
 }
 
 /**

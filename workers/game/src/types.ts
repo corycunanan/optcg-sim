@@ -28,6 +28,7 @@ export type { LobbyMode, PregameMode } from "../../../shared/game-init.js";
 
 import type {
   CardData as SharedCardData,
+  CardInstance,
   GameAction,
   GameState as SharedGameState,
   LifeCard,
@@ -107,7 +108,7 @@ export interface GameState extends Omit<
   | "effectStack"
 > {
   /** Retained native envelope: saves and later pauses may never downgrade. */
-  schemaVersion?: 6 | 7 | 8;
+  schemaVersion?: 6 | 7 | 8 | 9;
   /** Required for native8: recorded game-wide capability, never upgraded on load. */
   costSemanticsVersion?: 6 | 7 | 8;
   activeEffects: RuntimeActiveEffect[];
@@ -182,6 +183,8 @@ export const END_PHASE_STEPS = ["TURN_PLAYER", "NON_TURN_PLAYER"] as const;
 export type EndPhaseStep = (typeof END_PHASE_STEPS)[number];
 
 export interface EndPhaseScheduledAction {
+  /** Immutable origin of already-activated work, schema 9+. */
+  sourceCardSnapshot?: CardInstance;
   action: import("./engine/effect-types.js").Action;
   controller: 0 | 1;
   sourceEffectId: string;

@@ -14,7 +14,7 @@ const DonInstance = z.strictObject({
   attachedTo: NullableString,
 });
 
-const CardInstance = z.strictObject({
+export const CardInstance = z.strictObject({
   instanceId: z.string(),
   cardId: z.string(),
   zone: z.enum([
@@ -304,6 +304,7 @@ const PhaseBoundaryContinuation = z.strictObject({
       action: z.unknown(),
       controller: PlayerIndex,
       sourceEffectId: z.string(),
+      sourceCardSnapshot: CardInstance.optional(),
       step: z.enum(END_PHASE_STEPS).optional(),
     })
   ),

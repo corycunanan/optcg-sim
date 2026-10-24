@@ -862,10 +862,11 @@ function isValidNativeVersion4(
   replacementScan = false,
   costOutcomes = false,
   battleCompletion = false,
+  scheduledOrigin = false,
 ): raw is GameState {
   if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
   const projected = convertToCurrentShape(
-    { ...raw, schemaVersion: battleCompletion ? 8 : costOutcomes ? 7 : replacementScan ? 6 : 4 },
+    { ...raw, schemaVersion: scheduledOrigin ? 9 : battleCompletion ? 8 : costOutcomes ? 7 : replacementScan ? 6 : 4 },
     location
   );
   const validated = parseStoredGameState(projected, location);
@@ -879,16 +880,27 @@ function isValidNativeVersion5(
   replacementScan = false,
   costOutcomes = false,
   battleCompletion = false,
+  scheduledOrigin = false,
 ): raw is GameState {
   if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
   const projected = projectVersion5(raw, reason => { throw new SessionLoadError(location, reason); });
-  return isValidNativeVersion4(projected, location, replacementScan, costOutcomes, battleCompletion);
+  return isValidNativeVersion4(projected, location, replacementScan, costOutcomes, battleCompletion, scheduledOrigin);
 }
 
 export function convertPersistedGameState(
   raw: unknown,
   location: string
 ): GameState {
+  if (isRecord(raw) && raw.schemaVersion === 9) {
+    const native = { ...raw };
+    delete native.schemaVersion;
+    if (isValidNativeVersion5(native, location, true, true, true, true)) {
+      const state = { ...migrateLegacyTriggerRegistry(liftLegacyPrompt(native, location)), schemaVersion: 9 as const };
+      validateContinuationReferences(state, location);
+      logLegacyShapes(state, location);
+      return isGameTerminated(state) ? clearTerminalPendingWork(state) : state;
+    }
+  }
   if (isRecord(raw) && raw.schemaVersion === 8) {
     const native = { ...raw };
     delete native.schemaVersion;
@@ -956,7 +968,7 @@ export function convertPersistedGameState(
  * and source7 are eligible for native costs; no8->7 helper downgrade occurs. */
 export function promoteGameStateForWriter(state: GameState, location: string): GameState {
   readGameStateSchemaVersion({ schemaVersion: state.schemaVersion }, location);
-  if (state.schemaVersion === 7 || state.schemaVersion === 8) {
+  if (state.schemaVersion === 7 || state.schemaVersion === 8 || state.schemaVersion === 9) {
     for (const [index, frame] of state.effectStack.entries()) {
       if (hasNativeCostSemantics(state) && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
         const violation = costReplacementReplayViolation(state, frame);
@@ -970,7 +982,7 @@ export function promoteGameStateForWriter(state: GameState, location: string): G
   // read as source1 by parseStoredSession. Preserve that decision before codec.
   const source = toPersistedGameState({ ...state, schemaVersion: state.schemaVersion ?? 6 });
   const validated = convertPersistedGameState(source, location);
-  if (state.schemaVersion === 8) return state; // Validated wire view is proof, not runtime normalization.
+  if (state.schemaVersion === 8 || state.schemaVersion === 9) return state; // Validated wire view is proof, not runtime normalization.
   const native = promoteStateToVersion7(validated, location, convertPersistedGameState);
   return convertPersistedGameState({ ...native, schemaVersion: 8, costSemanticsVersion: 7 }, location);
 }

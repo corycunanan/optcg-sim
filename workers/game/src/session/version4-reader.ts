@@ -3,6 +3,7 @@
  */
 import { z } from "zod";
 import {
+  CardInstance,
   PersistedGameStateV3,
   StackFrameCore,
   TurnState,
@@ -71,6 +72,7 @@ const Scheduled = z.strictObject({
   action: z.unknown(),
   boundToInstanceId: z.string().nullable(),
   sourceEffectId: z.string(),
+  sourceCardSnapshot: CardInstance.optional(),
   controller: Seat,
 });
 const Activation = z.strictObject({

@@ -827,3 +827,41 @@ The new reader accepts schema8/costSemanticsVersion8 while retaining ordinary se
 ### New-game mode8 writer after verified reader floor (OPT-969)
 
 New setup now chooses schema8/mode8 before its first action/save. Historical promotions remain7 and existing explicit6/7/8 retain their mode and stored cardDb. Reader PR786 at `e14af35bad3a7189a40294f5d4ab3db5b5602f0e` is the verified deployed minimum rollback floor (deployment40139694972, post-CI40139694988); c50/2ca reject8 and cannot be rollback targets. The prior reader-stage paragraph records its historical setup7 behavior. See [the current cost contract](MODE8-COST-SEMANTICS.md#new-game-writer-enablement) for the three new-game authored corrections, historical fixture preservation, carried source-equivalent corpus and retained OPT-958 debt. No active-session migration or production repair is included.
+
+### Scheduled-origin schema9 reader prerequisite (OPT-1004, stage 1)
+
+This reader accepts schema9 while ordinary setup and the default writer remain
+schema8. Schema9 adds optional `sourceCardSnapshot` to scheduled obligations and
+parked End Phase queue entries. It reuses the strict full CardInstance snapshot
+already carried by effect result refs; only instance/card/controller identity is
+used as origin provenance. Rested state, power and attached DON at capture are
+not queried as current characteristics. Both scheduled collectors preserve the
+snapshot. Already-activated scheduled execution seeds the existing source ref,
+including across a prompt, without bypassing departed-source rejection for a
+trigger that has not activated yet.
+
+Top-level obligations, parked queues, transaction/expected roots and resumed
+refs validate snapshots strictly. Scheduled snapshot instance identity must
+match `sourceEffectId`. Schema1–8 reject the new scheduled field. Native9
+requires explicit costSemanticsVersion6|7|8, and retains that independent mode;
+resaving loaded9 and its undo entries retains9. Ordinary stage1 scheduling does
+not capture or emit the new field. A future writer must promote the owning
+state to9 before saving newly captured origin, including scheduling from an
+existing8 game. Cost semantics are not promoted by scheduled provenance.
+
+Historical obligations without origin use exact live-instance lookup. If the
+source has departed, its card category is unknown: classification
+`legacy.scheduled_origin_unknown` diagnoses this absence. The old obligation
+still executes and can incorrectly activate DON under a Character-effect
+restriction; no card/category is inferred, no obligation is dropped, and no
+historical fixture is rewritten. This bounded limitation applies to pre-writer
+obligations, not newly captured work after stage2.
+
+The user explicitly approved “Approve scoped synthetic-only evidence and legacy
+limitation” for this run. Compatibility evidence therefore uses real-pipeline
+synthetic states and isolated actual-writer output; production DO capture stays
+unmet. This exception does not waive reader-first deployment, writer-output
+replay, strict validation, or a verified reader-capable rollback floor. Stage2
+must remain disabled until the coordinator records the deployed stage1 commit
+and names that reader as the rollback floor. A build that reads only1–8 cannot
+be a rollback target after a schema9 writer runs.
