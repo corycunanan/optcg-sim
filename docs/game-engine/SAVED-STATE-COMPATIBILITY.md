@@ -686,33 +686,6 @@ projection. Bounded regression measured 11,210 evidence bytes in a 36,943-byte p
 state (JSON string length, ASCII fixture);
 no production workload or broad performance claim follows.
 
-
-### Native cost writer rollout in schema8 (OPT-969)
-
-Ordinary setup now owns explicit8/costSemanticsVersion7 before its first action/save. SessionRepository
-validates runtime provenance before shape encoding and validates/promotes the
-live state and every undo snapshot atomically before history retention or any
-storage write. The low-level encoder preserves explicit6 for historical/direct
-controls. Unprovable continuation or unsupported provenance fails without input
-or storage mutation; no historical expected root or replacement outcome is
-invented. Valid legacy unknown debt stays diagnostic after promotion.
-
-The rollback floor is verified deployed PR784 history reader
-`c50b1d037ea38c004aa3d29b6b2ee5b90b45574e`. Original485 and69125276 are known
-unsafe for published Counter history. The writer preserves the deployed
-`publishCostOwnerRoots` contract: new-owner publication carries proven committed
-history into staged payment before refreshing expected evidence. Existing
-mismatches and historical evidence absence remain conservative. Current writer
-first/subsequent pauses, history queries, all storage contexts and real
-GameSession messages execute on that actual reader; equality is supplemental.
-
-Historical corpus bytes remain immutable. Evidence is synthetic under the
-explicit accepted exception; no production capture, repair or retirement is
-claimed. Final OPT921/948 domains/feasibility and the
-Decision10 policy decision are outside this rollout. See
-[the writer handoff](../project/handoffs/opt969-native7-writer.md) for ownership,
-reader selection, validation and remaining parent work. Earlier ordinary6
-statements above describe the prerequisite releases, superseded by this rollout.
 ### Bounded staged-entry history ownership reader (OPT-969)
 
 `applyCostTransactionState` remains an exact projection overlay, including for
@@ -769,6 +742,66 @@ This release does not promote existing sessions, enable the ordinary8 writer,
 change End Phase stage bytes, infer old replacement outcomes, or claim production
 capture evidence. Deploy and verify this semantic8 reader before writer rollout.
 
+
+### Writer activation after deployed native8 reader (OPT-1003 delivery history)
+
+The OPT-1007 reader above shipped first. At the OPT-1003/main785 delivery, production new games started as schema 8 with cost mode 6;
+repository load/save activates validated historical live and all undo snapshots
+before gameplay, preserving6→8.mode 6 and7→8.mode 7. Older supported envelopes
+first use their existing conversion hooks and then mode 6. Explicit schema 8 mode is
+required and preserved; invalid/missing mode never defaults. No payment outcome,
+expected-root evidence or battle completion is reconstructed. Already-started
+legacy EOB prompts retain their committed events and expired effects.
+
+The repository save return is the activated runtime, matching stored semantics.
+Low-level `convertPersistedGameState` / `parseStoredSession` and explicitly
+versioned serializer inputs preserve historical reader contracts. Historical typed
+coordinator actions activate before accepted gameplay; rejected commands retain
+original live/undo state. Current writer 16-case golden is separately named
+`opt-1003-writer-golden.synthetic.json`, pinned to source `6469e366`; every older
+golden/prototype input stays frozen. Its delta from the ordinary6 golden is only
+the8 envelope and mode 6 provenance. Synthetic-only evidence was explicitly approved
+for this run; no production capture claim follows. The semantic rollback floor
+is the deployed combined reader at `c50b1d03`, including schema 8 completion and
+COST publication-history ownership for cost mode 7. The earlier 864 receipt covers
+the unchanged mode 6 corpus only. See [the completion and Refresh contract](./NATIVE8-BATTLE-COMPLETION.md).
+
+
+### Native cost writer rollout in schema8 (OPT-969)
+
+Ordinary setup now owns explicit8/costSemanticsVersion7 before its first action/save. SessionRepository
+validates runtime provenance before shape encoding and validates/promotes the
+live state and every undo snapshot atomically before history retention or any
+storage write. The low-level encoder preserves explicit6 for historical/direct
+controls. Unprovable continuation or unsupported provenance fails without input
+or storage mutation; no historical expected root or replacement outcome is
+invented. Valid legacy unknown debt stays diagnostic after promotion.
+
+The rollback floor is verified deployed PR784 history reader
+`c50b1d037ea38c004aa3d29b6b2ee5b90b45574e`. Original485 and69125276 are known
+unsafe for published Counter history. The writer preserves the deployed
+`publishCostOwnerRoots` contract: new-owner publication carries proven committed
+history into staged payment before refreshing expected evidence. Existing
+mismatches and historical evidence absence remain conservative. Current writer
+first/subsequent pauses, history queries, all storage contexts and real
+GameSession messages execute on that actual reader; equality is supplemental.
+
+Historical corpus bytes remain immutable. Evidence is synthetic under the
+explicit accepted exception; no production capture, repair or retirement is
+claimed. Final OPT921/948 domains/feasibility and the
+Decision10 policy decision are outside this rollout. See
+[the writer handoff](../project/handoffs/opt969-native7-writer.md) for ownership,
+reader selection, validation and remaining parent work. Earlier ordinary6
+statements above describe the prerequisite releases, superseded by this rollout.
+
+### Source-aware schema8/mode7 composition (OPT-969)
+
+The OPT-1003 activation and golden notes above remain delivery history. Its
+source6→8/mode6 policy is superseded only for historical sources not yet8; already
+activated8/mode6 sessions keep that explicit mode. The frozen16-case main785
+golden and39already8/mode6 battle replay cases remain immutable historical
+controls; current mode7 producer proof is separate.
+
 The user-approved schema8/mode7 composition supersedes the prerequisite writer
 policies above. New setup is8/mode7; historical source<=6 must prove the original
 native7 continuation migration before8 activation, and source7 activates8/mode7.
@@ -781,6 +814,8 @@ The repaired c50 reader floor applies to this schema8/mode7 rollout and preserve
 native8 inputs. No7-only rollback or envelope/mode downgrade of8 is supported.
 The original f19 writer full reviews returned P1 FINDINGS and stopped at the
 publication design checkpoint; the deployed reader repair permits writer
-resumption, without erasing findings or resetting its remaining delta reviews.
+resumption. Its968 full/delta CLEAN remains historical; the user-approved main785
+composition has one full and one delta per same reviewer, without erasing prior
+findings or design stops.
 Historical82/13 payloads and manifests are immutable; original c50 generator
 sources are archived non-executably before current writer assertions change.
