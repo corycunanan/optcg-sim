@@ -513,7 +513,7 @@ export function convertToCurrentShape(
   const version = readGameStateSchemaVersion(raw, location);
   if (version < 7) {
     const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
-    if (frames.some(frame => isRecord(frame) && "costReplacementResolution" in frame) ||
+    if (frames.some(frame => isRecord(frame) && ("costReplacementResolution" in frame || "costExpectedRoot" in frame)) ||
         (isRecord(raw.pendingPrompt) && isRecord(raw.pendingPrompt.options) && "donIdentityReturn" in raw.pendingPrompt.options)) {
       throw new SessionLoadError(location, "carries COST outcome or DON identity picker requiring schemaVersion 7");
     }
@@ -872,6 +872,15 @@ export function validateContinuationReferences(
         }
       }
     }
+    if (
+      frame.costExpectedRoot !== undefined &&
+      (derived !== "COST" || !frame.costTransactionState)
+    ) {
+      throw new SessionLoadError(
+        location,
+        `${ref} has expected root without a native7 staged COST owner`
+      );
+    }
     if (frame.costReplacementResolution !== undefined && (
       derived !== "COST" || frame.phase !== "AWAITING_COST_SELECTION" ||
       !frame.costReplacementAction || frame.costReplacementChecked !== true ||
@@ -901,11 +910,12 @@ export function validateContinuationReferences(
       }
       if (
         frameKindOf(parent) !== "TRIGGER_DRAIN" ||
-        parent.pausedAction?.type !== "DEAL_DAMAGE"
+        (parent.pausedAction?.type !== "DEAL_DAMAGE" &&
+          parent.pausedAction?.type !== "SELF_TAKE_DAMAGE")
       ) {
         throw new SessionLoadError(
           location,
-          `${parentRef} names frame ${JSON.stringify(parentId)}, which is not an effect chain paused on DEAL_DAMAGE`
+          `${parentRef} names frame ${JSON.stringify(parentId)}, which is not an effect chain paused on DEAL_DAMAGE or SELF_TAKE_DAMAGE`
         );
       }
     }

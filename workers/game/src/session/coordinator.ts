@@ -1,3 +1,7 @@
+import {
+  captureCostExpectedRoot,
+  costRootMatches,
+} from "../engine/effect-resolver/cost/transaction.js";
 import { drainPendingWork } from "../engine/pending-work-drain.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import type {
@@ -250,7 +254,7 @@ export class SessionCoordinator {
       return {
         kind: "reject",
         state: stateBeforePipeline,
-        undoHistory: [],
+        undoHistory: [...initialUndoHistory],
         reason: pipeline.error ?? "Invalid action",
       };
     }
@@ -265,6 +269,26 @@ export class SessionCoordinator {
     if (state.pendingPrompt || state.effectStack.length > 0)
       nextUndoHistory = [];
     state = this.surfaceRevealTrigger(state, cardDb);
+    // Initial pipeline cleanup has finished. Only newly created evidence owners
+    // receive the actual published root; existing snapshots are never blessed.
+    if (state.schemaVersion === 7) {
+      const priorIds = new Set(
+        stateBeforePipeline.effectStack.map((frame) => frame.id)
+      );
+      const owners = state.effectStack.filter(
+        (frame) => frame.costExpectedRoot && !priorIds.has(frame.id)
+      );
+      if (owners.length) {
+        const expected = captureCostExpectedRoot(state);
+        const ids = new Set(owners.map((frame) => frame.id));
+        state = {
+          ...state,
+          effectStack: state.effectStack.map((frame) =>
+            ids.has(frame.id) ? { ...frame, costExpectedRoot: expected } : frame
+          ),
+        };
+      }
+    }
     if (pipeline.gameOver) nextUndoHistory = [];
     return {
       kind: "applied",
@@ -332,7 +356,42 @@ export class SessionCoordinator {
       connected.players[1],
     ];
     players[playerIndex] = { ...players[playerIndex], ...update };
-    return { ...connected, players };
+    const published = { ...connected, players };
+    // Presence is a sanctioned exact transport delta, including under a cost
+    // replacement child. Never bless an unrelated gameplay divergence.
+    if (
+      state.schemaVersion !== 7 ||
+      state.effectStack.some(
+        (frame) =>
+          frame.costExpectedRoot &&
+          !costRootMatches(state, frame.costExpectedRoot)
+      )
+    )
+      return published;
+    const presence = {
+      connected: update.connected,
+      awayReason: update.awayReason,
+      rejoinDeadlineAt: update.rejoinDeadlineAt,
+    };
+    return {
+      ...published,
+      effectStack: published.effectStack.map((frame) => {
+        if (!frame.costExpectedRoot || !frame.costTransactionState)
+          return frame;
+        const patch = (
+          snapshot: NonNullable<typeof frame.costExpectedRoot>
+        ) => {
+          const patched: GameState["players"] = [...snapshot.players];
+          patched[playerIndex] = { ...patched[playerIndex], ...presence };
+          return { ...snapshot, players: patched };
+        };
+        return {
+          ...frame,
+          costExpectedRoot: patch(frame.costExpectedRoot),
+          costTransactionState: patch(frame.costTransactionState),
+        };
+      }),
+    };
   }
 
   canUndo(

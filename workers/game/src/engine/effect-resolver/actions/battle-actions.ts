@@ -4,6 +4,7 @@
 
 import type { ActionOf, EffectResult } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
+import type { EffectResolverServices } from "../services.js";
 import type { ActionResult } from "../types.js";
 import {
   computeAllValidTargets,
@@ -12,8 +13,6 @@ import {
   buildSelectTargetPrompt,
 } from "../target-resolver.js";
 import { continueEffectDamageSequence } from "../../effect-damage.js";
-import { lifeToHandDestination } from "../../life-destination.js";
-import { transitionCard } from "../../zone-transition.js";
 import { resolveAmount } from "../action-utils.js";
 
 // ─── REDIRECT_ATTACK ─────────────────────────────────────────────────────────
@@ -114,7 +113,9 @@ export function executeDealDamage(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>
+  resultRefs: Map<string, EffectResult>,
+  _preselectedTargets?: string[],
+  services?: EffectResolverServices
 ): ActionResult {
   const params = action.params ?? {};
   const amount = resolveAmount(
@@ -133,7 +134,9 @@ export function executeDealDamage(
     amount,
     sourceCardInstanceId,
     controller,
-    true
+    true,
+    undefined,
+    services?.publishCommittedEvents
   );
 
   // A [Trigger] window pauses the instruction on its EFFECT_DAMAGE frame
@@ -156,12 +159,13 @@ export function executeDealDamage(
 export function executeSelfTakeDamage(
   state: GameState,
   action: ActionOf<"SELF_TAKE_DAMAGE">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
-  resultRefs: Map<string, EffectResult>
+  resultRefs: Map<string, EffectResult>,
+  _preselectedTargets?: string[],
+  services?: EffectResolverServices
 ): ActionResult {
-  const events: PendingEvent[] = [];
   const params = action.params ?? {};
   const amount = resolveAmount(
     params.amount ?? 1,
@@ -171,49 +175,20 @@ export function executeSelfTakeDamage(
     cardDb
   );
 
-  // OPT-925 / 9-2-1-1: taking damage while at 0 Life is lethal (OP14-115
-  // Rindo: "you take 1 damage" after declining the Life add,
-  // qa_op14_eb04.md:339-341). Determined once, as the instruction deals the
-  // damage; a later point that finds 0 Life is not a new determination.
-  if (amount > 0 && state.players[controller].life.length === 0) {
-    return {
-      state,
-      events,
-      succeeded: true,
-      result: { targetInstanceIds: [], count: 0 },
-      lethalDamagePlayerIndex: controller,
-    };
-  }
-
-  let nextState = state;
-  let dealt = 0;
-  for (let i = 0; i < amount; i++) {
-    const player = nextState.players[controller];
-    if (player.life.length === 0) break;
-
-    const lifeCard = player.life[0];
-    const destination = lifeToHandDestination(nextState, controller, lifeCard, cardDb);
-    const moved = transitionCard(nextState, lifeCard.instanceId,
-      destination === "DECK_BOTTOM" ? "DECK" : destination,
-      { position: destination === "TRASH" ? "TOP" : "BOTTOM" });
-    if (!moved) break;
-    nextState = moved.state;
-    dealt++;
-
-    events.push({
-      type: "CARD_REMOVED_FROM_LIFE",
-      playerIndex: controller,
-      payload: {
-        cardInstanceId: lifeCard.instanceId,
-        newCardInstanceId: moved.fact.newInstanceId,
-      },
-    });
-  }
-
+  // Self-inflicted damage uses the same per-point Life/Trigger continuation;
+  // controller and damaged player are independently represented by the frame.
+  const cont = continueEffectDamageSequence(
+    state, cardDb, controller, amount, sourceCardInstanceId, controller, true,
+    undefined, services?.publishCommittedEvents
+  );
   return {
-    state: nextState,
-    events,
-    succeeded: dealt > 0,
-    result: { targetInstanceIds: [], count: dealt },
+    state: cont.state,
+    events: cont.events,
+    succeeded: cont.dealt > 0 || cont.lethalDamagePlayerIndex !== undefined,
+    result: { targetInstanceIds: [], count: cont.dealt },
+    ...(cont.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: cont.lethalDamagePlayerIndex }
+      : {}),
+    ...(cont.pendingPrompt ? { pendingPrompt: cont.pendingPrompt } : {}),
   };
 }

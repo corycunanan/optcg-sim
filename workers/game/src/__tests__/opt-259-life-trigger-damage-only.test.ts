@@ -1,8 +1,8 @@
 /**
  * OPT-259 F6 — Life card [Trigger] activates ONLY on damage-driven reveal.
  *
- * Per Bandai rulings, a Life card's `[Trigger]` opens the reveal/activate
- * window ONLY when the opponent deals damage to the player's Life. No other
+ * Rules 4-6-3 and 10-1-5: a Life card's `[Trigger]` opens the reveal/activate
+ * window when damage removes it from Life, including self-inflicted damage. No other
  * path that touches a Life card — look, reorder, flip, trash, send-to-deck,
  * or non-damage add-to-hand — may open a Trigger window, even if the
  * manipulated Life card has the [Trigger] keyword. Effect-sourced damage
@@ -17,8 +17,8 @@
  *      the damaged player accepts or declines the Trigger, then resumes.
  *      (Regression fix: previously DEAL_DAMAGE moved Life→hand directly with
  *      no Trigger check at all.)
- *   4. SELF_TAKE_DAMAGE does NOT open a Trigger window — the FAQ gates the
- *      window on "opponent deals damage", which self-inflicted damage is not.
+ *   4. SELF_TAKE_DAMAGE shares the effect-damage Trigger window (OPT-993);
+ *      declining it still adds the Life card to its owner's hand.
  */
 
 import { describe, it, expect } from "vitest";
@@ -514,10 +514,10 @@ describe("OPT-259 F6 — DEAL_DAMAGE opens the Trigger window (regression)", () 
   });
 });
 
-// ─── 4. SELF_TAKE_DAMAGE — Trigger window stays closed ──────────────────────
+// ─── 4. SELF_TAKE_DAMAGE — shared damage Trigger window (OPT-993) ────────────
 
-describe("OPT-259 F6 — SELF_TAKE_DAMAGE does not open the Trigger window", () => {
-  it("self-damage on own [Trigger] Life moves the card straight to hand, no prompt", () => {
+describe("OPT-259 F6 / OPT-993 — SELF_TAKE_DAMAGE opens the damage Trigger window", () => {
+  it("self-damage offers the owner its Life Trigger, then decline adds it to hand", () => {
     const cardDb = createTestCardDb();
     const trigger = makeTriggerDrawCard("OPT259-SELF-TRIG");
     cardDb.set(trigger.id, trigger);
@@ -536,10 +536,14 @@ describe("OPT-259 F6 — SELF_TAKE_DAMAGE does not open the Trigger window", () 
     );
 
     expect(result.succeeded).toBe(true);
-    expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(false);
-    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
-    // Self damage = not opponent damage → Trigger does not open; Life goes to hand.
-    expect(result.state.players[0].hand.some((c) => c.instanceId === triggerLife.instanceId)).toBe(false);
+    expect(result.events.some((e) => e.type === "TRIGGER_ACTIVATED")).toBe(true);
+    expect(effectTriggerWindow(result.state)).toMatchObject({ damagedPlayerIndex: 0, controllerIndex: 0, lifeCard: triggerLife });
+    expect(result.state.players[0].hand).toEqual(state.players[0].hand);
     expect(result.state.players[0].life).toHaveLength(0);
+    const declined = revealTrigger(result.state, false, cardDb);
+    expect(declined.valid).toBe(true);
+    expect(effectTriggerWindow(declined.state) ?? null).toBeNull();
+    expect(declined.state.players[0].hand).toHaveLength(state.players[0].hand.length + 1);
+    expect(declined.state.players[0].hand.at(-1)?.cardId).toBe(trigger.id);
   });
 });

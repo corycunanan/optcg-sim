@@ -14,7 +14,7 @@ export type CostTransactionState = Pick<
 >;
 
 export function captureCostTransactionState(
-  state: GameState,
+  state: GameState
 ): CostTransactionState {
   return {
     players: state.players,
@@ -30,7 +30,7 @@ export function captureCostTransactionState(
 /** Overlay staged cost mutations while preserving live stack/prompt metadata. */
 export function applyCostTransactionState(
   state: GameState,
-  staged: CostTransactionState,
+  staged: CostTransactionState
 ): GameState {
   return { ...state, ...staged };
 }
@@ -59,15 +59,64 @@ function fieldInstanceIds(state: GameState): string[] {
  * it there. Conditions and dynamic coverage then evaluate against the staged
  * board.
  */
-export function stagedProhibitionView(live: GameState, staged: GameState): GameState {
+export function stagedProhibitionView(
+  live: GameState,
+  staged: GameState
+): GameState {
   const stagedIds = new Set(staged.prohibitions.map((p) => p.id));
   const liveOnly = live.prohibitions.filter((p) => !stagedIds.has(p.id));
   if (liveOnly.length === 0) return staged;
-  let merged: GameState = { ...staged, prohibitions: [...staged.prohibitions, ...liveOnly] };
+  let merged: GameState = {
+    ...staged,
+    prohibitions: [...staged.prohibitions, ...liveOnly],
+  };
   const stagedField = new Set(fieldInstanceIds(staged));
   for (const id of fieldInstanceIds(live)) {
     if (!stagedField.has(id)) merged = expireSourceLeftZone(merged, id);
   }
   // Only the prohibition list is reconciled; everything else stays staged.
   return { ...staged, prohibitions: merged.prohibitions };
+}
+
+/** JSON structural equality: object insertion order is incidental; array order is gameplay. */
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (
+    left === null ||
+    right === null ||
+    typeof left !== "object" ||
+    typeof right !== "object"
+  )
+    return false;
+  if (Array.isArray(left) || Array.isArray(right))
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => sameValue(value, right[index]))
+    );
+  const a = Object.entries(left).filter(([, value]) => value !== undefined);
+  const b = Object.entries(right).filter(([, value]) => value !== undefined);
+  return (
+    a.length === b.length &&
+    a.every(
+      ([key, value]) =>
+        Object.hasOwn(right, key) && sameValue(value, Reflect.get(right, key))
+    )
+  );
+}
+
+export function costRootMatches(
+  state: GameState,
+  expected: CostTransactionState
+): boolean {
+  return sameValue(captureCostTransactionState(state), expected);
+}
+
+/** Only sanctioned native7 suspension/continuation boundaries call this helper.
+ * Clone even in memory: evidence must never alias the mutable published board. */
+export function captureCostExpectedRoot(
+  state: GameState
+): CostTransactionState {
+  return structuredClone(captureCostTransactionState(state));
 }
