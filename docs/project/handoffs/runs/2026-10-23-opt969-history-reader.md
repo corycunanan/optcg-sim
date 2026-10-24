@@ -1,0 +1,29 @@
+# OPT969 reader-first history ownership repair, then writer783
+
+## Current checkpoint
+
+User resumed “continue with the reader-first repair, then resume the version 7 writer”. Merge permission remains on for these bounded stages after readiness gates. Latest orchestrate skill reverified against main; main remains 864bee2b9282004aa46476462447a0aa57b28686. Large tier; no stacking. Ordinary reader writes remain6; native8 mode6 unchanged. No final921/948 semantics, historical recovery, production repair/retirement or parent closure. Synthetic-only capture exception remains explicit and scoped.
+
+Reader /private/tmp/opt969-history-reader, branch corymcunanan/opt-969-cost-publication-reader, base864bee2. Sol6.1 medium history_implementer owns source/tests/handoff; root owns this ledger. Astra medium history_design consultation completed source-only. Dedicated staged entry retains longer exact-prefix history only under actual native owner evidence; exact generic rollback untouched. Publication retains previous root B and carries proven B→L history into staged resources. Synthetic suffix placement refinement recorded below. Stop for any supported current-producer divergence. Implementation committed498b9e9f8eaba2f058ec8d27cb674382634e6d7d; root ledger commit follows, then immutable review freeze. No formal reader review spent yet; one full + one delta each reserved for fresh Sol spec/Astra correctness. No reader PR/fullverify yet.
+
+Reader focused26 files passed1,405 plus3 existing expected failures; final two-file24pass, four-file63pass and source-exit/moved-DON/terminal6file122pass deltas. TypeScript exit0; targeted9file ESLint exit0 with3 existingwarnings; diffcheck passed. Main RED and actual691 RED both lose Counter activation at timestamp14 from exact f19 capture. Manifest independently verified:13payloads,12recipes,41steps,95 continuation actions; no historical fixture modifications. Counter live/undo first+later/embedded and actual GameSession WS/recreate/duplicate checks pass; synthetic staged-only history stays private on replacement abandon. Root read all production/test logic and contract/handoff pre-freeze; final freeze review/mutations pending. Registry recursive inventory2474schemas,3 ACTION_PERFORMED_THIS_TURN nodes (OP12-020, OP15-002, OP16-100), onlyOP15-002 ACTIVATED_EVENT threshold3. No direct natural reachability claim for ST04-016 cost1.
+
+Fresh isolated rootcheck/spec/correctness clones prepared at864 base with independent COW deps; Vitest4.1.4/node24.16.0 preflight passed in each. Freeze head must be fetched/checked out before any review. Implementer will set reader origin to actual GitHub (clone currently points at preserved writer), then push/createPR. Root owns ledger commit now; implementer owns no tracker/merge. User exact grant: “merge permission is on”.
+
+Writer /private/tmp/opt969-20261023-writer, draftPR783, frozen f19da7bb59aa4ef30185ed1d0f029a87c7fe3a3c. Original full spec/correctness findings retained, delta unused. Read-only writer CI triage reproduced7 failures; expectation/drift controls need repair after reader deployment (writer-ci-triage.md). Same implementer waiting. Merge reader main into writer normally; no rebase/force. Old deployed691 /private/tmp/pr778-followup preserved negative control. After reader deploy it becomes new rollback floor.
+
+Linear969 In Progress; initial304cc7c2-4034-41d6-87de-ff375c600916 audit pending close-out readback. Latest source24comments read. No stage-transition mutation yet. Owned lockfile deps restored after external eviction; COW independent copies in all3 workspaces, vitest4.1.4/node24.16.0 verified. No source/lock changes. Coordinator model not exposed; explicit Sol6.1medium implementation/spec, Astra medium design/correctness, no provider diversity. No allowance metrics available.
+
+Next: finish focused proof, freeze/commit/push readerPR and handoff; root final diff/mutations, fresh independent reviews, fullverify/CI, pinned merge then exact merge CI/deploy verification. Resume writer783 only then, CI repair + actual output replay on deployed reader, original reviewers delta + fullgates, merge/deploy. Scope not complete at reader-only delivery.
+
+## References
+
+## Design refinement before formal review
+
+Dedicated reader entry remains exact-prefix only and exact rollback remains unchanged. A synthetic staged-only suffix control exposed an ambiguity in consultation wording: appending published L-B after the staged suffix made new liveL cease to be a prefix of staged history, so the new state could not re-enter. Coordinator adjudicated publication as `L + S.slice(B.length)` when B is an exact structural prefix of both L and S. Committed published history stays authoritative prefix; the preserved transaction-only suffix follows until commit. Every existing record and per-stream order/timestamp is retained; no union/sorting or new historical baseline. The existing live-prefix-of-staged case is the explicit already-carried/idempotence guard. Repeat-publication and rollback control required. This is an anticipated synthetic design refinement before review, not proof of a current-producer divergence or a new patch-loop reset.
+
+Fresh reader deps installed frozenlockfile in isolated /private/tmp/opt969-history-store after all checkout node_modules externally vanished; original writer/691 COW dependency copies restored, no source changes. Disk externally freed~13GB, now sufficient. Prior writer783 CI40049077417 failed7 worker cases (details pr783-ci-failure-summary.txt), queued for writer resumption after reader deployment; no redundant rerun.
+
+- Prior checkpoint/receipt/review/witness outputs: currentchat outputs/PR-783-*.md/.patch/.log.
+- Source packet: currentchat work/writer-rollout/linear-source-packet.json.
+- Design result: work/history-reader/design.md pending.

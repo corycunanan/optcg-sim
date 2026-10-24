@@ -1,5 +1,4 @@
-import { hasNativeCostSemantics } from "./native-cost-semantics.js";
-import { captureCostExpectedRoot } from "./effect-resolver/cost/transaction.js";
+import { costRootMatches, publishCostOwnerRoots } from "./effect-resolver/cost/transaction.js";
 import type { LifeTriggerStagingScope } from "./life-trigger-staging.js";
 import { recalculateBattlePowers } from "./battle.js";
 import { drainPendingWork } from "./pending-work-drain.js";
@@ -56,18 +55,15 @@ export function runPipeline(
   cardDb: Map<string, CardData>,
   actingPlayerIndex: 0 | 1,
 ): PipelineResult {
+  if (state.effectStack.some(frame => frame.costExpectedRoot &&
+    !costRootMatches(state, frame.costExpectedRoot)))
+    return { state, valid: false, error: "Stale cost root" };
   const result = runPipelineAction(state, action, cardDb, actingPlayerIndex);
-  if (!result.valid || !hasNativeCostSemantics(result.state)) return result;
-  // A suspension captures before pipeline bookkeeping. Publish only newly
-  // created evidence owners against the actual returned board. Existing owners
-  // (including historical evidence-free owners) cannot acquire a new baseline.
+  if (!result.valid) return result;
   const priorIds = new Set(state.effectStack.map(frame => frame.id));
-  const ids = new Set(result.state.effectStack.filter(frame =>
-    frame.costExpectedRoot && !priorIds.has(frame.id)).map(frame => frame.id));
-  if (!ids.size) return result;
-  const expected = captureCostExpectedRoot(result.state);
-  return { ...result, state: { ...result.state, effectStack: result.state.effectStack.map(frame =>
-    ids.has(frame.id) ? { ...frame, costExpectedRoot: expected } : frame) } };
+  const published = publishCostOwnerRoots(result.state, frame => !priorIds.has(frame.id));
+  return published ? { ...result, state: published }
+    : { state, valid: false, error: "Ambiguous cost history publication" };
 }
 
 function runPipelineAction(
