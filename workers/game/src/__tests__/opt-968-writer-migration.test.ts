@@ -55,7 +55,7 @@ it("pins actual old-producer inputs and can recapture them through its immutable
   writeFileSync(output, JSON.stringify({ producer: inputs.producer, synthetic: true, cases: captured }) + "\n");
 });
 
-describe("OPT-968 complete legacy families on v6 emission and rollback resume", () => {
+describe("OPT-968 complete legacy families on native7 emission and rollback-reader resume", () => {
   for (const input of inputs.cases) for (const mode of ["live", "undo"] as const) for (const accept of [true, false]) {
     it(`${input.name}/${mode}/${accept ? "accept" : "decline"}: preserves offer/prefix and resumes exact emitted bytes`, async () => {
       const readerRoot = process.env.OPT968_DEPLOYED_READER_ROOT;
@@ -68,20 +68,23 @@ describe("OPT-968 complete legacy families on v6 emission and rollback resume", 
       const originalBatch = starting.effectStack.find((frame) => frame.replacementBatch)!.replacementBatch!;
       const currentId = originalBatch.pendingMatches[originalBatch.currentMatchIndex].effectId;
       const output = new MemorySessionStorage();
-      expect(originalBatch.events).toBeUndefined();
+      // Frozen legacy bytes omit events; promotion supplies the established
+      // complete event family before ordinary7 execution.
+      const rawState = (input.stored.session as { state: GameState }).state;
+      expect(rawState.effectStack.find(frame => frame.replacementBatch)!.replacementBatch!.events).toBeUndefined();
       const saved = await new SessionRepository(output, config).save({ ...oldLoaded, state: starting, undoHistory: [starting, ...oldLoaded.undoHistory] });
       const emitted = output.data.get("session") as { state: GameState };
       const family = input.kind === "KO" ? ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"] : input.kind === "SET_REST" ? ["WOULD_BE_RESTED"] : ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"];
       for (const state of [emitted.state, ...(output.data.get("session:undo-history") as GameState[])]) {
-        expect(state.schemaVersion).toBe(6);
+        expect(state.schemaVersion).toBe(7);
         const batch = state.effectStack.find((frame) => frame.replacementBatch)!.replacementBatch!;
         expect(batch.events).toEqual(family); expect(batch.currentMatchIndex).toBe(originalBatch.currentMatchIndex);
         expect(batch.pendingMatches).toEqual(originalBatch.pendingMatches); expect(batch.protectedIds).toEqual(originalBatch.protectedIds);
       }
-      // save() returns the authoritative runtime with any genuine prompt-ID
-      // allocation, but does not inject serialized v6 event metadata into it.
+      // The ordinary7 boundary returns the validated encoded representation,
+      // including the already-established complete event family.
       let loaded = saved;
-      expect(loaded.state.effectStack.find((frame) => frame.replacementBatch)!.replacementBatch!.events).toBeUndefined();
+      expect(loaded.state.effectStack.find((frame) => frame.replacementBatch)!.replacementBatch!.events).toEqual(family);
       const untouched = loaded.state.effectStack.find((frame) => frame.replacementBatch)!.replacementBatch!;
       expect(untouched.currentMatchIndex).toBe(originalBatch.currentMatchIndex);
       expect(untouched.pendingMatches[untouched.currentMatchIndex].effectId).toBe(currentId);
@@ -113,7 +116,7 @@ describe("OPT-968 complete legacy families on v6 emission and rollback resume", 
         if (prompt?.promptType === "SELECT_TARGET") { sawNested = true; next = { type: "SELECT_TARGET", selectedInstanceIds: input.hand.slice(0, 2) }; }
         else next = { type: "PLAYER_CHOICE", choiceId: "skip" };
       }
-      expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.schemaVersion).toBe(6);
+      expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.schemaVersion).toBe(7);
       if (input.phase !== "first") {
         if (input.kind !== "SET_REST") expect(loaded.state.players[0].characters.some((card) => card?.instanceId === input.a)).toBe(input.phase === "prefix");
         if (accept) {

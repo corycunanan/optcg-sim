@@ -3,14 +3,15 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { SessionRepository, type SessionStorage } from "../session/persistence.js";
+import { type SessionStorage } from "../session/persistence.js";
+import { LegacyReaderRepository as SessionRepository } from "./legacy-reader-repository.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import type { GameAction, GameState } from "../types.js";
 
 const families = ["action-identity", "replacement-identity", "don-minus", "variable-three", "historical-bucket", "cost-child-replacement", "opponent-active-cost-area"] as const;
 for (const family of families) for (const resumeUndo of [false, true]) {
-  describe(`OPT-969 captured ${family}, undo=${resumeUndo}`, () => {
+  describe(`OPT-969 historical parser/runtime+legacy boundary ${family}, undo=${resumeUndo}`, () => {
     it(family === "cost-child-replacement" ? "pins known OPT-997 owner leak, not completion" : "resumes exact persisted state through later pauses and completion", async () => {
       const path = fileURLToPath(new URL(`./fixtures/opt-969/${family}.json`, import.meta.url));
       const fixture: { initial: Record<string, unknown>; steps: { action: GameAction; expected: GameState }[] } = JSON.parse(readFileSync(path, "utf8"));

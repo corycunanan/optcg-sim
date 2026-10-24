@@ -1,3 +1,4 @@
+import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { promoteSessionToVersion7 } from "./version7-promotion.js";
 import { projectVersion5 } from "./version5-reader.js";
 import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
@@ -171,9 +172,20 @@ export class SessionRepository {
     // Runtime objects without provenance are old runtime6 inputs, not stored
     // version1 bytes. Validate them before promotion; new setup is explicit7.
     const validateRuntime = (state: GameState, location: string): GameState => {
-      // The encoder supplies missing runtime discriminants, but must never hide
-      // an explicitly inconsistent owner or native7 replay before validation.
-      validateContinuationReferences(state, location);
+      // Runtime kind tags may lag phase transitions. The established encoder
+      // derives those tags, but cannot authorize changing native7 COST evidence
+      // or supplying a legacy End Phase stage to a native7 producer.
+      if (state.schemaVersion === 7) {
+        for (const [index, frame] of state.effectStack.entries()) {
+          if (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true) {
+            const violation = costReplacementReplayViolation(state, frame);
+            if (violation) throw new SessionLoadError(location, `effectStack[${index}] ${violation}`);
+          }
+          if (frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined) {
+            throw new SessionLoadError(location, `effectStack[${index}] native7 End Phase continuation lacks stage`);
+          }
+        }
+      }
       return convertPersistedGameState(toPersistedGameState(state), location);
     };
     const validated = {

@@ -1,3 +1,5 @@
+import { convertPersistedGameState } from "../session/persistence.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import currentV6 from "./fixtures/opt-968-writer-golden.synthetic.json";
 /**
  * Historical OPT-940..967 inputs remain frozen. OPT-968 compares separate
@@ -34,7 +36,7 @@ async function writeThroughCurrentWriter(name: string) {
   };
 }
 
-describe("OPT-940 writer golden: persisted bytes match the current version 6 writer golden", () => {
+describe("OPT-940 writer golden: native7 envelope preserves frozen version6 writer payload", () => {
   const fixture = loadV5WriterGolden();
   const v3 = loadWriterGolden();
   const v1 = loadGoldenFixture();
@@ -53,23 +55,38 @@ describe("OPT-940 writer golden: persisted bytes match the current version 6 wri
     async (name) => {
       const golden = currentV6.cases[name as keyof typeof currentV6.cases];
       const current = await writeThroughCurrentWriter(name);
-      expect(current.sessionJson).toBe(golden.sessionJson);
+      const session = JSON.parse(golden.sessionJson);
+      const undo = JSON.parse(golden.undoHistoryJson) as Record<string, unknown>[];
+      // Structural legacy prompt records are lifted by the existing source
+      // parser before promotion; all other golden payloads differ only in7.
+      const expectedState = name === "structural-resume-context"
+        ? toPersistedGameState({ ...convertPersistedGameState(session.state, "expected"), schemaVersion: 7 })
+        : { ...session.state, schemaVersion: 7 };
+      if (name === "structural-resume-context") {
+        // Source validation lifts the legacy structural frame before assigning
+        // a missing prompt ID. Preserve the old golden; pin the new allocation
+        // order explicitly rather than normalizing either identity away.
+        expectedState.effectStack[0].id = "ef_0000003z";
+        expectedState.pendingPrompt!.resumeContext = "ef_0000003z";
+        expectedState.pendingPrompt!.promptId = "prompt_00000040";
+      }
+      expect(current.sessionJson).toBe(JSON.stringify({ ...session, state: expectedState }));
       expect(current.cardDbJson).toBe(golden.cardDbJson);
-      expect(current.undoHistoryJson).toBe(golden.undoHistoryJson);
+      expect(current.undoHistoryJson).toBe(JSON.stringify(undo.map(state => ({ ...state, schemaVersion: 7 }))));
     }
   );
 
-  it("writes version 6 first regardless of owners on live state and undo snapshots", async () => {
+  it("writes version 7 first regardless of owners on live state and undo snapshots", async () => {
     for (const name of Object.keys(fixture.cases)) {
       const current = await writeThroughCurrentWriter(name);
       const state = JSON.parse(current.sessionJson).state;
-      const version = 6;
+      const version = 7;
       expect(state.schemaVersion).toBe(version);
       expect(current.sessionJson, name).toContain(`"state":{"${GAME_STATE_SCHEMA_VERSION_KEY}":${version},`);
       const undo = JSON.parse(current.undoHistoryJson) as Array<Record<string, unknown>>;
       for (const snapshot of undo) expect(Object.keys(snapshot)[0], name).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
       for (const snapshot of undo) {
-        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(6);
+        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(7);
       }
     }
   });

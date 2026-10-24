@@ -1,3 +1,4 @@
+import { LegacyReaderRepository } from "./legacy-reader-repository.js";
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
@@ -132,17 +133,17 @@ it.skipIf(captureMode)("pinned Thatch corpus is complete and unchanged", () => {
   expect(manifest.scenarioCount).toBeGreaterThan(0);
   expect(manifest.startingPauseCount).toBeGreaterThan(0);
 });
-describe.skipIf(corpus.scenarios.length === 0)("OPT-968 alias-reader actual writer corpus", () => {
+describe.skipIf(corpus.scenarios.length === 0)("OPT-968 alias-reader corpus: current parser/runtime with legacy repository boundary", () => {
   for (const scenario of corpus.scenarios) for (const [index, captured] of scenario.cases.entries()) for (const mode of ["live", "undo"] as const) {
     it(`${scenario.name} / pause ${index} / ${mode}: exact later states, prompts, events, allocator identities`, async () => {
       const storage = new MemorySessionStorage(); await storage.put(structuredClone(captured.stored));
-      let loaded = (await new SessionRepository(storage, options).load())!;
+      let loaded = (await new LegacyReaderRepository(storage, options).load())!;
       if (mode === "undo") loaded = { ...loaded, state: loaded.undoHistory[0] };
       for (const [i, action] of captured.replies.entries()) {
         const result = resumePromptLifecycle(loaded.state, action, loaded.cardDb, { drainPregame: (s) => s, advanceStartOfTurn: (s) => s });
         expect(result.responseRejected).toBeFalsy();
-        const next = new MemorySessionStorage(); await new SessionRepository(next, options).save({ ...loaded, state: result.state });
-        loaded = (await new SessionRepository(next, options).load())!;
+        const next = new MemorySessionStorage(); await new LegacyReaderRepository(next, options).save({ ...loaded, state: result.state });
+        loaded = (await new LegacyReaderRepository(next, options).load())!;
         expect(json(toPersistedGameState(loaded.state))).toEqual(captured.expected[i]);
       }
       expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.effectStack).toEqual([]);

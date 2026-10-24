@@ -4,7 +4,7 @@ import { gunzipSync } from "node:zlib";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
-import { SessionRepository } from "../session/persistence.js";
+import { LegacyReaderRepository as SessionRepository } from "./legacy-reader-repository.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import manifest from "./fixtures/opt-966-final-writer-corpus.manifest.json";
@@ -20,7 +20,7 @@ function storageFor(stored: Record<string, unknown>) {
   return storage;
 }
 
-it.each(Object.keys(corpus))("replays committed actual writer live/undo and every subsequent pause: %s", async (name) => {
+it.each(Object.keys(corpus))("historical parser/runtime+legacy boundary replays writer live/undo and every subsequent pause: %s", async (name) => {
   const entry = corpus[name];
   expect(entry.writerBase).toBe(manifest.writerProducer);
   const root = process.env.OPT966_READER_ROOT;

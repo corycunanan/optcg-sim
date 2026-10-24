@@ -79,7 +79,7 @@ function withLegacyStage(state: GameState): GameState {
 describe("OPT-940 game-state schema version", () => {
   it("defines version 1 and assigns it to a persisted object without the key", () => {
     // OPT-980 reads 1 and 2; OPT-924 (PR 4b) writes 2; OPT-963 reads 3 (PR 5a) and writes 3 (PR 5b).
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(7);
     expect(LEGACY_GAME_STATE_SCHEMA_VERSION).toBe(1);
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(readGameStateSchemaVersion({}, "state")).toBe(1);
@@ -127,17 +127,17 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
     expect(loaded!.state).toEqual(withLegacyStage(saved.state));
     expect(loaded!.undoHistory).toEqual(saved.undoHistory.map(withLegacyStage));
     expect(loaded!.cardDb).toEqual(saved.cardDb);
-    expect(loaded!.state).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
+    expect(loaded!.state.schemaVersion).toBe(7);
   });
 
-  it("accepts an explicit schemaVersion 1 on the live state and strips the envelope key", async () => {
+  it("accepts explicit source version1 and promotes its runtime provenance", async () => {
     const storage = goldenStorage("effect-frame-prompt");
     const reference = (await repository(goldenStorage("effect-frame-prompt")).load())!;
     sessionValue(storage).state[GAME_STATE_SCHEMA_VERSION_KEY] = 1;
 
     const loaded = (await repository(storage).load())!;
     expect(loaded.state).toEqual(reference.state);
-    expect(loaded.state).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
+    expect(loaded.state.schemaVersion).toBe(7);
   });
 
   it("loads mixed undo history: a version-less live state with an explicitly versioned undo snapshot", async () => {
@@ -148,7 +148,7 @@ describe("OPT-940 reader: legacy live and undo snapshots round-trip", () => {
     const loaded = (await repository(storage).load())!;
     expect(loaded.undoHistory).toHaveLength(1);
     expect(loaded.undoHistory[0]).toEqual(reference.undoHistory[0]);
-    expect(loaded.undoHistory[0]).not.toHaveProperty(GAME_STATE_SCHEMA_VERSION_KEY);
+    expect(loaded.undoHistory[0].schemaVersion).toBe(7);
   });
 
   it("loads the same stored session twice to deep-equal, byte-equal snapshots", async () => {

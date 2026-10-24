@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 /**
  * OPT-854 — "When you activate an Event" is card activation (rule 8-5-4), and
  * resolving an Event's [Main] from trash via EB03-031 Reiju is not card
@@ -200,9 +201,10 @@ function fixture() {
     return c;
   };
   /** Reiju's DON!! −1 may ask where to return the DON from; keep attached DON. */
-  const payDonMinusFromCostArea = () => {
-    if (state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-      choose("cost_area");
+  const payDonMinusFromCostArea = (count = 1) => {
+    const payer = state.turn.activePlayerIndex;
+    const donors = state.players[payer].donCostArea.slice(0, count).map(d => d.instanceId);
+    state = scriptedDonPayment(state, db, payer, count, donors);
   };
   return {
     db,
@@ -386,7 +388,7 @@ describe("OPT-854 unrelated declines keep an activated Main's completion", () =>
       f.play("EB03-031");
       f.payDonMinusFromCostArea();
       f.select([event.instanceId]);
-      f.payDonMinusFromCostArea();
+      f.payDonMinusFromCostArea(kind === "KO" ? 2 : 1);
       expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
       await f.reload();
       f.select(kind === "KO" ? [target.instanceId] : [f.state.players[0].leader.instanceId]);

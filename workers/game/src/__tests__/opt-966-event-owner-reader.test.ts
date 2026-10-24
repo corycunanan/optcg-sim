@@ -23,7 +23,7 @@ it.each(corpus.cases)("replays actual Counter pause $index through every subsequ
       await new SessionRepository(storage, options).save({ ...loaded, state: actual, undoHistory: [actual] });
       actual = (await new SessionRepository(storage, options).load())!.state;
       expect(actual).toEqual(
-          candidateExpected(`event-owner/${index}/pause/${offset}`)
+          { ...candidateExpected<GameState>(`event-owner/${index}/pause/${offset}`), schemaVersion: 7 }
         );
       const completion = actual.effectStack.find(
           (frame) => frame.eventActivation)!;
@@ -35,7 +35,7 @@ it.each(corpus.cases)("replays actual Counter pause $index through every subsequ
       expect(result.responseRejected).toBe(false);
       actual = result.state;
     }
-    expect(actual).toEqual(candidateExpected(`event-owner/${index}/final`));
+    expect(actual).toEqual({ ...candidateExpected<GameState>(`event-owner/${index}/final`), schemaVersion: 7 });
     expect(actual.effectStack).toEqual([]);
     expect(actual.pendingPrompt).toBeNull();
     for (const type of ["POWER_MODIFIED", "EVENT_ACTIVATED_FROM_HAND", "COUNTER_USED"])

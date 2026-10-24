@@ -543,8 +543,8 @@ describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
     ]);
   });
 
-  it("promotes normal and trigger-owner states to v6 while preserving their scope", () => {
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
+  it("promotes normal and trigger-owner states to native7 while preserving their scope", () => {
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(7);
     const { state } = fixture();
     expect(restore(state).effectStack).toEqual(
       toPersistedGameState(state).effectStack
@@ -552,14 +552,14 @@ describe("OPT-966 version 5 semantic reader (normal writer remains v4)", () => {
     expect(
       (toPersistedGameState(state) as unknown as { schemaVersion: number })
         .schemaVersion
-    ).toBe(6);
+    ).toBe(7);
     expect(
       (
         toPersistedGameState({ ...state, effectStack: [] }) as unknown as {
           schemaVersion: number;
         }
       ).schemaVersion
-    ).toBe(6);
+    ).toBe(7);
   });
 
   it("reads A/X and executes A then X then C exactly once", () => {

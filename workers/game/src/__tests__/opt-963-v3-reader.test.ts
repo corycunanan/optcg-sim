@@ -86,11 +86,11 @@ function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
 const kindsOf = (state: GameState) => state.effectStack.map(frameKindOf);
 
 describe("OPT-963 version 3 runtime and writer (PR 5b)", () => {
-  it("reads 1–7, executes native 7 and normally writes 6", () => {
+  it("reads 1–7, executes native 7 and normally writes 7", () => {
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(7);
     expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(7);
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(7);
     expect([...EFFECT_STACK_FRAME_KINDS]).toEqual(
       expect.arrayContaining(["REPLACEMENT", "REPLACEMENT_BATCH", "BATTLE_DAMAGE", "EFFECT_DAMAGE"])
     );
@@ -237,7 +237,7 @@ describe("OPT-963 v2 → v3 lift: every version 2 record becomes a frame, live a
     const live = liftedGolden(name);
     expect(convertPersistedGameState(goldenV1Raw(name), "state")).toEqual(live);
     const loaded = (await repository(storageWith(golden("battle-ready-with-undo").session.state, [goldenV2Raw(name)])).load())!;
-    expect(loaded.undoHistory[0]).toEqual(live);
+    expect(loaded.undoHistory[0]).toEqual(toPersistedGameState({ ...live, schemaVersion: 7 }));
   });
 });
 
@@ -274,9 +274,9 @@ describe("OPT-963 mixed-version undo history", () => {
     const target = new MemorySessionStorage();
     const saved = await repository(target).save(first);
     const written = target.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
+    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(7);
     const writtenUndo = target.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Record<string, unknown>[];
-    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
+    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(7);
     const second = (await repository(target).load())!;
     expect(toPersistedGameState(second.state)).toEqual(toPersistedGameState(saved.state));
     expect(second.undoHistory.map(toPersistedGameState)).toEqual(saved.undoHistory.map(toPersistedGameState));
@@ -588,7 +588,7 @@ describe("PR #758 round 3: a version 2 object whose retired keys are present wit
     expect(hasRetiredKey(live.undoHistory[0])).toBe(false);
     expect(classifyLegacyShapes(live.state)).toEqual([]);
     expect(runtime(live.state)).toEqual(runtime(live.undoHistory[0]));
-    expect(runtime(live.state)).toEqual(runtime(liftedGolden(name)));
+    expect(runtime(live.state)).toEqual({ ...runtime(liftedGolden(name)), schemaVersion: 7 });
   });
 
   it("(b) through convertPersistedGameState on a structuredClone'd object", () => {

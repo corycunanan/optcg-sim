@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { resolve } from "node:path";
-import { SessionRepository } from "../session/persistence.js";
+import { LegacyReaderRepository as SessionRepository } from "./legacy-reader-repository.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
@@ -11,7 +11,7 @@ type Scenario = { name: string; cases: { index: number; stored: Record<string, u
 const corpus = JSON.parse(gunzipSync(readFileSync(resolve(__dirname, "fixtures/opt-968-final-writer-corpus.json.gz"))).toString()) as { scenarios: Scenario[] };
 const config = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
 for (const scenario of corpus.scenarios) for (const start of scenario.cases) for (const mode of ["live", "restoredUndo"] as const) {
-  it(`${scenario.name}/pause${start.index}/${mode}: exact final-writer bytes resume (pinned reader when configured)`, async () => {
+  it(`${scenario.name}/pause${start.index}/${mode}: historical writer bytes resume (current parser/runtime with legacy boundary unless pinned)`, async () => {
     const root = process.env.OPT968_DEPLOYED_READER_ROOT;
     const repository = root ? await import(`${root}/workers/game/src/session/persistence.ts`) as { SessionRepository: typeof SessionRepository } : { SessionRepository };
     const lifecycle = root ? await import(`${root}/workers/game/src/session/prompt-lifecycle.ts`) as { resumePromptLifecycle: typeof resumePromptLifecycle } : { resumePromptLifecycle };

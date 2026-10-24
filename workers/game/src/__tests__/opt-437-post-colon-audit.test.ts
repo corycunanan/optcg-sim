@@ -284,6 +284,9 @@ describe("OPT-437 family: the gate covers the whole chain incl. THEN (EB02-010 L
       characters: padChars(chars),
       donCostArea,
     });
+    // This direct-resolver unit isolates the post-colon gate with historical
+    // automatic payment. Ordinary7 donor choice is covered through sessions.
+    state.schemaVersion = 6;
     return { state, cardDb };
   }
 

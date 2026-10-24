@@ -844,6 +844,7 @@ export class GameSession implements DurableObject {
       undoHistory: this.undoHistory,
     });
     this.gameState = saved.state;
+    this.undoHistory = saved.undoHistory;
   }
 
   private async loadFromStorage(): Promise<boolean> {

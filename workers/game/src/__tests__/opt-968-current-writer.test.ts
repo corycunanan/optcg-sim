@@ -14,19 +14,19 @@ it("all current live/undo writer inputs emit v6 first, including undefined/stale
   }
 });
 
-for (const choice of ["accept", "skip"] as const) it(`current Franky ${choice} writes v6 before, during and after battle`, () => {
+for (const choice of ["accept", "skip"] as const) it(`current Franky ${choice} writes native7 before, during and after battle`, () => {
   const r = rig(); r.deck(0, 10); r.deck(1, 10); r.life(0, 1);
   const target = r.put("OP10-034", 0, "CHARACTER", { state: "RESTED", data: { power: 5000, cost: 4 } });
   const attacker = r.put("OPT968-CURRENT-ATTACKER", 1, "CHARACTER", { data: { power: 7000 } });
-  expect(toPersistedGameState(r.state).schemaVersion).toBe(6);
+  expect(toPersistedGameState(r.state).schemaVersion).toBe(7);
   r.state.turn.activePlayerIndex = 1;
   r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId }, 1);
   while (!r.state.pendingPrompt && r.state.turn.battle) r.act({ type: "PASS" });
-  expect(toPersistedGameState(r.state).schemaVersion).toBe(6);
+  expect(toPersistedGameState(r.state).schemaVersion).toBe(7);
   r.act({ type: "PLAYER_CHOICE", choiceId: choice });
   expect(r.state.pendingPrompt).toBeNull(); expect(r.state.turn.battle).toBeNull();
   expect(r.state.players[0].characters.some((card) => card?.instanceId === target.instanceId)).toBe(choice === "accept");
-  expect(toPersistedGameState(r.state).schemaVersion).toBe(6);
+  expect(toPersistedGameState(r.state).schemaVersion).toBe(7);
 });
 
 for (const amount of [1, 2]) it(`current Pica requires both active DON!! (${amount} available)`, () => {
@@ -39,5 +39,5 @@ for (const amount of [1, 2]) it(`current Pica requires both active DON!! (${amou
   if (amount === 2) r.accept();
   expect(r.state.players[0].characters.some((card) => card?.instanceId === pica.instanceId)).toBe(amount === 2);
   expect(r.state.players[0].donCostArea.filter((don) => don.state === "RESTED")).toHaveLength(amount === 2 ? 2 : 0);
-  expect(toPersistedGameState(r.state).schemaVersion).toBe(6);
+  expect(toPersistedGameState(r.state).schemaVersion).toBe(7);
 });

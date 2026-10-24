@@ -1,3 +1,4 @@
+import { LegacyReaderRepository } from "./legacy-reader-repository.js";
 import { describe, expect, it } from "vitest";
 import corpus from "./fixtures/opt-968-writer-corpus.json";
 import { SessionRepository } from "../session/persistence.js";
@@ -12,13 +13,13 @@ const fixtures = corpus as unknown as { scenarios: { name: string; cases: Captur
 
 const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
 
-describe("OPT-968 v6 actual-writer corpus: semantic reader continuation", () => {
+describe("OPT-968 v6 corpus: current parser/runtime with legacy repository boundary", () => {
   for (const scenario of fixtures.scenarios) for (const captured of scenario.cases) for (const mode of ["live", "undo", "mixedUndo"] as const) {
     it(`${scenario.name} / start pause ${captured.index} / ${mode}: live and mixed undo retain progress through every later reply`, async () => {
       const storage = new MemorySessionStorage();
       await storage.put(structuredClone(captured.stored));
       if (mode === "mixedUndo") storage.data.set("session:undo-history", [structuredClone(captured.legacyUndo)]);
-      let loaded = (await new SessionRepository(storage, options).load())!;
+      let loaded = (await new LegacyReaderRepository(storage, options).load())!;
       expect(loaded).not.toBeNull();
       expect(loaded.state.schemaVersion).toBe(6);
       expect(loaded.undoHistory).toHaveLength(1);
@@ -27,8 +28,8 @@ describe("OPT-968 v6 actual-writer corpus: semantic reader continuation", () => 
         expect(loaded.undoHistory[0].schemaVersion).toBe(6);
         if (mode === "undo") {
           const restored = new MemorySessionStorage();
-          await new SessionRepository(restored, options).save({ ...loaded, state: loaded.undoHistory[0] });
-          const undoLoaded = (await new SessionRepository(restored, options).load())!;
+          await new LegacyReaderRepository(restored, options).save({ ...loaded, state: loaded.undoHistory[0] });
+          const undoLoaded = (await new LegacyReaderRepository(restored, options).load())!;
           expect(undoLoaded.state).toEqual(loaded.state);
           loaded = undoLoaded;
         }
@@ -40,8 +41,8 @@ describe("OPT-968 v6 actual-writer corpus: semantic reader continuation", () => 
         expect(resumed.responseRejected).toBeFalsy();
         expect(resumed.state.schemaVersion).toBe(6);
         const next = new MemorySessionStorage();
-        await new SessionRepository(next, options).save({ ...loaded, state: resumed.state, undoHistory: loaded.undoHistory });
-        loaded = (await new SessionRepository(next, options).load())!;
+        await new LegacyReaderRepository(next, options).save({ ...loaded, state: resumed.state, undoHistory: loaded.undoHistory });
+        loaded = (await new LegacyReaderRepository(next, options).load())!;
         expect(loaded.state.schemaVersion).toBe(6);
         const nextPause = scenario.cases[captured.index + replyIndex + 1];
         if (nextPause) {
@@ -98,7 +99,7 @@ it("rejects malformed complete event families on real OP15-009 v6 pauses without
     drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
   });
   expect(resumed.responseRejected).toBeFalsy();
-  expect(JSON.parse(JSON.stringify(toPersistedGameState(resumed.state)))).toEqual(scenario.expected);
+  expect(JSON.parse(JSON.stringify(toPersistedGameState(resumed.state)))).toEqual({ ...(scenario.expected as object), schemaVersion: 7 });
   expect(resumed.state.eventLog.filter((event) => event.type === "CARD_KO")).toHaveLength(0);
 });
 
@@ -142,7 +143,7 @@ it("requires ordering prompt choices to be a unique bijection while allowing per
     await new SessionRepository(next, options).save({ ...loaded, state: resumed.state });
     loaded = (await new SessionRepository(next, options).load())!;
   }
-  expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual(scenario.expected);
+  expect(JSON.parse(JSON.stringify(toPersistedGameState(loaded.state)))).toEqual({ ...(scenario.expected as object), schemaVersion: 7 });
 });
 
 const nativeOrderingPause = fixtures.scenarios.flatMap((scenario) => scenario.cases).find((captured) => {

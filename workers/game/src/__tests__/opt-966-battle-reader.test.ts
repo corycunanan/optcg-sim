@@ -61,7 +61,7 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
     expect(actual.players).toEqual(expected.players);
     expect(actual.turn).toEqual(expected.turn);
     expect(actual.executionContext).toEqual(expected.executionContext);
-    expect(actual).toEqual({ ...expected, schemaVersion: 6 });
+    expect(actual).toEqual({ ...expected, schemaVersion: 7 });
     const types = actual.eventLog.map((event) => event.type);
     if (name.includes("immediate")) {
       expect(types.filter((type) => type === "CARD_DRAWN")).toHaveLength(2);

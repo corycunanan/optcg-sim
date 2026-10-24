@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 /**
  * OPT-894 — Counter Events authored as `category: "activate"` never resolved.
  *
@@ -122,6 +123,11 @@ function fixture() {
     let guard = 0;
     while (state.pendingPrompt) {
       const prompt = state.pendingPrompt;
+      // These two printed Counter cards pay DON!!−1 before their target/effect.
+      if (prompt.options.promptType === "PLAYER_CHOICE" && prompt.options.donIdentityReturn) {
+        state = scriptedDonPayment(state, db, 1, 1);
+        continue;
+      }
       const next = queue.shift();
       expect(
         next,

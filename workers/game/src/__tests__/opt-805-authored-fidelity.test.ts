@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { replayPauses } from "./fixtures/opt-966-replay.js";
 import { describe, expect, it } from "vitest";
 import type {
@@ -498,6 +499,7 @@ describe("OPT805 Magellan verified broad FAQ behavior", () => {
     for (let i = 0; i < 2; i++) {
       f.play("OP01-117");
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 1);
       if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
         f.select([]);
       expect(f.state.pendingPrompt).toBeNull();
@@ -535,6 +537,7 @@ describe("OPT805 Magellan verified broad FAQ behavior", () => {
       );
       if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
         f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
       if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
         f.select([]);
       expect(f.state.pendingPrompt).toBeNull();
@@ -566,6 +569,7 @@ describe("OPT805 authored trash-Event publication", () => {
     f.play("EB03-031");
     if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 1);
     expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     f.select([event.instanceId]);
     expect(f.state.pendingPrompt).toBeNull();
@@ -604,13 +608,15 @@ describe("OPT805 Event activation lifecycle regressions", () => {
       1
     );
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    f.choose("accept"); // Event DON -2 cost, not Crocodile
+    f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2); // Event DON -2 cost, not Crocodile
     if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
       f.select([]);
     expect(f.state.players[1].hand).toHaveLength(3); // Event draw resolved
     expect(f.state.players[1].leader.attachedDon).toHaveLength(1);
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     expect(f.state.players[1].hand).toHaveLength(4);
   });
   it.each([0, 1])(
@@ -691,6 +697,7 @@ describe("OPT805 Event activation lifecycle regressions", () => {
       expect(f.state.pendingEventActivationEvents).toBeUndefined();
       await f.reload();
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
       expect(f.state.players[0].hand).toHaveLength(3);
       expect(f.state.pendingPrompt).toBeNull();
       expect(
@@ -746,6 +753,7 @@ describe("OPT805 persisted Counter Event ordering", () => {
       expect(f.state.players[0].hand).toHaveLength(attackerHand); // Usopp waits for the Counter.
       await f.reload();
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
       expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
       expect(f.state.players[0].hand).toHaveLength(attackerHand);
       await f.reload();
@@ -759,6 +767,7 @@ describe("OPT805 persisted Counter Event ordering", () => {
         expect(f.state.pendingEventActivationEvents).toBeUndefined();
         await f.reload();
         f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
         expect(f.state.players[1].hand).toHaveLength(4);
       }
       expect(f.state.pendingPrompt).toBeNull();
@@ -865,6 +874,7 @@ describe("OPT805 activation barrier edge cases", () => {
     expect(f.state.players[1].hand).toHaveLength(2);
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     expect(f.state.players[1].hand).toHaveLength(3);
     expect(f.state.pendingPrompt).toBeNull();
   });
@@ -881,6 +891,7 @@ describe("OPT805 activation barrier edge cases", () => {
       1
     );
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     f.select([]);
     expect(f.state.players[1].hand).toHaveLength(3);
     expect(f.state.pendingEventActivationEvents).toBeUndefined();
@@ -897,6 +908,7 @@ describe("OPT805 activation barrier edge cases", () => {
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     await f.reload();
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     expect(f.state.players[1].hand).toHaveLength(4);
     expect(
       f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")

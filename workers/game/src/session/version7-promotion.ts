@@ -1,6 +1,6 @@
 /** Atomic writer boundary: prove legacy replay semantics before emitting native7. */
 import type { GameState, EffectStackFrame } from "../types.js";
-import { SessionLoadError } from "./game-state-schema.js";
+import { SessionLoadError, toPersistedGameState } from "./game-state-schema.js";
 import { canonicalCostReplacementReplay, costReplacementReplayViolation, fixedCostExitTarget, parseLifeDestinationChoiceId } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { replacementEventsFor } from "../engine/replacement-events.js";
 
@@ -36,7 +36,7 @@ export function promoteStateToVersion7(original: GameState, location: string, va
     if (violation) throw new SessionLoadError(location, `legacy-debt: unprovable COST replay (${violation}); preserve original reader6 storage`);
     // Valid accepted/orphan debt stays unresolved. No outcome is inferred.
   }
-  try { return validate({ ...state, schemaVersion: 7 }, location); }
+  try { return validate(toPersistedGameState({ ...state, schemaVersion: 7 }), location); }
   catch (error) { throw new SessionLoadError(location, `legacy-debt: unprovable native7 continuation (${String(error)}); preserve original reader6 storage`); }
 }
 

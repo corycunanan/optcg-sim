@@ -83,6 +83,7 @@ describe("OPT-480 runtime type boundaries", () => {
     }));
     stored.state.effectStack = [{
       id: "ordering-frame",
+      kind: "TRIGGER_ORDER",
       sourceCardInstanceId: "elder-1",
       controller: 0,
       effectBlock: triggers[1].effectBlock,
@@ -155,7 +156,7 @@ describe("OPT-480 runtime type boundaries", () => {
     }
 
     expect(() => parseStoredSession(stored)).toThrow(
-      "Stored session state has an invalid core shape"
+      "Stored session state has invalid version 4 shape"
     );
   });
 
@@ -207,7 +208,7 @@ describe("OPT-480 runtime type boundaries", () => {
     };
 
     expect(() => parseStoredSession(malformed)).toThrow(
-      "unknown scheduled action variant"
+      "scheduledActions"
     );
   });
 

@@ -35,12 +35,12 @@ for (const file of files) {
         expect(state.effectStack.some(frame => frame.kind === "COST" && !frame.costReplacementResolution)).toBe(true);
       } else { expect(state.effectStack).toHaveLength(0); expect(state.pendingPrompt).toBeNull(); }
     });
-    if (f.promotionSource) it("reader6 retains original first-load6 input bytes and absent outcomes", async () => {
+    if (f.promotionSource) it("ordinary writer promotes proven first-load6 offers without storage writes or inferred outcomes", async () => {
       const values = structuredClone(f.promotionSource!); const before = structuredClone(values);
       const loaded = (await memoryRepository(values).repo.load())!;
-      expect(loaded.state.schemaVersion).toBe(6);
+      expect(loaded.state.schemaVersion).toBe(7);
       expect(loaded.state.effectStack.find(frame => frame.kind === "COST")!.costReplacementResolution).toBeUndefined();
-      expect(values).toEqual(before); // Only the isolated writer performs promotion.
+      expect(values).toEqual(before); // Promotion is runtime-only until an ordinary save.
     });
   });
 }
@@ -93,8 +93,11 @@ it("retains unprovable legacy promotion input for reader6 recovery without silen
   const f = JSON.parse(readFileSync(`${dir}/promotion-unprovable-diagnostic.json`, "utf8"));
   for (const diagnostic of f.cases) {
     const original = structuredClone(diagnostic.original);
-    const { repo, values } = memoryRepository(original); const loaded = (await repo.load())!;
-    expect(loaded.state.schemaVersion).toBe(6); expect(values).toEqual(diagnostic.expectedStorage);
+    const { repo, values } = memoryRepository(original);
+    await expect(repo.load()).rejects.toThrow(/legacy-debt.*unprovable/);
+    expect(values).toEqual(diagnostic.expectedStorage);
+    // The unchanged low-level reader remains the recovery boundary.
+    expect(parseStoredSession(original.session, original["session:card-db"], original["session:undo-history"]).state.schemaVersion).toBe(6);
   }
   expect(f.disposition).toBe("atomic-legacy-debt-rejection");
 });

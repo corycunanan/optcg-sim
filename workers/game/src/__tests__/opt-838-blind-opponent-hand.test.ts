@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
@@ -161,6 +162,7 @@ function playDrake(owner: 0 | 1, count: number, seed?: string) {
   });
   f.act({ type: "PLAY_CARD", cardInstanceId: drake.instanceId });
   acceptOptionalIfPrompted(f);
+  f.state = scriptedDonPayment(f.state, f.db, owner, 2);
   return { f, opponent, drake, own, hand };
 }
 
