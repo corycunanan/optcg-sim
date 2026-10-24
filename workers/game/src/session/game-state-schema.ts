@@ -513,12 +513,22 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
-  if (version < 9 && Array.isArray(raw.effectStack)) {
-    raw.effectStack.forEach((frame, index) => {
-      if (isRecord(frame) && isRecord(frame.replacementBatch) && frame.replacementBatch.actionKind === "TRASH_CARD") {
-        throw new SessionLoadError(location, `effectStack[${index}].replacementBatch.actionKind TRASH_CARD requires schemaVersion 9`);
+  if (version < 9) {
+    const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
+    frames.forEach((frame, index) => {
+      if (!isRecord(frame)) return;
+      for (const field of ["replacementBatch", "replacementBatchContinuation"]) {
+        const batch = frame[field];
+        if (isRecord(batch) && batch.actionKind === "TRASH_CARD") {
+          throw new SessionLoadError(location, `effectStack[${index}].${field}.actionKind TRASH_CARD requires schemaVersion 9`);
+        }
       }
     });
+    const prompt = isRecord(raw.pendingPrompt) ? raw.pendingPrompt : {};
+    const context = isRecord(prompt.resumeContext) ? prompt.resumeContext : {};
+    if (context.type === "REPLACEMENT_BATCH" && context.actionKind === "TRASH_CARD") {
+      throw new SessionLoadError(location, "pendingPrompt.resumeContext.actionKind TRASH_CARD requires schemaVersion 9");
+    }
   }
   if (version >= 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7 && raw.costSemanticsVersion !== 8) {
     throw new SessionLoadError(location, `native${version} requires explicit costSemanticsVersion 6, 7 or 8`);

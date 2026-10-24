@@ -1,3 +1,4 @@
+import { goldenV2Raw } from "./fixtures/opt-963-v3-states.js";
 import { expect, it } from "vitest";
 import { convertPersistedGameState, promoteGameStateForWriter, SESSION_STORAGE_KEY, SESSION_CARD_DB_STORAGE_KEY, SESSION_UNDO_HISTORY_STORAGE_KEY, SessionRepository } from "../session/persistence.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
@@ -31,4 +32,11 @@ for (const mode of [undefined, null, 5, 9, "8"]) for (const undo of [false, true
   const before = structuredClone(storage.data);
   await expect(new SessionRepository(storage, { nextJsUrl: "https://x.test", workerSecret: "s" }).load()).rejects.toMatchObject({ name: "SessionLoadError", location: undo ? "undoHistory[0]" : "state", reason: expect.stringContaining("native9 requires explicit costSemanticsVersion") });
   expect(storage.data).toEqual(before); expect(storage.writes).toEqual([]);
+});
+
+it("OPT-1006 legacy object batch prompts cannot smuggle the new discriminator under v2", () => {
+  const state = goldenV2Raw("replacement-batch-prompt");
+  const prompt = state.pendingPrompt as { resumeContext: { actionKind: string } };
+  prompt.resumeContext.actionKind = "TRASH_CARD";
+  expect(() => convertPersistedGameState(state, "undoHistory[0]")).toThrow("pendingPrompt.resumeContext.actionKind TRASH_CARD requires schemaVersion 9");
 });

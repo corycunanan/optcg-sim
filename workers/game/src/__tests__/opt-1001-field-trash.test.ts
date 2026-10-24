@@ -134,6 +134,56 @@ it("OPT-1001 native9 downstream battle completion retains protection through EOB
   expect(alive(r, target.instanceId)).toBe(true); expect(r.state.prohibitions).toHaveLength(0); expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toEqual([]);
   expect(r.state.eventLog.filter(event => event.type === "BATTLE_RESOLVED")).toHaveLength(1); expect(r.state.schemaVersion).toBe(9);
 });
+for (const cardId of ["OP15-094", "OP08-045", "ST30-009"]) it(`OPT-1001 authored ${cardId} self-trash substitute never reapplies or KOs`, async () => {
+  const r = setup(); const source = r.put(cardId, 0, "CHARACTER", { data: { power: 9000 } });
+  const target = cardId === "OP08-045" ? source : r.put("OPT1001-SACRIFICE-TARGET", 0, "CHARACTER", { data: { power: cardId === "ST30-009" ? 6000 : 5000, types: ["Straw Hat Crew"] } });
+  event(r, { type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }); r.select([target.instanceId]);
+  if (r.promptType() === "OPTIONAL_EFFECT") { await r.reload(); r.accept(); }
+  expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toEqual([]); expect(alive(r, source.instanceId)).toBe(false);
+  if (source !== target) expect(alive(r, target.instanceId)).toBe(true);
+  expect(r.state.eventLog.filter(event => event.type === "CARD_KO")).toHaveLength(0);
+  expect(r.state.players[0].hand).toHaveLength(cardId === "OP15-094" ? 0 : 1);
+});
+for (const accept of [false, true]) it(`OPT-885 field-trash action count excludes protected cards and substitute movement accept=${accept}`, async () => {
+  const r = setup(); const { targets, payment } = prepare(r);
+  r.put("OPT1001-COUNT-NONNAVY", 0, "CHARACTER", { data: { power: 5000 } });
+  const source = r.put("OPT1001-COUNT-SOURCE", 1, "CHARACTER", { schema: synSchema("OPT1001-COUNT-SOURCE", [{ id: "count", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [
+    { type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } }, result_ref: "trashed" },
+    { type: "DRAW", params: { amount: { type: "PER_COUNT", source: "CARDS_TRASHED_THIS_WAY", ref: "trashed", multiplier: 1 } }, chain: "THEN" },
+  ] }]) });
+  r.state.turn.activePlayerIndex = 1; r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "count" });
+  expect(r.promptType()).toBe("OPTIONAL_EFFECT"); if (accept) await pay(r, payment.map(card => card.instanceId)); else r.decline();
+  expect(alive(r, targets[0].instanceId)).toBe(accept); expect(r.state.players[1].hand).toHaveLength(accept ? 1 : 2);
+  expect(r.state.eventLog.filter(event => event.type === "CARD_KO")).toHaveLength(0); expect(r.state.effectStack).toEqual([]);
+});
+it("OPT-1001 authored Brook choice reaches field-trash replacement", async () => {
+  const r = setup(); const { targets, payment } = prepare(r); r.db.get(targets[0].cardId)!.cost = 4;
+  const source = r.put("OP06-092", 1, "HAND", { data: { cost: 0 } }); r.state.turn.activePlayerIndex = 1;
+  r.act({ type: "PLAY_CARD", cardInstanceId: source.instanceId }, 1); const prompt = r.state.pendingPrompt!.options;
+  if (prompt.promptType !== "PLAYER_CHOICE") throw new Error("Brook choice");
+  r.act({ type: "PLAYER_CHOICE", choiceId: prompt.choices[0].id }); r.select([targets[0].instanceId]);
+  expect(r.promptType()).toBe("OPTIONAL_EFFECT"); await pay(r, payment.map(card => card.instanceId)); expect(alive(r, targets[0].instanceId)).toBe(true);
+});
+it("OPT-1001 Koby7k-base ceiling excludes an8k-base Navy despite printed remover legality", () => {
+  const r = setup(); const { targets } = prepare(r); r.db.get(targets[0].cardId)!.power = 8000;
+  event(r, { type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } } });
+  expect(r.state.pendingPrompt).toBeNull(); expect(alive(r, targets[0].instanceId)).toBe(false);
+});
+it("OPT-1001 native9 field-trash feasibility stays lazy with128 trash cards", () => {
+  const r = setup(); prepare(r, true, 128);
+  const started = performance.now();
+  event(r, { type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } } });
+  expect(r.promptType()).toBe("OPTIONAL_EFFECT"); expect(performance.now() - started).toBeLessThan(1000);
+});
+it("OPT-1001 field-trash rescans after Koby decline and offers authored Zoro", async () => {
+  const r = setup(); const { targets } = prepare(r); r.db.get(targets[0].cardId)!.types = ["Navy", "Straw Hat Crew"];
+  const zoro = r.put("OP15-094", 0, "CHARACTER", { data: { power: 9000 } });
+  beckman(r, [targets[0].instanceId]); expect(r.promptType()).toBe("PLAYER_CHOICE");
+  const koby = r.state.activeEffects.find(effect => effect.sourceCardInstanceId === r.state.players[0].leader.instanceId && effect.modifiers.some(modifier => modifier.type === "REPLACEMENT_EFFECT"))!;
+  r.act({ type: "PLAYER_CHOICE", choiceId: koby.id }); r.decline(); expect(r.promptType()).toBe("OPTIONAL_EFFECT"); await r.reload(); r.accept();
+  expect(alive(r, targets[0].instanceId)).toBe(true); expect(alive(r, zoro.instanceId)).toBe(false); expect(r.state.players[0].trash).toHaveLength(4);
+  expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toEqual([]); expect(r.state.eventLog.filter(event => event.type === "CARD_KO")).toHaveLength(0);
+});
 afterEach(async () => {
   const folder = process.env.OPT1001_WRITE_CORPUS;
   for (const capture of captures.splice(0)) {
