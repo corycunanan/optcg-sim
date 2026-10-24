@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
 /** Actual candidate-produced bytes, resumed from every pause on live/undo ingress. */
 import { describe, expect, it } from "vitest";
@@ -23,7 +24,8 @@ for (const file of readdirSync(dir).filter(f => f.endsWith(".json") && f !== "ma
       const { repo } = memoryRepository(values);
       const loaded = (await repo.load())!;
       let state = ingress.endsWith("undo") ? loaded.undoHistory[0] : loaded.state;
-      expect(state).toEqual(current); expect(state.schemaVersion).toBe(7);
+      expect(state).toEqual(writerEnvelope(current)); expect(state.schemaVersion).toBe(8);
+        expect(state.costSemanticsVersion).toBe(7);
       for (const step of fixture.steps.slice(pause)) {
         if (prefix && state.pendingPrompt?.options.promptType === "SELECT_TARGET" && state.effectStack.some(f => f.costReplacementResolution === "REPLACED")) {
           expect(state.players[fixture.owner].deck).toHaveLength(4); expect(state.players[fixture.owner].hand).toHaveLength(5);
@@ -36,10 +38,11 @@ for (const file of readdirSync(dir).filter(f => f.endsWith(".json") && f !== "ma
         const saved = await repo.save({ ...loaded, state, undoHistory: [] });
         await repo.save({ ...saved, undoHistory: [saved.state] });
         state = toPersistedGameState(saved.state);
-        expect(withoutAssertedCostEvidence(state)).toEqual(step.expected);
+        expect(withoutAssertedCostEvidence(state)).toEqual(writerEnvelope(step.expected));
         const reloaded = (await repo.load())!;
         expect(reloaded.state).toEqual(state); expect(reloaded.undoHistory).toEqual([state]);
-        expect(state.schemaVersion).toBe(7);
+        expect(state.schemaVersion).toBe(8);
+        expect(state.costSemanticsVersion).toBe(7);
       }
       if (fixture.knownDebt) {
         expect(state.pendingPrompt).toBeNull();
@@ -109,12 +112,12 @@ for (const file of readdirSync(originalDir).filter(f => f.endsWith(".json") && f
     const { repo } = memoryRepository(stored);
     const loaded = (await repo.load())!;
     let state = undo ? loaded.undoHistory[0] : loaded.state;
-    expect(state).toEqual((stored.session as { state: GameState }).state);
+    expect(state).toEqual(writerEnvelope((stored.session as { state: GameState }).state));
     for (let step = pause; step < old.steps.length; step++) {
       state = command(state, old.steps[step].action, loaded.cardDb);
       const saved = await repo.save({ ...loaded, state, undoHistory: [] });
       state = toPersistedGameState(saved.state);
-      expect(withoutAssertedCostEvidence(state)).toEqual(corrected.steps[step].expected);
+      expect(withoutAssertedCostEvidence(state)).toEqual(writerEnvelope(corrected.steps[step].expected));
     }
     if (!old.knownDebt) expect(state.effectStack).toHaveLength(0);
     else expect(state.effectStack.some(f => f.kind === "COST" && !f.costReplacementResolution)).toBe(true);

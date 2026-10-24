@@ -6,7 +6,7 @@ import { expandReplacementVisits, replacementAbilitySiblings, replacementStructu
 import type { EffectSchema } from "../engine/effect-types.js";
 
 function fixture() {
-  const r = rig(); r.state.schemaVersion = 6;
+  const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion;
   const card = r.put("OP08-045", 0, "CHARACTER");
   const effects = r.state.activeEffects.filter((e) => e.sourceCardInstanceId === card.instanceId);
   return { r, card, effects };

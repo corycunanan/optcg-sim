@@ -86,11 +86,11 @@ function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
 const kindsOf = (state: GameState) => state.effectStack.map(frameKindOf);
 
 describe("OPT-963 version 3 runtime and writer (PR 5b)", () => {
-  it("reads 1–8, executes native 8 and normally writes 6", () => {
+  it("reads 1–8, executes native 8 and normally writes 8", () => {
     expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(8);
     expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(8);
-    expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
+    expect(GAME_STATE_SCHEMA_VERSION).toBe(8);
     expect([...EFFECT_STACK_FRAME_KINDS]).toEqual(
       expect.arrayContaining(["REPLACEMENT", "REPLACEMENT_BATCH", "BATTLE_DAMAGE", "EFFECT_DAMAGE"])
     );
@@ -237,7 +237,7 @@ describe("OPT-963 v2 → v3 lift: every version 2 record becomes a frame, live a
     const live = liftedGolden(name);
     expect(convertPersistedGameState(goldenV1Raw(name), "state")).toEqual(live);
     const loaded = (await repository(storageWith(golden("battle-ready-with-undo").session.state, [goldenV2Raw(name)])).load())!;
-    expect(loaded.undoHistory[0]).toEqual(live);
+    expect(loaded.undoHistory[0]).toEqual({ ...live, schemaVersion: 8, costSemanticsVersion: 6 });
   });
 });
 
@@ -255,17 +255,18 @@ describe("OPT-963 v3 reader: every version 3 shape loads unchanged, live and as 
     expect(withoutVersion(persistedV3(loaded.undoHistory[0]))).toEqual(withoutVersion(raw));
   });
 
-  it.each(NAMES)("%s round-trips historical semantics through the version 6 writer", (name) => {
+  it.each(NAMES)("%s round-trips historical semantics through the version 8 writer", (name) => {
     const state = runtime(byName(name).state);
     const out = toPersistedGameState(state) as unknown as Record<string, unknown>;
     expect(Object.keys(out)[0]).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
-    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
+    expect(out[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(8);
+    expect(out.costSemanticsVersion).toBe(6);
     expect(persistedV3(convertPersistedGameState(JSON.parse(JSON.stringify(out)), "state"))).toEqual(persistedV3(state));
   });
 });
 
 describe("OPT-963 mixed-version undo history", () => {
-  it("[3, 2]: a version 3 live state with a version 2 undo snapshot loads, both as version 3, and re-saves as version 3", async () => {
+  it("[3, 2]: a version 3 live state with a version 2 undo snapshot loads and re-saves both as version 8", async () => {
     const entry = golden("battle-trigger-window");
     const storage = storageWith(persistedV3(byName("battle-trigger-window").state), [goldenV2Raw("effect-damage-trigger-window")], entry.cardDb);
     const first = (await repository(storage).load())!;
@@ -274,9 +275,11 @@ describe("OPT-963 mixed-version undo history", () => {
     const target = new MemorySessionStorage();
     const saved = await repository(target).save(first);
     const written = target.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
+    expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(8);
+    expect(written.state.costSemanticsVersion).toBe(6);
     const writtenUndo = target.data.get(SESSION_UNDO_HISTORY_STORAGE_KEY) as Record<string, unknown>[];
-    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(6);
+    expect(writtenUndo[0][GAME_STATE_SCHEMA_VERSION_KEY]).toBe(8);
+    expect(writtenUndo[0].costSemanticsVersion).toBe(6);
     const second = (await repository(target).load())!;
     expect(toPersistedGameState(second.state)).toEqual(toPersistedGameState(saved.state));
     expect(second.undoHistory.map(toPersistedGameState)).toEqual(saved.undoHistory.map(toPersistedGameState));
@@ -594,7 +597,7 @@ describe("PR #758 round 3: a version 2 object whose retired keys are present wit
     expect(hasRetiredKey(live.undoHistory[0])).toBe(false);
     expect(classifyLegacyShapes(live.state)).toEqual([]);
     expect(runtime(live.state)).toEqual(runtime(live.undoHistory[0]));
-    expect(runtime(live.state)).toEqual(runtime(liftedGolden(name)));
+    expect(runtime(live.state)).toEqual(runtime({ ...liftedGolden(name), schemaVersion: 8, costSemanticsVersion: 6 }));
   });
 
   it("(b) through convertPersistedGameState on a structuredClone'd object", () => {

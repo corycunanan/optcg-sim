@@ -1,7 +1,7 @@
-import currentV6 from "./fixtures/opt-968-writer-golden.synthetic.json";
+import currentV8 from "./fixtures/opt-1003-writer-golden.synthetic.json";
 /**
  * Historical OPT-940..967 inputs remain frozen. OPT-968 compares separate
- * current v6 writer bytes, including explicit complete batch event families.
+ * current v8 writer bytes, including explicit complete batch event families.
  * The historical version-transition assertions below still use old fixtures;
  * they do not manufacture historical inputs through the current writer.
  */
@@ -34,7 +34,7 @@ async function writeThroughCurrentWriter(name: string) {
   };
 }
 
-describe("OPT-940 writer golden: persisted bytes match the current version 6 writer golden", () => {
+describe("OPT-940 writer golden: persisted bytes match the current version 8 writer golden", () => {
   const fixture = loadV5WriterGolden();
   const v3 = loadWriterGolden();
   const v1 = loadGoldenFixture();
@@ -42,6 +42,8 @@ describe("OPT-940 writer golden: persisted bytes match the current version 6 wri
 
   it("was captured from the same synthetic states and is labelled synthetic", () => {
     expect(fixture.provenance).toBe("synthetic");
+    expect(currentV8.provenance).toBe("synthetic");
+    expect(currentV8.capturedAtCommit).toBe("6469e36650583fe745c7be2e283d10c2d9206c45");
     expect(Object.keys(fixture.cases).sort()).toEqual(
       getSyntheticStates().map((state) => state.name).sort()
     );
@@ -51,7 +53,7 @@ describe("OPT-940 writer golden: persisted bytes match the current version 6 wri
   it.each(Object.keys(fixture.cases))(
     "%s: session, card DB, and undo history bytes match the writer golden",
     async (name) => {
-      const golden = currentV6.cases[name as keyof typeof currentV6.cases];
+      const golden = currentV8.cases[name as keyof typeof currentV8.cases];
       const current = await writeThroughCurrentWriter(name);
       expect(current.sessionJson).toBe(golden.sessionJson);
       expect(current.cardDbJson).toBe(golden.cardDbJson);
@@ -59,17 +61,18 @@ describe("OPT-940 writer golden: persisted bytes match the current version 6 wri
     }
   );
 
-  it("writes version 6 first regardless of owners on live state and undo snapshots", async () => {
+  it("writes version 8 first regardless of owners on live state and undo snapshots", async () => {
     for (const name of Object.keys(fixture.cases)) {
       const current = await writeThroughCurrentWriter(name);
       const state = JSON.parse(current.sessionJson).state;
-      const version = 6;
+      const version = 8;
       expect(state.schemaVersion).toBe(version);
       expect(current.sessionJson, name).toContain(`"state":{"${GAME_STATE_SCHEMA_VERSION_KEY}":${version},`);
       const undo = JSON.parse(current.undoHistoryJson) as Array<Record<string, unknown>>;
       for (const snapshot of undo) expect(Object.keys(snapshot)[0], name).toBe(GAME_STATE_SCHEMA_VERSION_KEY);
       for (const snapshot of undo) {
-        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(6);
+        expect(snapshot[GAME_STATE_SCHEMA_VERSION_KEY], name).toBe(8);
+        expect(snapshot.costSemanticsVersion, name).toBe(6);
       }
     }
   });

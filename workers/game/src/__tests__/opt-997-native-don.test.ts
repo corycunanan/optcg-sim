@@ -4,7 +4,7 @@ import { rig, synSchema } from "./opt-960-rig.js";
 import type { Action } from "../engine/effect-types.js";
 
 function fixture(action: Action, version: 6 | 7 = 7) {
-  const r = rig(); r.state.schemaVersion = version; r.deck(0, 5); r.deck(1, 5);
+  const r = rig(); r.state.schemaVersion = version; delete r.state.costSemanticsVersion; r.deck(0, 5); r.deck(1, 5);
   const source = r.put("OPT997-native-don", 0, "CHARACTER", { schema: synSchema("OPT997-native-don", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [action, { type: "DRAW", params: { amount: 1 } }] }]) });
   return { r, source };
 }
@@ -33,7 +33,7 @@ it("native7 opponent cost-area active domain excludes rested/attached DON and pr
   expect(r.state.players[1].donDeck.map(d => d.instanceId)).toEqual([...deckBefore, active.instanceId]);
 });
 it("native7 never offers a replacement that can only partially return its restricted active pool", () => {
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   const source = r.put("OPT997-insufficient", 0, "CHARACTER", { schema: synSchema("OPT997-insufficient", [
     { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "RETURN_DON_TO_DECK", target: { type: "DON_IN_COST_AREA", filter: { is_active: true } }, params: { amount: 2 } }], flags: { optional: true } },
     { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] },
@@ -63,7 +63,7 @@ for (const filter of [{ is_rested: true }, { state: "RESTED" }] as const) {
     expect(r.state.players[0].hand).toHaveLength(1);
   });
   it(`native7 replacement rejects underpayment of rested pool ${JSON.stringify(filter)}`, () => {
-    const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+    const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
     const source = r.put("OPT997-rested-insufficient", 0, "CHARACTER", { schema: synSchema("OPT997-rested-insufficient", [
       { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "RETURN_DON_TO_DECK", target: { type: "DON_IN_COST_AREA", filter }, params: { amount: 2 } }], flags: { optional: true } },
       { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] },

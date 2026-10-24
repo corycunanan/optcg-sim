@@ -62,7 +62,7 @@ export interface SessionStorage extends TokenJtiStorage {
 
 /** Adapt Cloudflare storage to the narrower engine-owned session port. */
 export class DurableObjectSessionStorage implements SessionStorage {
-  constructor(private readonly storage: DurableObjectStorage) {}
+  constructor(private readonly storage: SessionStorage) {}
 
   get<T>(key: string): Promise<T | undefined> {
     return this.storage.get<T>(key);
@@ -167,10 +167,12 @@ export class SessionRepository {
   }
 
   async save(snapshot: SessionSnapshot): Promise<SessionSnapshot> {
-    const promptedState = ensurePromptId(snapshot.state);
+    const promptedState = ensurePromptId(promoteGameStateForWriter(snapshot.state, "state"));
     const compacted = compactSessionHistory(
       promptedState,
-      snapshot.undoHistory,
+      snapshot.undoHistory.map((state, index) =>
+        promoteGameStateForWriter(state, `undoHistory[${index}]`)
+      ),
       this.historySummary
     );
     const stored: PersistedSession = {
@@ -252,13 +254,13 @@ export class SessionRepository {
     ]);
     const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
     const restoredState = restoreIdCounterInvariant(
-      ensureExecutionContext(stored.state),
+      ensureExecutionContext(activateValidatedWriterState(stored.state)),
       "state"
     );
     const restoredUndoHistory = (stored.undoHistory ?? []).map(
       (snapshot, index) =>
         restoreIdCounterInvariant(
-          ensureExecutionContext(snapshot),
+          ensureExecutionContext(activateValidatedWriterState(snapshot)),
           `undoHistory[${index}]`
         )
     );
@@ -936,6 +938,30 @@ export function convertPersistedGameState(
   validateContinuationReferences(migrated, location);
   logLegacyShapes(migrated, location);
   return isGameTerminated(migrated) ? clearTerminalPendingWork(migrated) : migrated;
+}
+
+/** Metadata-only activation: never infer payment outcomes or an old battle's debt. */
+function activateValidatedWriterState(state: GameState): GameState {
+  if (state.schemaVersion === 8) return state;
+  return {
+    ...state,
+    schemaVersion: 8,
+    costSemanticsVersion: state.schemaVersion === 7 ? 7 : 6,
+  };
+}
+
+/** Validate the source contract before adding the deployed v8 writer metadata. */
+export function promoteGameStateForWriter(state: GameState, location: string): GameState {
+  // Runtime frames may acquire continuation fields before their optional kind
+  // tag is refreshed. Validate the actual wire shape emitted by the existing
+  // serializer (which derives kind), before adding any v8 provenance.
+  const source = toPersistedGameState({ ...state, schemaVersion: state.schemaVersion ?? 6 });
+  const validated = convertPersistedGameState(source, location);
+  // Validation uses the wire discriminators without injecting them, legacy
+  // stages, or inferred replacement event metadata into the live runtime.
+  return activateValidatedWriterState(state.schemaVersion === undefined ||
+    state.schemaVersion === 6 || state.schemaVersion === 7 || state.schemaVersion === 8
+      ? state : validated);
 }
 
 export function parseStoredSession(

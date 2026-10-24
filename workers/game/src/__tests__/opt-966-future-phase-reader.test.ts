@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
@@ -73,7 +74,7 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       expect(result.responseRejected).toBe(false);
       actual = result.state;
     }
-      expected = candidateExpected<GameState>(`future/${name}/${index}/final`);
+      expected = writerEnvelope(candidateExpected<GameState>(`future/${name}/${index}/final`));
       expect(actual).toEqual(expected);
       expect(actual.pendingPrompt).toBeNull();
     expect(actual.effectStack).toEqual([]);

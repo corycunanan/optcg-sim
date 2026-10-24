@@ -73,7 +73,7 @@ describe("OPT-968 complete legacy families on v6 emission and rollback resume", 
       const emitted = output.data.get("session") as { state: GameState };
       const family = input.kind === "KO" ? ["WOULD_BE_KO", "WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"] : input.kind === "SET_REST" ? ["WOULD_BE_RESTED"] : ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"];
       for (const state of [emitted.state, ...(output.data.get("session:undo-history") as GameState[])]) {
-        expect(state.schemaVersion).toBe(6);
+        expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
         const batch = state.effectStack.find((frame) => frame.replacementBatch)!.replacementBatch!;
         expect(batch.events).toEqual(family); expect(batch.currentMatchIndex).toBe(originalBatch.currentMatchIndex);
         expect(batch.pendingMatches).toEqual(originalBatch.pendingMatches); expect(batch.protectedIds).toEqual(originalBatch.protectedIds);
@@ -113,7 +113,7 @@ describe("OPT-968 complete legacy families on v6 emission and rollback resume", 
         if (prompt?.promptType === "SELECT_TARGET") { sawNested = true; next = { type: "SELECT_TARGET", selectedInstanceIds: input.hand.slice(0, 2) }; }
         else next = { type: "PLAYER_CHOICE", choiceId: "skip" };
       }
-      expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.schemaVersion).toBe(6);
+      expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
       if (input.phase !== "first") {
         if (input.kind !== "SET_REST") expect(loaded.state.players[0].characters.some((card) => card?.instanceId === input.a)).toBe(input.phase === "prefix");
         if (accept) {

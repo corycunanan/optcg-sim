@@ -914,7 +914,7 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
   for (const staleRoot of [false, true])
     it(`rest-prefix DON reply ${staleRoot ? "rejects persisted root drift" : "pays and draws once"}`, async () => {
       const r = rig();
-      r.state.schemaVersion = 7;
+      r.state.schemaVersion = 7; delete r.state.costSemanticsVersion;
       r.deck(0, 5);
       const donors = r.state.players[0].donCostArea;
       donors[1].state = "RESTED";

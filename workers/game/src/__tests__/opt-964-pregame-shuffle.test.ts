@@ -158,7 +158,7 @@ describe.each(["state", "undoHistory[0]"] as const)(
         };
         const uninterrupted = resume(paused);
         const reloaded = resume(restored);
-        expect(reloaded).toEqual({ ...uninterrupted, beforeDeal: { ...uninterrupted.beforeDeal, schemaVersion: 6 }, state: { ...uninterrupted.state, schemaVersion: 6 } });
+        expect(reloaded).toEqual({ ...uninterrupted, beforeDeal: { ...uninterrupted.beforeDeal, schemaVersion: 8, costSemanticsVersion: 6 }, state: { ...uninterrupted.state, schemaVersion: 8, costSemanticsVersion: 6 } });
         const dealt = reloaded.state;
         expect(dealt.pregame?.phase).toBe("MULLIGAN_DECISIONS");
         expect(dealt.players[0].hand.map((c) => c.cardId)).toEqual(

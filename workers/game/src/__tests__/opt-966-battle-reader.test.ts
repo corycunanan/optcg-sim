@@ -1,3 +1,4 @@
+import { currentBattleExpected } from "./opt-1003-battle-expectations.js";
 import battleImmediate from "./fixtures/opt-966-battle-immediate-writer.json";
 import lifeImmediate from "./fixtures/opt-966-life-immediate-writer.json";
 import restJson from "./fixtures/opt-966-battle-rest-writer.json";
@@ -30,6 +31,11 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
   const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
   const loaded = (await new SessionRepository(storage, options).load())!;
   for (const initial of [loaded.state, loaded.undoHistory[0]]) {
+    const currentExpected = currentBattleExpected(name, expected, initial.turn.battle !== null);
+    if (!initial.turn.battle && initial.eventLog.some(e => e.type === "END_OF_BATTLE")) {
+      expect(initial.effectStack.some(frame => frame.battleCompletion)).toBe(false);
+      expect(initial.eventLog).toEqual((stored.session as { state: GameState }).state.eventLog);
+    }
     let actual = initial;
     for (const [offset, action] of replies.entries()) {
       // The producer uses fixed prompt IDs to keep storage allocation identical.
@@ -57,11 +63,11 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
     }
     expect(actual.pendingPrompt).toBeNull();
     expect(actual.effectStack).toEqual([]);
-    expect(actual.eventLog).toEqual(expected.eventLog);
-    expect(actual.players).toEqual(expected.players);
-    expect(actual.turn).toEqual(expected.turn);
-    expect(actual.executionContext).toEqual(expected.executionContext);
-    expect(actual).toEqual({ ...expected, schemaVersion: 6 });
+    expect(actual.eventLog).toEqual(currentExpected.eventLog);
+    expect(actual.players).toEqual(currentExpected.players);
+    expect(actual.turn).toEqual(currentExpected.turn);
+    expect(actual.executionContext).toEqual(currentExpected.executionContext);
+    expect(actual).toEqual(currentExpected);
     const types = actual.eventLog.map((event) => event.type);
     if (name.includes("immediate")) {
       expect(types.filter((type) => type === "CARD_DRAWN")).toHaveLength(2);

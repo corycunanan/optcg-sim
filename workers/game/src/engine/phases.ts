@@ -478,7 +478,7 @@ function completeTurnHandoff(
   const turnEnded: PendingEvent = { type: "TURN_ENDED", playerIndex: pi };
   events.push(options.endOfTurnWindowsRan ? withTriggerScanned(turnEnded) : turnEnded);
 
-  const nextState: GameState = {
+  let nextState: GameState = {
     ...state,
     turn: {
       number: nextTurnNumber,
@@ -493,6 +493,9 @@ function completeTurnHandoff(
     },
   };
 
+  // 6-2-1: expiry is part of entering Refresh, before start-of-turn
+  // conditions are scanned. REFRESH also keeps its idempotent load fallback.
+  nextState = expireRefreshPhaseEffects(nextState);
   events.push({ type: "TURN_STARTED", playerIndex: nextPlayerIndex });
   events.push({
     type: "PHASE_CHANGED",

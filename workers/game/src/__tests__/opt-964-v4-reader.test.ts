@@ -10,19 +10,20 @@ export function version4Base(): Record<string, unknown> {
     goldenV2Raw("battle-ready-with-undo"),
     "state"
   );
+  const { costSemanticsVersion: _costSemanticsVersion, ...historical } = toPersistedGameState(state);
   return JSON.parse(
-    JSON.stringify({ ...toPersistedGameState(state), schemaVersion: 4 })
+    JSON.stringify({ ...historical, schemaVersion: 4 })
   );
 }
 
 describe("OPT-964 historical v4 input and current writer", () => {
-  it("reads v4 and promotes live and undo output to v6", () => {
+  it("reads v4 and promotes live and undo output to v8", () => {
     for (const location of ["state", "undoHistory[0]"]) {
       const loaded = convertPersistedGameState(version4Base(), location);
       expect(
         (toPersistedGameState(loaded) as unknown as { schemaVersion: number })
           .schemaVersion
-      ).toBe(6);
+      ).toBe(8);
     }
   });
 });
@@ -243,7 +244,8 @@ describe("OPT-964 actual pipeline debt survives native persistence", () => {
           JSON.parse(
             JSON.stringify({
               ...state,
-              schemaVersion: 6,
+              schemaVersion: 8,
+              costSemanticsVersion: 6,
               effectStack: state.effectStack.map((f) => ({
                 ...f,
                 kind: frameKindOf(f),
@@ -256,7 +258,7 @@ describe("OPT-964 actual pipeline debt survives native persistence", () => {
           "state"
         );
         const resolved = reply(reloaded, db, action);
-        expect(resolved).toEqual({ ...expected, schemaVersion: 6 });
+        expect(resolved).toEqual({ ...expected, schemaVersion: 8, costSemanticsVersion: 6 });
         expect(resolved.effectStack).toHaveLength(0);
         expect(resolved.pendingEventActivationEvents ?? []).toHaveLength(0);
         expect(

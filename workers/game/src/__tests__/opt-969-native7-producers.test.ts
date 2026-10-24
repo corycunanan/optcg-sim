@@ -1,3 +1,4 @@
+import { writerSessionEnvelope } from "./opt-1003-writer-expectations.js";
 import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
 /** Actual isolated writer captures; synthetic reachability, never production evidence. */
 import { describe, expect, it } from "vitest";
@@ -71,7 +72,7 @@ describe.each(files)("native7 future producers %s", (file) => {
           expect(
             withoutAssertedCostEvidence(stored),
             `${file} ${context} start${start} after ${step.action.type}`
-          ).toEqual(step.stored);
+          ).toEqual(writerSessionEnvelope(step.stored));
           loaded = (await memory(rt, stored).repo.load())!;
         }
         const initial = (await memory(rt, corpus.initial).repo.load())!;
@@ -98,7 +99,7 @@ it("preserves the original reported second meaningful choice from its saved firs
   expect(next.players[0].hand).toHaveLength(0);
   expect(
     withoutAssertedCostEvidence(await save(rt, next, loaded.cardDb))
-  ).toEqual(corpus.steps[1].stored);
+  ).toEqual(writerSessionEnvelope(corpus.steps[1].stored));
 });
 
 it("verifies immutable corpus, generator and producer patch hashes", () => {

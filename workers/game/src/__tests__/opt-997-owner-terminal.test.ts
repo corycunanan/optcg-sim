@@ -7,7 +7,7 @@ import { convertPersistedGameState } from "../session/persistence.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 
 it("native7 owner insertion respects terminal stack-depth failure after mandatory child creation", () => {
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   for (let n = 0; n < 3; n++) r.put("OPT997-hand", 0, "HAND");
   const schema = synSchema("OPT997-depth", [
     { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 2 } }], flags: { optional: false, once_per_turn: true } },

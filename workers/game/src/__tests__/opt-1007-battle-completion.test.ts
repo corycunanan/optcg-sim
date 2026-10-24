@@ -43,6 +43,7 @@ function protectedBattle(version: 6 | 7 | 8 = 8) {
     schemaVersion: version,
     ...(version === 8 ? { costSemanticsVersion: 6 as const } : {}),
   };
+  if (version !== 8) delete r.state.costSemanticsVersion;
   const attacker = r.put("ST08-013", 0, "CHARACTER", { power: 4000 }, 1);
   const target = r.putSyn("TARGET-1007", null, 1, "CHARACTER", { power: 1000 });
   r.state.players[1].characters[0]!.state = "RESTED";
@@ -148,10 +149,10 @@ it.each([6, 7] as const)(
   }
 );
 
-it("retains default writer6 and explicitly reads8", () => {
-  expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
+it("activates default writer8 after the reader deployment", () => {
+  expect(GAME_STATE_SCHEMA_VERSION).toBe(8);
   expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(8);
-  expect(toPersistedGameState(endPhaseRig().state).schemaVersion).toBe(6);
+  expect(toPersistedGameState(endPhaseRig().state)).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
 });
 
 function nativeRig(mode: 6 | 7 = 6) {

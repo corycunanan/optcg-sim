@@ -39,8 +39,10 @@ void actionUnionIsExhaustive;
 
 function storedFixture() {
   const cardDb = createTestCardDb();
+  // This source fixture deliberately exercises the historical v1 boundary.
+  const { schemaVersion: _schemaVersion, costSemanticsVersion: _costSemanticsVersion, ...state } = createBattleReadyState(cardDb);
   return {
-    state: createBattleReadyState(cardDb),
+    state,
     cardDb: Object.fromEntries(cardDb),
     mode: "PVP",
     testPriorityRolls: null,
