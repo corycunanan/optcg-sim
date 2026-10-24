@@ -243,13 +243,15 @@ describe("OPT-791 ST13-003 damage Life destination", () => {
     expect(r.state.turn.battle).toBeNull();
   });
 
-  it("preserves face-down self-damage's hand destination and no-Trigger behavior", () => {
+  it("offers face-down self-damage's Trigger and preserves its declined hand destination (4-6-3)", () => {
     const { state, db } = setup(["DOWN"], 0);
     const r = damage(state, db, "SELF_TAKE_DAMAGE", 1);
-    expect(r.state.players[0].hand).toHaveLength(
-      state.players[0].hand.length + 1
-    );
-    expect(r.state.players[0].deck).toEqual(state.players[0].deck);
-    expect(effectTriggerWindow(r.state) ?? null).toBeNull();
+    expect(effectTriggerWindow(r.state)?.damagedPlayerIndex).toBe(0);
+    expect(r.state.players[0].hand).toEqual(state.players[0].hand);
+    const declined = revealTrigger(r.state, false, db);
+    expect(declined.valid).toBe(true);
+    expect(declined.state.players[0].hand).toHaveLength(state.players[0].hand.length + 1);
+    expect(declined.state.players[0].deck).toEqual(state.players[0].deck);
+    expect(effectTriggerWindow(declined.state) ?? null).toBeNull();
   });
 });
