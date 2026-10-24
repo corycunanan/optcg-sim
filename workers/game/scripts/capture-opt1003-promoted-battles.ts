@@ -61,6 +61,13 @@ async function main(): Promise<void> {
         ...loaded,
         undoHistory: [loaded.state],
       });
+      // Establish the symmetric undo boundary from the actual saved return,
+      // after its prompt-ID allocation. The first save's earlier undo is a
+      // distinct supported snapshot, not an equivalent-ID comparison target.
+      loaded = await repository.save({
+        ...loaded,
+        undoHistory: [loaded.state],
+      });
       const initialStored = structuredClone(Object.fromEntries(storage.data));
       const steps: { action: GameAction; stored: Record<string, unknown> }[] =
         [];
@@ -99,6 +106,10 @@ async function main(): Promise<void> {
           ...loaded,
           state: resumed.state,
           undoHistory: [resumed.state],
+        });
+        loaded = await repository.save({
+          ...loaded,
+          undoHistory: [loaded.state],
         });
         steps.push({
           action,
