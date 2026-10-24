@@ -40,10 +40,10 @@ import { log } from "../lib/log.js";
 import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
-export const GAME_STATE_SCHEMA_VERSION = 6;
+export const GAME_STATE_SCHEMA_VERSION = 8;
 /** The newest readable envelope; native8 carries exact battle completion and cost provenance. */
 export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 8;
-/** The newest runtime shape this build executes; ordinary writers remain v6. */
+/** The deployed runtime and default production writer use v8. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
@@ -599,10 +599,11 @@ export function toPersistedGameState(state: GameState): GameState {
     : state.effectStack;
   const { schemaVersion: _schemaVersion, ...rest } = state;
   return {
-    // Reader preserves a native-v7/v8 session/undo entry; ordinary engine inputs
-    // still write v6 until the separately gated producer flips its version.
-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 8 ? 8 : state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
+    // Explicit historical envelopes retain their reader semantics. Production
+    // session ingress activates v8 separately, after validating the old shape.
+    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion ?? GAME_STATE_SCHEMA_VERSION,
     ...rest,
+    ...(state.schemaVersion === undefined ? { costSemanticsVersion: 6 as const } : {}),
     effectStack: effectStack.map((frame) => ({
       ...frame,
       kind: frameKindOf(frame),
