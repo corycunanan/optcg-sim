@@ -699,3 +699,25 @@ and [the synthetic isolated-writer corpus](../../workers/game/src/__tests__/fixt
 This release does not promote existing sessions, enable the ordinary8 writer,
 change End Phase stage bytes, infer old replacement outcomes, or claim production
 capture evidence. Deploy and verify this semantic8 reader before writer rollout.
+
+
+### Writer activation after deployed native8 reader (OPT-1003)
+
+The OPT-1007 reader above shipped first. Production new games now start as schema 8 with cost mode 6;
+repository load/save activates validated historical live and all undo snapshots
+before gameplay, preserving6→8.mode 6 and7→8.mode 7. Older supported envelopes
+first use their existing conversion hooks and then mode 6. Explicit schema 8 mode is
+required and preserved; invalid/missing mode never defaults. No payment outcome,
+expected-root evidence or battle completion is reconstructed. Already-started
+legacy EOB prompts retain their committed events and expired effects.
+
+The repository save return is the activated runtime, matching stored semantics.
+Low-level `convertPersistedGameState` / `parseStoredSession` and explicitly
+versioned serializer inputs preserve historical reader contracts. Historical typed
+coordinator actions activate before accepted gameplay; rejected commands retain
+original live/undo state. Current writer 16-case golden is separately named
+`opt-1003-writer-golden.synthetic.json`, pinned to source `6469e366`; every older
+golden/prototype input stays frozen. Its delta from the ordinary6 golden is only
+the8 envelope and mode 6 provenance. Synthetic-only evidence was explicitly approved
+for this run; no production capture claim follows. The semantic rollback floor
+remains the deployed8 reader. See [the completion and Refresh contract](./NATIVE8-BATTLE-COMPLETION.md).

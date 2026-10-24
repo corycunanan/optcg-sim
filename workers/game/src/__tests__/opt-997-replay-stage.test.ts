@@ -84,7 +84,7 @@ for (const [family, cases] of Object.entries(mutations)) {
 }
 
 for (const hand of [false, true]) for (const shuffle of [false, true]) for (const accept of [false, true]) it(`actual zero-secondary ${hand ? "hand" : "trash"} shuffle=${shuffle} accept=${accept}`, async () => {
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   r.put("zero-hand", 0, "HAND"); r.put("zero-trash", 0, "TRASH");
   const cost = { type: hand ? "PLACE_SELF_AND_HAND_TO_DECK" : "PLACE_SELF_AND_TRASH_TO_DECK", amount: 0 } as Cost;
   const source = r.put("zero-source", 0, hand ? "STAGE" : "CHARACTER", { ...(hand ? { data: { type: "Stage" } } : {}), schema: synSchema("zero-source", [
@@ -120,7 +120,7 @@ for (const hand of [false, true]) for (const shuffle of [false, true]) for (cons
 });
 
 for (const type of ["PLACE_SELF_TO_DECK", "KO_OWN_CHARACTER", "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE"] as const) for (const accept of [false, true]) it(`actual remaining field exit ${type} accept=${accept}`, async () => {
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   const source = r.put("field-source", 0, "CHARACTER", { schema: synSchema("field-source", [
     { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }] },
     { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type, amount: 1 }], actions: [{ type: "DRAW", params: { amount: 0 } }] },
@@ -135,7 +135,7 @@ for (const type of ["PLACE_SELF_TO_DECK", "KO_OWN_CHARACTER", "RETURN_OWN_CHARAC
 });
 
 for (const hand of [false, true]) for (const accept of [false, true]) it(`actual forced-candidate direct arrangement hand=${hand} accept=${accept}`, async () => {
-  const r = rig(); r.state.schemaVersion = 7; r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 7; delete r.state.costSemanticsVersion; r.deck(0, 5);
   const secondary = r.put("forced-secondary", 0, hand ? "HAND" : "TRASH");
   const source = r.put("forced-source", 0, hand ? "STAGE" : "CHARACTER", { ...(hand ? { data: { type: "Stage" } } : {}), schema: synSchema("forced-source", [
     { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }] },

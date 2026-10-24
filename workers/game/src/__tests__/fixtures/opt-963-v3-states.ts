@@ -57,7 +57,7 @@ export function persistedV3(state: GameState): Record<string, unknown> {
   // Construct historical input independently of the current writer. Routing
   // through the v6 writer would add scan metadata and then mislabel it v3.
   // This projection never changes prompt/frame identities or execution IDs.
-  const { schemaVersion: _version, ...runtime } = state;
+  const { schemaVersion: _version, costSemanticsVersion: _costMode, ...runtime } = state;
   const historical = { ...runtime, effectStack: state.effectStack.map((frame) => {
     const projected = { ...frame, kind: frameKindOf(frame) };
     if (frame.replacementBatch) {

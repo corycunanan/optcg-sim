@@ -240,3 +240,25 @@ No fixture carries an "assumed" status. Decision 7's replacement-precedence fixt
 ## 4. Rules-version notes
 
 None found during authoring. Any v1.2.1 divergence noticed later is to be recorded here, not migrated.
+
+
+## OPT-1003 writer ordering renewal
+
+The existing F1–F14 gameplay guards and event-order assertions remain intact;
+round-trip expectations explicitly add8.mode 6 to ordinary runtime metadata.
+End Phase stage bytes and trigger Decision 3 ordering do not change. New
+`opt-1003-rules-step-expiry` tests independently fail on deployed-reader base `864bee2b`:
+OP02-118 must survive through ST08-013's optional EOB KO, and Refresh conditions
+must not see an expired until-next-turn power effect. The first archived Refresh
+draft used an invalid array condition; only its corrected object-condition red
+run is valid evidence. Prompted Refresh memory/live/undo paths retain the OP11-040
+before-DON-return/set-active guard.
+
+Frozen OPT-966/968 writer payloads and outputs are unchanged. Separately named
+`opt-1003-battle-expectations.ts` specifies the new production outputs: committed
+EOB prefix, then children, then BATTLE_RESOLVED/MAIN. One new completion ef ID
+precedes child allocations, shifting only the named newly drawn card identities
+and final counter. A terminal child cancels completion notifications and their
+remaining clock ticks. Exact schedules and new identities are fixed expectations;
+actual IDs, counters and events are never normalized. Late historical EOB pauses
+retain their original outputs because promotion invents no completion debt.

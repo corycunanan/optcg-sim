@@ -8,7 +8,7 @@ import { toPersistedGameState } from "../session/game-state-schema.js";
 import type { Cost } from "../engine/effect-types.js";
 import type { GameState } from "../types.js";
 async function pending6(position: "TOP" | "BOTTOM") {
-  const r = rig(); r.state.schemaVersion = 6; r.deck(0, 5); r.deck(1, 5);
+  const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 5); r.deck(1, 5);
   for (let n = 0; n < 3; n++) r.put(`promotion-hand-${n}`, 0, "HAND");
   const source = r.put("promotion-source", 0, "CHARACTER", { schema: synSchema("promotion-source", [
     { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true, once_per_turn: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 } }] },

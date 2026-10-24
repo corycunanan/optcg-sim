@@ -9,7 +9,7 @@ import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 import type { EffectBlock } from "../engine/effect-types.js";
 
 const options = { nextJsUrl: "https://app.example.test", workerSecret: "secret" };
-function setup() { const r = rig(); r.state.schemaVersion = 6; r.deck(0, 8); r.deck(1, 8);
+function setup() { const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 8); r.deck(1, 8);
   const thatch = r.put("OP08-045", 0, "CHARACTER", { data: { power: 6000 } });
   return { r, thatch }; }
 function remove(r: Rig, type: "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK", controller: 0 | 1) {
@@ -53,7 +53,7 @@ describe("OPT-968 one printed Thatch OR ability (OP-08 printed clause)", () => {
   });
 
   it.each([false, true])("undeclared same-source identical abilities still order (reload=%s)", async (reload) => {
-    const r = rig(); r.state.schemaVersion = 6; r.deck(0, 5); r.deck(1, 5);
+    const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 5); r.deck(1, 5);
     const block: EffectBlock = { id: "a", category: "replacement", replaces: { event: "WOULD_BE_KO" },
       replacement_actions: [{ type: "SET_REST", target: { type: "SELF" } }] };
     r.put("OPT968-INDEPENDENT", 0, "CHARACTER", { schema: synSchema("OPT968-INDEPENDENT", [block, { ...block, id: "b" }]) });

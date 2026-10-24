@@ -47,6 +47,7 @@ function battleSession(): { session: TestAccess; ws: MockWebSocket } {
         defenderPower: 5000,
         counterPowerAdded: 0,
         blockerActivated: false,
+        redirectWindow: false,
       },
     },
   };

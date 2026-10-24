@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 import { expect, it } from "vitest";
 import type { GameAction, GameState } from "../types.js";
@@ -23,7 +24,7 @@ it.each(corpus.cases)("replays actual Counter pause $index through every subsequ
       await new SessionRepository(storage, options).save({ ...loaded, state: actual, undoHistory: [actual] });
       actual = (await new SessionRepository(storage, options).load())!.state;
       expect(actual).toEqual(
-          candidateExpected(`event-owner/${index}/pause/${offset}`)
+          writerEnvelope(candidateExpected(`event-owner/${index}/pause/${offset}`))
         );
       const completion = actual.effectStack.find(
           (frame) => frame.eventActivation)!;
@@ -35,7 +36,7 @@ it.each(corpus.cases)("replays actual Counter pause $index through every subsequ
       expect(result.responseRejected).toBe(false);
       actual = result.state;
     }
-    expect(actual).toEqual(candidateExpected(`event-owner/${index}/final`));
+    expect(actual).toEqual(writerEnvelope(candidateExpected(`event-owner/${index}/final`)));
     expect(actual.effectStack).toEqual([]);
     expect(actual.pendingPrompt).toBeNull();
     for (const type of ["POWER_MODIFIED", "EVENT_ACTIVATED_FROM_HAND", "COUNTER_USED"])

@@ -68,7 +68,10 @@ describe.runIf(Boolean(process.env.OPT997_REGENERATE))("OPT-997 actual v7 produc
     if (scenario === "nested-replacement") r.put("OPT997-nested", 0, "CHARACTER", { schema: synSchema("OPT997-nested", [{ id: "nested", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }], flags: { optional: true } }]) });
     // The candidate's actual writer supplies native7 before any offer is made.
     await capture(r); expect(r.state.schemaVersion).toBe(7);
-    if (scenario === "upgrade-pending6") r.state.schemaVersion = 6;
+    if (scenario === "upgrade-pending6") {
+      r.state.schemaVersion = 6;
+      delete r.state.costSemanticsVersion;
+    }
     r.state = command(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: activator.instanceId, effectId: "activate" }, r.db);
     const initial = await capture(r);
     if (prefix && r.promptType() === "SELECT_TARGET" && r.state.effectStack.some(f => f.costReplacementResolution === "REPLACED")) { expect(r.state.players[owner].deck).toHaveLength(4); expect(r.state.players[owner].hand).toHaveLength(5); expect(r.state.activeEffects.some(e => e.sourceCardInstanceId === source.instanceId && e.modifiers.some(m => m.params?.usedOnTurn === r.state.turn.number))).toBe(true); }

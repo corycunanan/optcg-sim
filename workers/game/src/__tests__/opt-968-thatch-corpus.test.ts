@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
@@ -16,7 +17,7 @@ type Scenario = { name: string; cases: Capture[] };
 const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 
 function start(make: typeof rig, kind: string) {
-  const r = make(); r.state.schemaVersion = 6; r.deck(0, 8); r.deck(1, 8);
+  const r = make(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 8); r.deck(1, 8);
   const thatch = r.put("OP08-045", 0, "CHARACTER", { data: { power: 6000 } });
   if (kind === "rayleigh") {
     const rayleigh = r.put("OP08-118", 1, "HAND", { data: { cost: 0, type: "Character" } });
@@ -143,7 +144,7 @@ describe.skipIf(corpus.scenarios.length === 0)("OPT-968 alias-reader actual writ
         expect(result.responseRejected).toBeFalsy();
         const next = new MemorySessionStorage(); await new SessionRepository(next, options).save({ ...loaded, state: result.state });
         loaded = (await new SessionRepository(next, options).load())!;
-        expect(json(toPersistedGameState(loaded.state))).toEqual(captured.expected[i]);
+        expect(json(toPersistedGameState(loaded.state))).toEqual(writerEnvelope(captured.expected[i]));
       }
       expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.effectStack).toEqual([]);
     });

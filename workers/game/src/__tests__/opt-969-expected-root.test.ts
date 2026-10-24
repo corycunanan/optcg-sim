@@ -6,7 +6,7 @@ import { runtime, memory, save, command } from "./native7-producer-support.js";
 it("staged REST_DON then rested-filter DON accepts offered newly rested donor", async () => {
   const rt = await runtime();
   const r = rig();
-  r.state.schemaVersion = 7;
+  r.state.schemaVersion = 7; delete r.state.costSemanticsVersion;
   r.deck(0, 5);
   const ds = r.state.players[0].donCostArea;
   ds[1].state = "RESTED";
@@ -64,7 +64,7 @@ import { withoutAssertedCostEvidence } from "./cost-expected-root-support.js";
 async function offered(filter: boolean = false, pauses = 1) {
   const rt = await runtime();
   const r = rig();
-  r.state.schemaVersion = 7;
+  r.state.schemaVersion = 7; delete r.state.costSemanticsVersion;
   r.deck(0, 6);
   const ds = r.state.players[0].donCostArea;
   ds[1].state = "RESTED";
@@ -277,7 +277,7 @@ for (const optional of [true, false])
     it(`${optional ? "optional" : "mandatory"} replacement ${accept ? "commits and aborts" : "declines then continues"} with evidence across child pauses`, async () => {
       const rt = await runtime();
       const r = rig();
-      r.state.schemaVersion = 7;
+      r.state.schemaVersion = 7; delete r.state.costSemanticsVersion;
       r.deck(0, 6);
       for (let n = 0; n < 3; n++) r.put(`replace-hand-${n}`, 0, "HAND");
       r.state.players[0].donCostArea[1].state = "RESTED";
@@ -453,7 +453,7 @@ for (const version of [undefined, 6] as const)
   it(`ordinary ${version ?? "default"} writer never emits evidence`, async () => {
     const rt = await runtime();
     const r = rig();
-    r.state.schemaVersion = version;
+    r.state.schemaVersion = version; delete r.state.costSemanticsVersion;
     r.deck(0, 5);
     r.state.players[0].donCostArea[1].state = "RESTED";
     const source = r.put("ordinary-root", 0, "CHARACTER", {
@@ -478,7 +478,7 @@ for (const version of [undefined, 6] as const)
     expect(
       (await memory(rt, await save(rt, state, r.db)).repo.load())!.state
         .schemaVersion
-    ).toBe(6);
+    ).toBe(8);
   });
 for (const mutation of [
   "wrong-player",

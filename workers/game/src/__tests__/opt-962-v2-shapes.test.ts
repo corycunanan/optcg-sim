@@ -1,3 +1,4 @@
+import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 /**
  * OPT-962 (OPT-924) drift guard between this writer and the deployed PR 4a
@@ -52,7 +53,7 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
   it.each(built.map((s) => s.name))("%s: current writer matches its separate exact fixture and historical input still loads", (name) => {
     const state = built.find((s) => s.name === name)!.state;
       expect(currentWriter.cases).toHaveProperty(name);
-    expect(persisted(state)).toEqual(candidateExpected(`endphase/${name}`));
+    expect(persisted(state)).toEqual(writerEnvelope(candidateExpected(`endphase/${name}`)));
     // The v2 reader input is frozen, not rewritten to hide current scheduling.
     const historical = structuredClone(fixture.cases[name].state);
     expect(() => convertPersistedGameState(historical, "historical v2 state")).not.toThrow();

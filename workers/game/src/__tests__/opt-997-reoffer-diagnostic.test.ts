@@ -5,7 +5,7 @@ import { command } from "./opt-997-corpus-support.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { convertPersistedGameState } from "../session/persistence.js";
 for (const version of [6] as const) it(`diagnoses version${version} ordering-to-offer payload`, () => {
-  const r = rig(); r.state.schemaVersion = version; r.deck(0, 5); r.deck(1, 5);
+  const r = rig(); r.state.schemaVersion = version; delete r.state.costSemanticsVersion; r.deck(0, 5); r.deck(1, 5);
   for (let n = 0; n < 3; n++) r.put(`reoffer-hand-${n}`, 0, "HAND");
   const source = r.put("reoffer-source", 0, "CHARACTER", { schema: synSchema("reoffer-source", [
     ...["first", "second"].map(id => ({ id, category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true }, replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }] })) as never[],
