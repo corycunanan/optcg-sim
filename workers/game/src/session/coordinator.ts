@@ -177,7 +177,10 @@ export class SessionCoordinator {
       state = promote(initialState, "state");
       history = initialUndoHistory.map((value, index) => promote(value, `undoHistory[${index}]`));
     } catch (error) {
-      return { kind: "reject", state: initialState, undoHistory: boundUndoHistory(initialUndoHistory),
+      // Failed ingress has not proved any retention or normalization safe.
+      // Return the original history entries even when an invalid oldest input
+      // would otherwise fall outside the normal undo window.
+      return { kind: "reject", state: initialState, undoHistory: [...initialUndoHistory],
         reason: error instanceof Error ? error.message : "Invalid game state" };
     }
     const result = this.executeWriterAction(state, history, playerIndex, action, cardDb);

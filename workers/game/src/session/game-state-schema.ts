@@ -513,8 +513,8 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
-  if (version === 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7) {
-    throw new SessionLoadError(location, "native8 requires explicit costSemanticsVersion 6 or 7");
+  if (version === 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7 && raw.costSemanticsVersion !== 8) {
+    throw new SessionLoadError(location, "native8 requires explicit costSemanticsVersion 6, 7 or 8");
   }
   if (version < 8 && "costSemanticsVersion" in raw) {
     throw new SessionLoadError(location, "costSemanticsVersion requires schemaVersion 8");

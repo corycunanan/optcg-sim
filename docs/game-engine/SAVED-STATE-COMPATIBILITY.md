@@ -819,3 +819,7 @@ composition has one full and one delta per same reviewer, without erasing prior
 findings or design stops.
 Historical82/13 payloads and manifests are immutable; original c50 generator
 sources are archived non-executably before current writer assertions change.
+
+### Explicit mode8 cost capability reader (OPT-969)
+
+The new reader accepts schema8/costSemanticsVersion8 while retaining ordinary setup8/7 and every existing6/7 promotion/behavior. Mode8 governs the entire effect graph, including fresh triggers after resumed work; the unsuccessful continuation-only mode7 split is not included. Unknown/misdeclared modes reject atomically. c50/2ca cannot read8 and are not a future mode8 rollback floor. See [the mode8 contract](MODE8-COST-SEMANTICS.md) for shared runtime ownership, immutable forward producer evidence, saved-definition preservation and the separate future new-game writer gate.

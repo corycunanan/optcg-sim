@@ -1,4 +1,5 @@
 /** Pure cost payability predicates. */
+import { hasStructuralCostSemantics } from "../../native-cost-semantics.js";
 import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
@@ -59,7 +60,10 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
 }
 
 /**
- * Determine whether a single cost is payable in the current state.
+ * Single-cost resource oracle for the current state, not an initial-state
+ * sequence veto. Earlier printed payments can supply later resources or end
+ * prohibitions: use isCostSequencePayable for every multi-cost gate. This
+ * predicate cannot establish whether a replacement pays the printed cost.
  * Pure predicate — no state mutation.
  */
 export function isCostPayable(
@@ -116,6 +120,9 @@ export function isCostPayable(
   const player = state.players[controller];
   switch (cost.type) {
     case "DON_MINUS": {
+      if (hasStructuralCostSemantics(state)) {
+        return computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).length >= resolveAmount(cost);
+      }
       const amt = resolveAmount(cost, 0);
       if (cost.filter?.is_active === true || cost.filter?.state === "ACTIVE") {
         return player.donCostArea.filter((d) => d.state === "ACTIVE").length >= amt;
@@ -137,6 +144,9 @@ export function isCostPayable(
     }
 
     case "VARIABLE_DON_RETURN": {
+      if (hasStructuralCostSemantics(state)) {
+        return computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).length >= resolveAmount(cost);
+      }
       const amt = resolveAmount(cost, 0);
       if (amt === 0) return true;
       return player.donCostArea.filter((d) => !d.attachedTo).length >= amt;

@@ -1,3 +1,4 @@
+import { hasStructuralCostSemantics } from "../../native-cost-semantics.js";
 import { handTrashEvent } from "../../hand-trash.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 /** Fixed and automatically selected cost payment mutations. */
@@ -30,8 +31,9 @@ export function payCosts(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   sourceCardInstanceId?: string,
+  lifeDestinationPolicy: "ACTUAL" | "PRINTED_COST_PROBE" = "ACTUAL",
 ): CostPaymentResult | null {
-  const paid = payCostsUnreleased(state, costs, controller, cardDb, sourceCardInstanceId);
+  const paid = payCostsUnreleased(state, costs, controller, cardDb, sourceCardInstanceId, lifeDestinationPolicy);
   if (!paid) return paid;
   return { ...paid, state: releaseMovedDonEffects(state, paid.state) };
 }
@@ -42,6 +44,7 @@ function payCostsUnreleased(
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   sourceCardInstanceId?: string,
+  lifeDestinationPolicy: "ACTUAL" | "PRINTED_COST_PROBE" = "ACTUAL",
 ): CostPaymentResult | null {
   const causingSource = effectSourceIdentity(state, sourceCardInstanceId, _cardDb);
   const events: PendingEvent[] = [];
@@ -61,6 +64,11 @@ function payCostsUnreleased(
   let nextState = state;
 
   for (const cost of costs) {
+    // Mode8 rule1-3-2-2: zero/negative DON repetition performs no movement
+    // and publishes no payment event. Keep recorded modes6/7 unchanged.
+    if (hasStructuralCostSemantics(nextState) &&
+        (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
+        typeof cost.amount === "number" && cost.amount <= 0) continue;
     // OPT-961: a fixed movement an activation-time prohibition forbids makes
     // the cost unpayable (rules 1-3-3, 8-3-1-3).
     if (isFixedCostMovementProhibited(nextState, cost, controller, _cardDb, sourceCardInstanceId)) return null;
@@ -247,7 +255,7 @@ function payCostsUnreleased(
         if (p.life.length < amount) return null;
 
         const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
-        const moved = moveLifeToHand(nextState, removed, controller, _cardDb);
+        const moved = moveLifeToHand(nextState, removed, controller, _cardDb, lifeDestinationPolicy);
         nextState = moved.state;
         const addedCount = moved.transitions.filter(t => t.addedToHand).length;
         if (addedCount > 0) events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: addedCount } });
