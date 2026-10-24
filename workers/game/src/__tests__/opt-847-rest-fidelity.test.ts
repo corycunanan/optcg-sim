@@ -149,6 +149,7 @@ function fixture() {
     db.set(CARDS.LEADER.id, { ...CARDS.LEADER, types });
   }
   return {
+    payDon(payer: 0 | 1, count: number) { state = scriptedDonPayment(state, db, payer, count); },
     db,
     put,
     act,
@@ -172,7 +173,7 @@ it("documented PRB02-006 source-kind gap: Sheep's Horn Event must not offer Zoro
   f.put(CARDS.VANILLA.id, 1);
   f.play("OP01-117");
   f.choose("accept");
-  f.state = scriptedDonPayment(f.state, f.db, 0, 1);
+  f.payDon(0, 1);
   f.select([zoro.instanceId]);
   expect(f.state.pendingPrompt).toBeNull();
   expect(
@@ -300,7 +301,7 @@ it("Buffalo ignores a Sheep's Horn Event", () => {
     n = f.state.players[1].donCostArea.length;
   f.play("OP01-117");
   f.choose("accept");
-  f.state = scriptedDonPayment(f.state, f.db, 0, 1);
+  f.payDon(0, 1);
   f.select([b.instanceId]);
   expect(f.state.pendingPrompt).toBeNull();
   expect(current(f, b)?.state).toBe("RESTED");

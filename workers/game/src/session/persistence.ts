@@ -41,6 +41,7 @@ import {
 } from "./legacy-trigger-migration.js";
 import {
   SessionLoadError,
+  readGameStateSchemaVersion,
   convertToCurrentShape,
   logLegacyShapes,
   toPersistedGameState,
@@ -172,6 +173,7 @@ export class SessionRepository {
     // Runtime objects without provenance are old runtime6 inputs, not stored
     // version1 bytes. Validate them before promotion; new setup is explicit7.
     const validateRuntime = (state: GameState, location: string): GameState => {
+      readGameStateSchemaVersion(state as unknown as Record<string, unknown>, location);
       // Runtime kind tags may lag phase transitions. The established encoder
       // derives those tags, but cannot authorize changing native7 COST evidence
       // or supplying a legacy End Phase stage to a native7 producer.

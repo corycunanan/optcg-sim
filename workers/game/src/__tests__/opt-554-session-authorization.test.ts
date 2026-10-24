@@ -907,10 +907,10 @@ describe("OPT-578 production spectator admission protections", () => {
 // Actual durable message/action path, including rehydration, prompt issuance,
 // persistence, and outbound acceptance/rejection. No coordinator routing mock.
 describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
-  for (const staleRoot of [false, true])
-    it(`rest-prefix DON reply ${staleRoot ? "rejects persisted root drift" : "pays and draws once"}`, async () => {
+  for (const firstDon of [false, true]) for (const staleRoot of [false, true])
+    it(`first-action ${firstDon ? "DON" : "rest-prefix DON"} reply ${staleRoot ? "rejects persisted root drift" : "pays and draws once"}`, async () => {
       const r = rig();
-      r.state.schemaVersion = 7;
+      r.state.schemaVersion = undefined;
       r.deck(0, 5);
       const donors = r.state.players[0].donCostArea;
       donors[1].state = "RESTED";
@@ -921,7 +921,7 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
             id: "activate",
             category: "activate",
             trigger: { keyword: "ACTIVATE_MAIN" },
-            costs: [
+            costs: firstDon ? [{ type: "DON_MINUS", amount: 1 }] : [
               { type: "REST_DON", amount: 1 },
               { type: "DON_MINUS", amount: 1, filter: { is_rested: true } },
             ],
@@ -952,6 +952,7 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
       initial.gameState = r.state;
       initial.cardDb = r.db;
       await initial.persist();
+      expect(initial.gameState.schemaVersion).toBe(7);
       const socket = new MockWebSocket();
       const ws = socket as unknown as WebSocket;
       initial.transport.accept(0, ws);
@@ -992,7 +993,7 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
           .costTransactionState!.players[0].donCostArea.find(
             (donor) => donor.instanceId === donorId
           )!.state
-      ).toBe("RESTED");
+      ).toBe(firstDon ? "ACTIVE" : "RESTED");
       expect(
         stored.state.effectStack
           .at(-1)!
@@ -1007,7 +1008,10 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
         await durableState.storage.put("session", stored);
       }
       const before = structuredClone(stored.state);
-      const resumed = new GameSession(
+      const ReaderGameSession = process.env.OPT969_WRITER_READER_ROOT
+        ? (await import(`${process.env.OPT969_WRITER_READER_ROOT}/workers/game/src/GameSession.ts`) as { GameSession: typeof GameSession }).GameSession
+        : GameSession;
+      const resumed = new ReaderGameSession(
         durableState as unknown as DurableObjectState,
         env
       ) as unknown as GameSessionTestAccess;

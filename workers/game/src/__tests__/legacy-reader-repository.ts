@@ -9,7 +9,7 @@ import { allocateEngineId, ensureExecutionContext, reconcileExecutionContextIdCo
 
 export class LegacyReaderRepository {
   private summary = emptyEventHistorySummary();
-  constructor(private storage: SessionStorage, _config?: unknown) {}
+  constructor(private storage: SessionStorage, config?: unknown) { void config; }
   async load(): Promise<SessionSnapshot | null> {
     const raw = await this.storage.get<Record<string, unknown>>("session"); if (!raw) return null;
     const stored = parseStoredSession(raw, await this.storage.get("session:card-db"), await this.storage.get("session:undo-history"));

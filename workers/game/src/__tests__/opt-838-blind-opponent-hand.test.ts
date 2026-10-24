@@ -1,3 +1,4 @@
+import { costRootMatches } from "../engine/effect-resolver/cost/transaction.js";
 import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
@@ -83,7 +84,10 @@ function fixture(seed = "opt-838") {
     return card;
   }
   function act(action: GameAction, player = state.turn.activePlayerIndex) {
+    const before = structuredClone(state);
     const result = runPipeline(state, action, db, player);
+    expect(state).toEqual(before);
+    for (const frame of result.state.effectStack) if (frame.costExpectedRoot) expect(costRootMatches(result.state, frame.costExpectedRoot)).toBe(true);
     expect(result.valid, result.error).toBe(true);
     state = result.state;
   }

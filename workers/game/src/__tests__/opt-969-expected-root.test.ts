@@ -450,7 +450,7 @@ it("rejects unknown executable evidence and evidence on a non-COST owner", async
 });
 
 for (const version of [undefined, 6] as const)
-  it(`ordinary ${version ?? "default"} writer never emits evidence`, async () => {
+  it(`direct ${version ?? "default"} execution omits evidence until repository promotion`, async () => {
     const rt = await runtime();
     const r = rig();
     r.state.schemaVersion = version;
@@ -478,7 +478,7 @@ for (const version of [undefined, 6] as const)
     expect(
       (await memory(rt, await save(rt, state, r.db)).repo.load())!.state
         .schemaVersion
-    ).toBe(6);
+    ).toBe(7);
   });
 for (const mutation of [
   "wrong-player",

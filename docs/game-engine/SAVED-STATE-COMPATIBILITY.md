@@ -683,3 +683,30 @@ projection per COST owner, with serialization cost proportional to that
 projection. Bounded regression measured 11,210 evidence bytes in a 36,943-byte published
 state (JSON string length, ASCII fixture);
 no production workload or broad performance claim follows.
+
+
+### Ordinary version7 writer rollout (OPT-969)
+
+Ordinary setup now owns explicit7 before its first action/save. SessionRepository
+validates runtime provenance before shape encoding and validates/promotes the
+live state and every undo snapshot atomically before history retention or any
+storage write. The low-level encoder preserves explicit6 for historical/direct
+controls. Unprovable continuation or unsupported provenance fails without input
+or storage mutation; no historical expected root or replacement outcome is
+invented. Valid legacy unknown debt stays diagnostic after promotion.
+
+The rollback floor is deployed PR778 amendment
+`69125276e1bb4a1eba7ea2170056cd392b02885b`, including subsequent native7 producers
+and optional immutable `costExpectedRoot`. Original485 is unsafe. Public
+runPipeline publication now finalizes only new evidence-bearing COST owner IDs
+after its bookkeeping; SessionCoordinator retains its later finalization.
+Existing mismatches and historical evidence absence are preserved. Reader-floor
+proof covers actual writer first/subsequent pauses and real GameSession messages.
+
+Historical corpus bytes remain immutable. Evidence is synthetic under the
+explicit accepted exception; no production capture, repair or retirement is
+claimed. Native8 ordinary writing, final OPT921/948 domains/feasibility and the
+Decision10 policy decision are outside this rollout. See
+[the writer handoff](../project/handoffs/opt969-native7-writer.md) for ownership,
+reader selection, validation and remaining parent work. Earlier ordinary6
+statements above describe the prerequisite releases, superseded by this rollout.

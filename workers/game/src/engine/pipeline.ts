@@ -1,3 +1,4 @@
+import { captureCostExpectedRoot } from "./effect-resolver/cost/transaction.js";
 import type { LifeTriggerStagingScope } from "./life-trigger-staging.js";
 import { recalculateBattlePowers } from "./battle.js";
 import { drainPendingWork } from "./pending-work-drain.js";
@@ -49,6 +50,26 @@ export interface PipelineResult {
 }
 
 export function runPipeline(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): PipelineResult {
+  const result = runPipelineAction(state, action, cardDb, actingPlayerIndex);
+  if (!result.valid || result.state.schemaVersion !== 7) return result;
+  // A suspension captures before pipeline bookkeeping. Publish only newly
+  // created evidence owners against the actual returned board. Existing owners
+  // (including historical evidence-free owners) cannot acquire a new baseline.
+  const priorIds = new Set(state.effectStack.map(frame => frame.id));
+  const ids = new Set(result.state.effectStack.filter(frame =>
+    frame.costExpectedRoot && !priorIds.has(frame.id)).map(frame => frame.id));
+  if (!ids.size) return result;
+  const expected = captureCostExpectedRoot(result.state);
+  return { ...result, state: { ...result.state, effectStack: result.state.effectStack.map(frame =>
+    ids.has(frame.id) ? { ...frame, costExpectedRoot: expected } : frame) } };
+}
+
+function runPipelineAction(
   state: GameState,
   action: GameAction,
   cardDb: Map<string, CardData>,

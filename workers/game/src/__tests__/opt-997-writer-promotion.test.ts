@@ -5,7 +5,7 @@ import { memoryRepository, command, type CostCorpus } from "./opt-997-corpus-sup
 import { classifyLegacyShapes } from "../session/game-state-schema.js";
 import type { GameState } from "../types.js";
 
-it("new games own native7 before their first save, load and action", async () => {
+it("new games own native7 before their first save and load", async () => {
   const { state, cardDb } = setupGame(); expect(state.schemaVersion).toBe(7);
   const { repo, values } = memoryRepository();
   const saved = await repo.save({ state, cardDb, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [state] });
