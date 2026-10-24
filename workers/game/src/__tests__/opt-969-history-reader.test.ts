@@ -45,6 +45,7 @@ async function generateCounter(
   let state = createBattleReadyState(db);
   state.schemaVersion = version;
   if (version === 8) state.costSemanticsVersion = mode;
+  else delete state.costSemanticsVersion;
   state.players[1].hand = [
     {
       cardId: "ST04-016",
@@ -269,13 +270,13 @@ it("Counter staged-entry history repair never blesses stale live history or reso
   }
 });
 
-it("ordinary setup and direct Repository writes stay version6", async () => {
+it("ordinary setup and Repository writes use schema8 with legacy cost mode6", async () => {
   const rt = await runtime();
   const db = createTestCardDb();
   const state = createBattleReadyState(db);
-  expect(state.schemaVersion ?? 6).toBe(6);
+  expect(state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
   const loaded = (await memory(rt, await save(rt, state, db)).repo.load())!;
-  expect(loaded.state.schemaVersion).toBe(6);
+  expect(loaded.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 6 });
 });
 
 for (const context of [

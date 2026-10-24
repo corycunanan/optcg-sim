@@ -51,8 +51,14 @@ it("pins the new fixture bytes and capture sources to actual frozen f19 provenan
   );
   for (const [file, sha] of Object.entries(manifest.fixtures))
     expect(hash(readFileSync(resolve(directory, "..", file))), file).toBe(sha);
-  for (const [file, sha] of Object.entries(manifest.generators))
-    expect(hash(readFileSync(resolve(__dirname, file))), file).toBe(sha);
+  // Writer activation renews the active test harness, not the pinned capture
+  // sources. Reconstruct those original files from the byte-identical archive.
+  for (const [file, sha] of Object.entries(manifest.generators)) {
+    const original = file === "opt-969-history-reader.test.ts" || file === "opt-969-history-producers.test.ts"
+      ? resolve(directory, "../generator-sources", file.replace(".test.ts", ".historical.test-source"))
+      : resolve(__dirname, file);
+    expect(hash(readFileSync(original)), file).toBe(sha);
+  }
   for (const [file, sha] of Object.entries(manifest.seedRecipes))
     expect(
       hash(

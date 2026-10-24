@@ -762,4 +762,6 @@ original live/undo state. Current writer 16-case golden is separately named
 golden/prototype input stays frozen. Its delta from the ordinary6 golden is only
 the8 envelope and mode 6 provenance. Synthetic-only evidence was explicitly approved
 for this run; no production capture claim follows. The semantic rollback floor
-remains the deployed8 reader. See [the completion and Refresh contract](./NATIVE8-BATTLE-COMPLETION.md).
+is the deployed combined reader at `c50b1d03`, including schema 8 completion and
+COST publication-history ownership for cost mode 7. The earlier 864 receipt covers
+the unchanged mode 6 corpus only. See [the completion and Refresh contract](./NATIVE8-BATTLE-COMPLETION.md).
