@@ -1,0 +1,42 @@
+{
+  "producer": "d9a92467049c1c36b195f2808d867a7e7398f337",
+  "base": "2ca28d76d0d35d99d66c14e035495e9754b6cd87",
+  "readerEngineAnchor": "b3160f8562fd0ff40597b99524351a84a60551e9",
+  "productionPatchSha256": "0eb2d25ae4bdf6f830c8b4deace1c4f34972630fb632b934435342fd30af4d1a",
+  "generatorSha256": "f6b0e93c31dfcaa25ca6514af37962158b8ae773f4a3a57bc92b13b4a7cf07a1",
+  "runtimeSourceFilesMatched": 205,
+  "onlyRuntimeDifferences": [
+    {
+      "path": "workers/game/src/engine/authored-schemas.generated.ts",
+      "readerSha256": "4570c2d429affbe22e3a2cf9044bf2ac892215a992f91d2483d9babae05275c7",
+      "producerSha256": "b0860d4dbd6dec90fed9979d52a94b7f2843b98e25543708c26f958fe0fc7180"
+    },
+    {
+      "path": "workers/game/src/engine/schemas/eb02.ts",
+      "readerSha256": "bdbc2915be7bc2c03cdee83c86f059a7a68dd05da5cd951ae2a15df48b45cd79",
+      "producerSha256": "2f986daf5d09aa630e991d7d857b79b7dfd1d73c62127f5d24cc04cf8dc399ca"
+    },
+    {
+      "path": "workers/game/src/engine/schemas/op12.ts",
+      "readerSha256": "6ad7854f4712871ca5b2d4dc5627339c99ca99b06712c7838d8d2b1a536e13c8",
+      "producerSha256": "ebfd51d83e54fc12b8d70a6de2238e5aabfac79f67cd007063d85ecf7591fdc8"
+    },
+    {
+      "path": "workers/game/src/engine/schemas/op15.ts",
+      "readerSha256": "6cf4ca49541952cb1e61b0c2c6bdf45fdd7f006497cf25d5fa39321f4103bc9e",
+      "producerSha256": "2d89a21a6375c39496c5a10780c486d781c302d81b400fff9ab2adde46130f95"
+    },
+    {
+      "path": "workers/game/src/engine/setup.ts",
+      "readerSha256": "c3d01cbbd592b6bfee2305826b470316639ff0ba9467563f6d7bef1862f38196",
+      "producerSha256": "502988d8d71b7adbb87056a47491bd0e9c813d9d1733c62f738f519f8c79e0ff"
+    }
+  ],
+  "lockSha256": "080bf6130ab2656ff730fd2ca775051bca59c74a835f610d2525cf3c869c9ffe",
+  "versions": {
+    "node": "24.16.0",
+    "pnpm": "10.28.0",
+    "vitest": "4.1.4"
+  },
+  "proof": "Actual new setup8/mode8 before first action/save, no retagged historical fixtures."
+}

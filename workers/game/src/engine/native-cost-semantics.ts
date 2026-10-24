@@ -1,6 +1,6 @@
 import type { GameState } from "../types.js";
-/** Battle completion does not migrate existing COST semantics. Native8 must
- * explicitly retain the deployed6 or native7 provenance of its producer. */
+/** Native transaction/identity ownership is shared by modes7 and8. The v8
+ * envelope records its cost capability explicitly; loading never upgrades it. */
 export function hasNativeCostSemantics(
   state: Pick<GameState, "schemaVersion" | "costSemanticsVersion">
 ): boolean {

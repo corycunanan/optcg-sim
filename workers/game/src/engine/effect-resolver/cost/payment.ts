@@ -1,3 +1,4 @@
+import { hasStructuralCostSemantics } from "../../native-cost-semantics.js";
 import { handTrashEvent } from "../../hand-trash.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 /** Fixed and automatically selected cost payment mutations. */
@@ -63,6 +64,11 @@ function payCostsUnreleased(
   let nextState = state;
 
   for (const cost of costs) {
+    // Mode8 rule1-3-2-2: zero/negative DON repetition performs no movement
+    // and publishes no payment event. Keep recorded modes6/7 unchanged.
+    if (hasStructuralCostSemantics(nextState) &&
+        (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
+        typeof cost.amount === "number" && cost.amount <= 0) continue;
     // OPT-961: a fixed movement an activation-time prohibition forbids makes
     // the cost unpayable (rules 1-3-3, 8-3-1-3).
     if (isFixedCostMovementProhibited(nextState, cost, controller, _cardDb, sourceCardInstanceId)) return null;
