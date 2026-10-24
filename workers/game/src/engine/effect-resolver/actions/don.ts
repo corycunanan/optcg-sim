@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
 import { buildDonIdentityPlans } from "../don-identity-plans.js";
 /**
  * Action handlers: GIVE_DON, ADD_DON_FROM_DECK, FORCE_OPPONENT_DON_RETURN,
@@ -687,7 +688,7 @@ export function executeReturnDonToDeck(
   if (params.until_count !== undefined) {
     return returnDonUntilCount(state, action, params.until_count, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
-  if (state.schemaVersion === 7) {
+  if (hasNativeCostSemantics(state)) {
     const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
     const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? controller === 0 ? 1 : 0 : controller;
     const p = state.players[owner];

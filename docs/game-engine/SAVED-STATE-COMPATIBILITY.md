@@ -683,3 +683,19 @@ projection per COST owner, with serialization cost proportional to that
 projection. Bounded regression measured 11,210 evidence bytes in a 36,943-byte published
 state (JSON string length, ASCII fixture);
 no production workload or broad performance claim follows.
+
+## Native8 battle completion reader (OPT-1007)
+
+The reader accepts8 while ordinary writers remain6 and existing loaded6/7
+retain their deployed semantics. Native8 requires explicit
+`costSemanticsVersion: 6 | 7`; it does not imply a native7 cost migration.
+The exact-battle BATTLE_COMPLETION owner sits below all End-of-Battle work,
+then expires turn-player and opponent battle durations before returning to Main.
+Stable8 states preserve both envelope and mode after that owner disappears.
+Older envelopes reject the new field/owner; mode6 rejects native7-only cost data.
+
+See [the complete ownership, publication, support and rollback contract](./NATIVE8-BATTLE-COMPLETION.md)
+and [the synthetic isolated-writer corpus](../../workers/game/src/__tests__/fixtures/opt-1007-native8/README.md).
+This release does not promote existing sessions, enable the ordinary8 writer,
+change End Phase stage bytes, infer old replacement outcomes, or claim production
+capture evidence. Deploy and verify this semantic8 reader before writer rollout.

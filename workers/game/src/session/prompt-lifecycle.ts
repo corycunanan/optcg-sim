@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import {
   captureCostExpectedRoot,
   costRootMatches,
@@ -112,7 +113,7 @@ export function resumePromptLifecycle(
   // A validated successful reply may commit replacement work. Snapshot only
   // existing evidence owners after all sanctioned processing and cleanup.
   const expected =
-    released.schemaVersion === 7 &&
+    hasNativeCostSemantics(released) &&
     released.effectStack.some((frame) => frame.costExpectedRoot)
       ? captureCostExpectedRoot(released)
       : undefined;
@@ -409,7 +410,7 @@ function answerReplacementOffer(
   const callerKind = caller ? frameKindOf(caller) : null;
   // A changed in-memory phase can derive EFFECT despite explicit COST kind
   // or retained COST replay evidence. Validate that caller before effects.
-  if (state.schemaVersion === 7 && caller && (
+  if (hasNativeCostSemantics(state) && caller && (
     callerKind === "COST" || caller.kind === "COST" ||
     caller.costReplacementAction !== undefined || caller.costReplacementChecked !== undefined ||
     caller.costReplacementResolution !== undefined
@@ -487,12 +488,12 @@ function answerReplacementOffer(
   // Persist the final scan result on the exact COST caller captured before
   // substitute execution. A prompting child may now be topmost; it owns its
   // own completion/events, and the shared drain settles COST only afterward.
-  if (state.schemaVersion === 7 && caller?.costReplacementAction && callerKind === "COST") {
+  if (hasNativeCostSemantics(state) && caller?.costReplacementAction && callerKind === "COST") {
     state = updateFrameById(state, caller.id, frame => ({
       ...frame,
       costReplacementResolution: replacement.replaced ? "REPLACED" : "NOT_REPLACED",
     }));
-  } else if (state.schemaVersion !== 7 && state.effectStack.at(-1)?.costReplacementAction &&
+  } else if (!hasNativeCostSemantics(state) && state.effectStack.at(-1)?.costReplacementAction &&
       frameKindOf(state.effectStack.at(-1)!) === "COST") {
     // Historical-v6 behavior remains unchanged until the ordinary writer flips.
     const topAfter = state.effectStack.at(-1)!;

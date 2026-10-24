@@ -22,6 +22,7 @@ export const EFFECT_STACK_FRAME_KINDS = [
   "REPLACEMENT",
   "REPLACEMENT_BATCH",
   "BATTLE_DAMAGE",
+  "BATTLE_COMPLETION",
   "EFFECT_DAMAGE",
 ] as const;
 
@@ -60,6 +61,7 @@ export function isHandlerOwnedFrame(
     | "phaseBoundaryContinuation"
     | "replacement"
     | "replacementBatch"
+    | "battleCompletion"
     | "battleDamage"
     | "effectDamage"
   >
@@ -87,6 +89,7 @@ export function frameKindOf(
     | "phaseBoundaryContinuation"
     | "replacement"
     | "replacementBatch"
+    | "battleCompletion"
     | "battleDamage"
     | "effectDamage"
   >
@@ -97,6 +100,7 @@ export function frameKindOf(
   if (frame.pregameContinuation) return "PREGAME";
   if (frame.replacement) return "REPLACEMENT";
   if (frame.replacementBatch) return "REPLACEMENT_BATCH";
+  if (frame.battleCompletion) return "BATTLE_COMPLETION";
   if (frame.battleDamage) return "BATTLE_DAMAGE";
   if (frame.effectDamage) return "EFFECT_DAMAGE";
   if (frame.phaseBoundaryContinuation) return "PHASE_BOUNDARY";

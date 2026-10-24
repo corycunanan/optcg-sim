@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
 import { buildDonIdentityPlans } from "../don-identity-plans.js";
 import { decodeDonReturnIds } from "../actions/don.js";
 import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
@@ -108,11 +109,11 @@ export function payCostsWithSelection(
     // Accepted mandatory substitutes already execute on the root baseline.
     // Their prefix and use marker are committed; staged payment stays on COST.
     const offered = materializeReplacementOffer(
-      nextState.schemaVersion === 7 && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
+      hasNativeCostSemantics(nextState) && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
       pendingPrompt,
       offer,
     );
-    if (offered.state.schemaVersion === 7) {
+    if (hasNativeCostSemantics(offered.state)) {
       const expected = captureCostExpectedRoot(offered.state);
       offered.state = {
         ...offered.state,
@@ -576,7 +577,7 @@ export function payCostsWithSelection(
       continue;
     }
 
-    const nativeDonSelection = nextState.schemaVersion === 7 &&
+    const nativeDonSelection = hasNativeCostSemantics(nextState) &&
       (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
       !(typeof cost.amount === "number" && cost.amount <= 0);
     if (!autoPayTrashToDeck && (costNeedsPlayerSelection(cost) || nativeDonSelection)) {
@@ -702,7 +703,7 @@ export function payCostsWithSelection(
     // cost frame used by selectable payments so decline can resume exactly.
     const fixedExitTarget = fixedCostExitTarget(nextState, cost, controller, sourceCardInstanceId);
     if (fixedExitTarget) {
-      const replay = nextState.schemaVersion === 7 ? canonicalCostReplacementReplay({
+      const replay = hasNativeCostSemantics(nextState) ? canonicalCostReplacementReplay({
         costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId, effectBlock,
       }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
       const stagedBeforeReplacement = nextState;
@@ -727,9 +728,9 @@ export function payCostsWithSelection(
           pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
           costReplacementAction: replay ?? { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
           costReplacementChecked: true,
-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
         };
-        pushCostFrame(frame, stagedBeforeReplacement, nextState.schemaVersion === 7 ? stagedBeforeReplacement.effectStack.length : undefined);
+        pushCostFrame(frame, stagedBeforeReplacement, hasNativeCostSemantics(nextState) ? stagedBeforeReplacement.effectStack.length : undefined);
         if (isGameTerminated(nextState)) return cannotPay();
         return suspend(replacement.pendingPrompt, replacement.offer, replacement.replaced);
       }

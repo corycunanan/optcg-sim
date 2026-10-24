@@ -106,8 +106,10 @@ export interface GameState extends Omit<
   | "pendingPrompt"
   | "effectStack"
 > {
-  /** Retained native v6 provenance: saves and later pauses may never downgrade. */
-  schemaVersion?: 6 | 7;
+  /** Retained native envelope: saves and later pauses may never downgrade. */
+  schemaVersion?: 6 | 7 | 8;
+  /** Required for native8: preserve the originating deployed cost semantics. */
+  costSemanticsVersion?: 6 | 7;
   activeEffects: RuntimeActiveEffect[];
   prohibitions: RuntimeProhibition[];
   scheduledActions: RuntimeScheduledAction[];
@@ -244,6 +246,16 @@ export interface ReplacementBatchContinuation {
  * damage count stays on `turn.battle.damagesRemaining`, locked at Damage Step
  * entry (rule 7-1-4-1-1-3); the frame names the battle by `battleId`.
  */
+/** Exact battle completion obligation below every End-of-Battle child (native8). */
+export interface BattleCompletionContinuation {
+  battleId: string;
+  attackerInstanceId: string;
+  targetInstanceId: string;
+  turnPlayerIndex: 0 | 1;
+  turnNumber: number;
+  aborted: boolean;
+}
+
 export type BattleDamageContinuation =
   | {
       stage: "TRIGGER_WINDOW";
@@ -476,6 +488,7 @@ export interface EffectStackFrame {
   replacementBatch?: ReplacementBatchContinuation;
   /** OPT-963 BATTLE_DAMAGE frame: the paused Damage Step. */
   battleDamage?: BattleDamageContinuation;
+  battleCompletion?: BattleCompletionContinuation;
   /** OPT-963 EFFECT_DAMAGE frame: the paused DEAL_DAMAGE instruction. */
   effectDamage?: EffectDamageContinuation;
 

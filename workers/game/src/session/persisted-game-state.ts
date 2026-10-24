@@ -437,6 +437,14 @@ export const StackFrameCore = z.strictObject({
   replacement: ReplacementContinuation.optional(),
   replacementBatch: ReplacementBatchContinuation.optional(),
   battleDamage: BattleDamageContinuation.optional(),
+  battleCompletion: z.strictObject({
+    battleId: z.string().min(1),
+    attackerInstanceId: z.string().min(1),
+    targetInstanceId: z.string().min(1),
+    turnPlayerIndex: PlayerIndex,
+    turnNumber: NonNegativeInteger,
+    aborted: z.boolean(),
+  }).optional(),
   effectDamage: EffectDamageContinuation.optional(),
   costs: z.array(z.unknown()),
   currentCostIndex: NonNegativeInteger,
@@ -471,6 +479,7 @@ export const StackFrameCore = z.strictObject({
 });
 
 export const PersistedGameStateV3 = z.strictObject({
+  costSemanticsVersion: z.union([z.literal(6), z.literal(7)]).optional(),
   id: z.string(),
   executionContext: ExecutionContext,
   players: z.tuple([PlayerState, PlayerState]),

@@ -84,6 +84,7 @@ const ownerFields = {
   replacement: "absent",
   replacementBatch: "absent",
   battleDamage: "absent",
+  battleCompletion: "absent",
   effectDamage: "absent",
   costTransactionState: "absent",
   costExpectedRoot: "absent",
