@@ -1,3 +1,4 @@
+import { generateCounter } from "./history-counter-producer.js";
 import { rig, synSchema } from "./opt-960-rig.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -1072,12 +1073,15 @@ describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
     });
 });
 
-it("OPT-969 actual f19 Counter history survives durable DON/target replies and recreation", async () => {
-  const captured = JSON.parse(readFileSync(resolve(__dirname, "fixtures/opt-969-history-reader/counter.json"), "utf8")) as Record<string, unknown>;
+for (const freshWriter of [false, true]) it(`OPT-969 ${freshWriter ? "FINAL ordinary7" : "actual f19"} Counter history survives deployed durable DON/target replies and recreation`, async () => {
+  const captured = freshWriter ? await generateCounter() : JSON.parse(readFileSync(resolve(__dirname, "fixtures/opt-969-history-reader/counter.json"), "utf8")) as Record<string, unknown>;
   const durableState = new MockDurableObjectState();
   await durableState.storage.put(captured);
   const env = { GAME_WORKER_SECRET: "test-secret", NEXTJS_URL: "https://app.example.test" } as Env;
-  const create = () => new GameSession(durableState as unknown as DurableObjectState, env) as unknown as GameSessionTestAccess;
+  const ReaderGameSession = process.env.OPT969_WRITER_READER_ROOT
+    ? (await import(`${process.env.OPT969_WRITER_READER_ROOT}/workers/game/src/GameSession.ts`) as { GameSession: typeof GameSession }).GameSession
+    : GameSession;
+  const create = () => new ReaderGameSession(durableState as unknown as DurableObjectState, env) as unknown as GameSessionTestAccess;
   const first = create();
   const socket = new MockWebSocket();
   const ws = socket as unknown as WebSocket;

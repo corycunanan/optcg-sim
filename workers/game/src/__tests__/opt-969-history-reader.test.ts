@@ -1,9 +1,8 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, it } from "vitest";
-import { createBattleReadyState, createTestCardDb, CARDS } from "./helpers.js";
-import { getEffectSchema } from "../engine/schema-registry.js";
+import { createBattleReadyState, createTestCardDb } from "./helpers.js";
+import { generateCounter } from "./history-counter-producer.js";
 import { evaluateCondition } from "../engine/conditions.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { runtime, memory, command, save } from "./native7-producer-support.js";
@@ -24,92 +23,6 @@ async function counterPause() {
   return generateCounter(producerRoot, 7);
 }
 
-async function generateCounter(
-  root?: string,
-  version: 7 | 8 = 7,
-  mode: 6 | 7 = 7
-) {
-  if (root)
-    expect(
-      execFileSync("git", ["-C", root, "rev-parse", "HEAD"], {
-        encoding: "utf8",
-      }).trim()
-    ).toBe("f19da7bb59aa4ef30185ed1d0f029a87c7fe3a3c");
-  const producer = await runtime(root);
-  const { runPipeline } = root
-    ? ((await import(
-        `${root}/workers/game/src/engine/pipeline.ts`
-      )) as typeof import("../engine/pipeline.js"))
-    : await import("../engine/pipeline.js");
-  const db = createTestCardDb();
-  let state = createBattleReadyState(db);
-  state.schemaVersion = version;
-  if (version === 8) state.costSemanticsVersion = mode;
-  state.players[1].hand = [
-    {
-      cardId: "ST04-016",
-      instanceId: "history-counter",
-      owner: 1,
-      controller: 1,
-      zone: "HAND",
-      state: "ACTIVE",
-      attachedDon: [],
-      turnPlayed: 1,
-    },
-  ];
-  const canonical = readFileSync(
-    resolve(__dirname, "../../../../docs/cards/ST-04.md"),
-    "utf8"
-  )
-    .split("**ST04-016**")[1]
-    .split("\n---")[0]
-    .split("\n")
-    .slice(1)
-    .join("\n")
-    .trim();
-  db.set("ST04-016", {
-    ...CARDS.VANILLA,
-    id: "ST04-016",
-    type: "Event",
-    cost: 1,
-    power: null,
-    counter: null,
-    effectText: canonical,
-    effectSchema: getEffectSchema("ST04-016")!,
-  });
-  for (const [action, actor] of [
-    [
-      {
-        type: "DECLARE_ATTACK",
-        attackerInstanceId: state.players[0].leader.instanceId,
-        targetInstanceId: state.players[1].leader.instanceId,
-      },
-      0,
-    ],
-    [{ type: "PASS" }, 0],
-    [
-      {
-        type: "USE_COUNTER_EVENT",
-        cardInstanceId: "history-counter",
-        counterTargetInstanceId: state.players[1].leader.instanceId,
-      },
-      1,
-    ],
-  ] as const) {
-    const result = runPipeline(state, action, db, actor);
-    expect(result.valid, result.error).toBe(true);
-    state = result.state;
-  }
-  expect(state.pendingPrompt?.options.promptType).toBe(
-    mode === 7 ? "PLAYER_CHOICE" : "SELECT_TARGET"
-  );
-  const stored = await save(producer, state, db);
-  if (root && process.env.OPT969_HISTORY_CAPTURE === "1") {
-    mkdirSync(resolve(fixturePath, ".."), { recursive: true });
-    writeFileSync(fixturePath, JSON.stringify(stored, null, 2) + "\n");
-  }
-  return stored;
-}
 
 function activated(state: GameState, db: Map<string, CardData>) {
   return evaluateCondition(
@@ -177,6 +90,10 @@ async function completeCounter(
     history.filter((a) => a.actionType === "USE_COUNTER_EVENT")
   ).toHaveLength(1);
   expect(activated(first.state, first.cardDb)).toBe(true);
+  expect(history.find(a => a.actionType === "USE_COUNTER_EVENT")).toEqual({ actionType: "USE_COUNTER_EVENT", timestamp: 14, controller: 1, cardId: "ST04-016", cardType: "EVENT", baseCost: 1 });
+  const published = structuredClone(first.state.eventLog.filter(event => event.type === "EVENT_ACTIVATED_FROM_HAND" || event.type === "COUNTER_USED"));
+  const originalEvent = structuredClone(first.state.players[1].trash.find(card => card.cardId === "ST04-016")!);
+  expect(originalEvent.instanceId).toBe("card_00000043");
   const donId = first.state.players[1].donCostArea.find(
     (d) => d.state === "ACTIVE"
   )!.instanceId;
@@ -201,6 +118,8 @@ async function completeCounter(
   expect(done.schemaVersion).toBe(first.state.schemaVersion);
   expect(done.costSemanticsVersion).toBe(first.state.costSemanticsVersion);
   expect(done.turn.actionsPerformedThisTurn).toEqual(history);
+  expect(done.eventLog.filter(event => event.type === "EVENT_ACTIVATED_FROM_HAND" || event.type === "COUNTER_USED")).toEqual(published);
+  expect(done.players[1].trash.find(card => card.cardId === "ST04-016")).toEqual(originalEvent);
   expect(activated(done, reloaded.cardDb)).toBe(true);
   expect(done.players[1].donCostArea).toEqual(
     first.state.players[1].donCostArea.filter(
@@ -269,13 +188,13 @@ it("Counter staged-entry history repair never blesses stale live history or reso
   }
 });
 
-it("ordinary setup and direct Repository writes stay version6", async () => {
+it("ordinary setup and direct Repository writes own version7", async () => {
   const rt = await runtime();
   const db = createTestCardDb();
   const state = createBattleReadyState(db);
-  expect(state.schemaVersion ?? 6).toBe(6);
+  expect(state.schemaVersion).toBe(7);
   const loaded = (await memory(rt, await save(rt, state, db)).repo.load())!;
-  expect(loaded.state.schemaVersion).toBe(6);
+  expect(loaded.state.schemaVersion).toBe(7);
 });
 
 for (const context of [
@@ -299,5 +218,13 @@ for (const [version, mode] of [
       await generateCounter(undefined, version, mode),
       mode
     );
+  });
+}
+
+for (const context of ["live", "undo-first", "undo-later", "embedded-first", "embedded-later"]) {
+  it(`FINAL ordinary7 writer Counter preserves original activation/query/IDs on deployed reader from ${context}`, async () => {
+    const state = createBattleReadyState(createTestCardDb());
+    expect(state.schemaVersion).toBe(7);
+    await completeCounter(await generateCounter(), 7, context);
   });
 }

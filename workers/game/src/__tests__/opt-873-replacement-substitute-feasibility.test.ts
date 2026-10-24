@@ -1,3 +1,5 @@
+import { runtime, memory, command, save } from "./native7-producer-support.js";
+import { getEffectivePower } from "../engine/modifiers.js";
 /**
  * OPT-873 — a replacement whose substitute cannot be carried out is not
  * offered, and the original K.O. / removal proceeds.
@@ -366,9 +368,10 @@ describe("RETURN_DON_TO_DECK substitute (EB04-030)", () => {
   // OPT-921: executeReturnDonToDeck's `amount` path returns only unattached
   // cost-area DON!!, so accepting here saves the card without returning the
   // attached DON!!.
-  it.fails("accepting with every DON!! attached returns the attached DON!! (OPT-921)", () => {
+  it.fails("explicit6 known debt: accepting with every DON!! attached fails to return it (OPT-921)", () => {
     const { f, card } = allAttached();
     const donDeckBefore = f.state.players[0].donDeck.length;
+    f.state.schemaVersion = 6;
 
     f.opponentEffectKO(card);
     expect(f.replacementOffered()).toBe(true);
@@ -378,6 +381,49 @@ describe("RETURN_DON_TO_DECK substitute (EB04-030)", () => {
     expect(f.state.players[0].leader.attachedDon).toHaveLength(0);
     expect(f.state.players[0].donDeck).toHaveLength(donDeckBefore + 1);
   });
+
+  for (const mixed of [false, true]) it(`native7 all-attached return ${mixed ? "chooses the exact donor" : "executes the sole plan"} on deployed reader once`, async () => {
+    const { f, card } = allAttached();
+    expect(f.state.schemaVersion).toBe(7);
+    if (mixed) f.giveDon(0, 1);
+    const donor = structuredClone(f.state.players[0].leader.attachedDon[0]);
+    const area = structuredClone(f.state.players[0].donCostArea);
+    const deck = structuredClone(f.state.players[0].donDeck);
+    f.state.prohibitions.push({ id: "attached-return-hold", sourceCardInstanceId: card.instanceId, sourceEffectBlockId: "replacement", prohibitionType: "CANNOT_REFRESH", scope: {}, duration: { type: "SKIP_NEXT_REFRESH" }, controller: 0, appliesTo: [donor.instanceId], usesRemaining: null });
+    const base = f.db.get(f.state.players[0].leader.cardId)!;
+    expect(getEffectivePower(f.state.players[0].leader, base, { ...f.state, turn: { ...f.state.turn, activePlayerIndex: 0 } }, f.db)).toBe((base.power ?? 0) + 1000);
+    f.opponentEffectKO(card);
+    const writer = await runtime();
+    const reader = await runtime(process.env.OPT969_WRITER_READER_ROOT);
+    let loaded = (await memory(reader, await save(writer, f.state, f.db)).repo.load())!;
+    loaded.state = command(reader, loaded.state, loaded.cardDb, { type: "PLAYER_CHOICE", choiceId: "accept" });
+    if (mixed) {
+      const prompt = loaded.state.pendingPrompt!;
+      expect(prompt.respondingPlayer).toBe(0); expect(prompt.options.promptType).toBe("PLAYER_CHOICE");
+      if (prompt.options.promptType !== "PLAYER_CHOICE") throw Error("missing exact donor choice");
+      expect(prompt.options.choices.map(choice => choice.id).sort()).toEqual([donor.instanceId, area[0].instanceId].map(id => `don-return-ids:${JSON.stringify([id])}`).sort());
+      const action = { type: "PLAYER_CHOICE" as const, choiceId: `don-return-ids:${JSON.stringify([donor.instanceId])}`, promptId: prompt.promptId };
+      const before = structuredClone(loaded.state);
+      expect(new reader.SessionCoordinator().executeAction(loaded.state, [], 1, action, loaded.cardDb).kind).toBe("reject");
+      expect(loaded.state).toEqual(before);
+      loaded = (await memory(reader, await save(reader, loaded.state, loaded.cardDb)).repo.load())!;
+      loaded.state = command(reader, loaded.state, loaded.cardDb, action);
+    }
+    const done = (await memory(reader, await save(reader, loaded.state, loaded.cardDb)).repo.load())!.state;
+    expect(done.pendingPrompt).toBeNull(); expect(done.effectStack).toEqual([]);
+    expect(done.players[0].characters.some(c => c?.instanceId === card.instanceId)).toBe(true);
+    expect(done.players[0].leader.attachedDon).toEqual([]);
+    expect(done.players[0].donCostArea).toEqual(area);
+    expect(done.players[0].donDeck).toEqual([...deck, { ...donor, state: "ACTIVE", attachedTo: null }]);
+    expect(done.prohibitions.some(hold => hold.id === "attached-return-hold")).toBe(false);
+    expect(getEffectivePower(done.players[0].leader, base, { ...done, turn: { ...done.turn, activePlayerIndex: 0 } }, loaded.cardDb)).toBe(base.power);
+    expect(done.eventLog.filter(event => event.type === "DON_DETACHED")).toHaveLength(1);
+    expect(done.eventLog.filter(event => event.type === "CARD_KO" && event.payload.cardInstanceId === card.instanceId)).toEqual([]);
+    const before = structuredClone(done);
+    expect(new reader.SessionCoordinator().executeAction(done, [], 0, { type: "PLAYER_CHOICE", choiceId: "accept" }, loaded.cardDb).kind).toBe("reject");
+    expect(done).toEqual(before);
+  });
+
 });
 
 // ─── RETURN_TO_DECK (targeted substitute) ────────────────────────────────────

@@ -1,114 +1,125 @@
-# OPT-969 / OPT-997 native7 writer prerequisite
+# OPT969 / OPT997 bounded ordinary7 writer, resumed after reader repair
 
-Integration base: 864bee2b9282004aa46476462447a0aa57b28686 (PR782 reader).
-Rollback reader floor: deployed PR778 amendment
-69125276e1bb4a1eba7ea2170056cd392b02885b for this writer's ordinary7 outputs.
-Already existing native8 inputs require their native8 reader floor864bee2; they
-are never sent to the7-only rollback reader. Original4858458 is unsafe
-for subsequent native7 DON choices and expected-root evidence.
-This bounded stage enables provenance and continuation producers; final
-OPT-921/948 field-domain/feasibility behavior remains separate. No production
-repair, captures or reader retirement is claimed. Historical corpus bytes stay
-immutable; evidence remains synthetic under the accepted exception.
+Integration and rollback floor: verified deployed history reader
+`c50b1d037ea38c004aa3d29b6b2ee5b90b45574e` (PR784). Coordinator verified
+postmerge CI40052762418 and game-worker40052762462/job120748880646, deployed
+version707e3d1d-84a1-4a3f-bca5-a088d2679895 before writer work resumed.
+Original485 and69125276 are known unsafe for published Counter history and are
+negative controls only. Preserved native8 inputs also use the newer c50 floor.
+No ordinary8 writer is enabled.
 
-## Ownership contract
+## Scope and cumulative checkpoints
 
-Before: new setup runtime omitted schemaVersion; first save labeled6, repository
-load retained6, and first action/availability therefore used6 behavior. Explicit
-native7 inputs already retained the deployed reader semantics.
+New setup owns explicit7 before its first action/save. Repository validates
+source provenance, proves/promotes every legacy live and separate/embedded undo
+snapshot before retention or any storage write, and returns retained promoted
+snapshots to GameSession. Unsupported or unprovable input leaves caller,
+storage and metrics unchanged, including invalid history beyond retention.
+Low-level explicit6 remains6. Native7/8 validate without outcome/root repair;
+loaded8 retains required costSemanticsVersion6|7 through live/undo/action/save.
 
-After: setup owns explicit7 before first save/action. Repository load parses every
-legacy live/undo snapshot, promotes the entire session atomically, validates
-native7, then bounds retained history. Save similarly validates runtime inputs,
-proves/promotes all snapshots before compaction or any storage write, and returns
-native7 provenance to the caller. The low-level shape encoder preserves explicit
-legacy runtime6 provenance; only the repository promotion boundary authorizes the
-ordinary writer change. Native7 inputs are validated rather than canonicalized.
+Only an absent-outcome COST owner with an immediate matching REPLACEMENT offer
+and bound optional/choice prompt may canonicalize historical payment syntax.
+Actual source/selected/fixed/Life target and event family must match. No historical
+outcome or expected baseline is inferred. Valid unknown/orphan debt remains
+explicitly diagnostic through real load/action/save. Historical same-ID owners
+keep absent evidence and conservative eligibility, including rested-prefix debt.
 
-Only an absent-outcome COST frame with its immediate matching REPLACEMENT offer
-and bound pending optional/choice prompt may have historical payment syntax
-canonicalized. Match target is source for compound, staged Stage/source for
-fixed, and first selected/bound Life ID for selected costs: those are the actual
-capture sites, with no later-target cursor. KO accepts its KO/removal/leave event
-families; other exits use removal/leave. No accepted outcome is inferred.
-Unprovable data rejects atomically, including undo entries beyond retention.
-Valid unknown/orphan debt remains explicitly diagnostic: the first ATTACH_DON
-control retains version6 behavior and unknown outcome through action/save/load.
+The original writer f19 full SPEC and correctness passes both returned FINDINGS:
+P1 published USE_COUNTER_EVENT history vanished on current and actual691 readers.
+Earlier root-only publication repair therefore reached its declared repeat-design
+STOP. PR783 stayed draft; its CI40049077417 also failed seven worker cases.
+The reader-first adjudication produced PR784's separately reviewed/deployed
+ownership repair. That delivery permits this resumed writer stage; it does not
+erase original findings, reset the review budget, or claim final writer CLEAN.
+One full review per lens is spent; the existing reviewers retain only their
+remaining delta. Root owns those reviews, full verify, CI/freshness and delivery.
 
-Initial representative baseline112 tests passed. Slice1 adds19 public-boundary
-promotion/provenance cases and passes134 selected tests. Obsolete expected6
-assertions changed only where repository load/save now owns promotion; direct
-legacy conversion/shape encoding controls retain6. Runtime shape discriminants
-are encoded before strict parsing, after checking explicit ownership invariants,
-so absent runtime kinds can be supplied without hiding contradictory owners.
+## Reader ownership retained exactly
 
+Writer integration keeps the deployed pipeline, Coordinator, prompt-lifecycle,
+cost staged-entry and publication helpers unchanged. `applyCostTransactionState`
+remains exact for rollback. Evidence-gated entry reconciles only proven history
+prefixes after every root matches. Publication retains B, carries append-only
+B→L committed history into staged S before refreshing the root, and preserves
+transaction-only order. New-owner publication never blesses existing mismatches
+or adds missing evidence. See opt969-history-reader.md and the saved-state
+contract for the full per-field ownership audit. There are still only two
+production runPipeline call sites, both Coordinator-owned; raw pipeline is also
+a documented public action boundary.
 
-## Published COST ownership and compatibility
+## Honest CI expectation repairs
 
-New owners retain immutable costExpectedRoot at suspension. Both documented
-public runPipeline publication and SessionCoordinator publication finalize only
-new evidence-bearing IDs absent at their respective entry. Pipeline bookkeeping
-can update the projection after orchestrator suspension (notably Counter Event
-activation and X.Drake on-play). Its returned prompt must therefore own the
-actual returned root before any public reply. Coordinator additionally finalizes
-after session cleanup. Neither boundary adds evidence to historical same-ID
-owners or blesses existing evidence mismatches. Prompt continuation retains the
-deployed reader's prevalidation and sanctioned successful-refresh rules.
-Only two non-test runPipeline callers exist, both in coordinator.ts (executeAction
-and advanceStartOfTurn). The public engine README also names runPipeline as the
-action entry, so raw pipeline consumers remain supported.
+- OPT1005 still uses unchanged completed6 fixtures, explicitly expects current7
+  envelope only after repository promotion, and retains complete damage/resource/
+  event/stack comparisons for live and undo.
+- OPT429 keeps genuine explicit6 unpayable-suffix/queued-trigger cleanup. Native7
+  post-offer trash drift rejects with complete state unchanged through public
+  prompt lifecycle. A diagnostic direct resumeFromStack call normalized pending
+  triggers before its COST handler; no low-level whole-state-unchanged claim or
+  production guard change follows from that probe.
+- OPT614 legacy decline comes from an actual explicit6 producer, without expected
+  evidence. Contradictory modern root-without-staged data rejects actual strict
+  repository ingress without caller/storage/metrics mutation.
+- OPT868 retains explicit historical dual eligibility/hold-choice controls;
+  native7 live resource/hold drift rejects before mutation, retaining all state.
+- OPT873's attached-donor native7 witness now passes with exact donor/deck append,
+  attachment/power/hold cleanup, actual c50 replay, meaningful choice/controller
+  and duplicate completion checks. Explicit6 known debt remains expected-failure.
+  This does not close final OPT921 feasibility/domain work.
 
-First action and subsequent prompts use the deployed reader grammar. New setup
-is explicit7 before any persistence; legacy runtime input is validated before
-encoding, then every live/undo entry is proved/promoted before compaction/write.
-Unsupported or malformed provenance rejects before encoding can erase it.
-Explicit6 low-level shape encoding still emits6; no historical baseline is
-inferred, including after old owner resuspension. Valid outcome-unknown debt
-remains diagnostic through real load/action/save; unprovable continuations reject.
-No native8 writer is enabled. PR782 merged during this rollout and is integrated. Loaded8 live/undo entries
-are validated without promotion: envelope8 and explicit costSemanticsVersion6|7
-are preserved. Native8 mode6 never acquires native7 costs; mode7 uses the shared
-capability helper at publication. Unsupported9 rejects without downgrade.
+## Historical provenance and current output
 
-## Evidence and test dispositions
+All old82 and new13 historical payloads/manifests remain byte-identical. The four
+original c50 manifest.generators source modules were archived before edits as
+non-executed .ts.txt files under fixtures/opt-969-history-reader/capture-sources-c50.
+Current source-pin validation explicitly resolves those original bytes; manifest
+hashes were not rewritten. The f19 producer is immutable at
+/private/tmp/opt969-frozen-f19; implementation HEAD is never substituted for it.
+Current capture helpers reproduce all13 original payload bytes/hashes in an
+isolated output directory, without writing the historical fixture directory.
 
-Historical fixture JSON, manifests and archived generators are unchanged.
-LegacyReaderRepository is a test-only emulation of the prior repository boundary
-using the current strict parser/runtime, explicitly not a pinned old binary.
-Historical byte-proof tests use it where ordinary promotion would change the
-thing being measured; real promotion/safety tests use SessionRepository.
-Direct encoder/reader controls retain explicit6. Only repository-owned expected6
-assertions move to7. Existing authored tests answer new meaningful DON prompts
-with concrete offered identity replies and retain their independent printed-card
-outcomes. Their state is not globally forced to6. The existing one-ability
-native6 regression in opt808 and old debt controls retain their original scope.
+Separate current-writer evidence freshly executes twelve recipes from synthetic
+initial card/resource definitions and replies; historical end states are not
+oracles. Each final writer boundary resumes on exact c50, which creates/reloads
+its own successors. Executed matrix:12 recipes,41 producer steps,205 restored
+starting boundaries across live/separate-first/separate-later/embedded-first/
+embedded-later,475 continuation actions. Counts are recorded during execution.
+Independent target/resource/identity/event/history/terminal and next legal PASS
+assertions supplement equality. These cover repeated DON, branches, choose-one,
+nested parent/trigger, KO, fixed replacement accept/decline, held donor cleanup,
+terminal suppression and retained Decision10 rollback.
 
-Authored native7 Counter ST04-016 and OP17-077 and X.Drake OP17-075 execute raw
-pipeline -> public reply with independent power/trash/identity outcomes. Input
-immutability and actual returned expected-root equality are asserted there.
-OP16-060 additionally returns exactly8 active cost-area DON, leaves rested and
-given DON untouched, then plays the selected Admiral. Canonical text is in
-ST-04.md, OP-17.md and OP-16.md. Rules consulted: RULE-INDEX.md and repository
-Comprehensive Rules v1.2.0 (2026-01-16), 1-3-2-2, 4-4-2, 8-3-1 and10-2-10.
-The preceding producer packet records the v1.2.1 official check; this rollout
-does not migrate the repository ruleset or resolve deferred authored-domain bugs.
+Fresh current Counter output separately survives all five storage contexts with
+exact original USE_COUNTER_EVENT fields/timestamp14, real ACTIVATED_EVENT min1
+true, exact original Event instance/card/log records once, selected donor once,
+trash once and power9000. A real GameSession WebSocket case consumes that final
+writer pause on c50, recreates the DO, completes target and rejects duplication.
+Native8 modes6|7 retain their envelopes and separate cost behavior. Counter base
+cost1 is not a natural-reachability claim for OP15-002's base-cost3 condition.
 
-Actual writer outputs replay against a checkout pinned at69125276 via
-OPT969_WRITER_READER_ROOT=/private/tmp/pr778-followup. The permanent replay test
-uses the local runtime in normal CI and an explicit external root only for this
-cross-build validation. It verifies a first identity pause, subsequent identity
-pause, exact returned IDs, one DRAW and empty stack after completion. Real
-GameSession WebSocket tests persist/promote before first action, issue ordinary7
-DON/rest-prefix pauses, rehydrate in the selected reader, accept/reject replies,
-and reject duplication with one DRAW. Separate drift cases preserve state and
-emit action:rejected. Legacy migration replay can similarly select that floor
-with OPT968_DEPLOYED_READER_ROOT. These are synthetic inputs through real public
-boundaries; no production capture or deployment observation is claimed.
+Bounded OPT997 proof captures the actual ordinary7 Ganzui-style COST owner,
+accepts its prompting substitute through real Repository/Coordinator/lifecycle,
+reloads child/live/undo, settles that same owner once, empties the stack and
+accepts a subsequent legal battle PASS. Duplicate child reply rejects unchanged.
+Decision10 fixture stack assertions and its known OPT958 policy deviation remain.
 
-Validation detail, explicit path lists, honest intermediate failures and final
-counts are in the current chat work/writer-rollout source report and logs.
-Root owns full pnpm verify, independent reviews, deployment and merge gates.
-Parent OPT969 remains open: final OPT921/948 domain/feasibility integration,
-historical recovery, production repair and retirement remain excluded. Bounded
-OPT997 completion uses the closed outcomes; Decision10 rollback policy and its
-known rules deviation remain unchanged.
+## Validation and remaining work
+
+Resumption focused selection/list: work/history-reader/writer-resume-focused-paths.txt
+and writer-resume-focused-list.log in the current chat. Initial integrated run:
+26 files,1745 passed,1 intentional explicit6 expected failure,1 opt-in producer
+matrix skipped (1747 selected); exact deployed-reader envs select
+/private/tmp/opt969-history-reader, frozen producer selects the immutable f19 path,
+maxWorkers2. Source pin/regeneration receipt and separate current-writer hashes,
+reader/producer SHAs and executed counts live in the same work directory.
+Final freeze results are in the resumption source report; earlier f19 successes
+are historical receipts and not evidence for this integrated head.
+
+Canonical source packet: repo RULE-INDEX and Comprehensive Rules v1.2.0,
+1-3-2-2,4-4-2,8-3-1,8-5-4 and10-2-10; canonical ST04-016, OP16-060, EB04-030
+and OP17 Ganzui text. No global rules migration. Evidence remains synthetic
+under the explicit user-approved exception, with no production capture/repair/
+retirement claim. Parent OPT969 stays open for final OPT921/948 domain/feasibility,
+deferred authored EB02-061/OP12-070/OP15-069 corrections, historical recovery and
+OPT958 policy disposition. No parent/project closure is claimed.

@@ -1,6 +1,6 @@
 /** Ordinary writer output is replayed on an explicitly selected rollback build.
  * Default CI covers the same contract locally; rollout validation sets the root
- * to the deployed691 checkout, including its subsequent prompt producers. */
+ * to the deployed history-reader checkout, including its subsequent prompt producers. */
 import { expect, it } from "vitest";
 import { rig, synSchema } from "./opt-960-rig.js";
 import { runtime, memory, command, save } from "./native7-producer-support.js";

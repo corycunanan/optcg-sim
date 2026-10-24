@@ -697,13 +697,14 @@ controls. Unprovable continuation or unsupported provenance fails without input
 or storage mutation; no historical expected root or replacement outcome is
 invented. Valid legacy unknown debt stays diagnostic after promotion.
 
-The rollback floor is deployed PR778 amendment
-`69125276e1bb4a1eba7ea2170056cd392b02885b`, including subsequent native7 producers
-and optional immutable `costExpectedRoot`. Original485 is unsafe. Public
-runPipeline publication now finalizes only new evidence-bearing COST owner IDs
-after its bookkeeping; SessionCoordinator retains its later finalization.
-Existing mismatches and historical evidence absence are preserved. Reader-floor
-proof covers actual writer first/subsequent pauses and real GameSession messages.
+The rollback floor is verified deployed PR784 history reader
+`c50b1d037ea38c004aa3d29b6b2ee5b90b45574e`. Original485 and69125276 are known
+unsafe for published Counter history. The writer preserves the deployed
+`publishCostOwnerRoots` contract: new-owner publication carries proven committed
+history into staged payment before refreshing expected evidence. Existing
+mismatches and historical evidence absence remain conservative. Current writer
+first/subsequent pauses, history queries, all storage contexts and real
+GameSession messages execute on that actual reader; equality is supplemental.
 
 Historical corpus bytes remain immutable. Evidence is synthetic under the
 explicit accepted exception; no production capture, repair or retirement is
@@ -772,6 +773,10 @@ Ordinary7 rollout supersedes the prerequisite ordinary6 policy above. Already
 loaded8 live/undo entries retain schema8 and explicit costSemanticsVersion6|7;
 this writer never downgrades or cost-migrates them and does not create ordinary8.
 
-The691 reader-floor proof applies to ordinary7 outputs. Preserved preexisting8
-inputs continue to require the native8-capable864bee2 reader; no7-only rollback
-or downgrade of those inputs is supported.
+The repaired c50 reader floor applies to this ordinary7 rollout and preserved
+native8 inputs. No7-only rollback or envelope/mode downgrade of8 is supported.
+The original f19 writer full reviews returned P1 FINDINGS and stopped at the
+publication design checkpoint; the deployed reader repair permits writer
+resumption, without erasing findings or resetting its remaining delta reviews.
+Historical82/13 payloads and manifests are immutable; original c50 generator
+sources are archived non-executably before current writer assertions change.
