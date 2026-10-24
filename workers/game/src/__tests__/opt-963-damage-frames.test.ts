@@ -621,7 +621,7 @@ describe("PR #758 D-F1b: the actions after an OPPONENT_ACTION run as the effect'
 describe("OPT-996 committed chain prefix", () => {
   it("publishes DRAW → damage → reply → DRAW exactly once across reload, scanning only at parent completion", async () => {
     const card = dealer("SYN-PREFIX", 1);
-    card.effectSchema!.effects[0].actions.unshift({ type: "DRAW", params: { amount: 1 } });
+    card.effectSchema!.effects[0].actions!.unshift({ type: "DRAW", params: { amount: 1 } });
     const r = rig({ p1Life: [life("prefix-trigger", TRIG_OPTIONAL.id)], dealer: card, p1Leader: ENEL });
     activate(r);
     expectWindow(r, "prefix-trigger");
