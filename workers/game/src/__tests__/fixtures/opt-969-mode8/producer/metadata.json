@@ -35,7 +35,7 @@
   "lockSha256": "080bf6130ab2656ff730fd2ca775051bca59c74a835f610d2525cf3c869c9ffe",
   "versions": {
     "node": "24.16.0",
-    "pnpm": "10.28.0",
+    "pnpm": "10.28.2",
     "vitest": "4.1.4"
   },
   "proof": "Actual new setup8/mode8 before first action/save, no retagged historical fixtures."
