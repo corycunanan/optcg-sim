@@ -1,6 +1,6 @@
 import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import {
-  captureCostExpectedRoot,
+  publishCostOwnerRoots,
   costRootMatches,
 } from "../engine/effect-resolver/cost/transaction.js";
 import { drainPendingWork } from "../engine/pending-work-drain.js";
@@ -270,26 +270,12 @@ export class SessionCoordinator {
     if (state.pendingPrompt || state.effectStack.length > 0)
       nextUndoHistory = [];
     state = this.surfaceRevealTrigger(state, cardDb);
-    // Initial pipeline cleanup has finished. Only newly created evidence owners
-    // receive the actual published root; existing snapshots are never blessed.
-    if (hasNativeCostSemantics(state)) {
-      const priorIds = new Set(
-        stateBeforePipeline.effectStack.map((frame) => frame.id)
-      );
-      const owners = state.effectStack.filter(
-        (frame) => frame.costExpectedRoot && !priorIds.has(frame.id)
-      );
-      if (owners.length) {
-        const expected = captureCostExpectedRoot(state);
-        const ids = new Set(owners.map((frame) => frame.id));
-        state = {
-          ...state,
-          effectStack: state.effectStack.map((frame) =>
-            ids.has(frame.id) ? { ...frame, costExpectedRoot: expected } : frame
-          ),
-        };
-      }
-    }
+    // Final session cleanup may append history after pipeline publication.
+    const priorIds = new Set(stateBeforePipeline.effectStack.map(frame => frame.id));
+    const published = publishCostOwnerRoots(state, frame => !priorIds.has(frame.id));
+    if (!published) return { kind: "reject", state: stateBeforePipeline,
+      undoHistory: [...initialUndoHistory], reason: "Ambiguous cost history publication" };
+    state = published;
     if (pipeline.gameOver) nextUndoHistory = [];
     return {
       kind: "applied",
