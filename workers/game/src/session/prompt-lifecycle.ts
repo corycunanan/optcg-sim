@@ -1,6 +1,6 @@
 import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import {
-  captureCostExpectedRoot,
+  publishCostOwnerRoots,
   costRootMatches,
 } from "../engine/effect-resolver/cost/transaction.js";
 import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
@@ -112,21 +112,8 @@ export function resumePromptLifecycle(
   const released = releaseMovedDonEffects(stateBeforeResume, result.state);
   // A validated successful reply may commit replacement work. Snapshot only
   // existing evidence owners after all sanctioned processing and cleanup.
-  const expected =
-    hasNativeCostSemantics(released) &&
-    released.effectStack.some((frame) => frame.costExpectedRoot)
-      ? captureCostExpectedRoot(released)
-      : undefined;
-  const published = expected
-    ? {
-        ...released,
-        effectStack: released.effectStack.map((frame) =>
-          frame.costExpectedRoot
-            ? { ...frame, costExpectedRoot: expected }
-            : frame
-        ),
-      }
-    : released;
+  const published = publishCostOwnerRoots(released);
+  if (!published) return { state: stateBeforeResume, responseRejected: true };
   return published === result.state ? result : { ...result, state: published };
 }
 

@@ -79,6 +79,7 @@ import { getEventCardInstanceId, replacePendingEventReferences } from "../../eve
 import { transitionCards } from "../../zone-transition.js";
 import {
   applyCostTransactionState,
+  enterCostTransactionState,
   captureCostTransactionState,
   captureCostExpectedRoot,
   costRootMatches,
@@ -435,8 +436,8 @@ export function handleAwaitingCostSelection(
   services: EffectResolverServices
 ): HandlerResult {
   if (
-    topFrame.costExpectedRoot &&
-    !costRootMatches(state, topFrame.costExpectedRoot)
+    state.effectStack.some(frame => frame.costExpectedRoot &&
+      !costRootMatches(state, frame.costExpectedRoot))
   ) {
     return { kind: "waiting", state, events: [], resolved: false };
   }
@@ -453,9 +454,9 @@ export function handleAwaitingCostSelection(
 
   const baselineState = state;
   const transactionBaseline = captureCostTransactionState(baselineState);
-  const workingState = topFrame.costTransactionState
-    ? applyCostTransactionState(baselineState, topFrame.costTransactionState)
-    : baselineState;
+  const workingState = enterCostTransactionState(baselineState, topFrame);
+  if (!workingState)
+    return { kind: "waiting", state, events: [], resolved: false };
   const updateCostOwner = (candidate: GameState, partial: Partial<EffectStackFrame>): GameState =>
     hasNativeCostSemantics(candidate)
       ? updateFrameById(candidate, topFrame.id, frame => ({ ...frame, ...partial }))

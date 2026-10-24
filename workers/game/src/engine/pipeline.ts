@@ -1,3 +1,4 @@
+import { costRootMatches, publishCostOwnerRoots } from "./effect-resolver/cost/transaction.js";
 import type { LifeTriggerStagingScope } from "./life-trigger-staging.js";
 import { recalculateBattlePowers } from "./battle.js";
 import { drainPendingWork } from "./pending-work-drain.js";
@@ -49,6 +50,23 @@ export interface PipelineResult {
 }
 
 export function runPipeline(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): PipelineResult {
+  if (state.effectStack.some(frame => frame.costExpectedRoot &&
+    !costRootMatches(state, frame.costExpectedRoot)))
+    return { state, valid: false, error: "Stale cost root" };
+  const result = runPipelineAction(state, action, cardDb, actingPlayerIndex);
+  if (!result.valid) return result;
+  const priorIds = new Set(state.effectStack.map(frame => frame.id));
+  const published = publishCostOwnerRoots(result.state, frame => !priorIds.has(frame.id));
+  return published ? { ...result, state: published }
+    : { state, valid: false, error: "Ambiguous cost history publication" };
+}
+
+function runPipelineAction(
   state: GameState,
   action: GameAction,
   cardDb: Map<string, CardData>,

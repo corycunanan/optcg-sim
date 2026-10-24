@@ -1,0 +1,54 @@
+{
+  "producerCommit": "f19da7bb59aa4ef30185ed1d0f029a87c7fe3a3c",
+  "provenance": "Fresh synthetic states executed through frozen f19 public pipeline or Repository/Coordinator/prompt lifecycle; no production capture. Immutable historical corpus used only as initial synthetic card/resource definitions and reply recipes. No writer-endstate equality oracle.",
+  "fixtures": {
+    "counter.json": "2a21629c73c67d36cc5562637412431f058b546257124a99c92f8bb2d343e98a",
+    "producers/DON_MINUS-DON_MINUS-active.json": "e8d316052d265003f6f4f29da63daea89cdbebddab1ff787e1a356f11192084b",
+    "producers/accepted-fixed-don-prefix-rollback.json": "590cf66ede9e741c4663005d32faf632cb6ca073d03a4bd35c03056e1f18800c",
+    "producers/branch-don.json": "8239886aa218354e617554d40b324bf8a3e9cfd4370c8db5d2a7e7b6859602eb",
+    "producers/choose-one-don.json": "9001d837836be2560785247481aa0c3d9c539edc75e93bfcc19ccb08c5d05aa9",
+    "producers/fixed-accept-then-don.json": "b424bda3110c6579bb98c21139383facb8d9426076d642813ddbcd44a69b7f0b",
+    "producers/fixed-decline-then-don.json": "ddb8eadf59d3db902c0c1bcdf9302b169ff6948b4968920524829fa177124047",
+    "producers/fixed-prefix.json": "65fda2ce384305420f5cea3d5d15183b3bce6841acf22e07fe07782be50dc442",
+    "producers/held-duration-groups.json": "1bd3a1fc1061dca7c4dfd2304470063df06fe8ae16fd10c797dc0193508f4ad9",
+    "producers/nested-trigger-parent.json": "25cbdb6952aeac09753a1620a34b550656aaec9c754033dd701e29c6a223f547",
+    "producers/positive-ko-decline.json": "9864d97fae31f5ded064f94f1d3113dba0e023c74d7d237cc04f2d3dcdafbcff",
+    "producers/selected-prefix-trigger-don.json": "d9f25d8376434fc9ee9e426a24bf5e255a30a5a57a99440161d0259efe081d91",
+    "producers/terminal-cost-suppresses-don.json": "b63cac37e04331fcd1e01e2245be8facdff6227598e72eca924e627065a4debd"
+  },
+  "generators": {
+    "opt-969-history-reader.test.ts": "3ea9c5043c0f5701baccf3a6b081374c297aba6824ddee48dd44df7df2f87476",
+    "opt-969-history-producers.test.ts": "84f59382878a39d12e19cf2518ae3b9cbb5ce5e7780d26efa852d628c02a80b5",
+    "native7-producer-support.ts": "f4c2d62a3ecf5d257e7fbf935d3b45588096b86e2054862744f0569c043a9127",
+    "helpers.ts": "a239f290e43031602ae3333c09b880fd00bdc23c3e0a355cc357d879149e2889"
+  },
+  "seedRecipes": {
+    "DON_MINUS-DON_MINUS-active.json": "f6110b304d614cc9d3d188f5e4e8d0f0094687908eca50159beb1255a92c9a08",
+    "accepted-fixed-don-prefix-rollback.json": "7ecda9907961c73bdff8b0e91693b3f7ccf1abbf44768019109100725da66e01",
+    "branch-don.json": "0580ccbed00bf81b8ebeb39c9e35340345f405abeec88ddfef47d07a18ddee84",
+    "choose-one-don.json": "5908c5d41d5df18dbbca9a225d03741d1051bffa7e750a6f1d2d064f4464c993",
+    "fixed-accept-then-don.json": "8c26ab570266e0b8d496a98f9b56737fe3a95d29324be87736ea947aaaefba43",
+    "fixed-decline-then-don.json": "ab88aceedd658f99d4a816ade7d208844f841e340edddcc6ddcaae52f341f79b",
+    "fixed-prefix.json": "8ef52a0474f62aa9d525c86174f91c71bf196a5ecee7b9912bb536c2a23c69c1",
+    "held-duration-groups.json": "f6a0b40bd3344236eee3e1c1adb9976a2a222b1595bc64760d3a342bb1dd866d",
+    "nested-trigger-parent.json": "5e33718ce7834834d4933956272a8e6ee41da3946eacf73cbba1103ea54d3e8d",
+    "positive-ko-decline.json": "fdaac331fe66173826e27615ab46027a1dede92223f880ce6f67189c5105fdb6",
+    "selected-prefix-trigger-don.json": "a111dabe269ecea26f092db1a6d3fcf4d5a4739a8a82c8b2cd407614f36b948d",
+    "terminal-cost-suppresses-don.json": "811fa2dc8786d4c57c3a70141c6ba1d8567b72980362e0d428d0a318d8b8c0bf"
+  },
+  "producerSources": {
+    "workers/game/src/engine/pipeline.ts": "0036c248a97f2529494bdfa968eac82dcc21b90e4bede74fed4f0fc31b8a57e0",
+    "workers/game/src/engine/effect-resolver/cost/transaction.ts": "36ccddb183a193cb1ed35c65d4ca35be2567016e48ccd49ddcc7c71abc7536df",
+    "workers/game/src/engine/effect-resolver/cost/orchestrator.ts": "0590882d47ce4da9016c349480acf184ec7d4f459fdd26fe5bfdf9c70109eb37",
+    "workers/game/src/engine/effect-resolver/cost/payability.ts": "d2274578c753f973ac81f241f102118b6bfc204b6b6f20392920e9c0d9012b3a",
+    "workers/game/src/engine/effect-resolver/resume/cost.ts": "155a7a11004041559d40080246bec7ad3a208384bf60a57719471a8920ef990b",
+    "workers/game/src/engine/battle.ts": "2a3b4064ce249820c0c52a49edac9c0b2c6f7ec07bcd6d717438d7c8211c3784",
+    "workers/game/src/engine/events.ts": "77d3c409c8cb4cae9ec037cda533b04ad251d0634732b543ad465c514a145244",
+    "workers/game/src/engine/trigger-queue.ts": "d74ca29032b57ba622f6cadd05663599160d0c70814b640bf49d9932a88a3d76",
+    "workers/game/src/engine/setup.ts": "c0210c84687eea11e61f39ccd4311b7e1c81768ec882d4c2e111c03be6722393",
+    "workers/game/src/session/persistence.ts": "9e96e65ddf0e0c40188e5408059f823daebd57d8068db159099c850278696f4e",
+    "workers/game/src/session/coordinator.ts": "dd918a5c94bd0b42887ceb2290ab8f6f02500bf62f7724b5ef925b043ed0d2c8",
+    "workers/game/src/session/prompt-lifecycle.ts": "9569d6094c26606893eabd1d4938ab3d1f791fc0d93ee5773199dd70b2197202",
+    "workers/game/src/session/game-state-schema.ts": "7ed642c189a0cf08251966cf1162a1edd966d2a3e2473c9f51318299367f8212"
+  }
+}
