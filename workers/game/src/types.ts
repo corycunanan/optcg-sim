@@ -109,7 +109,7 @@ export interface GameState extends Omit<
   /** Retained native envelope: saves and later pauses may never downgrade. */
   schemaVersion?: 6 | 7 | 8;
   /** Required for native8: preserve the originating deployed cost semantics. */
-  costSemanticsVersion?: 6 | 7;
+  costSemanticsVersion?: 6 | 7 | 8;
   activeEffects: RuntimeActiveEffect[];
   prohibitions: RuntimeProhibition[];
   scheduledActions: RuntimeScheduledAction[];

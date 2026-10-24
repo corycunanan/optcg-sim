@@ -6,6 +6,14 @@ export function hasNativeCostSemantics(
 ): boolean {
   return (
     state.schemaVersion === 7 ||
-    (state.schemaVersion === 8 && state.costSemanticsVersion === 7)
+    (state.schemaVersion === 8 && (state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8))
   );
+}
+
+/** Mode8 is game-wide admission semantics, including fresh downstream effects.
+ * Keep this separate from native transaction/continuation support (mode7+). */
+export function hasStructuralCostSemantics(
+  state: Pick<GameState, "schemaVersion" | "costSemanticsVersion">
+): boolean {
+  return state.schemaVersion === 8 && state.costSemanticsVersion === 8;
 }

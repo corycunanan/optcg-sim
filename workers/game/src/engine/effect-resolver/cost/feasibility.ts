@@ -1,4 +1,5 @@
 /** Pure sequential feasibility search for cost suffixes and choice branches. */
+import { hasStructuralCostSemantics } from "../../native-cost-semantics.js";
 import type { Cost, SimpleCost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
@@ -30,7 +31,13 @@ function* combinations(values: string[], count: number): Generator<string[]> {
   yield* visit(0);
 }
 
-/** True for selection costs whose payments are exactly the target combinations. */
+/** Mode8 probes native exact DON choices; earlier modes keep historical picks. */
+function needsProbeSelection(state: GameState, cost: Cost): boolean {
+  return costNeedsPlayerSelection(cost) || (hasStructuralCostSemantics(state) &&
+    (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN"));
+}
+
+/** True for selection costs whose payments are exactly target combinations. */
 function isCombinationSelection(cost: Cost): boolean {
   if (cost.type === "PLAY_NAMED_CARD_FROM_HAND") return false;
   if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
@@ -39,7 +46,12 @@ function isCombinationSelection(cost: Cost): boolean {
 }
 
 function selectionAmounts(cost: Cost, targetCount: number): number[] {
-  return cost.type === "REST_CARDS" && cost.amount === "ANY_NUMBER"
+  // Rule1-3-2-2: nonpositive numeric DON repetitions do nothing. Omitted
+  // VARIABLE_DON_RETURN is distinct: its printed minimum is one.
+  if ((cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
+      typeof cost.amount === "number" && cost.amount <= 0) return [0];
+  return (cost.type === "REST_CARDS" && cost.amount === "ANY_NUMBER") ||
+    (cost.type === "VARIABLE_DON_RETURN" && cost.amount === undefined)
     ? Array.from({ length: targetCount }, (_, index) => index + 1)
     : [costSelectionCount(cost as SimpleCost)];
 }
@@ -83,6 +95,7 @@ function* selectionPayments(
         controller,
         cardDb,
         sourceCardInstanceId,
+        hasStructuralCostSemantics(state) ? "PRINTED_COST_PROBE" : "ACTUAL",
       );
       if (paid) yield paid.state;
     }
@@ -294,7 +307,14 @@ export function sequenceFailsStableTargetCondition(
  * validation, the optional-effect prompt, the Life Trigger gate and payment
  * (rules 8-3-1-1, 8-3-1-3). It is pure: every payment runs on a copied
  * state, so the caller's state, RNG and ID counters never change.
- * Hypothetical payment is replacement-unaware (OPT-948 owns that).
+ * Mode8 initial permission models the full printed sequence (8-3-1-3), including
+ * printed Life-to-hand resources. Actual replacement completion is unpaid
+ * and terminal for COST execution; it never supplies this probe's suffix.
+ * The Life multicost interpretation is explicitly retained, not a ruling.
+ * Modes6/7 retain the delivered deterministic DON/actual Life probe.
+ * Structural pruning concerns only original payments: LIFE_TO_HAND already
+ * produces HAND; DON returns add to DON deck, not main DECK, and never
+ * activate DON or the source. Terminal substitute states never feed suffixes.
  *
  * Failure policy: expected infeasibility returns false. An engine error
  * (an unknown cost type, a broken identity assertion) is not infeasibility,
@@ -431,7 +451,7 @@ function searchCostSequence(
     });
   }
 
-  if (costNeedsPlayerSelection(cost) && isCombinationSelection(cost) && suffix.length === 0) {
+  if (needsProbeSelection(state, cost) && isCombinationSelection(cost) && suffix.length === 0) {
     // OPT-798 review: a terminal combination cost needs no search — every
     // combination of valid targets is a payment (applyCostSelection never
     // refuses a validated selection), so payability is a count check.
@@ -445,7 +465,7 @@ function searchCostSequence(
     return selectionAmounts(cost, targetCount).some((amount) => targetCount >= amount);
   }
 
-  const nextStates: Iterable<GameState> = costNeedsPlayerSelection(cost)
+  const nextStates: Iterable<GameState> = needsProbeSelection(state, cost)
     ? selectionPayments(state, cost, controller, cardDb, sourceCardInstanceId)
     : (() => {
         const paid = payCosts(
@@ -454,6 +474,7 @@ function searchCostSequence(
           controller,
           cardDb,
           sourceCardInstanceId,
+          hasStructuralCostSemantics(state) ? "PRINTED_COST_PROBE" : "ACTUAL",
         );
         return paid ? [paid.state] : [];
       })();

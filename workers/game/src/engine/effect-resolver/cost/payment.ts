@@ -30,8 +30,9 @@ export function payCosts(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   sourceCardInstanceId?: string,
+  lifeDestinationPolicy: "ACTUAL" | "PRINTED_COST_PROBE" = "ACTUAL",
 ): CostPaymentResult | null {
-  const paid = payCostsUnreleased(state, costs, controller, cardDb, sourceCardInstanceId);
+  const paid = payCostsUnreleased(state, costs, controller, cardDb, sourceCardInstanceId, lifeDestinationPolicy);
   if (!paid) return paid;
   return { ...paid, state: releaseMovedDonEffects(state, paid.state) };
 }
@@ -42,6 +43,7 @@ function payCostsUnreleased(
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
   sourceCardInstanceId?: string,
+  lifeDestinationPolicy: "ACTUAL" | "PRINTED_COST_PROBE" = "ACTUAL",
 ): CostPaymentResult | null {
   const causingSource = effectSourceIdentity(state, sourceCardInstanceId, _cardDb);
   const events: PendingEvent[] = [];
@@ -247,7 +249,7 @@ function payCostsUnreleased(
         if (p.life.length < amount) return null;
 
         const removed = position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
-        const moved = moveLifeToHand(nextState, removed, controller, _cardDb);
+        const moved = moveLifeToHand(nextState, removed, controller, _cardDb, lifeDestinationPolicy);
         nextState = moved.state;
         const addedCount = moved.transitions.filter(t => t.addedToHand).length;
         if (addedCount > 0) events.push({ type: "CARD_ADDED_TO_HAND_FROM_LIFE", playerIndex: controller, payload: { count: addedCount } });
