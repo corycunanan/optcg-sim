@@ -616,3 +616,107 @@ describe("PR #758 D-F1b: the actions after an OPPONENT_ACTION run as the effect'
     expect(r.state.players[1].hand).toHaveLength(hand1 + 1); // the declined Life card only
   });
 });
+
+// OPT-996: coordinator publication boundary; the first draw is committed before the window.
+describe("OPT-996 committed chain prefix", () => {
+  it("publishes DRAW → damage → reply → DRAW exactly once across reload, scanning only at parent completion", async () => {
+    const card = dealer("SYN-PREFIX", 1);
+    card.effectSchema!.effects[0].actions!.unshift({ type: "DRAW", params: { amount: 1 } });
+    const r = rig({ p1Life: [life("prefix-trigger", TRIG_OPTIONAL.id)], dealer: card, p1Leader: ENEL });
+    activate(r);
+    expectWindow(r, "prefix-trigger");
+    expect(r.log().map(e => e.type)).toEqual(["CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED"]);
+    const retained = r.state.effectStack.flatMap(f => f.accumulatedEvents);
+    expect(retained).toHaveLength(4);
+    expect(retained.every(e => e.propagation?.eventLogEmitted && !e.propagation?.triggerScanned)).toBe(true);
+    expect(r.log().filter(e => e.type === "CARD_DRAWN" && e.playerIndex === 1)).toHaveLength(0);
+    await r.reload();
+    reveal(r, false);
+    expect(r.log().map(e => [e.type, e.playerIndex])).toEqual([
+      ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["LIFE_COUNT_BECOMES_ZERO", 1], ["TRIGGER_ACTIVATED", 1],
+      ["CARD_ADDED_TO_HAND_FROM_LIFE", 1], ["CARD_REMOVED_FROM_LIFE", 1],
+      ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["CARD_DRAWN", 1], ["DRAW_OUTSIDE_DRAW_PHASE", 1],
+    ]);
+    expect(r.state.effectStack).toEqual([]);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.turn.triggerStagingInstanceIds ?? []).toEqual([]);
+  });
+});
+
+// OPT-1005 F1: synthetic multi-point controls, rules 4-6-2 and 8-6-2/-1.
+describe("OPT-1005 successive damage windows", () => {
+  async function checkReaderReplay(r: Rig, name: string) {
+    const storage = new MemoryStorage();
+    await new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" }).save({ state: r.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [r.state] });
+    const stored = Object.fromEntries(storage.data);
+    const { runtime, memory, command } = await import("./native7-producer-support.js");
+    const current = await runtime();
+    const currentLoaded = (await memory(current, stored).repo.load())!;
+    const expected = [currentLoaded.state, currentLoaded.undoHistory[0]].map(state => command(current, state, currentLoaded.cardDb, { type: "REVEAL_TRIGGER", reveal: false }));
+    if (process.env.OPT1005_F1_CAPTURE) {
+      const { writeFileSync } = await import("node:fs");
+      writeFileSync(`${process.env.OPT1005_F1_CAPTURE}/${name}.json`, JSON.stringify({ provenance: { label: "Synthetic actual candidate session writer; not production capture", producer: process.env.OPT1005_F1_PRODUCER ?? "uncommitted candidate" }, stored, completed: expected.map(toPersistedGameState) }, null, 2));
+    }
+    if (process.env.OPT1005_F1_READER_ROOT) {
+      const deployed = await runtime(process.env.OPT1005_F1_READER_ROOT);
+      const loaded = (await memory(deployed, stored).repo.load())!;
+      for (const [index, state] of [loaded.state, loaded.undoHistory[0]].entries()) {
+        const end = command(deployed, state, loaded.cardDb, { type: "REVEAL_TRIGGER", reveal: false });
+        expect(toPersistedGameState(end)).toEqual(toPersistedGameState(expected[index]));
+      }
+    }
+  }
+  for (const type of ["DEAL_DAMAGE", "SELF_TAKE_DAMAGE"] as const) {
+    it.each([false, true])(`${type}: both windows reload, each reply/point once, suffix then watcher (first accepts child %s)`, async child => {
+      const card = dealer(`SYN-REOPEN-${type}-${child}`, 2, [{ type: "DRAW", params: { amount: { type: "ACTION_RESULT", ref: "hits" } }, chain: "THEN" }], "hits");
+      const actions = card.effectSchema!.effects[0].actions!;
+      if (type === "SELF_TAKE_DAMAGE") actions[0] = { type, params: { amount: 2 }, result_ref: "hits" };
+      actions.unshift({ type: "DRAW", params: { amount: 1 } });
+      const damaged = type === "SELF_TAKE_DAMAGE" ? 0 : 1;
+      const r = rig({ p1Life: [life("reopen-first", TRIG_OPTIONAL.id), life("reopen-second", TRIG_OPTIONAL.id)], dealer: card, ...(damaged === 1 ? { p1Leader: ENEL } : {}) });
+      if (damaged === 0) {
+        r.db.set(ENEL.id, ENEL);
+        r.state.players[0].life = [life("reopen-first", TRIG_OPTIONAL.id), life("reopen-second", TRIG_OPTIONAL.id)];
+        r.state.players[0].leader = { ...r.state.players[0].leader, cardId: ENEL.id };
+        r.state = registerTriggersForCard(r.state, r.state.players[0].leader, ENEL);
+      }
+      activate(r); await r.reload();
+      expect(r.state.pendingPrompt?.respondingPlayer).toBe(damaged);
+      expect(r.act(damaged, { type: "REVEAL_TRIGGER", reveal: child })).toBeNull();
+      if (child) { expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT"); await r.reload(); expect(r.act(damaged, { type: "PASS" })).toBeNull(); }
+      expect(effectTriggerWindow(r.state)?.lifeCard.instanceId).toBe("reopen-second");
+      const prefix = [["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["TRIGGER_ACTIVATED", damaged],
+        ...(child ? [["TRIGGER_ACTIVATED", damaged], ["CARD_REMOVED_FROM_LIFE", damaged]] : [["CARD_ADDED_TO_HAND_FROM_LIFE", damaged], ["CARD_REMOVED_FROM_LIFE", damaged]]),
+        ["LIFE_COUNT_BECOMES_ZERO", damaged], ["TRIGGER_ACTIVATED", damaged]];
+      expect(r.log().map(event => [event.type, event.playerIndex])).toEqual(prefix);
+      const owners = r.state.effectStack.filter(frame => frame.accumulatedEvents.some(event => event.type === "LIFE_COUNT_BECOMES_ZERO"));
+      expect(owners).toHaveLength(1);
+      expect(owners[0].accumulatedEvents.map(event => [event.type, event.playerIndex])).toEqual(prefix);
+      expect(owners[0].accumulatedEvents.filter(event => ["CARD_REMOVED_FROM_LIFE", "LIFE_COUNT_BECOMES_ZERO"].includes(event.type)).every(event => event.propagation?.eventLogEmitted && !event.propagation?.triggerScanned)).toBe(true);
+      expect(r.state.effectStack.find(frame => !!frame.effectDamage)?.accumulatedEvents).toEqual([]);
+      await checkReaderReplay(r, `${type}-${child ? "child" : "decline"}`);
+      await r.reload(); expect(r.act(damaged, { type: "REVEAL_TRIGGER", reveal: false })).toBeNull();
+      expect(r.log().map(event => [event.type, event.playerIndex])).toEqual([...prefix, ["CARD_ADDED_TO_HAND_FROM_LIFE", damaged], ["CARD_REMOVED_FROM_LIFE", damaged],
+        ["CARD_DRAWN", 0], ["CARD_DRAWN", 0], ["DRAW_OUTSIDE_DRAW_PHASE", 0], ["CARD_DRAWN", damaged], ["DRAW_OUTSIDE_DRAW_PHASE", damaged]]);
+      expect(r.state.players[damaged].life).toEqual([]); expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toEqual([]); expect(r.state.turn.triggerStagingInstanceIds ?? []).toEqual([]);
+    });
+  }
+  it("lifted parentless control retains on an ordinary propagation owner understood by the deployed reader", async () => {
+    const r = rig({ p1Life: [life("legacy-first", TRIG_OPTIONAL.id), life("legacy-second", TRIG_OPTIONAL.id)], dealer: dealer("SYN-PARENTLESS", 2, []), p1Leader: ENEL });
+    activate(r);
+    // The v2 lift has no parent: its original chain already ran on.
+    const frame = r.state.effectStack.find(candidate => !!candidate.effectDamage)!;
+    const { parentFrameId: _parent, ...window } = frame.effectDamage!;
+    r.state.effectStack = [{ ...frame, effectDamage: window }];
+    await r.reload(); reveal(r, false); expectWindow(r, "legacy-second");
+    expect(r.log().map(event => event.type)).toEqual(["TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED"]);
+    const owner = r.state.effectStack.find(candidate => candidate.phase === "INTERRUPTED_BY_TRIGGERS")!;
+    expect(owner.pausedAction).toBeNull(); expect(owner.accumulatedEvents).toHaveLength(4);
+    expect(owner.accumulatedEvents.every(event => event.propagation?.eventLogEmitted && !event.propagation?.triggerScanned)).toBe(true);
+    expect(r.state.effectStack.at(-1)?.accumulatedEvents).toEqual([]);
+    await checkReaderReplay(r, "parentless");
+    await r.reload(); reveal(r, false);
+    expect(r.log().map(event => event.type)).toEqual(["TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "LIFE_COUNT_BECOMES_ZERO", "TRIGGER_ACTIVATED", "CARD_ADDED_TO_HAND_FROM_LIFE", "CARD_REMOVED_FROM_LIFE", "CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE"]);
+    expect(r.state.effectStack).toEqual([]); expect(r.state.pendingPrompt).toBeNull();
+  });
+});
