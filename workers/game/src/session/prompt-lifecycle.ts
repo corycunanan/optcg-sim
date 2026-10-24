@@ -1,3 +1,7 @@
+import {
+  captureCostExpectedRoot,
+  costRootMatches,
+} from "../engine/effect-resolver/cost/transaction.js";
 import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
 import { drainPendingWork } from "../engine/pending-work-drain.js";
@@ -82,6 +86,16 @@ export function resumePromptLifecycle(
   cardDb: Map<string, CardData>,
   services: PromptLifecycleServices
 ): PromptLifecycleResult {
+  // Validate before any overlay, replacement scan, or prompt consumption.
+  if (
+    stateBeforeResume.effectStack.some(
+      (frame) =>
+        frame.costExpectedRoot &&
+        !costRootMatches(stateBeforeResume, frame.costExpectedRoot)
+    )
+  ) {
+    return { state: stateBeforeResume, responseRejected: true };
+  }
   const result = resumePromptLifecycleUnreleased(
     stateBeforeResume,
     reply,
@@ -95,7 +109,24 @@ export function resumePromptLifecycle(
   // battle-damage continuations) — sheds its id-keyed effects. Effect
   // actions, cost payments and the Refresh Phase already release per step.
   const released = releaseMovedDonEffects(stateBeforeResume, result.state);
-  return released === result.state ? result : { ...result, state: released };
+  // A validated successful reply may commit replacement work. Snapshot only
+  // existing evidence owners after all sanctioned processing and cleanup.
+  const expected =
+    released.schemaVersion === 7 &&
+    released.effectStack.some((frame) => frame.costExpectedRoot)
+      ? captureCostExpectedRoot(released)
+      : undefined;
+  const published = expected
+    ? {
+        ...released,
+        effectStack: released.effectStack.map((frame) =>
+          frame.costExpectedRoot
+            ? { ...frame, costExpectedRoot: expected }
+            : frame
+        ),
+      }
+    : released;
+  return published === result.state ? result : { ...result, state: published };
 }
 
 function resumePromptLifecycleUnreleased(
