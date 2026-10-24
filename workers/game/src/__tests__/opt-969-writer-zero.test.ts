@@ -15,6 +15,6 @@ for (const version of [6, 7] as const) for (const type of ["KO_OWN_CHARACTER", "
   expect(r.state.players[0].characters[0]!.instanceId).toBe(source.instanceId);
   expect(r.state.players[0].hand).toHaveLength(1); expect(r.state.players[0].deck).toHaveLength(4);
   expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toHaveLength(0);
-  expect(r.state.eventLog.some(e => e.type === "CHARACTER_KO" || e.type === "CARD_TRASHED")).toBe(false);
+  expect(r.state.eventLog.some(e => e.type === "CARD_KO" || e.type === "CARD_TRASHED")).toBe(false);
   if (version === 7) await capture(r);
 });
