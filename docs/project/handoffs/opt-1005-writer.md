@@ -31,6 +31,22 @@ Every focused worker run uses `pnpm exec vitest list <explicit files>` followed 
 
 Large-tier independent spec/correctness review, exact-head CI and full local gate remain pending at candidate freeze. No merge, deployment or Linear writes by implementer. Coordinator owns rollout/postmerge CI observations. Historical D-F2b review file was absent in initial clone; full ticket and PR758 body supplied the relevant finding.
 
+## Bounded correctness fix: successive windows (review F1)
+
+The full correctness review found a P1 shared-path gap at f78f57b8: after replying to one Trigger and opening another point's window, finishEffectDamagePoints returned merged reply/point events without a persisted owner. The pending-prompt lifecycle ignores returned events, and the reused damage frame clears its accumulator. Both actual moves occurred but the first reply disappeared from the log and the later point's Life-zero watcher never scanned. The defect also exists on the original shared path; it is newly reachable for SELF_TAKE_DAMAGE. Preserved independent probe reproduced DEAL and SELF failures before this fix (two fail, nested-choice control passes).
+
+Before/after ownership contract:
+
+1. The in-flight reply/accepted-child result is caller-owned while finishing that point. A later Trigger window calls the existing log-only publication service over this accumulator before publishing the later point; no trigger scan occurs here.
+2. On a reopened prompt, transfer all merged reply/new-point obligations into the named parent chain, after its earlier committed prefix. Return no duplicate event debt. The damage TRIGGER_WINDOW accumulator remains empty. On instruction completion, append the final reply after the same parent prefix rather than reversing occurrence order.
+3. A lifted parentless frame uses the existing ordinary propagation-owner helper, preserving any older owner prefix. Its new owner is an already-supported interrupted TRIGGER_DRAIN with pausedAction null, not a new field/kind/version or unread damage-window debt. Existing stack-budget/terminal behavior remains the shared helper's; terminal events already published are not reattached.
+
+Five committed regressions: DEAL and SELF each with first Trigger declined or accepted into its own optional child prompt (reloaded, then declined); both reveal windows reload; result-ref suffix draws the final dealt count; exact point/reply/prefix/suffix/watcher log once; one owner holds emitted/unscanned obligations. A parentless control models the supported v2 lift boundary and verifies its ordinary owner, log order and completion. All are synthetic/latent; authored SELF inventory remains one point.
+
+Reader semantic preflight: the five actual second-window SessionRepository writer outputs include live plus undo. The original deployed-reader source (reader workspace fe376f86, workers/game/src byte-identical to deployed cba4e9b4; source diff is zero bytes) loads all ten inputs and resumes the final decline to a full state equal to the candidate runtime: events, players, allocator ids, clocks and cleanup. No parser or existing reader fixture was changed. Optional test environments OPT1005_F1_READER_ROOT / OPT1005_F1_CAPTURE / OPT1005_F1_PRODUCER reproduce cross-build execution and capture the actual writer inputs with producer metadata. Pinned captures and manifest are retained in the run evidence directory, not claimed as production sessions.
+
+Validation after restoration: 244/244 tests collected and passed in 11 explicit files (the previous nine plus opt-963-v3-reader and opt-1005-self-damage-reader), worker TypeScript passes. Omitting reopened-window retained ownership kills the regressions despite correct log publication, proving the scan-debt requirement. Golden/session files remain unchanged. Logs writer-f1-red-*, writer-f1-reader-*, writer-f1-retention-mutation, writer-f1-final-* and writer-f1-types-final; ownership receipt also saved beside them. Full gate and independent delta review remain pending; no further runtime edits after this bounded fix until delta assessment.
+
 ## Follow-ups
 
 None beyond the required independent review, exact-head CI/full gate and coordinator readiness/rollout checks. Preserve the reader floor and synthetic-evidence limitation in final receipts.

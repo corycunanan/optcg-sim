@@ -19,7 +19,7 @@ import { continuationFrame, revealTriggerPromptFor, updateFrameById } from "./da
 import { emitPendingEvent, withEventLogEmitted } from "./events.js";
 import { resolveEffectWork } from "./effect-resolver/resolver.js";
 import { isGameTerminated } from "./terminal.js";
-import { retainEventsOnFrame } from "./effect-resolver/resume/events.js";
+import { publishCommittedEvents, retainEventsOnFrame, retainPropagationBeforePrompt } from "./effect-resolver/resume/events.js";
 import type { EffectResult } from "./effect-types.js";
 
 export function popLifeForDamage(
@@ -462,13 +462,45 @@ function finishEffectDamagePoints(
     current.sourceCardInstanceId,
     current.controllerIndex,
     false,
-    { id: frame.id, dealt: current.dealt }
+    { id: frame.id, dealt: current.dealt },
+    // A later window is another publication boundary of this instruction.
+    // Its prior reply/child work must precede the next point in the log.
+    (nextState) => publishCommittedEvents(nextState, events)
   );
   const merged = [...events, ...cont.events];
-  if (cont.pendingPrompt || isGameTerminated(cont.state)) {
-    return { ...cont, events: merged };
+  if (isGameTerminated(cont.state)) return { ...cont, events: merged };
+  if (cont.pendingPrompt) {
+    const parentIndex = current.parentFrameId === undefined ? -1 :
+      cont.state.effectStack.findIndex(candidate => candidate.id === current.parentFrameId);
+    const retained = parentIndex >= 0
+      ? retainEventsOnFrame(cont.state, parentIndex, [
+          ...cont.state.effectStack[parentIndex].accumulatedEvents, ...merged,
+        ])
+      : retainParentlessDamageEvents(cont.state, merged);
+    // The pending-prompt lifecycle does not consume returned events. Keep
+    // every unscanned occurrence on one executable owner below the window.
+    return { ...cont, state: retained, events: [] };
   }
   return completeEffectDamageFrame(cont.state, merged, frame.id, cont.dealt, cont.lethalDamagePlayerIndex);
+}
+
+/** Lifted parentless damage has no chain result owner. Use the ordinary
+ * propagation continuation already understood by deployed readers, never a
+ * TRIGGER_WINDOW accumulator (its reveal resume does not read that debt).
+ */
+function retainParentlessDamageEvents(state: GameState, events: PendingEvent[]): GameState {
+  const prefixes = new Map(state.effectStack.map(frame => [frame.id, frame.accumulatedEvents]));
+  let retained = retainPropagationBeforePrompt(state, events);
+  // The shared helper accepts an outer prefix; here these are later child
+  // events, so preserve any existing owner's earlier debt in execution order.
+  for (let index = 0; index < retained.effectStack.length; index++) {
+    const owner = retained.effectStack[index];
+    const prefix = prefixes.get(owner.id);
+    if (prefix?.length && prefix !== owner.accumulatedEvents) {
+      retained = retainEventsOnFrame(retained, index, [...prefix, ...owner.accumulatedEvents]);
+    }
+  }
+  return retained;
 }
 
 /**
@@ -512,6 +544,6 @@ export function completeEffectDamageFrame(
       ...nextState.effectStack.slice(parentIndex + 1),
     ],
   };
-  nextState = retainEventsOnFrame(nextState, parentIndex, events);
+  nextState = retainEventsOnFrame(nextState, parentIndex, [...parent.accumulatedEvents, ...events]);
   return { state: nextState, events: [], dealt, ...lethal };
 }
