@@ -107,7 +107,7 @@ export interface GameState extends Omit<
   | "effectStack"
 > {
   /** Retained native envelope: saves and later pauses may never downgrade. */
-  schemaVersion?: 6 | 7 | 8;
+  schemaVersion?: 6 | 7 | 8 | 9;
   /** Required for native8: recorded game-wide capability, never upgraded on load. */
   costSemanticsVersion?: 6 | 7 | 8;
   activeEffects: RuntimeActiveEffect[];
