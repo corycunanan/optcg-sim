@@ -658,8 +658,10 @@ new evidence, including the transitive continuations of already loaded7 work.
 Thus this amendment is both the evidence-aware reader prerequisite and part of
 that native7 producer closure; it is not an independently deployable ordinary7
 writer release. Deploy/verify this reader before any future ordinary7 rollout.
-The verified PR778 amendment becomes the semantic rollback floor for those
-future writers. Original485 remains unsafe: accepting the optional shape alone
+PR778 supplies expected-root eligibility, but its deployed691 reader loses the
+published Counter history in the later frozen f19 writer witness. That writer
+requires the bounded history reader below to be deployed and verified before
+its ordinary7 promotion can resume. Original485 remains unsafe: accepting the optional shape alone
 cannot reproduce the new staged eligibility semantics. Rolling back to older
 readers is unsupported once evidence-bearing7 snapshots are written.
 
@@ -683,6 +685,46 @@ projection per COST owner, with serialization cost proportional to that
 projection. Bounded regression measured 11,210 evidence bytes in a 36,943-byte published
 state (JSON string length, ASCII fixture);
 no production workload or broad performance claim follows.
+
+### Bounded staged-entry history ownership reader (OPT-969)
+
+`applyCostTransactionState` remains an exact projection overlay, including for
+baseline rollback and Decision10 abandonment. A separate staged-entry helper is
+used only after all expected roots match, and only reconciles history for native
+cost capability7 (envelope7 or8/mode7) with both expected-root and staged evidence.
+If either history is an exact structural prefix of the other, entry retains the
+longer history with unchanged records, order and timestamps. Ambiguous historical
+divergence rejects conservatively. Missing historical evidence stays missing;
+no root or replacement outcome is inferred. Legacy6 and8/mode6 retain their exact
+overlay behavior.
+
+At sanctioned publication, retain old expected root B before publishing live L.
+For append-only B→L history, preserve staged S while making committed L the
+prefix: when B prefixes both divergent streams, use `L + S.slice(B.length)`.
+This retains the relative order and exact bytes of every record in each stream;
+transaction-only facts follow committed publication until commit. An existing
+exact L prefix in S is the explicit already-carried check. Repeated publication
+inserts each proven new committed suffix before the remaining staged-only facts.
+No sorting, timestamp deduplication, arbitrary union or persisted field is added.
+Other projected fields remain staged-owned during payment and baseline-owned on
+rollback. Rollback excludes transaction-only history.
+
+Public `runPipeline` and Coordinator publication finalize only new evidence-owner
+IDs; successful prompt continuations refresh surviving evidence only after root
+prevalidation and cleanup. Existing stale history/resources reject before any
+merge or consumption. A valid current producer that cannot satisfy this contract
+requires design adjudication rather than a broader merge or silent rejection.
+
+The new `opt-969-history-reader` fixtures pin actual frozen writer
+`f19da7bb59aa4ef30185ed1d0f029a87c7fe3a3c`, source and capture hashes. Authored
+ST04-016 records exactly one Counter activation and keeps the real
+`ACTIVATED_EVENT` query true through DON/target replies, persistence, undo readers
+and GameSession recreation. Its base cost1 does not prove natural reachability
+of OP15-002's base-cost3 condition. Twelve additional synthetic producer recipes
+cover first/subsequent pauses and reader-generated successor completion. These
+are synthetic compatibility evidence, with independent resource/history checks;
+no production capture, UI geometry, rules migration or parent closure is claimed.
+See [the bounded handoff](../project/handoffs/opt969-history-reader.md).
 
 ## Native8 battle completion reader (OPT-1007)
 
