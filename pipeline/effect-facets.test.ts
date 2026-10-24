@@ -116,6 +116,17 @@ describe("extractCardFacets", () => {
     expectTags("EB01-008", ["category:replacement"]);
   });
 
+  it("qualifies implicit RETURN_DON_TO_DECK as self without relabeling explicit opponent returns", () => {
+    for (const cardId of ["OP12-070", "OP15-069"]) {
+      const { tags } = extractCardFacets(schemaFor(cardId));
+      expect(tags).toContain("don:return:self");
+      expect(tags).not.toContain("don:return:opponent");
+    }
+    const opponent = extractCardFacets(schemaFor("OP15-059")).tags;
+    expect(opponent).toContain("don:return:opponent");
+    expect(opponent).not.toContain("don:return:self");
+  });
+
   it("walks choice action options and choice cost branches", () => {
     expectTags("OP09-084", [
       "keyword:double_attack:granted",
