@@ -62,7 +62,7 @@ export interface SessionStorage extends TokenJtiStorage {
 
 /** Adapt Cloudflare storage to the narrower engine-owned session port. */
 export class DurableObjectSessionStorage implements SessionStorage {
-  constructor(private readonly storage: DurableObjectStorage) {}
+  constructor(private readonly storage: SessionStorage) {}
 
   get<T>(key: string): Promise<T | undefined> {
     return this.storage.get<T>(key);
