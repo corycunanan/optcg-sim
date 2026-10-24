@@ -51,14 +51,8 @@ it("pins the new fixture bytes and capture sources to actual frozen f19 provenan
   );
   for (const [file, sha] of Object.entries(manifest.fixtures))
     expect(hash(readFileSync(resolve(directory, "..", file))), file).toBe(sha);
-  // Writer activation renews the active test harness, not the pinned capture
-  // sources. Reconstruct those original files from the byte-identical archive.
-  for (const [file, sha] of Object.entries(manifest.generators)) {
-    const original = file === "opt-969-history-reader.test.ts" || file === "opt-969-history-producers.test.ts"
-      ? resolve(directory, "../generator-sources", file.replace(".test.ts", ".historical.test-source"))
-      : resolve(__dirname, file);
-    expect(hash(readFileSync(original)), file).toBe(sha);
-  }
+  for (const [file, sha] of Object.entries(manifest.generators))
+    expect(hash(readFileSync(resolve(directory, "../capture-sources-c50", `${file}.txt`))), file).toBe(sha);
   for (const [file, sha] of Object.entries(manifest.seedRecipes))
     expect(
       hash(
@@ -114,9 +108,11 @@ async function fresh(id: string): Promise<ProducerScenario> {
   }
   expect(loaded.state.pendingPrompt, id).toBeNull();
   if (process.env.OPT969_HISTORY_CAPTURE === "1") {
-    mkdirSync(directory, { recursive: true });
+    const output = process.env.OPT969_HISTORY_CAPTURE_DIRECTORY;
+    if (!output) throw Error("Historical regeneration requires an isolated output directory");
+    mkdirSync(resolve(output, "producers"), { recursive: true });
     writeFileSync(
-      resolve(directory, `${id}.json`),
+      resolve(output, "producers", `${id}.json`),
       JSON.stringify(result, null, 2) + "\n"
     );
   }
@@ -126,7 +122,7 @@ async function fresh(id: string): Promise<ProducerScenario> {
 for (const id of ids) {
   it(`actual f19 ${id}: every first/subsequent pause and reader successor completes independently`, async () => {
     const corpus = await fresh(id);
-    const reader = await runtime();
+    const reader = await runtime(process.env.OPT969_HISTORY_READER_ROOT);
     const initial = (await memory(reader, corpus.initial).repo.load())!;
     // Start at each actual producer boundary; remaining pauses are freshly
     // produced by this reader and reloaded before their own next reply.
@@ -168,7 +164,7 @@ for (const id of ids) {
 
 it("synthetic staged-only history stays private through actual replacement-child reload and COST abandon", async () => {
   const corpus = await fresh("fixed-accept-then-don");
-  const reader = await runtime();
+  const reader = await runtime(process.env.OPT969_HISTORY_READER_ROOT);
   let loaded = (await memory(reader, corpus.steps[0].stored).repo.load())!;
   const owner = loaded.state.effectStack.find(
     (f) => f.costTransactionState && f.costExpectedRoot

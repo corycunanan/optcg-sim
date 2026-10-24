@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -475,6 +476,7 @@ describe("OPT-808 authored pipeline", () => {
       state = play(state, f.data, f.db);
       if (state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
         state = choose(state, "activate", f.db);
+      state = scriptedDonPayment(state, f.db, 0, 1);
       state = select(state, ["ch"], f.db);
       expect(power(state, "chessmarimo", f.db)).toBe(6000);
       state = choose(state, "choose-value:1", f.db);

@@ -1,4 +1,4 @@
-/** Regenerate only in the pinned isolated writer. Default CI replays captures. */
+/** Generate a separate ordinary7 writer corpus; historical captures stay immutable. */
 import { describe, expect, it } from "vitest";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -12,7 +12,7 @@ describe.runIf(Boolean(process.env.OPT997_REGENERATE))("OPT-997 actual v7 produc
   it("legacy-accepted6-unknown", async () => {
     const historical = JSON.parse(readFileSync(new URL("./fixtures/opt-969/cost-child-replacement.json", import.meta.url), "utf8"));
     const loaded = (await memoryRepository(historical.initial).repo.load())!;
-    expect(loaded.state.schemaVersion).toBe(6);
+    expect(loaded.state.schemaVersion).toBe(7);
     const r = rig(); r.state = loaded.state; r.db = loaded.cardDb;
     const initial = await capture(r);
     expect(r.state.schemaVersion).toBe(7);

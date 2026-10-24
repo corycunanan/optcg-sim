@@ -1,3 +1,4 @@
+import { runPipeline } from "../engine/pipeline.js";
 import { readFileSync } from "node:fs";
 import type { ProducerScenario } from "./native7-producer-support.js";
 import { it, expect } from "vitest";
@@ -450,7 +451,7 @@ it("rejects unknown executable evidence and evidence on a non-COST owner", async
 });
 
 for (const version of [undefined, 6] as const)
-  it(`ordinary ${version ?? "default"} writer never emits evidence`, async () => {
+  it(`direct historical ${version ?? "absent-runtime6"} API omits evidence before production activation`, async () => {
     const rt = await runtime();
     const r = rig();
     r.state.schemaVersion = version; delete r.state.costSemanticsVersion;
@@ -467,11 +468,11 @@ for (const version of [undefined, 6] as const)
         },
       ]),
     });
-    const state = command(rt, r.state, r.db, {
+    const state = runPipeline(r.state, {
       type: "ACTIVATE_EFFECT",
       cardInstanceId: source.instanceId,
       effectId: "activate",
-    });
+    }, r.db, 0).state;
     expect(
       state.effectStack.every((frame) => frame.costExpectedRoot === undefined)
     ).toBe(true);

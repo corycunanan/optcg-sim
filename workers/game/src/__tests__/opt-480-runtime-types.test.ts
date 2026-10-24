@@ -85,6 +85,7 @@ describe("OPT-480 runtime type boundaries", () => {
     }));
     stored.state.effectStack = [{
       id: "ordering-frame",
+      kind: "TRIGGER_ORDER",
       sourceCardInstanceId: "elder-1",
       controller: 0,
       effectBlock: triggers[1].effectBlock,
@@ -209,7 +210,7 @@ describe("OPT-480 runtime type boundaries", () => {
     };
 
     expect(() => parseStoredSession(malformed)).toThrow(
-      "unknown scheduled action variant"
+      "contains an unknown scheduled action variant"
     );
   });
 

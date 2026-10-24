@@ -173,9 +173,7 @@ export class SessionCoordinator {
     let state: GameState;
     let history: readonly GameState[];
     try {
-      const promote = (value: GameState, location: string) =>
-        value.schemaVersion === 8 && (value.costSemanticsVersion === 6 || value.costSemanticsVersion === 7)
-          ? value : promoteGameStateForWriter(value, location);
+      const promote = promoteGameStateForWriter;
       state = promote(initialState, "state");
       history = initialUndoHistory.map((value, index) => promote(value, `undoHistory[${index}]`));
     } catch (error) {

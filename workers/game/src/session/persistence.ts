@@ -1,3 +1,6 @@
+import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
+import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
+import { promoteStateToVersion7 } from "./version7-promotion.js";
 import { projectVersion5 } from "./version5-reader.js";
 import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
 import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
@@ -39,6 +42,7 @@ import {
 } from "./legacy-trigger-migration.js";
 import {
   SessionLoadError,
+  readGameStateSchemaVersion,
   convertToCurrentShape,
   logLegacyShapes,
   toPersistedGameState,
@@ -167,12 +171,15 @@ export class SessionRepository {
   }
 
   async save(snapshot: SessionSnapshot): Promise<SessionSnapshot> {
-    const promptedState = ensurePromptId(promoteGameStateForWriter(snapshot.state, "state"));
+    const state = promoteGameStateForWriter(snapshot.state, "state");
+    const undoHistory = snapshot.undoHistory.map((state, index) =>
+      promoteGameStateForWriter(state, `undoHistory[${index}]`)
+    );
+    // Prove every source before even allocating the live prompt ID or bounding history.
+    const promptedState = ensurePromptId(state);
     const compacted = compactSessionHistory(
       promptedState,
-      snapshot.undoHistory.map((state, index) =>
-        promoteGameStateForWriter(state, `undoHistory[${index}]`)
-      ),
+      undoHistory,
       this.historySummary
     );
     const stored: PersistedSession = {
@@ -252,15 +259,19 @@ export class SessionRepository {
         ? Promise.resolve(undefined)
         : this.storage.get<unknown>(SESSION_UNDO_HISTORY_STORAGE_KEY),
     ]);
-    const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
+    const parsed = parseStoredSession(raw, separateCardDb, separateUndoHistory);
+    const stored = { ...parsed,
+      state: promoteGameStateForWriter(parsed.state, "state"),
+      undoHistory: parsed.undoHistory.map((state, index) => promoteGameStateForWriter(state, `undoHistory[${index}]`)),
+    };
     const restoredState = restoreIdCounterInvariant(
-      ensureExecutionContext(activateValidatedWriterState(stored.state)),
+      ensureExecutionContext(stored.state),
       "state"
     );
     const restoredUndoHistory = (stored.undoHistory ?? []).map(
       (snapshot, index) =>
         restoreIdCounterInvariant(
-          ensureExecutionContext(activateValidatedWriterState(snapshot)),
+          ensureExecutionContext(snapshot),
           `undoHistory[${index}]`
         )
     );
@@ -940,28 +951,28 @@ export function convertPersistedGameState(
   return isGameTerminated(migrated) ? clearTerminalPendingWork(migrated) : migrated;
 }
 
-/** Metadata-only activation: never infer payment outcomes or an old battle's debt. */
-function activateValidatedWriterState(state: GameState): GameState {
-  if (state.schemaVersion === 8) return state;
-  return {
-    ...state,
-    schemaVersion: 8,
-    costSemanticsVersion: state.schemaVersion === 7 ? 7 : 6,
-  };
-}
-
-/** Validate the source contract before adding the deployed v8 writer metadata. */
+/** One source-aware production ingress for Repository and typed Coordinator calls.
+ * Explicit8 preserves its already activated cost mode. Only historical<=6 proof
+ * and source7 are eligible for native costs; no8->7 helper downgrade occurs. */
 export function promoteGameStateForWriter(state: GameState, location: string): GameState {
-  // Runtime frames may acquire continuation fields before their optional kind
-  // tag is refreshed. Validate the actual wire shape emitted by the existing
-  // serializer (which derives kind), before adding any v8 provenance.
+  readGameStateSchemaVersion({ schemaVersion: state.schemaVersion }, location);
+  if (state.schemaVersion === 7 || state.schemaVersion === 8) {
+    for (const [index, frame] of state.effectStack.entries()) {
+      if (hasNativeCostSemantics(state) && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
+        const violation = costReplacementReplayViolation(state, frame);
+        if (violation) throw new SessionLoadError(location, `effectStack[${index}] ${violation}`);
+      }
+      if (frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined)
+        throw new SessionLoadError(location, `effectStack[${index}] native End Phase continuation lacks stage`);
+    }
+  }
+  // Absent runtime provenance means source6; absent stored bytes were already
+  // read as source1 by parseStoredSession. Preserve that decision before codec.
   const source = toPersistedGameState({ ...state, schemaVersion: state.schemaVersion ?? 6 });
   const validated = convertPersistedGameState(source, location);
-  // Validation uses the wire discriminators without injecting them, legacy
-  // stages, or inferred replacement event metadata into the live runtime.
-  return activateValidatedWriterState(state.schemaVersion === undefined ||
-    state.schemaVersion === 6 || state.schemaVersion === 7 || state.schemaVersion === 8
-      ? state : validated);
+  if (state.schemaVersion === 8) return state; // Validated wire view is proof, not runtime normalization.
+  const native = promoteStateToVersion7(validated, location, convertPersistedGameState);
+  return convertPersistedGameState({ ...native, schemaVersion: 8, costSemanticsVersion: 7 }, location);
 }
 
 export function parseStoredSession(

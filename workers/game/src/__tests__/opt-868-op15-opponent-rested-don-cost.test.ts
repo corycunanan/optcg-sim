@@ -714,15 +714,18 @@ describe("OPT-868 cost DON!! binding against live and staged state", () => {
     expect(live(f, foes[0])!.attachedDon.map((d) => d.instanceId)).toEqual([plain]);
   });
 
-  it("the automatic (interchangeable) payment never gives a DON!! that is no longer rested live", () => {
+  it.each([6, 7] as const)("version%s: legacy automatic payment excludes changed live DON; native7 rejects root drift", (version) => {
     const { f, source, foes } = setup("OP15-017", { oppActive: 2, oppRested: 2 });
     const [first, second] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    f.state.schemaVersion = version; delete f.state.costSemanticsVersion;
     activate(f, "OP15-017", source);
     f.accept();
     f.persist();
     // Live state diverges from the staged transaction: `first` is active now.
     f.state.players[P1].donCostArea.find((d) => d.instanceId === first)!.state = "ACTIVE";
-    f.select([foes[0].instanceId]);
+    const before = structuredClone(f.state);
+    f.select([foes[0].instanceId], version === 7);
+    if (version === 7) { expect(f.state).toEqual(before); return; }
     expect(live(f, foes[0])!.attachedDon.map((d) => d.instanceId)).toEqual([second]);
   });
 
@@ -738,14 +741,17 @@ describe("OPT-868 cost DON!! binding against live and staged state", () => {
     expect(f.state).toEqual(before);
   });
 
-  it("a hold applied live after the staged snapshot restores the explicit DON!! step", () => {
+  it.each([6, 7] as const)("version%s: legacy live hold restores choice; native7 rejects root drift", (version) => {
     const { f, source, foes } = setup("OP15-017", { oppRested: 2 });
     const [held, free] = costDon(f, P1, "RESTED").map((d) => d.instanceId);
+    f.state.schemaVersion = version; delete f.state.costSemanticsVersion;
     activate(f, "OP15-017", source);
     f.accept();
     f.persist();
     withDonHold(f, held);
-    f.select([foes[0].instanceId]);
+    const before = structuredClone(f.state);
+    f.select([foes[0].instanceId], version === 7);
+    if (version === 7) { expect(f.state).toEqual(before); return; }
     expect(new Set(selectPrompt(f).validTargets)).toEqual(new Set([held, free]));
   });
 

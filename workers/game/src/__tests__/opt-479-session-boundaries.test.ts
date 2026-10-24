@@ -218,7 +218,7 @@ describe("OPT-479 GameSession collaborator contracts", () => {
     const restored = await repository.load();
 
     expect(saved.state.pendingPrompt?.promptId).toBeTruthy();
-    expect(restored).toEqual({ ...saved, state: { ...saved.state, schemaVersion: 8, costSemanticsVersion: 6 }, undoHistory: saved.undoHistory.map((state) => ({ ...state, schemaVersion: 8, costSemanticsVersion: 6 })) });
+    expect(restored).toEqual({ ...saved, state: { ...saved.state, schemaVersion: 8, costSemanticsVersion: 7 }, undoHistory: saved.undoHistory.map((state) => ({ ...state, schemaVersion: 8, costSemanticsVersion: 7 })) });
 
     const alarmState: GameState = {
       ...saved.state,

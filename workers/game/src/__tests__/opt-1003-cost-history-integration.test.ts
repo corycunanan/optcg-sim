@@ -1,7 +1,12 @@
 /** Bounded c50 history-reader interaction: authored Counter publication followed
  * by a synthetic conditional EOB payment. Every captured prompt uses the real
  * writer's returned allocator state, then the selected reader/live/undo path. */
-import { expect, it } from "vitest";
+import { afterAll, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+const receipts: { mode: 6 | 7; context: string; boundaries: string[]; final: string }[] = [];
+const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 import { endPhaseRig, synSchema } from "./opt-962-rig.js";
 import {
   runtime,
@@ -20,11 +25,14 @@ function counterHistory(state: GameState) {
 }
 async function scenario(
   context: "live" | "undo" | "embedded",
-  reader: Runtime
+  reader: Runtime,
+  mode: 6 | 7
 ) {
   const writer = await runtime();
+  const boundaries: string[] = [];
   const r = endPhaseRig();
-  r.state = { ...r.state, schemaVersion: 8, costSemanticsVersion: 7 };
+  expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+  if (mode === 6) r.state = { ...r.state, costSemanticsVersion: 6 }; // Explicit already8 legacy control.
   const condition = {
     type: "ACTION_PERFORMED_THIS_TURN",
     controller: "SELF",
@@ -80,7 +88,7 @@ async function scenario(
     },
     1
   );
-  expect(r.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+  expect(r.state.pendingPrompt?.options.promptType).toBe(mode === 7 ? "PLAYER_CHOICE" : "SELECT_TARGET");
   const publishedCounter = structuredClone(counterHistory(r.state));
   expect(publishedCounter).toHaveLength(1);
   const donorIds: string[] = [];
@@ -104,6 +112,7 @@ async function scenario(
     expect(counterHistory(saved.state)).toEqual(publishedCounter);
     expect(query(saved.state)).toBe(true);
     const emitted = structuredClone(output.values);
+    boundaries.push(hash(emitted));
     if (context === "embedded") {
       (emitted.session as { undoHistory?: unknown }).undoHistory =
         emitted["session:undo-history"];
@@ -112,12 +121,13 @@ async function scenario(
     const loaded = (await memory(reader, emitted).repo.load())!;
     const next = context === "live" ? loaded.state : loaded.undoHistory[0];
     expect(next).toEqual((output.values.session as { state: GameState }).state);
-    expect(next).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+    expect(next).toMatchObject({ schemaVersion: 8, costSemanticsVersion: mode });
     expect(counterHistory(next)).toEqual(publishedCounter);
     expect(query(next)).toBe(true);
     return next;
   }
   r.state = await boundary(r.state);
+  if (mode === 7) {
   donorIds.push(
     r.state.players[1].donCostArea.find((d) => d.state === "ACTIVE")!.instanceId
   );
@@ -125,6 +135,7 @@ async function scenario(
     type: "PLAYER_CHOICE",
     choiceId: `don-return-ids:${JSON.stringify([donorIds[0]])}`,
   });
+  } else donorIds.push(r.state.players[1].donDeck.at(-1)!.instanceId);
   expect(r.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
   r.state = await boundary(r.state);
   r.state = command(reader, r.state, r.db, {
@@ -140,6 +151,7 @@ async function scenario(
     )
   ).toBe(9000);
   r.state = command(reader, r.state, r.db, { type: "PASS" }, 1);
+  if (mode === 7) {
   // The preserved Counter query must open this new EOB COST prompt. Its owner
   // stays above the exact battle completion and sees the still-live buff.
   expect(r.state.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
@@ -177,6 +189,11 @@ async function scenario(
     type: "PLAYER_CHOICE",
     choiceId: `don-return-ids:${JSON.stringify([donorIds[1]])}`,
   });
+  } else {
+    donorIds.push(r.state.players[1].donDeck.at(-1)!.instanceId);
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toEqual([]);
+  }
   r.state = await boundary(r.state);
   expect(r.state.pendingPrompt).toBeNull();
   expect(r.state.effectStack).toEqual([]);
@@ -220,13 +237,29 @@ async function scenario(
       r.db
     )
   ).toBe(5000);
-  return r.state;
+  return { state: r.state, boundaries };
 }
-for (const context of ["live", "undo", "embedded"] as const)
-  it(`native8 mode7 Counter publication survives prompted EOB cost via ${context}`, async () => {
+for (const mode of [6, 7] as const) for (const context of ["live", "undo", "embedded"] as const)
+  it(`new8/mode7 or preserved8/mode${mode} Counter survives EOB cost via ${context}`, async () => {
     const writer = await runtime();
-    const expected = await scenario("live", writer);
+    const expected = await scenario("live", writer, mode);
     const reader = await runtime(process.env.OPT1003_HISTORY_READER_ROOT);
-    const actual = await scenario(context, reader);
-    expect(actual).toEqual(expected); // Exact IDs, counters, records and events.
+    const actual = await scenario(context, reader, mode);
+    expect(actual.state).toEqual(expected.state); // Exact IDs, counters, records and events.
+    receipts.push({ mode, context, boundaries: actual.boundaries, final: hash(actual.state) });
   });
+
+afterAll(() => {
+  const output = process.env.OPT1003_HISTORY_EVIDENCE_OUTPUT;
+  if (!output) return;
+  const reader = process.env.OPT1003_HISTORY_READER_ROOT;
+  if (!reader) throw Error("Pinned reader required for composition receipt");
+  writeFileSync(output, JSON.stringify({
+    synthetic: true,
+    readerCommit: execFileSync("git", ["-C", reader, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+    sourceSha256: createHash("sha256").update(readFileSync(new URL(import.meta.url))).digest("hex"),
+    contexts: receipts.length,
+    boundaryRuns: receipts.reduce((n, receipt) => n + receipt.boundaries.length, 0),
+    receipts,
+  }, null, 2) + "\n");
+});

@@ -1,3 +1,4 @@
+import { runPipeline } from "../engine/pipeline.js";
 import { describe, expect, it } from "vitest";
 import { GameSession } from "../GameSession.js";
 import type { CardData, Env, GameAction, GameState } from "../types.js";
@@ -33,24 +34,9 @@ function battleSession(): { session: TestAccess; ws: MockWebSocket } {
   const cardDb = createTestCardDb();
   const base = createBattleReadyState(cardDb);
   const attacker = base.players[0].characters[0]!;
-  const state: GameState = {
-    ...base,
-    pendingPrompt: null,
-    turn: {
-      ...base.turn,
-      battleSubPhase: "BLOCK_STEP",
-      battle: {
-        battleId: "opt-448-battle",
-        attackerInstanceId: attacker.instanceId,
-        targetInstanceId: base.players[1].leader.instanceId,
-        attackerPower: 5000,
-        defenderPower: 5000,
-        counterPowerAdded: 0,
-        blockerActivated: false,
-        redirectWindow: false,
-      },
-    },
-  };
+  let state = runPipeline(base, { type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: base.players[1].leader.instanceId }, cardDb, 0).state;
+  for (let step = 0; state.turn.battleSubPhase === "ATTACK_STEP" && step < 4; step++) state = runPipeline(state, { type: "PASS" }, cardDb, 0).state;
+  expect(state.turn.battleSubPhase).toBe("BLOCK_STEP");
   const session = new GameSession(
     new MockDurableObjectState() as unknown as DurableObjectState,
     { GAME_WORKER_SECRET: "test-secret", NEXTJS_URL: "https://app.example.test" } as Env,
@@ -85,7 +71,7 @@ describe("OPT-448: prompt identity cannot fall through as a plain action", () =>
 
     await session.handleAction(ws as unknown as WebSocket, 1, { type: "PASS" });
 
-    expect(errors(ws)).toHaveLength(0);
+    expect(errors(ws), JSON.stringify(errors(ws))).toHaveLength(0);
     expect(session.gameState.turn.battleSubPhase).toBe("COUNTER_STEP");
   });
 });

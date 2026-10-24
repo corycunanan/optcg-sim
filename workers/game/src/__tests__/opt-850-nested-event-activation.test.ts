@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { replayPauses } from "./fixtures/opt-966-replay.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { expect, it } from "vitest";
@@ -242,7 +243,7 @@ it.each([false, true])(
     // DON_MINUS uses the engine's existing automatic payment. The attached DON
     // remains, and both costs must still be paid exactly once.
     if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-      f.choose("cost_area");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 1, f.state.players[0].donCostArea.slice(0, 1).map(d => d.instanceId));
     f.select([event.instanceId]);
     expect(f.state.pendingPrompt).not.toBeNull();
     expect(
@@ -250,7 +251,7 @@ it.each([false, true])(
     ).toHaveLength(0);
     await f.reload();
     if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-      f.choose("cost_area");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 2, f.state.players[0].donCostArea.slice(0, 2).map(d => d.instanceId));
     expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     await f.reload();
     f.select(zero ? [] : [target.instanceId]);
@@ -285,10 +286,10 @@ it("Page One waits until Lightning finishes, then cycles exactly once across rel
     effectId: "OP12-041_activate",
   });
   if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-    f.choose("cost_area");
+    f.state = scriptedDonPayment(f.state, f.db, 0, 1, f.state.players[0].donCostArea.slice(0, 1).map(d => d.instanceId));
   f.select([event.instanceId]);
   if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-    f.choose("cost_area");
+    f.state = scriptedDonPayment(f.state, f.db, 0, 2, f.state.players[0].donCostArea.slice(0, 2).map(d => d.instanceId));
   expect(f.state.players[0].hand.length).toBe(hand - 1);
   expect(f.state.eventLog.filter((e) => e.type === "CARD_DRAWN")).toHaveLength(
     0
@@ -349,7 +350,9 @@ it("registered Reiju resolves nested Main from trash without changing Event iden
   const event = f.put("OP09-077", 0, "TRASH");
   const target = f.put(CARDS.VANILLA.id, 1);
   f.play("EB03-031");
+  f.state = scriptedDonPayment(f.state, f.db, 0, 1);
   f.select([event.instanceId]);
+  f.state = scriptedDonPayment(f.state, f.db, 0, 2);
   expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
   expect(
     f.state.eventLog.filter((e) => e.type === "EVENT_MAIN_RESOLVED_FROM_TRASH")
@@ -402,6 +405,7 @@ it.each([true, false])(
     const hand = f.state.players[0].hand.length;
     const payment = f.state.players[0].hand[0];
     f.play("EB03-031");
+    f.state = scriptedDonPayment(f.state, f.db, 0, 1);
     f.select([event.instanceId]);
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     await f.reload();

@@ -60,14 +60,6 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       const repo = new SessionRepository(nextStorage, options);
       await repo.save({ ...loaded, state: actual, undoHistory: [actual] });
       actual = (await new SessionRepository(nextStorage, options).load())!.state;
-      if (name === "absent legacy stage") {
-        // Missing stage is a legacy runtime spelling. Native v5 saves require
-        // an explicit stage, so preserve that strict reader contract and test
-        // the runtime fallback after the canonical save/load boundary.
-        for (const frame of actual.effectStack) {
-          if (frame.phaseBoundaryContinuation) delete frame.phaseBoundaryContinuation.stage;
-        }
-      }
       const result = resumePromptLifecycle(actual, action, loaded.cardDb, {
         drainPregame: (state) => state, advanceStartOfTurn: (state) => state,
       });

@@ -1,5 +1,6 @@
 /** OPT-969 reader-first coverage. The isolated mock is the proposed producer;
- * production still auto-pays DON costs until this reader is deployed. */
+ * explicit6 mock produces historical SELECT_TARGET spellings; ordinary7
+ * identity producers are covered separately without this mock. */
 import { describe, expect, it, vi } from "vitest";
 vi.mock("../engine/effect-resolver/cost/payability.js", async importOriginal => {
   const actual = await importOriginal<typeof import("../engine/effect-resolver/cost/payability.js")>();
@@ -15,7 +16,7 @@ for (const type of ["DON_MINUS", "VARIABLE_DON_RETURN"] as const) {
   describe(`OPT-969 ${type} reader`, () => {
     for (const reload of [false, true]) {
       it(`pays selected attached DON and advances suffix, reload=${reload}`, async () => {
-        const r = rig();
+        const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion;
         r.deck(0, 5);
         const source = r.put(`OPT969-${type}`, 0, "CHARACTER", { schema: synSchema(`OPT969-${type}`, [{
           id: "return", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" },
@@ -43,7 +44,7 @@ for (const type of ["DON_MINUS", "VARIABLE_DON_RETURN"] as const) {
       });
     }
     it("restricts active-cost-area wording and rejects attached selection", () => {
-      const r = rig(); r.deck(0, 5);
+      const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 5);
       const costs: Cost[] = [{ type, amount: 1, filter: { is_active: true } }];
       const source = r.put(`OPT969-${type}`, 0, "CHARACTER", { schema: synSchema(`OPT969-${type}`, [{
         id: "return", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs,
@@ -61,7 +62,7 @@ for (const type of ["DON_MINUS", "VARIABLE_DON_RETURN"] as const) {
 }
 
 it("DON cost reader rejects stale identities, duplicates, underpayment and foreign IDs without publishing", async () => {
-  const r = rig(); r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 5);
   const source = r.put("OPT969-count", 0, "CHARACTER", { schema: synSchema("OPT969-count", [{ id: "return", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "DON_MINUS", amount: 2 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "return" });
   await reloadLiveAndUndo(r);
@@ -79,7 +80,7 @@ it("DON cost reader rejects stale identities, duplicates, underpayment and forei
 });
 
 it("variable reader accepts a positive selected count, and suffix terminal checkpoint keeps DON payment", async () => {
-  const r = rig(); r.deck(0, 1);
+  const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 1);
   const source = r.put("OPT969-variable", 0, "CHARACTER", { schema: synSchema("OPT969-variable", [{ id: "return", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "VARIABLE_DON_RETURN" }, { type: "MILL", amount: 1 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
   const beforeDeck = r.state.players[0].donDeck.length;
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "return" });
@@ -97,7 +98,7 @@ it("variable reader accepts a positive selected count, and suffix terminal check
 
 
 it("reads an offered PLAYER_CHOICE identity plan on the existing cost owner after live+undo reload", async () => {
-  const r = rig(); r.deck(0, 5);
+  const r = rig(); r.state.schemaVersion = 6; delete r.state.costSemanticsVersion; r.deck(0, 5);
   const source = r.put("OPT969-plan", 0, "CHARACTER", { schema: synSchema("OPT969-plan", [{ id: "return", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "DON_MINUS", amount: 2 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "return" });
   const ids = r.state.players[0].donCostArea.slice(0, 2).map(d => d.instanceId);

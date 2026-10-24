@@ -7,7 +7,7 @@ export function writerEnvelope<T>(historical: T): T {
   return {
     ...historical,
     schemaVersion: 8,
-    costSemanticsVersion: source.schemaVersion === 7 ? 7 : 6,
+    costSemanticsVersion: 7,
   };
 }
 

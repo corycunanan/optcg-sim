@@ -322,8 +322,8 @@ describe.each(["battle", "effect"] as const)(
         stable(r);
         states.push(r.state);
       }
-      expect(states[1]).toEqual({ ...states[0], schemaVersion: 8, costSemanticsVersion: 6 });
-      expect(states[2]).toEqual({ ...states[0], schemaVersion: 8, costSemanticsVersion: 6 });
+      expect(states[1]).toEqual({ ...states[0], schemaVersion: 8, costSemanticsVersion: 7 });
+      expect(states[2]).toEqual({ ...states[0], schemaVersion: 8, costSemanticsVersion: 7 });
     });
     it("a genuine trigger-order decision clears staging after its same-effect suffix already excluded the source", () => {
       const r = setup(kind, [rest, play]);

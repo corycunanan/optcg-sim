@@ -1,3 +1,5 @@
+import { costRootMatches } from "../engine/effect-resolver/cost/transaction.js";
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
@@ -82,7 +84,10 @@ function fixture(seed = "opt-838") {
     return card;
   }
   function act(action: GameAction, player = state.turn.activePlayerIndex) {
+    const before = structuredClone(state);
     const result = runPipeline(state, action, db, player);
+    expect(state).toEqual(before);
+    for (const frame of result.state.effectStack) if (frame.costExpectedRoot) expect(costRootMatches(result.state, frame.costExpectedRoot)).toBe(true);
     expect(result.valid, result.error).toBe(true);
     state = result.state;
   }
@@ -161,6 +166,7 @@ function playDrake(owner: 0 | 1, count: number, seed?: string) {
   });
   f.act({ type: "PLAY_CARD", cardInstanceId: drake.instanceId });
   acceptOptionalIfPrompted(f);
+  f.state = scriptedDonPayment(f.state, f.db, owner, 2);
   return { f, opponent, drake, own, hand };
 }
 

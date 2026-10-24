@@ -95,6 +95,7 @@ describe("OPT-864 Decision 10 — retained rollback after a replaced cost (KNOWN
     // Both outcomes agree here: the substitute stands, Ganzui stays, and the
     // effect after the colon (DRAW 1) is not processed (8-3-1-7).
     expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toHaveLength(0);
     expect(onField(r, ganzui)).toBe(true);
     expect(r.state.players[P0].hand).toHaveLength(1);
     expect(r.state.players[P0].deck).toHaveLength(5);
@@ -121,6 +122,7 @@ describe("OPT-864 Decision 10 — retained rollback after a replaced cost (KNOWN
     r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: ganzui.instanceId, effectId: REST_THEN_TRASH_SELF.id });
     r.decline();
     expect(r.state.pendingPrompt).toBeNull();
+    expect(r.state.effectStack).toHaveLength(0);
     expect(restedDon(r)).toBe(1);
     expect(onField(r, ganzui)).toBe(false);
     expect(r.state.players[P0].trash.some((c) => c.cardId === "OP17-043")).toBe(true);

@@ -108,15 +108,15 @@ describe("OPT-980 mixed-version undo history", () => {
   it("[1, 2]: a version 1 live state with a version 2 undo snapshot loads", async () => {
     const live = golden("battle-ready-with-undo");
     const loaded = (await repository(storageWith(live.session.state, [v2State("turn-completed")])).load())!;
-    expect(loaded.state).toEqual({ ...convertPersistedGameState(live.session.state, "state"), schemaVersion: 8, costSemanticsVersion: 6 });
-    expect(loaded.undoHistory[0]).toEqual({ ...withoutVersion(v2State("turn-completed")), schemaVersion: 8, costSemanticsVersion: 6 });
+    expect(loaded.state).toEqual({ ...convertPersistedGameState(live.session.state, "state"), schemaVersion: 8, costSemanticsVersion: 7 });
+    expect(loaded.undoHistory[0]).toEqual({ ...withoutVersion(v2State("turn-completed")), schemaVersion: 8, costSemanticsVersion: 7 });
   });
 
   it("[2, 1]: a version 2 live state parked mid-wave with a version 1 undo snapshot loads", async () => {
     const v1Undo = golden("battle-ready-with-undo").undoHistory;
     const loaded = (await repository(storageWith(v2State("wave1-select-target"), v1Undo)).load())!;
     expect(continuationOf(loaded.state as never).stage).toBe("END_OF_YOUR_TURN_WAVE");
-    expect(loaded.undoHistory[0]).toEqual({ ...convertPersistedGameState(v1Undo[0], "undoHistory[0]"), schemaVersion: 8, costSemanticsVersion: 6 });
+    expect(loaded.undoHistory[0]).toEqual({ ...convertPersistedGameState(v1Undo[0], "undoHistory[0]"), schemaVersion: 8, costSemanticsVersion: 7 });
   });
 
   it("[2, 1] re-saved by the current writer: both objects are written as schemaVersion 8 and reload equal", async () => {

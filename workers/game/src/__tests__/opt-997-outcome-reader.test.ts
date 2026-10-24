@@ -128,3 +128,39 @@ it("rejects v7-only fields under every old source version before conversion", ()
     expect(() => convertPersistedGameState(raw, "undoHistory[1]")).toThrow("requiring schemaVersion 7");
   }
 });
+
+it("FINAL ordinary7 Ganzui prompting substitute settles its captured COST once on deployed reader and accepts legal PASS", async () => {
+  const { runtime, memory, command, save } = await import("./native7-producer-support.js");
+  const writer = await runtime();
+  const reader = await runtime(process.env.OPT969_WRITER_READER_ROOT);
+  const { r, source } = fixture(7);
+  expect(r.state.schemaVersion).toBe(7);
+  const capturedId = r.state.effectStack.find(frame => frame.costReplacementAction)!.id;
+  let loaded = (await memory(reader, await save(writer, r.state, r.db)).repo.load())!;
+  expect(loaded.state.effectStack.find(frame => frame.id === capturedId)?.costReplacementResolution).toBeUndefined();
+  loaded.state = command(reader, loaded.state, loaded.cardDb, { type: "PLAYER_CHOICE", choiceId: "accept" });
+  expect(loaded.state.effectStack.find(frame => frame.id === capturedId)?.costReplacementResolution).toBe("REPLACED");
+  expect(loaded.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  const m = memory(reader);
+  await m.repo.save({ ...loaded, undoHistory: [loaded.state] });
+  loaded = (await m.repo.load())!;
+  expect(loaded.undoHistory[0].effectStack.find(frame => frame.id === capturedId)?.costReplacementResolution).toBe("REPLACED");
+  const ids = loaded.state.players[0].hand.slice(0, 2).map(card => card.instanceId);
+  const reply = { type: "SELECT_TARGET" as const, selectedInstanceIds: ids, promptId: loaded.state.pendingPrompt!.promptId };
+  loaded.state = command(reader, loaded.state, loaded.cardDb, reply);
+  const done = (await memory(reader, await save(reader, loaded.state, loaded.cardDb)).repo.load())!.state;
+  expect(done.pendingPrompt).toBeNull(); expect(done.effectStack).toEqual([]);
+  expect(done.players[0].characters.some(card => card?.instanceId === source.instanceId)).toBe(true);
+  expect(done.players[0].hand).toHaveLength(1); expect(done.players[0].deck).toHaveLength(5);
+  expect(done.players[0].donCostArea.filter(don => don.state === "RESTED")).toEqual([]);
+  expect(done.turn.oncePerTurnUsed.activate?.includes(source.instanceId) ?? false).toBe(false);
+  expect(done.eventLog.filter(event => event.type === "CARD_TRASHED")).toHaveLength(1);
+  expect(done.eventLog.filter(event => event.type === "DON_RESTED")).toEqual([]);
+  const before = structuredClone(done);
+  expect(new reader.SessionCoordinator().executeAction(done, [], 0, reply, loaded.cardDb).kind).toBe("reject");
+  expect(done).toEqual(before);
+  const attached = command(reader, done, loaded.cardDb, { type: "ATTACH_DON", targetInstanceId: source.instanceId, count: 1 });
+  const attacking = command(reader, attached, loaded.cardDb, { type: "DECLARE_ATTACK", attackerInstanceId: source.instanceId, targetInstanceId: done.players[1].leader.instanceId });
+  const passed = command(reader, attacking, loaded.cardDb, { type: "PASS" }, 1);
+  expect(passed.effectStack.some(frame => frame.id === capturedId)).toBe(false);
+});

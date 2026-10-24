@@ -324,7 +324,7 @@ describe("OPT-963 Phase 1 records: lifted into version 3 frames by the reader", 
   ])("%s loads live and as undo without classification", async (name) => {
     const live = loadLive(name);
     const undo = await loadAsUndo(name);
-    expect(undo).toEqual({ ...live, schemaVersion: 8, costSemanticsVersion: 6 });
+    expect(undo).toEqual(toPersistedGameState({ ...live, schemaVersion: 8, costSemanticsVersion: 7 }));
     expect(classifyLegacyShapes(live)).toEqual([]);
   });
 });

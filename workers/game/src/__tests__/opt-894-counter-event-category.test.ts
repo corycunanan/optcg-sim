@@ -1,3 +1,5 @@
+import { costRootMatches } from "../engine/effect-resolver/cost/transaction.js";
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 /**
  * OPT-894 — Counter Events authored as `category: "activate"` never resolved.
  *
@@ -102,7 +104,10 @@ function fixture() {
   }
 
   function act(action: GameAction, player: 0 | 1) {
+    const before = structuredClone(state);
     const r = runPipeline(state, action, db, player);
+    expect(state).toEqual(before);
+    for (const frame of r.state.effectStack) if (frame.costExpectedRoot) expect(costRootMatches(r.state, frame.costExpectedRoot)).toBe(true);
     expect(r.valid, r.error).toBe(true);
     state = r.state;
   }
@@ -122,6 +127,11 @@ function fixture() {
     let guard = 0;
     while (state.pendingPrompt) {
       const prompt = state.pendingPrompt;
+      // These two printed Counter cards pay DON!!−1 before their target/effect.
+      if (prompt.options.promptType === "PLAYER_CHOICE" && prompt.options.donIdentityReturn) {
+        state = scriptedDonPayment(state, db, 1, 1);
+        continue;
+      }
       const next = queue.shift();
       expect(
         next,

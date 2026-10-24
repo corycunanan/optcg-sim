@@ -37,11 +37,11 @@ for (const file of files) {
         expect(state.effectStack.some(frame => frame.kind === "COST" && !frame.costReplacementResolution)).toBe(true);
       } else { expect(state.effectStack).toHaveLength(0); expect(state.pendingPrompt).toBeNull(); }
     });
-    if (f.promotionSource) it("production activation preserves legacy cost mode and absent outcomes without rewriting original input bytes", async () => {
+    if (f.promotionSource) it("production activation proves legacy cost7 and preserves absent outcomes without rewriting original input bytes", async () => {
       const values = structuredClone(f.promotionSource!); const before = structuredClone(values);
       const loaded = (await memoryRepository(values).repo.load())!;
       expect(loaded.state.schemaVersion).toBe(8);
-      expect(loaded.state.costSemanticsVersion).toBe(6);
+      expect(loaded.state.costSemanticsVersion).toBe(7);
       expect(loaded.state.effectStack.find(frame => frame.kind === "COST")!.costReplacementResolution).toBeUndefined();
       expect(values).toEqual(before); // Runtime activation never rewrites the original storage input.
     });
@@ -96,9 +96,11 @@ it("retains unprovable legacy promotion input for reader6 recovery without silen
   const f = JSON.parse(readFileSync(`${dir}/promotion-unprovable-diagnostic.json`, "utf8"));
   for (const diagnostic of f.cases) {
     const original = structuredClone(diagnostic.original);
-    const { repo, values } = memoryRepository(original); const loaded = (await repo.load())!;
-    expect(loaded.state.schemaVersion).toBe(8);
-      expect(loaded.state.costSemanticsVersion).toBe(6); expect(values).toEqual(diagnostic.expectedStorage);
+    const { repo, values } = memoryRepository(original);
+    const before = structuredClone(values);
+    await expect(repo.load()).rejects.toThrow(/legacy-debt/);
+    expect(values).toEqual(before); expect(values).toEqual(diagnostic.expectedStorage);
+
   }
   expect(f.disposition).toBe("atomic-legacy-debt-rejection");
 });
@@ -110,6 +112,6 @@ for (const family of ["fixed-accept", "selected-accept", "compound-select", "com
   const state = structuredClone(loaded.state);
   state.effectStack.find(frame => frame.kind === "COST")!.costReplacementAction = { type: "PLAYER_CHOICE", choiceId: "foreign" };
   const before = structuredClone(state);
-  expect(() => command(state, { type: "PLAYER_CHOICE", choiceId: "accept" }, loaded.cardDb)).toThrow(/Invalid replacement caller/);
+  expect(() => command(state, { type: "PLAYER_CHOICE", choiceId: "accept" }, loaded.cardDb)).toThrow(family === "fixed-accept" ? "invalid fixed replacement replay" : family === "opponent-life" ? "invalid replacement Life destination replay" : family === "compound-arrange" ? "invalid replacement arrangement replay" : "invalid replacement selection replay");
   expect(state).toEqual(before); // Includes usage, RNG, IDs, stack, events and prompt.
 });

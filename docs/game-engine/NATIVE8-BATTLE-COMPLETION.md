@@ -4,9 +4,9 @@ Rules source: Comprehensive Rules v1.2.0, `rule_comprehensive.md` §§7-1-5-2 th
 
 ## Runtime contract
 
-OPT-1007 deployed the reader before writer activation. OPT-1003 now creates new games as schema 8 with cost mode 6 and activates strictly validated historical sessions at production repository load/save and historical typed coordinator ingress. Historical schema 6 becomes schema 8 with cost mode 6; historical schema 7 becomes schema 8 with cost mode 7; historical schema 8 retains its exact mode. Older supported versions first pass their existing conversion hooks and retain legacy costs as mode 6. Live and every embedded/separate undo input validate before retention or promotion. The low-level converter/parser and explicit historical serializer envelopes remain available to test historical reader semantics independently. Rejected coordinator actions return their original live/undo state, including references.
+OPT-1007 deployed the reader before writer activation. At its main785 delivery, OPT-1003 created new games as schema 8 with cost mode 6 and activated strictly validated historical sessions at production repository load/save and historical typed coordinator ingress. That delivery promoted historical schema 6 to schema 8 with cost mode 6 and historical schema 7 to schema 8 with cost mode 7; historical schema 8 retained its exact mode. Older supported versions first passed their existing conversion hooks and retained legacy costs as mode 6. The source<=6 policy is superseded by the approved OPT969 composition below; this paragraph records the delivered main785 policy. Live and every embedded/separate undo input validate before retention or promotion. The low-level converter/parser and explicit historical serializer envelopes remain available to test historical reader semantics independently. Rejected coordinator actions return their original live/undo state, including references.
 
-Native schema 8 requires `costSemanticsVersion: 6 | 7`. No inference/default applies. Mode6 preserves deployed schema 6 costs, including known legacy replacement debt; mode 7 preserves native schema 7 identity choices, outcome replay and expected-root evidence. Stable completed schema 8 states retain their exact envelope and mode after their last completion frame disappears. Versions below schema 8 reject the provenance field and new continuation. Mode6 rejects native schema 7 only cost outcomes, expected-root evidence and DON identity picker metadata. The shared capability helper replaces exact7 cost predicates together, including session/coordinator publication and prompt evidence guards; production promotion adds only the explicit envelope/mode metadata, never payment evidence or outcomes.
+Native schema 8 requires `costSemanticsVersion: 6 | 7`. No inference/default applies. Mode6 preserves deployed schema 6 costs, including known legacy replacement debt; mode 7 preserves native schema 7 identity choices, outcome replay and expected-root evidence. Stable completed schema 8 states retain their exact envelope and mode after their last completion frame disappears. Versions below schema 8 reject the provenance field and new continuation. Mode6 rejects native schema 7 only cost outcomes, expected-root evidence and DON identity picker metadata. The shared capability helper replaces exact7 cost predicates together, including session/coordinator publication and prompt evidence guards; main785 production promotion added only the explicit envelope/mode metadata, never payment evidence or outcomes. The bounded historical migration proof below supersedes that metadata-only source<=6 policy.
 
 `BATTLE_COMPLETION` is one canonical root continuation boundary. Its metadata records exact battle ID, combatants, turn player, turn number and abort disposition. It owns no prompt, action suffix, cost state, trigger work or accumulated event debt. It must be unique, below the whole reused trigger execution owner and all descendants, with the live battle already cleared. This preserves payload-based combatant filters and prevents Damage Step replay. Strict validation applies independently to live state and every separate/embedded undo entry before retention; cost modes are preserved independently.
 
@@ -54,3 +54,53 @@ Inventory scope is authored THIS_BATTLE activeEffects/prohibitions. Symbol-count
 The writer also incorporates the bounded COST publication-history reader from PR #784, deployed at `c50b1d037ea38c004aa3d29b6b2ee5b90b45574e`. For schema 8 with cost mode 7, sanctioned publication preserves the committed history prefix in staged payment and rejects ambiguous evidence; mode 6 keeps its existing exact overlay behavior. This adds no persisted field. The combined writer's semantic rollback floor is this deployed c50 reader, which includes both schema 8 completion and COST history ownership. The earlier 864 reader receipt remains valid for the immutable mode 6 corpus, not for the combined mode 7 contract.
 
 `opt-1003-cost-history-integration.test.ts` drives authored ST04-016 through its DON and target replies, then a synthetic EOB effect conditioned on the real ACTIVATED_EVENT query with another DON payment. Live, separate undo and embedded undo preserve the exact single Counter activation, expected-root and staged history, selected DON identities, and raw emitted state. The battle buff stays visible through the EOB payment, its draw precedes completion, and the buff expires afterward. The same writer emissions replay through the isolated exact c50 reader with identical final IDs, counters and events.
+
+
+## Approved native cost mode7 composition (OPT-969)
+
+The user-approved composition on deployed main785
+`067b216982675dde568ceeb3da69e155f67e080e` creates new games as schema8 with
+costSemanticsVersion7 before first action or save. Historical source<=6 first
+validates and proves the original native7 continuation migration, then activates
+schema8/mode7; source7 activates8/mode7. Existing8 always retains its explicit
+mode6|7, with no inference of older provenance and no8→7 helper downgrade.
+Main785 battle completion and Refresh expiry behavior remain intact. Its frozen
+16-case golden and39already8/mode6 replay cases remain historical controls;
+their payloads, manifests and source pins are unchanged.
+
+Repository load/save and direct typed Coordinator share source-aware ingress.
+Provenance validates before encoding; native replay and End Phase stage guards
+run before wire parsing. All live and ALL undo inputs prove before retention,
+prompt ID allocation, storage or metrics. Explicit8 has no validation bypass:
+strict validation of its wire view is proof, then its ORIGINAL runtime object
+returns without derived-kind normalization. Persisted malformed kinds still
+reject independently in live, separate undo and embedded undo. Save may later
+compact history or allocate prompt IDs. Direct rejected Coordinator commands
+retain original live/undo references. A separately invoked prompt lifecycle
+operates on its already activated8 routed input; no historical7 rollback across
+two public calls is promised.
+
+No missing root, outcome or completion obligation is reconstructed. Bounded
+legacy unanswered-offer syntax canonicalization requires the existing exact
+native7 proof; historical evidence-free owners remain conservative. Already8
+mode6 retains its known debt and exact rollback behavior. Main785's delivery
+inventory, evidence correction, positive/negative condition controls, source-only
+caveats, Refresh receipts and integratedc50 floor above remain valid.
+
+Fresh final producer proof begins with actualnewsetup8/mode7 rather than a retagged
+historical7 capture. Authored Counter→real ACTIVATED_EVENT query→subsequent EOB
+DON prompt crosses exact deployedc50 through live/separate/embedded undo,
+retaining exact IDs/history/resources/events, visible9000buff until completion,
+then5000power after expiry. A separately labeled already8/mode6 control remains.
+Executed receipts record6mode/storage combinations and21boundary reloads; current
+recipe proof separately records12recipes,41steps,205restored contexts and475actions.
+Equality supplements independently asserted outcomes. The combined rollback
+floor remains exactc50; original485/691 are known-negative history controls.
+
+Synthetic-only evidence remains explicitly approved; production captures remain
+absent. No production repair/retirement, blanket existing8/mode6 migration,
+final921/948 feasibility/domain work or Decision10/958policy resolution is claimed.
+Earlier failed writer reviews/design stops and subsequent968full/delta CLEAN are
+cumulative. This newly approved composition has one full and one delta per same
+SPEC/correctness reviewer; coordinator owns final review, full verification,
+exact-head CI, merge and deployment.

@@ -61,7 +61,7 @@ function ownerContract(state: GameState) {
 for (const trace of corpus.traces)
   describe(`${trace.name}/start${trace.index}`, () => {
     for (const ingress of ["live", "undo", "embedded"] as const)
-      it(`replays every raw writer boundary through ${ingress}`, async () => {
+      it(`replays frozen785 already8/mode6 writer boundaries through ${ingress}`, async () => {
         const root = process.env.OPT1003_READER_ROOT;
         const rt = root
           ? {
@@ -82,10 +82,10 @@ for (const trace of corpus.traces)
         const original = old.cases.find((c) => c.index === trace.index)!.stored;
         const startsBattle = stateOf(original).turn.battle !== null;
         const storage = new MemorySessionStorage();
-        // Current production test proves historical activation and actual save
-        // return. The already-deployed reader starts at the actual emitted8 bytes.
+        // Frozen785 output is already activated8/mode6 and must remain so.
+        // Current source<=6 activation is tested separately; do not retag these bytes.
         await storage.put(
-          structuredClone(root ? trace.initialStored : original)
+          structuredClone(trace.initialStored)
         );
         const repo = new rt.SessionRepository(storage, config);
         let loaded = (await repo.load())!;
