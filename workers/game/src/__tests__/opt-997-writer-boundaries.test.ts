@@ -79,7 +79,7 @@ it("legacy runtime cannot smuggle native7 COST outcome metadata through save", a
   await rejectsAtEveryBoundary(values, bad);
 });
 
-for (const version of [0, -1, 1.5, 8, "7", null]) it(`unsupported runtime provenance ${JSON.stringify(version)} rejects before encoding`, async () => {
+for (const version of [0, -1, 1.5, 9, "7", null]) it(`unsupported runtime provenance ${JSON.stringify(version)} rejects before encoding`, async () => {
   const f = fixtures("fixed-accept-prefix");
   const bad = structuredClone((f.initial.session as { state: GameState }).state);
   Object.assign(bad, { schemaVersion: version });

@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "./native-cost-semantics.js";
 import { captureCostExpectedRoot } from "./effect-resolver/cost/transaction.js";
 import type { LifeTriggerStagingScope } from "./life-trigger-staging.js";
 import { recalculateBattlePowers } from "./battle.js";
@@ -56,7 +57,7 @@ export function runPipeline(
   actingPlayerIndex: 0 | 1,
 ): PipelineResult {
   const result = runPipelineAction(state, action, cardDb, actingPlayerIndex);
-  if (!result.valid || result.state.schemaVersion !== 7) return result;
+  if (!result.valid || !hasNativeCostSemantics(result.state)) return result;
   // A suspension captures before pipeline bookkeeping. Publish only newly
   // created evidence owners against the actual returned board. Existing owners
   // (including historical evidence-free owners) cannot acquire a new baseline.

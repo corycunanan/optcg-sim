@@ -1,3 +1,4 @@
+import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { promoteSessionToVersion7 } from "./version7-promotion.js";
 import { projectVersion5 } from "./version5-reader.js";
@@ -173,13 +174,13 @@ export class SessionRepository {
     // Runtime objects without provenance are old runtime6 inputs, not stored
     // version1 bytes. Validate them before promotion; new setup is explicit7.
     const validateRuntime = (state: GameState, location: string): GameState => {
-      readGameStateSchemaVersion(state as unknown as Record<string, unknown>, location);
+      readGameStateSchemaVersion({ schemaVersion: state.schemaVersion }, location);
       // Runtime kind tags may lag phase transitions. The established encoder
       // derives those tags, but cannot authorize changing native7 COST evidence
       // or supplying a legacy End Phase stage to a native7 producer.
-      if (state.schemaVersion === 7) {
+      if (state.schemaVersion === 7 || state.schemaVersion === 8) {
         for (const [index, frame] of state.effectStack.entries()) {
-          if (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true) {
+          if (hasNativeCostSemantics(state) && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
             const violation = costReplacementReplayViolation(state, frame);
             if (violation) throw new SessionLoadError(location, `effectStack[${index}] ${violation}`);
           }

@@ -729,3 +729,7 @@ capture evidence. Deploy and verify this semantic8 reader before writer rollout.
 Ordinary7 rollout supersedes the prerequisite ordinary6 policy above. Already
 loaded8 live/undo entries retain schema8 and explicit costSemanticsVersion6|7;
 this writer never downgrades or cost-migrates them and does not create ordinary8.
+
+The691 reader-floor proof applies to ordinary7 outputs. Preserved preexisting8
+inputs continue to require the native8-capable864bee2 reader; no7-only rollback
+or downgrade of those inputs is supported.

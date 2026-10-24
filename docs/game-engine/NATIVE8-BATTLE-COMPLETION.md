@@ -4,7 +4,10 @@ Rules source: Comprehensive Rules v1.2.0, `rule_comprehensive.md` §§7-1-5-2 th
 
 ## Runtime contract
 
-The ordinary writer remains6, and loaded6/7 retain their existing battle and cost behavior. Only explicitly loaded8 executes the new completion contract and creates its future completion owners. This is the reader prerequisite; OPT-1003 activates the writer only after this reader is deployed and verified.
+The reader prerequisite originally kept the ordinary writer at6. The OPT969
+rollout now creates ordinary7 and proves legacy promotion at its repository
+boundary; already loaded8 retains its envelope and explicit cost mode without
+that promotion. Native8 ordinary writing remains disabled. Only explicitly loaded8 executes the new completion contract and creates its future completion owners. This is the reader prerequisite; OPT-1003 activates the writer only after this reader is deployed and verified.
 
 Native8 requires `costSemanticsVersion: 6 | 7`. No inference/default applies. Mode6 preserves deployed6 costs, including known legacy replacement debt; mode7 preserves native7 identity choices, outcome replay and expected-root evidence. Stable completed8 states retain their exact envelope and mode after their last completion frame disappears. Versions below8 reject the provenance field and new continuation. Mode6 rejects native7-only cost outcomes, expected-root evidence and DON identity picker metadata. The shared capability helper replaces exact7 cost predicates together, including session/coordinator publication and prompt evidence guards; no state is silently promoted by this release.
 

@@ -1,6 +1,8 @@
 import { expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { setupGame } from "./helpers.js";
+import { rig, synSchema } from "./opt-960-rig.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { memoryRepository, command, type CostCorpus } from "./opt-997-corpus-support.js";
 import { classifyLegacyShapes } from "../session/game-state-schema.js";
 import type { GameState } from "../types.js";
@@ -90,4 +92,32 @@ for (const mismatch of ["offer-target", "prompt-owner", "accepted-outcome"] as c
   if (mismatch === "accepted-outcome") owner.costReplacementResolution = "REPLACED";
   const { repo, values: actual } = memoryRepository(values); const before = structuredClone(actual);
   await expect(repo.load()).rejects.toThrow(); expect(actual).toEqual(before);
+});
+
+for (const mode of [6, 7] as const) it(`loaded8 preserves cost mode${mode} across live/undo save/load and first action`, async () => {
+  const r = rig(); r.state.schemaVersion = 8; r.state.costSemanticsVersion = mode; r.deck(0, 5);
+  r.state.players[0].donCostArea[0].state = "RESTED";
+  const source = r.put("loaded8-don", 0, "CHARACTER", { schema: synSchema("loaded8-don", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "DON_MINUS", amount: 1 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
+  const before = structuredClone(r.state);
+  expect(toPersistedGameState(r.state).schemaVersion).toBe(8);
+  const { repo, values } = memoryRepository();
+  const saved = await repo.save({ state: r.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [r.state] });
+  const loaded = (await repo.load())!;
+  for (const state of [saved.state, ...saved.undoHistory, loaded.state, ...loaded.undoHistory]) {
+    expect(state.schemaVersion).toBe(8); expect(state.costSemanticsVersion).toBe(mode);
+  }
+  expect(r.state).toEqual(before);
+  expect((values.session as { state: GameState }).state.schemaVersion).toBe(8);
+  const next = command(loaded.state, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" }, loaded.cardDb);
+  expect(next.schemaVersion).toBe(8); expect(next.costSemanticsVersion).toBe(mode);
+  if (mode === 6) {
+    expect(next.pendingPrompt).toBeNull(); expect(next.players[0].hand).toHaveLength(1);
+    expect(next.effectStack.every(frame => !frame.costExpectedRoot)).toBe(true);
+  } else {
+    expect(next.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    expect(next.effectStack.some(frame => frame.costExpectedRoot)).toBe(true);
+    expect(next.players[0].hand).toHaveLength(0);
+  }
+  await repo.save({ ...loaded, state: next });
+  expect((await repo.load())!.state.costSemanticsVersion).toBe(mode);
 });

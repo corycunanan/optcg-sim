@@ -1,8 +1,10 @@
 # OPT-969 / OPT-997 native7 writer prerequisite
 
-Integration base: f50fce6bb97a869f2d3ea371a0c6f67761689939.
+Integration base: 864bee2b9282004aa46476462447a0aa57b28686 (PR782 reader).
 Rollback reader floor: deployed PR778 amendment
-69125276e1bb4a1eba7ea2170056cd392b02885b. Original4858458 is unsafe
+69125276e1bb4a1eba7ea2170056cd392b02885b for this writer's ordinary7 outputs.
+Already existing native8 inputs require their native8 reader floor864bee2; they
+are never sent to the7-only rollback reader. Original4858458 is unsafe
 for subsequent native7 DON choices and expected-root evidence.
 This bounded stage enables provenance and continuation producers; final
 OPT-921/948 field-domain/feasibility behavior remains separate. No production
@@ -63,9 +65,10 @@ Unsupported or malformed provenance rejects before encoding can erase it.
 Explicit6 low-level shape encoding still emits6; no historical baseline is
 inferred, including after old owner resuspension. Valid outcome-unknown debt
 remains diagnostic through real load/action/save; unprovable continuations reject.
-No native8 writer is enabled. PR782 was open at integration; loading unsupported8
-fails without downgrade in this candidate. A later reader merge requires explicit
-integration assessment.
+No native8 writer is enabled. PR782 merged during this rollout and is integrated. Loaded8 live/undo entries
+are validated without promotion: envelope8 and explicit costSemanticsVersion6|7
+are preserved. Native8 mode6 never acquires native7 costs; mode7 uses the shared
+capability helper at publication. Unsupported9 rejects without downgrade.
 
 ## Evidence and test dispositions
 

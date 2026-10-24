@@ -148,10 +148,11 @@ it.each([6, 7] as const)(
   }
 );
 
-it("retains default writer6 and explicitly reads8", () => {
-  expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
+it("creates ordinary7, preserves explicit6 and explicitly reads8", () => {
+  expect(GAME_STATE_SCHEMA_VERSION).toBe(7);
   expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(8);
-  expect(toPersistedGameState(endPhaseRig().state).schemaVersion).toBe(6);
+  expect(toPersistedGameState(endPhaseRig().state).schemaVersion).toBe(7);
+  expect(toPersistedGameState({ ...endPhaseRig().state, schemaVersion: 6 }).schemaVersion).toBe(6);
 });
 
 function nativeRig(mode: 6 | 7 = 6) {
