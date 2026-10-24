@@ -1,3 +1,5 @@
+import { hasNativeCostSemantics } from "./native-cost-semantics.js";
+import { completeBattleBoundary } from "./battle-completion.js";
 import { continueReadyCostReplacement } from "./effect-resolver/resume/cost.js";
 import { finishLifeTriggerStaging, validateLifeTriggerStaging } from "./life-trigger-staging.js";
 import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
@@ -216,8 +218,10 @@ export function drainPendingWork(
             events,
             resolved: true,
           });
-      } else if (kind === "COST" && state.schemaVersion === 7 && top.costReplacementResolution && !state.pendingPrompt)
+      } else if (kind === "COST" && hasNativeCostSemantics(state) && top.costReplacementResolution && !state.pendingPrompt)
         result = continueReadyCostReplacement(state, top, cardDb, services);
+      else if (kind === "BATTLE_COMPLETION")
+        result = completeBattleBoundary(state);
       else if (kind === "PHASE_BOUNDARY")
         result = advancePhaseBoundary(state, cardDb);
       else if (kind === "BATTLE_DAMAGE" || kind === "EFFECT_DAMAGE") {

@@ -710,3 +710,22 @@ Decision10 policy decision are outside this rollout. See
 [the writer handoff](../project/handoffs/opt969-native7-writer.md) for ownership,
 reader selection, validation and remaining parent work. Earlier ordinary6
 statements above describe the prerequisite releases, superseded by this rollout.
+## Native8 battle completion reader (OPT-1007)
+
+The reader accepts8 while ordinary writers remain6 and existing loaded6/7
+retain their deployed semantics. Native8 requires explicit
+`costSemanticsVersion: 6 | 7`; it does not imply a native7 cost migration.
+The exact-battle BATTLE_COMPLETION owner sits below all End-of-Battle work,
+then expires turn-player and opponent battle durations before returning to Main.
+Stable8 states preserve both envelope and mode after that owner disappears.
+Older envelopes reject the new field/owner; mode6 rejects native7-only cost data.
+
+See [the complete ownership, publication, support and rollback contract](./NATIVE8-BATTLE-COMPLETION.md)
+and [the synthetic isolated-writer corpus](../../workers/game/src/__tests__/fixtures/opt-1007-native8/README.md).
+This release does not promote existing sessions, enable the ordinary8 writer,
+change End Phase stage bytes, infer old replacement outcomes, or claim production
+capture evidence. Deploy and verify this semantic8 reader before writer rollout.
+
+Ordinary7 rollout supersedes the prerequisite ordinary6 policy above. Already
+loaded8 live/undo entries retain schema8 and explicit costSemanticsVersion6|7;
+this writer never downgrades or cost-migrates them and does not create ordinary8.

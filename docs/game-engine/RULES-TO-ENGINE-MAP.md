@@ -376,8 +376,8 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **7-1-5-1.** Battle ends | **IMPL** | `battle.ts → endBattle()` | Clears `battle` and `battleSubPhase` from turn state |
-| **7-1-5-2.** "At the end of battle" / "if this ... battles" effects | **IMPL** | `triggers.ts`, `duration-tracker.ts` | Trigger matching for battle-end events; END_OF_BATTLE duration wave |
-| **7-1-5-3/4.** "During this battle" effects expire (turn player then non-turn player) | **IMPL** | `duration-tracker.ts → expireEffects()` | END_OF_BATTLE wave expires battle-scoped effects |
+| **7-1-5-2.** "At the end of battle" / "if this ... battles" effects | **PARTIAL** | `triggers.ts`, `battle-completion.ts` | Native8 reader waits for all EOB children before expiry (OPT-1007); ordinary6/loaded7 still expire early until OPT-1003 writer rollout. See [completion contract](./NATIVE8-BATTLE-COMPLETION.md). |
+| **7-1-5-3/4.** "During this battle" effects expire (turn player then non-turn player) | **PARTIAL** | `battle-completion.ts`, `duration-tracker.ts → expireBattleEffects()` | Native8 completes EOB work, then expires turn player followed by opponent. Ordinary writer6 unchanged pending OPT-1003. |
 | **7-1-5-5.** Return to Main Phase (6-5-2) | **IMPL** | `endBattle()` emits `PHASE_CHANGED` from `DAMAGE_STEP` to `MAIN` | |
 
 ---

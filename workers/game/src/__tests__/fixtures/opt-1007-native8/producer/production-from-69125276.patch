@@ -1,0 +1,1280 @@
+diff --git a/workers/game/src/__tests__/opt-1007-battle-completion.test.ts b/workers/game/src/__tests__/opt-1007-battle-completion.test.ts
+new file mode 100644
+index 00000000..1282a999
+--- /dev/null
++++ b/workers/game/src/__tests__/opt-1007-battle-completion.test.ts
+@@ -0,0 +1,193 @@
++import { describe, expect, it } from "vitest";
++import { endPhaseRig, synSchema, type EndPhaseRig } from "./opt-962-rig.js";
++import { toPersistedGameState, GAME_STATE_SCHEMA_VERSION, LATEST_READABLE_GAME_STATE_SCHEMA_VERSION } from "../session/game-state-schema.js";
++import { parseStoredSession } from "../session/persistence.js";
++import { computeExpiry } from "../engine/effect-resolver/action-utils.js";
++import { expireBattleEffects } from "../engine/duration-tracker.js";
++import { continuationBoundary } from "../engine/effect-stack.js";
++import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
++import { completeBattleBoundary, parkBattleCompletion } from "../engine/battle-completion.js";
++import type { BattleCompletionContinuation } from "../types.js";
++
++function restore(r: EndPhaseRig, location: string) {
++  if (location === "memory") return;
++  const wire = JSON.parse(JSON.stringify({ state: toPersistedGameState(r.state), undoHistory: [toPersistedGameState(r.state)], cardDb: Object.fromEntries(r.db) }));
++  const loaded = parseStoredSession(wire);
++  r.state = location === "live" ? loaded.state : loaded.undoHistory[0];
++}
++function reply(r: EndPhaseRig, location: string, action: Parameters<EndPhaseRig["act"]>[0]) {
++  restore(r, location);
++  r.act(action, r.state.pendingPrompt?.respondingPlayer);
++}
++function protectedBattle(version: 6 | 7 | 8 = 8) {
++  const r = endPhaseRig({ handSize: 1 });
++  r.state = { ...r.state, schemaVersion: version, ...(version === 8 ? { costSemanticsVersion: 6 as const } : {}) };
++  const attacker = r.put("ST08-013", 0, "CHARACTER", { power: 4000 }, 1);
++  const target = r.putSyn("TARGET-1007", null, 1, "CHARACTER", { power: 1000 });
++  r.state.players[1].characters[0]!.state = "RESTED";
++  const payment = r.state.players[1].hand[0];
++  const counter = r.put("OP02-118", 1, "HAND", { type: "Event", cost: 0, power: null, counter: null, effectText: "[Counter] You may trash 1 card from your hand: Select up to 1 of your Characters. The selected Character cannot be K.O.'d during this battle." });
++  r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId });
++  r.act({ type: "PASS" }, 1);
++  r.act({ type: "USE_COUNTER_EVENT", cardInstanceId: counter.instanceId, counterTargetInstanceId: target.instanceId }, 1);
++  return { r, attacker, target, payment };
++}
++
++describe.each(["memory", "live", "undo"])("native8 completion (%s)", location => {
++  it("retains OP02-118 through prompted ST08-013, skips IF_DO, then completes exactly once", () => {
++    const { r, attacker, target, payment } = protectedBattle();
++    reply(r, location, { type: "PLAYER_CHOICE", choiceId: "accept" });
++    reply(r, location, { type: "SELECT_TARGET", selectedInstanceIds: [payment.instanceId] });
++    reply(r, location, { type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] });
++    expect(r.state.prohibitions).toHaveLength(1);
++    r.act({ type: "PASS" }, 1);
++    expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
++    expect(r.state.turn.battle).toBeNull();
++    expect(r.state.effectStack[0].battleCompletion?.battleId).toBeTruthy();
++    expect(r.state.prohibitions).toHaveLength(1);
++    expect(r.state.eventLog.filter(e => e.type === "END_OF_BATTLE")).toHaveLength(1);
++    expect(r.state.eventLog.filter(e => e.type === "BATTLE_RESOLVED")).toHaveLength(0);
++    reply(r, location, { type: "PLAYER_CHOICE", choiceId: "accept" });
++    expect(r.state.players[1].characters.some(c => c?.instanceId === target.instanceId)).toBe(true);
++    expect(r.state.players[0].characters.some(c => c?.instanceId === attacker.instanceId)).toBe(true);
++    expect(r.state.eventLog.filter(e => e.type === "CARD_KO")).toHaveLength(0);
++    expect(r.state.prohibitions).toHaveLength(0);
++    expect(r.state.effectStack).toHaveLength(0);
++    expect(r.state.eventLog.filter(e => e.type === "BATTLE_RESOLVED")).toHaveLength(1);
++    restore(r, location);
++    expect(toPersistedGameState(r.state).schemaVersion).toBe(8);
++  });
++});
++
++it.each([6, 7] as const)("ordinary/native%d remains on its deployed EOB expiry behavior", version => {
++  const { r, attacker, target, payment } = protectedBattle(version);
++  r.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
++  r.act({ type: "SELECT_TARGET", selectedInstanceIds: [payment.instanceId] });
++  r.act({ type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] });
++  r.act({ type: "PASS" }, 1);
++  expect(r.state.prohibitions).toHaveLength(0);
++  expect(r.state.effectStack.some(f => f.battleCompletion)).toBe(false);
++  r.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
++  expect(r.state.players[1].characters.some(c => c?.instanceId === target.instanceId)).toBe(false);
++  expect(r.state.players[0].characters.some(c => c?.instanceId === attacker.instanceId)).toBe(false);
++  expect(toPersistedGameState(r.state).schemaVersion).toBe(version);
++});
++
++it("retains default writer6 and explicitly reads8", () => {
++  expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
++  expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(8);
++  expect(toPersistedGameState(endPhaseRig().state).schemaVersion).toBe(6);
++});
++
++function nativeRig(mode: 6 | 7 = 6) {
++  const r = endPhaseRig({ handSize: 0 });
++  r.state = { ...r.state, schemaVersion: 8, costSemanticsVersion: mode };
++  return r;
++}
++function begin(r: EndPhaseRig, attacker = r.state.players[0].leader.instanceId, target = r.state.players[1].leader.instanceId) {
++  r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker, targetInstanceId: target });
++  r.act({ type: "PASS" }, 1);
++  r.act({ type: "PASS" }, 1);
++}
++
++it.each([6, 7] as const)("retains explicit cost provenance%d after completion and future battle", mode => {
++  const r = nativeRig(mode);
++  begin(r);
++  expect(r.state.effectStack).toHaveLength(0);
++  expect(r.state.turn.battle).toBeNull();
++  expect(r.state.eventLog.filter(e => e.type === "END_OF_BATTLE")).toHaveLength(1);
++  expect(r.state.eventLog.filter(e => e.type === "BATTLE_RESOLVED")).toHaveLength(1);
++  restore(r, "live");
++  expect(r.state.schemaVersion).toBe(8);
++  expect(r.state.costSemanticsVersion).toBe(mode);
++  const second = r.putSyn("SECOND-1007", null, 0, "CHARACTER");
++  begin(r, second.instanceId);
++  expect(r.state.eventLog.filter(e => e.type === "BATTLE_RESOLVED")).toHaveLength(2);
++});
++
++it.each(["live", "undo"])("nested EOB target and On KO optional prompt retains power/keyword expiry (%s)", location => {
++  const r = nativeRig();
++  const id = "EOB-NESTED-1007";
++  const source = r.putSyn(id, synSchema(id, "Character", [{
++    id: "end-child", category: "auto", trigger: { event: "END_OF_BATTLE" }, actions: [
++      { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_BATTLE" } },
++      { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "BLOCKER" }, duration: { type: "THIS_BATTLE" } },
++      { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } },
++    ],
++  }]), 0, "CHARACTER", { power: 1000 });
++  const victim = r.putSyn("KO-NESTED-1007", synSchema("KO-NESTED-1007", "Character", [{
++    id: "ko-draw", category: "auto", trigger: { keyword: "ON_KO" }, flags: { optional: true }, actions: [{ type: "DRAW", params: { amount: 1 } }],
++  }]), 1, "CHARACTER", { power: 10000 });
++  r.state.players[1].characters[0]!.state = "RESTED";
++  begin(r, source.instanceId, victim.instanceId);
++  expect(r.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
++  const completion = r.state.effectStack[0].battleCompletion!;
++  expect(r.state.activeEffects.filter(e => e.appliesTo.includes(source.instanceId))).toHaveLength(2);
++  expect(computeExpiry({ type: "THIS_BATTLE" }, r.state, 0)).toEqual({ wave: "END_OF_BATTLE", battleId: completion.battleId });
++  reply(r, location, { type: "SELECT_TARGET", selectedInstanceIds: [victim.instanceId] });
++  expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
++  expect(r.state.effectStack[0].battleCompletion).toEqual(completion);
++  expect(r.state.activeEffects.filter(e => e.appliesTo.includes(source.instanceId))).toHaveLength(2);
++  reply(r, location, { type: "PLAYER_CHOICE", choiceId: "accept" });
++  expect(r.state.players[1].hand).toHaveLength(1);
++  expect(r.state.activeEffects.filter(e => e.appliesTo.includes(source.instanceId))).toHaveLength(0);
++  expect(r.state.effectStack).toHaveLength(0);
++  const ko = r.state.eventLog.findIndex(e => e.type === "CARD_KO");
++  const draw = r.state.eventLog.findIndex(e => e.type === "CARD_DRAWN");
++  const resolved = r.state.eventLog.findIndex(e => e.type === "BATTLE_RESOLVED");
++  expect(ko).toBeLessThan(draw);
++  expect(draw).toBeLessThan(resolved);
++});
++
++it("terminal EOB child cancels uncommitted completion notifications", () => {
++  const r = nativeRig();
++  const id = "EOB-TERMINAL-1007";
++  r.putSyn(id, synSchema(id, "Character", [{ id: "win", category: "auto", trigger: { event: "END_OF_BATTLE" }, actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "WIN_GAME", params: {} }] }]), 0, "CHARACTER");
++  begin(r);
++  expect(r.state.status).toBe("FINISHED");
++  expect(r.state.winner).toBe(0);
++  expect(r.state.effectStack).toHaveLength(0);
++  const types = r.state.eventLog.map(e => e.type);
++  expect(types.filter(e => e === "END_OF_BATTLE")).toHaveLength(1);
++  expect(types).not.toContain("BATTLE_RESOLVED");
++  expect(types.indexOf("CARD_DRAWN")).toBeLessThan(types.indexOf("GAME_OVER"));
++  expect(types.at(-1)).toBe("GAME_OVER");
++});
++
++it("aborted attack reaches EOB once, then completes without combat damage", () => {
++  const r = nativeRig();
++  const id = "ATTACK-ABORT-1007";
++  const attacker = r.putSyn(id, synSchema(id, "Character", [{ id: "leave", category: "auto", trigger: { keyword: "WHEN_ATTACKING" }, actions: [{ type: "RETURN_TO_HAND", target: { type: "SELF" } }] }]), 0, "CHARACTER");
++  r.act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: r.state.players[1].leader.instanceId });
++  expect(r.state.turn.battle).toBeNull();
++  expect(r.state.effectStack).toHaveLength(0);
++  expect(r.state.eventLog.filter(e => e.type === "BATTLE_ABORTED")).toHaveLength(1);
++  expect(r.state.eventLog.find(e => e.type === "END_OF_BATTLE")?.payload.aborted).toBe(true);
++  expect(r.state.eventLog.filter(e => e.type === "BATTLE_RESOLVED")).toHaveLength(1);
++  expect(r.state.eventLog.filter(e => e.type === "DAMAGE_DEALT")).toHaveLength(0);
++});
++
++it("rejects missing provenance and misplaced/duplicate completion owners atomically", () => {
++  const r = nativeRig();
++  const completion: BattleCompletionContinuation = { battleId: "test-battle", attackerInstanceId: r.state.players[0].leader.instanceId, targetInstanceId: r.state.players[1].leader.instanceId, turnPlayerIndex: 0, turnNumber: r.state.turn.number, aborted: false };
++  r.state = parkBattleCompletion(r.state, completion);
++  const state = toPersistedGameState(r.state);
++  const load = (value: unknown) => parseStoredSession({ state: value, undoHistory: [], cardDb: Object.fromEntries(r.db) });
++  expect(() => load({ ...state, costSemanticsVersion: undefined })).toThrow(/costSemanticsVersion/);
++  expect(() => load({ ...state, schemaVersion: 7 })).toThrow(/costSemanticsVersion/);
++  expect(() => load({ ...state, effectStack: [...state.effectStack, { ...state.effectStack[0], id: "duplicate" }] })).toThrow(/unique root/);
++  expect(() => load({ ...state, turn: { ...state.turn, number: state.turn.number + 1 } })).toThrow(/identity/);
++  expect(() => parseStoredSession({ state, undoHistory: [{ ...state, costSemanticsVersion: 9 }], cardDb: Object.fromEntries(r.db) })).toThrow(/undoHistory\[0\].*costSemanticsVersion/);
++  expect(state).toEqual(toPersistedGameState(r.state));
++});
++
++it("stack exhaustion cannot leave a partial completion owner or replay Damage", () => {
++  const r = nativeRig();
++  const boundary = continuationBoundary(r.state, r.state.players[0].leader.instanceId, 0);
++  r.state = { ...boundary.state, effectStack: Array.from({ length: MAX_EFFECT_STACK_DEPTH }, (_, i) => ({ ...boundary.frame, id: `full-${i}` })) };
++  r.state = parkBattleCompletion(r.state, { battleId: "exhausted", attackerInstanceId: r.state.players[0].leader.instanceId, targetInstanceId: r.state.players[1].leader.instanceId, turnPlayerIndex: 0, turnNumber: r.state.turn.number, aborted: false });
++  expect(r.state.status).toBe("FINISHED");
++  expect(r.state.effectStack).toHaveLength(0);
++  expect(r.state.eventLog.at(-1)?.type).toBe("GAME_OVER");
++  expect(r.state.eventLog.some(e => e.type === "BATTLE_RESOLVED")).toBe(false);
++});
+diff --git a/workers/game/src/__tests__/opt-1007-producer.test.ts b/workers/game/src/__tests__/opt-1007-producer.test.ts
+new file mode 100644
+index 00000000..bdabe67d
+--- /dev/null
++++ b/workers/game/src/__tests__/opt-1007-producer.test.ts
+@@ -0,0 +1,148 @@
++import { getEffectSchema } from "../engine/schema-registry.js";
++/** Isolated writer capture generator; never installed in the reader release. */
++import { it, expect } from "vitest";
++import { mkdirSync, writeFileSync } from "node:fs";
++import { endPhaseRig, synSchema } from "./opt-962-rig.js";
++import { command, memory, runtime } from "./native7-producer-support.js";
++import { CARDS } from "./helpers.js";
++import type { GameAction, GameState } from "../types.js";
++import { continuationBoundary } from "../engine/effect-stack.js";
++import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
++import { executePass } from "../engine/battle.js";
++import { continuePipelineFromExecution } from "../engine/pipeline.js";
++
++it("captures actual native8 writer action/prompt boundaries", async () => {
++  const rt = await runtime();
++  const out = new URL("./fixtures/opt-1007-native8/", import.meta.url);
++  mkdirSync(out, { recursive: true });
++  const families = ["protected", "leader", "character", "nested", "source-leaves", "terminal", "abort-attack", "abort-block", "abort-counter", "life-trigger", "replacement-accept", "replacement-decline", "cost", "cost-replacement", "stack-exhaustion", "both-players", "power-condition"];
++  for (const mode of [6, 7] as const) for (const family of families) {
++    const r = endPhaseRig({ handSize: family === "protected" || family === "cost-replacement" ? 1 : 0 });
++    expect(r.state.schemaVersion).toBe(8); // actual isolated setup.ts writer
++    r.state.costSemanticsVersion = mode; // explicit input provenance, never inferred by reader
++    const steps: { action: GameAction; actor: 0 | 1; state: GameState }[] = [];
++    let sourceId = r.state.players[0].leader.instanceId;
++    let targetId = r.state.players[1].leader.instanceId;
++    let paymentId = "";
++    let eventId = "";
++    let victimId = "";
++    const attack = { type: "DECLARE_ATTACK", attackerInstanceId: sourceId, targetInstanceId: targetId } as GameAction;
++    const eob = (actions: any[], optional = false, costs?: any[]) => r.putSyn(`EOB-${family}`, synSchema(`EOB-${family}`, "Character", [...(family === "cost-replacement" ? [{ id: "replace-self", category: "replacement" as const, replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" as const }, flags: { optional: true, once_per_turn: true }, replacement_actions: [{ type: "DRAW" as const, params: { amount: 1 } }, { type: "TRASH_FROM_HAND" as const, params: { amount: 1 } }] }] : []), { id: "end", category: "auto", trigger: { event: "END_OF_BATTLE" }, ...(costs ? { costs } : {}), ...(optional ? { flags: { optional: true } } : {}), actions }]), 0, "CHARACTER", { power: 1000 });
++    if (family === "protected") {
++      const a = r.put("ST08-013", 0, "CHARACTER", { power: 4000 }, 1);
++      const t = r.putSyn("PROTECTED", null, 1, "CHARACTER", { power: 1000 });
++      t.state = "RESTED";
++      sourceId = a.instanceId; targetId = t.instanceId;
++      paymentId = r.state.players[1].hand[0].instanceId;
++      eventId = r.put("OP02-118", 1, "HAND", { type: "Event", cost: 0, power: null, counter: null, effectText: "[Counter] You may trash 1 card from your hand: Select up to 1 of your Characters. The selected Character cannot be K.O.'d during this battle." }).instanceId;
++    } else if (family === "character" || family.startsWith("replacement-")) {
++      const t = family === "character" ? r.putSyn("DEFENDER", null, 1, "CHARACTER", { power: 1000 }) : r.put("OP10-034", 1, "CHARACTER", { power: 1000 });
++      t.state = "RESTED"; targetId = t.instanceId;
++      eob([{ type: "DRAW", params: { amount: 1 } }], true);
++    } else if (family === "nested" || family === "source-leaves") {
++      const actions = family === "nested" ? [
++        { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_BATTLE" } },
++        { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "BLOCKER" }, duration: { type: "THIS_BATTLE" } },
++      ] : [{ type: "RETURN_TO_HAND", target: { type: "SELF" } }];
++      const s = eob([...actions, { type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }]);
++      sourceId = s.instanceId;
++      const v = r.putSyn("VICTIM", synSchema("VICTIM", "Character", [{ id: "ko", category: "auto", trigger: { keyword: "ON_KO" }, flags: { optional: true }, actions: [{ type: "DRAW", params: { amount: 1 } }] }]), 1, "CHARACTER", { power: 10000 });
++      v.state = "RESTED"; targetId = v.instanceId; victimId = v.instanceId;
++    } else if (family === "both-players") {
++      eob([{ type: "DRAW", params: { amount: 1 } }], true);
++      r.putSyn("OPPONENT-EOB", synSchema("OPPONENT-EOB", "Character", [{ id: "other-end", category: "auto", trigger: { event: "END_OF_BATTLE" }, flags: { optional: true }, actions: [{ type: "DRAW", params: { amount: 1 } }] }]), 1, "CHARACTER");
++    } else if (family === "power-condition") {
++      const s = r.putSyn("BATTLE-POWER", synSchema("BATTLE-POWER", "Character", [
++        { id: "attack-buff", category: "auto", trigger: { keyword: "WHEN_ATTACKING" }, actions: [
++          { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 2000 }, duration: { type: "THIS_BATTLE" } },
++          { type: "GRANT_KEYWORD", target: { type: "SELF" }, params: { keyword: "BLOCKER" }, duration: { type: "THIS_BATTLE" } },
++        ] },
++        { id: "end-power", category: "auto", trigger: { event: "END_OF_BATTLE" }, conditions: [{ type: "SELF_POWER", operator: ">=", value: 6000 }], flags: { optional: true }, actions: [{ type: "DRAW", params: { amount: 1 } }] },
++      ]), 0, "CHARACTER", { power: 4000 }); sourceId = s.instanceId;
++    } else if (family === "terminal") {
++      eob([{ type: "DRAW", params: { amount: 1 } }, { type: "WIN_GAME", params: {} }], true);
++    } else if (family.startsWith("abort-")) {
++      const step = family.slice(6);
++      const a = r.putSyn("ABORT-ATTACKER", null, 0, "CHARACTER", { power: 5000 }); sourceId = a.instanceId;
++      const keyword = step === "attack" ? "ON_OPPONENT_ATTACK" : step === "block" ? "ON_BLOCK" : "COUNTER_EVENT";
++      const schema = synSchema(`REMOVER-${step}`, step === "counter" ? "Event" : "Character", [{ id: "remove", category: "auto", trigger: { keyword } as any, actions: [{ type: "TRASH_CARD", target: { type: "CHARACTER", controller: "EITHER", count: { up_to: 1 } } }] }]);
++      const remover = r.putSyn(`REMOVER-${step}`, schema, 1, step === "counter" ? "HAND" : "CHARACTER", step === "counter" ? { type: "Event", cost: 0, power: null, counter: null, effectText: "[Counter] Remove a Character." } : { keywords: { ...CARDS.BLOCKER.keywords } });
++      eventId = remover.instanceId;
++      eob([{ type: "DRAW", params: { amount: 1 } }], true);
++    } else if (family === "life-trigger") {
++      r.db.set("ST01-002", { ...CARDS.TRIGGER, id: "ST01-002", name: "Usopp", cost: 2, effectSchema: getEffectSchema("ST01-002") });
++      r.state.players[1].life[0].cardId = "ST01-002";
++      eob([{ type: "DRAW", params: { amount: 1 } }], true);
++    } else if (family === "cost" || family === "cost-replacement") {
++      const s = eob([{ type: "DRAW", params: { amount: 1 } }], true, [{ type: "REST_DON", amount: 1 }, ...(family === "cost-replacement" ? [{ type: "TRASH_SELF" }] : []), { type: "DON_MINUS", amount: 1 }]);
++      r.state.prohibitions.push({ id: "held-donor", sourceCardInstanceId: s.instanceId, sourceEffectBlockId: "end", prohibitionType: "CANNOT_REFRESH", scope: {}, duration: { type: "SKIP_NEXT_REFRESH" }, controller: 0, appliesTo: [r.state.players[0].donCostArea[0].instanceId], usesRemaining: null });
++
++    }
++    // The isolated writer persists and reloads each real action before its successor.
++    let initial = structuredClone(r.state);
++    async function act(action: GameAction, actor: 0 | 1 = r.state.pendingPrompt?.respondingPlayer ?? r.state.turn.activePlayerIndex) {
++      const stored = await capture(command(rt, r.state, r.db, action, actor));
++      r.state = (await memory(rt, stored).repo.load())!.state;
++      steps.push({ action, actor, state: structuredClone(r.state) });
++    }
++    r.state = (await memory(rt, await capture(r.state)).repo.load())!.state;
++    if (family === "stack-exhaustion") {
++      await act({ type: "DECLARE_ATTACK", attackerInstanceId: sourceId, targetInstanceId: targetId });
++      await act({ type: "PASS" }, 1);
++      const boundary = continuationBoundary(r.state, sourceId, 0);
++      r.state = { ...boundary.state, effectStack: Array.from({ length: MAX_EFFECT_STACK_DEPTH }, (_, i) => ({ ...boundary.frame, id: `limit-${i}` })) };
++      r.state = (await memory(rt, await capture(r.state)).repo.load())!.state;
++      initial = structuredClone(r.state);
++      steps.length = 0;
++      const executed = executePass(r.state, r.db);
++      r.state = continuePipelineFromExecution(executed.state, executed, r.db, 1).state;
++      steps.push({ action: { type: "PASS" }, actor: 1, state: structuredClone(r.state) });
++      expect(r.state.status).toBe("FINISHED");
++    } else {
++    await act({ type: "DECLARE_ATTACK", attackerInstanceId: sourceId, targetInstanceId: targetId });
++    if (family === "abort-attack") {
++      await act({ type: "SELECT_TARGET", selectedInstanceIds: [sourceId] });
++    } else {
++      if (family === "abort-block") await act({ type: "DECLARE_BLOCKER", blockerInstanceId: eventId }, 1);
++      else await act({ type: "PASS" }, 1);
++      if (family === "abort-block") await act({ type: "SELECT_TARGET", selectedInstanceIds: [sourceId] });
++      else {
++        if (family === "protected") {
++          await act({ type: "USE_COUNTER_EVENT", cardInstanceId: eventId, counterTargetInstanceId: targetId }, 1);
++          await act({ type: "PLAYER_CHOICE", choiceId: "accept" });
++          await act({ type: "SELECT_TARGET", selectedInstanceIds: [paymentId] });
++          await act({ type: "SELECT_TARGET", selectedInstanceIds: [targetId] });
++        } else if (family === "abort-counter") {
++          await act({ type: "USE_COUNTER_EVENT", cardInstanceId: eventId, counterTargetInstanceId: targetId }, 1);
++          await act({ type: "SELECT_TARGET", selectedInstanceIds: [sourceId] });
++        }
++        if (family !== "abort-counter") await act({ type: "PASS" }, 1);
++      }
++    }
++    }
++    let count = 0;
++    while (r.state.pendingPrompt && count++ < 20) {
++      const p = r.state.pendingPrompt.options;
++      if (p.promptType === "OPTIONAL_EFFECT") await act({ type: "PLAYER_CHOICE", choiceId: family === "replacement-decline" && r.state.effectStack.some(f => f.battleDamage) ? "skip" : "accept" });
++      else if (p.promptType === "SELECT_TARGET") await act({ type: "SELECT_TARGET", selectedInstanceIds: [victimId || p.validTargets[0]] });
++      else if (p.promptType === "PLAYER_CHOICE") await act({ type: "PLAYER_CHOICE", choiceId: p.choices.find(c => !c.disabled && c.id !== "done")!.id });
++      else if (p.promptType === "REVEAL_TRIGGER") await act({ type: "REVEAL_TRIGGER", reveal: true });
++      else throw Error(`Unhandled ${family} ${JSON.stringify(p)}`);
++    }
++    expect(count).toBeLessThan(20);
++    const diagnostic = family === "cost-replacement" && mode === 6;
++    if (diagnostic) {
++      expect(r.state.pendingPrompt).toBeNull();
++      expect(r.state.effectStack.at(-1)?.costReplacementChecked).toBe(true);
++      expect(r.state.effectStack.at(-1)?.costReplacementResolution).toBeUndefined();
++    } else expect(r.state.effectStack).toHaveLength(0);
++    async function capture(state: GameState) {
++      const m = memory(rt);
++      await m.repo.save({ state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [state] });
++      expect((await m.repo.load())!.state.schemaVersion).toBe(8);
++      return m.values;
++    }
++    const corpus = { disposition: diagnostic ? "legacy-cost-debt" : "completed", id: `${family}-mode${mode}`, family, mode, sourceId, targetId, victimId, initial: await capture(initial), steps: await Promise.all(steps.map(async step => ({ action: step.action, actor: step.actor, stored: await capture(step.state) }))) };
++    writeFileSync(new URL(`${corpus.id}.json`, out), JSON.stringify(corpus) + "\n");
++  }
++});
+diff --git a/workers/game/src/__tests__/opt-963-v3-reader.test.ts b/workers/game/src/__tests__/opt-963-v3-reader.test.ts
+index df8d0fa7..71aa4fb9 100644
+--- a/workers/game/src/__tests__/opt-963-v3-reader.test.ts
++++ b/workers/game/src/__tests__/opt-963-v3-reader.test.ts
+@@ -86,10 +86,10 @@ function withoutVersion(raw: Record<string, unknown>): Record<string, unknown> {
+ const kindsOf = (state: GameState) => state.effectStack.map(frameKindOf);
+ 
+ describe("OPT-963 version 3 runtime and writer (PR 5b)", () => {
+-  it("reads 1–7, executes native 7 and normally writes 6", () => {
+-    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6, 7]);
+-    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(7);
+-    expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(7);
++  it("reads 1–8, executes native 8 and normally writes 6", () => {
++    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
++    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(8);
++    expect(RUNTIME_GAME_STATE_SCHEMA_VERSION).toBe(8);
+     expect(GAME_STATE_SCHEMA_VERSION).toBe(6);
+     expect([...EFFECT_STACK_FRAME_KINDS]).toEqual(
+       expect.arrayContaining(["REPLACEMENT", "REPLACEMENT_BATCH", "BATTLE_DAMAGE", "EFFECT_DAMAGE"])
+diff --git a/workers/game/src/engine/battle-completion-contract.ts b/workers/game/src/engine/battle-completion-contract.ts
+new file mode 100644
+index 00000000..25efd2c3
+--- /dev/null
++++ b/workers/game/src/engine/battle-completion-contract.ts
+@@ -0,0 +1,75 @@
++import type { EffectStackFrame, GameState } from "../types.js";
++
++const boundaryKeys = new Set([
++  "id",
++  "sourceCardInstanceId",
++  "controller",
++  "kind",
++  "battleCompletion",
++  "effectBlock",
++  "phase",
++  "pausedAction",
++  "remainingActions",
++  "resultRefs",
++  "validTargets",
++  "costs",
++  "currentCostIndex",
++  "costsPaid",
++  "oncePerTurnMarked",
++  "costResultRefs",
++  "pendingTriggers",
++  "simultaneousTriggers",
++  "accumulatedEvents",
++]);
++
++/** One exact obligation; no choices, executable suffix or publication debt. */
++export function battleCompletionOwnerViolation(
++  frame: EffectStackFrame,
++  state: GameState
++): string | null {
++  const completion = frame.battleCompletion;
++  if (!completion) return "missing battle completion identity";
++  if (
++    state.turn.battle ||
++    state.turn.battleSubPhase !== null ||
++    state.turn.phase !== "MAIN"
++  )
++    return "battle completion requires a cleared battle in MAIN";
++  if (
++    completion.turnPlayerIndex !== state.turn.activePlayerIndex ||
++    completion.turnNumber !== state.turn.number ||
++    frame.controller !== completion.turnPlayerIndex ||
++    frame.sourceCardInstanceId !== completion.attackerInstanceId
++  )
++    return "battle completion identity disagrees with turn or source";
++  if (
++    state.effectStack.filter((f) => f.battleCompletion).length !== 1 ||
++    state.effectStack[0] !== frame
++  )
++    return "battle completion must be the unique root boundary";
++  if (
++    Object.keys(frame).some((key) => !boundaryKeys.has(key)) ||
++    frame.phase !== "INTERRUPTED_BY_TRIGGERS" ||
++    frame.pausedAction !== null ||
++    frame.currentCostIndex !== 0 ||
++    !frame.costsPaid ||
++    !frame.oncePerTurnMarked ||
++    frame.effectBlock.id !== "__engine_continuation__" ||
++    frame.effectBlock.category !== "auto" ||
++    Object.keys(frame.effectBlock).some(
++      (key) => key !== "id" && key !== "category"
++    ) ||
++    [
++      frame.remainingActions,
++      frame.resultRefs,
++      frame.validTargets,
++      frame.costs,
++      frame.costResultRefs,
++      frame.pendingTriggers,
++      frame.simultaneousTriggers,
++      frame.accumulatedEvents,
++    ].some((entries) => entries.length > 0)
++  )
++    return "battle completion carries unrelated executable work";
++  return null;
++}
+diff --git a/workers/game/src/engine/battle-completion.ts b/workers/game/src/engine/battle-completion.ts
+new file mode 100644
+index 00000000..a761bdb9
+--- /dev/null
++++ b/workers/game/src/engine/battle-completion.ts
+@@ -0,0 +1,78 @@
++import { battleCompletionOwnerViolation } from "./battle-completion-contract.js";
++/** Native8 completion barrier: committed EOB events are separate from the
++ * uncommitted expiry/return-to-Main obligation. Ordinary6/7 never create it. */
++import type {
++  BattleCompletionContinuation,
++  ExecuteResult,
++  GameState,
++} from "../types.js";
++import {
++  continuationBoundary,
++  popFrame,
++  prependFrame,
++} from "./effect-stack.js";
++import { expireBattleEffects } from "./duration-tracker.js";
++import { terminateForEngineContract } from "./engine-limits.js";
++
++export function parkBattleCompletion(
++  state: GameState,
++  completion: BattleCompletionContinuation
++): GameState {
++  if (
++    state.schemaVersion !== 8 ||
++    state.effectStack.some((frame) => frame.battleCompletion)
++  ) {
++    return terminateForEngineContract(state, {
++      kind: "ENGINE_CONTRACT",
++      contract: "ACTION_HANDLER",
++      message: "Battle completion requires one native8 owner",
++    });
++  }
++  const boundary = continuationBoundary(
++    state,
++    completion.attackerInstanceId,
++    completion.turnPlayerIndex
++  );
++  // Existing trigger execution can already own other generations. Completion
++  // must sit below that whole owner, including its later reports and children.
++  return prependFrame(boundary.state, {
++    ...boundary.frame,
++    battleCompletion: completion,
++  });
++}
++
++export function completeBattleBoundary(state: GameState): ExecuteResult {
++  const frame = state.effectStack.at(-1);
++  const completion = frame?.battleCompletion;
++  if (
++    !completion ||
++    state.schemaVersion !== 8 ||
++    state.effectStack.length !== 1 ||
++    battleCompletionOwnerViolation(frame!, state) !== null
++  ) {
++    return {
++      state: terminateForEngineContract(state, {
++        kind: "ENGINE_CONTRACT",
++        contract: "ACTION_HANDLER",
++        message: "Battle completion lost its exact battle/turn boundary",
++      }),
++      events: [],
++    };
++  }
++  // Consume the sole obligation before expiry and before reporting anything it
++  // releases. A child raised by the completion notification cannot replay it.
++  let next = popFrame(state);
++  next = expireBattleEffects(next, completion.battleId, "TURN_PLAYER");
++  next = expireBattleEffects(next, completion.battleId, "NON_TURN_PLAYER");
++  return {
++    state: next,
++    events: [
++      { type: "BATTLE_RESOLVED", playerIndex: completion.turnPlayerIndex },
++      {
++        type: "PHASE_CHANGED",
++        playerIndex: completion.turnPlayerIndex,
++        payload: { from: "DAMAGE_STEP", to: "MAIN" },
++      },
++    ],
++  };
++}
+diff --git a/workers/game/src/engine/battle-context.ts b/workers/game/src/engine/battle-context.ts
+new file mode 100644
+index 00000000..9346ab37
+--- /dev/null
++++ b/workers/game/src/engine/battle-context.ts
+@@ -0,0 +1,10 @@
++import type { GameState } from "../types.js";
++/** The cleared live battle is represented by its sole native8 completion owner. */
++export function battleDurationContext(state: GameState): string {
++  return (
++    state.turn.battle?.battleId ??
++    state.effectStack.find((frame) => frame.battleCompletion)?.battleCompletion
++      ?.battleId ??
++    ""
++  );
++}
+diff --git a/workers/game/src/engine/battle.ts b/workers/game/src/engine/battle.ts
+index dd58f6ad..2af8d31d 100644
+--- a/workers/game/src/engine/battle.ts
++++ b/workers/game/src/engine/battle.ts
+@@ -39,6 +39,7 @@ import {
+   getBattleDefenderPower,
+ } from "./modifiers.js";
+ import { getEffectiveCounterValue } from "./counter-value.js";
++import { parkBattleCompletion } from "./battle-completion.js";
+ import { expireBattleEffects } from "./duration-tracker.js";
+ import { hasEffectiveKeyword } from "./keywords.js";
+ import { checkReplacementForKO } from "./replacements.js";
+@@ -1435,7 +1436,7 @@ function endBattle(
+   // Expire battle-scoped effects before clearing battle state
+   const battleId = state.turn.battle?.battleId;
+   const battle = state.turn.battle;
+-  if (battleId) {
++  if (battleId && state.schemaVersion !== 8) {
+     state = expireBattleEffects(state, battleId);
+   }
+ 
+@@ -1490,6 +1491,18 @@ function endBattle(
+     };
+   }
+ 
++  if (battle && state.schemaVersion === 8) {
++    state = { ...state, turn: { ...state.turn, battle: null, battleSubPhase: null } };
++    return parkBattleCompletion(state, {
++      battleId: battle.battleId,
++      attackerInstanceId: battle.attackerInstanceId,
++      targetInstanceId: battle.targetInstanceId,
++      turnPlayerIndex: state.turn.activePlayerIndex,
++      turnNumber: state.turn.number,
++      aborted: options.aborted === true,
++    });
++  }
++
+   events.push({
+     type: "BATTLE_RESOLVED",
+     playerIndex: state.turn.activePlayerIndex,
+diff --git a/workers/game/src/engine/duration-tracker.ts b/workers/game/src/engine/duration-tracker.ts
+index 60d8ea5f..90ee5d69 100644
+--- a/workers/game/src/engine/duration-tracker.ts
++++ b/workers/game/src/engine/duration-tracker.ts
+@@ -1,3 +1,4 @@
++import { battleDurationContext } from "./battle-context.js";
+ /**
+  * M4 Duration Tracker
+  *
+@@ -40,7 +41,15 @@ export function expireEffects(
+ /**
+  * Expire battle-scoped effects and prohibitions at End of Battle.
+  */
+-export function expireBattleEffects(state: GameState, battleId: string): GameState {
++export function expireBattleEffects(state: GameState, battleId: string, seat?: "TURN_PLAYER" | "NON_TURN_PLAYER"): GameState {
++  if (seat) {
++    const controller = seat === "TURN_PLAYER" ? state.turn.activePlayerIndex : state.turn.activePlayerIndex === 0 ? 1 : 0;
++    const due = (expiry: ExpiryTiming) => shouldExpire(expiry, "END_OF_BATTLE", { battleId });
++    return { ...state,
++      activeEffects: state.activeEffects.filter(effect => effect.controller !== controller || !due(effect.expiresAt)),
++      prohibitions: state.prohibitions.filter(prohibition => prohibitionOwner(prohibition) !== controller || !due(prohibition.expiresAt ?? (prohibition.duration.type === "THIS_BATTLE" ? { wave: "END_OF_BATTLE", battleId } : legacyProhibitionExpiry(prohibition.duration, state)))),
++    };
++  }
+   const nextState = expireEffects(state, "END_OF_BATTLE", { battleId });
+   return expireProhibitions(nextState, "END_OF_BATTLE", { battleId });
+ }
+@@ -494,7 +503,7 @@ function legacyProhibitionExpiry(
+     case "THIS_TURN":
+       return { wave: "END_OF_TURN", turn: state.turn.number };
+     case "THIS_BATTLE":
+-      return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
++      return { wave: "END_OF_BATTLE", battleId: battleDurationContext(state) };
+     case "PERMANENT":
+       return { wave: "SOURCE_LEAVES_ZONE" };
+     case "SKIP_NEXT_REFRESH":
+diff --git a/workers/game/src/engine/effect-resolver/action-utils.ts b/workers/game/src/engine/effect-resolver/action-utils.ts
+index 667b6550..3fe1301c 100644
+--- a/workers/game/src/engine/effect-resolver/action-utils.ts
++++ b/workers/game/src/engine/effect-resolver/action-utils.ts
+@@ -1,3 +1,4 @@
++import { battleDurationContext } from "../battle-context.js";
+ import { effectSourceCard } from "../effect-source.js";
+ /**
+  * Pure utility functions for action handlers.
+@@ -185,7 +186,7 @@ export function computeExpiry(duration: Duration, state: GameState, controller:
+     case "THIS_TURN":
+       return { wave: "END_OF_TURN", turn: state.turn.number };
+     case "THIS_BATTLE":
+-      return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
++      return { wave: "END_OF_BATTLE", battleId: battleDurationContext(state) };
+     case "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE":
+     case "UNTIL_END_OF_OPPONENT_NEXT_TURN": {
+       // Both mean "until the end of the controller's opponent's next turn"
+diff --git a/workers/game/src/engine/effect-resolver/actions/don.ts b/workers/game/src/engine/effect-resolver/actions/don.ts
+index c2381918..b1e9b209 100644
+--- a/workers/game/src/engine/effect-resolver/actions/don.ts
++++ b/workers/game/src/engine/effect-resolver/actions/don.ts
+@@ -1,3 +1,4 @@
++import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+ import { buildDonIdentityPlans } from "../don-identity-plans.js";
+ /**
+  * Action handlers: GIVE_DON, ADD_DON_FROM_DECK, FORCE_OPPONENT_DON_RETURN,
+@@ -687,7 +688,7 @@ export function executeReturnDonToDeck(
+   if (params.until_count !== undefined) {
+     return returnDonUntilCount(state, action, params.until_count, sourceCardInstanceId, controller, cardDb, resultRefs);
+   }
+-  if (state.schemaVersion === 7) {
++  if (hasNativeCostSemantics(state)) {
+     const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
+     const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? controller === 0 ? 1 : 0 : controller;
+     const p = state.players[owner];
+diff --git a/workers/game/src/engine/effect-resolver/cost/orchestrator.ts b/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
+index d7191b76..d83c4db8 100644
+--- a/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
++++ b/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
+@@ -1,3 +1,4 @@
++import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+ import { buildDonIdentityPlans } from "../don-identity-plans.js";
+ import { decodeDonReturnIds } from "../actions/don.js";
+ import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
+@@ -108,11 +109,11 @@ export function payCostsWithSelection(
+     // Accepted mandatory substitutes already execute on the root baseline.
+     // Their prefix and use marker are committed; staged payment stays on COST.
+     const offered = materializeReplacementOffer(
+-      nextState.schemaVersion === 7 && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
++      hasNativeCostSemantics(nextState) && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
+       pendingPrompt,
+       offer,
+     );
+-    if (offered.state.schemaVersion === 7) {
++    if (hasNativeCostSemantics(offered.state)) {
+       const expected = captureCostExpectedRoot(offered.state);
+       offered.state = {
+         ...offered.state,
+@@ -576,7 +577,7 @@ export function payCostsWithSelection(
+       continue;
+     }
+ 
+-    const nativeDonSelection = nextState.schemaVersion === 7 &&
++    const nativeDonSelection = hasNativeCostSemantics(nextState) &&
+       (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
+       !(typeof cost.amount === "number" && cost.amount <= 0);
+     if (!autoPayTrashToDeck && (costNeedsPlayerSelection(cost) || nativeDonSelection)) {
+@@ -702,7 +703,7 @@ export function payCostsWithSelection(
+     // cost frame used by selectable payments so decline can resume exactly.
+     const fixedExitTarget = fixedCostExitTarget(nextState, cost, controller, sourceCardInstanceId);
+     if (fixedExitTarget) {
+-      const replay = nextState.schemaVersion === 7 ? canonicalCostReplacementReplay({
++      const replay = hasNativeCostSemantics(nextState) ? canonicalCostReplacementReplay({
+         costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId, effectBlock,
+       }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
+       const stagedBeforeReplacement = nextState;
+@@ -727,9 +728,9 @@ export function payCostsWithSelection(
+           pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
+           costReplacementAction: replay ?? { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
+           costReplacementChecked: true,
+-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
++          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+         };
+-        pushCostFrame(frame, stagedBeforeReplacement, nextState.schemaVersion === 7 ? stagedBeforeReplacement.effectStack.length : undefined);
++        pushCostFrame(frame, stagedBeforeReplacement, hasNativeCostSemantics(nextState) ? stagedBeforeReplacement.effectStack.length : undefined);
+         if (isGameTerminated(nextState)) return cannotPay();
+         return suspend(replacement.pendingPrompt, replacement.offer, replacement.replaced);
+       }
+diff --git a/workers/game/src/engine/effect-resolver/cost/targets.ts b/workers/game/src/engine/effect-resolver/cost/targets.ts
+index 4965ca4d..f8216cd7 100644
+--- a/workers/game/src/engine/effect-resolver/cost/targets.ts
++++ b/workers/game/src/engine/effect-resolver/cost/targets.ts
+@@ -1,3 +1,4 @@
++import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+ /** Candidate computation for player-selected costs. */
+ import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
+ import type { CardData, CardInstance, DonInstance, GameState, PlayerState } from "../../../types.js";
+@@ -267,7 +268,7 @@ export function computeCostTargets(
+   switch (cost.type) {
+     case "DON_MINUS":
+     case "VARIABLE_DON_RETURN": {
+-      if (state.schemaVersion === 7) {
++      if (hasNativeCostSemantics(state)) {
+         const filter = cost.filter;
+         const restricted = filter?.is_active === true || filter?.is_rested === true || !!filter?.state;
+         return [
+diff --git a/workers/game/src/engine/effect-resolver/resume/cost.ts b/workers/game/src/engine/effect-resolver/resume/cost.ts
+index 18063557..3a3373f5 100644
+--- a/workers/game/src/engine/effect-resolver/resume/cost.ts
++++ b/workers/game/src/engine/effect-resolver/resume/cost.ts
+@@ -1,3 +1,4 @@
++import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+ import { canonicalCostReplacementReplay, lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
+ import { updateFrameById } from "../../damage-frames.js";
+ import { decodeDonReturnIds } from "../actions/don.js";
+@@ -456,7 +457,7 @@ export function handleAwaitingCostSelection(
+     ? applyCostTransactionState(baselineState, topFrame.costTransactionState)
+     : baselineState;
+   const updateCostOwner = (candidate: GameState, partial: Partial<EffectStackFrame>): GameState =>
+-    candidate.schemaVersion === 7
++    hasNativeCostSemantics(candidate)
+       ? updateFrameById(candidate, topFrame.id, frame => ({ ...frame, ...partial }))
+       : updateTopFrame(candidate, partial);
+   const suspendCurrentFrame = (
+@@ -476,11 +477,11 @@ export function handleAwaitingCostSelection(
+     // Accepted mandatory substitutes already execute on the root baseline.
+     // Their prefix and use marker are committed; staged payment stays on COST.
+     const offered = materializeReplacementOffer(
+-      withTransaction.schemaVersion === 7 && committedReplacement ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
++      hasNativeCostSemantics(withTransaction) && committedReplacement ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
+       pendingPrompt,
+       offer,
+     );
+-    if (offered.state.schemaVersion === 7 && topFrame.costExpectedRoot) {
++    if (hasNativeCostSemantics(offered.state) && topFrame.costExpectedRoot) {
+       offered.state = updateCostOwner(offered.state, {
+         costExpectedRoot: captureCostExpectedRoot(offered.state),
+       });
+@@ -907,7 +908,7 @@ export function handleAwaitingCostSelection(
+     }
+ 
+     if (!topFrame.costReplacementChecked) {
+-      const replay = nextState.schemaVersion === 7
++      const replay = hasNativeCostSemantics(nextState)
+         ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacement = checkReplacementForRemoval(
+@@ -926,7 +927,7 @@ export function handleAwaitingCostSelection(
+             selectedInstanceIds: selected,
+           },
+           costReplacementChecked: true,
+-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
++          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+         });
+         return suspendCurrentFrame(
+           nextState,
+@@ -983,7 +984,7 @@ export function handleAwaitingCostSelection(
+     }
+ 
+     if (!topFrame.costReplacementChecked) {
+-      const replay = nextState.schemaVersion === 7
++      const replay = hasNativeCostSemantics(nextState)
+         ? canonicalCostReplacementReplay(topFrame, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ordered, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacement = checkReplacementForRemoval(
+@@ -1004,7 +1005,7 @@ export function handleAwaitingCostSelection(
+             destination: action.destination,
+           },
+           costReplacementChecked: true,
+-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
++          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+         });
+         return suspendCurrentFrame(
+           nextState,
+@@ -1150,7 +1151,7 @@ export function handleAwaitingCostSelection(
+     if (!topFrame.costReplacementChecked) {
+       // Placing the Character is an effect-caused removal; a replacement means
+       // the printed cost was not paid (rules 8-3-1-3-1 / 8-3-1-7).
+-      const replay = nextState.schemaVersion === 7
++      const replay = hasNativeCostSemantics(nextState)
+         ? canonicalCostReplacementReplay(topFrame, cost.position === "TOP_OR_BOTTOM" ? { ...action, type: "PLAYER_CHOICE", choiceId: lifeDestinationChoiceId(placedIds, position) } : { type: "SELECT_TARGET", selectedInstanceIds: placedIds }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacement = checkReplacementForRemoval(
+@@ -1166,7 +1167,7 @@ export function handleAwaitingCostSelection(
+         nextState = updateCostOwner(nextState, {
+           costReplacementAction: replay ?? action,
+           costReplacementChecked: true,
+-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
++          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+         });
+         return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer, replacement.replaced);
+       }
+@@ -1340,12 +1341,12 @@ export function handleAwaitingCostSelection(
+     const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
+     // Rule 1-3-2-2: zero repetitions perform no removal. There is no target
+     // for a replacement scan or canonical replay; keep the closed reader grammar.
+-    const zeroFieldPayment = nextState.schemaVersion === 7 && amount === 0 && selected.length === 0;
++    const zeroFieldPayment = hasNativeCostSemantics(nextState) && amount === 0 && selected.length === 0;
+     if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !zeroFieldPayment && !topFrame.costReplacementChecked) {
+       // Cost exits are still effect-caused removal events, but a replacement
+       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
+       // Park the already-validated selection on the existing cost frame.
+-      const replay = nextState.schemaVersion === 7
++      const replay = hasNativeCostSemantics(nextState)
+         ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacementInput = applyCostTransactionState(
+@@ -1393,7 +1394,7 @@ export function handleAwaitingCostSelection(
+             selectedInstanceIds: selected,
+           },
+           costReplacementChecked: true,
+-          ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
++          ...(hasNativeCostSemantics(nextState) && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+         });
+         return suspendCurrentFrame(
+           nextState,
+diff --git a/workers/game/src/engine/frame-kinds.ts b/workers/game/src/engine/frame-kinds.ts
+index 16c3e7c8..61f6d2ef 100644
+--- a/workers/game/src/engine/frame-kinds.ts
++++ b/workers/game/src/engine/frame-kinds.ts
+@@ -22,6 +22,7 @@ export const EFFECT_STACK_FRAME_KINDS = [
+   "REPLACEMENT",
+   "REPLACEMENT_BATCH",
+   "BATTLE_DAMAGE",
++  "BATTLE_COMPLETION",
+   "EFFECT_DAMAGE",
+ ] as const;
+ 
+@@ -60,6 +61,7 @@ export function isHandlerOwnedFrame(
+     | "phaseBoundaryContinuation"
+     | "replacement"
+     | "replacementBatch"
++    | "battleCompletion"
+     | "battleDamage"
+     | "effectDamage"
+   >
+@@ -87,6 +89,7 @@ export function frameKindOf(
+     | "phaseBoundaryContinuation"
+     | "replacement"
+     | "replacementBatch"
++    | "battleCompletion"
+     | "battleDamage"
+     | "effectDamage"
+   >
+@@ -97,6 +100,7 @@ export function frameKindOf(
+   if (frame.pregameContinuation) return "PREGAME";
+   if (frame.replacement) return "REPLACEMENT";
+   if (frame.replacementBatch) return "REPLACEMENT_BATCH";
++  if (frame.battleCompletion) return "BATTLE_COMPLETION";
+   if (frame.battleDamage) return "BATTLE_DAMAGE";
+   if (frame.effectDamage) return "EFFECT_DAMAGE";
+   if (frame.phaseBoundaryContinuation) return "PHASE_BOUNDARY";
+diff --git a/workers/game/src/engine/native-cost-semantics.ts b/workers/game/src/engine/native-cost-semantics.ts
+new file mode 100644
+index 00000000..2a583fcf
+--- /dev/null
++++ b/workers/game/src/engine/native-cost-semantics.ts
+@@ -0,0 +1,11 @@
++import type { GameState } from "../types.js";
++/** Battle completion does not migrate existing COST semantics. Native8 must
++ * explicitly retain the deployed6 or native7 provenance of its producer. */
++export function hasNativeCostSemantics(
++  state: Pick<GameState, "schemaVersion" | "costSemanticsVersion">
++): boolean {
++  return (
++    state.schemaVersion === 7 ||
++    (state.schemaVersion === 8 && state.costSemanticsVersion === 7)
++  );
++}
+diff --git a/workers/game/src/engine/pending-work-drain.ts b/workers/game/src/engine/pending-work-drain.ts
+index 45d3b29a..0ed83e01 100644
+--- a/workers/game/src/engine/pending-work-drain.ts
++++ b/workers/game/src/engine/pending-work-drain.ts
+@@ -1,3 +1,5 @@
++import { hasNativeCostSemantics } from "./native-cost-semantics.js";
++import { completeBattleBoundary } from "./battle-completion.js";
+ import { continueReadyCostReplacement } from "./effect-resolver/resume/cost.js";
+ import { finishLifeTriggerStaging, validateLifeTriggerStaging } from "./life-trigger-staging.js";
+ import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
+@@ -216,8 +218,10 @@ export function drainPendingWork(
+             events,
+             resolved: true,
+           });
+-      } else if (kind === "COST" && state.schemaVersion === 7 && top.costReplacementResolution && !state.pendingPrompt)
++      } else if (kind === "COST" && hasNativeCostSemantics(state) && top.costReplacementResolution && !state.pendingPrompt)
+         result = continueReadyCostReplacement(state, top, cardDb, services);
++      else if (kind === "BATTLE_COMPLETION")
++        result = completeBattleBoundary(state);
+       else if (kind === "PHASE_BOUNDARY")
+         result = advancePhaseBoundary(state, cardDb);
+       else if (kind === "BATTLE_DAMAGE" || kind === "EFFECT_DAMAGE") {
+diff --git a/workers/game/src/engine/replacements.ts b/workers/game/src/engine/replacements.ts
+index e07197bb..0fa7bbb0 100644
+--- a/workers/game/src/engine/replacements.ts
++++ b/workers/game/src/engine/replacements.ts
+@@ -1,3 +1,4 @@
++import { hasNativeCostSemantics } from "./native-cost-semantics.js";
+ import { applyDonReturnIds, decodeDonReturnIds } from "./effect-resolver/actions/don.js";
+ import { replacementEventsFor } from "./replacement-events.js";
+ import { expandReplacementVisits, replacementAbilitySiblings } from "./replacement-ability-identity.js";
+@@ -730,7 +731,7 @@ function probeSubstituteChain(
+   }
+   if (!isActionFeasible(state, action, effect.sourceCardInstanceId, effect.controller, cardDb, refs)) return null;
+   // Attached DON!! retains the established printed-domain gate until OPT-969.
+-  if (state.schemaVersion !== 7 && action.type === "RETURN_DON_TO_DECK") {
++  if (!hasNativeCostSemantics(state) && action.type === "RETURN_DON_TO_DECK") {
+     if (!canReturnDonToDeckSucceed(state, action, effect.controller, cardDb, refs)) return null;
+   }
+   const probeState = {
+@@ -813,7 +814,7 @@ function probeSubstituteChain(
+       continue;
+     if (needed !== undefined && pool && pool.length < needed) continue;
+     let result = selection ? invoke(selection) : initial;
+-    if (state.schemaVersion === 7 && action.type === "RETURN_DON_TO_DECK" && result.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
++    if (hasNativeCostSemantics(state) && action.type === "RETURN_DON_TO_DECK" && result.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+       const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? effect.controller === 0 ? 1 : 0 : effect.controller;
+       for (const choice of result.pendingPrompt.options.choices) {
+         if (choice.disabled) continue;
+@@ -827,7 +828,7 @@ function probeSubstituteChain(
+         if (next) return next;
+       }
+     }
+-    if (state.schemaVersion !== 7 && action.type === "RETURN_DON_TO_DECK" && !result.pendingPrompt && action.params?.until_count === undefined) {
++    if (!hasNativeCostSemantics(state) && action.type === "RETURN_DON_TO_DECK" && !result.pendingPrompt && action.params?.until_count === undefined) {
+       // Preserve only OPT-969's printed-field/attached-DON underpayment exception.
+       // The real executor's intermediate cost-area mutation still feeds later actions.
+       result = { ...result, succeeded: true, fullyExecuted: true };
+@@ -1113,7 +1114,7 @@ export function materializeReplacementOffer(
+     // Native7 persists only the offer grammar, never transient resume-context
+     // discriminators carried through ordering/reoffer progress. Reader6 keeps
+     // its historical byte path for the staged rollout.
+-    replacement: state.schemaVersion === 7 ? {
++    replacement: hasNativeCostSemantics(state) ? {
+       effectId, targetInstanceId, event,
+       ...(offer.visitedEffectIds !== undefined ? { visitedEffectIds: offer.visitedEffectIds } : {}),
+       ...(offer.cause !== undefined ? { cause: offer.cause } : {}),
+diff --git a/workers/game/src/engine/setup.ts b/workers/game/src/engine/setup.ts
+index 18d21be6..b84edefd 100644
+--- a/workers/game/src/engine/setup.ts
++++ b/workers/game/src/engine/setup.ts
+@@ -131,6 +131,8 @@ export function prepareDecksAndLeaders(
+   };
+ 
+   let state: GameState = {
++    schemaVersion: 8,
++    costSemanticsVersion: 6,
+     id: payload.gameId,
+     executionContext,
+     players: [player0, player1],
+diff --git a/workers/game/src/session/coordinator.ts b/workers/game/src/session/coordinator.ts
+index d416ecc3..e5e1628b 100644
+--- a/workers/game/src/session/coordinator.ts
++++ b/workers/game/src/session/coordinator.ts
+@@ -1,3 +1,4 @@
++import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
+ import {
+   captureCostExpectedRoot,
+   costRootMatches,
+@@ -271,7 +272,7 @@ export class SessionCoordinator {
+     state = this.surfaceRevealTrigger(state, cardDb);
+     // Initial pipeline cleanup has finished. Only newly created evidence owners
+     // receive the actual published root; existing snapshots are never blessed.
+-    if (state.schemaVersion === 7) {
++    if (hasNativeCostSemantics(state)) {
+       const priorIds = new Set(
+         stateBeforePipeline.effectStack.map((frame) => frame.id)
+       );
+@@ -360,7 +361,7 @@ export class SessionCoordinator {
+     // Presence is a sanctioned exact transport delta, including under a cost
+     // replacement child. Never bless an unrelated gameplay divergence.
+     if (
+-      state.schemaVersion !== 7 ||
++      !hasNativeCostSemantics(state) ||
+       state.effectStack.some(
+         (frame) =>
+           frame.costExpectedRoot &&
+diff --git a/workers/game/src/session/game-state-schema.ts b/workers/game/src/session/game-state-schema.ts
+index 9c9b2abd..991ffd86 100644
+--- a/workers/game/src/session/game-state-schema.ts
++++ b/workers/game/src/session/game-state-schema.ts
+@@ -1,3 +1,5 @@
++import { battleCompletionOwnerViolation } from "../engine/battle-completion-contract.js";
++import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
+ import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
+ import { replacementEventsFor } from "../engine/replacement-events.js";
+ import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
+@@ -40,12 +42,12 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
+ /** The version this build's writer emits for state its own engine produces. */
+ export const GAME_STATE_SCHEMA_VERSION = 6;
+ /** The newest persisted version this build can read; v7 carries explicit cost outcomes. */
+-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
++export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 8;
+ /** The newest runtime shape this build executes; ordinary writers remain v6. */
+-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
++export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
+ export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
+ /** Versions this build can read. Retiring one follows the support-window policy (§3). */
+-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7,
++export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8,
+ ];
+ /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
+ export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
+@@ -511,7 +513,17 @@ export function convertToCurrentShape(
+     throw new SessionLoadError(location, "must be an object");
+   }
+   const version = readGameStateSchemaVersion(raw, location);
+-  if (version < 7) {
++  if (version === 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7) {
++    throw new SessionLoadError(location, "native8 requires explicit costSemanticsVersion 6 or 7");
++  }
++  if (version < 8 && "costSemanticsVersion" in raw) {
++    throw new SessionLoadError(location, "costSemanticsVersion requires schemaVersion 8");
++  }
++  if (version < 8 && Array.isArray(raw.effectStack) && raw.effectStack.some(frame =>
++    isRecord(frame) && ("battleCompletion" in frame || frame.kind === "BATTLE_COMPLETION"))) {
++    throw new SessionLoadError(location, "carries battle completion requiring schemaVersion 8");
++  }
++  if (version < 7 || (version === 8 && raw.costSemanticsVersion === 6)) {
+     const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
+     if (frames.some(frame => isRecord(frame) && ("costReplacementResolution" in frame || "costExpectedRoot" in frame)) ||
+         (isRecord(raw.pendingPrompt) && isRecord(raw.pendingPrompt.options) && "donIdentityReturn" in raw.pendingPrompt.options)) {
+@@ -589,7 +601,7 @@ export function toPersistedGameState(state: GameState): GameState {
+   return {
+     // Reader preserves a native-v7 session/undo entry; ordinary engine inputs
+     // still write v6 until the separately gated producer flips its version.
+-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
++    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 8 ? 8 : state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
+     ...rest,
+     effectStack: effectStack.map((frame) => ({
+       ...frame,
+@@ -626,6 +638,8 @@ function frameInvariantViolation(
+       if (frame.triggerExecution!.selectedTrigger && index !== state.effectStack.length - 1) return "has selectedTrigger while an activated child is already present";
+       return null;
+     }
++    case "BATTLE_COMPLETION":
++      return battleCompletionOwnerViolation(frame, state);
+     case "PHASE_BOUNDARY": {
+       const continuation = frame.phaseBoundaryContinuation!;
+       if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") {
+@@ -804,6 +818,9 @@ export function validateContinuationReferences(
+       );
+     }
+     const derived = frameKindOf(frame);
++    if (frame.battleCompletion && derived !== "BATTLE_COMPLETION") {
++      throw new SessionLoadError(location, `${ref} battle completion carries another continuation family`);
++    }
+     if (frame.kind !== undefined && frame.kind !== derived) {
+       throw new SessionLoadError(
+         location,
+@@ -889,7 +906,7 @@ export function validateContinuationReferences(
+     )) {
+       throw new SessionLoadError(location, `${ref} has costReplacementResolution without a checked COST replay owner`);
+     }
+-    if (state.schemaVersion === 7 && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
++    if (hasNativeCostSemantics(state) && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
+       const replayViolation = costReplacementReplayViolation(state, frame);
+       if (replayViolation) throw new SessionLoadError(location, `${ref} ${replayViolation}`);
+     }
+@@ -955,10 +972,10 @@ export function validateContinuationReferences(
+       );
+     }
+     const kind = frameKindOf(target);
+-    if (kind === "PHASE_BOUNDARY") {
++    if (kind === "PHASE_BOUNDARY" || kind === "BATTLE_COMPLETION") {
+       throw new SessionLoadError(
+         location,
+-        `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, a PHASE_BOUNDARY frame that cannot own a prompt`
++        `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, a ${kind} frame that cannot own a prompt`
+       );
+     }
+     const promptType = prompt.options.promptType;
+diff --git a/workers/game/src/session/persisted-game-state.ts b/workers/game/src/session/persisted-game-state.ts
+index 037f66c6..d15ad408 100644
+--- a/workers/game/src/session/persisted-game-state.ts
++++ b/workers/game/src/session/persisted-game-state.ts
+@@ -437,6 +437,14 @@ export const StackFrameCore = z.strictObject({
+   replacement: ReplacementContinuation.optional(),
+   replacementBatch: ReplacementBatchContinuation.optional(),
+   battleDamage: BattleDamageContinuation.optional(),
++  battleCompletion: z.strictObject({
++    battleId: z.string().min(1),
++    attackerInstanceId: z.string().min(1),
++    targetInstanceId: z.string().min(1),
++    turnPlayerIndex: PlayerIndex,
++    turnNumber: NonNegativeInteger,
++    aborted: z.boolean(),
++  }).optional(),
+   effectDamage: EffectDamageContinuation.optional(),
+   costs: z.array(z.unknown()),
+   currentCostIndex: NonNegativeInteger,
+@@ -471,6 +479,7 @@ export const StackFrameCore = z.strictObject({
+ });
+ 
+ export const PersistedGameStateV3 = z.strictObject({
++  costSemanticsVersion: z.union([z.literal(6), z.literal(7)]).optional(),
+   id: z.string(),
+   executionContext: ExecutionContext,
+   players: z.tuple([PlayerState, PlayerState]),
+diff --git a/workers/game/src/session/persistence.ts b/workers/game/src/session/persistence.ts
+index 0d4831c9..e0c01b16 100644
+--- a/workers/game/src/session/persistence.ts
++++ b/workers/game/src/session/persistence.ts
+@@ -848,10 +848,11 @@ function isValidNativeVersion4(
+   location: string,
+   replacementScan = false,
+   costOutcomes = false,
++  battleCompletion = false,
+ ): raw is GameState {
+   if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
+   const projected = convertToCurrentShape(
+-    { ...raw, schemaVersion: costOutcomes ? 7 : replacementScan ? 6 : 4 },
++    { ...raw, schemaVersion: battleCompletion ? 8 : costOutcomes ? 7 : replacementScan ? 6 : 4 },
+     location
+   );
+   const validated = parseStoredGameState(projected, location);
+@@ -864,16 +865,27 @@ function isValidNativeVersion5(
+   location: string,
+   replacementScan = false,
+   costOutcomes = false,
++  battleCompletion = false,
+ ): raw is GameState {
+   if (!isRecord(raw)) throw new SessionLoadError(location, "must be an object");
+   const projected = projectVersion5(raw, reason => { throw new SessionLoadError(location, reason); });
+-  return isValidNativeVersion4(projected, location, replacementScan, costOutcomes);
++  return isValidNativeVersion4(projected, location, replacementScan, costOutcomes, battleCompletion);
+ }
+ 
+ export function convertPersistedGameState(
+   raw: unknown,
+   location: string
+ ): GameState {
++  if (isRecord(raw) && raw.schemaVersion === 8) {
++    const native = { ...raw };
++    delete native.schemaVersion;
++    if (isValidNativeVersion5(native, location, true, true, true)) {
++      const state = { ...migrateLegacyTriggerRegistry(liftLegacyPrompt(native, location)), schemaVersion: 8 as const };
++      validateContinuationReferences(state, location);
++      logLegacyShapes(state, location);
++      return isGameTerminated(state) ? clearTerminalPendingWork(state) : state;
++    }
++  }
+   if (isRecord(raw) && raw.schemaVersion === 7) {
+     const native = { ...raw };
+     delete native.schemaVersion;
+diff --git a/workers/game/src/session/prompt-lifecycle.ts b/workers/game/src/session/prompt-lifecycle.ts
+index 7f37239b..5250ba2f 100644
+--- a/workers/game/src/session/prompt-lifecycle.ts
++++ b/workers/game/src/session/prompt-lifecycle.ts
+@@ -1,3 +1,4 @@
++import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
+ import {
+   captureCostExpectedRoot,
+   costRootMatches,
+@@ -112,7 +113,7 @@ export function resumePromptLifecycle(
+   // A validated successful reply may commit replacement work. Snapshot only
+   // existing evidence owners after all sanctioned processing and cleanup.
+   const expected =
+-    released.schemaVersion === 7 &&
++    hasNativeCostSemantics(released) &&
+     released.effectStack.some((frame) => frame.costExpectedRoot)
+       ? captureCostExpectedRoot(released)
+       : undefined;
+@@ -409,7 +410,7 @@ function answerReplacementOffer(
+   const callerKind = caller ? frameKindOf(caller) : null;
+   // A changed in-memory phase can derive EFFECT despite explicit COST kind
+   // or retained COST replay evidence. Validate that caller before effects.
+-  if (state.schemaVersion === 7 && caller && (
++  if (hasNativeCostSemantics(state) && caller && (
+     callerKind === "COST" || caller.kind === "COST" ||
+     caller.costReplacementAction !== undefined || caller.costReplacementChecked !== undefined ||
+     caller.costReplacementResolution !== undefined
+@@ -487,12 +488,12 @@ function answerReplacementOffer(
+   // Persist the final scan result on the exact COST caller captured before
+   // substitute execution. A prompting child may now be topmost; it owns its
+   // own completion/events, and the shared drain settles COST only afterward.
+-  if (state.schemaVersion === 7 && caller?.costReplacementAction && callerKind === "COST") {
++  if (hasNativeCostSemantics(state) && caller?.costReplacementAction && callerKind === "COST") {
+     state = updateFrameById(state, caller.id, frame => ({
+       ...frame,
+       costReplacementResolution: replacement.replaced ? "REPLACED" : "NOT_REPLACED",
+     }));
+-  } else if (state.schemaVersion !== 7 && state.effectStack.at(-1)?.costReplacementAction &&
++  } else if (!hasNativeCostSemantics(state) && state.effectStack.at(-1)?.costReplacementAction &&
+       frameKindOf(state.effectStack.at(-1)!) === "COST") {
+     // Historical-v6 behavior remains unchanged until the ordinary writer flips.
+     const topAfter = state.effectStack.at(-1)!;
+diff --git a/workers/game/src/session/version5-reader.ts b/workers/game/src/session/version5-reader.ts
+index f89fb4d9..0d870108 100644
+--- a/workers/game/src/session/version5-reader.ts
++++ b/workers/game/src/session/version5-reader.ts
+@@ -84,6 +84,7 @@ const ownerFields = {
+   replacement: "absent",
+   replacementBatch: "absent",
+   battleDamage: "absent",
++  battleCompletion: "absent",
+   effectDamage: "absent",
+   costTransactionState: "absent",
+   costExpectedRoot: "absent",
+diff --git a/workers/game/src/session/visibility.ts b/workers/game/src/session/visibility.ts
+index d2da4c30..15f08157 100644
+--- a/workers/game/src/session/visibility.ts
++++ b/workers/game/src/session/visibility.ts
+@@ -519,7 +519,7 @@ export function mergePlayerViewsForSpectator(
+     engineOutcome: stripped.engineOutcome,
+     engineActionCount: stripped.engineActionCount,
+   } satisfies GameState & Record<
+-    keyof Omit<GameState, "effectAvailability" | "pendingEventActivationEvents" | "schemaVersion">,
++    keyof Omit<GameState, "effectAvailability" | "pendingEventActivationEvents" | "schemaVersion" | "costSemanticsVersion">,
+     unknown
+   >;
+ }
+diff --git a/workers/game/src/types.ts b/workers/game/src/types.ts
+index b385b4cd..7f8a0c8e 100644
+--- a/workers/game/src/types.ts
++++ b/workers/game/src/types.ts
+@@ -107,7 +107,9 @@ export interface GameState extends Omit<
+   | "effectStack"
+ > {
+   /** Retained native v6 provenance: saves and later pauses may never downgrade. */
+-  schemaVersion?: 6 | 7;
++  schemaVersion?: 6 | 7 | 8;
++  /** Required for native8: preserve the originating deployed cost semantics. */
++  costSemanticsVersion?: 6 | 7;
+   activeEffects: RuntimeActiveEffect[];
+   prohibitions: RuntimeProhibition[];
+   scheduledActions: RuntimeScheduledAction[];
+@@ -244,6 +246,16 @@ export interface ReplacementBatchContinuation {
+  * damage count stays on `turn.battle.damagesRemaining`, locked at Damage Step
+  * entry (rule 7-1-4-1-1-3); the frame names the battle by `battleId`.
+  */
++/** Exact battle completion obligation below every End-of-Battle child (native8). */
++export interface BattleCompletionContinuation {
++  battleId: string;
++  attackerInstanceId: string;
++  targetInstanceId: string;
++  turnPlayerIndex: 0 | 1;
++  turnNumber: number;
++  aborted: boolean;
++}
++
+ export type BattleDamageContinuation =
+   | {
+       stage: "TRIGGER_WINDOW";
+@@ -476,6 +488,7 @@ export interface EffectStackFrame {
+   replacementBatch?: ReplacementBatchContinuation;
+   /** OPT-963 BATTLE_DAMAGE frame: the paused Damage Step. */
+   battleDamage?: BattleDamageContinuation;
++  battleCompletion?: BattleCompletionContinuation;
+   /** OPT-963 EFFECT_DAMAGE frame: the paused DEAL_DAMAGE instruction. */
+   effectDamage?: EffectDamageContinuation;
+ 

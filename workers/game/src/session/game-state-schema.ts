@@ -1,3 +1,5 @@
+import { battleCompletionOwnerViolation } from "../engine/battle-completion-contract.js";
+import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
 import { replacementEventsFor } from "../engine/replacement-events.js";
 import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
@@ -39,13 +41,13 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 7;
-/** The newest persisted version this build can read; v7 carries explicit cost outcomes. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
-/** The newest runtime shape this build executes and ordinary producers emit. */
-export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
+/** The newest readable envelope; native8 carries exact battle completion and cost provenance. */
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 8;
+/** The newest runtime shape; ordinary new sessions remain version7. */
+export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7,
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8,
 ];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
@@ -511,7 +513,17 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
-  if (version < 7) {
+  if (version === 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7) {
+    throw new SessionLoadError(location, "native8 requires explicit costSemanticsVersion 6 or 7");
+  }
+  if (version < 8 && "costSemanticsVersion" in raw) {
+    throw new SessionLoadError(location, "costSemanticsVersion requires schemaVersion 8");
+  }
+  if (version < 8 && Array.isArray(raw.effectStack) && raw.effectStack.some(frame =>
+    isRecord(frame) && ("battleCompletion" in frame || frame.kind === "BATTLE_COMPLETION"))) {
+    throw new SessionLoadError(location, "carries battle completion requiring schemaVersion 8");
+  }
+  if (version < 7 || (version === 8 && raw.costSemanticsVersion === 6)) {
     const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
     if (frames.some(frame => isRecord(frame) && ("costReplacementResolution" in frame || "costExpectedRoot" in frame)) ||
         (isRecord(raw.pendingPrompt) && isRecord(raw.pendingPrompt.options) && "donIdentityReturn" in raw.pendingPrompt.options)) {
@@ -568,8 +580,8 @@ export function convertToCurrentShape(
 
 /**
  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
- * Repository save proves/promotes ordinary inputs to version7 before this
- * shape encoder. Explicit legacy runtime provenance is retained here. Every
+ * Repository save proves/promotes legacy inputs to version7 before this
+ * shape encoder. Explicit legacy6 and native7/8 provenance are retained. Every
  * End Phase frame with its stage. A runtime frame without a stage can only be
  * a version 1 frame, so it is written with the legacy stage, which is its
  * version 1 meaning.
@@ -587,9 +599,9 @@ export function toPersistedGameState(state: GameState): GameState {
     : state.effectStack;
   const { schemaVersion: _schemaVersion, ...rest } = state;
   return {
-    // Shape encoding preserves explicit legacy provenance; repository save
-    // proves/promotes every runtime snapshot before calling this encoder.
-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? GAME_STATE_SCHEMA_VERSION : 6,
+    // Only the repository promotes legacy inputs. Loaded8 preserves both its
+    // envelope and explicit cost mode; low-level legacy controls remain6.
+    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 8 ? 8 : state.schemaVersion === 7 ? 7 : 6,
     ...rest,
     effectStack: effectStack.map((frame) => ({
       ...frame,
@@ -626,6 +638,8 @@ function frameInvariantViolation(
       if (frame.triggerExecution!.selectedTrigger && index !== state.effectStack.length - 1) return "has selectedTrigger while an activated child is already present";
       return null;
     }
+    case "BATTLE_COMPLETION":
+      return battleCompletionOwnerViolation(frame, state);
     case "PHASE_BOUNDARY": {
       const continuation = frame.phaseBoundaryContinuation!;
       if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") {
@@ -804,6 +818,9 @@ export function validateContinuationReferences(
       );
     }
     const derived = frameKindOf(frame);
+    if (frame.battleCompletion && derived !== "BATTLE_COMPLETION") {
+      throw new SessionLoadError(location, `${ref} battle completion carries another continuation family`);
+    }
     if (frame.kind !== undefined && frame.kind !== derived) {
       throw new SessionLoadError(
         location,
@@ -889,7 +906,7 @@ export function validateContinuationReferences(
     )) {
       throw new SessionLoadError(location, `${ref} has costReplacementResolution without a checked COST replay owner`);
     }
-    if (state.schemaVersion === 7 && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
+    if (hasNativeCostSemantics(state) && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
       const replayViolation = costReplacementReplayViolation(state, frame);
       if (replayViolation) throw new SessionLoadError(location, `${ref} ${replayViolation}`);
     }
@@ -956,10 +973,10 @@ export function validateContinuationReferences(
       );
     }
     const kind = frameKindOf(target);
-    if (kind === "PHASE_BOUNDARY") {
+    if (kind === "PHASE_BOUNDARY" || kind === "BATTLE_COMPLETION") {
       throw new SessionLoadError(
         location,
-        `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, a PHASE_BOUNDARY frame that cannot own a prompt`
+        `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, a ${kind} frame that cannot own a prompt`
       );
     }
     const promptType = prompt.options.promptType;

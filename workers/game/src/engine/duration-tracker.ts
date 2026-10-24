@@ -1,3 +1,4 @@
+import { battleDurationContext } from "./battle-context.js";
 /**
  * M4 Duration Tracker
  *
@@ -40,7 +41,15 @@ export function expireEffects(
 /**
  * Expire battle-scoped effects and prohibitions at End of Battle.
  */
-export function expireBattleEffects(state: GameState, battleId: string): GameState {
+export function expireBattleEffects(state: GameState, battleId: string, seat?: "TURN_PLAYER" | "NON_TURN_PLAYER"): GameState {
+  if (seat) {
+    const controller = seat === "TURN_PLAYER" ? state.turn.activePlayerIndex : state.turn.activePlayerIndex === 0 ? 1 : 0;
+    const due = (expiry: ExpiryTiming) => shouldExpire(expiry, "END_OF_BATTLE", { battleId });
+    return { ...state,
+      activeEffects: state.activeEffects.filter(effect => effect.controller !== controller || !due(effect.expiresAt)),
+      prohibitions: state.prohibitions.filter(prohibition => prohibitionOwner(prohibition) !== controller || !due(prohibition.expiresAt ?? (prohibition.duration.type === "THIS_BATTLE" ? { wave: "END_OF_BATTLE", battleId } : legacyProhibitionExpiry(prohibition.duration, state)))),
+    };
+  }
   const nextState = expireEffects(state, "END_OF_BATTLE", { battleId });
   return expireProhibitions(nextState, "END_OF_BATTLE", { battleId });
 }
@@ -494,7 +503,7 @@ function legacyProhibitionExpiry(
     case "THIS_TURN":
       return { wave: "END_OF_TURN", turn: state.turn.number };
     case "THIS_BATTLE":
-      return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
+      return { wave: "END_OF_BATTLE", battleId: battleDurationContext(state) };
     case "PERMANENT":
       return { wave: "SOURCE_LEAVES_ZONE" };
     case "SKIP_NEXT_REFRESH":

@@ -1,3 +1,4 @@
+import { battleDurationContext } from "../battle-context.js";
 import { effectSourceCard } from "../effect-source.js";
 /**
  * Pure utility functions for action handlers.
@@ -185,7 +186,7 @@ export function computeExpiry(duration: Duration, state: GameState, controller: 
     case "THIS_TURN":
       return { wave: "END_OF_TURN", turn: state.turn.number };
     case "THIS_BATTLE":
-      return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
+      return { wave: "END_OF_BATTLE", battleId: battleDurationContext(state) };
     case "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE":
     case "UNTIL_END_OF_OPPONENT_NEXT_TURN": {
       // Both mean "until the end of the controller's opponent's next turn"
