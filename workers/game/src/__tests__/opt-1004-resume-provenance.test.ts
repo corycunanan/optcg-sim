@@ -57,12 +57,14 @@ for (const [name, entry] of Object.entries(manifest.cases) as [string, { file: s
     const mixed = parseStoredSession({ state: toPersistedGameState(after.state), undoHistory: [loadBytes(entry.file).session.state, toPersistedGameState(after.state)], cardDb: Object.fromEntries(after.cardDb), mode: "PVP" });
     expect(mixed.undoHistory.map(state => state.schemaVersion)).toEqual([8, 10]);
   });
-  it.each([8, 9] as const)("ordinary reader%s resume stays metadata-free", async version => {
+  it.each([8, 9] as const)("writer source%s accepted historical resume captures proven origin", async version => {
     const raw = loadBytes(entry.file); raw.session.state.schemaVersion = version;
     const storage = memory(raw); const after = await act(storage, reply(raw.session.state));
-    expect(after.state.schemaVersion).toBe(version);
-    expect(after.state.scheduledActions[0].sourceIdentity).toBeUndefined();
-    expect(after.state.scheduledActions[0].sourceCardSnapshot).toBeUndefined();
+    expect(after.state).toMatchObject({ schemaVersion: 10, fieldTrashSemanticsVersion: version === 9 ? 9 : 8, costSemanticsVersion: entry.costMode });
+    const identity = origin(raw.session.state).sourceIdentity!;
+    expect(after.state.scheduledActions[0].sourceIdentity).toEqual(identity);
+    if (entry.phase === "COST") expect(after.state.scheduledActions[0].sourceCardSnapshot).toMatchObject({ instanceId: identity.instanceId, cardId: identity.cardId, controller: identity.controller });
+    else expect(after.state.scheduledActions[0].sourceCardSnapshot).toBeUndefined();
   });
   it.each(["wrong", "PASS", "skip"])("does not leak provenance on %s response", async path => {
     const storage = memory(upgrade(loadBytes(entry.file))); const loaded = (await new SessionRepository(storage, options).load())!;
