@@ -1,3 +1,5 @@
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
+import { findCardInstance } from "../../state.js";
 /**
  * Action handlers: APPLY_PROHIBITION, APPLY_ONE_TIME_MODIFIER, SCHEDULE_ACTION,
  * SET_COST, WIN_GAME, NEGATE_TRIGGER_TYPE, EXTRA_TURN
@@ -121,11 +123,18 @@ export function executeScheduleAction(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = getActionParams(action, "SCHEDULE_ACTION");
 
+  // A rollback reader must also produce valid work when continuing loaded9.
+  // Ordinary8 scheduling remains unchanged until the writer rollout.
+  const reference = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot;
+  const source = state.schemaVersion === 9
+    ? reference?.instanceId === sourceCardInstanceId
+      ? reference : findCardInstance(state, sourceCardInstanceId)
+    : undefined;
   const allocated = allocateEngineId(state, "scheduled-action");
   const entry: RuntimeScheduledAction = {
     id: allocated.id,
@@ -134,6 +143,7 @@ export function executeScheduleAction(
     boundToInstanceId: params.bound_to ?? null,
     sourceEffectId: sourceCardInstanceId,
     controller,
+    ...(source ? { sourceCardSnapshot: structuredClone(source) } : {}),
   };
 
   return {

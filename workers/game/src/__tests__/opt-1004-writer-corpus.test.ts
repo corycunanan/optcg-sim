@@ -62,14 +62,14 @@ it("reads every actual writer boundary live/undo write-free and retains9 when re
 });
 
 describe.each(Object.entries(corpus.cases))("OPT-1004 actual writer suffix %s", (id, scenario) => {
-  it("loads and semantically resumes after the last writer-created obligation", async () => {
-    // Stage 1 deliberately does not create schema9 obligations. Resume only
-    // after their actual writer creation; every stored boundary above loads.
+  it("loads and semantically resumes after the first writer-created obligation", async () => {
+    // Stage 1 deliberately does not activate schema9 from8. Resume only
+    // after initial writer activation of9; later9 scheduling must match too.
     let previous = scenario.initial.session.state.scheduledActions.length;
     let start = -1;
     scenario.steps.forEach((step, index) => {
       const count = step.stored.session.state.scheduledActions.length;
-      if (count > previous) start = index;
+      if (count > previous && start === -1) start = index;
       previous = count;
     });
     expect(start).toBeGreaterThanOrEqual(0);

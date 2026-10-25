@@ -844,8 +844,10 @@ Top-level obligations, parked queues, transaction/expected roots and resumed
 refs validate snapshots strictly. Scheduled snapshot instance identity must
 match `sourceEffectId`. Schema1–8 reject the new scheduled field. Native9
 requires explicit costSemanticsVersion6|7|8, and retains that independent mode;
-resaving loaded9 and its undo entries retains9. Ordinary stage1 scheduling does
-not capture or emit the new field. A future writer must promote the owning
+resaving loaded9 and its undo entries retains9. Ordinary schema8 scheduling does
+not capture or emit the new field. Continuing loaded9 does capture origin for
+new obligations, including full pre-cost origin before a queued TRASH_SELF;
+a rollback reader must preserve this future producer behavior. A future writer must promote the owning
 state to9 before saving newly captured origin, including scheduling from an
 existing8 game. Cost semantics are not promoted by scheduled provenance.
 
@@ -876,9 +878,10 @@ full writer patch. Cases include ST24-005 before/after source departure, both
 restrictions imposed after scheduling, an End Phase park and reply, allowed
 Leader/Event origins, existing8 queued On Play/TRASH_SELF/scheduling, COST
 transaction/expected roots and mixed8/9 undo. The reader suite loads all boundaries
-write-free and replays the suffix after the last actual writer-created
-obligation through GameSession against the writer's exact saved output. Reader
-creation of new provenance is deliberately disabled in this release.
+write-free and replays the suffix after the first actual writer-created
+obligation, including subsequent scheduling from loaded9 through GameSession against the writer's exact saved output. Reader
+activation of schema9 from schema8 is deliberately disabled in this release;
+continued scheduling from an already-loaded9 state preserves origin.
 
 Regenerate only from that isolated candidate using
 `OPT1004_WRITER_CAPTURE_DIR=/absolute/new/output-dir pnpm --filter optcg-game exec vitest run src/__tests__/opt-1004-writer-producer.test.ts`.
