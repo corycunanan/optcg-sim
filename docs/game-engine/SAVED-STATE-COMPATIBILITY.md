@@ -924,7 +924,9 @@ validation, synthetic-evidence exception and retained OPT-958 policy.
 Main deployed9 is exclusively the FIELD-TRASH reader contract above. Scheduled
 origin requires10. Every native10 envelope requires explicit
 `fieldTrashSemanticsVersion: 8 | 9` as well as independent cost mode6|7|8. Mode8
-retains legacy trash; mode9 retains deployed native9 replacement behavior.
+records legacy trash until an eligible field-Character consequence activates
+mode9 at the delivered producer boundary; mode9 retains native replacement
+behavior. Loading/restoring10/8 alone never activates that capability.
 Source<=9 rejects the new capability and scheduled metadata. COST roots inherit
 the enclosing capabilities; they are partial state snapshots, not new envelopes.
 Default setup/runtime/writer remain8. Loaded9 does not emit scheduled origin;
@@ -934,13 +936,37 @@ strict dual identity, and live/undo envelopes without mode drift.
 The future scheduling writer promotes8→10/field8 and9→10/field9 before optional
 or cost pauses for recursively scheduling-capable blocks, preserving cost mode.
 New-game10 candidates choose field8/cost8. These are isolated evidence producers,
-not production enablement. The future OPT-1006 field-trash writer must support
-10/field8→10/field9 at its own eligible producer boundary, retaining scheduled
-metadata; it must not downgrade10 to9. That separate writer is not enabled here.
+not production scheduling enablement. Main PR789 delivered the field-trash
+producer; integration supports10/field8→10/field9 at its eligible consequence
+boundary while retaining scheduled metadata, envelope10 and explicit cost mode.
+Explicit native8 upgrades to9 there as on main; raw historical callers and
+hand-only/zero-selection actions retain their previous boundary.
 
 The original draft9 14-case/103-boundary archive is retained byte-for-byte as
 obsolete development evidence; it cannot establish compatibility with deployed9.
-The replacement schema10 writer corpus and sources are archived separately.
+The first21/153 schema10 reader-only prototype is also retained unchanged as
+obsolete runtime-parity evidence after the delivered trash producer. Current
+schema10 writer output and sources are archived separately against that merged
+producer and the resolved-modifier correction.
 Reader deployment and a named verified reader rollback floor still precede
 writer enablement. The accepted synthetic-only capture exception and historical
 missing-origin limitation remain: no production repair or migration is claimed.
+
+### Field-trash producer9 after verified reader (OPT-1006 / OPT-1001)
+
+The final writer enables the existing9 field-Character trash route from explicit
+native8/costSemanticsVersion6|7|8 only, with an immutable scalar promotion before
+its replacement scan. Source9 remains9 after completion; synchronous/no-match
+field consequences also promote. Hand-only/zero-selection actions and ordinary
+setup stay8; setup retains mode8. Raw historical direct engine callers are not
+migrated at the trash site. Repository/Coordinator shared validated ingress still
+owns historical6/7→8/mode7 before gameplay, and existing explicit modes are retained.
+
+Minimum rollback floor: deployed PR788 merge
+`d8309e70fef64a133ce19d8a2bd327bb625e56fb`, worker
+`bd251100-440e-40f8-b381-302f0a3db6f2`. Actual final writer output is loaded and
+completed by that floor through Repository/Coordinator/GameSession, with exact
+state/event/ID comparisons. The historical reader corpus stays immutable; new
+canonical writer output has a separate manifest. See the updated
+[field-trash contract](FIELD-TRASH-READER-V9.md) for the six non-contiguous old8
+choice scripts,22 exact native9 suffixes, producer policy and retained OPT-958 debt.

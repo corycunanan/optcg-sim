@@ -1,3 +1,9 @@
+> Obsolete runtime-parity prototype after main PR789 enabled field-trash
+> production. All21/153 payload/source/manifest bytes remain unchanged. The
+> current reader still validates their saved envelopes, but later eligible
+> field-trash actions deliberately upgrade10/field8 to10/field9. Current
+> writer compatibility uses the separate scheduled-writer10-final archive.
+
 # Actual schema10 scheduling-writer evidence
 
 This immutable corpus was emitted by isolated candidate

@@ -18,3 +18,18 @@ it("mixed-zone resumed trash finalization keeps one immutable aggregate hand eve
   expect(result.events.filter(event => event.type === "CARD_TRASHED" && event.payload?.from === "HAND")).toMatchObject([{ playerIndex: 0, payload: { count: 2, effectSourceCardId: source.cardId, effectSourceController: 1 } }]);
   expect(r.state).toEqual(initial);
 });
+
+for (const zone of ["HAND", "CHARACTER"] as const) it(`native8 ${zone} trash with ${zone === "HAND" ? "a selected hand card" : "zero selected targets"} stays8`, () => {
+  const r = rig(); const source = r.put("OPT1006-SOURCE", 1, "CHARACTER"); const target = r.put("OPT1006-TARGET", 0, zone);
+  const before = structuredClone(r.state);
+  const result = executeTrashCard(r.state, { type: "TRASH_CARD", target: { type: zone === "HAND" ? "CARD_IN_HAND" : "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }, source.instanceId, 1, r.db, new Map(), zone === "HAND" ? [target.instanceId] : [], resolverExecutionServices);
+  expect(result.state.schemaVersion).toBe(8); expect(result.state.costSemanticsVersion).toBe(8); expect(r.state).toEqual(before);
+});
+it("selected prohibited field consequence activates9 before the empty replacement scan without movement", () => {
+  const r = rig(); const source = r.put("OPT1006-SOURCE", 1, "CHARACTER"); const target = r.put("OPT1006-TARGET", 0, "CHARACTER");
+  r.state.prohibitions.push({ id: "field-gate", sourceCardInstanceId: target.instanceId, sourceEffectBlockId: "gate", controller: 0, prohibitionType: "CANNOT_LEAVE_FIELD", scope: { controller: "SELF" }, appliesTo: [target.instanceId], usesRemaining: null, duration: { type: "THIS_TURN" } });
+  const before = structuredClone(r.state);
+  const result = executeTrashCard(r.state, { type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } } }, source.instanceId, 1, r.db, new Map(), [target.instanceId], resolverExecutionServices);
+  expect(result.state.schemaVersion).toBe(9); expect(result.state.players).toEqual(before.players);
+  expect(result.events).toEqual([]); expect(result.pendingPrompt).toBeUndefined(); expect(r.state).toEqual(before);
+});

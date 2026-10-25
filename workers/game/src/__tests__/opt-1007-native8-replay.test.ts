@@ -2,6 +2,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ABORT_TRASH_STEP, assertStoredEnvelope } from "./opt-1006-envelope-expectations.js";
 import { command, memory, runtime } from "./native7-producer-support.js";
 import { computeExpiry } from "../engine/effect-resolver/action-utils.js";
 import { executePass } from "../engine/battle.js";
@@ -32,8 +33,8 @@ const files = readdirSync(directory).filter(
 const corpusOf = (file: string) =>
   JSON.parse(readFileSync(`${directory}/${file}`, "utf8")) as Corpus;
 
-function assertBoundary(state: GameState, corpus: Corpus) {
-  expect(state.schemaVersion).toBe(8);
+function assertBoundary(state: GameState, corpus: Corpus, version: 8 | 9 = 8) {
+  expect(state.schemaVersion).toBe(version);
   expect(state.costSemanticsVersion).toBe(corpus.mode);
   const owner = state.effectStack.find((frame) => frame.battleCompletion);
   if (owner) {
@@ -67,8 +68,8 @@ function assertBoundary(state: GameState, corpus: Corpus) {
     }
 }
 
-function assertCompletion(state: GameState, corpus: Corpus) {
-  assertBoundary(state, corpus);
+function assertCompletion(state: GameState, corpus: Corpus, version: 8 | 9 = 8) {
+  assertBoundary(state, corpus, version);
   const count = (type: string) =>
     state.eventLog.filter((e) => e.type === type).length;
   const onField = (id: string) =>
@@ -216,7 +217,11 @@ describe.each(files)("native8 isolated writer %s", (file) => {
   it.each(["live", "undo", "embedded-undo"])(
     "resumes every starting/later boundary through %s",
     async (location) => {
-      const rt = await runtime();
+      const floor = await runtime(process.env.OPT1006_WRITER_FLOOR_ROOT);
+      // With the env supplied, retain the original exact8 reader replay as
+      // well as current-writer capability expectations. Default CI is self-runtime.
+      for (const branch of ["writer", ...(process.env.OPT1006_WRITER_FLOOR_ROOT ? ["deployed-reader"] : [])]) {
+      const rt = branch === "writer" ? await runtime() : floor;
       const corpus = corpusOf(file);
       const starts = [
         corpus.initial,
@@ -252,7 +257,10 @@ describe.each(files)("native8 isolated writer %s", (file) => {
           loaded = { ...loaded, state: undone.state };
         }
         assertBoundary(loaded.state, corpus);
-        for (const step of corpus.steps.slice(start)) {
+        let version: 8 | 9 = 8;
+        let rollback: typeof loaded | undefined;
+        const trashStep = ABORT_TRASH_STEP[corpus.family];
+        for (const [suffixIndex, step] of corpus.steps.slice(start).entries()) {
           let next: GameState;
           if (corpus.family === "stack-exhaustion") {
             const executed = executePass(loaded.state, loaded.cardDb);
@@ -271,14 +279,22 @@ describe.each(files)("native8 isolated writer %s", (file) => {
               step.actor
             );
           const stored = await saveBoth(rt, next, loaded.cardDb);
-          expect(
-            stored,
-            `${corpus.id} ${location} start${start} ${step.action.type}`
-          ).toEqual(step.stored);
+          // Only replays that actually execute this captured Character-trash
+          // selection promote. Starting after historical movement remains8.
+          if (branch === "writer" && trashStep !== undefined && start <= trashStep && start + suffixIndex >= trashStep) version = 9;
+          assertStoredEnvelope(stored, step.stored, version);
+          if (version === 9) {
+            if (rollback) {
+              const floorNext = command(floor, rollback.state, rollback.cardDb, step.action, step.actor);
+              expect(await saveBoth(floor, floorNext, rollback.cardDb)).toEqual(stored);
+            }
+            rollback = (await memory(floor, stored).repo.load())!;
+          }
           loaded = (await memory(rt, stored).repo.load())!;
-          assertBoundary(loaded.state, corpus);
+          assertBoundary(loaded.state, corpus, version);
         }
-        assertCompletion(loaded.state, corpus);
+        assertCompletion(loaded.state, corpus, version);
+      }
       }
     }
   );

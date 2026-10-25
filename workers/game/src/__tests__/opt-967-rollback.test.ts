@@ -13,6 +13,8 @@ import { drainPendingWork } from "../engine/pending-work-drain.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import { createTriggerExecution } from "../engine/trigger-executor.js";
 import { terminateGame } from "../engine/terminal.js";
+import { runtime, memory } from "./native7-producer-support.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { CARDS } from "./helpers.js";
 
 const config = {
@@ -145,7 +147,19 @@ describe.each(["attack", "block"] as const)(
           loaded.cardDb,
           lifecycle
         );
-        expect(actual).toEqual({ ...expected, state: { ...expected.state, schemaVersion: 8, costSemanticsVersion: expected.state.costSemanticsVersion ?? 7 } });
+        expect(actual).toEqual({ ...expected, state: { ...expected.state, schemaVersion: 9, costSemanticsVersion: expected.state.costSemanticsVersion ?? 7 } });
+        if (process.env.OPT1006_WRITER_FLOOR_ROOT) {
+          const floor = await runtime(process.env.OPT1006_WRITER_FLOOR_ROOT);
+          // Preserve original reader8 semantics on the unchanged8 input.
+          const reader = floor.resumePromptLifecycle(current, reply, loaded.cardDb, lifecycle);
+          expect(reader).toEqual({ ...expected, state: { ...expected.state, schemaVersion: 8, costSemanticsVersion: expected.state.costSemanticsVersion ?? 7 } });
+          // Actual current writer9 completion is also saved/loaded unchanged
+          // by the supported floor; the obsolete baseline below is separate.
+          const emitted = await write(actual.state, loaded.cardDb);
+          const saved = (await memory(floor, emitted).repo.load())!;
+          expect(toPersistedGameState(saved.state)).toEqual(toPersistedGameState(actual.state));
+          expect(saved.state.schemaVersion).toBe(9);
+        }
         expect(actual.state.effectStack).toEqual([]);
         expect(actual.state.pendingPrompt).toBeNull();
         expect(
@@ -210,6 +224,8 @@ describe.each(["attack", "block"] as const)(
         )
       ).toBe(false);
       expect(terminal.state.eventLog.at(-1)?.type).toBe("GAME_OVER");
+      // The pre9 baseline is a historical checkpoint-defect experiment only;
+      // it is not a supported rollback floor after current writer9 publication.
       const root = process.env.OPT967_BASELINE_ROOT;
       if (!root) return;
       const oldPersistence = (await import(

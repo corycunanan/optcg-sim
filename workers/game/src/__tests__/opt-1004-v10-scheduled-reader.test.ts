@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { runPipeline } from "../engine/pipeline.js";
 import type { CardData, GameState } from "../types.js";
 import { rig, synSchema } from "./opt-960-rig.js";
 import { toPersistedGameState, GAME_STATE_SCHEMA_VERSION, LATEST_READABLE_GAME_STATE_SCHEMA_VERSION } from "../session/game-state-schema.js";
@@ -173,28 +174,29 @@ describe("OPT-1004 schema10 reader and execution", () => {
   });
 });
 
-it.each([8, 9] as const)("native10 retains field-trash mode%s through real successor actions and mixed undo", async field => {
+it.each([8, 9] as const)("native10 loads field-trash mode%s then upgrades only at the eligible producer", async field => {
   const r = rig(); r.leader(1, "OP11-001");
   r.state.schemaVersion = 10; r.state.fieldTrashSemanticsVersion = field;
   const target = r.put("SYN-navy", 1, "CHARACTER", { data: { power: 5000, types: ["Navy"] } });
   for (let i = 0; i < 3; i++) r.put(`SYN-pay-${i}`, 1, "TRASH");
   const source = r.put("SYN-trash-schedule", 0, "CHARACTER", { schema: synSchema("SYN-trash-schedule", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }, { type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] }]) });
   await r.reload();
+  expect(r.state.fieldTrashSemanticsVersion).toBe(field);
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" });
   r.select([target.instanceId]);
-  if (field === 9) {
+  {
     expect(r.promptType()).toBe("OPTIONAL_EFFECT");
     const raw = wire(r.state); raw.fieldTrashSemanticsVersion = 8;
     expect(() => convertPersistedGameState(raw, "state")).toThrow(/replacementBatch.actionKind TRASH_CARD/);
     await r.reload(); r.decline();
-  } else expect(r.state.pendingPrompt).toBeNull();
+  }
   expect(r.state.scheduledActions[0].sourceCardSnapshot?.cardId).toBe(source.cardId);
-  expect(r.state.fieldTrashSemanticsVersion).toBe(field);
+  expect(r.state.fieldTrashSemanticsVersion).toBe(9);
   const prior = wire(rig().state);
   const native9 = { ...prior, schemaVersion: 9 };
   const parsed = parseStoredSession({ state: wire(r.state), undoHistory: [prior, native9, wire(r.state)], cardDb: Object.fromEntries(r.db), mode: "PVP" });
   expect(parsed.undoHistory.map(state => state.schemaVersion)).toEqual([8, 9, 10]);
-  expect(parsed.undoHistory.map(state => state.fieldTrashSemanticsVersion)).toEqual([undefined, undefined, field]);
+  expect(parsed.undoHistory.map(state => state.fieldTrashSemanticsVersion)).toEqual([undefined, undefined, 9]);
 });
 
 it.each([undefined, null, 6, 10, "8"])("native10 rejects missing or invalid field capability %s on read and save", mode => {
@@ -236,4 +238,33 @@ it.each([8, 9, 10] as const)("source%s COST roots reject independent capability 
 it.each([undefined, null, 5, 9, "8"])("native10 rejects invalid cost mode %s independently of valid field mode", mode => {
   const raw = { ...wire(rig().state), schemaVersion: 10, fieldTrashSemanticsVersion: 8, costSemanticsVersion: mode };
   expect(() => convertPersistedGameState(raw, "state")).toThrow(/native10 requires explicit costSemanticsVersion/);
+});
+
+it.each(([8, 9] as const).flatMap(field => ([6, 7, 8] as const).flatMap(cost => [false, true].map(offer => ({ field, cost, offer }))))) ("eligible10 field consequence upgrades immutably: field$field cost$cost offer$offer", ({ field, cost, offer }) => {
+  const r = rig(); r.state.schemaVersion = 10; r.state.fieldTrashSemanticsVersion = field; r.state.costSemanticsVersion = cost;
+  r.leader(1, "OP11-001");
+  r.put("SYN-upgrade-target", 1, "CHARACTER", { data: { power: 5000, types: offer ? ["Navy"] : [] } });
+  for (let i = 0; i < 3; i++) r.put(`SYN-upgrade-payment-${i}`, 1, "TRASH");
+  const source = r.put("SYN-upgrade-source", 0, "CHARACTER", { schema: synSchema("SYN-upgrade-source", [
+    { id: "schedule", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] },
+    { id: "trash", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { all: true } } }] },
+  ]) });
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "schedule" });
+  const input = r.state; const before = structuredClone(input);
+  const result = runPipeline(input, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "trash" }, r.db, 0);
+  expect(result.valid).toBe(true); expect(input).toEqual(before);
+  expect(result.state).toMatchObject({ schemaVersion: 10, fieldTrashSemanticsVersion: 9, costSemanticsVersion: cost });
+  expect(result.state.scheduledActions).toEqual(before.scheduledActions);
+  expect(result.state.scheduledActions[0].sourceCardSnapshot?.cardId).toBe(source.cardId);
+  expect(result.state.effectStack.some(frame => frame.replacementBatch?.actionKind === "TRASH_CARD")).toBe(offer);
+  expect(() => convertPersistedGameState(wire(result.state), "state")).not.toThrow();
+});
+it.each(["hand only", "zero selection"])("native10/field8 %s does not activate the trash capability", path => {
+  const r = rig(); r.state.schemaVersion = 10; r.state.fieldTrashSemanticsVersion = 8;
+  r.put("SYN-no-upgrade-hand", 0, "HAND"); r.put("SYN-no-upgrade-field", 1, "CHARACTER");
+  const source = r.put("SYN-no-upgrade", 0, "CHARACTER", { schema: synSchema("SYN-no-upgrade", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "TRASH_CARD", target: path === "hand only" ? { type: "CARD_IN_HAND", controller: "SELF", count: { all: true } } : { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }] }]) });
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" });
+  if (path === "zero selection") r.select([]);
+  expect(r.state).toMatchObject({ schemaVersion: 10, fieldTrashSemanticsVersion: 8, costSemanticsVersion: 8 });
+  expect(r.state.pendingPrompt).toBeNull();
 });
