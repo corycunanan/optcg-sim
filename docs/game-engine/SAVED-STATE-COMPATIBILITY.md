@@ -998,12 +998,48 @@ refs or schema changes, even if prior-payment event debt is reported. Existing
 event scans remain intact. A committed schedule remains10 if a later action
 terminates; an independent committed field-trash upgrade also survives.
 
-The current isolated writer keeps defaults8 and activates10 at new scheduling
-activation or accepted scheduling-capable COST/ACTION continuation boundaries.
+The current isolated writer `046324c4bf2aa2072c3ba253b9a04c9c9ab0893c`
+(base reader `ab15a965dcda19cf609a6c169abe7b867037c59f`) keeps defaults8
+and activates10 at new scheduling activation or accepted scheduling-capable
+COST/ACTION continuation boundaries. Explicit8/9 must carry recorded cost6|7|8;
+raw callers without that evidence do not invent a mode or promote.
 It preserves field/cost modes and activates before later pauses or destructive
 payment can erase the original. Reader8/9 does not activate this metadata. The
 unchanged actual67cbb COST6/7/8 and ACTION pause artifacts are archived separately
-with producer source hashes; previous draft9/full-only10 corpus bytes remain
-immutable historical evidence. Current reader compatibility uses revised actual
-writer output including those historical producer inputs. Scheduling enablement
-still requires verified deployed reader and a named rollback floor.
+with producer source hashes. The current archive is
+`workers/game/src/__tests__/fixtures/opt-1004-scheduled-resume-writer10/`:
+41 real-pipeline synthetic families and217 actual saved boundaries, including
+20 unchanged historical producer inputs. Reader replay completes every174 saved10
+start plus3 pure8 skip controls (425 actions), checking complete storage, events,
+prompts and IDs. Every217 boundary also loads write-free and resaves exactly.
+Payload SHA256: `61edf23feb3d4bfc916fcb32bbec5e9af510e86a95c158ce1a2acb541158e3d6`;
+manifest SHA256: `72056960286393cdaf522c5a1b09dbce8f76394ff568031bb77b337bc523ec7e`.
+Independent coordinator regeneration matches both files byte-for-byte. The
+archived two-file activation patch and source/generator hashes pin this actual
+producer; they do not enable it on the reader branch.
+
+The sole bounded C3 correction preserves8/9 and exact legacy outcomes when
+ANY_NUMBER cost or an optional action is declined without body work, including
+fully disabled conditional/simultaneous suffixes. Retained payment events alone
+do not prove acceptance. A real THEN DRAW or THEN SCHEDULE suffix is accepted
+progress, as is fully paid progress whose post-cost condition fails. Committed
+scheduling followed by terminal DRAW retains10. The internal execution signal
+is neither saved nor used to alter event scan/publication ownership.
+
+The original14/103 draft9 archive, first21/153 reader-only10 prototype and
+21/156 full-only10 candidate remain byte-for-byte historical evidence; the last
+candidate's new-game10 policy and incomplete historical-resume coverage are
+obsolete. The provisional36/205 resume candidate is separately preserved as
+pre-C3 evidence and does not establish current writer purity. No older archive
+is retagged as current output. Regenerate only at the exact current isolated
+candidate with `OPT1004_WRITER_CAPTURE_DIR=/absolute/new/output-dir pnpm --filter
+optcg-game exec vitest run src/__tests__/opt-1004-writer-producer.test.ts`;
+replay on the reader with `pnpm --filter optcg-game exec vitest run
+src/__tests__/opt-1004-resume-writer-corpus.test.ts`.
+
+The synthetic-only exception remains explicit; production capture, repair,
+retirement and broad historical migration are unclaimed. The accepted unknown
+origin limitation covers absence of full, typed and exact-live evidence; it does
+not cover a known identity4 merely missing a full CardInstance. Scheduling
+enablement still requires verified deployed reader and a named rollback floor.
+New-game/default8 remains unchanged in that future producer-only writer.
