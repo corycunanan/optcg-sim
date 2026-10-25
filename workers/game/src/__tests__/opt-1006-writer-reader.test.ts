@@ -10,12 +10,19 @@ import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { runtime, memory } from "./native7-producer-support.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 interface Capture { producer: string; cases: { stored: Record<string, unknown>; replies: GameAction[] }[]; expected: GameState }
-const bytes = readFileSync(new URL("./fixtures/opt-1006-writer-corpus.json.gz", import.meta.url));
+for (const stage of ["reader", "final-writer"] as const) {
+const stem = stage === "reader" ? "opt-1006-writer-corpus" : "opt-1006-final-writer-corpus";
+const bytes = readFileSync(new URL(`./fixtures/${stem}.json.gz`, import.meta.url));
 const corpus: Record<string, Capture> = JSON.parse(gunzipSync(bytes).toString());
-const manifest = JSON.parse(readFileSync(new URL("./fixtures/opt-1006-writer-corpus.manifest.json", import.meta.url), "utf8")) as { sha256: string; families: Record<string, { producer: string; starts: number; native9Starts: number }> };
-it("OPT-1006 producer corpus matches its immutable manifest hash, families and producer pins", () => {
+const manifest = JSON.parse(readFileSync(new URL(`./fixtures/${stem}.manifest.json`, import.meta.url), "utf8")) as { sha256: string; producer?: string; generatorSha256?: string; rollbackFloor?: string; families: Record<string, { producer: string; starts: number; native9Starts: number }> };
+it(`OPT-1006 ${stage} corpus matches its immutable manifest hash, families and producer pins`, () => {
   expect(createHash("sha256").update(bytes).digest("hex")).toBe(manifest.sha256);
   expect(Object.keys(corpus)).toEqual(Object.keys(manifest.families));
+  if (stage === "final-writer") {
+    expect(manifest.producer).toBe("a529eebceb5b6a933734403d695829335ebb7653");
+    expect(manifest.rollbackFloor).toBe("d8309e70fef64a133ce19d8a2bd327bb625e56fb");
+    expect(createHash("sha256").update(readFileSync(new URL("./opt-1001-field-trash.test.ts", import.meta.url))).digest("hex")).toBe(manifest.generatorSha256);
+  }
   for (const [name, capture] of Object.entries(corpus)) {
     expect(capture.producer).toBe(manifest.families[name].producer);
     expect(capture.cases).toHaveLength(manifest.families[name].starts);
@@ -25,7 +32,7 @@ it("OPT-1006 producer corpus matches its immutable manifest hash, families and p
 const config = { nextJsUrl: "https://x.test", workerSecret: "s" };
 for (const [name, capture] of Object.entries(corpus)) for (const [index, start] of capture.cases.entries()) {
   const raw = (start.stored[SESSION_STORAGE_KEY] as { state: GameState }).state;
-  it(`OPT-1006 frozen producer${raw.schemaVersion} ${name} pause${index}: live/coordinator undo, every reply reload`, async () => {
+  it(`OPT-1006 ${stage} producer${raw.schemaVersion} ${name} pause${index}: live/coordinator undo, every reply reload`, async () => {
     expect(capture.producer).toMatch(/^[a-f0-9]{40}$/);
     const storage = new MemorySessionStorage(); for (const [key, value] of Object.entries(start.stored)) storage.data.set(key, structuredClone(value));
     let snapshot = (await new SessionRepository(storage, config).load())!;
@@ -38,7 +45,7 @@ for (const [name, capture] of Object.entries(corpus)) for (const [index, start] 
       // The six pre8 cases were saved independently, before first-prompt IDs
       // were recorded. They are user-choice scripts, not contiguous ID suffixes.
       // Submit authoritative live IDs for that path; native9 suffixes stay exact.
-      const action = raw.schemaVersion === 8 || !("promptId" in recordedAction) || recordedAction.promptId === undefined ? { ...recordedAction, promptId: prompt.promptId } as GameAction : recordedAction;
+      const action = (stage === "reader" && raw.schemaVersion === 8) || !("promptId" in recordedAction) || recordedAction.promptId === undefined ? { ...recordedAction, promptId: prompt.promptId } as GameAction : recordedAction;
       const routed = coordinator.executeAction(snapshot.state, snapshot.undoHistory, prompt.respondingPlayer, action, snapshot.cardDb as Map<string, CardData>);
       expect(routed.kind, JSON.stringify({ reason: "reason" in routed ? routed.reason : "", action, prompt })).toBe("resume");
       const resumed = resumePromptLifecycle(routed.state, action, snapshot.cardDb, { drainPregame: state => state, advanceStartOfTurn: state => state });
@@ -62,7 +69,7 @@ for (const [name, capture] of Object.entries(corpus)) for (const [index, start] 
       }
     }
     const actual = toPersistedGameState(snapshot.state);
-    if (raw.schemaVersion === 8) {
+    if (stage === "reader" && raw.schemaVersion === 8) {
       // These starts are non-contiguous historical choice scripts. Keep their
       // independently saved bytes immutable; assert gameplay independently,
       // while the actual final writer and floor compare every emitted byte.
@@ -76,7 +83,7 @@ for (const [name, capture] of Object.entries(corpus)) for (const [index, start] 
     } else expect(actual).toEqual(capture.expected);
     expect(snapshot.state.schemaVersion).toBe(9); expect(snapshot.state.pendingPrompt).toBeNull(); expect(snapshot.state.effectStack).toEqual([]);
   });
-  if (raw.effectStack.some(frame => frame.replacementBatch?.actionKind === "TRASH_CARD")) for (const location of ["state", "undoHistory[0]"]) it(`OPT-1006 TRASH_CARD discriminator rejects schema8 ${name} pause${index} ${location}`, async () => {
+  if (raw.effectStack.some(frame => frame.replacementBatch?.actionKind === "TRASH_CARD")) for (const location of ["state", "undoHistory[0]"]) it(`OPT-1006 ${stage} TRASH_CARD discriminator rejects schema8 ${name} pause${index} ${location}`, async () => {
     const malformed = structuredClone(raw); malformed.schemaVersion = 8;
     const storage = new MemorySessionStorage(); for (const [key, value] of Object.entries(start.stored)) storage.data.set(key, structuredClone(value));
     if (location === "state") (storage.data.get("session") as { state: GameState }).state = malformed;
@@ -85,4 +92,5 @@ for (const [name, capture] of Object.entries(corpus)) for (const [index, start] 
     await expect(new SessionRepository(storage, config).load()).rejects.toMatchObject({ name: "SessionLoadError", location, reason: expect.stringMatching(/effectStack\[\d+\]\.replacementBatch.actionKind TRASH_CARD requires schemaVersion 9/) });
     expect(storage.data).toEqual(before); expect(storage.writes).toEqual([]);
   });
+}
 }

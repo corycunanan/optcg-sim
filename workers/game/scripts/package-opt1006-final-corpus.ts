@@ -23,7 +23,7 @@ const manifest = {
   provenance: "Separate final writer source8 setup; canonical authoritative Repository/Coordinator/save/load/reply chain. Historical corpus unchanged. Minimal synthetic sessions under user-approved exception; not production captures.",
   reproduction: [
     `OPT1001_WRITE_CORPUS=CAPTURE_DIRECTORY OPT1001_PRODUCER_SHA=${producer} pnpm --filter optcg-game exec vitest run src/__tests__/opt-1001-field-trash.test.ts`,
-    `pnpm --filter optcg-game exec tsx scripts/package-opt1006-final-corpus.ts CAPTURE_DIRECTORY ${producer}`,
+    `pnpm --filter optcg-game exec node --import tsx scripts/package-opt1006-final-corpus.ts CAPTURE_DIRECTORY ${producer}`,
   ],
   families: Object.fromEntries(Object.entries(corpus).map(([name, capture]) => {
     const typed = capture as { producer: string; cases: { stored: { session: { state: { schemaVersion: number } } } }[] };

@@ -43,7 +43,8 @@ type Access = {
 
 // Actual isolated writer inputs, including recorded prompt IDs. The coordinator
 // clears undo at these mandatory prompts; separate repository tests cover mixed8/9.
-// The reader must finish the same choices through the real Durable Object entry.
+// The current writer executes the first8 selection; after publication the actual
+// floor (when env supplied) recreates the Durable Object for each subsequent reply.
 for (const disposition of ["accept", "decline"]) it(`OPT-1006 setup8→writer9 ${disposition} survives GameSession recreate and duplicate socket response`, async () => {
   const corpus = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/opt-1006-writer-corpus.json.gz", import.meta.url))).toString("utf8"));
   const capture = corpus[`OPT-1001-authored-Beckman-Koby-${disposition}-mode8-reload.json`] as {
