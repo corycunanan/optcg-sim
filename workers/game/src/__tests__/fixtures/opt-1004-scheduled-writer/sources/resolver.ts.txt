@@ -1,0 +1,1673 @@
+import { drainPendingWork } from "../pending-work-drain.js";
+import {
+  createEffectExecutionScope, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
+import { getBattleOpponentInstanceId } from "../events.js";
+import { isGameTerminated } from "../terminal.js";
+import { runRuleProcessingAfterMove } from "../defeat.js";
+import { releaseMovedDonEffects } from "../don-area-effects.js";
+import { finishReplacedLifeCost } from "./cost/replaced.js";
+import { completeHandTrashCostSources, isHandTrashByEffect, TRIGGERING_HAND_TRASH_REF } from "../hand-trash.js";
+import { retainEventParent } from "./event-activation.js";
+import {
+  publishCommittedEvents,
+  retainEventsOnFrame,
+} from "./resume/events.js";
+/**
+ * Core effect resolver — resolveEffect, executeActionChain, action dispatcher.
+ */
+
+import type {
+  Action,
+  ActionOf,
+  CostResult,
+  EffectBlock,
+  EffectResult,
+} from "../effect-types.js";
+import type {
+  CardData,
+  CardInstance,
+  GameState,
+  PendingEvent,
+  PendingPromptState,
+  EffectStackFrame,
+} from "../../types.js";
+import { evaluateCondition, type ConditionContext } from "../conditions.js";
+import { postCostConditionsMet } from "./post-cost.js";
+import {
+  CONTINUATION_EFFECT_BLOCK,
+  pushFrame,
+  generateFrameId,
+  updateTopFrame,
+} from "../effect-stack.js";
+import { findCardInstance } from "../state.js";
+import { insertFrameAt } from "../damage-frames.js";
+import { isHandlerOwnedFrame } from "../frame-kinds.js";
+import type {
+  EffectResolverResult,
+  ActionResult,
+  ActionHandler,
+  ActionHandlerMap,
+  EffectResolverServices,
+} from "./types.js";
+import { COST_DON_GIVEN_REF } from "./types.js";
+import {
+  markOncePerTurnUsed,
+  extractEffectDescription,
+  optionalClauseDescription,
+  resolveAmount,
+  sourceTextForBlock,
+} from "./action-utils.js";
+import { isCostSequencePayable, payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
+import {
+  pushBatchResumeFrame,
+} from "./resume-core.js";
+import { buildSelectTargetPrompt } from "./target-resolver.js";
+import {
+  SIMULTANEOUS_ACTION_TYPES,
+  isSimultaneousGroupStart,
+  planSimultaneousGroup,
+  simultaneousGroupEnd,
+  type SimultaneousGroupPlan,
+} from "./simultaneous.js";
+
+// Action handlers
+import * as drawSearch from "./actions/draw-search.js";
+import * as modifiers from "./actions/modifiers.js";
+import * as removal from "./actions/removal.js";
+import * as life from "./actions/life.js";
+import * as don from "./actions/don.js";
+import * as play from "./actions/play.js";
+import * as handDeck from "./actions/hand-deck.js";
+import * as effects from "./actions/effects.js";
+import * as battleActions from "./actions/battle-actions.js";
+import {
+  executeChooseValue,
+  executePlayerChoice,
+  executeOpponentAction,
+  executeReuseEffect,
+} from "./actions/choice.js";
+import { log } from "../../lib/log.js";
+import {
+  consumeResolutionAction,
+  terminateForEngineContract,
+} from "../engine-limits.js";
+
+import {
+  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER,
+  ALL_ACTION_TYPES,
+  TRIGGERING_CARD_REF,
+  BATTLE_TARGET_REF,
+  EFFECT_SOURCE_SNAPSHOT_REF,
+  isOncePerTurnBlock,
+  getNestedActions,
+  type ActionType,
+} from "../effect-types.js";
+
+// ─── Action dispatcher map ───────────────────────────────────────────────────
+
+const ACTION_HANDLERS: Partial<ActionHandlerMap> = {
+  // Draw / search
+  DRAW: drawSearch.executeDraw,
+  SEARCH_DECK: drawSearch.executeSearchDeck,
+  SEARCH_TRASH_THE_REST: drawSearch.executeSearchTrashTheRest,
+  MILL: drawSearch.executeMill,
+  FULL_DECK_SEARCH: drawSearch.executeFullDeckSearch,
+  DECK_SCRY: drawSearch.executeDeckScry,
+
+  // Modifiers
+  MODIFY_POWER: modifiers.executeModifyPower,
+  MODIFY_COST: modifiers.executeModifyCost,
+  GRANT_KEYWORD: modifiers.executeGrantKeyword,
+  GRANT_ATTRIBUTE: modifiers.executeGrantAttribute,
+  NEGATE_EFFECTS: modifiers.executeNegateEffects,
+  SET_BASE_POWER: modifiers.executeSetBasePower,
+  SET_POWER_TO_ZERO: modifiers.executeSetPowerToZero,
+  COPY_POWER: modifiers.executeCopyPower,
+  SWAP_BASE_POWER: modifiers.executeSwapBasePower,
+
+  // Removal
+  KO: removal.executeKO,
+  RETURN_TO_HAND: removal.executeReturnToHand,
+  RETURN_TO_DECK: removal.executeReturnToDeck,
+  TRASH_CARD: removal.executeTrashCard,
+  TRASH_FROM_HAND: removal.executeTrashFromHand,
+
+  // Life
+  ADD_TO_LIFE: life.executeAddToLife,
+  ADD_TO_LIFE_FROM_DECK: life.executeAddToLifeFromDeck,
+  TRASH_FROM_LIFE: life.executeTrashFromLife,
+  TURN_LIFE_FACE_UP: life.executeTurnLifeFaceUp,
+  TURN_LIFE_FACE_DOWN: life.executeTurnLifeFaceDown,
+  TURN_ALL_LIFE_FACE_DOWN: life.executeTurnAllLifeFaceDown,
+  LIFE_TO_HAND: life.executeLifeToHand,
+  ADD_TO_LIFE_FROM_HAND: life.executeAddToLifeFromHand,
+  ADD_TO_LIFE_FROM_FIELD: life.executeAddToLifeFromField,
+  PLAY_FROM_LIFE: life.executePlayFromLife,
+  LIFE_CARD_TO_DECK: life.executeLifeCardToDeck,
+  TRASH_FACE_UP_LIFE: life.executeTrashFaceUpLife,
+  LIFE_SCRY: life.executeLifeScry,
+  DRAIN_LIFE_TO_THRESHOLD: life.executeDrainLifeToThreshold,
+  REORDER_ALL_LIFE: life.executeReorderAllLife,
+
+  // DON
+  GIVE_DON: don.executeGiveDon,
+  ADD_DON_FROM_DECK: don.executeAddDonFromDeck,
+  FORCE_OPPONENT_DON_RETURN: don.executeForceOpponentDonReturn,
+  SET_DON_ACTIVE: don.executeSetDonActive,
+  REST_OPPONENT_DON: don.executeRestOpponentDon,
+  RETURN_DON_TO_DECK: don.executeReturnDonToDeck,
+  REST_DON: don.executeRestDon,
+  DISTRIBUTE_DON: don.executeDistributeDon,
+  REDISTRIBUTE_DON: don.executeRedistributeDon,
+  GIVE_OPPONENT_DON_TO_OPPONENT: don.executeGiveOpponentDonToOpponent,
+
+  // Play / state
+  PLAY_CARD: (
+    state,
+    action,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs,
+    preselectedTargets
+  ) =>
+    play.executePlayCard(
+      state,
+      action,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      preselectedTargets
+    ),
+  PLAY_SELF: play.executePlaySelf,
+  SET_ACTIVE: play.executeSetActive,
+  SET_REST: play.executeSetRest,
+  ACTIVATE_EVENT_FROM_HAND: play.executeActivateEventFromHand,
+  ACTIVATE_EVENT_FROM_TRASH: play.executeActivateEventFromTrash,
+
+  // Hand / deck
+  PLACE_HAND_TO_DECK: handDeck.executePlaceHandToDeck,
+  RETURN_HAND_TO_DECK: handDeck.executeReturnHandToDeck,
+  HAND_WHEEL: handDeck.executeHandWheel,
+  SHUFFLE_DECK: handDeck.executeShuffleDeck,
+  REVEAL: handDeck.executeReveal,
+  REVEAL_HAND: handDeck.executeRevealHand,
+  SEARCH_AND_PLAY: handDeck.executeSearchAndPlay,
+
+  // Effects / scheduling
+  APPLY_PROHIBITION: effects.executeApplyProhibition,
+  SCHEDULE_ACTION: effects.executeScheduleAction,
+  APPLY_ONE_TIME_MODIFIER: effects.executeApplyOneTimeModifier,
+  SET_COST: effects.executeSetCost,
+  WIN_GAME: effects.executeWinGame,
+  NEGATE_TRIGGER_TYPE: effects.executeNegateTriggerType,
+  EXTRA_TURN: effects.executeExtraTurn,
+
+  // Battle
+  REDIRECT_ATTACK: battleActions.executeRedirectAttack,
+  DEAL_DAMAGE: battleActions.executeDealDamage,
+  SELF_TAKE_DAMAGE: battleActions.executeSelfTakeDamage,
+
+  // Choice
+  PLAYER_CHOICE: executePlayerChoice,
+  OPPONENT_CHOICE: executePlayerChoice, // same handler, chooser determined inside
+  CHOOSE_VALUE: executeChooseValue,
+  OPPONENT_ACTION: executeOpponentAction,
+  REUSE_EFFECT: executeReuseEffect,
+};
+
+function getActionHandler<K extends ActionType>(
+  action: ActionOf<K>
+): ActionHandler<K> | undefined {
+  // TypeScript cannot retain the correlation between a computed union key and
+  // its mapped value. Keep that one assertion at the dispatcher boundary.
+  return ACTION_HANDLERS[action.type] as ActionHandler<K> | undefined;
+}
+
+/** Runtime handler inventory consumed by the authored-action CI contract. */
+export function listRegisteredActionTypes(): ActionType[] {
+  return Object.keys(ACTION_HANDLERS).sort() as ActionType[];
+}
+
+// OPT-200: drift detection between the `ActionType` union and `ACTION_HANDLERS`.
+// Members listed here resolve through a different path or are referenced by
+// zero schemas:
+//   - RETURN_ATTACHED_DON_TO_COST is shared with the Cost union and resolves
+//     through cost-handler.ts.
+//   - GRANT_COUNTER / REMOVE_PROHIBITION are declared in the
+//     union but referenced by zero schemas. Schema validation rejects authored
+//     uses until a real handler is registered.
+//
+// Adding a new ActionType without registering a handler or adding it here trips
+// this assertion at worker boot rather than no-op'ing in production.
+const KNOWN_UNHANDLED_ACTION_TYPES: ReadonlySet<ActionType> = new Set(
+  ACTION_TYPES_WITHOUT_RESOLVER_HANDLER
+);
+
+const _missingActionHandlers = ALL_ACTION_TYPES.filter(
+  (t) => !(t in ACTION_HANDLERS) && !KNOWN_UNHANDLED_ACTION_TYPES.has(t)
+);
+if (_missingActionHandlers.length > 0) {
+  throw new Error(
+    `[resolver] ActionType union has unhandled types: ${_missingActionHandlers.join(", ")}. ` +
+      `Register a handler in ACTION_HANDLERS or add to KNOWN_UNHANDLED_ACTION_TYPES.`
+  );
+}
+
+/** Each synchronous caller owns its events until a descendant publication boundary.
+ * Child services expose that prefix before nested execution can publish. Once a
+ * call returns, existing frames own any unpublished events across persistence.
+ */
+function createResolverServices(
+  publishPrefix: (state: GameState) => GameState = (state) => state
+): EffectResolverServices {
+  const services: EffectResolverServices = {
+    withCommittedEvents: (events) =>
+      createResolverServices((state) =>
+        publishCommittedEvents(publishPrefix(state), events)
+      ),
+    publishCommittedEvents: publishPrefix,
+    executeActionChain: (
+      state,
+      actions,
+      source,
+      controller,
+      db,
+      refs,
+      description,
+      succeeded
+    ) =>
+      executeActionChain(
+        state,
+        actions,
+        source,
+        controller,
+        db,
+        refs,
+        description,
+        succeeded,
+        services
+      ),
+    executeEffectAction: (
+      state,
+      action,
+      source,
+      controller,
+      db,
+      refs,
+      targets
+    ) =>
+      executeEffectAction(
+        state,
+        action,
+        source,
+        controller,
+        db,
+        refs,
+        targets,
+        services
+      ),
+    resolveEffect: (
+      state,
+      block,
+      source,
+      controller,
+      db,
+      triggering,
+      event,
+      snapshot
+    ) =>
+      resolveEffectWork(
+        state,
+        block,
+        source,
+        controller,
+        db,
+        triggering,
+        services,
+        event,
+        snapshot
+      ),
+    continueSimultaneousGroup: (...args) =>
+      continueSimultaneousGroup(...args, services),
+    reportTriggers: (state, triggers, _cardDb, events = [], group) => {
+      if (isGameTerminated(state))
+        return { kind: "terminal", state, events, resolved: false };
+      if (!triggerExecutionOwner(state)) {
+        if (!triggers.length)
+          return { kind: "continued", state, events, resolved: true };
+        const queued = createTriggerExecution(state, triggers, group);
+        return { ...queued, events };
+      }
+      return reportTriggerWork(state, triggers, events, group);
+    },
+    continueHandler: (state, _cardDb, events = []) => ({
+      kind: isGameTerminated(state) ? "terminal" : "continued", state, events, resolved: true,
+    }),
+  };
+  return services;
+}
+export const resolverExecutionServices = Object.freeze(
+  createResolverServices()
+);
+
+// ─── resolveEffect ───────────────────────────────────────────────────────────
+
+/**
+ * OPT-797: "the opponent's Character you battled with" — the BATTLE_TARGET
+ * reference seeded from the battle event that triggered this effect.
+ */
+export function battleTargetRefFor(
+  triggeringEvent: PendingEvent | undefined,
+  sourceCardInstanceId: string,
+): [string, EffectResult] | null {
+  const opposing = getBattleOpponentInstanceId(triggeringEvent, sourceCardInstanceId);
+  return opposing ? [BATTLE_TARGET_REF, { targetInstanceIds: [opposing], count: 1 }] : null;
+}
+
+/** Public convenience boundary; engine handlers use resolveEffectWork. */
+export function resolveEffect(
+  ...args: Parameters<typeof resolveEffectCore>
+): EffectResolverResult {
+  const owned = triggerExecutionOwner(args[0]);
+  const result = resolveEffectWork(...args);
+  if (
+    owned ||
+    (!result.resolved && !result.pendingPrompt && !result.events.length)
+  )
+    return result;
+  return drainPendingWork(
+    result,
+    args[4],
+    args[6] ?? resolverExecutionServices
+  );
+}
+
+/** Execute one effect body and report its children to the common drain. */
+export function resolveEffectWork(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
+  if (triggerExecutionOwner(args[0])) return resolveEffectCore(...args);
+  const initialState = args[0];
+  args[0] = createEffectExecutionScope(initialState, args[2], args[3]);
+  const result = resolveEffectCore(...args);
+  if (!isGameTerminated(result.state) && !result.pendingPrompt &&
+      !result.resolved && result.events.length === 0) {
+    return { ...result, state: initialState };
+  }
+  return result;
+}
+
+/** Execute an obligation whose creating effect already activated. A departed
+ * origin is provenance, unlike a queued trigger's activation eligibility.
+ */
+export function resolveScheduledEffectWork(
+  state: GameState,
+  entry: import("../../types.js").EndPhaseScheduledAction,
+  cardDb: Map<string, CardData>,
+): EffectResolverResult {
+  return resolveEffectWork(state, {
+    id: "scheduled_" + entry.sourceEffectId,
+    category: "auto",
+    actions: [entry.action],
+  }, entry.sourceEffectId, entry.controller, cardDb,
+  undefined, undefined, undefined, undefined, entry.sourceCardSnapshot);
+}
+
+function actionsCanSchedule(actions: readonly Action[] | undefined): boolean {
+  return actions?.some(action => action.type === "SCHEDULE_ACTION" || actionsCanSchedule(getNestedActions(action))) ?? false;
+}
+
+function resolveEffectCore(
+  state: GameState,
+  block: EffectBlock,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  triggeringCardInstanceId?: string | null,
+  services: EffectResolverServices = resolverExecutionServices,
+  triggeringEvent?: PendingEvent,
+  sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot,
+  activatedSource?: import("../../types.js").CardInstance
+): EffectResolverResult {
+  const events: PendingEvent[] = [];
+  const logCtx = {
+    blockId: block.id,
+    category: block.category,
+    sourceInstanceId: sourceCardInstanceId,
+    controller,
+  };
+
+  // OPT-960: nothing activates or resolves after a terminal outcome.
+  if (isGameTerminated(state)) return { state, events, resolved: false };
+
+  // Rule 8-1-3-1-3: this boundary starts queued activation, never resumes it.
+  // On K.O. matches already name the fresh Trash instance (10-2-17-2).
+  // Any subsequent zone change creates another ID and invalidates this queue.
+  if (sourceSnapshot && !findCardInstance(state, sourceSnapshot.instanceId)) {
+    return { state, events, resolved: false, effectNotActivated: true };
+  }
+
+  // Guard: reject once-per-turn effects already used this turn
+  if (isOncePerTurnBlock(block)) {
+    const usedSet = state.turn.oncePerTurnUsed[block.id];
+    if (usedSet?.includes(sourceCardInstanceId)) {
+      log("effect.skipped", { ...logCtx, reason: "once_per_turn_used" });
+      return { state, events, resolved: false, effectNotActivated: true };
+    }
+  }
+
+  const condCtx: ConditionContext = {
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+  };
+
+  // Extract block-specific effect description for prompts
+  const sourceCard = findCardInstance(state, sourceCardInstanceId);
+  const sourceCardData = cardDb.get(
+    activatedSource?.cardId ?? sourceSnapshot?.cardId ?? sourceCard?.cardId ?? ""
+  );
+  const sourceSnapshotRef: [string, EffectResult][] = activatedSource || sourceCard
+    ? [
+        [
+          EFFECT_SOURCE_SNAPSHOT_REF,
+          {
+            targetInstanceIds: [],
+            count: 0,
+            ...(activatedSource
+              ? { sourceCardSnapshot: activatedSource }
+              : sourceSnapshot
+                ? { sourceIdentity: sourceSnapshot, sourceCardSnapshot: { ...structuredClone(sourceCard!), controller: sourceSnapshot.controller } }
+                : { sourceCardSnapshot: structuredClone(sourceCard!) }),
+          },
+        ],
+      ]
+    : [];
+  if (
+    triggeringEvent &&
+    isHandTrashByEffect(triggeringEvent) &&
+    triggeringEvent.type === "CARD_TRASHED"
+  ) {
+    sourceSnapshotRef.push([
+      TRIGGERING_HAND_TRASH_REF,
+      {
+        targetInstanceIds: [],
+        count: triggeringEvent.payload?.count ?? 0,
+      },
+    ]);
+  }
+  // OPT-797: rides with the other context refs into the optional-prompt
+  // frame, the cost-prompt frame and the action chain.
+  const battleTargetRef = battleTargetRefFor(
+    triggeringEvent,
+    sourceCardInstanceId
+  );
+  if (battleTargetRef) sourceSnapshotRef.push(battleTargetRef);
+  const fullText = sourceTextForBlock(sourceCardData, block);
+  const blockDescription = extractEffectDescription(fullText, block);
+
+  // Step 1: Evaluate block-level conditions
+  if (block.conditions) {
+    if (!evaluateCondition(state, block.conditions, condCtx)) {
+      log("effect.skipped", { ...logCtx, reason: "conditions_not_met" });
+      return { state, events, resolved: false };
+    }
+  }
+
+  // Scheduling work needs durable origin even if costs or an optional choice
+  // park before SCHEDULE_ACTION itself. Promote shape, never cost capability.
+  if (state.schemaVersion !== 9 && actionsCanSchedule(block.actions)) {
+    state = { ...state, schemaVersion: 9,
+      costSemanticsVersion: state.costSemanticsVersion ?? (state.schemaVersion === 7 ? 7 : 6) };
+  }
+
+  // Step 2: Check optional flag — prompt the player before paying costs
+  if (block.flags?.optional) {
+    // OPT-864: rule 8-3-1-3 — an activation cost that cannot be paid in full
+    // (in printed order, 8-3-1-1) cannot be paid at all, so the effect is not
+    // activated. Skip before offering the prompt: accepting would pay nothing
+    // and run nothing (OP07-079 Lucci, EB04-042 Alpha with a short deck).
+    // Same evaluator and same state as the payment's own upfront check.
+    if (
+      block.costs?.length &&
+      !isCostSequencePayable(
+        state,
+        block.costs,
+        controller,
+        cardDb,
+        sourceCardInstanceId
+      )
+    ) {
+      log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
+      return { state, events, resolved: false, effectNotActivated: true };
+    }
+
+    const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
+    const frameId = generateFrameId(state);
+    state = frameId.state;
+
+    const frame: EffectStackFrame = {
+      id: frameId.id,
+      sourceCardInstanceId,
+      controller,
+      effectDescription: blockDescription,
+      effectBlock: block,
+      phase: "AWAITING_OPTIONAL_RESPONSE",
+      pausedAction: null,
+      remainingActions: block.actions ?? [],
+      resultRefs: [
+        ...sourceSnapshotRef,
+        ...(triggeringCardInstanceId
+          ? [
+              [
+                TRIGGERING_CARD_REF,
+                {
+                  targetInstanceIds: [triggeringCardInstanceId],
+                  count: 1,
+                },
+              ] as [string, EffectResult],
+            ]
+          : []),
+      ],
+      validTargets: [],
+      costs: block.costs ?? [],
+      currentCostIndex: 0,
+      costsPaid: false,
+      oncePerTurnMarked: false,
+      costResultRefs: [],
+      pendingTriggers: [],
+      simultaneousTriggers: [],
+      accumulatedEvents: [],
+    };
+    state = pushFrame(state, frame);
+    if (isGameTerminated(state)) {
+      return { state, events, resolved: false };
+    }
+
+    const pendingPrompt: PendingPromptState = {
+      options: {
+        promptType: "OPTIONAL_EFFECT",
+        effectDescription: blockDescription,
+        cards,
+      },
+      respondingPlayer: controller,
+      resumeContext: frame.id,
+    };
+    log("effect.prompt", { ...logCtx, phase: "optional_prompt" });
+    return { state, events, resolved: false, pendingPrompt };
+  }
+
+  // Step 3: Pay costs (with player selection support)
+  let costResult: CostResult | undefined;
+  if (block.costs && block.costs.length > 0) {
+    const costPayResult = payCostsWithSelection(
+      state,
+      block.costs,
+      0,
+      controller,
+      cardDb,
+      sourceCardInstanceId,
+      block,
+      services,
+      blockDescription
+    );
+
+    if (costPayResult.replaced) {
+      return finishReplacedLifeCost(
+        costPayResult.state,
+        [...events, ...costPayResult.events],
+        block,
+        sourceCardInstanceId,
+        controller,
+        [],
+        cardDb,
+        services,
+        new Map(sourceSnapshotRef)
+      );
+    }
+
+    if (costPayResult.cannotPay) {
+      state = costPayResult.state;
+      log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
+      return { state, events, resolved: false, effectNotActivated: true };
+    }
+
+    state = costPayResult.state;
+    completeHandTrashCostSources(
+      costPayResult.events,
+      state,
+      sourceCardInstanceId,
+      controller,
+      new Map(sourceSnapshotRef)
+    );
+    events.push(...costPayResult.events);
+    costResult = costPayResult.costResult;
+    // OPT-862: a cost that ended the game leaves no action to run.
+    if (isGameTerminated(state)) return { state, events, resolved: true };
+
+    if (costPayResult.pendingPrompt) {
+      // Seed the newly-created cost continuation with the pre-payment source.
+      const frame = state.effectStack.at(-1);
+      if (frame && sourceSnapshotRef.length > 0) {
+        state = {
+          ...state,
+          effectStack: [
+            ...state.effectStack.slice(0, -1),
+            {
+              ...frame,
+              resultRefs: [...frame.resultRefs, ...sourceSnapshotRef],
+            },
+          ],
+        };
+      }
+      log("effect.prompt", { ...logCtx, phase: "cost_selection" });
+      return {
+        state,
+        events,
+        resolved: false,
+        pendingPrompt: costPayResult.pendingPrompt,
+      };
+    }
+  }
+
+  // Mark once-per-turn as used
+  if (isOncePerTurnBlock(block)) {
+    state = markOncePerTurnUsed(state, block.id, sourceCardInstanceId);
+  }
+
+  // Step 4: Execute action chain — gated by the post-colon "If" (OPT-437),
+  // evaluated exactly once now that costs are fully paid.
+  if (
+    !postCostConditionsMet(
+      state,
+      block,
+      sourceCardInstanceId,
+      controller,
+      cardDb
+    )
+  ) {
+    log("effect.skipped", {
+      ...logCtx,
+      reason: "post_cost_conditions_not_met",
+    });
+    return { state, events, resolved: true };
+  }
+  if (block.actions && block.actions.length > 0) {
+    let initialRefs = costResultToRefs(costResult);
+    if (sourceSnapshotRef.length > 0) {
+      initialRefs = initialRefs ?? new Map<string, EffectResult>();
+      for (const [key, value] of sourceSnapshotRef) initialRefs.set(key, value);
+    }
+    if (triggeringCardInstanceId) {
+      initialRefs = initialRefs ?? new Map<string, EffectResult>();
+      initialRefs.set(TRIGGERING_CARD_REF, {
+        targetInstanceIds: [triggeringCardInstanceId],
+        count: 1,
+      });
+    }
+    const stackDepth = state.effectStack.length;
+    const chainResult = services
+      .withCommittedEvents(events)
+      .executeActionChain(
+        state,
+        block.actions,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        initialRefs,
+        blockDescription,
+        undefined
+      );
+    state = chainResult.state;
+    events.push(...chainResult.events);
+
+    if (chainResult.pendingPrompt) {
+      state = retainEventsOnFrame(state, stackDepth, events);
+      log("effect.prompt", { ...logCtx, phase: "action_chain" });
+      return {
+        state,
+        events,
+        resolved: false,
+        pendingPrompt: chainResult.pendingPrompt,
+      };
+    }
+  }
+
+  log("effect.resolved", { ...logCtx, eventCount: events.length });
+  return { state, events, resolved: true };
+}
+
+// ─── Action Chain ─────────────────────────────────────────────────────────────
+
+export interface ChainResult {
+  state: GameState;
+  events: PendingEvent[];
+  pendingPrompt?: PendingPromptState;
+}
+
+type UpToResourceAction =
+  | ActionOf<"ADD_DON_FROM_DECK">
+  | ActionOf<"ADD_TO_LIFE_FROM_DECK">
+  | ActionOf<"SET_DON_ACTIVE">
+  | ActionOf<"TRASH_FROM_LIFE">;
+
+function isUpToResourceAction(action: Action): action is UpToResourceAction {
+  return (
+    (action.type === "ADD_DON_FROM_DECK" ||
+      action.type === "ADD_TO_LIFE_FROM_DECK" ||
+      action.type === "SET_DON_ACTIVE" ||
+      action.type === "TRASH_FROM_LIFE") &&
+    action.params?.up_to === true
+  );
+}
+
+function availableUpToAmount(
+  state: GameState,
+  action: UpToResourceAction,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>
+): number {
+  const requested = Math.max(
+    0,
+    resolveAmount(
+      action.params?.amount ?? 1,
+      resultRefs,
+      state,
+      controller,
+      cardDb
+    )
+  );
+  const player = state.players[controller];
+  const available =
+    action.type === "ADD_DON_FROM_DECK"
+      ? player.donDeck.length
+      : action.type === "ADD_TO_LIFE_FROM_DECK"
+        ? player.deck.length
+        : action.type === "TRASH_FROM_LIFE"
+          ? state.players[life.trashFromLifeOwner(action, controller)].life.length
+          : player.donCostArea.filter((don) => don.state === "RESTED").length;
+  return Math.min(requested, available);
+}
+
+function expandUpToResourceAction(
+  state: GameState,
+  action: UpToResourceAction,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>
+): [ActionOf<"CHOOSE_VALUE">, Action] {
+  const resultRef = "__engine_up_to_amount";
+  const max = availableUpToAmount(
+    state,
+    action,
+    controller,
+    cardDb,
+    resultRefs
+  );
+  const chooseAction: ActionOf<"CHOOSE_VALUE"> = {
+    type: "CHOOSE_VALUE",
+    params: { domain: "NUMBER", constraints: { min: 0, max } },
+    result_ref: resultRef,
+    chain: action.chain,
+  };
+  const resumedAction = {
+    ...action,
+    chain: "IF_DO",
+    params: {
+      ...action.params,
+      amount: { type: "CHOSEN_VALUE", ref: resultRef },
+      up_to: false,
+    },
+  } as Action;
+  return [chooseAction, resumedAction];
+}
+
+function promptForSimultaneousSelection(
+  state: GameState,
+  plan: SimultaneousGroupPlan,
+  actionIndex: number,
+  validTargetIds: string[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>
+): ChainResult {
+  const action = plan.actions[actionIndex];
+  const resultRefs = new Map<string, EffectResult>(plan.resultRefs);
+  const promptResult = buildSelectTargetPrompt(
+    state,
+    action,
+    validTargetIds,
+    sourceCardInstanceId,
+    controller,
+    cardDb,
+    resultRefs
+  );
+  if (!promptResult.pendingPrompt) return { state, events: [] };
+
+  const frameId = generateFrameId(state);
+  const frame: EffectStackFrame = {
+    id: frameId.id,
+    sourceCardInstanceId,
+    controller,
+    effectDescription: plan.effectDescription,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_TARGET_SELECTION",
+    pausedAction: action,
+    remainingActions: plan.followingActions,
+    resultRefs: plan.resultRefs,
+    validTargets: validTargetIds,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+    simultaneousGroup: plan,
+  };
+  const nextState = pushFrame(frameId.state, frame);
+  if (isGameTerminated(nextState)) return { state: nextState, events: [] };
+
+  let prompt = { ...promptResult.pendingPrompt, resumeContext: frame.id };
+  if (plan.effectDescription && prompt.options) {
+    prompt = {
+      ...prompt,
+      options: {
+        ...prompt.options,
+        effectDescription: plan.effectDescription,
+      } as typeof prompt.options,
+    };
+  }
+  return { state: nextState, events: [], pendingPrompt: prompt };
+}
+
+/**
+ * Continue an AND transaction. Planning reads one unchanged snapshot and may
+ * pause repeatedly for choices; handlers run only after every target is
+ * locked. Events are returned only after the whole group commits.
+ */
+export function continueSimultaneousGroup(
+  state: GameState,
+  plan: SimultaneousGroupPlan,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices = resolverExecutionServices
+): ChainResult {
+  const unsupportedAction = plan.actions.find(
+    (action) =>
+      !SIMULTANEOUS_ACTION_TYPES.has(action.type) || action.optional === true
+  );
+  if (unsupportedAction) {
+    const terminated = terminateForEngineContract(state, {
+      kind: "ENGINE_CONTRACT",
+      contract: "ACTION_HANDLER",
+      actionType: unsupportedAction.type,
+      sourceCardInstanceId,
+      message: unsupportedAction.optional
+        ? `An optional '${unsupportedAction.type}' cannot be decided inside an AND transaction`
+        : `Action type '${unsupportedAction.type}' cannot commit inside an AND transaction`,
+    });
+    return { state: terminated, events: [] };
+  }
+
+  const dependentTail = plan.followingActions[0];
+  if (dependentTail?.chain === "IF_DO") {
+    const terminated = terminateForEngineContract(state, {
+      kind: "ENGINE_CONTRACT",
+      contract: "ACTION_HANDLER",
+      actionType: dependentTail.type,
+      sourceCardInstanceId,
+      message:
+        "IF_DO cannot follow an AND transaction until group-success semantics are defined",
+    });
+    return { state: terminated, events: [] };
+  }
+
+  const planning = planSimultaneousGroup(
+    state,
+    plan,
+    sourceCardInstanceId,
+    controller,
+    cardDb
+  );
+  if (planning.selection) {
+    return promptForSimultaneousSelection(
+      state,
+      planning.plan,
+      planning.selection.actionIndex,
+      planning.selection.validTargetIds,
+      sourceCardInstanceId,
+      controller,
+      cardDb
+    );
+  }
+
+  const resultRefs = new Map<string, EffectResult>(planning.plan.resultRefs);
+  const events: PendingEvent[] = [];
+  let nextState = state;
+
+  for (let index = 0; index < planning.plan.actions.length; index++) {
+    const action = planning.plan.actions[index];
+    const lock = planning.plan.locks[index];
+    if (!lock?.execute) continue;
+    const result = services
+      .withCommittedEvents(events)
+      .executeEffectAction(
+        nextState,
+        action,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+        lock.targetInstanceIds
+      );
+    nextState = result.state;
+    events.push(...result.events);
+    if (isGameTerminated(nextState)) return { state: nextState, events };
+    if (result.pendingPrompt || result.pendingBatchTriggers) {
+      nextState = terminateForEngineContract(nextState, {
+        kind: "ENGINE_CONTRACT",
+        contract: "ACTION_HANDLER",
+        actionType: action.type,
+        sourceCardInstanceId,
+        message: `Action type '${action.type}' opened an unsupported continuation during an AND commit`,
+      });
+      return { state: nextState, events };
+    }
+    if (action.result_ref && result.result)
+      resultRefs.set(action.result_ref, result.result);
+  }
+
+  if (planning.plan.followingActions.length === 0)
+    return { state: nextState, events };
+  const tail = services
+    .withCommittedEvents(events)
+    .executeActionChain(
+      nextState,
+      planning.plan.followingActions,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      planning.plan.effectDescription
+    );
+  return {
+    state: tail.pendingPrompt
+      ? retainEventsOnFrame(tail.state, nextState.effectStack.length, events)
+      : tail.state,
+    events: [...events, ...tail.events],
+    ...(tail.pendingPrompt ? { pendingPrompt: tail.pendingPrompt } : {}),
+  };
+}
+
+export function executeActionChain(
+  state: GameState,
+  actions: Action[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  initialResultRefs?: Map<string, EffectResult>,
+  effectDescription?: string,
+  priorActionSucceeded?: boolean,
+  services: EffectResolverServices = resolverExecutionServices
+): ChainResult {
+  const events: PendingEvent[] = [];
+  const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
+  let lastActionSucceeded = priorActionSucceeded ?? true;
+  // OPT-960: a terminal checkpoint earlier in this resolution ends play.
+  if (isGameTerminated(state)) return { state, events };
+
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+
+    // A simultaneous group can itself be the dependent side of IF_DO. When
+    // the dependency failed, skip the complete group rather than allowing an
+    // AND sibling to escape as a standalone action.
+    if (
+      action.chain === "IF_DO" &&
+      (i > 0 || priorActionSucceeded !== undefined) &&
+      !lastActionSucceeded
+    ) {
+      lastActionSucceeded = false;
+      if (isSimultaneousGroupStart(actions, i))
+        i = simultaneousGroupEnd(actions, i);
+      continue;
+    }
+
+    if (isSimultaneousGroupStart(actions, i)) {
+      const end = simultaneousGroupEnd(actions, i);
+      const group = actions.slice(i, end + 1);
+      const plan: SimultaneousGroupPlan = {
+        actions: group,
+        locks: [],
+        nextActionIndex: 0,
+        followingActions: actions.slice(end + 1),
+        resultRefs: [...resultRefs.entries()],
+        effectDescription,
+      };
+      const groupResult = services
+        .withCommittedEvents(events)
+        .continueSimultaneousGroup(
+          state,
+          plan,
+          sourceCardInstanceId,
+          controller,
+          cardDb
+        );
+      return {
+        state: groupResult.pendingPrompt
+          ? retainEventsOnFrame(
+              groupResult.state,
+              state.effectStack.length,
+              events
+            )
+          : groupResult.state,
+        events: [...events, ...groupResult.events],
+        ...(groupResult.pendingPrompt
+          ? { pendingPrompt: groupResult.pendingPrompt }
+          : {}),
+      };
+    }
+
+    // Check inline conditions
+    if (action.conditions) {
+      const condCtx: ConditionContext = {
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+      };
+      if (!evaluateCondition(state, action.conditions, condCtx)) {
+        lastActionSucceeded = false;
+        continue;
+      }
+    }
+
+    // OPT-799: clause-level "you may". The connector and the inline condition
+    // were checked first ("Then, if you have 2 or more Life cards, you may…"
+    // asks only when the condition holds); now the controller chooses.
+    if (action.optional === true) {
+      return pauseForOptionalAction(
+        state,
+        action,
+        actions.slice(i + 1),
+        resultRefs,
+        lastActionSucceeded,
+        sourceCardInstanceId,
+        controller,
+        effectDescription,
+        events
+      );
+    }
+
+    if (isUpToResourceAction(action)) {
+      const expanded = expandUpToResourceAction(
+        state,
+        action,
+        controller,
+        cardDb,
+        resultRefs
+      );
+      const continuation = services
+        .withCommittedEvents(events)
+        .executeActionChain(
+          state,
+          [...expanded, ...actions.slice(i + 1)],
+          sourceCardInstanceId,
+          controller,
+          cardDb,
+          resultRefs,
+          effectDescription,
+          lastActionSucceeded
+        );
+      return {
+        state: continuation.pendingPrompt
+          ? retainEventsOnFrame(
+              continuation.state,
+              state.effectStack.length,
+              events
+            )
+          : continuation.state,
+        events: [...events, ...continuation.events],
+        ...(continuation.pendingPrompt
+          ? { pendingPrompt: continuation.pendingPrompt }
+          : {}),
+      };
+    }
+
+    // Resolve target_ref to preselected targets
+    let preselected: string[] | undefined;
+    if (action.target_ref && resultRefs.has(action.target_ref)) {
+      const refResult = resultRefs.get(action.target_ref);
+      if (refResult?.targetInstanceIds?.length) {
+        preselected = refResult.targetInstanceIds;
+      }
+    }
+
+    // Execute the action
+    const stackDepthBeforeAction = state.effectStack.length;
+    const result = services
+      .withCommittedEvents(events)
+      .executeEffectAction(
+        state,
+        action,
+        sourceCardInstanceId,
+        controller,
+        cardDb,
+        resultRefs,
+        preselected
+      );
+
+    state = result.state;
+    events.push(...result.events);
+    lastActionSucceeded = result.succeeded;
+    if (isGameTerminated(state)) return { state, events };
+
+    if (result.pendingPrompt && result.nestedEventActivation) {
+      return {
+        state: retainEventParent(
+          state,
+          stackDepthBeforeAction,
+          action,
+          actions.slice(i + 1),
+          sourceCardInstanceId,
+          controller,
+          resultRefs,
+          result,
+          events,
+          effectDescription
+        ),
+        events,
+        pendingPrompt: result.pendingPrompt,
+      };
+    }
+    if (result.pendingPrompt) {
+      // Pause — push a stack frame with the remaining actions and surface the prompt
+      const nestedPromptFrame = result.state.effectStack.at(-1);
+      if (
+        (action.type === "PLAYER_CHOICE" ||
+          action.type === "OPPONENT_CHOICE" ||
+          action.type === "OPPONENT_ACTION" ||
+          action.type === "REUSE_EFFECT") &&
+        nestedPromptFrame &&
+        result.state.effectStack.length > stackDepthBeforeAction
+      ) {
+        const remainingActions = actions.slice(i + 1);
+        if (action.type === "REUSE_EFFECT") {
+          // OPT-863: the reused block's frame and prompt keep that block's own
+          // description (e.g. the [Main] text with its cost), not the reusing
+          // [Trigger]'s. Nothing is appended to the reused frame: schema
+          // validation (validateReuseEffectTailPosition) rejects any action
+          // after REUSE_EFFECT, because a suffix merged here would run with the
+          // reused block's resultRefs/controller/success and be lost whenever
+          // that frame is declined, abandoned or replaced by a cost frame.
+          return {
+            state: retainEventsOnFrame(
+              result.state,
+              stackDepthBeforeAction,
+              events
+            ),
+            events,
+            pendingPrompt: result.pendingPrompt,
+          };
+        }
+        // OPT-963: when the branch paused on a frame its handler owns (an
+        // EFFECT_DAMAGE window, a REPLACEMENT_BATCH offer or substitute), the
+        // branch's chain continuation sits at the pre-action depth with the
+        // handler's frame directly above it. The actions after the choice
+        // outlive both: they get their own continuation under this chain's
+        // controller, inserted below the branch's continuation, so the branch
+        // (possibly the opponent's, under OPPONENT_ACTION) finishes first and
+        // the suffix then resumes as this chain's controller (PR #758 D-F1b).
+        const continuationBelow = result.state.effectStack[stackDepthBeforeAction];
+        const frameAbove = result.state.effectStack[stackDepthBeforeAction + 1];
+        const handlerOwnsPause =
+          continuationBelow !== undefined &&
+          continuationBelow !== nestedPromptFrame &&
+          frameAbove !== undefined &&
+          isHandlerOwnedFrame(frameAbove);
+        if (handlerOwnsPause) {
+          let parked = result.state;
+          if (remainingActions.length > 0) {
+            const outerId = generateFrameId(parked);
+            parked = insertFrameAt(
+              outerId.state,
+              stackDepthBeforeAction,
+              outerSuffixContinuation(outerId.id, sourceCardInstanceId, controller, effectDescription, action, remainingActions, resultRefs)
+            );
+          }
+          return {
+            state: retainEventsOnFrame(parked, stackDepthBeforeAction, events),
+            events,
+            // The nested prompt belongs to the handler's frame: its own description.
+            pendingPrompt: result.pendingPrompt,
+          };
+        }
+        const nestedState =
+          remainingActions.length > 0 || effectDescription
+            ? updateTopFrame(result.state, {
+                ...(remainingActions.length > 0
+                  ? {
+                      remainingActions: [
+                        ...nestedPromptFrame.remainingActions,
+                        ...remainingActions,
+                      ],
+                      ...(action.type === "OPPONENT_ACTION"
+                        ? { remainingActionsController: controller }
+                        : {}),
+                    }
+                  : {}),
+                ...(effectDescription ? { effectDescription } : {}),
+              })
+            : result.state;
+        return {
+          state: retainEventsOnFrame(
+            nestedState,
+            stackDepthBeforeAction,
+            events
+          ),
+          events,
+          pendingPrompt: withChainDescription(
+            result.pendingPrompt,
+            effectDescription
+          ),
+        };
+      }
+      // OPT-963: the handler owns the pause on a frame it pushed itself (a
+      // REPLACEMENT_BATCH offer or substitute, an EFFECT_DAMAGE window). This
+      // action chain's continuation is inserted at the depth the action
+      // started from, below everything the handler pushed, so the handler's
+      // work finishes before the suffix resumes. An EFFECT_DAMAGE frame names
+      // the continuation as its parent so the instruction's final count
+      // reaches the chain (completeEffectDamageFrame).
+      // The handler's own frame is the first one it pushed (an offer or a
+      // window on top, or a batch frame inserted below its substitute's
+      // prompt frames).
+      const handlerFrame = result.state.effectStack[stackDepthBeforeAction];
+      const ownsPause = handlerFrame !== undefined && isHandlerOwnedFrame(handlerFrame);
+      if (ownsPause) {
+        const frameId = generateFrameId(result.state);
+        const continuationFrame: EffectStackFrame = {
+          id: frameId.id,
+          sourceCardInstanceId,
+          controller,
+          effectDescription,
+          effectBlock: CONTINUATION_EFFECT_BLOCK,
+          phase: "INTERRUPTED_BY_TRIGGERS",
+          pausedAction: action,
+          remainingActions: actions.slice(i + 1),
+          resultRefs: [...resultRefs.entries()],
+          validTargets: [],
+          priorActionSucceeded: false,
+          costs: [],
+          currentCostIndex: 0,
+          costsPaid: true,
+          oncePerTurnMarked: true,
+          costResultRefs: [],
+          pendingTriggers: [],
+          simultaneousTriggers: [],
+          accumulatedEvents: events,
+        };
+        const continuationState = insertFrameAt(frameId.state, stackDepthBeforeAction, continuationFrame);
+        if (isGameTerminated(continuationState)) return { state: continuationState, events };
+        return {
+          state: linkDamageParent(continuationState, stackDepthBeforeAction + 1, frameId.id),
+          events,
+          // The nested prompt belongs to the handler's own frame, so
+          // preserve its own description instead of the outer chain's.
+          pendingPrompt: result.pendingPrompt,
+        };
+      }
+
+      const ctx = result.pendingPrompt
+        .resumeContext as import("../../types.js").ResumeContext;
+      const phaseForPrompt = promptTypeToPhase(
+        result.pendingPrompt.options.promptType
+      );
+      // Use the resume context's controller — it may differ from the chain's
+      // controller when an OPPONENT_ACTION flips who is acting (e.g. opponent
+      // trashes from their own hand via Perona OP06-093).
+      const resumeController = ctx.controller ?? controller;
+      const frameId = generateFrameId(result.state);
+      const frame: EffectStackFrame = {
+        id: frameId.id,
+        sourceCardInstanceId,
+        controller: resumeController,
+        remainingActionsController: controller,
+        effectDescription,
+        effectBlock: CONTINUATION_EFFECT_BLOCK,
+        phase: phaseForPrompt,
+        pausedAction: ctx.pausedAction,
+        remainingActions: actions.slice(i + 1),
+        resultRefs: [...resultRefs.entries()],
+        validTargets: ctx.validTargets,
+        returnToDeckArrangement: ctx.returnToDeckArrangement,
+        fieldToLifeTargetIds: ctx.fieldToLifeTargetIds,
+        giveDonIdentity: ctx.giveDonIdentity,
+        costs: [],
+        currentCostIndex: 0,
+        costsPaid: true, // costs already paid before action chain
+        oncePerTurnMarked: true,
+        costResultRefs: [],
+        pendingTriggers: [],
+        simultaneousTriggers: [],
+        accumulatedEvents: events,
+        playOverflow: ctx.ruleTrashForPlay,
+        stateDistributionForPlay: ctx.stateDistributionForPlay,
+      };
+      const updatedState = pushFrame(frameId.state, frame);
+      if (isGameTerminated(updatedState))
+        return { state: updatedState, events };
+      // Override with block-specific description so prompts show the triggered
+      // effect text rather than the full card text
+      const prompt = withChainDescription(
+        { ...result.pendingPrompt, resumeContext: frame.id },
+        effectDescription
+      );
+      return { state: updatedState, events, pendingPrompt: prompt };
+    }
+
+    // OPT-172: rule 6-2 — handler paused mid-batch because a frame's events
+    // queued ON_PLAY (or sibling) triggers. Push an AWAITING_BATCH_RESUME
+    // frame carrying the marker + remaining chain actions, then report fresh
+    // triggers to their owner. The shared executor resumes this same-effect
+    // batch and suffix before releasing the newly fulfilled ordinary work.
+    if (result.pendingBatchTriggers) {
+      const { triggers, marker } = result.pendingBatchTriggers;
+      const stateWithFrame = pushBatchResumeFrame(
+        result.state,
+        sourceCardInstanceId,
+        controller,
+        CONTINUATION_EFFECT_BLOCK,
+        marker,
+        triggers,
+        actions.slice(i + 1),
+        resultRefs,
+        effectDescription
+      );
+      if (isGameTerminated(stateWithFrame))
+        return { state: stateWithFrame, events };
+      const drain = services.reportTriggers(
+        stateWithFrame,
+        triggers,
+        cardDb,
+        events
+      );
+      return {
+        state: drain.state,
+        events: drain.events,
+        pendingPrompt: drain.pendingPrompt,
+      };
+    }
+
+    // Store result reference
+    if (action.result_ref && result.result) {
+      resultRefs.set(action.result_ref, result.result);
+    }
+  }
+
+  return { state, events };
+}
+
+/**
+ * The continuation of the actions after a choice whose branch paused on a
+ * handler-owned frame (PR #758 D-F1b). It runs as the choosing chain's
+ * controller once the branch's own continuation (which may be the opponent's,
+ * under OPPONENT_ACTION) has finished; the choice itself counts as succeeded,
+ * as it does when its branch completes without pausing.
+ */
+export function outerSuffixContinuation(
+  id: string,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  effectDescription: string | undefined,
+  choice: Action,
+  remainingActions: Action[],
+  resultRefs: Map<string, EffectResult>
+): EffectStackFrame {
+  return {
+    id,
+    sourceCardInstanceId,
+    controller,
+    effectDescription,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "INTERRUPTED_BY_TRIGGERS",
+    pausedAction: choice,
+    remainingActions,
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [],
+    priorActionSucceeded: true,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+  };
+}
+
+/** Name the chain continuation as the parent of the EFFECT_DAMAGE frame directly above it. */
+function linkDamageParent(state: GameState, damageIndex: number, parentFrameId: string): GameState {
+  const frame = state.effectStack[damageIndex];
+  if (!frame?.effectDamage) return state;
+  return {
+    ...state,
+    effectStack: [
+      ...state.effectStack.slice(0, damageIndex),
+      { ...frame, effectDamage: { ...frame.effectDamage, parentFrameId } },
+      ...state.effectStack.slice(damageIndex + 1),
+    ],
+  };
+}
+
+/**
+ * OPT-799: park the chain on an action-level `optional` clause. The frame
+ * keeps the undecided action as `pausedAction` (still carrying
+ * `optional: true`, which is how resumeFromStack tells it apart from a
+ * block-level optional frame, whose pausedAction is null) and the rest of the
+ * chain, so earlier clauses are never re-applied on resume.
+ */
+function pauseForOptionalAction(
+  state: GameState,
+  action: Action,
+  remainingActions: Action[],
+  resultRefs: Map<string, EffectResult>,
+  priorActionSucceeded: boolean,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  effectDescription: string | undefined,
+  events: PendingEvent[]
+): ChainResult {
+  const frameId = generateFrameId(state);
+  const frame: EffectStackFrame = {
+    id: frameId.id,
+    sourceCardInstanceId,
+    controller,
+    effectDescription,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_OPTIONAL_RESPONSE",
+    pausedAction: action,
+    remainingActions,
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [],
+    priorActionSucceeded,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: events,
+  };
+  const nextState = pushFrame(frameId.state, frame);
+  if (isGameTerminated(nextState)) return { state: nextState, events };
+  const sourceCard = findCardInstance(nextState, sourceCardInstanceId);
+  log("effect.prompt", {
+    sourceInstanceId: sourceCardInstanceId,
+    controller,
+    actionType: action.type,
+    phase: "optional_action_prompt",
+  });
+  return {
+    state: nextState,
+    events,
+    pendingPrompt: {
+      options: {
+        promptType: "OPTIONAL_EFFECT",
+        effectDescription: optionalClauseDescription(effectDescription),
+        cards: sourceCard ? [sourceCard] : [],
+      },
+      respondingPlayer: controller,
+      resumeContext: frame.id,
+    },
+  };
+}
+
+export function withChainDescription(
+  prompt: PendingPromptState,
+  effectDescription: string | undefined
+): PendingPromptState {
+  if (!effectDescription || !prompt.options) return prompt;
+  return {
+    ...prompt,
+    options: { ...prompt.options, effectDescription } as typeof prompt.options,
+  };
+}
+
+function costResultToRefs(
+  costResult: CostResult | undefined
+): Map<string, EffectResult> | undefined {
+  if (!costResult) return undefined;
+  const hasValues =
+    costResult.donRestedCount > 0 ||
+    costResult.cardsTrashedCount > 0 ||
+    costResult.cardsReturnedCount > 0 ||
+    costResult.cardsPlacedToDeckCount > 0 ||
+    costResult.charactersKoCount > 0 ||
+    costResult.donGivenCount > 0;
+  if (!hasValues) return undefined;
+  const refs = new Map<string, EffectResult>();
+  refs.set("__cost_don_rested", {
+    targetInstanceIds: [],
+    count: costResult.donRestedCount,
+  });
+  refs.set("__cost_cards_trashed", {
+    targetInstanceIds: costResult.cardsTrashedInstanceIds ?? [],
+    count: costResult.cardsTrashedCount,
+  });
+  refs.set("__cost_cards_returned", {
+    targetInstanceIds: costResult.cardsReturnedInstanceIds ?? [],
+    count: costResult.cardsReturnedCount,
+  });
+  refs.set("__cost_cards_placed_to_deck", {
+    targetInstanceIds: [],
+    count: costResult.cardsPlacedToDeckCount,
+  });
+  refs.set("__cost_characters_ko", {
+    targetInstanceIds: costResult.charactersKoInstanceIds ?? [],
+    count: costResult.charactersKoCount,
+  });
+  refs.set(COST_DON_GIVEN_REF, {
+    targetInstanceIds: costResult.donGivenInstanceIds ?? [],
+    count: costResult.donGivenCount,
+  });
+  return refs;
+}
+
+// ─── Single Action Dispatcher ─────────────────────────────────────────────────
+
+/**
+ * Rule-processing checkpoint after one effect action (OPT-949 acceptance 3,
+ * OPT-862, OPT-925). Runs when the action changed a deck or Life count or
+ * made a lethal damage determination. A multi-card draw or mill moves one
+ * player's cards from one deck, so that deck can reach 0 only on its last
+ * moved card (rule 3-2-3): checking after the move is the between-cards check.
+ * When the checkpoint ends the game the terminal writer has cleared every
+ * continuation, and the result drops any prompt or batch continuation the
+ * handler returned so no caller can resurrect it.
+ */
+function ruleProcessingAfterAction(
+  before: GameState,
+  result: ActionResult,
+  cardDb: Map<string, CardData>,
+): ActionResult {
+  if (isGameTerminated(result.state)) return withoutContinuation(result, result.state);
+  const lethal = result.lethalDamagePlayerIndex;
+  const checked = runRuleProcessingAfterMove(
+    before,
+    result.state,
+    lethal !== undefined ? { lethalDamage: [lethal] } : {},
+    cardDb,
+  );
+  if (!isGameTerminated(checked)) {
+    return checked === result.state ? result : { ...result, state: checked };
+  }
+  return withoutContinuation(result, checked);
+}
+
+/** A terminal action result: no prompt, batch continuation or nested Event boundary survives. */
+function withoutContinuation(result: ActionResult, state: GameState): ActionResult {
+  return {
+    state,
+    events: result.events,
+    succeeded: result.succeeded,
+    ...(result.result ? { result: result.result } : {}),
+    ...(result.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: result.lethalDamagePlayerIndex }
+      : {}),
+  };
+}
+
+export function executeEffectAction<K extends ActionType>(
+  state: GameState,
+  action: ActionOf<K>,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
+  preselectedTargets?: string[],
+  services: EffectResolverServices = resolverExecutionServices
+): ActionResult {
+  state = consumeResolutionAction(state, action.type, sourceCardInstanceId);
+  if (isGameTerminated(state)) {
+    return { state, events: [], succeeded: false };
+  }
+  const handler = getActionHandler(action);
+  if (handler) {
+    const result = handler(
+      state,
+      action,
+      sourceCardInstanceId,
+      controller,
+      cardDb,
+      resultRefs,
+      preselectedTargets,
+      services
+    );
+    // Rule 3-1-6-1: a DON!! this action moved sheds its effects.
+    const released = releaseMovedDonEffects(state, result.state);
+    const settled = released === result.state ? result : { ...result, state: released };
+    return ruleProcessingAfterAction(state, settled, cardDb);
+  }
+  // Boot validation makes this unreachable for authored schemas. Treat any
+  // untrusted/runtime drift as a rules-visible terminal engine contract fault.
+  log("action.unhandled", {
+    actionType: action.type,
+    sourceInstanceId: sourceCardInstanceId,
+    controller,
+  });
+  state = terminateForEngineContract(state, {
+    kind: "ENGINE_CONTRACT",
+    contract: "ACTION_HANDLER",
+    actionType: action.type,
+    sourceCardInstanceId,
+    message: `No resolver handler is registered for action type '${action.type}'`,
+  });
+  return { state, events: [], succeeded: false };
+}

@@ -304,6 +304,8 @@ export function processScheduledActions(
     action: Action;
     controller: 0 | 1;
     sourceEffectId: string;
+    sourceCardSnapshot?: import("../types.js").CardInstance;
+    sourceIdentity?: import("../types.js").QueuedSourceSnapshot;
   }>;
 } {
   const scheduled = state.scheduledActions;
@@ -311,6 +313,8 @@ export function processScheduledActions(
     action: Action;
     controller: 0 | 1;
     sourceEffectId: string;
+    sourceCardSnapshot?: import("../types.js").CardInstance;
+    sourceIdentity?: import("../types.js").QueuedSourceSnapshot;
   }> = [];
   const remaining: typeof scheduled = [];
 
@@ -325,6 +329,8 @@ export function processScheduledActions(
         action: entry.action,
         controller: entry.controller,
         sourceEffectId: entry.sourceEffectId,
+        ...(entry.sourceCardSnapshot ? { sourceCardSnapshot: entry.sourceCardSnapshot } : {}),
+        ...(entry.sourceIdentity ? { sourceIdentity: entry.sourceIdentity } : {}),
       });
     } else {
       remaining.push(entry);
@@ -349,9 +355,11 @@ export function collectEndOfTurnObligations(
   step: "TURN_PLAYER" | "NON_TURN_PLAYER",
 ): {
   state: GameState;
-  entries: Array<{ action: Action; controller: 0 | 1; sourceEffectId: string; step: "TURN_PLAYER" | "NON_TURN_PLAYER" }>;
+  entries: Array<{ action: Action; controller: 0 | 1; sourceEffectId: string; sourceCardSnapshot?: import("../types.js").CardInstance;
+    sourceIdentity?: import("../types.js").QueuedSourceSnapshot; step: "TURN_PLAYER" | "NON_TURN_PLAYER" }>;
 } {
-  const entries: Array<{ action: Action; controller: 0 | 1; sourceEffectId: string; step: "TURN_PLAYER" | "NON_TURN_PLAYER" }> = [];
+  const entries: Array<{ action: Action; controller: 0 | 1; sourceEffectId: string; sourceCardSnapshot?: import("../types.js").CardInstance;
+    sourceIdentity?: import("../types.js").QueuedSourceSnapshot; step: "TURN_PLAYER" | "NON_TURN_PLAYER" }> = [];
   const remaining: typeof state.scheduledActions = [];
   for (const entry of state.scheduledActions) {
     if (entry.timing !== "END_OF_THIS_TURN" || entry.controller !== controller) {
@@ -359,7 +367,8 @@ export function collectEndOfTurnObligations(
       continue;
     }
     if (entry.boundToInstanceId && !findCardOnField(state, entry.boundToInstanceId)) continue;
-    entries.push({ action: entry.action, controller: entry.controller, sourceEffectId: entry.sourceEffectId, step });
+    entries.push({ action: entry.action, controller: entry.controller, sourceEffectId: entry.sourceEffectId, ...(entry.sourceCardSnapshot ? { sourceCardSnapshot: entry.sourceCardSnapshot } : {}),
+        ...(entry.sourceIdentity ? { sourceIdentity: entry.sourceIdentity } : {}), step });
   }
   if (remaining.length === state.scheduledActions.length) return { state, entries };
   return { state: { ...state, scheduledActions: remaining }, entries };

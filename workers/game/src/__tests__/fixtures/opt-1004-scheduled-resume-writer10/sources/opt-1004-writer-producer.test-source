@@ -1,0 +1,357 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { gzipSync, gunzipSync } from "node:zlib";
+import { createHash } from "node:crypto";
+import { expect, it } from "vitest";
+import { GameSession } from "../GameSession.js";
+import type { CardData, Env, GameAction, GameState } from "../types.js";
+import { SessionRepository } from "../session/persistence.js";
+import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
+import { rig, synSchema } from "./opt-960-rig.js";
+import { runPipeline } from "../engine/pipeline.js";
+import { resumeFromStackWork } from "../engine/effect-resolver/resume.js";
+
+type Access = { gameState: GameState; cardDb: Map<string, CardData>; undoHistory: GameState[]; writeResultToDb(): Promise<void>; handleAction(ws: WebSocket, player: 0 | 1, action: GameAction): Promise<void> };
+const env = { GAME_WORKER_SECRET: "test", NEXTJS_URL: "https://app.example.test" } as Env;
+const socket = () => ({ sent: [] as string[], send(value: string) { this.sent.push(value); }, close() {} });
+function access(storage: MemorySessionStorage, state: GameState, db: Map<string, CardData>, undo: GameState[]) {
+  const durable = { storage, getWebSockets: () => [], getTags: () => [], acceptWebSocket() {} } as unknown as DurableObjectState;
+  const session = new GameSession(durable, env) as unknown as Access;
+  session.gameState = state; session.cardDb = db; session.undoHistory = undo;
+  session.writeResultToDb = async () => undefined;
+  return session;
+}
+const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+const copyStorage = (storage: MemorySessionStorage) => Object.fromEntries([...storage.data.entries()].map(([key, value]) => [key, structuredClone(value)]));
+
+it("captures isolated schema10 writer outputs through actual GameSession and repository boundaries", async () => {
+  const output = process.env.OPT1004_WRITER_CAPTURE_DIR;
+  if (!output) throw new Error("OPT1004_WRITER_CAPTURE_DIR required for isolated capture");
+  mkdirSync(output, { recursive: true });
+  const root = resolve(__dirname, "../../../..");
+  const commit = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  execFileSync("git", ["-C", root, "diff", "--exit-code", "--", "workers/game"]);
+  expect(rig().state.schemaVersion).toBe(8);
+  const cases: Record<string, unknown> = {};
+  for (const restriction of ["OP10-030", "EB04-016", null] as const) {
+    for (const departed of [false, true]) {
+      const id = `${restriction ?? "allowed"}-${departed ? "departed" : "present"}`;
+      const r = rig(); r.state.schemaVersion = 8; delete r.state.fieldTrashSemanticsVersion; r.state.costSemanticsVersion = 8;
+      r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+      const leader = r.state.players[0].leader;
+      r.db.set(leader.cardId, { ...r.db.get(leader.cardId)!, types: ["Supernovas"] });
+      const blocker = restriction ? r.put(restriction, 0, "CHARACTER") : null;
+      const remover = r.put("SYN-bounce", 0, "CHARACTER", { schema: synSchema("SYN-bounce", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "RETURN_TO_HAND", target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 } } }] }]) });
+      const park = r.put("SYN-park", 0, "CHARACTER", { schema: synSchema("SYN-park", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "ADD_DON_FROM_DECK", params: { amount: 1, up_to: true, target_state: "RESTED" } } } }] }]) });
+      const drake = r.put("ST24-005", 0, "HAND", { data: { cost: 0 } });
+      const storage = new MemorySessionStorage();
+      const repo = new SessionRepository(storage, { nextJsUrl: env.NEXTJS_URL, workerSecret: env.GAME_WORKER_SECRET });
+      await repo.save({ state: r.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [structuredClone(r.state)] });
+      const initial = copyStorage(storage);
+      let session = access(storage, r.state, r.db, [structuredClone(r.state)]);
+      const steps: unknown[] = [];
+      async function act(action: GameAction) {
+        const sent = socket();
+        const normalized = { ...action, ...(session.gameState.pendingPrompt?.promptId ? { promptId: session.gameState.pendingPrompt.promptId } : {}) } as GameAction;
+        await session.handleAction(sent as unknown as WebSocket, 0, normalized);
+        expect(sent.sent.map(s => JSON.parse(s)).filter(m => m.type === "action:rejected"), id).toEqual([]);
+        steps.push({ action: normalized, player: 0, stored: copyStorage(storage) });
+        // Every continuation proceeds from the actual saved/reloaded graph.
+        const loaded = (await new SessionRepository(storage, { nextJsUrl: env.NEXTJS_URL, workerSecret: env.GAME_WORKER_SECRET }).load())!;
+        session = access(storage, loaded.state, loaded.cardDb, loaded.undoHistory);
+      }
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: park.instanceId, effectId: "main" });
+      expect(session.gameState.schemaVersion).toBe(10);
+      await act({ type: "PLAY_CARD", cardInstanceId: drake.instanceId });
+      const played = session.gameState.players[0].characters.find(c => c?.cardId === "ST24-005")!;
+      expect(session.gameState.scheduledActions.find(s => s.sourceEffectId === played.instanceId)?.sourceCardSnapshot?.cardId).toBe("ST24-005");
+      if (departed) {
+        await act({ type: "ACTIVATE_EFFECT", cardInstanceId: remover.instanceId, effectId: "main" });
+        await act({ type: "SELECT_TARGET", selectedInstanceIds: [played.instanceId] });
+      }
+      if (blocker) {
+        const block = r.db.get(blocker.cardId)!.effectSchema!.effects.find(e => e.category === "activate")!;
+        await act({ type: "ACTIVATE_EFFECT", cardInstanceId: blocker.instanceId, effectId: block.id });
+        await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
+      }
+      await act({ type: "ADVANCE_PHASE" });
+      expect(session.gameState.effectStack.some(f => f.phaseBoundaryContinuation?.remainingScheduledActions.some(s => s.sourceEffectId === played.instanceId))).toBe(true);
+      await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+      if (session.gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+      const expectedDonEvents = restriction ? 0 : 1;
+      expect(session.gameState.eventLog.filter(e => e.type === "DON_SET_ACTIVE"), id).toHaveLength(expectedDonEvents);
+      expect(session.gameState.pendingPrompt).toBeNull();
+      expect(session.gameState.turn.activePlayerIndex).toBe(1);
+      cases[id] = { initial, steps, expectedDonEvents };
+    }
+  }
+
+  async function extra(id: string, r: ReturnType<typeof rig>, drive: (act: (action: GameAction, player?: 0 | 1) => Promise<void>, current: () => Access) => Promise<void>, expectedDonEvents: number) {
+    if (id !== "stable10-field8-EOB-scheduled-and-mixed-undo") {
+      r.state.schemaVersion = id.startsWith("source9-") ? 9 : 8;
+      delete r.state.fieldTrashSemanticsVersion;
+    }
+    const storage = new MemorySessionStorage();
+    const options = { nextJsUrl: env.NEXTJS_URL, workerSecret: env.GAME_WORKER_SECRET };
+    const undo = [structuredClone(r.state)];
+    if (r.state.schemaVersion === 10) {
+      const legacy = structuredClone(r.state); delete legacy.fieldTrashSemanticsVersion; legacy.schemaVersion = 8;
+      undo.unshift(legacy, { ...structuredClone(legacy), schemaVersion: 9 });
+    }
+    await new SessionRepository(storage, options).save({ state: r.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: undo });
+    const initial = copyStorage(storage);
+    let session = access(storage, r.state, r.db, undo);
+    const steps: unknown[] = [];
+    async function act(action: GameAction, actingPlayer: 0 | 1 = session.gameState.pendingPrompt?.respondingPlayer ?? session.gameState.turn.activePlayerIndex) {
+      const sent = socket();
+      const normalized = { ...action, ...(session.gameState.pendingPrompt?.promptId ? { promptId: session.gameState.pendingPrompt.promptId } : {}) } as GameAction;
+      await session.handleAction(sent as unknown as WebSocket, actingPlayer, normalized);
+      expect(sent.sent.map(s => JSON.parse(s)).filter(m => m.type === "action:rejected"), id).toEqual([]);
+      steps.push({ action: normalized, player: actingPlayer, stored: copyStorage(storage) });
+      const loaded = (await new SessionRepository(storage, options).load())!;
+      session = access(storage, loaded.state, loaded.cardDb, loaded.undoHistory);
+    }
+    await drive(act, () => session);
+    expect(session.gameState.eventLog.filter(e => e.type === "DON_SET_ACTIVE"), id).toHaveLength(expectedDonEvents);
+    cases[id] = { initial, steps, expectedDonEvents };
+  }
+  for (const type of ["Leader", "Event"] as const) {
+    const r = rig(); r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+    const restriction = r.put("EB04-016", 0, "CHARACTER");
+    const id = `SYN-${type}-scheduler`;
+    const source = r.put(id, 0, type === "Leader" ? "LEADER" : "HAND", { data: { type, cost: 0, effectText: type === "Event" ? "[Main] Schedule DON activation." : "" }, schema: synSchema(id, [{ id: "schedule", category: type === "Leader" ? "activate" : "auto", trigger: { keyword: type === "Leader" ? "ACTIVATE_MAIN" : "MAIN_EVENT" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } } } }] }], type) });
+    await extra(`allowed-${type}`, r, async (act, current) => {
+      await act(type === "Leader" ? { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "schedule" } : { type: "PLAY_CARD", cardInstanceId: source.instanceId });
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: restriction.instanceId, effectId: "activate_set_don_active" });
+      await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
+      await act({ type: "ADVANCE_PHASE" });
+      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+    }, 1);
+  }
+  for (const already10 of [false, true]) {
+    const r = rig(); r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+    const restriction = r.put("OP10-030", 0, "CHARACTER");
+    const prior = already10 ? r.put("SYN-prior-schedule", 0, "CHARACTER", { schema: synSchema("SYN-prior-schedule", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "ADD_DON_FROM_DECK", params: { amount: 1, up_to: true, target_state: "RESTED" } } } }] }]) }) : null;
+    const source = r.put("SYN-queued-trash", 0, "HAND", { data: { cost: 0 }, schema: synSchema("SYN-queued-trash", [{ id: "onplay", category: "auto", trigger: { keyword: "ON_PLAY" }, costs: [{ type: "TRASH_SELF" }], actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } } } }] }]) });
+    await extra(already10 ? "loaded10-queued-TRASH_SELF-schedule" : "existing8-queued-TRASH_SELF-schedule", r, async (act, current) => {
+      if (prior) {
+        await act({ type: "ACTIVATE_EFFECT", cardInstanceId: prior.instanceId, effectId: "main" });
+        expect(current().gameState.schemaVersion).toBe(10);
+      }
+      await act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
+      expect(current().gameState.schemaVersion).toBe(10);
+      const obligation = current().gameState.scheduledActions.find(s => s.sourceCardSnapshot?.cardId === source.cardId)!;
+      expect(obligation.sourceCardSnapshot?.cardId).toBe(source.cardId);
+      expect(current().gameState.players[0].characters.some(c => c?.cardId === source.cardId)).toBe(false);
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: restriction.instanceId, effectId: "activate_set_don_active_then_prohibit" });
+      await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
+      await act({ type: "ADVANCE_PHASE" });
+      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+    }, 0);
+  }
+  {
+    const r = rig();
+    const scheduler = r.put("SYN-cost-schedule", 0, "CHARACTER", { schema: synSchema("SYN-cost-schedule", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } } } }] }]) });
+    const payer = r.put("SYN-cost-payer", 0, "CHARACTER", { schema: synSchema("SYN-cost-payer", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "REST_DON", amount: 1 }, { type: "DON_MINUS", amount: 1 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
+    await extra("scheduled-COST-roots", r, async (act, current) => {
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: scheduler.instanceId, effectId: "main" });
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: payer.instanceId, effectId: "main" });
+      expect(current().gameState.effectStack.some(f => f.costTransactionState && f.costExpectedRoot)).toBe(true);
+      const choices = current().gameState.pendingPrompt!.options;
+      if (choices.promptType !== "PLAYER_CHOICE") throw new Error("expected DON identity choice");
+      // Prefer returning the rested DON so the later activation has no target.
+      await act({ type: "PLAYER_CHOICE", choiceId: choices.choices[0].id });
+      await act({ type: "ADVANCE_PHASE" });
+      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
+    }, 0);
+  }
+
+  for (const mode of [6, 7, 8] as const) {
+    const r = rig(); r.state.costSemanticsVersion = mode;
+    r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+    const restriction = r.put("OP10-030", 0, "CHARACTER");
+    const source = r.put("SYN-paused-origin", 0, "HAND", { data: { cost: 0 }, schema: synSchema("SYN-paused-origin", [{ id: "onplay", category: "auto", trigger: { keyword: "ON_PLAY" }, costs: [{ type: "TRASH_SELF" }, { type: "TRASH_FROM_HAND", amount: 1 }], actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } } } }] }]) });
+    r.put("CHAR-VANILLA", 0, "HAND"); r.put("CHAR-RUSH", 0, "HAND");
+    await extra(`existing8-paused-queued-origin-mode${mode}`, r, async (act, current) => {
+      await act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
+      expect(current().gameState.schemaVersion).toBe(10);
+      expect(current().gameState.costSemanticsVersion).toBe(mode);
+      expect(current().gameState.pendingPrompt).not.toBeNull();
+      const paymentState = current().gameState.effectStack.find(f => f.costTransactionState)?.costTransactionState ?? current().gameState;
+      expect(paymentState.players[0].characters.some(c => c?.cardId === source.cardId)).toBe(false);
+      expect(current().gameState.scheduledActions).toHaveLength(0);
+      await act({ type: "SELECT_TARGET", selectedInstanceIds: [current().gameState.players[0].hand[0].instanceId] });
+      expect(current().gameState.scheduledActions[0].sourceCardSnapshot?.cardId).toBe(source.cardId);
+      expect(current().gameState.costSemanticsVersion).toBe(mode);
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: restriction.instanceId, effectId: "activate_set_don_active_then_prohibit" });
+      await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
+      await act({ type: "ADVANCE_PHASE" });
+      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+      expect(current().gameState.costSemanticsVersion).toBe(mode);
+    }, 0);
+  }
+  for (const sourceVersion of [8, 9] as const) for (const costMode of [6, 7, 8] as const) {
+    const r = rig(); r.state.schemaVersion = sourceVersion; r.state.costSemanticsVersion = costMode;
+    r.leader(1, "OP11-001");
+    const target = r.put("SYN-forward-navy", 1, "CHARACTER", { data: { power: 5000, types: ["Navy"] } });
+    for (let i = 0; i < 3; i++) r.put(`SYN-forward-pay-${i}`, 1, "TRASH");
+    const source = r.put("SYN-forward-scheduler", 0, "CHARACTER", { schema: synSchema("SYN-forward-scheduler", [
+      { id: "schedule", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] },
+      { id: "trash", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }] },
+    ]) });
+    await extra(`source${sourceVersion}-field${sourceVersion}-mode${costMode}-trash-successor`, r, async (act, current) => {
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "schedule" });
+      expect(current().gameState.schemaVersion).toBe(10);
+      expect(current().gameState.fieldTrashSemanticsVersion).toBe(sourceVersion);
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "trash" });
+      await act({ type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] });
+      {
+        // Main789 now activates native trash at this eligible boundary even
+        // when scheduling first retained the prior field8 capability.
+        expect(current().gameState.fieldTrashSemanticsVersion).toBe(9);
+        expect(current().gameState.schemaVersion).toBe(10);
+        expect(current().gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+        expect(current().gameState.effectStack.some(frame => frame.replacementBatch?.actionKind === "TRASH_CARD")).toBe(true);
+        await act({ type: "PLAYER_CHOICE", choiceId: "skip" });
+      }
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "schedule" });
+      expect(current().gameState.scheduledActions).toHaveLength(2);
+      expect(current().gameState.scheduledActions.every(entry => entry.sourceCardSnapshot?.cardId === source.cardId)).toBe(true);
+      expect(current().gameState.costSemanticsVersion).toBe(costMode);
+      await act({ type: "ADVANCE_PHASE" });
+    }, 0);
+  }
+  {
+    const r = rig(); r.state.schemaVersion = 10; r.state.fieldTrashSemanticsVersion = 8;
+    const scheduler = r.put("SYN-eob-scheduler", 0, "CHARACTER", { schema: synSchema("SYN-eob-scheduler", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] }]) });
+    const attacker = r.put("ST08-013", 0, "CHARACTER", { data: { power: 4000 } });
+    attacker.attachedDon = [{ instanceId: "schema10-attack-don", state: "ACTIVE", attachedTo: attacker.instanceId }]; attacker.turnPlayed = 0;
+    const target = r.put("SYN-eob-target", 1, "CHARACTER", { state: "RESTED", data: { power: 1000 } });
+    const hand = r.put("SYN-eob-payment", 1, "HAND");
+    const counter = r.put("OP02-118", 1, "HAND", { data: { type: "Event", cost: 0, power: null, counter: null, effectText: "[Counter] Protect a Character." } });
+    await extra("stable10-field8-EOB-scheduled-and-mixed-undo", r, async (act, current) => {
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: scheduler.instanceId, effectId: "main" });
+      await act({ type: "DECLARE_ATTACK", attackerInstanceId: attacker.instanceId, targetInstanceId: target.instanceId });
+      await act({ type: "PASS" }, 1);
+      await act({ type: "USE_COUNTER_EVENT", cardInstanceId: counter.instanceId, counterTargetInstanceId: target.instanceId }, 1);
+      await act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      await act({ type: "SELECT_TARGET", selectedInstanceIds: [hand.instanceId] });
+      await act({ type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] });
+      await act({ type: "PASS" }, 1);
+      expect(current().gameState.effectStack.some(frame => frame.battleCompletion)).toBe(true);
+      expect(current().gameState.prohibitions).toHaveLength(1);
+      await act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      expect(current().gameState.players[1].characters.some(card => card?.instanceId === target.instanceId)).toBe(true);
+      expect(current().gameState.eventLog.filter(event => event.type === "BATTLE_RESOLVED")).toHaveLength(1);
+      expect(current().gameState.prohibitions).toHaveLength(0);
+      await act({ type: "ADVANCE_PHASE" });
+    }, 0);
+  }
+  const historicalDirectory = resolve(__dirname, "fixtures/opt-1004-historical-resume");
+  const historicalManifest = JSON.parse(readFileSync(resolve(historicalDirectory, "manifest.json"), "utf8"));
+  const historicalCases = { ...historicalManifest.cases, ...historicalManifest.additionalCases, ...historicalManifest.restrictedCases };
+  for (const [name, description] of Object.entries(historicalCases) as [string, { file: string; phase: string; costMode: number; restriction?: string }][]) {
+    const initial = JSON.parse(gunzipSync(readFileSync(resolve(historicalDirectory, description.file))).toString());
+    const storage = new MemorySessionStorage(); Object.entries(initial).forEach(([key, value]) => storage.data.set(key, structuredClone(value)));
+    const options = { nextJsUrl: env.NEXTJS_URL, workerSecret: env.GAME_WORKER_SECRET };
+    let loaded = (await new SessionRepository(storage, options).load())!;
+    const identity = structuredClone(loaded.state.effectStack.flatMap(frame => frame.resultRefs).find(([, value]) => value.sourceIdentity)![1].sourceIdentity!);
+    const steps: unknown[] = [];
+    async function act(action: GameAction) {
+      const session = access(storage, loaded.state, loaded.cardDb, loaded.undoHistory);
+      const normalized = { ...action, ...(loaded.state.pendingPrompt?.promptId ? { promptId: loaded.state.pendingPrompt.promptId } : {}) } as GameAction;
+      const sent = socket(); await session.handleAction(sent as unknown as WebSocket, loaded.state.pendingPrompt?.respondingPlayer ?? 0, normalized);
+      expect(sent.sent.map(value => JSON.parse(value)).filter(message => message.type === "action:rejected"), name).toEqual([]);
+      steps.push({ action: normalized, player: loaded.state.pendingPrompt?.respondingPlayer ?? 0, stored: copyStorage(storage) });
+      loaded = (await new SessionRepository(storage, options).load())!;
+    }
+    async function reply() {
+      const prompt = loaded.state.pendingPrompt!.options;
+      if (prompt.promptType === "SELECT_TARGET") await act({ type: "SELECT_TARGET", selectedInstanceIds: [prompt.validTargets[0]] });
+      else await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+    }
+    expect(loaded.state.schemaVersion).toBe(8);
+    await reply();
+    expect(loaded.state).toMatchObject({ schemaVersion: 10, fieldTrashSemanticsVersion: 8, costSemanticsVersion: description.costMode });
+    if (name === "cost-next" || name === "action-next") {
+      expect(loaded.state.pendingPrompt).not.toBeNull(); expect(loaded.state.scheduledActions).toHaveLength(0);
+      const ref = loaded.state.effectStack.flatMap(frame => frame.resultRefs).find(([, value]) => value.sourceIdentity)![1];
+      expect(ref.sourceIdentity).toEqual(identity);
+      if (name === "cost-next") expect(ref.sourceCardSnapshot?.instanceId).toBe(identity.instanceId); else expect(ref.sourceCardSnapshot).toBeUndefined();
+    }
+    while (loaded.state.pendingPrompt) await reply();
+    expect(loaded.state.scheduledActions[0].sourceIdentity).toEqual(identity);
+    if (description.phase === "COST") expect(loaded.state.scheduledActions[0].sourceCardSnapshot?.instanceId).toBe(identity.instanceId);
+    else expect(loaded.state.scheduledActions[0].sourceCardSnapshot).toBeUndefined();
+    if (description.restriction) {
+      expect(loaded.state.prohibitions.some(row => row.prohibitionType === "CANNOT_SET_DON_ACTIVE")).toBe(true);
+      expect(loaded.state.players[0].donCostArea.some(don => don.state === "RESTED")).toBe(true);
+    }
+    const expectedDonEvents = description.restriction || loaded.state.status !== "IN_PROGRESS" ? 0
+      : loaded.state.players[0].donCostArea.some(don => don.state === "RESTED") ? 1 : 0;
+    if (loaded.state.status === "IN_PROGRESS") {
+      await act({ type: "ADVANCE_PHASE" });
+      while (loaded.state.pendingPrompt) await reply();
+      expect(loaded.state.turn.activePlayerIndex).toBe(1);
+    }
+    expect(loaded.state.eventLog.filter(event => event.type === "DON_SET_ACTIVE")).toHaveLength(expectedDonEvents);
+    expect(loaded.state.schemaVersion).toBe(10);
+    cases[`historical-${name}`] = { initial, steps, expectedDonEvents, historicalProducer: historicalManifest.producerCommit, historicalFile: description.file, historicalSHA256: historicalManifest.files[description.file] };
+  }
+  for (const [name, description] of Object.entries(historicalManifest.c3Cases) as [string, { file: string; expectedVersion: number; draws: number; schedules: number }][]) {
+    const initial = JSON.parse(gunzipSync(readFileSync(resolve(historicalDirectory, description.file))).toString());
+    const storage = new MemorySessionStorage(); Object.entries(initial).forEach(([key, value]) => storage.data.set(key, structuredClone(value)));
+    const options = { nextJsUrl: env.NEXTJS_URL, workerSecret: env.GAME_WORKER_SECRET };
+    let loaded = (await new SessionRepository(storage, options).load())!;
+    const initialHand = loaded.state.players[0].hand.length;
+    const steps: unknown[] = [];
+    async function act(action: GameAction) {
+      const session = access(storage, loaded.state, loaded.cardDb, loaded.undoHistory);
+      const normalized = { ...action, ...(loaded.state.pendingPrompt?.promptId ? { promptId: loaded.state.pendingPrompt.promptId } : {}) } as GameAction;
+      const sent = socket(); await session.handleAction(sent as unknown as WebSocket, loaded.state.pendingPrompt?.respondingPlayer ?? 0, normalized);
+      expect(sent.sent.map(value => JSON.parse(value)).filter(message => message.type === "action:rejected"), name).toEqual([]);
+      steps.push({ action: normalized, player: 0, stored: copyStorage(storage) });
+      loaded = (await new SessionRepository(storage, options).load())!;
+    }
+    await act({ type: "PLAYER_CHOICE", choiceId: "skip" });
+    expect(loaded.state.schemaVersion, name).toBe(description.expectedVersion);
+    expect(loaded.state.players[0].hand.length - initialHand, name).toBe(description.draws);
+    expect(loaded.state.scheduledActions, name).toHaveLength(description.schedules);
+    expect(loaded.state.pendingPrompt).toBeNull();
+    if (description.expectedVersion === 8) {
+      expect(loaded.state.fieldTrashSemanticsVersion).toBeUndefined();
+    } else await act({ type: "ADVANCE_PHASE" });
+    cases[`C3-${name}`] = { initial, steps, expectedDonEvents: 0, allowNo10: description.expectedVersion === 8,
+      historicalProducer: historicalManifest.producerCommit, historicalFile: description.file, historicalSHA256: historicalManifest.files[description.file] };
+  }
+  writeFileSync(resolve(output, "cases.json.gz"), gzipSync(JSON.stringify({ provenance: "real GameSession pipeline in synthetic environment; no production capture", cases })));
+  const sources = execFileSync("git", ["-C", root, "ls-files", "workers/game/src/engine", "workers/game/src/session", "workers/game/src/GameSession.ts", "workers/game/src/types.ts", "workers/game/src/__tests__/opt-1004-writer-producer.test.ts", "workers/game/src/__tests__/opt-960-rig.ts", "workers/game/src/__tests__/helpers.ts"], { encoding: "utf8" }).trim().split("\n");
+  const sourceHashes = Object.fromEntries(sources.map(file => [file, hash(readFileSync(resolve(root, file)))]));
+  writeFileSync(resolve(output, "manifest.json"), JSON.stringify({ producerCommit: commit, readerBase: "ab15a965dcda19cf609a6c169abe7b867037c59f", provenance: "synthetic-only exception for OPT-1004; no production DO capture", caseCount: Object.keys(cases).length, snapshots: Object.values(cases).reduce<number>((n, value) => n + 1 + (value as { steps: unknown[] }).steps.length, 0), fixtures: { "cases.json.gz": hash(readFileSync(resolve(output, "cases.json.gz"))) }, sourceHashes }, null, 2) + "\n");
+});
+
+
+it("scheduling producer guards retain raw historical/missing cost provenance and explicit native modes", () => {
+  for (const version of [undefined, 6, 7, 8, 9] as const) {
+    const r = rig(); r.state.schemaVersion = version; delete r.state.costSemanticsVersion;
+    const source = r.put("SYN-raw-producer", 0, "CHARACTER", { schema: synSchema("SYN-raw-producer", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] }]) });
+    const before = structuredClone(r.state);
+    const result = runPipeline(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" }, r.db, 0);
+    expect(r.state).toEqual(before); expect(result.state.schemaVersion).toBe(version); expect(result.state.costSemanticsVersion).toBeUndefined();
+    expect(result.state.fieldTrashSemanticsVersion).toBeUndefined();
+    const raw = JSON.parse(gunzipSync(readFileSync(resolve(__dirname, "fixtures/opt-1004-historical-resume/cost-mode6.json.gz"))).toString());
+    raw.session.state.schemaVersion = version; delete raw.session.state.costSemanticsVersion;
+    const db = new Map<string, CardData>(Object.entries(raw["session:card-db"]));
+    const state = raw.session.state as GameState; const owner = state.effectStack.find(frame => frame.phase === "AWAITING_COST_SELECTION")!;
+    const resumed = resumeFromStackWork(state, { type: "SELECT_TARGET", selectedInstanceIds: [owner.validTargets[0]] }, db);
+    expect(resumed.state.schemaVersion).toBe(version); expect(resumed.state.costSemanticsVersion).toBeUndefined(); expect(resumed.state.fieldTrashSemanticsVersion).toBeUndefined();
+  }
+  for (const version of [8, 9] as const) for (const mode of [6, 7, 8] as const) {
+    const r = rig(); r.state.schemaVersion = version; r.state.costSemanticsVersion = mode;
+    const source = r.put("SYN-explicit-producer", 0, "CHARACTER", { schema: synSchema("SYN-explicit-producer", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] }]) });
+    const result = runPipeline(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" }, r.db, 0);
+    expect(result.state).toMatchObject({ schemaVersion: 10, fieldTrashSemanticsVersion: version === 9 ? 9 : 8, costSemanticsVersion: mode });
+  }
+});

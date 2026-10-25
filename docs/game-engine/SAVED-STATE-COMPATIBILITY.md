@@ -828,6 +828,82 @@ The new reader accepts schema8/costSemanticsVersion8 while retaining ordinary se
 
 New setup now chooses schema8/mode8 before its first action/save. Historical promotions remain7 and existing explicit6/7/8 retain their mode and stored cardDb. Reader PR786 at `e14af35bad3a7189a40294f5d4ab3db5b5602f0e` is the verified deployed minimum rollback floor (deployment40139694972, post-CI40139694988); c50/2ca reject8 and cannot be rollback targets. The prior reader-stage paragraph records its historical setup7 behavior. See [the current cost contract](MODE8-COST-SEMANTICS.md#new-game-writer-enablement) for the three new-game authored corrections, historical fixture preservation, carried source-equivalent corpus and retained OPT-958 debt. No active-session migration or production repair is included.
 
+### Superseded scheduled-origin draft9 evidence (OPT-1004)
+
+The following describes the immutable pre-integration draft. It is obsolete for
+current compatibility: deployed9 belongs exclusively to OPT-1006. Scheduled
+origin now requires10 and an independent field-trash capability (see below).
+
+This reader accepts schema9 while ordinary setup and the default writer remain
+schema8. Schema9 adds optional `sourceCardSnapshot` to scheduled obligations and
+parked End Phase queue entries. It reuses the strict full CardInstance snapshot
+already carried by effect result refs; only instance/card/controller identity is
+used as origin provenance. Rested state, power and attached DON at capture are
+not queried as current characteristics. Both scheduled collectors preserve the
+snapshot. Already-activated scheduled execution seeds the existing source ref,
+including across a prompt, without bypassing departed-source rejection for a
+trigger that has not activated yet.
+
+Top-level obligations, parked queues, transaction/expected roots and resumed
+refs validate snapshots strictly. Scheduled snapshot instance identity must
+match `sourceEffectId`. Schema1–8 reject the new scheduled field. Native9
+requires explicit costSemanticsVersion6|7|8, and retains that independent mode;
+resaving loaded9 and its undo entries retains9. Ordinary schema8 scheduling does
+not capture or emit the new field. Continuing loaded9 does capture origin for
+new obligations, including full pre-cost origin before a queued TRASH_SELF;
+a rollback reader must preserve this future producer behavior. A future writer must promote the owning
+state to9 before saving newly captured origin, including scheduling from an
+existing8 game. Cost semantics are not promoted by scheduled provenance.
+
+Historical obligations without origin use exact live-instance lookup. If the
+source has departed, its card category is unknown: classification
+`legacy.scheduled_origin_unknown` diagnoses this absence. The old obligation
+still executes and can incorrectly activate DON under a Character-effect
+restriction; no card/category is inferred, no obligation is dropped, and no
+historical fixture is rewritten. This bounded limitation applies to pre-writer
+obligations, not newly captured work after stage2.
+
+The user explicitly approved “Approve scoped synthetic-only evidence and legacy
+limitation” for this run. Compatibility evidence therefore uses real-pipeline
+synthetic states and isolated actual-writer output; production DO capture stays
+unmet. This exception does not waive reader-first deployment, writer-output
+replay, strict validation, or a verified reader-capable rollback floor. Stage2
+must remain disabled until the coordinator records the deployed stage1 commit
+and names that reader as the rollback floor. A build that reads only1–8 cannot
+be a rollback target after a schema9 writer runs.
+
+The isolated writer candidate is
+`71bb66df105a763ac2ab2cf1f5f3f4ccc286eabc`, based on reader draft
+`66df1d56f4768790c8f8f9eaaab0623c33abd251`. Its immutable corpus is
+`workers/game/src/__tests__/fixtures/opt-1004-scheduled-writer/`: the manifest
+pins fourteen scenarios and 103 actual GameSession/repository saved boundaries,
+complete candidate source hashes, compressed payload, archived generator and
+full writer patch (zero-context diff; apply with `git apply --unidiff-zero`). Cases include ST24-005 before/after source departure, both
+restrictions imposed after scheduling, an End Phase park and reply, allowed
+Leader/Event origins, existing8 queued On Play/TRASH_SELF/scheduling, COST
+transaction/expected roots and mixed8/9 undo. The reader suite loads all boundaries
+write-free and replays the suffix from the first actual schema9 saved boundary, including
+pre-obligation cost pauses and subsequent scheduling from loaded9 through GameSession against the writer's exact saved output. Reader
+activation of schema9 from schema8 is deliberately disabled in this release;
+continued scheduling from an already-loaded9 state preserves origin.
+
+Regenerate only from that isolated candidate using
+`OPT1004_WRITER_CAPTURE_DIR=/absolute/new/output-dir pnpm --filter optcg-game exec vitest run src/__tests__/opt-1004-writer-producer.test.ts`.
+The frozen compressed payload SHA256 is
+`46c642c96ea6b145f14675890a11e74d64c479f6358ae4e6918d21838c254c2b`;
+the candidate manifest SHA256 is
+`5583144b186bbd1e600b254a2fc83dbb7463def2c0b457aec45d1bfeba9345d4`.
+The generator/source archives are non-executable evidence. They do not enable
+the future writer on the reader branch.
+
+The isolated writer promotes only scheduling-capable effects (recursively via
+getNestedActions) before optional/cost handling, preserving the existing cost
+mode. Three added actual GameSession cases prove existing8→queued On Play→
+TRASH_SELF→later hand-cost prompt→save/load→schedule for modes6/7/8. Native costs
+may keep the departure staged until commit; the captured payment root has
+already removed the source while immutable origin remains. The prior eleven
+case objects remain byte-equivalent in the expanded corpus. This early shape
+promotion is archived future-writer code, not enabled for ordinary8 here.
 ### Field-trash batch reader9 (OPT-1006)
 
 The reader now accepts retained schema9 graphs with explicit cost mode6|7|8 and
@@ -843,6 +919,40 @@ verified reader SHA as its rollback floor. See the [field-trash reader contract]
 for ownership, producer corpus, original writer-byte comparison, strict source
 validation, synthetic-evidence exception and retained OPT-958 policy.
 
+### Scheduled-origin schema10 with independent field-trash capability (OPT-1004)
+
+Main deployed9 is exclusively the FIELD-TRASH reader contract above. Scheduled
+origin requires10. Every native10 envelope requires explicit
+`fieldTrashSemanticsVersion: 8 | 9` as well as independent cost mode6|7|8. Mode8
+records legacy trash until an eligible field-Character consequence activates
+mode9 at the delivered producer boundary; mode9 retains native replacement
+behavior. Loading/restoring10/8 alone never activates that capability.
+Source<=9 rejects the new capability and scheduled metadata. COST roots inherit
+the enclosing capabilities; they are partial state snapshots, not new envelopes.
+Default setup/runtime/writer remain8. Loaded9 does not emit scheduled origin;
+loaded10 preserves future scheduling, queued pre-cost snapshots, parked work,
+strict dual identity, and live/undo envelopes without mode drift.
+
+The future scheduling writer promotes8→10/field8 and9→10/field9 before optional
+or cost pauses for recursively scheduling-capable blocks, preserving cost mode.
+Earlier obsolete candidates chose new-game10/field8/cost8. The current
+scheduling candidate retains new-game/default8 and activates10 only at accepted
+scheduling producers, including COST/ACTION resumes; it is isolated evidence,
+not production scheduling enablement. Main PR789 delivered the field-trash
+producer; integration supports10/field8→10/field9 at its eligible consequence
+boundary while retaining scheduled metadata, envelope10 and explicit cost mode.
+Explicit native8 upgrades to9 there as on main; raw historical callers and
+hand-only/zero-selection actions retain their previous boundary.
+
+The original draft9 14-case/103-boundary archive is retained byte-for-byte as
+obsolete development evidence; it cannot establish compatibility with deployed9.
+The first21/153 schema10 reader-only prototype is also retained unchanged as
+obsolete runtime-parity evidence after the delivered trash producer. Current
+schema10 writer output and sources are archived separately against that merged
+producer and the resolved-modifier correction.
+Reader deployment and a named verified reader rollback floor still precede
+writer enablement. The accepted synthetic-only capture exception and historical
+missing-origin limitation remain: no production repair or migration is claimed.
 
 ### Field-trash producer9 after verified reader (OPT-1006 / OPT-1001)
 
@@ -862,3 +972,98 @@ state/event/ID comparisons. The historical reader corpus stays immutable; new
 canonical writer output has a separate manifest. See the updated
 [field-trash contract](FIELD-TRASH-READER-V9.md) for the six non-contiguous old8
 choice scripts,22 exact native9 suffixes, producer policy and retained OPT-958 debt.
+
+### Historical activated resume provenance (OPT-1004 checkpoint correction)
+
+Schema10 scheduled and parked entries also accept strict optional identity4
+`sourceIdentity` (instanceId/cardId/controller/effectBlockId). It is provenance
+of an already-activated effect, never a queued-source eligibility snapshot.
+Source<=9 rejects it. Identity instance binds to sourceEffectId; full and typed
+carriers must agree on instance/card/controller. The proven origin controller
+may differ from the scheduled execution controller or prompt responder. Generic
+engine-continuation frames retain their original authored block identity; they
+do not require that block to equal the generated continuation block.
+
+Loaded10 COST resume captures an exact matching live full source before entering
+its staged payment view, preserving an existing full ref first. Controller
+changes retain identity alone; no full card is fabricated. Historical ACTION
+pauses may have identity4 after the original full instance has gone: scheduling,
+both collectors, parked refs and activated resolution retain that typed origin.
+The unknown-origin classification applies only when no full/typed/live evidence
+exists. Queued triggers still require their exact original source to be live.
+
+Preparation is local until accepted continuation progress. Rejected/unsupported
+waiting, no-op and explicit optional/cost abandonment do not publish tentative
+refs or schema changes, even if prior-payment event debt is reported. Existing
+event scans remain intact. A committed schedule remains10 if a later action
+terminates; an independent committed field-trash upgrade also survives.
+
+The current isolated writer `046324c4bf2aa2072c3ba253b9a04c9c9ab0893c`
+(base reader `ab15a965dcda19cf609a6c169abe7b867037c59f`) keeps defaults8
+and activates10 at new scheduling activation or accepted scheduling-capable
+COST/ACTION continuation boundaries. Explicit8/9 must carry recorded cost6|7|8;
+raw callers without that evidence do not invent a mode or promote.
+It preserves field/cost modes and activates before later pauses or destructive
+payment can erase the original. Reader8/9 does not activate this metadata. The
+unchanged actual67cbb COST6/7/8 and ACTION pause artifacts are archived separately
+with producer source hashes. The current archive is
+`workers/game/src/__tests__/fixtures/opt-1004-scheduled-resume-writer10/`:
+41 real-pipeline synthetic families and217 actual saved boundaries, including
+20 unchanged historical producer inputs. Reader replay completes every174 saved10
+start plus3 pure8 skip controls (425 actions), checking complete storage, events,
+prompts and IDs. Every217 boundary also loads write-free and resaves exactly.
+Payload SHA256: `61edf23feb3d4bfc916fcb32bbec5e9af510e86a95c158ce1a2acb541158e3d6`;
+manifest SHA256: `72056960286393cdaf522c5a1b09dbce8f76394ff568031bb77b337bc523ec7e`.
+Independent coordinator regeneration matches both files byte-for-byte. The
+archived two-file activation patch and source/generator hashes pin this actual
+producer; they do not enable it on the reader branch.
+
+The sole bounded C3 correction preserves8/9 and exact legacy outcomes when
+ANY_NUMBER cost or an optional action is declined without body work, including
+fully disabled conditional/simultaneous suffixes. Retained payment events alone
+do not prove acceptance. A real THEN DRAW or THEN SCHEDULE suffix is accepted
+progress, as is fully paid progress whose post-cost condition fails. Committed
+scheduling followed by terminal DRAW retains10. The internal execution signal
+is neither saved nor used to alter event scan/publication ownership.
+
+The original14/103 draft9 archive, first21/153 reader-only10 prototype and
+21/156 full-only10 candidate remain byte-for-byte historical evidence; the last
+candidate's new-game10 policy and incomplete historical-resume coverage are
+obsolete. The provisional36/205 resume candidate is separately preserved as
+pre-C3 evidence and does not establish current writer purity. No older archive
+is retagged as current output. Regenerate only at the exact current isolated
+candidate with `OPT1004_WRITER_CAPTURE_DIR=/absolute/new/output-dir pnpm --filter
+optcg-game exec vitest run src/__tests__/opt-1004-writer-producer.test.ts`;
+replay on the reader with `pnpm --filter optcg-game exec vitest run
+src/__tests__/opt-1004-resume-writer-corpus.test.ts`.
+
+The synthetic-only exception remains explicit; production capture, repair,
+retirement and broad historical migration are unclaimed. The accepted unknown
+origin limitation covers absence of full, typed and exact-live evidence; it does
+not cover a known identity4 merely missing a full CardInstance. Scheduling
+enablement still requires verified deployed reader and a named rollback floor.
+New-game/default8 remains unchanged in that future producer-only writer.
+
+### Resolved prohibition lifetime prerequisite (OPT-910)
+
+The common prohibition condition reader now recognizes the existing exact
+`sourceEffectBlockId: ""` action-output signature from APPLY_PROHIBITION and
+NEGATE_TRIGGER_TYPE. Later source negation cannot revoke that resolved result
+(rule8-2-3), including Kalgara's turn-long draw restriction after Roger enters.
+Registered continuous rows retain authored block IDs and pause with their source;
+missing, null, numeric and other unproven block metadata retain the prior source
+gate. No duration inference, persistence field, shape tightening or row rewrite
+is introduced. The earlier DON-only exception now delegates this same gate.
+Conditions, WHILE_CONDITION, expiry, uses, overrides, ownership and targets keep
+their existing behavior. The direct trigger-type reader's existing bypass is
+inventoried and preserved rather than expanded to new condition semantics.
+
+See the [producer/consumer inventory and acceptance map](evidence/opt-910/prohibition-lifetime-inventory.md).
+All prior payload/source archives remain immutable. The actual04641-family/
+217-boundary corpus replays unchanged on this correction, including its existing
+non-DON protection rows. A future enabled writer must inherit this common gate
+correction in addition to the reviewed two-file activation delta; the earlier046
+source remains an archive, not the final enablement commit. Defaults8,
+producer-only scheduling activation and verified deployed reader rollback-floor
+requirements are unchanged. OPT-954 and unrelated prohibition debt remain out of
+scope under the user's bounded OPT-910 prerequisite approval.

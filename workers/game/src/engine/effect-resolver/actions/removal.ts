@@ -1,3 +1,4 @@
+import { fieldTrashSemanticsVersion } from "../../field-trash-semantics.js";
 import type { EffectSourceIdentity } from "../../../../../../shared/game-types.js";
 import { effectSourceIdentity } from "../../effect-source.js";
 import { handTrashEvent } from "../../hand-trash.js";
@@ -388,13 +389,17 @@ export function executeTrashCard(
 
   const sourceSnapshot = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF);
   const causingSource = effectSourceIdentity(state, sourceCardInstanceId, cardDb, sourceSnapshot?.sourceIdentity ?? sourceSnapshot?.sourceCardSnapshot);
-  // Only an explicit native8 provenance can publish the new reader capability.
-  // Raw historical engine callers retain their existing semantics; session
-  // ingress owns their validated promotion and cost-mode provenance.
-  const nativeFieldTrash = state.schemaVersion === 9 || (state.schemaVersion === 8 &&
-    (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8));
+  // Retain main's explicit8 producer and raw historical caller boundary.
+  // A scheduled10 graph upgrades only the independent trash capability here;
+  // its envelope, scheduled provenance and explicit cost mode remain intact.
+  const fieldMode = fieldTrashSemanticsVersion(state);
+  const nativeFieldTrash = state.schemaVersion === 10 || fieldMode === 9 ||
+    (state.schemaVersion === 8 && (state.costSemanticsVersion === 6 ||
+      state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8));
   if (nativeFieldTrash && targetIds.some(id => findCardInstance(state, id)?.zone === "CHARACTER")) {
-    state = { ...state, schemaVersion: 9 };
+    state = state.schemaVersion === 10
+      ? { ...state, fieldTrashSemanticsVersion: 9 }
+      : { ...state, schemaVersion: 9 };
     const attemptableIds = filterProhibitedTargets(state, targetIds, "TRASH", "EFFECT", causingController, sourceCardInstanceId, cardDb);
     const batch = processBatchReplacements(state, attemptableIds, "TRASH_CARD", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", causingController, cardDb, services, undefined, causingSource);
     if (batch.pendingPrompt) return { state: batch.state, events: batch.events, succeeded: false, pendingPrompt: batch.pendingPrompt };

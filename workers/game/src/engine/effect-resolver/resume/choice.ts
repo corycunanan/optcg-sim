@@ -1,3 +1,4 @@
+import { abandonedResume } from "../resume-provenance.js";
 import { applyDonReturnIds, decodeDonReturnIds } from "../actions/don.js";
 import { isReplacementSubstituteBranchFeasible } from "../../replacements.js";
 import { REPLACED_CARD_REF } from "../../effect-types.js";
@@ -596,13 +597,13 @@ export function handleAwaitingOptionalResponse(
         sourceCardInstanceId
       );
     }
-    return services.reportTriggers(
+    return abandonedResume(services.reportTriggers(
       nextState,
       topFrame.pendingTriggers,
       cardDb,
       [],
       topFrame.triggerOrderingGroup
-    );
+    ));
   }
 
   const block = topFrame.effectBlock;
@@ -640,13 +641,13 @@ export function handleAwaitingOptionalResponse(
         popFrame(costResult.state),
         topFrame
       );
-      return services.reportTriggers(
+      return abandonedResume(services.reportTriggers(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
         [],
         topFrame.triggerOrderingGroup
-      );
+      ));
     }
 
     nextState = costResult.state;
@@ -841,6 +842,7 @@ export function handleAwaitingOptionalActionResponse(
   let nextState = popFrame(state);
   const stackDepthAfterPop = nextState.effectStack.length;
 
+  let bodyExecuted = false;
   let chainActions = topFrame.remainingActions;
   if (accepted) {
     const decided = { ...pausedAction };
@@ -860,6 +862,7 @@ export function handleAwaitingOptionalActionResponse(
       topFrame.effectDescription,
       accepted ? (topFrame.priorActionSucceeded ?? true) : false
     );
+    bodyExecuted = Boolean(chainResult.bodyExecuted);
     nextState = chainResult.state;
     events.push(...chainResult.events);
     if (isGameTerminated(nextState)) {
@@ -882,6 +885,8 @@ export function handleAwaitingOptionalActionResponse(
     }
   }
 
+  const disposition = (result: HandlerResult): HandlerResult => declined && !bodyExecuted ? abandonedResume(result) : result;
+
   // Same publication/trigger obligations as an interrupted continuation: the
   // saved prefix and the new chain events are scanned once (already-scanned
   // events are skipped), then queued triggers drain.
@@ -890,23 +895,23 @@ export function handleAwaitingOptionalActionResponse(
     nextState = scan.state;
     events.splice(0, events.length, ...scan.events);
     if (scan.triggers.length > 0) {
-      return services.reportTriggers(
+      return disposition(services.reportTriggers(
         nextState,
         [...scan.triggers, ...topFrame.pendingTriggers],
         cardDb,
         events,
         topFrame.triggerOrderingGroup
-      );
+      ));
     }
   }
 
-  return services.reportTriggers(
+  return disposition(services.reportTriggers(
     nextState,
     topFrame.pendingTriggers,
     cardDb,
     events,
     topFrame.triggerOrderingGroup
-  );
+  ));
 }
 
 /**

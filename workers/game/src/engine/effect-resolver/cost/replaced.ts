@@ -1,3 +1,4 @@
+import { abandonedResume } from "../resume-provenance.js";
 import type {
   CardData,
   GameState,
@@ -57,11 +58,11 @@ export function finishReplacedLifeCost(
   );
   const scan = scanEventsForTriggers(state, scannable, controller, cardDb);
   replacePendingEventReferences(events, scannable, scan.events);
-  return services.reportTriggers(
+  return abandonedResume(services.reportTriggers(
     scan.state,
     [...pendingTriggers, ...scan.triggers],
     cardDb,
     events,
     triggerOrderingGroup
-  );
+  ));
 }

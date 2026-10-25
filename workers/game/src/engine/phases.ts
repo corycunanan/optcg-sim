@@ -33,7 +33,7 @@ import {
   expireRefreshPhaseEffects,
   expireUntilEndOfTurn,
 } from "./duration-tracker.js";
-import { resolveEffectWork } from "./effect-resolver/resolver.js";
+import { resolveScheduledEffectWork } from "./effect-resolver/resolver.js";
 import { withTriggerScanned } from "./events.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
@@ -308,16 +308,7 @@ function continueEndPhase(
   }
   const entry = queue.shift();
   if (entry) {
-    const result = resolveEffectWork(
-      state,
-      {
-        id: "scheduled_" + entry.sourceEffectId,
-        category: "auto",
-        actions: [entry.action],
-      },
-      entry.sourceEffectId,
-      entry.controller,
-      cardDb);
+    const result = resolveScheduledEffectWork(state, entry, cardDb);
     state = result.pendingPrompt
       ? { ...result.state, pendingPrompt: result.pendingPrompt }
       : result.state;

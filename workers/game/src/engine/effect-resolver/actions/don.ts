@@ -28,7 +28,9 @@ import {
 } from "../target-resolver.js";
 import { promptEffectDescription, resolveAmount, tryResolveAmount } from "../action-utils.js";
 import { donIdentityChoiceMatters } from "../cost/targets.js";
-import { isDonAttachProhibited } from "../../prohibitions.js";
+import { effectSourceIdentity } from "../../effect-source.js";
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
+import { isDonActivationProhibitedByEffect, isDonAttachProhibited } from "../../prohibitions.js";
 
 export function executeGiveDon(
   state: GameState,
@@ -549,14 +551,20 @@ function buildFieldDonReturnPrompt(
 export function executeSetDonActive(
   state: GameState,
   action: ActionOf<"SET_DON_ACTIVE">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
 ): ActionResult {
+  const source = effectSourceIdentity(state, sourceCardInstanceId, cardDb,
+    resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceIdentity ??
+      resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot);
+  if (isDonActivationProhibitedByEffect(state, controller, source, cardDb)) {
+    return { state, events: [], succeeded: false };
+  }
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = resolveAmount(params.amount ?? 1, _resultRefs, state, controller, _cardDb);
+  const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
   const p = state.players[controller];
   const restedDon = p.donCostArea.filter((d) => d.state === "RESTED");
   const count = Math.min(amount, restedDon.length);

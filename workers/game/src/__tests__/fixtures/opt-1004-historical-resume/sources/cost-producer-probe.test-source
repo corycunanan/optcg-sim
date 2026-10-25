@@ -1,0 +1,84 @@
+import { expect, it } from '/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/optcg-sim/node_modules/vitest/dist/index.js';
+import { writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
+import { rig, synSchema } from '../opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/opt-960-rig.ts';
+import { GameSession as OldSession } from '../opt1004-historical67cbb-diagnostic/workers/game/src/GameSession.ts';
+import { SessionRepository as OldRepository } from '../opt1004-historical67cbb-diagnostic/workers/game/src/session/persistence.ts';
+import { GameSession as ReaderSession } from '../optcg-sim/workers/game/src/GameSession.ts';
+import { SessionRepository as ReaderRepository } from '../optcg-sim/workers/game/src/session/persistence.ts';
+import { GameSession as WriterSession } from '../opt1004-writer10-final-candidate/workers/game/src/GameSession.ts';
+import { SessionRepository as WriterRepository } from '../opt1004-writer10-final-candidate/workers/game/src/session/persistence.ts';
+import { MemorySessionStorage } from '../opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/fixtures/opt-940-synthetic-states.ts';
+const base = '/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/opt1004-legacy-inflight-diagnostic/';
+const options = { nextJsUrl: 'https://app.example.test', workerSecret: 'test' };
+const env = { NEXTJS_URL: options.nextJsUrl, GAME_WORKER_SECRET: options.workerSecret };
+const memory = (values?: Record<string, unknown>) => { const storage = new MemorySessionStorage(); for (const [k, v] of Object.entries(values ?? {})) storage.data.set(k, structuredClone(v)); return storage; };
+const copy = (storage: MemorySessionStorage) => Object.fromEntries([...storage.data].map(([k, v]) => [k, structuredClone(v)]));
+const digest = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+function runtime(Session: any, storage: MemorySessionStorage, snapshot: any) {
+  const session = new Session({ storage, getWebSockets: () => [], getTags: () => [], acceptWebSocket() {} }, env);
+  session.gameState = snapshot.state; session.cardDb = snapshot.cardDb; session.undoHistory = snapshot.undoHistory;
+  return session;
+}
+async function act(Session: any, Repository: any, storage: MemorySessionStorage, action: any) {
+  const loaded = (await new Repository(storage, options).load())!;
+  const session = runtime(Session, storage, loaded);
+  const normalized = { ...action, ...(loaded.state.pendingPrompt?.promptId ? { promptId: loaded.state.pendingPrompt.promptId } : {}) };
+  const messages: any[] = [];
+  await session.handleAction({ send(value: string) { messages.push(JSON.parse(value)); }, close() {} }, loaded.state.pendingPrompt?.respondingPlayer ?? 0, normalized);
+  expect(messages.filter(m => m.type === 'action:rejected')).toEqual([]);
+  return { action: normalized, stored: copy(storage), state: session.gameState };
+}
+function exact(root: any, id: string) {
+  if (!root?.players) return null;
+  for (const p of root.players) for (const card of [p.leader, p.stage, ...p.characters, ...p.hand, ...p.trash, ...p.deck, ...p.removedFromGame]) if (card?.instanceId === id) return card;
+  return null;
+}
+it('audits actual67cbb source8 pre-cost pause on reader0a and writer8485 without changing production', async () => {
+  const payload: Record<string, unknown> = {};
+  const result: any[] = [];
+  for (const mode of [6, 7, 8]) {
+    const r = rig(); r.state.schemaVersion = 8; r.state.costSemanticsVersion = mode as 6 | 7 | 8;
+    r.state.players[0].donCostArea.forEach(d => d.state = 'RESTED');
+    const restriction = r.put('OP10-030', 0, 'CHARACTER');
+    const source = r.put('SYN-historical-paused-origin', 0, 'HAND', { data: { cost: 0 }, schema: synSchema('SYN-historical-paused-origin', [{ id: 'onplay', category: 'auto', trigger: { keyword: 'ON_PLAY' }, costs: [{ type: 'TRASH_SELF' }, { type: 'TRASH_FROM_HAND', amount: 1 }], actions: [{ type: 'SCHEDULE_ACTION', params: { timing: 'END_OF_THIS_TURN', action: { type: 'SET_DON_ACTIVE', params: { amount: 1, up_to: true } } } }] }]) });
+    r.put('CHAR-VANILLA', 0, 'HAND'); r.put('CHAR-RUSH', 0, 'HAND');
+    const oldStorage = memory();
+    await new OldRepository(oldStorage, options).save({ state: r.state, cardDb: r.db, undoHistory: [structuredClone(r.state)], mode: 'PVP', pregameMode: 'PRIORITY_ROLL', testPriorityRolls: null });
+    const initial = copy(oldStorage);
+    const played = await act(OldSession, OldRepository, oldStorage, { type: 'PLAY_CARD', cardInstanceId: source.instanceId });
+    const pause = copy(oldStorage);
+    const paused = (await new OldRepository(oldStorage, options).load())!.state;
+    expect(paused.schemaVersion).toBe(8); expect(paused.costSemanticsVersion).toBe(mode);
+    expect(paused.pendingPrompt?.options.promptType).toBe('SELECT_TARGET'); expect(paused.scheduledActions).toHaveLength(0);
+    const frame = paused.effectStack.find((f: any) => f.costs?.some((c: any) => c.type === 'TRASH_SELF'))!;
+    const refs = frame.resultRefs.filter(([, ref]: any) => ref.sourceIdentity || ref.sourceCardSnapshot);
+    expect(refs.some(([, ref]: any) => ref.sourceIdentity?.cardId === source.cardId)).toBe(true);
+    expect(refs.some(([, ref]: any) => ref.sourceCardSnapshot)).toBe(false);
+    const identity = refs.find(([, ref]: any) => ref.sourceIdentity)[1].sourceIdentity;
+    const oldOriginalId = identity.instanceId;
+    const originalPositions = { live: exact(paused, oldOriginalId), transaction: exact(frame.costTransactionState, oldOriginalId), expected: exact(frame.costExpectedRoot, oldOriginalId), prompt: paused.pendingPrompt, refs };
+    payload[`mode${mode}`] = { producerCommit: '67cbbde3622fb13600084e1f73edc67e15dff910', initial, playAction: played.action, pause, sourceIdentity: identity, exactOriginalCarriers: originalPositions };
+    for (const [name, Session, Repository] of [['reader0a', ReaderSession, ReaderRepository], ['writer8485', WriterSession, WriterRepository]] as const) {
+      const storage = memory(pause); const suffix: any[] = [];
+      let loaded = (await new Repository(storage, options).load())!;
+      suffix.push(await act(Session, Repository, storage, { type: 'SELECT_TARGET', selectedInstanceIds: [loaded.state.players[0].hand[0].instanceId] }));
+      const afterSchedule = (await new Repository(storage, options).load())!.state;
+      expect(afterSchedule.scheduledActions).toHaveLength(1);
+      suffix.push(await act(Session, Repository, storage, { type: 'ACTIVATE_EFFECT', cardInstanceId: restriction.instanceId, effectId: 'activate_set_don_active_then_prohibit' }));
+      suffix.push(await act(Session, Repository, storage, { type: 'PLAYER_CHOICE', choiceId: 'choose-value:0' }));
+      suffix.push(await act(Session, Repository, storage, { type: 'ADVANCE_PHASE' }));
+      loaded = (await new Repository(storage, options).load())!;
+      if (loaded.state.pendingPrompt) suffix.push(await act(Session, Repository, storage, { type: 'PLAYER_CHOICE', choiceId: 'choose-value:1' }));
+      loaded = (await new Repository(storage, options).load())!;
+      const row = { mode, runtime: name, sourceIdentity: identity, originalAtPause: { live: !!originalPositions.live, transaction: !!originalPositions.transaction, expected: !!originalPositions.expected }, afterSchedule: { schemaVersion: afterSchedule.schemaVersion, costSemanticsVersion: afterSchedule.costSemanticsVersion, obligation: afterSchedule.scheduledActions[0] }, final: { schemaVersion: loaded.state.schemaVersion, costSemanticsVersion: loaded.state.costSemanticsVersion, donEvents: loaded.state.eventLog.filter((e: any) => e.type === 'DON_SET_ACTIVE').length, prompt: loaded.state.pendingPrompt, activePlayer: loaded.state.turn.activePlayerIndex } };
+      result.push(row);
+      writeFileSync(`${base}suffix-mode${mode}-${name}.json.gz`, gzipSync(JSON.stringify({ originalPauseProducer: '67cbbde3622fb13600084e1f73edc67e15dff910', runtime: name, suffix })));
+    }
+  }
+  const bytes = gzipSync(JSON.stringify({ provenance: 'actual main67cbb writer GameSession/Repository output in synthetic environment; no production capture; original pause bytes unmodified', cases: payload }));
+  writeFileSync(`${base}historical-main67cbb-pauses.json.gz`, bytes);
+  writeFileSync(`${base}manifest.json`, JSON.stringify({ producer: '67cbbde3622fb13600084e1f73edc67e15dff910', frozenReader: '0a1d579ad1cd5a49612fa9f0572811912908892b', actualWriter: '8485aa5cd1521186979fdbb0d2c4e2fcbe1de30a', modeCount: 3, payloadSHA256: digest(bytes), results: result }, null, 2) + '\n');
+  console.log(JSON.stringify({ payloadSHA256: digest(bytes), results: result }, null, 2));
+});

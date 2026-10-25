@@ -79,6 +79,7 @@ describe("OPT-940 stage-less PhaseBoundaryContinuation: lossless, legacy semanti
       expect(phaseFrame.phaseBoundaryContinuation).not.toHaveProperty("activatedWaveEffects");
       expect(state.turn.phase).toBe("END");
       expect(classifyLegacyShapes(state)).toEqual([
+        { shape: "legacy.scheduled_origin_unknown", frameId: phaseFrame.id },
         { shape: "legacy.stage_less_phase_boundary", frameId: phaseFrame.id },
       ]);
     }

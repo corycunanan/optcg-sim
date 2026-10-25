@@ -1,3 +1,4 @@
+import { fieldTrashSemanticsVersion, validateFieldTrashCapability, validateFieldTrashDiscriminators } from "../engine/field-trash-semantics.js";
 import { battleCompletionOwnerViolation } from "../engine/battle-completion-contract.js";
 import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
 import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
@@ -37,17 +38,19 @@ import type { EffectStackFrame, GameState, PhaseBoundaryContinuation } from "../
 import { EFFECT_STACK_FRAME_KINDS, VERSION_3_CONTINUATION_FIELDS, VERSION_3_FRAME_KINDS, frameKindOf, type EffectStackFrameKind } from "../engine/frame-kinds.js";
 import { promptCardForLifeCard, revealTriggerPromptOptions } from "../engine/damage-frames.js";
 import { log } from "../lib/log.js";
+import { findCardInstance } from "../engine/state.js";
+import { validateScheduledSourceSnapshots } from "./version10-reader.js";
 import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 8;
 /** The newest readable envelope; native8 carries exact battle completion and cost provenance. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 9;
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 10;
 /** The deployed runtime and default production writer use v8. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9,
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 ];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
@@ -65,6 +68,7 @@ export {
  * disposition and owner in SAVED-STATE-COMPATIBILITY.md §4.
  */
 export type LegacyShape =
+  | "legacy.scheduled_origin_unknown"
   | "legacy.stage_less_phase_boundary"
   | "legacy.structural_resume_context"
   | "legacy.cost_transaction_frame"
@@ -513,23 +517,9 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
-  if (version < 9) {
-    const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
-    frames.forEach((frame, index) => {
-      if (!isRecord(frame)) return;
-      for (const field of ["replacementBatch", "replacementBatchContinuation"]) {
-        const batch = frame[field];
-        if (isRecord(batch) && batch.actionKind === "TRASH_CARD") {
-          throw new SessionLoadError(location, `effectStack[${index}].${field}.actionKind TRASH_CARD requires schemaVersion 9`);
-        }
-      }
-    });
-    const prompt = isRecord(raw.pendingPrompt) ? raw.pendingPrompt : {};
-    const context = isRecord(prompt.resumeContext) ? prompt.resumeContext : {};
-    if (context.type === "REPLACEMENT_BATCH" && context.actionKind === "TRASH_CARD") {
-      throw new SessionLoadError(location, "pendingPrompt.resumeContext.actionKind TRASH_CARD requires schemaVersion 9");
-    }
-  }
+  validateFieldTrashCapability(raw, version, reason => { throw new SessionLoadError(location, reason); });
+  validateScheduledSourceSnapshots(raw, version, reason => { throw new SessionLoadError(location, reason); });
+  validateFieldTrashDiscriminators(raw, fieldTrashSemanticsVersion(raw, version), reason => { throw new SessionLoadError(location, reason); });
   if (version >= 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7 && raw.costSemanticsVersion !== 8) {
     throw new SessionLoadError(location, `native${version} requires explicit costSemanticsVersion 6, 7 or 8`);
   }
@@ -604,6 +594,9 @@ export function convertToCurrentShape(
  * version 1 meaning.
  */
 export function toPersistedGameState(state: GameState): GameState {
+  validateFieldTrashCapability(state, state.schemaVersion ?? GAME_STATE_SCHEMA_VERSION, reason => { throw new SessionLoadError("writer", reason); });
+  validateFieldTrashDiscriminators(state, fieldTrashSemanticsVersion(state), reason => { throw new SessionLoadError("writer", reason); });
+  validateScheduledSourceSnapshots(state, state.schemaVersion ?? GAME_STATE_SCHEMA_VERSION, reason => { throw new SessionLoadError("writer", reason); });
   const unstaged = state.effectStack.some(
     (frame) => frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined
   );
@@ -1119,7 +1112,13 @@ export interface LegacyShapeReport {
  */
 export function classifyLegacyShapes(state: GameState): LegacyShapeReport[] {
   const reports: LegacyShapeReport[] = [];
+  const unknownOrigin = (entry: { sourceEffectId: string; sourceCardSnapshot?: unknown; sourceIdentity?: unknown }) =>
+    entry.sourceCardSnapshot === undefined && entry.sourceIdentity === undefined && !findCardInstance(state, entry.sourceEffectId);
+  if (state.scheduledActions.some(unknownOrigin)) reports.push({ shape: "legacy.scheduled_origin_unknown" });
   for (const frame of state.effectStack) {
+    if (frame.phaseBoundaryContinuation?.remainingScheduledActions.some(unknownOrigin)) {
+      reports.push({ shape: "legacy.scheduled_origin_unknown", frameId: frame.id });
+    }
     if (frame.phaseBoundaryContinuation?.stage === LEGACY_END_PHASE_STAGE) {
       reports.push({ shape: "legacy.stage_less_phase_boundary", frameId: frame.id });
     }

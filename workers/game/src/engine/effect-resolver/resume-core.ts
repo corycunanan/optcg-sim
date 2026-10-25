@@ -1,3 +1,4 @@
+import { prepareResumeProvenance, settleResumeProvenance, abandonedResume } from "./resume-provenance.js";
 import { updateEffectContinuation } from "./event-activation.js";
 /**
  * Dependency-injected resume dispatchers — resumeEffectChain (action-type based) and
@@ -93,6 +94,20 @@ export function resumeEffectChain(
   resumeCtx: ResumeContext,
   action: GameAction,
   cardDb: Map<string, CardData>,
+  services: EffectResolverServices,
+): HandlerResult {
+  const prepared = prepareResumeProvenance(state, resumeCtx.effectSourceInstanceId, resumeCtx.resultRefs,
+    [...(resumeCtx.pausedAction ? [resumeCtx.pausedAction] : []), ...resumeCtx.remainingActions]);
+  const context = prepared.refs === resumeCtx.resultRefs ? resumeCtx : { ...resumeCtx, resultRefs: prepared.refs };
+  const result = resumeEffectChainCore(prepared.state, context, action, cardDb, services);
+  return settleResumeProvenance(state, prepared.state, result);
+}
+
+function resumeEffectChainCore(
+  state: GameState,
+  resumeCtx: ResumeContext,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
   services: EffectResolverServices
 ): HandlerResult {
   const {
@@ -115,10 +130,10 @@ export function resumeEffectChain(
 
   // Player skipped the optional effect
   if (action.type === "PASS") {
-    return { kind: isGameTerminated(state) ? "terminal" : "completed", state, events, resolved: false };
+    return abandonedResume({ kind: isGameTerminated(state) ? "terminal" : "completed", state, events, resolved: false });
   }
   if (action.type === "PLAYER_CHOICE" && action.choiceId === "skip") {
-    return { kind: isGameTerminated(state) ? "terminal" : "completed", state, events, resolved: false };
+    return abandonedResume({ kind: isGameTerminated(state) ? "terminal" : "completed", state, events, resolved: false });
   }
 
   // ── ARRANGE_TOP_CARDS branches ────────────────────────────────────────────
@@ -383,6 +398,26 @@ export function resumeFromStack(
   state: GameState,
   action: GameAction,
   cardDb: Map<string, CardData>,
+  services: EffectResolverServices,
+): HandlerResult {
+  const owner = peekFrame(state);
+  if (!owner || isGameTerminated(state)) return resumeFromStackCore(state, action, cardDb, services);
+  const actions = [...(owner.effectBlock.actions ?? []), ...(owner.pausedAction ? [owner.pausedAction] : []),
+    ...owner.remainingActions, ...(owner.simultaneousGroup?.actions ?? [])];
+  const prepared = prepareResumeProvenance(state, owner.sourceCardInstanceId, owner.resultRefs, actions);
+  const plan = owner.simultaneousGroup && prepareResumeProvenance(prepared.state, owner.sourceCardInstanceId, owner.simultaneousGroup.resultRefs, actions);
+  const frame = prepared.refs === owner.resultRefs && (!plan || plan.refs === owner.simultaneousGroup!.resultRefs)
+    ? owner : { ...owner, resultRefs: prepared.refs,
+      ...(plan ? { simultaneousGroup: { ...owner.simultaneousGroup!, resultRefs: plan.refs } } : {}) };
+  const input = frame === owner ? prepared.state : { ...prepared.state,
+    effectStack: prepared.state.effectStack.map(existing => existing.id === owner.id ? frame : existing) };
+  return settleResumeProvenance(state, input, resumeFromStackCore(input, action, cardDb, services));
+}
+
+function resumeFromStackCore(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
   services: EffectResolverServices
 ): HandlerResult {
   const topFrame = peekFrame(state);
@@ -643,22 +678,22 @@ export function resumeFromStack(
             ...chainScan.triggers,
             ...topFrame.pendingTriggers,
           ];
-          return services.reportTriggers(
+          return { ...services.reportTriggers(
             nextState,
             allTriggers,
             cardDb,
             events
-          );
+          ), ...(result.resumeBodyAbandoned ? { resumeBodyAbandoned: true as const } : {}) };
         }
       }
 
-      return services.reportTriggers(
+      return { ...services.reportTriggers(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
         events,
         topFrame.triggerOrderingGroup
-      );
+      ), ...(result.resumeBodyAbandoned ? { resumeBodyAbandoned: true as const } : {}) };
     }
 
     // ── Interrupted by nested triggers (triggers have completed, resume) ─

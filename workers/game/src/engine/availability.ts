@@ -218,6 +218,9 @@ function availabilityForBlock(
   }
 
   if (!isActivateMain(block)) return null;
+  if (isCardNegated(card, state, cardDb)) {
+    return { effectId: block.id, status: "blocked", reason: "CONDITION" };
+  }
 
   if (
     getActivateEffectTimingError(state) !== null ||

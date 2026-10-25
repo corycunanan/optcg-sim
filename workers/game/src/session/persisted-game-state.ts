@@ -5,6 +5,7 @@ import { EFFECT_STACK_FRAME_KINDS } from "../engine/frame-kinds.js";
 const EffectSourceIdentity = z.strictObject({ instanceId: z.string(), cardId: z.string(), cardType: z.enum(["Leader", "Character", "Event", "Stage"]) });
 
 const PlayerIndex = z.union([z.literal(0), z.literal(1)]);
+export const ActivatedSourceIdentity = z.strictObject({ instanceId: z.string(), cardId: z.string(), controller: PlayerIndex, effectBlockId: z.string() });
 const FiniteNumber = z.number().finite();
 const NonNegativeInteger = z.number().int().nonnegative();
 const NullableString = z.string().nullable();
@@ -16,7 +17,7 @@ const DonInstance = z.strictObject({
   attachedTo: NullableString,
 });
 
-const CardInstance = z.strictObject({
+export const CardInstance = z.strictObject({
   instanceId: z.string(),
   cardId: z.string(),
   zone: z.enum([
@@ -306,6 +307,8 @@ const PhaseBoundaryContinuation = z.strictObject({
       action: z.unknown(),
       controller: PlayerIndex,
       sourceEffectId: z.string(),
+      sourceCardSnapshot: CardInstance.optional(),
+      sourceIdentity: ActivatedSourceIdentity.optional(),
       step: z.enum(END_PHASE_STEPS).optional(),
     })
   ),
@@ -481,6 +484,7 @@ export const StackFrameCore = z.strictObject({
 });
 
 export const PersistedGameStateV3 = z.strictObject({
+  fieldTrashSemanticsVersion: z.union([z.literal(8), z.literal(9)]).optional(),
   costSemanticsVersion: z.union([z.literal(6), z.literal(7), z.literal(8)]).optional(),
   id: z.string(),
   executionContext: ExecutionContext,
