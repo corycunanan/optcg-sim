@@ -1,10 +1,10 @@
 {
   "files": {
-    "sources/opt-1004-writer-producer.test-source": "4b4ae3576e532e4cfb07f2853d120a500b16a8c2712f573df38dbb8a24ecb525",
+    "sources/opt-1004-writer-producer.test-source": "bbbe1d33ddbe351aa3d035cc39bc83c7ea219791ad1c7edd92c17ab17758bbe0",
     "sources/resolver.ts.txt": "4da623856d2d3d08dd37f7e35ffb465213da83583c99c01effdaf9f1a8f2c391",
     "sources/setup.ts.txt": "42ef932e8c2f7feb8c9b580c6727f045f46aea62adee817246e7151f314a582c",
     "sources/effects.ts.txt": "1b844c247790e5be7b6a166e8193b584050304b50390b5eb4fec6aa0e43afccd",
     "sources/game-state-schema.ts.txt": "1009dd9123639fb0efcddfd7d7c7c5dd814a83088da3e9cf875d1e1ff267b695",
-    "candidate.patch": "6152a0925f8983dafe6af5d7ac928328781b7cdb3c1cccf45a6509f0a67d8dfe"
+    "candidate.patch": "4f41298f6c8125880d0faaf5c339415ca6590939f555c650d960ada417224ec9"
   }
 }

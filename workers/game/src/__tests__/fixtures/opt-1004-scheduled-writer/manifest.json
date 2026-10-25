@@ -1,16 +1,16 @@
 {
-  "producerCommit": "3bac57f3679bc837e90ad12841bce7321e0f7789",
+  "producerCommit": "b091bf176f5d713835dc56e1d56ea6f29f8943f5",
   "readerBase": "66df1d56f4768790c8f8f9eaaab0623c33abd251",
   "provenance": "synthetic-only exception for OPT-1004; no production DO capture",
-  "caseCount": 10,
-  "snapshots": 74,
+  "caseCount": 11,
+  "snapshots": 82,
   "fixtures": {
-    "cases.json.gz": "c9dddfc3529bcef949e3e3febce37b3b5a3364adfb0a21fcd5eda9a9f1efafe8"
+    "cases.json.gz": "e7c6213997a06b5f2962dcd99b4e613908e0bf15abfc55fb80381c3dd216e538"
   },
   "sourceHashes": {
     "workers/game/src/GameSession.ts": "ed99ca2b2ab79486a82bb6f4692061d638036e8228e0bda9bc60136d852e0bde",
     "workers/game/src/__tests__/helpers.ts": "a239f290e43031602ae3333c09b880fd00bdc23c3e0a355cc357d879149e2889",
-    "workers/game/src/__tests__/opt-1004-writer-producer.test.ts": "4b4ae3576e532e4cfb07f2853d120a500b16a8c2712f573df38dbb8a24ecb525",
+    "workers/game/src/__tests__/opt-1004-writer-producer.test.ts": "bbbe1d33ddbe351aa3d035cc39bc83c7ea219791ad1c7edd92c17ab17758bbe0",
     "workers/game/src/__tests__/opt-960-rig.ts": "6d22df45fcf4c16611e940fca457e4168aab8d2978bc9866b1b43bc6813d5815",
     "workers/game/src/engine/README.md": "ca7cd6992139c50c7d74d8b40de65adbdbb2bbbf497ec91e564867299de01215",
     "workers/game/src/engine/action-coverage-contract.ts": "e2cbbc51b4079eb2217b12cb61100ce6863ca799459613e588b18317f2f3b9ac",

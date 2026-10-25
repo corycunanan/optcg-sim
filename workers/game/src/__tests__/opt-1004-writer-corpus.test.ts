@@ -24,7 +24,7 @@ const memory = (values: Stored) => {
 type Access = { gameState: GameState; cardDb: Map<string, CardData>; undoHistory: GameState[]; handleAction(ws: WebSocket, player: 0 | 1, action: GameAction): Promise<void> };
 
 it("pins actual isolated writer candidate, payload, patch and capture sources", () => {
-  expect(manifest.producerCommit).toBe("3bac57f3679bc837e90ad12841bce7321e0f7789");
+  expect(manifest.producerCommit).toBe("b091bf176f5d713835dc56e1d56ea6f29f8943f5");
   expect(manifest.readerBase).toBe("66df1d56f4768790c8f8f9eaaab0623c33abd251");
   expect(manifest.caseCount).toBe(Object.keys(corpus.cases).length);
   expect(manifest.snapshots).toBe(Object.values(corpus.cases).reduce((n, c) => n + 1 + c.steps.length, 0));
@@ -65,13 +65,7 @@ describe.each(Object.entries(corpus.cases))("OPT-1004 actual writer suffix %s", 
   it("loads and semantically resumes after the first writer-created obligation", async () => {
     // Stage 1 deliberately does not activate schema9 from8. Resume only
     // after initial writer activation of9; later9 scheduling must match too.
-    let previous = scenario.initial.session.state.scheduledActions.length;
-    let start = -1;
-    scenario.steps.forEach((step, index) => {
-      const count = step.stored.session.state.scheduledActions.length;
-      if (count > previous && start === -1) start = index;
-      previous = count;
-    });
+    const start = scenario.steps.findIndex(step => step.stored.session.state.schemaVersion === 9);
     expect(start).toBeGreaterThanOrEqual(0);
     const storage = memory(scenario.steps[start].stored);
     const durable = { storage, getWebSockets: () => [], getTags: () => [], acceptWebSocket() {} } as unknown as DurableObjectState;

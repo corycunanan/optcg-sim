@@ -129,6 +129,28 @@ describe("OPT-1004 schema9 reader and execution", () => {
     expect(result.events).toEqual([]);
   });
 
+  it("validates agreement of dual origin carriers and their proven frame owner in9", () => {
+    const r = rig();
+    r.state.schemaVersion = 9;
+    const block = { id: "queued-origin", category: "auto" as const, trigger: { keyword: "ON_PLAY" as const }, costs: [{ type: "TRASH_SELF" as const }], actions: [{ type: "CHOOSE_VALUE" as const, result_ref: "number", params: { domain: "NUMBER" as const, constraints: { min: 0, max: 1 } } }, { type: "DRAW" as const, params: { amount: { type: "CHOSEN_VALUE" as const, ref: "number" } } }, { type: "SCHEDULE_ACTION" as const, params: { timing: "END_OF_THIS_TURN" as const, action: { type: "SET_DON_ACTIVE" as const, params: { amount: 1 } } } }] };
+    const source = r.put("SYN-queued-origin", 0, "CHARACTER", { schema: synSchema("SYN-queued-origin", [block]) });
+    const result = resolveEffectWork(r.state, block, source.instanceId, 0, r.db, undefined, undefined, undefined, { instanceId: source.instanceId, cardId: source.cardId, controller: 0, effectBlockId: block.id });
+    r.state = { ...result.state, pendingPrompt: result.pendingPrompt ?? null };
+    const good = wire(r.state);
+    expect(() => convertPersistedGameState(good, "state")).not.toThrow();
+    for (const [field, value] of [["cardId", "different-card"], ["controller", 1], ["instanceId", "different-instance"]] as const) {
+      const raw = structuredClone(good);
+      const frame = raw.effectStack.find((f: { resultRefs: [string, { sourceIdentity?: unknown }][] }) => f.resultRefs.some(([, value]) => value.sourceIdentity));
+      frame.resultRefs.find(([, value]: [string, { sourceIdentity?: unknown }]) => value.sourceIdentity)[1].sourceCardSnapshot[field] = value;
+      expect(() => convertPersistedGameState(raw, "undoHistory[3]")).toThrow(/undoHistory\[3\].*sourceCardSnapshot disagrees with sourceIdentity/);
+    }
+    const owner = structuredClone(good);
+    const frame = owner.effectStack.find((f: { resultRefs: [string, { sourceIdentity?: unknown }][] }) => f.resultRefs.some(([, value]) => value.sourceIdentity));
+    frame.effectBlock.id = frame.resultRefs.find(([, value]: [string, { sourceIdentity?: unknown }]) => value.sourceIdentity)[1].sourceIdentity.effectBlockId;
+    frame.sourceCardInstanceId = "unrelated";
+    expect(() => convertPersistedGameState(owner, "state")).toThrow(/sourceIdentity disagrees with its effect frame owner/);
+  });
+
   it("rejects metadata relabeled8 on read and save", () => {
     const { r } = scheduledFixture();
     const raw = wire(r.state);

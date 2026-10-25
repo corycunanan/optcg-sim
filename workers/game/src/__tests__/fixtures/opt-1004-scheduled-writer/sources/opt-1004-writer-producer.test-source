@@ -117,19 +117,25 @@ it("captures isolated schema9 writer outputs through actual GameSession and repo
       if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
     }, 1);
   }
-  {
+  for (const already9 of [false, true]) {
     const r = rig(); r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
     const restriction = r.put("OP10-030", 0, "CHARACTER");
+    const prior = already9 ? r.put("SYN-prior-schedule", 0, "CHARACTER", { schema: synSchema("SYN-prior-schedule", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "ADD_DON_FROM_DECK", params: { amount: 1, up_to: true, target_state: "RESTED" } } } }] }]) }) : null;
     const source = r.put("SYN-queued-trash", 0, "HAND", { data: { cost: 0 }, schema: synSchema("SYN-queued-trash", [{ id: "onplay", category: "auto", trigger: { keyword: "ON_PLAY" }, costs: [{ type: "TRASH_SELF" }], actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } } } }] }]) });
-    await extra("existing8-queued-TRASH_SELF-schedule", r, async (act, current) => {
+    await extra(already9 ? "loaded9-queued-TRASH_SELF-schedule" : "existing8-queued-TRASH_SELF-schedule", r, async (act, current) => {
+      if (prior) {
+        await act({ type: "ACTIVATE_EFFECT", cardInstanceId: prior.instanceId, effectId: "main" });
+        expect(current().gameState.schemaVersion).toBe(9);
+      }
       await act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
       expect(current().gameState.schemaVersion).toBe(9);
-      const obligation = current().gameState.scheduledActions[0];
+      const obligation = current().gameState.scheduledActions.find(s => s.sourceCardSnapshot?.cardId === source.cardId)!;
       expect(obligation.sourceCardSnapshot?.cardId).toBe(source.cardId);
       expect(current().gameState.players[0].characters.some(c => c?.cardId === source.cardId)).toBe(false);
       await act({ type: "ACTIVATE_EFFECT", cardInstanceId: restriction.instanceId, effectId: "activate_set_don_active_then_prohibit" });
       await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
       await act({ type: "ADVANCE_PHASE" });
+      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
       if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
     }, 0);
   }
