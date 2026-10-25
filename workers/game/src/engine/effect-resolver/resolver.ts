@@ -476,7 +476,7 @@ function resolveEffectCore(
               : sourceSnapshot
                 ? {
                     sourceIdentity: sourceSnapshot,
-                    ...(state.schemaVersion === 10 && sourceCard!.controller === sourceSnapshot.controller ? {
+                    ...(state.schemaVersion === 10 && sourceCard!.cardId === sourceSnapshot.cardId && sourceCard!.controller === sourceSnapshot.controller ? {
                       // Keep the proven original controller with the actual
                       // pre-cost card snapshot, before TRASH_SELF can move it.
                       sourceCardSnapshot: structuredClone(sourceCard!),
@@ -737,6 +737,8 @@ function resolveEffectCore(
 // ─── Action Chain ─────────────────────────────────────────────────────────────
 
 export interface ChainResult {
+  /** Internal dispatch progress, never serialized; skipped conditions/chains are false. */
+  bodyExecuted?: boolean;
   state: GameState;
   events: PendingEvent[];
   pendingPrompt?: PendingPromptState;
@@ -893,6 +895,20 @@ export function continueSimultaneousGroup(
   cardDb: Map<string, CardData>,
   services: EffectResolverServices = resolverExecutionServices
 ): ChainResult {
+  const progress = { executed: false };
+  const result = continueSimultaneousGroupCore(state, plan, sourceCardInstanceId, controller, cardDb, services, progress);
+  return { ...result, ...(progress.executed ? { bodyExecuted: true } : {}) };
+}
+
+function continueSimultaneousGroupCore(
+  state: GameState,
+  plan: SimultaneousGroupPlan,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices,
+  progress: { executed: boolean },
+): ChainResult {
   const unsupportedAction = plan.actions.find(
     (action) =>
       !SIMULTANEOUS_ACTION_TYPES.has(action.type) || action.optional === true
@@ -950,6 +966,7 @@ export function continueSimultaneousGroup(
     const action = planning.plan.actions[index];
     const lock = planning.plan.locks[index];
     if (!lock?.execute) continue;
+    progress.executed = true;
     const result = services
       .withCommittedEvents(events)
       .executeEffectAction(
@@ -991,6 +1008,7 @@ export function continueSimultaneousGroup(
       resultRefs,
       planning.plan.effectDescription
     );
+  progress.executed ||= Boolean(tail.bodyExecuted);
   return {
     state: tail.pendingPrompt
       ? retainEventsOnFrame(tail.state, nextState.effectStack.length, events)
@@ -1010,6 +1028,23 @@ export function executeActionChain(
   effectDescription?: string,
   priorActionSucceeded?: boolean,
   services: EffectResolverServices = resolverExecutionServices
+): ChainResult {
+  const progress = { executed: false };
+  const result = executeActionChainCore(state, actions, sourceCardInstanceId, controller, cardDb, initialResultRefs, effectDescription, priorActionSucceeded, services, progress);
+  return { ...result, ...(progress.executed ? { bodyExecuted: true } : {}) };
+}
+
+function executeActionChainCore(
+  state: GameState,
+  actions: Action[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  initialResultRefs: Map<string, EffectResult> | undefined,
+  effectDescription: string | undefined,
+  priorActionSucceeded: boolean | undefined,
+  services: EffectResolverServices,
+  progress: { executed: boolean },
 ): ChainResult {
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
@@ -1054,6 +1089,7 @@ export function executeActionChain(
           controller,
           cardDb
         );
+      progress.executed ||= Boolean(groupResult.bodyExecuted);
       return {
         state: groupResult.pendingPrompt
           ? retainEventsOnFrame(
@@ -1120,6 +1156,7 @@ export function executeActionChain(
           effectDescription,
           lastActionSucceeded
         );
+      progress.executed ||= Boolean(continuation.bodyExecuted);
       return {
         state: continuation.pendingPrompt
           ? retainEventsOnFrame(
@@ -1146,6 +1183,7 @@ export function executeActionChain(
 
     // Execute the action
     const stackDepthBeforeAction = state.effectStack.length;
+    progress.executed = true;
     const result = services
       .withCommittedEvents(events)
       .executeEffectAction(

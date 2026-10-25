@@ -53,6 +53,7 @@ export interface EffectResolverServices {
     state: GameState;
     events: PendingEvent[];
     pendingPrompt?: PendingPromptState;
+    bodyExecuted?: boolean;
   };
 
   executeEffectAction(
@@ -86,6 +87,7 @@ export interface EffectResolverServices {
     state: GameState;
     events: PendingEvent[];
     pendingPrompt?: PendingPromptState;
+    bodyExecuted?: boolean;
   };
   reportTriggers(
     state: GameState,

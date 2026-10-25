@@ -521,12 +521,12 @@ function handleAwaitingCostSelectionCore(
     (cost.type === "REST_DON" || cost.type === "DON_REST") &&
     cost.amount === "ANY_NUMBER"
   ) {
-    return services.reportTriggers(
+    return abandonedResume(services.reportTriggers(
       withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
       topFrame.pendingTriggers,
       cardDb,
       eventsForCostAbandon(topFrame),
-    );
+    ));
   }
 
   if (
@@ -543,12 +543,12 @@ function handleAwaitingCostSelectionCore(
       sourceCardInstanceId
     );
     if (!paid) {
-      return services.reportTriggers(
+      return abandonedResume(services.reportTriggers(
         withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
         topFrame.pendingTriggers,
         cardDb,
         eventsForCostAbandon(topFrame),
-      );
+      ));
     }
     nextState = paid.state;
     events.push(...paid.events);
@@ -796,12 +796,12 @@ function handleAwaitingCostSelectionCore(
       nextState, [{ ...cost, position }], controller, cardDb, sourceCardInstanceId
     );
     if (!paid) {
-      return services.reportTriggers(
+      return abandonedResume(services.reportTriggers(
         withdrawUnactivatedTrashMain(popFrame(baselineState), topFrame),
         topFrame.pendingTriggers,
         cardDb,
         eventsForCostAbandon(topFrame)
-      );
+      ));
     }
     nextState = paid.state;
     events.push(...paid.events);

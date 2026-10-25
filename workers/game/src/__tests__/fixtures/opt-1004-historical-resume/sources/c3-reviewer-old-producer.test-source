@@ -1,0 +1,66 @@
+import { it, expect } from './optcg-sim/node_modules/vitest/dist/index.js';
+import { writeFileSync } from 'node:fs';
+import { rig, synSchema } from './opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/opt-960-rig.ts';
+import { GameSession as OldSession } from './opt1004-historical67cbb-diagnostic/workers/game/src/GameSession.ts';
+import { SessionRepository as OldRepository } from './opt1004-historical67cbb-diagnostic/workers/game/src/session/persistence.ts';
+import { GameSession as WriterSession } from './opt1004-resume-writer-candidate/workers/game/src/GameSession.ts';
+import { SessionRepository as WriterRepository } from './opt1004-resume-writer-candidate/workers/game/src/session/persistence.ts';
+import { MemorySessionStorage } from './opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/fixtures/opt-940-synthetic-states.ts';
+const options={nextJsUrl:'https://app.example.test',workerSecret:'test'};
+async function act(Session:any,Repository:any,storage:any,action:any){
+ const loaded=await new Repository(storage,options).load();
+ const session:any=new Session({storage,getWebSockets:()=>[],getTags:()=>[],acceptWebSocket(){}},{GAME_WORKER_SECRET:'test',NEXTJS_URL:options.nextJsUrl});
+ session.gameState=loaded.state;session.cardDb=loaded.cardDb;session.undoHistory=loaded.undoHistory;session.writeResultToDb=async()=>{};
+ const messages:any[]=[];await session.handleAction({send(v:string){messages.push(JSON.parse(v));},close(){}},0,{...action,...(loaded.state.pendingPrompt?.promptId?{promptId:loaded.state.pendingPrompt.promptId}:{})});
+ expect(messages.filter(m=>m.type==='action:rejected')).toEqual([]);
+ return (await new Repository(storage,options).load()).state;
+}
+it('actual old ANY_NUMBER cost skip does not activate writer10',async()=>{
+ const r=rig();r.state.schemaVersion=8;r.state.costSemanticsVersion=8;
+ const source=r.put('SYN-correctness-any-don',0,'HAND',{data:{cost:0},schema:synSchema('SYN-correctness-any-don',[{id:'onplay',category:'auto',trigger:{keyword:'ON_PLAY'},costs:[{type:'REST_DON',amount:'ANY_NUMBER'}],actions:[{type:'SCHEDULE_ACTION',params:{timing:'END_OF_THIS_TURN',action:{type:'SET_DON_ACTIVE',params:{amount:1}}}}]}])});
+ const storage=new MemorySessionStorage();await new OldRepository(storage,options).save({state:r.state,cardDb:r.db,undoHistory:[],mode:'PVP',pregameMode:'PRIORITY_ROLL',testPriorityRolls:null});
+ const paused=await act(OldSession,OldRepository,storage,{type:'PLAY_CARD',cardInstanceId:source.instanceId});
+ expect(paused.schemaVersion).toBe(8);expect(paused.pendingPrompt?.options.promptType).toBe('PLAYER_CHOICE');
+ expect(paused.pendingPrompt.options.confirmOrSkip).toBe(true);
+ const original=structuredClone(Object.fromEntries(storage.data));
+ const oldControl=new MemorySessionStorage();Object.entries(original).forEach(([k,v])=>oldControl.data.set(k,v));
+ const control=await act(OldSession,OldRepository,oldControl,{type:'PLAYER_CHOICE',choiceId:'skip'});
+ const after=await act(WriterSession,WriterRepository,storage,{type:'PLAYER_CHOICE',choiceId:'skip'});
+ writeFileSync('/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/opt1004-stage-correctness-skip-evidence.json',JSON.stringify({original,control:control.schemaVersion,after:{schemaVersion:after.schemaVersion,field:after.fieldTrashSemanticsVersion,cost:after.costSemanticsVersion,scheduled:after.scheduledActions,prompt:after.pendingPrompt}},null,2));
+ console.log(JSON.stringify({control:control.schemaVersion,writer:after.schemaVersion,scheduled:after.scheduledActions.length,prompt:after.pendingPrompt}));
+ expect(after.scheduledActions).toHaveLength(0);expect(after.schemaVersion).toBe(8);
+});
+
+it('actual old optional schedule skip does not activate writer10',async()=>{
+ const r=rig();r.state.schemaVersion=8;r.state.costSemanticsVersion=8;
+ const source=r.put('SYN-correctness-optional-schedule',0,'HAND',{data:{cost:0},schema:synSchema('SYN-correctness-optional-schedule',[{id:'onplay',category:'auto',trigger:{keyword:'ON_PLAY'},actions:[{type:'SCHEDULE_ACTION',optional:true,params:{timing:'END_OF_THIS_TURN',action:{type:'SET_DON_ACTIVE',params:{amount:1}}}}]}])});
+ const storage=new MemorySessionStorage();await new OldRepository(storage,options).save({state:r.state,cardDb:r.db,undoHistory:[],mode:'PVP',pregameMode:'PRIORITY_ROLL',testPriorityRolls:null});
+ const paused=await act(OldSession,OldRepository,storage,{type:'PLAY_CARD',cardInstanceId:source.instanceId});
+ expect(paused.schemaVersion).toBe(8);expect(paused.pendingPrompt?.options.promptType).toBe('OPTIONAL_EFFECT');
+
+ const original=structuredClone(Object.fromEntries(storage.data));
+ const oldControl=new MemorySessionStorage();Object.entries(original).forEach(([k,v])=>oldControl.data.set(k,v));
+ const control=await act(OldSession,OldRepository,oldControl,{type:'PLAYER_CHOICE',choiceId:'skip'});
+ const after=await act(WriterSession,WriterRepository,storage,{type:'PLAYER_CHOICE',choiceId:'skip'});
+ writeFileSync('/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/opt1004-stage-correctness-optional-skip-evidence.json',JSON.stringify({original,control:control.schemaVersion,after:{schemaVersion:after.schemaVersion,field:after.fieldTrashSemanticsVersion,cost:after.costSemanticsVersion,scheduled:after.scheduledActions,prompt:after.pendingPrompt}},null,2));
+ console.log(JSON.stringify({control:control.schemaVersion,writer:after.schemaVersion,scheduled:after.scheduledActions.length,prompt:after.pendingPrompt}));
+ expect(after.scheduledActions).toHaveLength(0);expect(after.schemaVersion).toBe(8);
+});
+it.each(['then-draw','then-schedule','if-do-schedule'])('optional decline suffix boundary %s',async suffix=>{
+ const r=rig();r.state.schemaVersion=8;r.state.costSemanticsVersion=8;r.deck(0,10);
+ const schedule={type:'SCHEDULE_ACTION',params:{timing:'END_OF_THIS_TURN',action:{type:'SET_DON_ACTIVE',params:{amount:1}}}};
+ const actions=suffix==='then-draw'?[{...schedule,optional:true},{type:'DRAW',params:{amount:1},chain:'THEN'}]:[{type:'DRAW',params:{amount:1},optional:true},{...schedule,chain:suffix==='then-schedule'?'THEN':'IF_DO'}];
+ const id='SYN-correctness-'+suffix;
+ const source=r.put(id,0,'HAND',{data:{cost:0},schema:synSchema(id,[{id:'onplay',category:'auto',trigger:{keyword:'ON_PLAY'},actions}] as any)});
+ const storage=new MemorySessionStorage();await new OldRepository(storage,options).save({state:r.state,cardDb:r.db,undoHistory:[],mode:'PVP',pregameMode:'PRIORITY_ROLL',testPriorityRolls:null});
+ const paused=await act(OldSession,OldRepository,storage,{type:'PLAY_CARD',cardInstanceId:source.instanceId});
+ expect(paused.schemaVersion).toBe(8);expect(paused.pendingPrompt?.options.promptType).toBe('OPTIONAL_EFFECT');
+ const original=structuredClone(Object.fromEntries(storage.data));
+ const after=await act(WriterSession,WriterRepository,storage,{type:'PLAYER_CHOICE',choiceId:'skip'});
+ const draws=after.players[0].hand.length-paused.players[0].hand.length;
+ console.log(JSON.stringify({suffix,writer:after.schemaVersion,scheduled:after.scheduledActions.length,draws}));
+ writeFileSync('/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/opt1004-stage-correctness-'+suffix+'-evidence.json',JSON.stringify({original,after:{schemaVersion:after.schemaVersion,scheduled:after.scheduledActions.length,draws}},null,2));
+ expect(after.scheduledActions).toHaveLength(suffix==='then-schedule'?1:0);
+ expect(draws).toBe(suffix==='then-draw'?1:0);
+ expect(after.schemaVersion).toBe(suffix==='if-do-schedule'?8:10);
+});
