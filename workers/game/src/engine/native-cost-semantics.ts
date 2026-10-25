@@ -6,7 +6,7 @@ export function hasNativeCostSemantics(
 ): boolean {
   return (
     state.schemaVersion === 7 ||
-    (state.schemaVersion === 8 && (state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8))
+    ((state.schemaVersion === 8 || state.schemaVersion === 9) && (state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8))
   );
 }
 
@@ -15,5 +15,5 @@ export function hasNativeCostSemantics(
 export function hasStructuralCostSemantics(
   state: Pick<GameState, "schemaVersion" | "costSemanticsVersion">
 ): boolean {
-  return state.schemaVersion === 8 && state.costSemanticsVersion === 8;
+  return (state.schemaVersion === 8 || state.schemaVersion === 9) && state.costSemanticsVersion === 8;
 }

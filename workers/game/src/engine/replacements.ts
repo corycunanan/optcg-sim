@@ -47,7 +47,7 @@ import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
 import { extractEffectDescription, resolveAmount } from "./effect-resolver/action-utils.js";
-import { executeReturnToDeck } from "./effect-resolver/actions/removal.js";
+import { executeReturnToDeck, finalizeTrashCards } from "./effect-resolver/actions/removal.js";
 import {
   validateTargetConstraints,
   computeAllValidTargets,
@@ -1217,7 +1217,7 @@ export function chooseReplacementOrder(
 
 // ─── Batch Resume (OPT-219) ──────────────────────────────────────────────────
 
-export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "SET_REST";
+export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "SET_REST" | "TRASH_CARD";
 
 /**
  * The batch state machine as the batch functions pass it around. From
@@ -1477,6 +1477,10 @@ function finalizeTarget(
       return returnToHand(state, targetId, causingController);
     case "RETURN_TO_DECK":
       return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM", causingController);
+    case "TRASH_CARD": {
+      const result = finalizeTrashCards(state, [targetId], causingController, cardDb, causingSource);
+      return result.result?.targetInstanceIds?.length ? { state: result.state, events: result.events, transition: { newInstanceId: result.result.targetInstanceIds[0] } } : null;
+    }
     case "SET_REST":
       return restFieldTarget(state, targetId, causingController, causingSource);
   }
@@ -1718,6 +1722,13 @@ function finishReplacementBatch(
     };
   }
 
+  // Keep one simultaneous hand-discard event and one action-scoped result,
+  // including mixed-zone target groups, when a field-trash batch resumes.
+  if (ctx.actionKind === "TRASH_CARD") {
+    const trash = finalizeTrashCards(resumeState, rest.unprotectedIds, ctx.causingController, cardDb, ctx.causingSource);
+    return { state: trash.state, events: [...resumeEvents, ...trash.events], protectedIds: rest.protectedIds,
+      finalizedIds: trash.result?.targetInstanceIds ?? [], unprotectedIds: rest.unprotectedIds };
+  }
   // All replacements resolved — finalize unprotected targets inline.
   const finalizedIds: string[] = [];
   for (const id of rest.unprotectedIds) {

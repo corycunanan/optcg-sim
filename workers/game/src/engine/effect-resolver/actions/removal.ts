@@ -1,8 +1,11 @@
+import type { EffectSourceIdentity } from "../../../../../../shared/game-types.js";
+import { effectSourceIdentity } from "../../effect-source.js";
 import { handTrashEvent } from "../../hand-trash.js";
 /**
  * Action handlers: KO, RETURN_TO_HAND, RETURN_TO_DECK, TRASH_CARD, TRASH_FROM_HAND
  */
 
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 import type { ActionOf, EffectResult } from "../../effect-types.js";
 import type {
   BatchResumeMarker,
@@ -371,7 +374,8 @@ export function executeTrashCard(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   resultRefs: Map<string, EffectResult>,
-  preselectedTargets?: string[],
+  preselectedTargets: string[] | undefined,
+  services: EffectResolverServices,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const causingController = effectSourceController(state, sourceCardInstanceId, controller, resultRefs);
@@ -382,6 +386,31 @@ export function executeTrashCard(
   const targetIds = autoSelectTargets(action.target, allValidIds);
   if (targetIds.length === 0) return { state, events, succeeded: false };
 
+  const sourceSnapshot = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF);
+  const causingSource = effectSourceIdentity(state, sourceCardInstanceId, cardDb, sourceSnapshot?.sourceIdentity ?? sourceSnapshot?.sourceCardSnapshot);
+  if (state.schemaVersion === 9 && targetIds.some(id => findCardInstance(state, id)?.zone === "CHARACTER")) {
+    const attemptableIds = filterProhibitedTargets(state, targetIds, "TRASH", "EFFECT", causingController, sourceCardInstanceId, cardDb);
+    const batch = processBatchReplacements(state, attemptableIds, "TRASH_CARD", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", causingController, cardDb, services, undefined, causingSource);
+    if (batch.pendingPrompt) return { state: batch.state, events: batch.events, succeeded: false, pendingPrompt: batch.pendingPrompt };
+    const trash = finalizeTrashCards(batch.state, batch.unprotectedIds, causingController, cardDb, causingSource, resultRefs, sourceCardInstanceId);
+    return { ...trash, events: [...batch.events, ...trash.events] };
+  }
+  return finalizeTrashCards(state, targetIds, causingController, cardDb, causingSource, resultRefs, sourceCardInstanceId);
+}
+
+/** Existing trash movement/event contract, shared by initial and resumed batches. */
+export function finalizeTrashCards(
+  state: GameState,
+  targetIds: string[],
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+  causingSource?: EffectSourceIdentity,
+  resultRefs?: Map<string, EffectResult>,
+  originalSourceCardInstanceId?: string,
+): ActionResult {
+  const events: PendingEvent[] = [];
+  const sourceCardInstanceId = causingSource?.instanceId ?? originalSourceCardInstanceId ?? "";
+  const controller = causingController;
   let nextState = state;
   const trashedIds: string[] = [];
   for (const id of targetIds) {
@@ -431,7 +460,14 @@ export function executeTrashCard(
       const card = findCardInstance(state, id);
       return card?.zone === "HAND" && card.controller === playerIndex && !findCardInstance(nextState, id);
     }).length;
-    if (count > 0) events.push(handTrashEvent(state, playerIndex, count, "EFFECT", sourceCardInstanceId, controller, resultRefs));
+    if (count > 0) {
+      const event = handTrashEvent(state, playerIndex, count, "EFFECT", sourceCardInstanceId, controller, resultRefs);
+      if (causingSource && event.payload && !event.payload.effectSourceCardId) {
+        event.payload.effectSourceCardId = causingSource.cardId;
+        event.payload.effectSourceController = causingController;
+      }
+      events.push(event);
+    }
   }
 
   return {

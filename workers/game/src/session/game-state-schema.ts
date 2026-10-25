@@ -42,12 +42,12 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 8;
 /** The newest readable envelope; native8 carries exact battle completion and cost provenance. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 8;
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 9;
 /** The deployed runtime and default production writer use v8. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8,
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9,
 ];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
@@ -513,8 +513,25 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
-  if (version === 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7 && raw.costSemanticsVersion !== 8) {
-    throw new SessionLoadError(location, "native8 requires explicit costSemanticsVersion 6, 7 or 8");
+  if (version < 9) {
+    const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
+    frames.forEach((frame, index) => {
+      if (!isRecord(frame)) return;
+      for (const field of ["replacementBatch", "replacementBatchContinuation"]) {
+        const batch = frame[field];
+        if (isRecord(batch) && batch.actionKind === "TRASH_CARD") {
+          throw new SessionLoadError(location, `effectStack[${index}].${field}.actionKind TRASH_CARD requires schemaVersion 9`);
+        }
+      }
+    });
+    const prompt = isRecord(raw.pendingPrompt) ? raw.pendingPrompt : {};
+    const context = isRecord(prompt.resumeContext) ? prompt.resumeContext : {};
+    if (context.type === "REPLACEMENT_BATCH" && context.actionKind === "TRASH_CARD") {
+      throw new SessionLoadError(location, "pendingPrompt.resumeContext.actionKind TRASH_CARD requires schemaVersion 9");
+    }
+  }
+  if (version >= 8 && raw.costSemanticsVersion !== 6 && raw.costSemanticsVersion !== 7 && raw.costSemanticsVersion !== 8) {
+    throw new SessionLoadError(location, `native${version} requires explicit costSemanticsVersion 6, 7 or 8`);
   }
   if (version < 8 && "costSemanticsVersion" in raw) {
     throw new SessionLoadError(location, "costSemanticsVersion requires schemaVersion 8");
@@ -523,7 +540,7 @@ export function convertToCurrentShape(
     isRecord(frame) && ("battleCompletion" in frame || frame.kind === "BATTLE_COMPLETION"))) {
     throw new SessionLoadError(location, "carries battle completion requiring schemaVersion 8");
   }
-  if (version < 7 || (version === 8 && raw.costSemanticsVersion === 6)) {
+  if (version < 7 || (version >= 8 && raw.costSemanticsVersion === 6)) {
     const frames = Array.isArray(raw.effectStack) ? raw.effectStack : [];
     if (frames.some(frame => isRecord(frame) && ("costReplacementResolution" in frame || "costExpectedRoot" in frame)) ||
         (isRecord(raw.pendingPrompt) && isRecord(raw.pendingPrompt.options) && "donIdentityReturn" in raw.pendingPrompt.options)) {

@@ -1,0 +1,80 @@
+{
+  "base": "05d02e88a9b90cf44f774e507d845a700749b659",
+  "readerBase": "6f319a36d7cde6fd0214b344cea3675441af1317",
+  "provenance": "Synthetic sessions driven through actual authored-card pipeline, SessionCoordinator, and SessionRepository; no production captures. Historical payloads unchanged.",
+  "sha256": "053c26128aeb1e5fb68eb8e0f68d2b75c12365c62072b43bb70bd61bb50d824e",
+  "families": {
+    "OPT-1001-authored-Beckman-Koby-accept-mode6-reload.json": {
+      "producer": "09b6b43adc608a07716eef152b29a93afa2d8437",
+      "starts": 3,
+      "native9Starts": 2
+    },
+    "OPT-1001-authored-Beckman-Koby-accept-mode7-reload.json": {
+      "producer": "09b6b43adc608a07716eef152b29a93afa2d8437",
+      "starts": 3,
+      "native9Starts": 2
+    },
+    "OPT-1001-authored-Beckman-Koby-accept-mode8-reload.json": {
+      "producer": "09b6b43adc608a07716eef152b29a93afa2d8437",
+      "starts": 3,
+      "native9Starts": 2
+    },
+    "OPT-1001-authored-Beckman-Koby-decline-mode6-reload.json": {
+      "producer": "09b6b43adc608a07716eef152b29a93afa2d8437",
+      "starts": 2,
+      "native9Starts": 1
+    },
+    "OPT-1001-authored-Beckman-Koby-decline-mode7-reload.json": {
+      "producer": "09b6b43adc608a07716eef152b29a93afa2d8437",
+      "starts": 2,
+      "native9Starts": 1
+    },
+    "OPT-1001-authored-Beckman-Koby-decline-mode8-reload.json": {
+      "producer": "09b6b43adc608a07716eef152b29a93afa2d8437",
+      "starts": 2,
+      "native9Starts": 1
+    },
+    "OPT-1001-native9-downstream-battle-completion-retains-protection-through-EOB-prompt.json": {
+      "producer": "7ccfecb46f43ea00ee013f646965ce91cf87c09a",
+      "starts": 1,
+      "native9Starts": 1
+    },
+    "OPT-1001-native9-downstream-mode8-COST-keeps-Decision10-debt-accept-false.json": {
+      "producer": "7ccfecb46f43ea00ee013f646965ce91cf87c09a",
+      "starts": 3,
+      "native9Starts": 3
+    },
+    "OPT-1001-native9-downstream-mode8-COST-keeps-Decision10-debt-accept-true.json": {
+      "producer": "7ccfecb46f43ea00ee013f646965ce91cf87c09a",
+      "starts": 4,
+      "native9Starts": 4
+    },
+    "OPT-1001-native9-successor-trash-after-stable-save-still-offers-Ganzui.json": {
+      "producer": "7ccfecb46f43ea00ee013f646965ce91cf87c09a",
+      "starts": 3,
+      "native9Starts": 3
+    },
+    "OPT-1001-one-payment-protects-simultaneous-group-and-all-members-stay-field-during-payment.json": {
+      "producer": "7ccfecb46f43ea00ee013f646965ce91cf87c09a",
+      "starts": 2,
+      "native9Starts": 2
+    }
+  },
+  "producers": {
+    "09b6b43adc608a07716eef152b29a93afa2d8437": {
+      "base": "6f319a36d7cde6fd0214b344cea3675441af1317",
+      "patch": "docs/game-engine/evidence/opt-1006/producer-09b6b43.patch.txt",
+      "command": "OPT1001_WRITE_CORPUS=<absolute-output-directory> OPT1001_PRODUCER_SHA=09b6b43adc608a07716eef152b29a93afa2d8437 pnpm --filter optcg-game exec vitest run src/__tests__/opt-1001-field-trash.test.ts"
+    },
+    "7ccfecb46f43ea00ee013f646965ce91cf87c09a": {
+      "base": "6f319a36d7cde6fd0214b344cea3675441af1317",
+      "patch": "docs/game-engine/evidence/opt-1006/producer-7ccfecb.patch.txt",
+      "command": "OPT1001_WRITE_CORPUS=<absolute-output-directory> OPT1001_PRODUCER_SHA=7ccfecb46f43ea00ee013f646965ce91cf87c09a pnpm --filter optcg-game exec vitest run src/__tests__/opt-1001-field-trash.test.ts -t 'simultaneous group|native9'"
+    }
+  },
+  "totals": {
+    "families": 11,
+    "starts": 28,
+    "native9Starts": 22
+  }
+}

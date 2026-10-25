@@ -827,3 +827,18 @@ The new reader accepts schema8/costSemanticsVersion8 while retaining ordinary se
 ### New-game mode8 writer after verified reader floor (OPT-969)
 
 New setup now chooses schema8/mode8 before its first action/save. Historical promotions remain7 and existing explicit6/7/8 retain their mode and stored cardDb. Reader PR786 at `e14af35bad3a7189a40294f5d4ab3db5b5602f0e` is the verified deployed minimum rollback floor (deployment40139694972, post-CI40139694988); c50/2ca reject8 and cannot be rollback targets. The prior reader-stage paragraph records its historical setup7 behavior. See [the current cost contract](MODE8-COST-SEMANTICS.md#new-game-writer-enablement) for the three new-game authored corrections, historical fixture preservation, carried source-equivalent corpus and retained OPT-958 debt. No active-session migration or production repair is included.
+
+### Field-trash batch reader9 (OPT-1006)
+
+The reader now accepts retained schema9 graphs with explicit cost mode6|7|8 and
+`replacementBatch.actionKind: TRASH_CARD`. Ordinary setup/default writer/ingress
+remain8; only loaded9 uses the new route in this reader release. Versions<=8
+reject the discriminator by name. The new route reuses batch ownership and
+non-K.O. trash finalization; no session-format/execution-context bump or cost
+migration occurs. The future writer must activate9 immutably only at an eligible
+field-trash producer and wait for this reader's verified deployment. Source9 is
+retained after completion and executes later trash/cost/battle work; rolling back
+to05d after9 writes is unsupported. The future writer PR must pin the actual
+verified reader SHA as its rollback floor. See the [field-trash reader contract](FIELD-TRASH-READER-V9.md)
+for ownership, producer corpus, original writer-byte comparison, strict source
+validation, synthetic-evidence exception and retained OPT-958 policy.
