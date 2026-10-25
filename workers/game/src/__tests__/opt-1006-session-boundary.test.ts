@@ -44,7 +44,7 @@ type Access = {
 // Actual isolated writer inputs, including recorded prompt IDs. The coordinator
 // clears undo at these mandatory prompts; separate repository tests cover mixed8/9.
 // The reader must finish the same choices through the real Durable Object entry.
-for (const disposition of ["accept", "decline"]) it(`OPT-1006 writer9 ${disposition} survives GameSession recreate and duplicate socket response`, async () => {
+for (const disposition of ["accept", "decline"]) it(`OPT-1006 setup8→writer9 ${disposition} survives GameSession recreate and duplicate socket response`, async () => {
   const corpus = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/opt-1006-writer-corpus.json.gz", import.meta.url))).toString("utf8"));
   const capture = corpus[`OPT-1001-authored-Beckman-Koby-${disposition}-mode8-reload.json`] as {
     producer: string;
@@ -52,25 +52,35 @@ for (const disposition of ["accept", "decline"]) it(`OPT-1006 writer9 ${disposit
     expected: GameState;
   };
   expect(capture.producer).toBe("09b6b43adc608a07716eef152b29a93afa2d8437");
-  const start = capture.cases.find(entry => (entry.stored.session as { state: GameState }).state.schemaVersion === 9)!;
+  const start = capture.cases[0];
+  const FloorSession = process.env.OPT1006_WRITER_FLOOR_ROOT ? (await import(`${process.env.OPT1006_WRITER_FLOOR_ROOT}/workers/game/src/GameSession.ts`) as { GameSession: typeof GameSession }).GameSession : GameSession;
   expect(start).toBeDefined();
   const host = durable(start.stored);
+  const referenceHost = durable(start.stored);
   const recreate = async () => {
-    const session = new GameSession(host as unknown as DurableObjectState, { GAME_WORKER_SECRET: "test", NEXTJS_URL: "https://example.test" } as Env) as unknown as Access;
+    const version = (host.data.get("session") as { state: GameState }).state.schemaVersion;
+    const ActiveSession = version === 9 ? FloorSession : GameSession;
+    const session = new ActiveSession(host as unknown as DurableObjectState, { GAME_WORKER_SECRET: "test", NEXTJS_URL: "https://example.test" } as Env) as unknown as Access;
     expect(await session.loadFromStorage()).toBe(true);
-    expect(session.gameState.schemaVersion).toBe(9);
+    expect(session.gameState.schemaVersion).toBe(version);
     expect(session.gameState.costSemanticsVersion).toBe(8);
     return session;
   };
   let session = await recreate();
+  let reference = new GameSession(referenceHost as unknown as DurableObjectState, { GAME_WORKER_SECRET: "test", NEXTJS_URL: "https://example.test" } as Env) as unknown as Access;
+  expect(await reference.loadFromStorage()).toBe(true);
   let lastSocket: Socket | undefined;
-  for (const action of start.replies) {
+  for (const recordedAction of start.replies) {
     const prompt = session.gameState.pendingPrompt!;
     expect(prompt).not.toBeNull();
+    const action = { ...recordedAction, promptId: prompt.promptId } as GameAction;
     const socket = new Socket();
     session.transport.accept(prompt.respondingPlayer, socket as unknown as WebSocket);
     const message = JSON.stringify({ type: "game:action", action });
     await session.webSocketMessage(socket as unknown as WebSocket, message);
+    const referenceSocket = new Socket(); reference.transport.accept(prompt.respondingPlayer, referenceSocket as unknown as WebSocket);
+    await reference.webSocketMessage(referenceSocket as unknown as WebSocket, message);
+    expect(session.gameState).toEqual(reference.gameState); expect(host.data).toEqual(referenceHost.data);
     expect(socket.sent.map(item => JSON.parse(item)).filter(item => item.type === "action:rejected" || item.type === "game:error")).toEqual([]);
     const stateAfter = structuredClone(session.gameState);
     const storageAfter = structuredClone(host.data);
@@ -81,10 +91,13 @@ for (const disposition of ["accept", "decline"]) it(`OPT-1006 writer9 ${disposit
     expect(host.data).toEqual(storageAfter);
     expect(host.storage.put).toHaveBeenCalledTimes(writes);
     session = await recreate();
+    reference = new GameSession(referenceHost as unknown as DurableObjectState, { GAME_WORKER_SECRET: "test", NEXTJS_URL: "https://example.test" } as Env) as unknown as Access;
+    expect(await reference.loadFromStorage()).toBe(true);
     lastSocket = socket;
   }
   expect(lastSocket).toBeDefined();
-  expect(toPersistedGameState(session.gameState)).toEqual(capture.expected);
+  expect(toPersistedGameState(session.gameState)).toEqual(toPersistedGameState(reference.gameState));
+  expect(session.gameState.schemaVersion).toBe(9);
   expect(session.gameState.effectStack).toEqual([]);
   expect(session.gameState.pendingPrompt).toBeNull();
   expect(session.gameState.eventLog.filter(event => event.type === "CARD_KO")).toEqual([]);
