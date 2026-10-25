@@ -126,3 +126,10 @@ validation, continuation, feasibility and movement code are byte-equivalent to
 the verified reader. The reader-stage strict validation and historical corpus
 results therefore remain applicable to unchanged code; new writer tests cover
 the scalar/provenance boundary, input/undo, IDs/RNG/events and actual floor replay.
+
+Retained pre9 replay suites use static clause/action producer maps for the new
+writer's expected envelope, while comparing every other byte/event/ID exactly.
+Starts already past historical field movement stay8. The env-enabled actual
+floor branch separately retains exact old8 behavior and replays new9 output.
+See the [writer handoff](../project/handoffs/opt1006-field-trash-writer.md#full-gate-expectation-delta)
+for the initial36 full-gate expectation failures, case/step map and correction.

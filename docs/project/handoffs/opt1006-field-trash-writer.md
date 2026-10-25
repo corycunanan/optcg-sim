@@ -104,3 +104,49 @@ payment/card change expanding authored reachability. The grafted Thatch activati
 is synthetic and does not broaden authored-combination claims. No debt closure,
 active-session repair, migration, merge, Linear write or self-approval is part
 of this implementation stage.
+
+## Full-gate expectation delta
+
+The initial frozen-head `a17d7690c4bf63d1b81c6b63fe2fe26d3361aba0` full gate
+passed lint, both type checks, bundle/schema checks,261 root files/2431 tests and
+7 pipeline files/58 tests. Worker coverage found36 failures in3 retained replay
+suites, with437 files/8380 tests passing plus9 expected debts and85 skips. Build
+was not reached. Every failure was solely expected schema8 versus actual9; no
+other byte, event, ID, counter, mode or gameplay difference appeared. The initial
+receipt remains `../opt1006-final-full-verify.txt`; the coordinator's independent
+493-transition diagnostic is retained at
+`../evidence/writer-existing-corpus-diagnostic-a17d769.json`.
+
+The bounded correction changes tests only. `opt-1006-envelope-expectations.ts`
+asserts the specifically expected live/same-state-undo schema separately, then
+compares every remaining stored byte exactly. It never changes a fixture or an
+input. Expected capability is a static clause/action table, never inferred from
+observed output, event or version:
+
+- OPT-1007 abort-attack/block/counter execute their watcher Character-trash
+  selection at global step1/2/3, in both cost modes. Only a replay starting at or
+  before that producer step becomes9 after that step. Historical8 starts after
+  the movement remain8.
+- Thatch's authored SELF trash executes at Rayleigh pause0 reply1/pause1 reply0;
+  two-instances pause0 reply0; group-then-nested-payment pause0 reply0;
+  declined-prefix pause0 reply1/pause1 reply0; old-offered-ko/removal pause0 reply0.
+  Group later pauses, nested-trash-watcher and declined-prefix pause2 already
+  passed the movement and remain8.
+- OPT-967 attack/block synthetic watcher replies explicitly produce9. The raw
+  historical reference keeps old engine semantics; its comparison composes the
+  known9 envelope and retained mode provenance explicitly.
+
+With `OPT1006_WRITER_FLOOR_ROOT`, the original exact8 semantics replay separately
+on actual d8309e7, while newly emitted9 states and subsequent replies compare
+exactly between current writer and that floor. OPT-967 also saves/loads its actual
+completed9 output on that floor. Its unrelated `OPT967_BASELINE_ROOT` branch is
+explicitly a pre9 historical checkpoint-defect experiment, never a supported
+writer9 rollback claim. Default CI runs the statically mapped current-writer
+branch; actual cross-build evidence requires the env-enabled run.
+
+Focused delta selection `../opt1006-envelope-delta-selection.txt` and env run
+`../opt1006-envelope-delta-floor.txt` passed132 tests/3 files plus1 capture-only
+skip; worker types passed. The additional OPT-967 exact8/final9 floor assertions
+have their separate focused receipt. Runtime, producer/generator, all historical
+fixtures and both writer corpus payloads are unchanged. Same-reviewer reserved
+delta assessments and a new exact-head full gate are required after this change.
