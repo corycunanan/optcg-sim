@@ -1,3 +1,4 @@
+import { prepareResumeProvenance, settleResumeProvenance, abandonedResume } from "../resume-provenance.js";
 import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
 import { canonicalCostReplacementReplay, lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
 import { updateFrameById } from "../../damage-frames.js";
@@ -122,12 +123,12 @@ export function abortReplacedCost(
     frameOnStack ? popFrame(state) : state,
     frame
   );
-  return services.reportTriggers(
+  return abandonedResume(services.reportTriggers(
     nextState,
     frame.pendingTriggers,
     cardDb,
     eventsForCostAbandon(frame, events),
-  );
+  ));
 }
 
 /** Consume an explicit result only after all children have finished. The
@@ -383,12 +384,12 @@ function resumeAfterBranchPick(
   }
 
   if (resumeResult.cannotPay) {
-    return services.reportTriggers(
+    return abandonedResume(services.reportTriggers(
       withdrawUnactivatedTrashMain(resumeResult.state, topFrame),
       topFrame.pendingTriggers,
       cardDb,
       eventsForCostAbandon(topFrame, resumeResult.events),
-    );
+    ));
   }
 
   nextState = resumeResult.state;
@@ -429,6 +430,20 @@ function resumeAfterBranchPick(
 }
 
 export function handleAwaitingCostSelection(
+  state: GameState,
+  action: GameAction,
+  topFrame: EffectStackFrame,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices,
+): HandlerResult {
+  const prepared = prepareResumeProvenance(state, topFrame.sourceCardInstanceId, topFrame.resultRefs, topFrame.effectBlock.actions ?? []);
+  const owner = prepared.refs === topFrame.resultRefs ? topFrame : { ...topFrame, resultRefs: prepared.refs };
+  const input = owner === topFrame ? prepared.state : { ...prepared.state,
+    effectStack: prepared.state.effectStack.map(frame => frame.id === owner.id ? owner : frame) };
+  return settleResumeProvenance(state, input, handleAwaitingCostSelectionCore(input, action, owner, cardDb, services));
+}
+
+function handleAwaitingCostSelectionCore(
   state: GameState,
   action: GameAction,
   topFrame: EffectStackFrame,
@@ -583,12 +598,12 @@ export function handleAwaitingCostSelection(
       }
 
       if (remaining.cannotPay) {
-        return services.reportTriggers(
+        return abandonedResume(services.reportTriggers(
           withdrawUnactivatedTrashMain(remaining.state, topFrame),
           topFrame.pendingTriggers,
           cardDb,
           eventsForCostAbandon(topFrame),
-        );
+        ));
       }
       nextState = remaining.state;
       events.push(...remaining.events);
@@ -1547,12 +1562,12 @@ export function handleAwaitingCostSelection(
     }
 
     if (remainingCostResult.cannotPay) {
-      return services.reportTriggers(
+      return abandonedResume(services.reportTriggers(
         withdrawUnactivatedTrashMain(remainingCostResult.state, topFrame),
         topFrame.pendingTriggers,
         cardDb,
         eventsForCostAbandon(topFrame),
-      );
+      ));
     }
 
     nextState = remainingCostResult.state;

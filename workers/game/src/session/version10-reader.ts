@@ -1,4 +1,4 @@
-import { CardInstance } from "./persisted-game-state.js";
+import { CardInstance, ActivatedSourceIdentity } from "./persisted-game-state.js";
 
 type Raw = Record<string, unknown>;
 const record = (value: unknown): value is Raw =>
@@ -19,6 +19,14 @@ export function validateScheduledSourceSnapshots(
     return;
   }
   if (!record(raw)) return;
+  if ("sourceIdentity" in raw && (version >= 10 || "sourceEffectId" in raw)) {
+    if ("sourceEffectId" in raw && version < 10) fail(`${path}.sourceIdentity requires schemaVersion 10`);
+    const identity = ActivatedSourceIdentity.safeParse(raw.sourceIdentity);
+    if (!identity.success) fail(`${path}.sourceIdentity: ${identity.error.message}`);
+    if ("sourceEffectId" in raw && identity.data.instanceId !== raw.sourceEffectId) {
+      fail(`${path}.sourceIdentity.instanceId must match sourceEffectId`);
+    }
+  }
   if ("sourceCardSnapshot" in raw) {
     if ("sourceEffectId" in raw && version < 10) {
       fail(`${path}.sourceCardSnapshot requires schemaVersion 10`);
@@ -38,15 +46,27 @@ export function validateScheduledSourceSnapshots(
       }
     }
   }
-  if (version >= 10 && typeof raw.sourceCardInstanceId === "string" && record(raw.effectBlock)) {
-    for (const carrier of [raw.resultRefs, raw.costResultRefs]) {
+  const owner = typeof raw.sourceCardInstanceId === "string" ? raw.sourceCardInstanceId : raw.effectSourceInstanceId;
+  if (version >= 10 && typeof owner === "string") {
+    const simultaneous = record(raw.simultaneousGroup) ? raw.simultaneousGroup.resultRefs : undefined;
+    for (const carrier of [raw.resultRefs, raw.costResultRefs, simultaneous]) {
       if (!Array.isArray(carrier)) continue;
       for (const entry of carrier) {
         const value = Array.isArray(entry) ? entry[1] : undefined;
-        if (!record(value) || !record(value.sourceIdentity) || !record(value.sourceCardSnapshot)) continue;
-        if (value.sourceIdentity.effectBlockId === raw.effectBlock.id &&
-            value.sourceIdentity.instanceId !== raw.sourceCardInstanceId) {
-          fail(`${path}.resultRefs sourceIdentity disagrees with its effect frame owner`);
+        if (!record(value)) continue;
+        if (record(value.sourceIdentity) && record(value.sourceCardSnapshot) &&
+            (["instanceId", "cardId", "controller"] as const).some(key => (value.sourceIdentity as Raw)[key] !== (value.sourceCardSnapshot as Raw)[key])) {
+          fail(`${path}.resultRefs sourceCardSnapshot disagrees with sourceIdentity`);
+        }
+        for (const origin of [value.sourceIdentity, value.sourceCardSnapshot]) {
+          if (record(origin) && origin.instanceId !== owner) fail(`${path}.resultRefs sourceIdentity disagrees with its effect frame owner`);
+        }
+        // Only an authored COST owner proves this block relationship. Generic
+        // ACTION and scheduled frames retain the original activation block ID.
+        if (raw.kind === "COST" && record(raw.effectBlock) && raw.effectBlock.id !== "__engine_continuation__" &&
+            Array.isArray(raw.effectBlock.costs) && record(value.sourceIdentity) &&
+            value.sourceIdentity.effectBlockId !== raw.effectBlock.id) {
+          fail(`${path}.resultRefs sourceIdentity disagrees with its authored COST owner`);
         }
       }
     }

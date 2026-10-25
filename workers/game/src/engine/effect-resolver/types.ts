@@ -103,7 +103,7 @@ export interface EffectResolverServices {
 
 /** Resume handlers report state-owned progress; only the dispatcher advances. */
 export type HandlerProgress = "completed" | "waiting" | "queued" | "continued" | "terminal";
-export type HandlerResult = EffectResolverResult & { kind: HandlerProgress };
+export type HandlerResult = EffectResolverResult & { kind: HandlerProgress; /** Body abandoned; retained payment events may still publish. Internal, never persisted. */ resumeBodyAbandoned?: true };
 
 export interface EffectResolverResult extends LifeTriggerStagingWork {
   state: GameState;

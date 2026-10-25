@@ -187,6 +187,7 @@ export type EndPhaseStep = (typeof END_PHASE_STEPS)[number];
 export interface EndPhaseScheduledAction {
   /** Immutable origin of already-activated work, schema 10+. */
   sourceCardSnapshot?: CardInstance;
+  sourceIdentity?: QueuedSourceSnapshot;
   action: import("./engine/effect-types.js").Action;
   controller: 0 | 1;
   sourceEffectId: string;

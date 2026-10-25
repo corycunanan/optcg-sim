@@ -409,7 +409,9 @@ export function resolveScheduledEffectWork(
     category: "auto",
     actions: [entry.action],
   }, entry.sourceEffectId, entry.controller, cardDb,
-  undefined, undefined, undefined, undefined, entry.sourceCardSnapshot);
+  undefined, undefined, undefined, undefined, entry.sourceCardSnapshot || entry.sourceIdentity
+    ? { ...(entry.sourceCardSnapshot ? { sourceCardSnapshot: entry.sourceCardSnapshot } : {}),
+      ...(entry.sourceIdentity ? { sourceIdentity: entry.sourceIdentity } : {}) } : undefined);
 }
 
 function resolveEffectCore(
@@ -422,7 +424,7 @@ function resolveEffectCore(
   services: EffectResolverServices = resolverExecutionServices,
   triggeringEvent?: PendingEvent,
   sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot,
-  activatedSource?: import("../../types.js").CardInstance
+  activatedOrigin?: Pick<import("../../types.js").EndPhaseScheduledAction, "sourceCardSnapshot" | "sourceIdentity">
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -460,24 +462,24 @@ function resolveEffectCore(
   // Extract block-specific effect description for prompts
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
   const sourceCardData = cardDb.get(
-    activatedSource?.cardId ?? sourceSnapshot?.cardId ?? sourceCard?.cardId ?? ""
+    activatedOrigin?.sourceCardSnapshot?.cardId ?? activatedOrigin?.sourceIdentity?.cardId ?? sourceSnapshot?.cardId ?? sourceCard?.cardId ?? ""
   );
-  const sourceSnapshotRef: [string, EffectResult][] = activatedSource || sourceCard
+  const sourceSnapshotRef: [string, EffectResult][] = activatedOrigin || sourceCard
     ? [
         [
           EFFECT_SOURCE_SNAPSHOT_REF,
           {
             targetInstanceIds: [],
             count: 0,
-            ...(activatedSource
-              ? { sourceCardSnapshot: activatedSource }
+            ...(activatedOrigin
+              ? { ...activatedOrigin }
               : sourceSnapshot
                 ? {
                     sourceIdentity: sourceSnapshot,
-                    ...(state.schemaVersion === 10 ? {
+                    ...(state.schemaVersion === 10 && sourceCard!.controller === sourceSnapshot.controller ? {
                       // Keep the proven original controller with the actual
                       // pre-cost card snapshot, before TRASH_SELF can move it.
-                      sourceCardSnapshot: { ...structuredClone(sourceCard!), controller: sourceSnapshot.controller },
+                      sourceCardSnapshot: structuredClone(sourceCard!),
                     } : {}),
                   }
                 : { sourceCardSnapshot: structuredClone(sourceCard!) }),

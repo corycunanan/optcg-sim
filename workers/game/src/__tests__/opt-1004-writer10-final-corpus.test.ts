@@ -2,9 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
-import { GameSession } from "../GameSession.js";
-import type { CardData, Env, GameAction, GameState } from "../types.js";
+import { expect, it } from "vitest";
+import type { GameAction, GameState } from "../types.js";
 import { SessionRepository } from "../session/persistence.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 
@@ -21,9 +20,8 @@ const memory = (values: Stored) => {
   for (const [key, value] of Object.entries(values)) storage.data.set(key, structuredClone(value));
   return storage;
 };
-type Access = { gameState: GameState; cardDb: Map<string, CardData>; undoHistory: GameState[]; handleAction(ws: WebSocket, player: 0 | 1, action: GameAction): Promise<void> };
 
-it("pins actual isolated writer candidate, payload, patch and capture sources", () => {
+it("pins prior full-only writer archive without claiming historical-resume coverage", () => {
   expect(manifest.producerCommit).toBe("8485aa5cd1521186979fdbb0d2c4e2fcbe1de30a");
   expect(manifest.readerBase).toBe("00e2320b8ea803634ec43530ffd3cbdfbd80721f");
   expect(manifest.caseCount).toBe(Object.keys(corpus.cases).length);
@@ -60,29 +58,4 @@ it("reads every actual writer boundary live/undo write-free and retains10 when r
   }
   expect(count).toBe(manifest.snapshots);
   expect(mixed).toBe(true);
-});
-
-describe.each(Object.entries(corpus.cases))("OPT-1004 actual writer suffix %s", (id, scenario) => {
-  it("loads and semantically resumes after the first writer-created obligation", async () => {
-    // Stage 1 deliberately does not activate schema10 from8. Resume only
-    // after initial writer activation of10; later10 scheduling must match too.
-    const boundaries = [scenario.initial, ...scenario.steps.map(step => step.stored)];
-    const start = boundaries.findIndex(stored => stored.session.state.schemaVersion === 10);
-    expect(start).toBeGreaterThanOrEqual(0);
-    const storage = memory(boundaries[start]);
-    const durable = { storage, getWebSockets: () => [], getTags: () => [], acceptWebSocket() {} } as unknown as DurableObjectState;
-    let loaded = (await new SessionRepository(storage, options).load())!;
-    for (const step of scenario.steps.slice(start)) {
-      const session = new GameSession(durable, { GAME_WORKER_SECRET: "test", NEXTJS_URL: options.nextJsUrl } as Env) as unknown as Access;
-      session.gameState = loaded.state; session.cardDb = loaded.cardDb; session.undoHistory = loaded.undoHistory;
-      const sent: string[] = [];
-      await session.handleAction({ send(value: string) { sent.push(value); }, close() {} } as unknown as WebSocket, step.player, step.action);
-      expect(sent.map(s => JSON.parse(s)).filter(m => m.type === "action:rejected"), id).toEqual([]);
-      expect(Object.fromEntries(storage.data), `${id} ${step.action.type}`).toEqual(step.stored);
-      loaded = (await new SessionRepository(storage, options).load())!;
-    }
-    expect(loaded.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(scenario.expectedDonEvents);
-    expect(loaded.state.pendingPrompt).toBeNull();
-    expect(loaded.state.turn.activePlayerIndex).toBe(1);
-  });
 });

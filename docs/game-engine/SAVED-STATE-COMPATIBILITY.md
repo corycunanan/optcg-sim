@@ -935,7 +935,9 @@ strict dual identity, and live/undo envelopes without mode drift.
 
 The future scheduling writer promotes8→10/field8 and9→10/field9 before optional
 or cost pauses for recursively scheduling-capable blocks, preserving cost mode.
-New-game10 candidates choose field8/cost8. These are isolated evidence producers,
+Earlier obsolete candidates chose new-game10/field8/cost8. The current
+scheduling candidate retains new-game/default8 and activates10 only at accepted
+scheduling producers, including COST/ACTION resumes; it is isolated evidence,
 not production scheduling enablement. Main PR789 delivered the field-trash
 producer; integration supports10/field8→10/field9 at its eligible consequence
 boundary while retaining scheduled metadata, envelope10 and explicit cost mode.
@@ -970,3 +972,38 @@ state/event/ID comparisons. The historical reader corpus stays immutable; new
 canonical writer output has a separate manifest. See the updated
 [field-trash contract](FIELD-TRASH-READER-V9.md) for the six non-contiguous old8
 choice scripts,22 exact native9 suffixes, producer policy and retained OPT-958 debt.
+
+### Historical activated resume provenance (OPT-1004 checkpoint correction)
+
+Schema10 scheduled and parked entries also accept strict optional identity4
+`sourceIdentity` (instanceId/cardId/controller/effectBlockId). It is provenance
+of an already-activated effect, never a queued-source eligibility snapshot.
+Source<=9 rejects it. Identity instance binds to sourceEffectId; full and typed
+carriers must agree on instance/card/controller. The proven origin controller
+may differ from the scheduled execution controller or prompt responder. Generic
+engine-continuation frames retain their original authored block identity; they
+do not require that block to equal the generated continuation block.
+
+Loaded10 COST resume captures an exact matching live full source before entering
+its staged payment view, preserving an existing full ref first. Controller
+changes retain identity alone; no full card is fabricated. Historical ACTION
+pauses may have identity4 after the original full instance has gone: scheduling,
+both collectors, parked refs and activated resolution retain that typed origin.
+The unknown-origin classification applies only when no full/typed/live evidence
+exists. Queued triggers still require their exact original source to be live.
+
+Preparation is local until accepted continuation progress. Rejected/unsupported
+waiting, no-op and explicit optional/cost abandonment do not publish tentative
+refs or schema changes, even if prior-payment event debt is reported. Existing
+event scans remain intact. A committed schedule remains10 if a later action
+terminates; an independent committed field-trash upgrade also survives.
+
+The current isolated writer keeps defaults8 and activates10 at new scheduling
+activation or accepted scheduling-capable COST/ACTION continuation boundaries.
+It preserves field/cost modes and activates before later pauses or destructive
+payment can erase the original. Reader8/9 does not activate this metadata. The
+unchanged actual67cbb COST6/7/8 and ACTION pause artifacts are archived separately
+with producer source hashes; previous draft9/full-only10 corpus bytes remain
+immutable historical evidence. Current reader compatibility uses revised actual
+writer output including those historical producer inputs. Scheduling enablement
+still requires verified deployed reader and a named rollback floor.

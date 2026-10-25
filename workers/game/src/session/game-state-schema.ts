@@ -1112,8 +1112,8 @@ export interface LegacyShapeReport {
  */
 export function classifyLegacyShapes(state: GameState): LegacyShapeReport[] {
   const reports: LegacyShapeReport[] = [];
-  const unknownOrigin = (entry: { sourceEffectId: string; sourceCardSnapshot?: unknown }) =>
-    entry.sourceCardSnapshot === undefined && !findCardInstance(state, entry.sourceEffectId);
+  const unknownOrigin = (entry: { sourceEffectId: string; sourceCardSnapshot?: unknown; sourceIdentity?: unknown }) =>
+    entry.sourceCardSnapshot === undefined && entry.sourceIdentity === undefined && !findCardInstance(state, entry.sourceEffectId);
   if (state.scheduledActions.some(unknownOrigin)) reports.push({ shape: "legacy.scheduled_origin_unknown" });
   for (const frame of state.effectStack) {
     if (frame.phaseBoundaryContinuation?.remainingScheduledActions.some(unknownOrigin)) {

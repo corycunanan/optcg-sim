@@ -1,3 +1,4 @@
+import { abandonedResume } from "../resume-provenance.js";
 import { applyDonReturnIds, decodeDonReturnIds } from "../actions/don.js";
 import { isReplacementSubstituteBranchFeasible } from "../../replacements.js";
 import { REPLACED_CARD_REF } from "../../effect-types.js";
@@ -596,13 +597,13 @@ export function handleAwaitingOptionalResponse(
         sourceCardInstanceId
       );
     }
-    return services.reportTriggers(
+    return abandonedResume(services.reportTriggers(
       nextState,
       topFrame.pendingTriggers,
       cardDb,
       [],
       topFrame.triggerOrderingGroup
-    );
+    ));
   }
 
   const block = topFrame.effectBlock;
@@ -640,13 +641,13 @@ export function handleAwaitingOptionalResponse(
         popFrame(costResult.state),
         topFrame
       );
-      return services.reportTriggers(
+      return abandonedResume(services.reportTriggers(
         nextState,
         topFrame.pendingTriggers,
         cardDb,
         [],
         topFrame.triggerOrderingGroup
-      );
+      ));
     }
 
     nextState = costResult.state;

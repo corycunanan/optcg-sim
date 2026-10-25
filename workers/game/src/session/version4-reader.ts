@@ -1,3 +1,4 @@
+import { ActivatedSourceIdentity } from "./persisted-game-state.js";
 /** PR 6a: validate future v4 bytes before lowering into the deployed v3 runtime.
  * No engine/writer imports this contract. See SAVED-STATE-COMPATIBILITY §9.
  */
@@ -73,6 +74,7 @@ const Scheduled = z.strictObject({
   boundToInstanceId: z.string().nullable(),
   sourceEffectId: z.string(),
   sourceCardSnapshot: CardInstance.optional(),
+  sourceIdentity: ActivatedSourceIdentity.optional(),
   controller: Seat,
 });
 const Activation = z.strictObject({

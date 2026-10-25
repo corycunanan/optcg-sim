@@ -1,3 +1,8 @@
+> Prior full-only21/156 writer evidence, retained unchanged after the resume
+> provenance checkpoint. Payload, manifest, patch and source bytes are immutable.
+> It lacks accepted historical COST/ACTION resume activation and typed identity
+> fallback. Current compatibility uses the separate resume-writer archive.
+
 # Current scheduling writer10 compatibility evidence
 
 Actual isolated candidate `8485aa5cd1521186979fdbb0d2c4e2fcbe1de30a` is based on

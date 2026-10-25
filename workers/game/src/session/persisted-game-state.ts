@@ -5,6 +5,7 @@ import { EFFECT_STACK_FRAME_KINDS } from "../engine/frame-kinds.js";
 const EffectSourceIdentity = z.strictObject({ instanceId: z.string(), cardId: z.string(), cardType: z.enum(["Leader", "Character", "Event", "Stage"]) });
 
 const PlayerIndex = z.union([z.literal(0), z.literal(1)]);
+export const ActivatedSourceIdentity = z.strictObject({ instanceId: z.string(), cardId: z.string(), controller: PlayerIndex, effectBlockId: z.string() });
 const FiniteNumber = z.number().finite();
 const NonNegativeInteger = z.number().int().nonnegative();
 const NullableString = z.string().nullable();
@@ -307,6 +308,7 @@ const PhaseBoundaryContinuation = z.strictObject({
       controller: PlayerIndex,
       sourceEffectId: z.string(),
       sourceCardSnapshot: CardInstance.optional(),
+      sourceIdentity: ActivatedSourceIdentity.optional(),
       step: z.enum(END_PHASE_STEPS).optional(),
     })
   ),

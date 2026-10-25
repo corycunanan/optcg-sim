@@ -1,0 +1,63 @@
+{
+  "producerCommit": "67cbbde3622fb13600084e1f73edc67e15dff910",
+  "provenance": "Unchanged actual old GameSession/Repository storage; synthetic-only evidence exception, no production capture",
+  "cases": {
+    "cost-mode6": {
+      "file": "cost-mode6.json.gz",
+      "costMode": 6,
+      "phase": "COST"
+    },
+    "cost-mode7": {
+      "file": "cost-mode7.json.gz",
+      "costMode": 7,
+      "phase": "COST"
+    },
+    "cost-mode8": {
+      "file": "cost-mode8.json.gz",
+      "costMode": 8,
+      "phase": "COST"
+    },
+    "action-mode8": {
+      "file": "action-mode8.json.gz",
+      "costMode": 8,
+      "phase": "ACTION"
+    }
+  },
+  "files": {
+    "action-mode8.json.gz": "176975d1f98394481a7a91caa5c97294e4988b7f1a2a616997731da9d33c9637",
+    "cost-mode8.json.gz": "8adaf59b2c41010b4fbfec85068fe8b4e3767b9e6def4c2e5f4cd26f60b6082c",
+    "cost-mode7.json.gz": "802043c6c7d6e60df6d6c573d99c668fc47c8a3798b3666120e4c19cd6565c62",
+    "cost-mode6.json.gz": "37c0f5a6a7df22c5a54f94e6347993c85c41c4ea32390467b90c31d3fad06cd2",
+    "sources/action-producer-probe.test-source": "9a984e25180f81c0d6bee17e07c28fce245be522af104d9ac34d50da9b7b344e",
+    "sources/cost-producer-probe.test-source": "fe5302bf695ae6c3b34d657eb196e7e61f1423359161766499ccf846b02c57d2",
+    "cost-next-mode8.json.gz": "67066da6ee5498af43560fc34361fe73bf4b336db1310d70ddc27939291daf41",
+    "action-terminal-mode8.json.gz": "d9c0420b3819eef21b664ac049dd49549d843508e299f9b8527e4d72eeda4ac8",
+    "action-next-mode8.json.gz": "a901559fd5ee70c3f5b839bfb609a712d9545d7b2cff749bb700ab3596287079",
+    "sources/additional-producer-probe.test-source": "214000b7e2fe66bbad54df7984ef54409b12e12534e904b55747f15c45017d9d"
+  },
+  "sourceHashes": {
+    "workers/game/src/GameSession.ts": "ed99ca2b2ab79486a82bb6f4692061d638036e8228e0bda9bc60136d852e0bde",
+    "workers/game/src/engine/effect-resolver/resolver.ts": "a8581c933656eee2c7518bc604a4045c264eb99320db9909e2182ec24851829a",
+    "workers/game/src/engine/effect-resolver/resume/cost.ts": "ec27c577f2be3fd0adb6059ac829f9add7a71d8f82dd76674a3f69f01d9795ff",
+    "workers/game/src/engine/effect-resolver/cost/orchestrator.ts": "0590882d47ce4da9016c349480acf184ec7d4f459fdd26fe5bfdf9c70109eb37",
+    "workers/game/src/session/persistence.ts": "c7bc4228112eb842d142ebba26f35ec6db13a2355985d7917a23e0f354fb1d3f",
+    "pnpm-lock.yaml": "080bf6130ab2656ff730fd2ca775051bca59c74a835f610d2525cf3c869c9ffe"
+  },
+  "additionalCases": {
+    "cost-next": {
+      "file": "cost-next-mode8.json.gz",
+      "costMode": 8,
+      "phase": "COST"
+    },
+    "action-next": {
+      "file": "action-next-mode8.json.gz",
+      "costMode": 8,
+      "phase": "ACTION"
+    },
+    "action-terminal": {
+      "file": "action-terminal-mode8.json.gz",
+      "costMode": 8,
+      "phase": "ACTION"
+    }
+  }
+}
