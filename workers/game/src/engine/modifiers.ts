@@ -320,14 +320,18 @@ function isCardNegatedWithGuard(
 }
 
 /**
- * OPT-253: Is this effect's source Character currently negated?
- * If so, its non-negation modifiers should be treated as inactive.
+ * Ongoing effects depend on a live effective source; resolved action output
+ * is independent of later source negation.
  */
 function isEffectSourceNegated(
   effect: RuntimeActiveEffect,
   state: GameState,
   cardDb?: Map<string, CardDataType>
 ): boolean {
+  // Current action handlers persist already-resolved output with this exact
+  // signature. Later source negation cannot undo it (rule 8-2-3). Ongoing and
+  // unproven historical rows retain the source gate; no provenance is inferred.
+  if (effect.category === "auto" && effect.sourceEffectBlockId === "") return false;
   if (!effect.sourceCardInstanceId) return false;
   const source = findCardInstance(state, effect.sourceCardInstanceId);
   if (!source) return false;
@@ -385,9 +389,9 @@ function isModifierGateMet(
  * Check whether a permanent WHILE_CONDITION effect's condition is currently met.
  * Returns true for effects that have no WHILE_CONDITION duration (always active).
  *
- * OPT-253: also returns false if the effect's source Character is currently
- * effect-negated, except for the negation flag itself (which must stay active
- * regardless of who negated whom, to avoid recursion and mutual-negation cycles).
+ * Ongoing and unproven effects pause when their source is negated. Current
+ * resolved action output remains effective under rule 8-2-3. The existing
+ * negation-flag exception stays independent of both provenance and source.
  */
 export function isEffectConditionMet(
   effect: RuntimeActiveEffect,
@@ -396,7 +400,7 @@ export function isEffectConditionMet(
 ): boolean {
   if (!cardDb) return true; // can't evaluate without cardDb — assume active
 
-  // OPT-253: suppress effects whose source Character is negated. The
+  // Suppress ongoing/unproven effects whose source is negated. The
   // NEGATE_EFFECTS_FLAG modifier itself is exempt to keep the negation
   // itself resolvable even if the negator is later negated.
   const isNegationFlag = effect.modifiers?.some(

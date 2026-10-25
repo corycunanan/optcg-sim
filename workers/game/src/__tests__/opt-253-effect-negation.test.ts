@@ -453,7 +453,10 @@ describe("OPT-253: negation does not rewrite the card's base-effect status", () 
 
 describe("OPT-253: a negated Character's own passive buff to other cards pauses", () => {
   it("a MODIFY_POWER effect sourced BY the negated card stops applying, then resumes after expiry", () => {
-    const buffer = makeCard("BUFFER", { effectText: "Your other Characters gain +2000." });
+    const buffer = makeCard("BUFFER", {
+      effectText: "Your other Characters gain +2000.",
+      effectSchema: { effects: [{ id: "buffer-aura", category: "permanent", modifiers: [{ type: "MODIFY_POWER", target: { type: "ALL_YOUR_CHARACTERS", filter: { exclude_self: true } }, params: { amount: 2000 } }] }] } as EffectSchema,
+    });
     const ally = makeCard("ALLY", { power: 3000 });
     const cardDb = new Map<string, CardData>([
       [buffer.id, buffer],
@@ -465,21 +468,8 @@ describe("OPT-253: a negated Character's own passive buff to other cards pauses"
     const allyInst = makeInstance(ally.id, "CHARACTER", 0, { instanceId: "ally" });
     state.players[0].characters = padChars([bufferInst, allyInst]);
 
-    // Active effect sourced BY the buffer, targeting the ally.
-    const buffEffect: RuntimeActiveEffect = {
-      id: "buffer-aura",
-      sourceCardInstanceId: bufferInst.instanceId,
-      sourceEffectBlockId: "",
-      category: "auto",
-      modifiers: [{ type: "MODIFY_POWER", params: { amount: 2000 }, duration: { type: "THIS_TURN" } }],
-      duration: { type: "THIS_TURN" },
-      expiresAt: { wave: "NEVER" } as any,
-      controller: 0,
-      appliesTo: [allyInst.instanceId],
-      timestamp: Date.now(),
-    } as RuntimeActiveEffect;
-
-    const withAura = { ...state, activeEffects: [buffEffect] as any };
+    const withAura = registerPermanentEffectsForCard(state, bufferInst, buffer);
+    expect(withAura.activeEffects[0]).toMatchObject({ category: "permanent", sourceEffectBlockId: "buffer-aura" });
     expect(getEffectivePower(allyInst, ally, withAura, cardDb)).toBe(5000);
 
     // Negate the buffer → its aura pauses.
