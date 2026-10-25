@@ -19,7 +19,7 @@ export function parkBattleCompletion(
   completion: BattleCompletionContinuation
 ): GameState {
   if (
-    (state.schemaVersion !== 8 && state.schemaVersion !== 9) ||
+    (state.schemaVersion !== 8 && state.schemaVersion !== 9 && state.schemaVersion !== 10) ||
     state.effectStack.some((frame) => frame.battleCompletion)
   ) {
     return terminateForEngineContract(state, {
@@ -46,7 +46,7 @@ export function completeBattleBoundary(state: GameState): ExecuteResult {
   const completion = frame?.battleCompletion;
   if (
     !completion ||
-    (state.schemaVersion !== 8 && state.schemaVersion !== 9) ||
+    (state.schemaVersion !== 8 && state.schemaVersion !== 9 && state.schemaVersion !== 10) ||
     state.effectStack.length !== 1 ||
     battleCompletionOwnerViolation(frame!, state) !== null
   ) {

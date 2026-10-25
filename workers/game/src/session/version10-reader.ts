@@ -20,10 +20,10 @@ export function validateScheduledSourceSnapshots(
   }
   if (!record(raw)) return;
   if ("sourceCardSnapshot" in raw) {
-    if ("sourceEffectId" in raw && version < 9) {
-      fail(`${path}.sourceCardSnapshot requires schemaVersion 9`);
+    if ("sourceEffectId" in raw && version < 10) {
+      fail(`${path}.sourceCardSnapshot requires schemaVersion 10`);
     }
-    if (version >= 9) {
+    if (version >= 10) {
       const parsed = CardInstance.safeParse(raw.sourceCardSnapshot);
       if (!parsed.success) fail(`${path}.sourceCardSnapshot: ${parsed.error.message}`);
       if ("sourceIdentity" in raw) {
@@ -38,7 +38,7 @@ export function validateScheduledSourceSnapshots(
       }
     }
   }
-  if (version >= 9 && typeof raw.sourceCardInstanceId === "string" && record(raw.effectBlock)) {
+  if (version >= 10 && typeof raw.sourceCardInstanceId === "string" && record(raw.effectBlock)) {
     for (const carrier of [raw.resultRefs, raw.costResultRefs]) {
       if (!Array.isArray(carrier)) continue;
       for (const entry of carrier) {

@@ -828,7 +828,11 @@ The new reader accepts schema8/costSemanticsVersion8 while retaining ordinary se
 
 New setup now chooses schema8/mode8 before its first action/save. Historical promotions remain7 and existing explicit6/7/8 retain their mode and stored cardDb. Reader PR786 at `e14af35bad3a7189a40294f5d4ab3db5b5602f0e` is the verified deployed minimum rollback floor (deployment40139694972, post-CI40139694988); c50/2ca reject8 and cannot be rollback targets. The prior reader-stage paragraph records its historical setup7 behavior. See [the current cost contract](MODE8-COST-SEMANTICS.md#new-game-writer-enablement) for the three new-game authored corrections, historical fixture preservation, carried source-equivalent corpus and retained OPT-958 debt. No active-session migration or production repair is included.
 
-### Scheduled-origin schema9 reader prerequisite (OPT-1004, stage 1)
+### Superseded scheduled-origin draft9 evidence (OPT-1004)
+
+The following describes the immutable pre-integration draft. It is obsolete for
+current compatibility: deployed9 belongs exclusively to OPT-1006. Scheduled
+origin now requires10 and an independent field-trash capability (see below).
 
 This reader accepts schema9 while ordinary setup and the default writer remain
 schema8. Schema9 adds optional `sourceCardSnapshot` to scheduled obligations and
@@ -900,3 +904,43 @@ may keep the departure staged until commit; the captured payment root has
 already removed the source while immutable origin remains. The prior eleven
 case objects remain byte-equivalent in the expanded corpus. This early shape
 promotion is archived future-writer code, not enabled for ordinary8 here.
+### Field-trash batch reader9 (OPT-1006)
+
+The reader now accepts retained schema9 graphs with explicit cost mode6|7|8 and
+`replacementBatch.actionKind: TRASH_CARD`. Ordinary setup/default writer/ingress
+remain8; only loaded9 uses the new route in this reader release. Versions<=8
+reject the discriminator by name. The new route reuses batch ownership and
+non-K.O. trash finalization; no session-format/execution-context bump or cost
+migration occurs. The future writer must activate9 immutably only at an eligible
+field-trash producer and wait for this reader's verified deployment. Source9 is
+retained after completion and executes later trash/cost/battle work; rolling back
+to05d after9 writes is unsupported. The future writer PR must pin the actual
+verified reader SHA as its rollback floor. See the [field-trash reader contract](FIELD-TRASH-READER-V9.md)
+for ownership, producer corpus, original writer-byte comparison, strict source
+validation, synthetic-evidence exception and retained OPT-958 policy.
+
+### Scheduled-origin schema10 with independent field-trash capability (OPT-1004)
+
+Main deployed9 is exclusively the FIELD-TRASH reader contract above. Scheduled
+origin requires10. Every native10 envelope requires explicit
+`fieldTrashSemanticsVersion: 8 | 9` as well as independent cost mode6|7|8. Mode8
+retains legacy trash; mode9 retains deployed native9 replacement behavior.
+Source<=9 rejects the new capability and scheduled metadata. COST roots inherit
+the enclosing capabilities; they are partial state snapshots, not new envelopes.
+Default setup/runtime/writer remain8. Loaded9 does not emit scheduled origin;
+loaded10 preserves future scheduling, queued pre-cost snapshots, parked work,
+strict dual identity, and live/undo envelopes without mode drift.
+
+The future scheduling writer promotes8→10/field8 and9→10/field9 before optional
+or cost pauses for recursively scheduling-capable blocks, preserving cost mode.
+New-game10 candidates choose field8/cost8. These are isolated evidence producers,
+not production enablement. The future OPT-1006 field-trash writer must support
+10/field8→10/field9 at its own eligible producer boundary, retaining scheduled
+metadata; it must not downgrade10 to9. That separate writer is not enabled here.
+
+The original draft9 14-case/103-boundary archive is retained byte-for-byte as
+obsolete development evidence; it cannot establish compatibility with deployed9.
+The replacement schema10 writer corpus and sources are archived separately.
+Reader deployment and a named verified reader rollback floor still precede
+writer enablement. The accepted synthetic-only capture exception and historical
+missing-origin limitation remain: no production repair or migration is claimed.

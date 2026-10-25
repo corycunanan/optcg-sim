@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
-import { GameSession } from "../GameSession.js";
-import type { CardData, Env, GameAction, GameState } from "../types.js";
-import { SessionRepository } from "../session/persistence.js";
-import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
+import { expect, it } from "vitest";
+
+import type { GameAction, GameState } from "../types.js";
+import { convertPersistedGameState } from "../session/persistence.js";
+
 
 const directory = resolve(__dirname, "fixtures/opt-1004-scheduled-writer");
 const manifest = JSON.parse(readFileSync(resolve(directory, "manifest.json"), "utf8"));
@@ -15,14 +15,6 @@ type Stored = Record<string, unknown> & { session: { state: GameState } };
 type Scenario = { initial: Stored; steps: { action: GameAction; player: 0 | 1; stored: Stored }[]; expectedDonEvents: number };
 const corpus = JSON.parse(gunzipSync(readFileSync(resolve(directory, "cases.json.gz"))).toString()) as { provenance: string; cases: Record<string, Scenario> };
 const hash = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
-const options = { nextJsUrl: "https://app.example.test", workerSecret: "test" };
-const memory = (values: Stored) => {
-  const storage = new MemorySessionStorage();
-  for (const [key, value] of Object.entries(values)) storage.data.set(key, structuredClone(value));
-  return storage;
-};
-type Access = { gameState: GameState; cardDb: Map<string, CardData>; undoHistory: GameState[]; handleAction(ws: WebSocket, player: 0 | 1, action: GameAction): Promise<void> };
-
 it("pins actual isolated writer candidate, payload, patch and capture sources", () => {
   expect(manifest.producerCommit).toBe("71bb66df105a763ac2ab2cf1f5f3f4ccc286eabc");
   expect(manifest.readerBase).toBe("66df1d56f4768790c8f8f9eaaab0623c33abd251");
@@ -34,53 +26,8 @@ it("pins actual isolated writer candidate, payload, patch and capture sources", 
   expect(hash(readFileSync(resolve(directory, "sources/opt-1004-writer-producer.test-source")))).toBe(manifest.sourceHashes["workers/game/src/__tests__/opt-1004-writer-producer.test.ts"]);
 });
 
-it("reads every actual writer boundary live/undo write-free and retains9 when re-saving", async () => {
-  let count = 0;
-  let mixed = false;
-  for (const scenario of Object.values(corpus.cases)) {
-    for (const values of [scenario.initial, ...scenario.steps.map(s => s.stored)]) {
-      const storage = memory(values);
-      const before = structuredClone([...storage.data]);
-      const repository = new SessionRepository(storage, options);
-      const loaded = (await repository.load())!;
-      expect([...storage.data]).toEqual(before);
-      expect(storage.writes).toEqual([]);
-      expect(loaded.state.costSemanticsVersion).toBe(values.session.state.costSemanticsVersion);
-      const originalUndo = values["session:undo-history"] as GameState[];
-      if (loaded.state.schemaVersion === 9 && originalUndo.some(s => s.schemaVersion === 8)) mixed = true;
-      expect(loaded.undoHistory.map(s => s.schemaVersion)).toEqual(originalUndo.map(s => s.schemaVersion));
-      await repository.save({ ...loaded, state: loaded.state, cardDb: loaded.cardDb, undoHistory: loaded.undoHistory });
-      const emitted = storage.data.get("session") as { state: GameState };
-      expect(emitted.state.schemaVersion).toBe(values.session.state.schemaVersion);
-      expect(emitted.state.costSemanticsVersion).toBe(values.session.state.costSemanticsVersion);
-      expect(emitted.state.scheduledActions).toEqual(values.session.state.scheduledActions);
-      count++;
-    }
-  }
-  expect(count).toBe(manifest.snapshots);
-  expect(mixed).toBe(true);
-});
-
-describe.each(Object.entries(corpus.cases))("OPT-1004 actual writer suffix %s", (id, scenario) => {
-  it("loads and semantically resumes after the first writer-created obligation", async () => {
-    // Stage 1 deliberately does not activate schema9 from8. Resume only
-    // after initial writer activation of9; later9 scheduling must match too.
-    const start = scenario.steps.findIndex(step => step.stored.session.state.schemaVersion === 9);
-    expect(start).toBeGreaterThanOrEqual(0);
-    const storage = memory(scenario.steps[start].stored);
-    const durable = { storage, getWebSockets: () => [], getTags: () => [], acceptWebSocket() {} } as unknown as DurableObjectState;
-    let loaded = (await new SessionRepository(storage, options).load())!;
-    for (const step of scenario.steps.slice(start + 1)) {
-      const session = new GameSession(durable, { GAME_WORKER_SECRET: "test", NEXTJS_URL: options.nextJsUrl } as Env) as unknown as Access;
-      session.gameState = loaded.state; session.cardDb = loaded.cardDb; session.undoHistory = loaded.undoHistory;
-      const sent: string[] = [];
-      await session.handleAction({ send(value: string) { sent.push(value); }, close() {} } as unknown as WebSocket, step.player, step.action);
-      expect(sent.map(s => JSON.parse(s)).filter(m => m.type === "action:rejected"), id).toEqual([]);
-      expect(Object.fromEntries(storage.data), `${id} ${step.action.type}`).toEqual(step.stored);
-      loaded = (await new SessionRepository(storage, options).load())!;
-    }
-    expect(loaded.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(scenario.expectedDonEvents);
-    expect(loaded.state.pendingPrompt).toBeNull();
-    expect(loaded.state.turn.activePlayerIndex).toBe(1);
-  });
+it("obsolete draft9 scheduled metadata is rejected under deployed native9 meaning", () => {
+  const scenario = Object.values(corpus.cases)[0];
+  const values = scenario.steps.find(step => step.stored.session.state.scheduledActions.some(action => action.sourceCardSnapshot))!.stored;
+  expect(() => convertPersistedGameState(values.session.state, "draft9")).toThrow(/sourceCardSnapshot requires schemaVersion 10/);
 });

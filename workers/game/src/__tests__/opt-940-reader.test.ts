@@ -82,7 +82,7 @@ describe("OPT-940 game-state schema version", () => {
     // OPT-980 reads 1 and 2; OPT-924 (PR 4b) writes 2; OPT-963 reads 3 (PR 5a) and writes 3 (PR 5b).
     expect(GAME_STATE_SCHEMA_VERSION).toBe(8);
     expect(LEGACY_GAME_STATE_SCHEMA_VERSION).toBe(1);
-    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect([...SUPPORTED_GAME_STATE_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(readGameStateSchemaVersion({}, "state")).toBe(1);
     expect(readGameStateSchemaVersion({ [GAME_STATE_SCHEMA_VERSION_KEY]: 1 }, "state")).toBe(1);
   });

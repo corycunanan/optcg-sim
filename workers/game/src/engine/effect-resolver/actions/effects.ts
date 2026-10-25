@@ -131,7 +131,7 @@ export function executeScheduleAction(
   // A rollback reader must also produce valid work when continuing loaded9.
   // Ordinary8 scheduling remains unchanged until the writer rollout.
   const reference = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot;
-  const source = state.schemaVersion === 9
+  const source = state.schemaVersion === 10
     ? reference?.instanceId === sourceCardInstanceId
       ? reference : findCardInstance(state, sourceCardInstanceId)
     : undefined;

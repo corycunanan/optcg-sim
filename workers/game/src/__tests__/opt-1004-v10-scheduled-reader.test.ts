@@ -18,7 +18,7 @@ function scheduledFixture(type: CardData["type"] = "Character", restricted = tru
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" });
   const snapshot = structuredClone(source);
   r.state.scheduledActions[0].sourceCardSnapshot = snapshot;
-  r.state.schemaVersion = 9;
+  r.state.schemaVersion = 10; r.state.fieldTrashSemanticsVersion = 8;
   r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
   if (restricted) {
     const blocker = r.put("OP10-030", 0, "CHARACTER");
@@ -32,16 +32,16 @@ function scheduledFixture(type: CardData["type"] = "Character", restricted = tru
 
 const wire = (state: GameState) => JSON.parse(JSON.stringify(toPersistedGameState(state)));
 
-describe("OPT-1004 schema9 reader and execution", () => {
-  it("keeps the production writer8 while accepting9, never changes cost semantics", () => {
+describe("OPT-1004 schema10 reader and execution", () => {
+  it("keeps the production writer8 while accepting10, never changes cost semantics", () => {
     expect(GAME_STATE_SCHEMA_VERSION).toBe(8);
-    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(9);
+    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(10);
     for (const costSemanticsVersion of [6, 7, 8] as const) {
       const { r } = scheduledFixture();
       r.state.costSemanticsVersion = costSemanticsVersion;
       const loaded = convertPersistedGameState(wire(r.state), "state");
-      expect(loaded.schemaVersion).toBe(9);
-      expect(toPersistedGameState(loaded).schemaVersion).toBe(9);
+      expect(loaded.schemaVersion).toBe(10);
+      expect(toPersistedGameState(loaded).schemaVersion).toBe(10);
       expect(promoteGameStateForWriter(loaded, "state").costSemanticsVersion).toBe(costSemanticsVersion);
       expect(hasNativeCostSemantics(loaded)).toBe(costSemanticsVersion >= 7);
       expect(hasStructuralCostSemantics(loaded)).toBe(costSemanticsVersion === 8);
@@ -92,8 +92,8 @@ describe("OPT-1004 schema9 reader and execution", () => {
     const current = wire(r.state);
     const legacy = rig().state;
     const parsed = parseStoredSession({ state: current, undoHistory: [wire(legacy), current], cardDb: Object.fromEntries(r.db), mode: "PVP" });
-    expect(parsed.undoHistory.map(s => s.schemaVersion)).toEqual([8, 9]);
-    expect(toPersistedGameState(parsed.undoHistory[1]).schemaVersion).toBe(9);
+    expect(parsed.undoHistory.map(s => s.schemaVersion)).toEqual([8, 10]);
+    expect(toPersistedGameState(parsed.undoHistory[1]).schemaVersion).toBe(10);
     await r.reload();
     r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
     if (r.state.pendingPrompt) {
@@ -129,9 +129,9 @@ describe("OPT-1004 schema9 reader and execution", () => {
     expect(result.events).toEqual([]);
   });
 
-  it("validates agreement of dual origin carriers and their proven frame owner in9", () => {
+  it("validates agreement of dual origin carriers and their proven frame owner in10", () => {
     const r = rig();
-    r.state.schemaVersion = 9;
+    r.state.schemaVersion = 10; r.state.fieldTrashSemanticsVersion = 8;
     const block = { id: "queued-origin", category: "auto" as const, trigger: { keyword: "ON_PLAY" as const }, costs: [{ type: "TRASH_SELF" as const }], actions: [{ type: "CHOOSE_VALUE" as const, result_ref: "number", params: { domain: "NUMBER" as const, constraints: { min: 0, max: 1 } } }, { type: "DRAW" as const, params: { amount: { type: "CHOSEN_VALUE" as const, ref: "number" } } }, { type: "SCHEDULE_ACTION" as const, params: { timing: "END_OF_THIS_TURN" as const, action: { type: "SET_DON_ACTIVE" as const, params: { amount: 1 } } } }] };
     const source = r.put("SYN-queued-origin", 0, "CHARACTER", { schema: synSchema("SYN-queued-origin", [block]) });
     const result = resolveEffectWork(r.state, block, source.instanceId, 0, r.db, undefined, undefined, undefined, { instanceId: source.instanceId, cardId: source.cardId, controller: 0, effectBlockId: block.id });
@@ -154,10 +154,10 @@ describe("OPT-1004 schema9 reader and execution", () => {
   it("rejects metadata relabeled8 on read and save", () => {
     const { r } = scheduledFixture();
     const raw = wire(r.state);
-    raw.schemaVersion = 8;
-    expect(() => convertPersistedGameState(raw, "undoHistory[2]")).toThrow(/undoHistory\[2\].*sourceCardSnapshot requires schemaVersion 9/);
-    r.state.schemaVersion = 8;
-    expect(() => toPersistedGameState(r.state)).toThrow(/requires schemaVersion 9/);
+    raw.schemaVersion = 8; delete raw.fieldTrashSemanticsVersion;
+    expect(() => convertPersistedGameState(raw, "undoHistory[2]")).toThrow(/undoHistory\[2\].*sourceCardSnapshot requires schemaVersion 10/);
+    r.state.schemaVersion = 8; delete r.state.fieldTrashSemanticsVersion;
+    expect(() => toPersistedGameState(r.state)).toThrow(/requires schemaVersion 10/);
   });
 
   it.each([
@@ -171,4 +171,49 @@ describe("OPT-1004 schema9 reader and execution", () => {
     mutate(raw.scheduledActions[0].sourceCardSnapshot);
     expect(() => convertPersistedGameState(raw, "undoHistory[0]")).toThrow(/undoHistory\[0\].*scheduledActions\[0\].sourceCardSnapshot/);
   });
+});
+
+it.each([8, 9] as const)("native10 retains field-trash mode%s through real successor actions and mixed undo", async field => {
+  const r = rig(); r.leader(1, "OP11-001");
+  r.state.schemaVersion = 10; r.state.fieldTrashSemanticsVersion = field;
+  const target = r.put("SYN-navy", 1, "CHARACTER", { data: { power: 5000, types: ["Navy"] } });
+  for (let i = 0; i < 3; i++) r.put(`SYN-pay-${i}`, 1, "TRASH");
+  const source = r.put("SYN-trash-schedule", 0, "CHARACTER", { schema: synSchema("SYN-trash-schedule", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "TRASH_CARD", target: { type: "CHARACTER", controller: "OPPONENT", count: { up_to: 1 } } }, { type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] }]) });
+  await r.reload();
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" });
+  r.select([target.instanceId]);
+  if (field === 9) {
+    expect(r.promptType()).toBe("OPTIONAL_EFFECT");
+    const raw = wire(r.state); raw.fieldTrashSemanticsVersion = 8;
+    expect(() => convertPersistedGameState(raw, "state")).toThrow(/replacementBatch.actionKind TRASH_CARD/);
+    await r.reload(); r.decline();
+  } else expect(r.state.pendingPrompt).toBeNull();
+  expect(r.state.scheduledActions[0].sourceCardSnapshot?.cardId).toBe(source.cardId);
+  expect(r.state.fieldTrashSemanticsVersion).toBe(field);
+  const prior = wire(rig().state);
+  const native9 = { ...prior, schemaVersion: 9 };
+  const parsed = parseStoredSession({ state: wire(r.state), undoHistory: [prior, native9, wire(r.state)], cardDb: Object.fromEntries(r.db), mode: "PVP" });
+  expect(parsed.undoHistory.map(state => state.schemaVersion)).toEqual([8, 9, 10]);
+  expect(parsed.undoHistory.map(state => state.fieldTrashSemanticsVersion)).toEqual([undefined, undefined, field]);
+});
+
+it.each([undefined, null, 6, 10, "8"])("native10 rejects missing or invalid field capability %s on read and save", mode => {
+  const raw = { ...wire(rig().state), schemaVersion: 10, fieldTrashSemanticsVersion: mode };
+  expect(() => convertPersistedGameState(raw, "state")).toThrow(/native10 requires explicit fieldTrashSemanticsVersion/);
+  expect(() => toPersistedGameState(raw)).toThrow(/native10 requires explicit fieldTrashSemanticsVersion/);
+});
+it.each([8, 9])("source%s rejects field capability and scheduled metadata independently", version => {
+  const raw = { ...wire(rig().state), schemaVersion: version, fieldTrashSemanticsVersion: 8 };
+  expect(() => convertPersistedGameState(raw, "state")).toThrow(/fieldTrashSemanticsVersion requires schemaVersion 10/);
+  const { r } = scheduledFixture(); const scheduled = wire(r.state);
+  scheduled.schemaVersion = version; delete scheduled.fieldTrashSemanticsVersion;
+  expect(() => convertPersistedGameState(scheduled, "state")).toThrow(/sourceCardSnapshot requires schemaVersion 10/);
+});
+it.each([8, 9] as const)("ordinary source%s scheduling retains its envelope and omits scheduled origin", version => {
+  const r = rig(); r.state.schemaVersion = version;
+  const source = r.put("SYN-old-scheduler", 0, "CHARACTER", { schema: synSchema("SYN-old-scheduler", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] }]) });
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" });
+  expect(r.state.schemaVersion).toBe(version);
+  expect(r.state.scheduledActions[0].sourceCardSnapshot).toBeUndefined();
+  expect(r.state.fieldTrashSemanticsVersion).toBeUndefined();
 });

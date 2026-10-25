@@ -2,6 +2,8 @@ import { z } from "zod";
 import { END_PHASE_STAGES, END_PHASE_STEPS, type GameEventType } from "../types.js";
 import { EFFECT_STACK_FRAME_KINDS } from "../engine/frame-kinds.js";
 
+const EffectSourceIdentity = z.strictObject({ instanceId: z.string(), cardId: z.string(), cardType: z.enum(["Leader", "Character", "Event", "Stage"]) });
+
 const PlayerIndex = z.union([z.literal(0), z.literal(1)]);
 const FiniteNumber = z.number().finite();
 const NonNegativeInteger = z.number().int().nonnegative();
@@ -337,7 +339,7 @@ const ReplacementBatchContinuation = z.strictObject({
   events: z.array(ReplacementEvent).min(1).optional(),
   cause: z.enum(["battle", "effect"]).optional(),
   orderingEffectIds: StringArray.optional(),
-  actionKind: z.enum(["KO", "RETURN_TO_HAND", "RETURN_TO_DECK", "SET_REST"]),
+  actionKind: z.enum(["KO", "RETURN_TO_HAND", "RETURN_TO_DECK", "SET_REST", "TRASH_CARD"]),
   event: ReplacementEvent,
   allTargetIds: StringArray,
   protectedIds: StringArray,
@@ -350,7 +352,7 @@ const ReplacementBatchContinuation = z.strictObject({
   ),
   currentMatchIndex: NonNegativeInteger,
   causingController: PlayerIndex,
-  causingSource: z.unknown().optional(),
+  causingSource: EffectSourceIdentity.optional(),
   returnToDeckPosition: z.enum(["TOP", "BOTTOM"]).optional(),
 });
 
@@ -480,6 +482,7 @@ export const StackFrameCore = z.strictObject({
 });
 
 export const PersistedGameStateV3 = z.strictObject({
+  fieldTrashSemanticsVersion: z.union([z.literal(8), z.literal(9)]).optional(),
   costSemanticsVersion: z.union([z.literal(6), z.literal(7), z.literal(8)]).optional(),
   id: z.string(),
   executionContext: ExecutionContext,
@@ -627,7 +630,7 @@ const EventPayloadSchemas = {
     newState: z.string().optional(),
     error: z.string().optional(),
     cause: z.enum(["EFFECT", "EFFECT_COST"]).optional(),
-    causingSource: z.strictObject({ instanceId: z.string(), cardId: z.string(), cardType: z.enum(["Leader", "Character", "Event", "Stage"]) }).optional(),
+    causingSource: EffectSourceIdentity.optional(),
     causingController: PlayerIndex.optional(),
   }),
   POWER_MODIFIED: z.strictObject({

@@ -619,6 +619,7 @@ describe("OPT-251: removal handlers respect prohibitions", () => {
       cardDb,
       new Map(),
       [targetId],
+      resolverExecutionServices,
     );
 
     const stillThere = result.state.players[1].characters.find((c) => c?.instanceId === targetId);
