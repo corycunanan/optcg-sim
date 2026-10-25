@@ -99,6 +99,7 @@ import {
   BATTLE_TARGET_REF,
   EFFECT_SOURCE_SNAPSHOT_REF,
   isOncePerTurnBlock,
+  getNestedActions,
   type ActionType,
 } from "../effect-types.js";
 
@@ -412,6 +413,10 @@ export function resolveScheduledEffectWork(
   undefined, undefined, undefined, undefined, entry.sourceCardSnapshot);
 }
 
+function actionsCanSchedule(actions: readonly Action[] | undefined): boolean {
+  return actions?.some(action => action.type === "SCHEDULE_ACTION" || actionsCanSchedule(getNestedActions(action))) ?? false;
+}
+
 function resolveEffectCore(
   state: GameState,
   block: EffectBlock,
@@ -507,6 +512,13 @@ function resolveEffectCore(
       log("effect.skipped", { ...logCtx, reason: "conditions_not_met" });
       return { state, events, resolved: false };
     }
+  }
+
+  // Scheduling work needs durable origin even if costs or an optional choice
+  // park before SCHEDULE_ACTION itself. Promote shape, never cost capability.
+  if (state.schemaVersion !== 9 && actionsCanSchedule(block.actions)) {
+    state = { ...state, schemaVersion: 9,
+      costSemanticsVersion: state.costSemanticsVersion ?? (state.schemaVersion === 7 ? 7 : 6) };
   }
 
   // Step 2: Check optional flag — prompt the player before paying costs

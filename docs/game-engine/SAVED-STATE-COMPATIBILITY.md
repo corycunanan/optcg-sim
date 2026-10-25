@@ -869,25 +869,34 @@ and names that reader as the rollback floor. A build that reads only1–8 cannot
 be a rollback target after a schema9 writer runs.
 
 The isolated writer candidate is
-`b091bf176f5d713835dc56e1d56ea6f29f8943f5`, based on reader draft
+`71bb66df105a763ac2ab2cf1f5f3f4ccc286eabc`, based on reader draft
 `66df1d56f4768790c8f8f9eaaab0623c33abd251`. Its immutable corpus is
 `workers/game/src/__tests__/fixtures/opt-1004-scheduled-writer/`: the manifest
-pins eleven scenarios and 82 actual GameSession/repository saved boundaries,
+pins fourteen scenarios and 103 actual GameSession/repository saved boundaries,
 complete candidate source hashes, compressed payload, archived generator and
-full writer patch. Cases include ST24-005 before/after source departure, both
+full writer patch (zero-context diff; apply with `git apply --unidiff-zero`). Cases include ST24-005 before/after source departure, both
 restrictions imposed after scheduling, an End Phase park and reply, allowed
 Leader/Event origins, existing8 queued On Play/TRASH_SELF/scheduling, COST
 transaction/expected roots and mixed8/9 undo. The reader suite loads all boundaries
-write-free and replays the suffix after the first actual writer-created
-obligation, including subsequent scheduling from loaded9 through GameSession against the writer's exact saved output. Reader
+write-free and replays the suffix from the first actual schema9 saved boundary, including
+pre-obligation cost pauses and subsequent scheduling from loaded9 through GameSession against the writer's exact saved output. Reader
 activation of schema9 from schema8 is deliberately disabled in this release;
 continued scheduling from an already-loaded9 state preserves origin.
 
 Regenerate only from that isolated candidate using
 `OPT1004_WRITER_CAPTURE_DIR=/absolute/new/output-dir pnpm --filter optcg-game exec vitest run src/__tests__/opt-1004-writer-producer.test.ts`.
 The frozen compressed payload SHA256 is
-`e7c6213997a06b5f2962dcd99b4e613908e0bf15abfc55fb80381c3dd216e538`;
+`46c642c96ea6b145f14675890a11e74d64c479f6358ae4e6918d21838c254c2b`;
 the candidate manifest SHA256 is
-`cedc3b769a4ddada93922768fed3d141f0c8bcff6e4310be7f3ee5abe1a7e45e`.
+`5583144b186bbd1e600b254a2fc83dbb7463def2c0b457aec45d1bfeba9345d4`.
 The generator/source archives are non-executable evidence. They do not enable
 the future writer on the reader branch.
+
+The isolated writer promotes only scheduling-capable effects (recursively via
+getNestedActions) before optional/cost handling, preserving the existing cost
+mode. Three added actual GameSession cases prove existing8→queued On Play→
+TRASH_SELF→later hand-cost prompt→save/load→schedule for modes6/7/8. Native costs
+may keep the departure staged until commit; the captured payment root has
+already removed the source while immutable origin remains. The prior eleven
+case objects remain byte-equivalent in the expanded corpus. This early shape
+promotion is archived future-writer code, not enabled for ordinary8 here.

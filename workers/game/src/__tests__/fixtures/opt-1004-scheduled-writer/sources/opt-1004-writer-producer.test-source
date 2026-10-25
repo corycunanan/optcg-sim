@@ -155,6 +155,31 @@ it("captures isolated schema9 writer outputs through actual GameSession and repo
       if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
     }, 0);
   }
+
+  for (const mode of [6, 7, 8] as const) {
+    const r = rig(); r.state.costSemanticsVersion = mode;
+    r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+    const restriction = r.put("OP10-030", 0, "CHARACTER");
+    const source = r.put("SYN-paused-origin", 0, "HAND", { data: { cost: 0 }, schema: synSchema("SYN-paused-origin", [{ id: "onplay", category: "auto", trigger: { keyword: "ON_PLAY" }, costs: [{ type: "TRASH_SELF" }, { type: "TRASH_FROM_HAND", amount: 1 }], actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } } } }] }]) });
+    r.put("CHAR-VANILLA", 0, "HAND"); r.put("CHAR-RUSH", 0, "HAND");
+    await extra(`existing8-paused-queued-origin-mode${mode}`, r, async (act, current) => {
+      await act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
+      expect(current().gameState.schemaVersion).toBe(9);
+      expect(current().gameState.costSemanticsVersion).toBe(mode);
+      expect(current().gameState.pendingPrompt).not.toBeNull();
+      const paymentState = current().gameState.effectStack.find(f => f.costTransactionState)?.costTransactionState ?? current().gameState;
+      expect(paymentState.players[0].characters.some(c => c?.cardId === source.cardId)).toBe(false);
+      expect(current().gameState.scheduledActions).toHaveLength(0);
+      await act({ type: "SELECT_TARGET", selectedInstanceIds: [current().gameState.players[0].hand[0].instanceId] });
+      expect(current().gameState.scheduledActions[0].sourceCardSnapshot?.cardId).toBe(source.cardId);
+      expect(current().gameState.costSemanticsVersion).toBe(mode);
+      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: restriction.instanceId, effectId: "activate_set_don_active_then_prohibit" });
+      await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
+      await act({ type: "ADVANCE_PHASE" });
+      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+      expect(current().gameState.costSemanticsVersion).toBe(mode);
+    }, 0);
+  }
   writeFileSync(resolve(output, "cases.json.gz"), gzipSync(JSON.stringify({ provenance: "real GameSession pipeline in synthetic environment; no production capture", cases })));
   const sources = execFileSync("git", ["-C", root, "ls-files", "workers/game/src/engine", "workers/game/src/session", "workers/game/src/GameSession.ts", "workers/game/src/types.ts", "workers/game/src/__tests__/opt-1004-writer-producer.test.ts", "workers/game/src/__tests__/opt-960-rig.ts", "workers/game/src/__tests__/helpers.ts"], { encoding: "utf8" }).trim().split("\n");
   const sourceHashes = Object.fromEntries(sources.map(file => [file, hash(readFileSync(resolve(root, file)))]));

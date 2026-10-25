@@ -1,9 +1,9 @@
 diff --git a/workers/game/src/__tests__/opt-1004-writer-producer.test.ts b/workers/game/src/__tests__/opt-1004-writer-producer.test.ts
 new file mode 100644
-index 00000000..a48cedd2
+index 00000000..0939fa19
 --- /dev/null
 +++ b/workers/game/src/__tests__/opt-1004-writer-producer.test.ts
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,187 @@
 +import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 +import { resolve } from "node:path";
 +import { execFileSync } from "node:child_process";
@@ -161,6 +161,31 @@ index 00000000..a48cedd2
 +      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
 +    }, 0);
 +  }
++
++  for (const mode of [6, 7, 8] as const) {
++    const r = rig(); r.state.costSemanticsVersion = mode;
++    r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
++    const restriction = r.put("OP10-030", 0, "CHARACTER");
++    const source = r.put("SYN-paused-origin", 0, "HAND", { data: { cost: 0 }, schema: synSchema("SYN-paused-origin", [{ id: "onplay", category: "auto", trigger: { keyword: "ON_PLAY" }, costs: [{ type: "TRASH_SELF" }, { type: "TRASH_FROM_HAND", amount: 1 }], actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "SET_DON_ACTIVE", params: { amount: 1, up_to: true } } } }] }]) });
++    r.put("CHAR-VANILLA", 0, "HAND"); r.put("CHAR-RUSH", 0, "HAND");
++    await extra(`existing8-paused-queued-origin-mode${mode}`, r, async (act, current) => {
++      await act({ type: "PLAY_CARD", cardInstanceId: source.instanceId });
++      expect(current().gameState.schemaVersion).toBe(9);
++      expect(current().gameState.costSemanticsVersion).toBe(mode);
++      expect(current().gameState.pendingPrompt).not.toBeNull();
++      const paymentState = current().gameState.effectStack.find(f => f.costTransactionState)?.costTransactionState ?? current().gameState;
++      expect(paymentState.players[0].characters.some(c => c?.cardId === source.cardId)).toBe(false);
++      expect(current().gameState.scheduledActions).toHaveLength(0);
++      await act({ type: "SELECT_TARGET", selectedInstanceIds: [current().gameState.players[0].hand[0].instanceId] });
++      expect(current().gameState.scheduledActions[0].sourceCardSnapshot?.cardId).toBe(source.cardId);
++      expect(current().gameState.costSemanticsVersion).toBe(mode);
++      await act({ type: "ACTIVATE_EFFECT", cardInstanceId: restriction.instanceId, effectId: "activate_set_don_active_then_prohibit" });
++      await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
++      await act({ type: "ADVANCE_PHASE" });
++      if (current().gameState.pendingPrompt) await act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
++      expect(current().gameState.costSemanticsVersion).toBe(mode);
++    }, 0);
++  }
 +  writeFileSync(resolve(output, "cases.json.gz"), gzipSync(JSON.stringify({ provenance: "real GameSession pipeline in synthetic environment; no production capture", cases })));
 +  const sources = execFileSync("git", ["-C", root, "ls-files", "workers/game/src/engine", "workers/game/src/session", "workers/game/src/GameSession.ts", "workers/game/src/types.ts", "workers/game/src/__tests__/opt-1004-writer-producer.test.ts", "workers/game/src/__tests__/opt-960-rig.ts", "workers/game/src/__tests__/helpers.ts"], { encoding: "utf8" }).trim().split("\n");
 +  const sourceHashes = Object.fromEntries(sources.map(file => [file, hash(readFileSync(resolve(root, file)))]));
@@ -170,22 +195,13 @@ diff --git a/workers/game/src/engine/effect-resolver/actions/effects.ts b/worker
 index 00d4d6a6..1ccdf5f6 100644
 --- a/workers/game/src/engine/effect-resolver/actions/effects.ts
 +++ b/workers/game/src/engine/effect-resolver/actions/effects.ts
-@@ -1,3 +1,5 @@
+@@ -0,0 +1,2 @@
 +import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
 +import { findCardInstance } from "../../state.js";
- /**
-  * Action handlers: APPLY_PROHIBITION, APPLY_ONE_TIME_MODIFIER, SCHEDULE_ACTION,
-  * SET_COST, WIN_GAME, NEGATE_TRIGGER_TYPE, EXTRA_TURN
-@@ -121,12 +123,22 @@ export function executeScheduleAction(
-   sourceCardInstanceId: string,
-   controller: 0 | 1,
-   _cardDb: Map<string, CardData>,
+@@ -124 +126 @@ export function executeScheduleAction(
 -  _resultRefs: Map<string, EffectResult>,
 +  resultRefs: Map<string, EffectResult>,
- ): ActionResult {
-   const events: PendingEvent[] = [];
-   const params = getActionParams(action, "SCHEDULE_ACTION");
- 
+@@ -129 +131,11 @@ export function executeScheduleAction(
 -  const allocated = allocateEngineId(state, "scheduled-action");
 +  const reference = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot;
 +  const source = reference?.instanceId === sourceCardInstanceId
@@ -198,58 +214,44 @@ index 00d4d6a6..1ccdf5f6 100644
 +    costSemanticsVersion: state.costSemanticsVersion ?? (state.schemaVersion === 7 ? 7 as const : 6 as const),
 +  } : state;
 +  const allocated = allocateEngineId(originState, "scheduled-action");
-   const entry: RuntimeScheduledAction = {
-     id: allocated.id,
-     timing: params.timing ?? "END_OF_THIS_TURN",
-@@ -134,6 +146,7 @@ export function executeScheduleAction(
-     boundToInstanceId: params.bound_to ?? null,
-     sourceEffectId: sourceCardInstanceId,
-     controller,
+@@ -136,0 +149 @@ export function executeScheduleAction(
 +    ...(source ? { sourceCardSnapshot: structuredClone(source) } : {}),
-   };
- 
-   return {
 diff --git a/workers/game/src/engine/effect-resolver/resolver.ts b/workers/game/src/engine/effect-resolver/resolver.ts
-index 4e64478b..74bf23c7 100644
+index 4e64478b..559c9bdb 100644
 --- a/workers/game/src/engine/effect-resolver/resolver.ts
 +++ b/workers/game/src/engine/effect-resolver/resolver.ts
-@@ -472,7 +472,7 @@ function resolveEffectCore(
-             ...(activatedSource
-               ? { sourceCardSnapshot: activatedSource }
-               : sourceSnapshot
+@@ -101,0 +102 @@ import {
++  getNestedActions,
+@@ -414,0 +416,4 @@ export function resolveScheduledEffectWork(
++function actionsCanSchedule(actions: readonly Action[] | undefined): boolean {
++  return actions?.some(action => action.type === "SCHEDULE_ACTION" || actionsCanSchedule(getNestedActions(action))) ?? false;
++}
++
+@@ -475 +480 @@ function resolveEffectCore(
 -                ? { sourceIdentity: sourceSnapshot }
 +                ? { sourceIdentity: sourceSnapshot, sourceCardSnapshot: { ...structuredClone(sourceCard!), controller: sourceSnapshot.controller } }
-                 : { sourceCardSnapshot: structuredClone(sourceCard!) }),
-           },
-         ],
+@@ -511,0 +517,7 @@ function resolveEffectCore(
++  // Scheduling work needs durable origin even if costs or an optional choice
++  // park before SCHEDULE_ACTION itself. Promote shape, never cost capability.
++  if (state.schemaVersion !== 9 && actionsCanSchedule(block.actions)) {
++    state = { ...state, schemaVersion: 9,
++      costSemanticsVersion: state.costSemanticsVersion ?? (state.schemaVersion === 7 ? 7 : 6) };
++  }
++
 diff --git a/workers/game/src/engine/setup.ts b/workers/game/src/engine/setup.ts
 index 3b61ed0c..8683a441 100644
 --- a/workers/game/src/engine/setup.ts
 +++ b/workers/game/src/engine/setup.ts
-@@ -132,7 +132,7 @@ export function prepareDecksAndLeaders(
- 
-   let state: GameState = {
-     id: payload.gameId,
+@@ -135 +135 @@ export function prepareDecksAndLeaders(
 -    schemaVersion: 8,
 +    schemaVersion: 9,
-     costSemanticsVersion: 8,
-     executionContext,
-     players: [player0, player1],
 diff --git a/workers/game/src/session/game-state-schema.ts b/workers/game/src/session/game-state-schema.ts
 index 98fa6e12..9692c400 100644
 --- a/workers/game/src/session/game-state-schema.ts
 +++ b/workers/game/src/session/game-state-schema.ts
-@@ -42,11 +42,11 @@ import { validateScheduledSourceSnapshots } from "./version9-reader.js";
- import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
- 
- /** The version this build's writer emits for state its own engine produces. */
+@@ -45 +45 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 -export const GAME_STATE_SCHEMA_VERSION = 8;
 +export const GAME_STATE_SCHEMA_VERSION = 9;
- /** The newest readable envelope; native8 carries exact battle completion and cost provenance. */
- export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 9;
- /** The deployed runtime and default production writer use v8. */
+@@ -49 +49 @@ export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 9;
 -export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
 +export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 9;
- export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
- /** Versions this build can read. Retiring one follows the support-window policy (§3). */
- export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9,

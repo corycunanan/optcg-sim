@@ -1,16 +1,16 @@
 {
-  "producerCommit": "b091bf176f5d713835dc56e1d56ea6f29f8943f5",
+  "producerCommit": "71bb66df105a763ac2ab2cf1f5f3f4ccc286eabc",
   "readerBase": "66df1d56f4768790c8f8f9eaaab0623c33abd251",
   "provenance": "synthetic-only exception for OPT-1004; no production DO capture",
-  "caseCount": 11,
-  "snapshots": 82,
+  "caseCount": 14,
+  "snapshots": 103,
   "fixtures": {
-    "cases.json.gz": "e7c6213997a06b5f2962dcd99b4e613908e0bf15abfc55fb80381c3dd216e538"
+    "cases.json.gz": "46c642c96ea6b145f14675890a11e74d64c479f6358ae4e6918d21838c254c2b"
   },
   "sourceHashes": {
     "workers/game/src/GameSession.ts": "ed99ca2b2ab79486a82bb6f4692061d638036e8228e0bda9bc60136d852e0bde",
     "workers/game/src/__tests__/helpers.ts": "a239f290e43031602ae3333c09b880fd00bdc23c3e0a355cc357d879149e2889",
-    "workers/game/src/__tests__/opt-1004-writer-producer.test.ts": "bbbe1d33ddbe351aa3d035cc39bc83c7ea219791ad1c7edd92c17ab17758bbe0",
+    "workers/game/src/__tests__/opt-1004-writer-producer.test.ts": "08466a39d4d4754e6f683784c9e698d245200a7b93133ff1f947bd3500ab6ec6",
     "workers/game/src/__tests__/opt-960-rig.ts": "6d22df45fcf4c16611e940fca457e4168aab8d2978bc9866b1b43bc6813d5815",
     "workers/game/src/engine/README.md": "ca7cd6992139c50c7d74d8b40de65adbdbb2bbbf497ec91e564867299de01215",
     "workers/game/src/engine/action-coverage-contract.ts": "e2cbbc51b4079eb2217b12cb61100ce6863ca799459613e588b18317f2f3b9ac",
@@ -66,7 +66,7 @@
     "workers/game/src/engine/effect-resolver/index.ts": "916167d15f86b847769cb2a18e0d7910b4370e2b7b8db520eb1693e77d4f7505",
     "workers/game/src/engine/effect-resolver/life-movement.ts": "948fdbf77128c0291847bc8ef53b06cfb016f2e036674586a7f68baea3f29fcb",
     "workers/game/src/engine/effect-resolver/post-cost.ts": "019666fa0225a3cd2b33291b5e4567e21efee461b600f01c7a111013258cfc3f",
-    "workers/game/src/engine/effect-resolver/resolver.ts": "4da623856d2d3d08dd37f7e35ffb465213da83583c99c01effdaf9f1a8f2c391",
+    "workers/game/src/engine/effect-resolver/resolver.ts": "962713dcd6485ed464ac82fe24321b18705b18ef179369d7e6d9772ea590506c",
     "workers/game/src/engine/effect-resolver/resume-core.ts": "72fa089e277f04faf169ef36106c7cfa98b29deaeb8ba72120fa11dd0cc724e1",
     "workers/game/src/engine/effect-resolver/resume.ts": "2ebc01bfe5ca0da9ec797017a886079007220f9226e0a4fc5ed1dd992a7ee205",
     "workers/game/src/engine/effect-resolver/resume/batch.ts": "37cce677308b25f538c39d0fdfbe3c5625ef691f4c2ee2e1a34974bd5b66180c",

@@ -24,7 +24,7 @@ const memory = (values: Stored) => {
 type Access = { gameState: GameState; cardDb: Map<string, CardData>; undoHistory: GameState[]; handleAction(ws: WebSocket, player: 0 | 1, action: GameAction): Promise<void> };
 
 it("pins actual isolated writer candidate, payload, patch and capture sources", () => {
-  expect(manifest.producerCommit).toBe("b091bf176f5d713835dc56e1d56ea6f29f8943f5");
+  expect(manifest.producerCommit).toBe("71bb66df105a763ac2ab2cf1f5f3f4ccc286eabc");
   expect(manifest.readerBase).toBe("66df1d56f4768790c8f8f9eaaab0623c33abd251");
   expect(manifest.caseCount).toBe(Object.keys(corpus.cases).length);
   expect(manifest.snapshots).toBe(Object.values(corpus.cases).reduce((n, c) => n + 1 + c.steps.length, 0));
