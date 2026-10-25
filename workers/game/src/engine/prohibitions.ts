@@ -84,20 +84,21 @@ export function isProhibitionOverridden(
  * Re-evaluate a prohibition's carried block/prohibition conditions and any
  * WHILE_CONDITION duration. Prohibitions without either gate are always active.
  *
- * Also honors the OPT-253 negation contract: while the prohibition's source
- * card is effect-negated on the field, its schema-sourced prohibitions pause —
- * mirroring isEffectConditionMet's isEffectSourceNegated gate for modifiers.
- * Sources that already left the field (e.g. a resolved Event in the trash)
- * are never in a NEGATE_EFFECTS_FLAG's appliesTo, so one-shot prohibitions
- * written by resolved effects are unaffected.
+ * APPLY_PROHIBITION and NEGATE_TRIGGER_TYPE write the exact empty block id
+ * for resolved action output. Later source negation cannot retract that result
+ * (rule 8-2-3). Registered continuous prohibitions carry their authored block
+ * id; those and unproven historical metadata retain the source-negation gate.
+ * Duration is independent of this provenance distinction.
  */
 export function isProhibitionConditionMet(
   prohibition: RuntimeProhibition,
   state: GameState,
   cardDb: Map<string, CardData>,
 ): boolean {
-  const source = findCardInstance(state, prohibition.sourceCardInstanceId);
-  if (source && isCardNegated(source, state, cardDb)) return false;
+  if (prohibition.sourceEffectBlockId !== "") {
+    const source = findCardInstance(state, prohibition.sourceCardInstanceId);
+    if (source && isCardNegated(source, state, cardDb)) return false;
+  }
 
   return isProhibitionConditionAndDurationMet(prohibition, state, cardDb);
 }
@@ -1105,12 +1106,7 @@ export function isDonActivationProhibitedByEffect(
   return state.prohibitions.some((p) => {
     if (p.prohibitionType !== "CANNOT_SET_DON_ACTIVE" || p.controller !== player) return false;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) return false;
-    // APPLY_PROHIBITION records use the empty block id; registered permanent
-    // restrictions retain their authored block id and pause with their source.
-    const conditionsMet = p.sourceEffectBlockId === ""
-      ? isProhibitionConditionAndDurationMet(p, state, cardDb)
-      : isProhibitionConditionMet(p, state, cardDb);
-    if (!conditionsMet || isProhibitionOverridden(p, state, cardDb)) return false;
+    if (!isProhibitionConditionMet(p, state, cardDb) || isProhibitionOverridden(p, state, cardDb)) return false;
     // Both existing authored spellings describe the causing card category.
     if (p.scope?.cause !== undefined && p.scope.cause !== "BY_CHARACTER_EFFECT") return false;
     if (p.scope?.card_type_filter !== undefined && p.scope.card_type_filter !== "CHARACTER") return false;

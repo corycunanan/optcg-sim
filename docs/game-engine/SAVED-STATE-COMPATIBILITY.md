@@ -1043,3 +1043,27 @@ origin limitation covers absence of full, typed and exact-live evidence; it does
 not cover a known identity4 merely missing a full CardInstance. Scheduling
 enablement still requires verified deployed reader and a named rollback floor.
 New-game/default8 remains unchanged in that future producer-only writer.
+
+### Resolved prohibition lifetime prerequisite (OPT-910)
+
+The common prohibition condition reader now recognizes the existing exact
+`sourceEffectBlockId: ""` action-output signature from APPLY_PROHIBITION and
+NEGATE_TRIGGER_TYPE. Later source negation cannot revoke that resolved result
+(rule8-2-3), including Kalgara's turn-long draw restriction after Roger enters.
+Registered continuous rows retain authored block IDs and pause with their source;
+missing, null, numeric and other unproven block metadata retain the prior source
+gate. No duration inference, persistence field, shape tightening or row rewrite
+is introduced. The earlier DON-only exception now delegates this same gate.
+Conditions, WHILE_CONDITION, expiry, uses, overrides, ownership and targets keep
+their existing behavior. The direct trigger-type reader's existing bypass is
+inventoried and preserved rather than expanded to new condition semantics.
+
+See the [producer/consumer inventory and acceptance map](evidence/opt-910/prohibition-lifetime-inventory.md).
+All prior payload/source archives remain immutable. The actual04641-family/
+217-boundary corpus replays unchanged on this correction, including its existing
+non-DON protection rows. A future enabled writer must inherit this common gate
+correction in addition to the reviewed two-file activation delta; the earlier046
+source remains an archive, not the final enablement commit. Defaults8,
+producer-only scheduling activation and verified deployed reader rollback-floor
+requirements are unchanged. OPT-954 and unrelated prohibition debt remain out of
+scope under the user's bounded OPT-910 prerequisite approval.
