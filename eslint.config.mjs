@@ -64,6 +64,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    ".cache/**",
+    ".corepack/**",
     "storybook-static/**",
     "workers/game/.wrangler/**",
     "workers/game/coverage/**",
