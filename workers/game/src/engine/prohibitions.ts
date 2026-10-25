@@ -99,6 +99,17 @@ export function isProhibitionConditionMet(
   const source = findCardInstance(state, prohibition.sourceCardInstanceId);
   if (source && isCardNegated(source, state, cardDb)) return false;
 
+  return isProhibitionConditionAndDurationMet(prohibition, state, cardDb);
+}
+
+/** Conditions on an already-resolved restriction still apply, but later source
+ * negation cannot invalidate that resolved effect (rule 8-2-3).
+ */
+function isProhibitionConditionAndDurationMet(
+  prohibition: RuntimeProhibition,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
   const ctx: ConditionContext = {
     sourceCardInstanceId: prohibition.sourceCardInstanceId,
     controller: prohibition.controller,
@@ -1094,7 +1105,12 @@ export function isDonActivationProhibitedByEffect(
   return state.prohibitions.some((p) => {
     if (p.prohibitionType !== "CANNOT_SET_DON_ACTIVE" || p.controller !== player) return false;
     if (p.usesRemaining !== null && p.usesRemaining <= 0) return false;
-    if (!isProhibitionConditionMet(p, state, cardDb) || isProhibitionOverridden(p, state, cardDb)) return false;
+    // APPLY_PROHIBITION records use the empty block id; registered permanent
+    // restrictions retain their authored block id and pause with their source.
+    const conditionsMet = p.sourceEffectBlockId === ""
+      ? isProhibitionConditionAndDurationMet(p, state, cardDb)
+      : isProhibitionConditionMet(p, state, cardDb);
+    if (!conditionsMet || isProhibitionOverridden(p, state, cardDb)) return false;
     // Both existing authored spellings describe the causing card category.
     if (p.scope?.cause !== undefined && p.scope.cause !== "BY_CHARACTER_EFFECT") return false;
     if (p.scope?.card_type_filter !== undefined && p.scope.card_type_filter !== "CHARACTER") return false;

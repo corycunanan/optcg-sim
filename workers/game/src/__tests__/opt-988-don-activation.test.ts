@@ -3,6 +3,7 @@ import { rig, synSchema } from "./opt-960-rig.js";
 import { executeSetDonActive } from "../engine/effect-resolver/actions/don.js";
 import { executeAdvancePhaseWork } from "../engine/phases.js";
 import { getEffectSchema, validateEffectSchema } from "../engine/schema-registry.js";
+import { isCardNegated } from "../engine/modifiers.js";
 import { type Action } from "../engine/effect-types.js";
 
 const setDon = { type: "SET_DON_ACTIVE", params: { amount: 1 } } as const;
@@ -127,4 +128,52 @@ describe("OPT-988 schema cause validation", () => {
     const schema = synSchema("SYN", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "APPLY_PROHIBITION", params: { prohibition_type: "CANNOT_SET_DON_ACTIVE", scope: { cause: "BY_EFFECT" } } } } } as Action] }]);
     expect(validateEffectSchema(schema).some(e => e.includes("unsupported CANNOT_SET_DON_ACTIVE scope.cause"))).toBe(true);
   });
+});
+
+
+describe.each(["EB04-016", "OP10-030"])("OPT-1004 resolved %s restriction survives source negation", id => {
+  it.each(["Roger", "flag"] as const)("keeps ST24-005 blocked after %s negates the resolved restriction's source", negation => {
+    const r = rig();
+    const source = r.put(id, 0, "CHARACTER");
+    r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+    const block = getEffectSchema(id)!.effects.find(b => b.category === "activate")!;
+    r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: block.id });
+    r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:0" });
+    const prohibition = r.state.prohibitions.find(p => p.prohibitionType === "CANNOT_SET_DON_ACTIVE")!;
+    expect(prohibition.sourceEffectBlockId).toBe("");
+    const leader = r.state.players[0].leader;
+    r.db.set(leader.cardId, { ...r.db.get(leader.cardId)!, types: ["Supernovas"] });
+    const drake = r.put("ST24-005", 0, "HAND", { data: { cost: 0 } });
+    r.act({ type: "PLAY_CARD", cardInstanceId: drake.instanceId });
+    expect(r.state.scheduledActions).toHaveLength(1);
+    if (negation === "Roger") {
+      const roger = r.put("OP13-064", 0, "HAND", { data: { cost: 0, types: ["Roger Pirates"] } });
+      r.act({ type: "PLAY_CARD", cardInstanceId: roger.instanceId });
+    } else {
+      const negator = r.put("SYN-negator", 0, "CHARACTER", { schema: synSchema("SYN-negator", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "NEGATE_EFFECTS", target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 } } }] }]) });
+      r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: negator.instanceId, effectId: "main" });
+      r.select([source.instanceId]);
+    }
+    expect(r.state.pendingPrompt).toBeNull();
+    expect(isCardNegated(source, r.state, r.db)).toBe(true);
+    const before = r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE").length;
+    r.act({ type: "ADVANCE_PHASE" });
+    if (r.state.pendingPrompt) r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+    expect(r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(before);
+  });
+});
+
+it("a registered permanent DON restriction still pauses with its negated source", () => {
+  const r = rig();
+  r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+  const source = r.put("SYN-permanent-don", 0, "CHARACTER", { schema: synSchema("SYN-permanent-don", [{ id: "permanent-restriction", category: "permanent", prohibitions: [{ type: "CANNOT_SET_DON_ACTIVE", scope: { cause: "BY_CHARACTER_EFFECT" } }] }]) });
+  const activator = r.put("SYN-exempt-don", 0, "CHARACTER", { data: { types: ["Roger Pirates"] }, schema: synSchema("SYN-exempt-don", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [setDon] }]) });
+  expect(r.state.prohibitions[0].sourceEffectBlockId).toBe("permanent-restriction");
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: activator.instanceId, effectId: "main" });
+  expect(r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(0);
+  r.put("OP13-064", 0, "CHARACTER", { data: { types: ["Roger Pirates"] } });
+  expect(isCardNegated(source, r.state, r.db)).toBe(true);
+  expect(isCardNegated(activator, r.state, r.db)).toBe(false);
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: activator.instanceId, effectId: "main" });
+  expect(r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(1);
 });
