@@ -90,7 +90,7 @@ for (const prohibited of [false, true]) it(`mode8 initial full suffix and origin
   expect(result.valid).toBe(false); expect(result.error).toBe("Cost cannot be paid"); expect(r.state).toEqual(before);
 });
 
-for (const schemaVersion of [6, 7, 9]) it(`mode8 cannot be inferred or downgraded from declared schema${schemaVersion}`, () => {
+for (const schemaVersion of [6, 7, 10]) it(`mode8 cannot be inferred or downgraded from declared schema${schemaVersion}`, () => {
   const r = fixture(8); const raw = { ...r.state, schemaVersion };
-  expect(() => convertPersistedGameState(raw, "state")).toThrow(schemaVersion === 9 ? /version/i : /requires schemaVersion 8/);
+  expect(() => convertPersistedGameState(raw, "state")).toThrow(schemaVersion === 10 ? /version/i : /requires schemaVersion 8/);
 });
