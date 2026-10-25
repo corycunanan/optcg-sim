@@ -865,3 +865,26 @@ replay, strict validation, or a verified reader-capable rollback floor. Stage2
 must remain disabled until the coordinator records the deployed stage1 commit
 and names that reader as the rollback floor. A build that reads only1–8 cannot
 be a rollback target after a schema9 writer runs.
+
+The isolated writer candidate is
+`3bac57f3679bc837e90ad12841bce7321e0f7789`, based on reader draft
+`66df1d56f4768790c8f8f9eaaab0623c33abd251`. Its immutable corpus is
+`workers/game/src/__tests__/fixtures/opt-1004-scheduled-writer/`: the manifest
+pins ten scenarios and 74 actual GameSession/repository saved boundaries,
+complete candidate source hashes, compressed payload, archived generator and
+full writer patch. Cases include ST24-005 before/after source departure, both
+restrictions imposed after scheduling, an End Phase park and reply, allowed
+Leader/Event origins, existing8 queued On Play/TRASH_SELF/scheduling, COST
+transaction/expected roots and mixed8/9 undo. The reader suite loads all boundaries
+write-free and replays the suffix after the last actual writer-created
+obligation through GameSession against the writer's exact saved output. Reader
+creation of new provenance is deliberately disabled in this release.
+
+Regenerate only from that isolated candidate using
+`OPT1004_WRITER_CAPTURE_DIR=/absolute/new/output-dir pnpm --filter optcg-game exec vitest run src/__tests__/opt-1004-writer-producer.test.ts`.
+The frozen compressed payload SHA256 is
+`c9dddfc3529bcef949e3e3febce37b3b5a3364adfb0a21fcd5eda9a9f1efafe8`;
+the candidate manifest SHA256 is
+`1a162976674f7094ecb3e3cd7a70c5af5b77a3c169b540ff48aead18485e57c9`.
+The generator/source archives are non-executable evidence. They do not enable
+the future writer on the reader branch.
