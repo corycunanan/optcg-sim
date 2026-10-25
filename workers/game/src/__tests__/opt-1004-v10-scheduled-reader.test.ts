@@ -211,13 +211,14 @@ it.each([8, 9])("source%s rejects field capability and scheduled metadata indepe
   scheduled.schemaVersion = version; delete scheduled.fieldTrashSemanticsVersion;
   expect(() => convertPersistedGameState(scheduled, "state")).toThrow(/sourceCardSnapshot requires schemaVersion 10/);
 });
-it.each([8, 9] as const)("ordinary source%s scheduling retains its envelope and omits scheduled origin", version => {
+it.each([8, 9] as const)("writer source%s scheduling captures source and preserves independent modes", version => {
   const r = rig(); r.state.schemaVersion = version;
   const source = r.put("SYN-old-scheduler", 0, "CHARACTER", { schema: synSchema("SYN-old-scheduler", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "DRAW", params: { amount: 1 } } } }] }]) });
   r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "main" });
-  expect(r.state.schemaVersion).toBe(version);
-  expect(r.state.scheduledActions[0].sourceCardSnapshot).toBeUndefined();
-  expect(r.state.fieldTrashSemanticsVersion).toBeUndefined();
+  expect(r.state.schemaVersion).toBe(10);
+  expect(r.state.scheduledActions[0].sourceCardSnapshot).toMatchObject({ instanceId: source.instanceId, cardId: source.cardId, controller: source.controller });
+  expect(r.state.fieldTrashSemanticsVersion).toBe(version === 9 ? 9 : 8);
+  expect(r.state.costSemanticsVersion).toBe(8);
 });
 
 it.each([8, 9, 10] as const)("source%s COST roots reject independent capability overrides", version => {

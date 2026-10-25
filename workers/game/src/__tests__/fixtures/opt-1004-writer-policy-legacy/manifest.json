@@ -1,0 +1,8 @@
+{
+  "producer": "67cbbde3622fb13600084e1f73edc67e15dff910",
+  "reason": "Actual old producer saved after source departure and before End; no removed or rewritten provenance. Preserves accepted unknown-origin limitation independently from newly captured writer scheduling.",
+  "files": {
+    "cases.json.gz": "37b2ac4573e28e59f981d40fe21c2ce0a69a751d563fefc3c9f8aabf8504b66b",
+    "producer.test-source": "39fa6f3d5f7fc48d62c0a9f90e7357147689f510aea3de909d2a04d0abcfb86f"
+  }
+}

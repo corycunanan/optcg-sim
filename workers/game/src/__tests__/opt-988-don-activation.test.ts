@@ -54,7 +54,7 @@ describe.each(["EB04-016", "OP10-030"])("OPT-988 authored %s", id => {
     expect(r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(before);
   });
 
-  it("records the legacy missing-origin limitation after ST24-005 leaves the field", () => {
+  it("retains newly captured ST24-005 origin after it leaves the field", () => {
     const { r } = fixture(id);
     const leader = r.state.players[0].leader;
     r.db.set(leader.cardId, { ...r.db.get(leader.cardId)!, types: ["Supernovas"] });
@@ -68,7 +68,7 @@ describe.each(["EB04-016", "OP10-030"])("OPT-988 authored %s", id => {
     const before = r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE").length;
     r.act({ type: "ADVANCE_PHASE" });
     if (r.state.pendingPrompt) r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
-    expect(r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(before + 1);
+    expect(r.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(before);
   });
 
   it("allows the real OP10-001 Leader effect (FAQ)", () => {

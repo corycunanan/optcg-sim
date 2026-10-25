@@ -1,0 +1,41 @@
+import { expect, it } from "vitest";
+import { writeFileSync } from "node:fs";
+import { rig, synSchema } from "./opt-960-rig.js";
+import { getEffectSchema } from "../engine/schema-registry.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
+const setDon = { type: "SET_DON_ACTIVE", params: { amount: 1 } } as const;
+function fixture(id: string) {
+  const r = rig();
+  const source = r.put(id, 0, "CHARACTER");
+  r.state.players[0].donCostArea.forEach(d => d.state = "RESTED");
+  const block = getEffectSchema(id)!.effects.find(b => b.category === "activate")!;
+  const activate = () => {
+    r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: block.id });
+    if (r.state.pendingPrompt) r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+  };
+  activate();
+  expect(r.state.players[0].donCostArea.filter(d => d.state === "ACTIVE")).toHaveLength(1);
+  expect(r.state.prohibitions.some(p => p.prohibitionType === "CANNOT_SET_DON_ACTIVE")).toBe(true);
+  return { r, source, activate };
+}
+
+it("captures actual main67cbb departed ST24 legacy obligations", () => {
+ const cases: Record<string, unknown> = {};
+ for (const id of ["EB04-016", "OP10-030"]) {
+    const { r } = fixture(id);
+    const leader = r.state.players[0].leader;
+    r.db.set(leader.cardId, { ...r.db.get(leader.cardId)!, types: ["Supernovas"] });
+    const drake = r.put("ST24-005", 0, "HAND", { data: { cost: 0 } });
+    r.act({ type: "PLAY_CARD", cardInstanceId: drake.instanceId });
+    const fieldDrake = r.state.players[0].characters.find(c => c?.cardId === "ST24-005")!;
+    const remover = r.put("SYN-bounce", 0, "CHARACTER", { schema: synSchema("SYN-bounce", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "RETURN_TO_HAND", target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 } } }] }]) });
+    r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: remover.instanceId, effectId: "main" });
+    r.select([fieldDrake.instanceId]);
+    expect(r.state.players[0].characters.some(c => c?.instanceId === fieldDrake.instanceId)).toBe(false);
+
+    expect(r.state.schemaVersion).toBe(8);
+    expect(r.state.scheduledActions[0].sourceCardSnapshot).toBeUndefined();
+    cases[id] = { state: toPersistedGameState(r.state), cardDb: Object.fromEntries(r.db) };
+ }
+ writeFileSync("/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/opt1004-writer-policy-legacy.json", JSON.stringify({producer: "67cbbde3622fb13600084e1f73edc67e15dff910", cases}, null, 2)+"\n");
+});

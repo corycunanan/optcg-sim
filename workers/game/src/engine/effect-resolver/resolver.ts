@@ -1,3 +1,4 @@
+import { prepareResumeProvenance, settleResumeProvenance } from "./resume-provenance.js";
 import { drainPendingWork } from "../pending-work-drain.js";
 import {
   createEffectExecutionScope, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
@@ -385,6 +386,16 @@ export function resolveEffect(
 
 /** Execute one effect body and report its children to the common drain. */
 export function resolveEffectWork(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
+  const before = args[0];
+  const prepared = prepareResumeProvenance(before, args[2], [], args[1].actions ?? []);
+  args[0] = prepared.state;
+  const result = resolveEffectWorkCore(...args);
+  const settled = settleResumeProvenance(before, prepared.state, { ...result,
+    kind: isGameTerminated(result.state) ? "terminal" : result.pendingPrompt ? "waiting" : "completed" });
+  return { ...result, state: settled.state };
+}
+
+function resolveEffectWorkCore(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
   if (triggerExecutionOwner(args[0])) return resolveEffectCore(...args);
   const initialState = args[0];
   args[0] = createEffectExecutionScope(initialState, args[2], args[3]);

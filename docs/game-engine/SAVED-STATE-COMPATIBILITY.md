@@ -1067,3 +1067,36 @@ source remains an archive, not the final enablement commit. Defaults8,
 producer-only scheduling activation and verified deployed reader rollback-floor
 requirements are unchanged. OPT-954 and unrelated prohibition debt remain out of
 scope under the user's bounded OPT-910 prerequisite approval.
+
+### Producer-only scheduled-origin writer after verified reader (OPT-1004)
+
+The enabled scheduling writer retains new-game/default schema8 and explicit
+cost mode8. It activates schema10 only at a new scheduling-capable effect
+activation or accepted scheduling-capable COST/ACTION continuation, before
+later destructive payment or pauses can erase proven source evidence. Explicit8
+and9 require recorded costSemanticsVersion6|7|8 and become10/field8 or10/field9
+respectively; existing10 retains its recorded capabilities. Raw engine callers
+without that provenance do not invent it. Delivered field-trash advancement
+10/field8→10/field9 retains10 and scheduled origin. No load-time scheduling
+promotion or cost migration is introduced.
+
+Rejected, waiting/no-op and abandoned work do not publish tentative promotion
+or origin refs. A genuine advancing THEN suffix, fully paid progress, or
+committed scheduling followed by terminal DRAW retains its accepted result.
+Exact full source/typed identity fallback, queued departure eligibility,
+conditions/expiry, resolved modifier/prohibition lifetime (including OPT-910),
+legacy unknown-obligation behavior and the synthetic-only exception are the
+verified reader contracts above, unchanged by this two-file activation delta.
+
+The minimum rollback floor after any10 write is the deployed reader PR790 merge
+`127631dc1c67411e04062d45803c7bf2a0b680b0`, whose complete tree equals reviewed
+`432061c101a691772d446189852cafff9e9123e0`. Workers deployment40162744972,
+game job121077670523, deployed version
+`8c3509d3-7407-4ea7-8665-ad68cc3813b1`; post-CI40162744953 and both schema
+sync jobs succeeded. Earlier readers without the complete schema10 provenance
+and resolved-output fixes are not rollback targets. The coordinator verified
+this floor before writer assembly; final writer CI/deployment gates remain
+separate from these reader receipts. No production capture or historical repair
+is claimed. The reviewed046 archives and all earlier producer bytes remain
+immutable; this delivery inherits the landed reader and exact reviewed activation
+and test-policy patches rather than changing their semantic contract.
