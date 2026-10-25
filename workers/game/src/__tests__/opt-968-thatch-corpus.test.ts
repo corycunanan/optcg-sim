@@ -1,3 +1,5 @@
+import { assertStateEnvelope, THATCH_TRASH_REPLY } from "./opt-1006-envelope-expectations.js";
+import { runtime, memory } from "./native7-producer-support.js";
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -136,17 +138,33 @@ it.skipIf(captureMode)("pinned Thatch corpus is complete and unchanged", () => {
 describe.skipIf(corpus.scenarios.length === 0)("OPT-968 alias-reader actual writer corpus", () => {
   for (const scenario of corpus.scenarios) for (const [index, captured] of scenario.cases.entries()) for (const mode of ["live", "undo"] as const) {
     it(`${scenario.name} / pause ${index} / ${mode}: exact later states, prompts, events, allocator identities`, async () => {
+      const floor = await runtime(process.env.OPT1006_WRITER_FLOOR_ROOT);
+      for (const branch of ["writer", ...(process.env.OPT1006_WRITER_FLOOR_ROOT ? ["deployed-reader"] : [])]) {
+      const rt = branch === "writer" ? await runtime() : floor;
       const storage = new MemorySessionStorage(); await storage.put(structuredClone(captured.stored));
-      let loaded = (await new SessionRepository(storage, options).load())!;
+      let loaded = (await new rt.SessionRepository(storage, options).load())!;
       if (mode === "undo") loaded = { ...loaded, state: loaded.undoHistory[0] };
+      let rollback: typeof loaded | undefined;
+      const trashReply = THATCH_TRASH_REPLY[scenario.name]?.[index];
       for (const [i, action] of captured.replies.entries()) {
-        const result = resumePromptLifecycle(loaded.state, action, loaded.cardDb, { drainPregame: (s) => s, advanceStartOfTurn: (s) => s });
+        const result = rt.resumePromptLifecycle(loaded.state, action, loaded.cardDb, { drainPregame: (s) => s, advanceStartOfTurn: (s) => s });
         expect(result.responseRejected).toBeFalsy();
-        const next = new MemorySessionStorage(); await new SessionRepository(next, options).save({ ...loaded, state: result.state });
-        loaded = (await new SessionRepository(next, options).load())!;
-        expect(json(toPersistedGameState(loaded.state))).toEqual(writerEnvelope(captured.expected[i]));
+        const next = new MemorySessionStorage(); await new rt.SessionRepository(next, options).save({ ...loaded, state: result.state });
+        loaded = (await new rt.SessionRepository(next, options).load())!;
+        const version = branch === "writer" && trashReply !== undefined && i >= trashReply ? 9 : 8;
+        assertStateEnvelope(json(toPersistedGameState(loaded.state)), writerEnvelope(captured.expected[i]), version);
+        if (version === 9) {
+          if (rollback) {
+            const floorResult = floor.resumePromptLifecycle(rollback.state, action, rollback.cardDb, { drainPregame: s => s, advanceStartOfTurn: s => s });
+            expect(floorResult.responseRejected).toBeFalsy();
+            const savedFloor = memory(floor); await savedFloor.repo.save({ ...rollback, state: floorResult.state });
+            expect(savedFloor.values).toEqual(Object.fromEntries(next.data));
+          }
+          rollback = (await memory(floor, Object.fromEntries(next.data)).repo.load())!;
+        }
       }
       expect(loaded.state.pendingPrompt).toBeNull(); expect(loaded.state.effectStack).toEqual([]);
+      }
     });
   }
 });

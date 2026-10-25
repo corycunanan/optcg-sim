@@ -388,7 +388,13 @@ export function executeTrashCard(
 
   const sourceSnapshot = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF);
   const causingSource = effectSourceIdentity(state, sourceCardInstanceId, cardDb, sourceSnapshot?.sourceIdentity ?? sourceSnapshot?.sourceCardSnapshot);
-  if (state.schemaVersion === 9 && targetIds.some(id => findCardInstance(state, id)?.zone === "CHARACTER")) {
+  // Only an explicit native8 provenance can publish the new reader capability.
+  // Raw historical engine callers retain their existing semantics; session
+  // ingress owns their validated promotion and cost-mode provenance.
+  const nativeFieldTrash = state.schemaVersion === 9 || (state.schemaVersion === 8 &&
+    (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8));
+  if (nativeFieldTrash && targetIds.some(id => findCardInstance(state, id)?.zone === "CHARACTER")) {
+    state = { ...state, schemaVersion: 9 };
     const attemptableIds = filterProhibitedTargets(state, targetIds, "TRASH", "EFFECT", causingController, sourceCardInstanceId, cardDb);
     const batch = processBatchReplacements(state, attemptableIds, "TRASH_CARD", ["WOULD_BE_REMOVED_FROM_FIELD", "WOULD_LEAVE_FIELD"], "effect", causingController, cardDb, services, undefined, causingSource);
     if (batch.pendingPrompt) return { state: batch.state, events: batch.events, succeeded: false, pendingPrompt: batch.pendingPrompt };

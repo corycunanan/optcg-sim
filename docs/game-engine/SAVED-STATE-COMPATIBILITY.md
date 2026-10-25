@@ -842,3 +842,23 @@ to05d after9 writes is unsupported. The future writer PR must pin the actual
 verified reader SHA as its rollback floor. See the [field-trash reader contract](FIELD-TRASH-READER-V9.md)
 for ownership, producer corpus, original writer-byte comparison, strict source
 validation, synthetic-evidence exception and retained OPT-958 policy.
+
+
+### Field-trash producer9 after verified reader (OPT-1006 / OPT-1001)
+
+The final writer enables the existing9 field-Character trash route from explicit
+native8/costSemanticsVersion6|7|8 only, with an immutable scalar promotion before
+its replacement scan. Source9 remains9 after completion; synchronous/no-match
+field consequences also promote. Hand-only/zero-selection actions and ordinary
+setup stay8; setup retains mode8. Raw historical direct engine callers are not
+migrated at the trash site. Repository/Coordinator shared validated ingress still
+owns historical6/7→8/mode7 before gameplay, and existing explicit modes are retained.
+
+Minimum rollback floor: deployed PR788 merge
+`d8309e70fef64a133ce19d8a2bd327bb625e56fb`, worker
+`bd251100-440e-40f8-b381-302f0a3db6f2`. Actual final writer output is loaded and
+completed by that floor through Repository/Coordinator/GameSession, with exact
+state/event/ID comparisons. The historical reader corpus stays immutable; new
+canonical writer output has a separate manifest. See the updated
+[field-trash contract](FIELD-TRASH-READER-V9.md) for the six non-contiguous old8
+choice scripts,22 exact native9 suffixes, producer policy and retained OPT-958 debt.

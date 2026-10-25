@@ -419,8 +419,8 @@ describe("field TRASH_CARD route inventory (pre-existing OPT-1001 gap)", () => {
     });
     return { r, target };
   }
-  it.fails(
-    "KNOWN GAP OPT-1001: Koby's printed opponent-removal replacement must be offered for field trash",
+  it(
+    "OPT-1001: Koby's printed opponent-removal replacement must be offered for field trash",
     () => {
       const { r } = navyRemoval("TRASH_CARD", true);
       expect(r.promptType()).toBe("OPTIONAL_EFFECT");
@@ -518,7 +518,7 @@ for (const staleAtReply of [false, true]) it(`OPT-922 competing resource recheck
   expect(r.state.eventLog.filter((entry) => entry.type === "CARD_KO")).toHaveLength(staleAtReply ? 2 : 1);
 });
 
-it.fails("KNOWN GAP OPT-1001: authored OP09-009 Beckman field trash must offer OP11-001 Koby's Navy removal protection", () => {
+it("OPT-1001: authored OP09-009 Beckman field trash must offer OP11-001 Koby's Navy removal protection", () => {
   const r = setup(); r.leader(0, "OP11-001");
   const navy = r.put("OPT968-BECKMAN-NAVY", 0, "CHARACTER", { data: { power: 5000, types: ["Navy"] } });
   for (let i = 0; i < 3; i++) r.put(`OPT968-BECKMAN-TRASH-${i}`, 0, "TRASH");
