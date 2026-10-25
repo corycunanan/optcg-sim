@@ -1,0 +1,9 @@
+{
+  "files": {
+    "sources/game-state-schema.ts.txt": "d9d1f7a12e976f953378bda9351e8336faa3ca426419d09de71b9a3a41375e88",
+    "sources/opt-1004-writer-producer.test-source": "1b057af9e4e374b692e029ccae01f95c20004a9288189b468831a3d855e8b7e9",
+    "sources/resolver.ts.txt": "670963c34f858cc58e717b51c82519f00845fcbc812e8f8172b08476f9531060",
+    "sources/setup.ts.txt": "663ba715631381a6bbbcc68095ede72aa3c7791e764a0c93c5f3671442b25587",
+    "candidate.patch": "d9a3c2d606e1549ca3c70cbc5a8f7615942b3c029e65427c158bb67208f8fe59"
+  }
+}

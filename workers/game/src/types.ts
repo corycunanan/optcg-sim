@@ -185,7 +185,7 @@ export const END_PHASE_STEPS = ["TURN_PLAYER", "NON_TURN_PLAYER"] as const;
 export type EndPhaseStep = (typeof END_PHASE_STEPS)[number];
 
 export interface EndPhaseScheduledAction {
-  /** Immutable origin of already-activated work, schema 9+. */
+  /** Immutable origin of already-activated work, schema 10+. */
   sourceCardSnapshot?: CardInstance;
   action: import("./engine/effect-types.js").Action;
   controller: 0 | 1;

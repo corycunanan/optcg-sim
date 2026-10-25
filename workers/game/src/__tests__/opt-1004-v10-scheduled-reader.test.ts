@@ -217,3 +217,23 @@ it.each([8, 9] as const)("ordinary source%s scheduling retains its envelope and 
   expect(r.state.scheduledActions[0].sourceCardSnapshot).toBeUndefined();
   expect(r.state.fieldTrashSemanticsVersion).toBeUndefined();
 });
+
+it.each([8, 9, 10] as const)("source%s COST roots reject independent capability overrides", version => {
+  const r = rig(); r.state.schemaVersion = version;
+  if (version === 10) r.state.fieldTrashSemanticsVersion = 8;
+  const payer = r.put("SYN-capability-root", 0, "CHARACTER", { schema: synSchema("SYN-capability-root", [{ id: "main", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "REST_DON", amount: 1 }, { type: "DON_MINUS", amount: 1 }], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
+  r.act({ type: "ACTIVATE_EFFECT", cardInstanceId: payer.instanceId, effectId: "main" });
+  const good = wire(r.state);
+  expect(() => convertPersistedGameState(good, "state")).not.toThrow();
+  for (const key of ["costTransactionState", "costExpectedRoot"] as const) {
+    const bad = structuredClone(good);
+    const frame = bad.effectStack.find((f: { costTransactionState?: unknown; costExpectedRoot?: unknown }) => f.costTransactionState && f.costExpectedRoot);
+    expect(frame).toBeDefined();
+    frame[key].fieldTrashSemanticsVersion = 9;
+    expect(() => convertPersistedGameState(bad, "state")).toThrow(/fieldTrashSemanticsVersion/);
+  }
+});
+it.each([undefined, null, 5, 9, "8"])("native10 rejects invalid cost mode %s independently of valid field mode", mode => {
+  const raw = { ...wire(rig().state), schemaVersion: 10, fieldTrashSemanticsVersion: 8, costSemanticsVersion: mode };
+  expect(() => convertPersistedGameState(raw, "state")).toThrow(/native10 requires explicit costSemanticsVersion/);
+});
