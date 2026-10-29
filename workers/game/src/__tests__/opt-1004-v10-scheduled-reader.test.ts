@@ -36,7 +36,7 @@ const wire = (state: GameState) => JSON.parse(JSON.stringify(toPersistedGameStat
 describe("OPT-1004 schema10 reader and execution", () => {
   it("keeps the production writer8 while accepting10, never changes cost semantics", () => {
     expect(GAME_STATE_SCHEMA_VERSION).toBe(8);
-    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(10);
+    expect(LATEST_READABLE_GAME_STATE_SCHEMA_VERSION).toBe(11);
     for (const costSemanticsVersion of [6, 7, 8] as const) {
       const { r } = scheduledFixture();
       r.state.costSemanticsVersion = costSemanticsVersion;

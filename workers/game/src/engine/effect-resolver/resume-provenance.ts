@@ -24,7 +24,7 @@ export function prepareResumeProvenance(
       (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8)) {
     state = { ...state, schemaVersion: 10, fieldTrashSemanticsVersion: state.schemaVersion === 9 ? 9 : 8 };
   }
-  if (state.schemaVersion !== 10) return { state, refs };
+  if ((state.schemaVersion !== 10 && state.schemaVersion !== 11)) return { state, refs };
   const original = refs.find(([key]) => key === EFFECT_SOURCE_SNAPSHOT_REF)?.[1];
   if (!original || original.sourceCardSnapshot) return { state, refs };
   const identity = original.sourceIdentity;
@@ -75,7 +75,7 @@ export function settleResumeProvenance(
   }) };
   const fieldAdvanced = prepared.fieldTrashSemanticsVersion === 8 && result.state.fieldTrashSemanticsVersion === 9;
   if (fieldAdvanced) {
-    if (before.schemaVersion === 10) restored.fieldTrashSemanticsVersion = 9;
+    if ((before.schemaVersion === 10 || before.schemaVersion === 11)) restored.fieldTrashSemanticsVersion = 9;
     else { restored.schemaVersion = 9; delete restored.fieldTrashSemanticsVersion; }
   } else if (before.fieldTrashSemanticsVersion === undefined) delete restored.fieldTrashSemanticsVersion;
   else restored.fieldTrashSemanticsVersion = before.fieldTrashSemanticsVersion;

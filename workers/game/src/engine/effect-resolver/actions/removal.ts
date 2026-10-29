@@ -393,11 +393,11 @@ export function executeTrashCard(
   // A scheduled10 graph upgrades only the independent trash capability here;
   // its envelope, scheduled provenance and explicit cost mode remain intact.
   const fieldMode = fieldTrashSemanticsVersion(state);
-  const nativeFieldTrash = state.schemaVersion === 10 || fieldMode === 9 ||
+  const nativeFieldTrash = (state.schemaVersion === 10 || state.schemaVersion === 11) || fieldMode === 9 ||
     (state.schemaVersion === 8 && (state.costSemanticsVersion === 6 ||
       state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8));
   if (nativeFieldTrash && targetIds.some(id => findCardInstance(state, id)?.zone === "CHARACTER")) {
-    state = state.schemaVersion === 10
+    state = (state.schemaVersion === 10 || state.schemaVersion === 11)
       ? { ...state, fieldTrashSemanticsVersion: 9 }
       : { ...state, schemaVersion: 9 };
     const attemptableIds = filterProhibitedTargets(state, targetIds, "TRASH", "EFFECT", causingController, sourceCardInstanceId, cardDb);

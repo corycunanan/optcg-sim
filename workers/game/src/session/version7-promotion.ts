@@ -24,7 +24,7 @@ function unansweredOfferMatches(state: GameState, frame: EffectStackFrame, index
 }
 
 export function promoteStateToVersion7(original: GameState, location: string, validate: ValidateState): GameState {
-  if (original.schemaVersion === 7 || original.schemaVersion === 8 || original.schemaVersion === 9 || original.schemaVersion === 10) return validate(original, location);
+  if (original.schemaVersion === 7 || original.schemaVersion === 8 || original.schemaVersion === 9 || (original.schemaVersion === 10 || original.schemaVersion === 11)) return validate(original, location);
   const state = structuredClone(original);
   for (const [index, frame] of state.effectStack.entries()) {
     if (frame.costReplacementAction === undefined && frame.costReplacementChecked !== true && frame.costReplacementResolution === undefined) continue;

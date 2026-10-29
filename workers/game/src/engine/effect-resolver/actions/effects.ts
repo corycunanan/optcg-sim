@@ -131,11 +131,11 @@ export function executeScheduleAction(
   // Loaded10 must preserve future work on rollback; ordinary8/9 remains
   // metadata-free until the scheduling writer's producer boundaries activate10.
   const provenance = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF);
-  const identity = state.schemaVersion === 10 && provenance?.sourceIdentity?.instanceId === sourceCardInstanceId
+  const identity = (state.schemaVersion === 10 || state.schemaVersion === 11) && provenance?.sourceIdentity?.instanceId === sourceCardInstanceId
     ? provenance.sourceIdentity : undefined;
   const reference = provenance?.sourceCardSnapshot;
   const candidate = reference?.instanceId === sourceCardInstanceId ? reference : findCardInstance(state, sourceCardInstanceId);
-  const source = state.schemaVersion === 10 && candidate && (!identity ||
+  const source = (state.schemaVersion === 10 || state.schemaVersion === 11) && candidate && (!identity ||
     candidate.cardId === identity.cardId && candidate.controller === identity.controller)
     ? candidate : undefined;
   const allocated = allocateEngineId(state, "scheduled-action");

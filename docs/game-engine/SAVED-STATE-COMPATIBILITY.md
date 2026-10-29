@@ -1100,3 +1100,40 @@ separate from these reader receipts. No production capture or historical repair
 is claimed. The reviewed046 archives and all earlier producer bytes remain
 immutable; this delivery inherits the landed reader and exact reviewed activation
 and test-policy patches rather than changing their semantic contract.
+
+### End Phase obligation-order reader11 (OPT-981)
+
+Reader11 accepts native envelopes with the existing explicit cost mode6|7|8 and
+field-trash mode8|9, retaining scheduled-origin and battle-completion semantics.
+It adds `phaseBoundaryContinuation.awaitingOrder?: true`: only a top END_PHASE
+frame in a turn/non-turn-player obligation step, holding at least two entries,
+may carry the marker. Its phase is AWAITING_PLAYER_CHOICE; its controller and
+pending prompt's respondingPlayer are the step owner. The PLAYER_CHOICE prompt
+names that exact frame and enumerates the remaining queue without a skip option.
+Unknown fields, false markers, wrong ownership/stage, mismatched choices and
+versions1–10 carrying the marker are rejected, on live states and undo snapshots.
+
+An imported11 reply consumes only the selected entry through the existing
+scheduled resolver. It uses the common rule checkpoint and event-reporting
+services before the shared drain advances any sibling or handoff. Prompted
+children retain publication debt through the existing event owner. Awaiting
+ordering frames remain waiting during an idle drain. Newly scheduled obligations
+for the same owner join its remaining queue before the next offer. Historical
+1–10 retain their existing collected-cohort behavior. Imported11 remains11 after
+completion, future scheduling, cost/trash work and undo/load/save.
+
+This is reader-only: default construction/writer remain8, and existing eligible
+producer transitions8→9 and8/9→10 remain unchanged. No ordinary producer enables11.
+The separate writer must promote at the End Phase ordering producer boundary
+before emitting a new marker, preserving prior explicit capabilities. Its
+rollback floor must be this exact reader-capable commit after authoritative
+worker deployment/version verification and local replay against that deployed
+source/build. There is no remote saved-state injection route. Merge alone is
+not deployment evidence; the writer remains disabled until the verified floor
+and actual writer-generated live/undo corpus are reviewed.
+
+See [the reader11 contract](audits/opt-981/reader11-contract.md) for the authored
+Maria/Rayleigh reproduction, the17-producer inventory, nested/watcher/terminal
+coverage, and the independent rule6-6-1-3 invalidation assessment. Those are
+synthetic engine fixtures, not captured production sessions or a claim that all
+possible authored pairs have been exhaustively played.

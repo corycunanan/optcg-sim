@@ -260,12 +260,36 @@ export function modifierAppliesToCard(
  * `isEffectConditionMet` path on the negation effect itself to avoid recursion
  * (and to prevent an attacker mutually-negating their way out of a negation).
  */
+// Synchronous query scopes include keyword/filter/condition and effective-stat
+// callbacks, not just direct aura-source traversal. Only explicitly identified
+// internal SET_POWER views share their parent's root; even independent shallow
+// state snapshots and different databases retain their own guard.
+const negationEvaluationRoots = new WeakMap<GameState, GameState>();
+interface NegationQueryContext {
+  state: GameState;
+  cardDb: Map<string, CardDataType> | undefined;
+  visiting: Set<string>;
+}
+const negationQueryContexts: NegationQueryContext[] = [];
+
 export function isCardNegated(
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>
 ): boolean {
-  return isCardNegatedWithGuard(card, state, cardDb, new Set());
+  const queryState = negationEvaluationRoots.get(state) ?? state;
+  const active = negationQueryContexts.find(context =>
+    context.state === queryState && context.cardDb === cardDb);
+  if (active) return isCardNegatedWithGuard(card, state, cardDb, active.visiting);
+  const context: NegationQueryContext = {
+    state: queryState, cardDb, visiting: new Set(),
+  };
+  negationQueryContexts.push(context);
+  try {
+    return isCardNegatedWithGuard(card, state, cardDb, context.visiting);
+  } finally {
+    negationQueryContexts.pop();
+  }
 }
 
 function isCardNegatedWithGuard(
@@ -292,6 +316,10 @@ function isCardNegatedWithGuard(
     }
     return true;
   }
+  // Accepted OPT-1008 apply-once policy: an in-progress card still exposes its
+  // pre-negation effects to the condition that is deciding that negation. This
+  // matches OPT-242 self-falsifying cost thresholds; it is not a general ordered
+  // solver for mutually dependent multi-source permanent effects.
   if (!cardDb || visiting.has(card.instanceId)) return false;
   visiting.add(card.instanceId);
   try {
@@ -333,9 +361,13 @@ function isEffectSourceNegated(
   // unproven historical rows retain the source gate; no provenance is inferred.
   if (effect.category === "auto" && effect.sourceEffectBlockId === "") return false;
   if (!effect.sourceCardInstanceId) return false;
-  const source = findCardInstance(state, effect.sourceCardInstanceId);
+  // SET_POWER excludes its own output only to test setter eligibility. Source
+  // negation still observes the real query root, including that output as a
+  // pre-negation witness under the apply-once contract.
+  const sourceState = negationEvaluationRoots.get(state) ?? state;
+  const source = findCardInstance(sourceState, effect.sourceCardInstanceId);
   if (!source) return false;
-  return isCardNegated(source, state, cardDb);
+  return isCardNegated(source, sourceState, cardDb);
 }
 
 /**
@@ -516,6 +548,10 @@ export function getEffectiveBasePower(
           ) };
         }),
       };
+      // This fresh eligibility-only view belongs to its parent's query. A
+      // WeakMap alias keeps unrelated shallow snapshots isolated and does not
+      // retain the temporary view after evaluation.
+      negationEvaluationRoots.set(evaluationState, negationEvaluationRoots.get(state) ?? state);
       if (!modifierAppliesToCard(effect, mod, card, evaluationState, cardDb)) continue;
       if (!isModifierConditionMet(effect, mod, evaluationState, cardDb)) continue;
       const value = permanentModifierParam(
