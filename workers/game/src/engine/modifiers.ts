@@ -361,9 +361,13 @@ function isEffectSourceNegated(
   // unproven historical rows retain the source gate; no provenance is inferred.
   if (effect.category === "auto" && effect.sourceEffectBlockId === "") return false;
   if (!effect.sourceCardInstanceId) return false;
-  const source = findCardInstance(state, effect.sourceCardInstanceId);
+  // SET_POWER excludes its own output only to test setter eligibility. Source
+  // negation still observes the real query root, including that output as a
+  // pre-negation witness under the apply-once contract.
+  const sourceState = negationEvaluationRoots.get(state) ?? state;
+  const source = findCardInstance(sourceState, effect.sourceCardInstanceId);
   if (!source) return false;
-  return isCardNegated(source, state, cardDb);
+  return isCardNegated(source, sourceState, cardDb);
 }
 
 /**

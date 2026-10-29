@@ -1,6 +1,7 @@
 # OPT-1008 — bounded conditional negation contract
 
-Base: `main` at `0bc10b57dc227c5d6c25e66356e7adf8ecc5778a`.
+Original assessment base: `main` at `0bc10b57dc227c5d6c25e66356e7adf8ecc5778a`.
+Integrated review base: `main` at `0d902815eec39da26ecb46fbc5b294e0983246e5`.
 The initial assessment/reproduction was committed as 265fde08. On 2026-10-28 the
 user accepted **apply-once semantics for self-falsifying conditional permanent
 negation, matching the existing OPT-242 cost precedent**, with mutually dependent
@@ -10,7 +11,7 @@ card-specific Bandai FAQ or a general fixed-point solution.
 
 ## Independent expectations and scope
 
-Rules 8-1-3-3 and8-1-3-3-2 require permanent effects to be valid and conditioned.
+Rules 8-1-3-3 and 8-1-3-3-2 require permanent effects to be valid and conditioned.
 Rule 8-1-3-3-5 specifies turn-player then non-turn-player processing, player choice
 within each group, and repetition if application changes the state. Its sequential
 processing is not a simultaneous Boolean fixed-point equation. The user-approved
@@ -28,11 +29,15 @@ accepted policy. The test repeats these public entries to detect entry-order or
 stale-result errors. Additional tests cover target keyword filtering and effective
 power/cost conditions re-entering source-negation queries.
 
-SET_POWER already evaluates its own eligibility against a shallow state view
-excluding its own setting. Its numeric read can therefore retain the setter when
-that exclusion removes a synthetic negation threshold witness. This change bounds
-that callback too but preserves the separate numeric self-exclusion contract;
-it does not claim a universal shared value across differently defined read views.
+SET_POWER evaluates its own target and condition eligibility against a shallow
+state view excluding its own setting. Its source-negation query observes the real
+root state instead: the setter's pre-negation output can witness a conditional
+negation, which applies once and suppresses that setter. Thus a printed 4000 ally
+with its own 5000 setter and a synthetic base-power-at-least-5000 negation condition
+reports negated true and effective power 4000, regardless of query order. The
+setter's own eligibility still cannot bootstrap from its own output. Existing
+SET_POWER precedence, self-exclusion and authored base-power controls remain in
+the focused suite; this does not redefine numeric layering.
 
 Rule 8-2-3 preserves already-resolved effects. The existing resolved-flag loop still
 precedes the permanent-aura visiting guard. Authored OP13-064 remains unconditional
@@ -90,8 +95,11 @@ reentry-false can differ from player-chosen sequential processing. The existing
 source-only fallback already shares that limitation. This change does not build
 an ordered processor, add player choice, broaden schema admission, or emit a new
 runtime exception. Cyclic conditions on resolved NEGATE_EFFECTS_FLAG durations
-are outside this permanent-aura contract; their existing flag-first behavior is
-preserved, not claimed to be a general cycle solver.
+are outside this permanent-aura contract. A resolved flag whose WHILE_CONDITION
+probes its own effective keyword still overflows because flag evaluation precedes
+the visiting guard. This is pre-existing and has no authored producer; it needs a
+separate follow-up defining resolved-duration cycle semantics before changing the
+flag-first contract. No runtime fix for that route is included here.
 
 Follow-up: a separate ordered 8-1-3-3-5 processor must specify mutually dependent
 multi-source outcomes and choices. Any asynchronous query API must replace this

@@ -73,11 +73,31 @@ describe("OPT-1008 bounded conditional permanent negation", () => {
     aura.conditions = { type: "CARD_ON_FIELD", controller: "SELF", filter: { card_type: "CHARACTER", ...filter } };
     expect(isCardNegated(ally, r.state, r.db)).toBe(true);
     const data = r.db.get(ally.cardId)!;
-    // SET_POWER separately excludes itself from eligibility. That existing
-    // query-local rule sees no5000 witness and retains the setter; do not
-    // redefine the numeric layer while bounding its negation callback.
-    expect(getEffectivePower(ally, data, r.state, r.db)).toBe(modifier.type === "SET_POWER" ? 5000 : 4000);
+    expect(getEffectivePower(ally, data, r.state, r.db)).toBe(4000);
     expect(getEffectiveCostForRead(ally, data, r.state, r.db)).toBe(3);
+  });
+
+  it("reads SET_POWER source negation from the root even when power is queried first", () => {
+    const { r, roger, ally, aura } = fixture({ type: "SET_POWER", params: { value: 5000 } });
+    aura.conditions = { type: "CARD_ON_FIELD", controller: "SELF", filter: { card_type: "CHARACTER", base_power_min: 5000 } };
+    const data = r.db.get(ally.cardId)!;
+    expect(getEffectivePower(ally, data, r.state, r.db)).toBe(4000);
+    expect(isCardNegated(ally, r.state, r.db)).toBe(true);
+    expect(getEffectivePower(ally, data, r.state, r.db)).toBe(4000);
+    r.state.players[0].characters = r.state.players[0].characters.map(c => c === roger ? null : c);
+    expect(getEffectivePower(ally, data, r.state, r.db)).toBe(5000);
+    expect(isCardNegated(ally, r.state, r.db)).toBe(false);
+  });
+
+  it("still excludes SET_POWER's own output from its condition eligibility", () => {
+    const { r, ally, aura } = fixture({ type: "SET_POWER", params: { value: 5000 } });
+    r.state.activeEffects = r.state.activeEffects.filter(effect => effect !== aura);
+    const setter = r.state.activeEffects.find(effect => effect.sourceEffectBlockId === "synthetic-stat")!;
+    setter.conditions = { type: "CARD_ON_FIELD", controller: "SELF", filter: { card_type: "CHARACTER", base_power_min: 5000 } };
+    expect(isCardNegated(ally, r.state, r.db)).toBe(false);
+    expect(getEffectivePower(ally, r.db.get(ally.cardId)!, r.state, r.db)).toBe(4000);
+    setter.conditions = undefined;
+    expect(getEffectivePower(ally, r.db.get(ally.cardId)!, r.state, r.db)).toBe(5000);
   });
 
   it("independent opponent witness activates and removal deactivates the condition", () => {
