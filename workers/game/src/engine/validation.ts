@@ -30,7 +30,7 @@ export function validate(
   if (state.status === "FINISHED") return "Game is already over";
   if (
     state.pendingPrompt &&
-    ["DECLARE_BLOCKER", "USE_COUNTER", "USE_COUNTER_EVENT"].includes(
+    ["DECLARE_BLOCKER", "USE_COUNTER", "USE_COUNTER_EVENT", "PASS"].includes(
       action.type
     )
   )

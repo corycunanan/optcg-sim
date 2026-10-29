@@ -49,6 +49,13 @@ export interface PipelineResult {
   pendingPrompt?: PendingPromptState;
 }
 
+/**
+ * Public game-action boundary: validates commands without requiring prior session
+ * admission. In particular, PASS cannot advance battle while a decision waits.
+ * Prompt replies (including OPTIONAL_EFFECT PASS declines) belong to the session
+ * prompt lifecycle, not this boundary. Session identity, turn ownership, stale
+ * reply IDs and undo policy remain the coordinator's responsibility.
+ */
 export function runPipeline(
   state: GameState,
   action: GameAction,
