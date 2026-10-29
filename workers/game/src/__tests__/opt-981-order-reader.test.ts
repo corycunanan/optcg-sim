@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { GameState } from "../types.js";
-import { endPhaseRig, type EndPhaseRig } from "./opt-962-rig.js";
+import { endPhaseRig, synSchema, type EndPhaseRig } from "./opt-962-rig.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
 import { convertPersistedGameState, SessionRepository } from "../session/persistence.js";
 import { toPersistedGameState, GAME_STATE_SCHEMA_VERSION } from "../session/game-state-schema.js";
+import { resumePhaseBoundary } from "../engine/phases.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { hasNativeCostSemantics, hasStructuralCostSemantics } from "../engine/native-cost-semantics.js";
 import { fieldTrashSemanticsVersion } from "../engine/field-trash-semantics.js";
@@ -167,6 +168,85 @@ describe("OPT-981 reader11 end-of-turn ordering", () => {
       expect(hasNativeCostSemantics(r.state)).toBe(cost >= 7);
       expect(hasStructuralCostSemantics(r.state)).toBe(cost === 8);
       expect(fieldTrashSemanticsVersion(r.state)).toBe(trash);
+    }
+  });
+
+  it("does not rebuild a persisted ordering prompt during an idle drain", async () => {
+    const r = pair(); future(r); r.act({ type: "ADVANCE_PHASE" }); await reload(r);
+    const before = r.state;
+    expect(before.pendingPrompt?.promptId).toBeDefined();
+    const result = resumePhaseBoundary(before, r.db);
+    expect(result.state).toBe(before);
+    expect(result.state.pendingPrompt).toBe(before.pendingPrompt);
+    expect(result.state.pendingPrompt?.options).toMatchObject({ choices: [
+      { label: expect.stringContaining("Return DON!!") },
+      { label: expect.stringContaining("Add DON!!") },
+    ] });
+  });
+
+  it("does not use hidden hand cards to name a historical obligation", () => {
+    const r = endPhaseRig();
+    r.state.schemaVersion = 11; r.state.fieldTrashSemanticsVersion = 8;
+    r.state.scheduledActions = [1, 2].map((amount, index) => ({
+      id: `historical-hand-source-${index}`, timing: "END_OF_THIS_TURN", controller: 0,
+      sourceEffectId: r.state.players[0].hand[0].instanceId, boundToInstanceId: null,
+      action: { type: "DRAW", params: { amount } },
+    }));
+    r.act({ type: "ADVANCE_PHASE" });
+    expect(r.state.pendingPrompt?.options).toMatchObject({ choices: [
+      { label: "Resolved effect: Draw cards (1)" },
+      { label: "Resolved effect: Draw cards (2)" },
+    ] });
+  });
+
+  it.each([10, 11] as const)("scans selected trash on the ending player's turn at schema%i, including prompted/terminal watchers", async version => {
+    for (const prompted of [false, true]) for (const terminal of [false, true]) {
+      const r = endPhaseRig({ deckSize: terminal ? 1 : 6 });
+      r.state.schemaVersion = version; r.state.fieldTrashSemanticsVersion = 9;
+      const victim = r.putSyn("SYN-trash-victim", null, 0, "CHARACTER");
+      r.putSyn("SYN-your-turn-trash-watcher", synSchema("SYN-your-turn-trash-watcher", "Character", [{
+        id: "your-turn-trash-watch", category: "auto",
+        trigger: { event: "ANY_CHARACTER_TRASHED", turn_restriction: "YOUR_TURN" },
+        ...(prompted ? { flags: { optional: true } } : {}),
+        actions: [{ type: "DRAW", params: { amount: 1 } }],
+      }]), 0, "CHARACTER");
+      r.state.scheduledActions = [{
+        id: "trash-first", timing: "END_OF_THIS_TURN", controller: 0,
+        sourceEffectId: victim.instanceId, boundToInstanceId: null,
+        action: { type: "TRASH_CARD", target: { type: "SELF" } },
+      }, {
+        id: "don-second", timing: "END_OF_THIS_TURN", controller: 0,
+        sourceEffectId: r.state.players[0].leader.instanceId, boundToInstanceId: null,
+        action: { type: "ADD_DON_FROM_DECK", params: { amount: 1 } },
+      }];
+      const before = r.state.players[0].hand.length;
+      const dons = field(r.state, 0);
+      r.act({ type: "ADVANCE_PHASE" });
+      if (version === 11) {
+        await reload(r);
+        r.act({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
+      }
+      if (prompted) {
+        expect(r.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
+        expect(r.state.turn.activePlayerIndex).toBe(0);
+        expect(field(r.state, 0)).toBe(dons);
+        await reload(r);
+        r.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      }
+      expect(r.state.players[0].hand).toHaveLength(before + 1);
+      const events = r.state.eventLog.map(event => event.type);
+      expect(events.filter(type => type === "CARD_DRAWN")).toHaveLength(1);
+      expect(events.indexOf("CARD_TRASHED")).toBeLessThan(events.indexOf("CARD_DRAWN"));
+      if (terminal) {
+        expect(r.state.status).toBe("FINISHED");
+        expect(r.state.turn.activePlayerIndex).toBe(0);
+        expect(field(r.state, 0)).toBe(dons);
+        expect(events).not.toContain("TURN_ENDED");
+        expect(events.at(-1)).toBe("GAME_OVER");
+      } else {
+        expect(events.indexOf("CARD_DRAWN")).toBeLessThan(events.indexOf("TURN_ENDED"));
+        expect(r.state.turn.activePlayerIndex).toBe(1);
+      }
     }
   });
 

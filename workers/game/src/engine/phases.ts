@@ -47,7 +47,9 @@ import { transitionCard } from "./zone-transition.js";
 import { evaluateCondition } from "./conditions.js";
 import { takeEngineTimestamp } from "./execution-context.js";
 import { matchTriggersForEvent, orderMatchedTriggers } from "./triggers.js";
-import { hasDelayedDeckOutLoss, runRuleProcessing } from "./defeat.js";
+import { describeActionBranch } from "./effect-resolver/action-utils.js";
+import { retainPropagationBeforePrompt } from "./effect-resolver/resume/events.js";
+import { hasDelayedDeckOutLoss, runRuleProcessing, runRuleProcessingAfterMove } from "./defeat.js";
 import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
 // The End Phase resolves its waves and obligations with the pipeline's own
 // Step 5 trigger policy (no third policy, OPT-924).
@@ -262,7 +264,19 @@ export function selectEndOfTurnObligation(
     { ...next, remainingScheduledActions: [chosen, ...queue] },
     cardDb, [], frame, true,
   );
-  return { ...result, kind: result.pendingPrompt ? "waiting" : "continued", resolved: !result.pendingPrompt };
+  // A choice resumes outside the drain's domain-dispatch branch. Apply the
+  // same checkpoint/reporting contract before returning to that common drain,
+  // so children observe this End Phase and can terminate before any sibling.
+  const checked = runRuleProcessingAfterMove(state, result.state, {}, cardDb);
+  if (isGameTerminated(checked)) return {
+    ...result, state: checked, kind: "terminal", resolved: true, pendingPrompt: undefined,
+  };
+  if (result.pendingPrompt) return {
+    ...result, state: retainPropagationBeforePrompt(checked, result.events),
+    kind: "waiting", resolved: false,
+  };
+  const reported = reportExecutionEvents(checked, result, cardDb);
+  return { ...result, state: reported.state, events: reported.events, kind: "continued", resolved: true };
 }
 
 /** Advance one End Phase rules stage; children return to the common drain. */
@@ -350,10 +364,14 @@ function continueEndPhase(
         effectDescription: "Choose which end-of-turn effect to process next",
         choices: queue.map((entry, index) => {
           const source = entry.sourceCardSnapshot ?? state.players.flatMap(player =>
-            [player.leader, ...player.characters.filter(card => card !== null), ...player.trash, ...player.hand]
+            [player.leader, ...player.characters.filter(card => card !== null), ...(player.stage ? [player.stage] : []), ...player.trash]
           ).find(card => card.instanceId === entry.sourceEffectId);
+          const description = entry.action.type === "RETURN_DON_TO_DECK"
+            ? "Return DON!! to your DON!! deck" : describeActionBranch([entry.action]);
+          const amount = "params" in entry.action && entry.action.params && "amount" in entry.action.params
+            && typeof entry.action.params.amount === "number" ? ` (${entry.action.params.amount})` : "";
           return { id: `end-of-turn-obligation:${index}`,
-            label: `${source ? cardDb.get(source.cardId)?.name ?? source.cardId : "Resolved effect"}: end-of-turn effect ${index + 1}` };
+            label: `${source ? cardDb.get(source.cardId)?.name ?? source.cardId : "Resolved effect"}: ${description}${amount}` };
         }),
       },
       respondingPlayer: owner,

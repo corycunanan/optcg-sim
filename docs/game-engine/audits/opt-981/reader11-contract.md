@@ -102,3 +102,25 @@ check; each must make focused tests fail, then production code is restored.
 Full verification results and review/deployment evidence belong in the PR body.
 The writer is deferred until verified reader deployment; OPT-981 gameplay rollout
 is not complete with this reader alone.
+
+## Independent review correction
+
+The first review identified that selecting an obligation bypassed the drain's
+post-move checkpoint and event scan. The final selection boundary now calls the
+same runRuleProcessingAfterMove/reportExecutionEvents services; a prompted result
+retains unscanned events through retainPropagationBeforePrompt. The common drain
+still executes all reported child work. A synthetic Your Turn character-trash
+watcher reproduces the old failure in11 while10 succeeds; continuous, optional
+watcher, reload and terminal-on-watcher variants pin scanning before handoff and
+before the next obligation. An idle drain preserves the original persisted
+ordering prompt and its promptId. Labels describe the action and numeric amount;
+source lookup uses historical snapshots or public field/trash, never hands.
+
+The6-6-1-3 assessment was re-derived by reading expireEndPhaseClause,
+shouldExpire, expireDuringThisTurn, cleanupConsumedOneTimeModifiers and
+expireOneTimeModifiers. All predicates use fixed context/record fields. They
+filter arrays without intermediate event publication, trigger scanning, card
+queries or callbacks; consumed/THIS_TURN one-time modifiers are filtered only
+after both owner passes. No intra-owner invalidation ordering effect is exposed
+by these implementations. New expiry callbacks or checkpoints would require
+reassessing that conclusion rather than extending it automatically.

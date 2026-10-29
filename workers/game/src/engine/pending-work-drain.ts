@@ -183,6 +183,10 @@ export function drainPendingWork(
       !state.effectStack.length && state.turn.battleSubPhase === "DAMAGE_STEP";
     if (!enteringDamage) state = publishDrainEvents(state, events);
     const top = state.effectStack.at(-1);
+    if (top?.phaseBoundaryContinuation?.awaitingOrder && state.pendingPrompt) {
+      return expose({ kind: "waiting", state: publishDrainEvents(state, events),
+        events, pendingPrompt: state.pendingPrompt, resolved: false });
+    }
     const ownerBefore = triggerExecutionOwner(state);
     // A domain frame is one unit of work, never a private scheduler. Its
     // children are inspected again at the top of this same loop.
