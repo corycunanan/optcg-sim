@@ -1,3 +1,4 @@
+import { fieldTrashSemanticsVersion } from "./field-trash-semantics.js";
 import { drainPendingWork } from "./pending-work-drain.js";
 import { resolverExecutionServices } from "./effect-resolver/resolver.js";
 /**
@@ -350,7 +351,14 @@ function continueEndPhase(
     // historical1–10 retain their original collected-cohort behavior.
     queue = [...queue, ...collected.entries];
   }
-  // Reader-first: only imported v11 states opt into obligation ordering.
+  // The deployed reader11 floor permits promotion only at this producer. Keep
+  // explicit cost semantics and the independent field-trash capability; raw
+  // historical callers must pass through session ingress, not invent a mode here.
+  if (!legacy && queue.length > 1 && !selectedObligation &&
+      (state.schemaVersion === 8 || state.schemaVersion === 9 || state.schemaVersion === 10) &&
+      (state.costSemanticsVersion === 6 || state.costSemanticsVersion === 7 || state.costSemanticsVersion === 8)) {
+    state = { ...state, schemaVersion: 11, fieldTrashSemanticsVersion: fieldTrashSemanticsVersion(state) };
+  }
   // Already-resolved obligations must not pass through trigger activation gates.
   if (!legacy && state.schemaVersion === 11 && queue.length > 1 && !selectedObligation) {
     state = parkEndPhaseAt(state, {
