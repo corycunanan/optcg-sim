@@ -243,7 +243,9 @@ export async function handleSessionExportRequest(
     const embedded = raw.undoHistory !== undefined;
     const undo = embedded
       ? raw.undoHistory
-      : (values.get("session:undo-history") ?? []);
+      : values.has("session:undo-history")
+        ? values.get("session:undo-history")
+        : [];
     const sanitized = sanitizeSessionCapture(raw.state, undo);
     return Response.json(
       {

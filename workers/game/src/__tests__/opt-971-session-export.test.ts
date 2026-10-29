@@ -461,3 +461,14 @@ it("distinguishes absent undo from an explicit empty embedded history", async ()
       expect(body.undoHistory).toEqual([]);
     }
   }));
+
+it("does not normalize a stored null undo value into an absent history", async () =>
+  atTime(async () => {
+    const f = fixture();
+    const h = host({ session: f.session, "session:undo-history": null });
+    const before = structuredClone(h.data);
+    const response = await worker.fetch(request(), h.env);
+    expect(response.status).toBe(422);
+    expect(h.data).toEqual(before);
+    expect(h.storage.put).not.toHaveBeenCalled();
+  }));
