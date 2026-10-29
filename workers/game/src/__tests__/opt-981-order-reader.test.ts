@@ -170,6 +170,44 @@ describe("OPT-981 reader11 end-of-turn ordering", () => {
     }
   });
 
+  it.each([0, 1] as const)("offers newly created obligations alongside remaining work for step owner %i", async owner => {
+    const r = endPhaseRig();
+    r.state.schemaVersion = 11; r.state.fieldTrashSemanticsVersion = 8;
+    const source = r.state.players[owner].leader.instanceId;
+    r.state.scheduledActions = [{
+      id: "synthetic-nested-scheduler", timing: "END_OF_THIS_TURN", controller: owner,
+      sourceEffectId: source, boundToInstanceId: null,
+      action: { type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN",
+        action: { type: "DRAW", params: { amount: 2 } },
+      } },
+    }, {
+      id: "synthetic-existing-draw", timing: "END_OF_THIS_TURN", controller: owner,
+      sourceEffectId: source, boundToInstanceId: null,
+      action: { type: "DRAW", params: { amount: 1 } },
+    }];
+    r.state.activeEffects.push({
+      id: "synthetic-step-expiry", sourceCardInstanceId: source, sourceEffectBlockId: "",
+      category: "auto", controller: owner, modifiers: [], appliesTo: [source], timestamp: 1,
+      duration: { type: "UNTIL_END_OF_YOUR_NEXT_TURN" },
+      expiresAt: { wave: "END_OF_TURN", turn: r.state.turn.number, player: 0 },
+    });
+    const before = r.state.players[owner].hand.length;
+    r.act({ type: "ADVANCE_PHASE" });
+    r.act({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" }, owner);
+    expect(r.state.players[owner].hand).toHaveLength(before);
+    expect(r.state.pendingPrompt?.respondingPlayer).toBe(owner);
+    expect(r.state.pendingPrompt?.options).toMatchObject({ choices: [{ id: "end-of-turn-obligation:0" }, { id: "end-of-turn-obligation:1" }] });
+    expect(r.state.scheduledActions).toHaveLength(0);
+    expect(r.state.effectStack.at(-1)?.phaseBoundaryContinuation?.remainingScheduledActions.map(entry => entry.action.type === "DRAW" ? entry.action.params : null)).toEqual([{ amount: 1 }, { amount: 2 }]);
+    expect(r.state.activeEffects.some(effect => effect.id === "synthetic-step-expiry")).toBe(true);
+    await reload(r);
+    r.act({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:1" }, owner);
+    expect(r.state.players[owner].hand).toHaveLength(before + 3);
+    expect(r.state.activeEffects.some(effect => effect.id === "synthetic-step-expiry")).toBe(false);
+    expect(r.state.turn.activePlayerIndex).toBe(1);
+    expect(r.state.effectStack).toHaveLength(0);
+  });
+
   it("retains11 while newly scheduling authored work and upgrading field-trash capability", () => {
     const r = pair(0, 11);
     expect(r.state.schemaVersion).toBe(11);

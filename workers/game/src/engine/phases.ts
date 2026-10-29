@@ -328,10 +328,13 @@ function continueEndPhase(
     stage === "TURN_PLAYER_END_OF_TURN" ? "TURN_PLAYER" : "NON_TURN_PLAYER";
   const owner: 0 | 1 = step === "TURN_PLAYER" ? pi : pi === 0 ? 1 : 0;
   let queue = [...continuation.remainingScheduledActions];
-  if (!legacy && !queue.length) {
+  if (!legacy && (!queue.length || state.schemaVersion === 11)) {
     const collected = collectEndOfTurnObligations(state, owner, step);
     state = collected.state;
-    queue = collected.entries;
+    // A nested obligation may create more work for this same step. Imported11
+    // lets its owner choose among all still-pending entries on the next offer;
+    // historical1–10 retain their original collected-cohort behavior.
+    queue = [...queue, ...collected.entries];
   }
   // Reader-first: only imported v11 states opt into obligation ordering.
   // Already-resolved obligations must not pass through trigger activation gates.

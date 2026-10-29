@@ -41,7 +41,9 @@ Versions1–10 cannot carry the marker.
 A reply removes precisely the selected queue entry, processes it with the
 existing scheduled resolver, and parks the remaining queue under any action
 prompt or nested work. Its completion returns to the phase owner. Two or more
-remaining obligations offer another choice; one drains directly. Step expiry
+remaining obligations offer another choice; one drains directly. Newly created
+same-owner obligations join the remaining queue before the next choice; a choice
+already accepted still runs first. Older1–10 retain their prior cohort boundary. Step expiry
 and handoff occur only after that owner's queue drains. The implementation
 reuses PLAYER_CHOICE presentation/routing, without feeding scheduled work into
 the trigger activation executor. No new UI prompt kind or third trigger policy
