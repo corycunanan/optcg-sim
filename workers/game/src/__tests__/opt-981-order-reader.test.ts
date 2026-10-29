@@ -10,8 +10,9 @@ import { hasNativeCostSemantics, hasStructuralCostSemantics } from "../engine/na
 import { fieldTrashSemanticsVersion } from "../engine/field-trash-semantics.js";
 import { MemorySessionStorage } from "./fixtures/opt-940-synthetic-states.js";
 
-function pair(owner: 0 | 1 = 0) {
+function pair(owner: 0 | 1 = 0, version?: 11) {
   const r = endPhaseRig();
+  if (version) { r.state.schemaVersion = version; r.state.fieldTrashSemanticsVersion = 8; }
   r.state.turn.activePlayerIndex = owner;
   const maria = r.put("OP08-074", owner, "CHARACTER");
   const ray = r.put("OP13-066", owner, "CHARACTER");
@@ -167,6 +168,27 @@ describe("OPT-981 reader11 end-of-turn ordering", () => {
       expect(hasStructuralCostSemantics(r.state)).toBe(cost === 8);
       expect(fieldTrashSemanticsVersion(r.state)).toBe(trash);
     }
+  });
+
+  it("retains11 while newly scheduling authored work and upgrading field-trash capability", () => {
+    const r = pair(0, 11);
+    expect(r.state.schemaVersion).toBe(11);
+    const inherited = pair().state.scheduledActions.map(entry => ({
+      sourceIdentity: entry.sourceIdentity, sourceCardSnapshot: entry.sourceCardSnapshot,
+    }));
+    expect(r.state.scheduledActions.map(entry => ({
+      sourceIdentity: entry.sourceIdentity, sourceCardSnapshot: entry.sourceCardSnapshot,
+    }))).toEqual(inherited);
+    const source = r.putSyn("SYN-reader11-trash", null, 0, "CHARACTER");
+    const resolved = resolveEffect(r.state, {
+      id: "synthetic-reader11-trash", category: "auto",
+      actions: [{ type: "TRASH_CARD", target: { type: "SELF" } }],
+    }, source.instanceId, 0, r.db);
+    r.state = resolved.state;
+    expect(r.state.schemaVersion).toBe(11);
+    expect(r.state.fieldTrashSemanticsVersion).toBe(9);
+    expect(r.state.players[0].characters.some(card => card?.instanceId === source.instanceId)).toBe(false);
+    expect(convertPersistedGameState(wire(r.state), "state").schemaVersion).toBe(11);
   });
 
   it("strictly rejects malformed and mismatched ordering owners without mutating input", () => {
