@@ -1,3 +1,4 @@
+import { chooseFirstObligation } from "../opt-981-test-ordering.js";
 /**
  * OPT-962 (OPT-924) version 2 End Phase states, produced by the real engine.
  *
@@ -92,7 +93,7 @@ class Table {
     }
     const result = runPipeline(this.state, action, this.db, player);
     if (!result.valid) throw new Error(`v2 states: ${action.type} rejected: ${result.error}`);
-    this.state = result.state;
+    this.state = chooseFirstObligation(result.state, this.db);
   }
 
   parked(): EffectStackFrame {

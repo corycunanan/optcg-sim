@@ -151,7 +151,8 @@ it("parked End Phase identity-only origins remain strict through reply and reloa
   const malformed = JSON.parse(JSON.stringify(toPersistedGameState(r.state)));
   malformed.effectStack.find((row: { id: string }) => row.id === frame.id).phaseBoundaryContinuation.remainingScheduledActions[0].sourceIdentity.instanceId = "another-owner";
   expect(() => convertPersistedGameState(malformed, "state")).toThrow(/remainingScheduledActions.*sourceIdentity.instanceId must match sourceEffectId/);
-  await r.reload(); r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
+  await r.reload(); r.act({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
+  r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
   expect(r.state.eventLog.filter(event => event.type === "DON_SET_ACTIVE")).toHaveLength(0);
 });
 it("dual origins and generic/action vs authored COST owners reject contradictions before projection", async () => {

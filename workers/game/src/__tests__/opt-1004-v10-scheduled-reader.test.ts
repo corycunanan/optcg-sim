@@ -79,6 +79,7 @@ describe("OPT-1004 schema10 reader and execution", () => {
     const { r, snapshot } = scheduledFixture();
     r.state.scheduledActions.unshift({ ...r.state.scheduledActions[0], id: "first", action: { type: "CHOOSE_VALUE", result_ref: "parked-choice", params: { domain: "NUMBER", constraints: { min: 0, max: 1 } } } });
     r.act({ type: "ADVANCE_PHASE" });
+    r.act({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
     expect(r.state.pendingPrompt).not.toBeNull();
     const queued = r.state.effectStack.find(f => f.phaseBoundaryContinuation)?.phaseBoundaryContinuation?.remainingScheduledActions;
     expect(queued?.[0].sourceCardSnapshot).toEqual(snapshot);
@@ -93,8 +94,8 @@ describe("OPT-1004 schema10 reader and execution", () => {
     const current = wire(r.state);
     const legacy = rig().state;
     const parsed = parseStoredSession({ state: current, undoHistory: [wire(legacy), current], cardDb: Object.fromEntries(r.db), mode: "PVP" });
-    expect(parsed.undoHistory.map(s => s.schemaVersion)).toEqual([8, 10]);
-    expect(toPersistedGameState(parsed.undoHistory[1]).schemaVersion).toBe(10);
+    expect(parsed.undoHistory.map(s => s.schemaVersion)).toEqual([8, 11]);
+    expect(toPersistedGameState(parsed.undoHistory[1]).schemaVersion).toBe(11);
     await r.reload();
     r.act({ type: "PLAYER_CHOICE", choiceId: "choose-value:1" });
     if (r.state.pendingPrompt) {

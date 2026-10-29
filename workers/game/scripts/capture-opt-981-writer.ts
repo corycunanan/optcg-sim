@@ -1,4 +1,5 @@
 /** Run from workers/game; no deployed sessions or network are accessed. */
+import { gzipSync } from "node:zlib";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -22,9 +23,10 @@ async function trace(name: string, r: ReturnType<typeof endPhaseRig>, actions: {
   return history;
 }
 for (const owner of [0, 1] as const) for (const first of [0, 1]) {
-  const { r, history, setupTrace } = await authoredPair(owner);
+  const { r, setupTrace, history: initialHistory } = await authoredPair(owner);
+  let history = initialHistory;
   records.push(...setupTrace.map((entry, index) => ({ ...entry, name: `authored-setup-seat${owner}-first${first}-${index}`, replay: false, provenance: "Public authored activation/play setup receipt; reader11 does not enable ordering" })));
-  await trace(`authored-seat${owner}-first${first}`, r, [
+  history = await trace(`authored-seat${owner}-first${first}`, r, [
     { owner, action: { type: "ADVANCE_PHASE" } },
     { owner, action: { type: "PLAYER_CHOICE", choiceId: `end-of-turn-obligation:${first}` } },
   ], history);
@@ -32,14 +34,14 @@ for (const owner of [0, 1] as const) for (const first of [0, 1]) {
     const options = r.state.pendingPrompt.options;
     if (options.promptType !== "PLAYER_CHOICE") throw Error("unexpected authored prompt");
     const choice = options.choices.find(c => c.id === "choose-value:1") ?? options.choices.find(c => !c.disabled)!;
-    await trace(`authored-seat${owner}-first${first}-nested${index}`, r, [{ owner, action: { type: "PLAYER_CHOICE", choiceId: choice.id } }]);
+    history = await trace(`authored-seat${owner}-first${first}-nested${index}`, r, [{ owner, action: { type: "PLAYER_CHOICE", choiceId: choice.id } }], history);
   }
   // Real coordinator-generated v11 undo snapshot: the next player's DON attachment.
   const next = r.state.turn.activePlayerIndex;
-  await trace(`authored-seat${owner}-first${first}-undo`, r, [
+  history = await trace(`authored-seat${owner}-first${first}-undo`, r, [
     { owner: next, action: { type: "ATTACH_DON", targetInstanceId: r.state.players[next].leader.instanceId, count: 1 } },
     { owner: next, action: { type: "UNDO" } },
-  ]);
+  ], history);
 }
 for (const owner of [0, 1] as const) for (const terminal of [false, true]) {
   const r = endPhaseRig({ deckSize: terminal ? 1 : 6 });
@@ -86,9 +88,10 @@ const corpus = { producerSourceSha: execFileSync("git", ["rev-parse", "HEAD"], {
   producerRuntimeSha256: createHash("sha256").update(readFileSync("src/engine/phases.ts")).digest("hex"),
   deployedReaderSha: "8c8a80bdf93c0d095d10f100feb3e31c60aa3e61", records };
 const bytes = JSON.stringify(corpus, null, 2) + "\n";
-const output = "src/__tests__/fixtures/opt-981-writer-produced.json";
-writeFileSync(output, bytes);
-console.log(JSON.stringify({ output, records: records.length, sha256: createHash("sha256").update(bytes).digest("hex"), producerSourceSha: corpus.producerSourceSha }));
+const output = "src/__tests__/fixtures/opt-981-writer-produced.json.gz";
+const compressed = gzipSync(bytes);
+writeFileSync(output, compressed);
+console.log(JSON.stringify({ output, records: records.length, sha256: createHash("sha256").update(compressed).digest("hex"), payloadSha256: createHash("sha256").update(bytes).digest("hex"), producerSourceSha: corpus.producerSourceSha }));
 
 }
 void main();

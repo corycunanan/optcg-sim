@@ -1,5 +1,6 @@
 /** Replay immutable writer bytes using ONLY the explicitly selected reader's
  * runtime modules. Run from workers/game with node --import tsx. */
+import { gunzipSync } from "node:zlib";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -7,7 +8,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 async function main() {
   const reader = resolve(process.argv[2]);
-  const corpus = JSON.parse(readFileSync(process.argv[3] ?? "src/__tests__/fixtures/opt-981-writer-produced.json", "utf8"));
+  const corpus = JSON.parse(gunzipSync(readFileSync(process.argv[3] ?? "src/__tests__/fixtures/opt-981-writer-produced.json.gz")).toString());
   const sha = execFileSync("git", ["-C", reader, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   assert.equal(sha, corpus.deployedReaderSha, "must replay exact deployed reader");
   assert.equal(execFileSync("git", ["-C", reader, "diff", "HEAD", "--name-only"], { encoding: "utf8" }).trim(), "", "reader tracked sources must be clean");
