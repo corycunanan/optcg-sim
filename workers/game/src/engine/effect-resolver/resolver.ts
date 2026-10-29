@@ -487,7 +487,7 @@ function resolveEffectCore(
               : sourceSnapshot
                 ? {
                     sourceIdentity: sourceSnapshot,
-                    ...(state.schemaVersion === 10 && sourceCard!.cardId === sourceSnapshot.cardId && sourceCard!.controller === sourceSnapshot.controller ? {
+                    ...((state.schemaVersion === 10 || state.schemaVersion === 11) && sourceCard!.cardId === sourceSnapshot.cardId && sourceCard!.controller === sourceSnapshot.controller ? {
                       // Keep the proven original controller with the actual
                       // pre-cost card snapshot, before TRASH_SELF can move it.
                       sourceCardSnapshot: structuredClone(sourceCard!),

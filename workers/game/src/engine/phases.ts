@@ -15,6 +15,7 @@ import type {
   EffectStackFrame,
   EndPhaseStep,
   ExecuteResult,
+  GameAction,
   GameEvent,
   GameState,
   PendingEvent,
@@ -46,7 +47,9 @@ import { transitionCard } from "./zone-transition.js";
 import { evaluateCondition } from "./conditions.js";
 import { takeEngineTimestamp } from "./execution-context.js";
 import { matchTriggersForEvent, orderMatchedTriggers } from "./triggers.js";
-import { hasDelayedDeckOutLoss, runRuleProcessing } from "./defeat.js";
+import { describeActionBranch } from "./effect-resolver/action-utils.js";
+import { retainPropagationBeforePrompt } from "./effect-resolver/resume/events.js";
+import { hasDelayedDeckOutLoss, runRuleProcessing, runRuleProcessingAfterMove } from "./defeat.js";
 import { MAX_EFFECT_STACK_DEPTH, terminateForEngineLimit } from "./engine-limits.js";
 // The End Phase resolves its waves and obligations with the pipeline's own
 // Step 5 trigger policy (no third policy, OPT-924).
@@ -239,13 +242,51 @@ export function advancePhaseBoundary(
   );
 }
 
+/** Consume one phase-owned choice; nested action prompts retain the parent queue. */
+export function selectEndOfTurnObligation(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+): import("./effect-resolver/types.js").HandlerResult | undefined {
+  const frame = state.effectStack.at(-1);
+  const continuation = frame?.phaseBoundaryContinuation;
+  if (!frame || !continuation?.awaitingOrder) return undefined;
+  const index = action.type === "PLAYER_CHOICE"
+    ? continuation.remainingScheduledActions.findIndex((_, i) => action.choiceId === `end-of-turn-obligation:${i}`)
+    : -1;
+  if (index < 0) return { kind: "waiting", state, events: [], resolved: false, rejected: true };
+  const queue = [...continuation.remainingScheduledActions];
+  const [chosen] = queue.splice(index, 1);
+  const next = { ...continuation };
+  delete next.awaitingOrder;
+  const result = continueEndPhase(
+    { ...popFrame(state), pendingPrompt: null },
+    { ...next, remainingScheduledActions: [chosen, ...queue] },
+    cardDb, [], frame, true,
+  );
+  // A choice resumes outside the drain's domain-dispatch branch. Apply the
+  // same checkpoint/reporting contract before returning to that common drain,
+  // so children observe this End Phase and can terminate before any sibling.
+  const checked = runRuleProcessingAfterMove(state, result.state, {}, cardDb);
+  if (isGameTerminated(checked)) return {
+    ...result, state: checked, kind: "terminal", resolved: true, pendingPrompt: undefined,
+  };
+  if (result.pendingPrompt) return {
+    ...result, state: retainPropagationBeforePrompt(checked, result.events),
+    kind: "waiting", resolved: false,
+  };
+  const reported = reportExecutionEvents(checked, result, cardDb);
+  return { ...result, state: reported.state, events: reported.events, kind: "continued", resolved: true };
+}
+
 /** Advance one End Phase rules stage; children return to the common drain. */
 function continueEndPhase(
   state: GameState,
   continuation: PhaseBoundaryContinuation,
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
-  priorFrame?: EffectStackFrame
+  priorFrame?: EffectStackFrame,
+  selectedObligation = false,
 ): ExecuteResult {
   const pi = continuation.endingPlayerIndex;
   const depth = state.effectStack.length;
@@ -301,10 +342,47 @@ function continueEndPhase(
     stage === "TURN_PLAYER_END_OF_TURN" ? "TURN_PLAYER" : "NON_TURN_PLAYER";
   const owner: 0 | 1 = step === "TURN_PLAYER" ? pi : pi === 0 ? 1 : 0;
   let queue = [...continuation.remainingScheduledActions];
-  if (!legacy && !queue.length) {
+  if (!legacy && (!queue.length || state.schemaVersion === 11)) {
     const collected = collectEndOfTurnObligations(state, owner, step);
     state = collected.state;
-    queue = collected.entries;
+    // A nested obligation may create more work for this same step. Imported11
+    // lets its owner choose among all still-pending entries on the next offer;
+    // historical1–10 retain their original collected-cohort behavior.
+    queue = [...queue, ...collected.entries];
+  }
+  // Reader-first: only imported v11 states opt into obligation ordering.
+  // Already-resolved obligations must not pass through trigger activation gates.
+  if (!legacy && state.schemaVersion === 11 && queue.length > 1 && !selectedObligation) {
+    state = parkEndPhaseAt(state, {
+      ...continuation, stage, remainingScheduledActions: queue, awaitingOrder: true,
+    }, depth, priorFrame);
+    if (isGameTerminated(state)) return { state, events: [] };
+    const frame = state.effectStack.at(-1)!;
+    const pendingPrompt: NonNullable<GameState["pendingPrompt"]> = {
+      options: {
+        promptType: "PLAYER_CHOICE",
+        effectDescription: "Choose which end-of-turn effect to process next",
+        choices: queue.map((entry, index) => {
+          const source = entry.sourceCardSnapshot ?? state.players.flatMap(player =>
+            [player.leader, ...player.characters.filter(card => card !== null), ...(player.stage ? [player.stage] : []), ...player.trash]
+          ).find(card => card.instanceId === entry.sourceEffectId);
+          const description = entry.action.type === "RETURN_DON_TO_DECK"
+            ? "Return DON!! to your DON!! deck" : describeActionBranch([entry.action]);
+          const amount = "params" in entry.action && entry.action.params && "amount" in entry.action.params
+            && typeof entry.action.params.amount === "number" ? ` (${entry.action.params.amount})` : "";
+          return { id: `end-of-turn-obligation:${index}`,
+            label: `${source ? cardDb.get(source.cardId)?.name ?? source.cardId : "Resolved effect"}: ${description}${amount}` };
+        }),
+      },
+      respondingPlayer: owner,
+      resumeContext: frame.id,
+    };
+    state = { ...state, pendingPrompt,
+      effectStack: state.effectStack.map(candidate => candidate.id === frame.id
+        ? { ...candidate, controller: owner, phase: "AWAITING_PLAYER_CHOICE" as const }
+        : candidate),
+    };
+    return { state, events: [], pendingPrompt };
   }
   const entry = queue.shift();
   if (entry) {

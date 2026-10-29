@@ -1436,7 +1436,7 @@ function endBattle(
   // Expire battle-scoped effects before clearing battle state
   const battleId = state.turn.battle?.battleId;
   const battle = state.turn.battle;
-  if (battleId && (state.schemaVersion !== 8 && state.schemaVersion !== 9 && state.schemaVersion !== 10)) {
+  if (battleId && (state.schemaVersion !== 8 && state.schemaVersion !== 9 && (state.schemaVersion !== 10 && state.schemaVersion !== 11))) {
     state = expireBattleEffects(state, battleId);
   }
 
@@ -1491,7 +1491,7 @@ function endBattle(
     };
   }
 
-  if (battle && (state.schemaVersion === 8 || state.schemaVersion === 9 || state.schemaVersion === 10)) {
+  if (battle && (state.schemaVersion === 8 || state.schemaVersion === 9 || (state.schemaVersion === 10 || state.schemaVersion === 11))) {
     state = { ...state, turn: { ...state.turn, battle: null, battleSubPhase: null } };
     return parkBattleCompletion(state, {
       battleId: battle.battleId,

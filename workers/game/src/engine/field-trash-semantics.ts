@@ -6,7 +6,7 @@ export function fieldTrashSemanticsVersion(
   version = state.schemaVersion ?? 8,
 ): 8 | 9 {
   if (version === 9) return 9;
-  if (version !== 10) return 8;
+  if (version !== 10 && version !== 11) return 8;
   if (state.fieldTrashSemanticsVersion === 8 || state.fieldTrashSemanticsVersion === 9) {
     return state.fieldTrashSemanticsVersion;
   }
@@ -21,7 +21,7 @@ export function validateFieldTrashCapability(
   if (version < 10 && "fieldTrashSemanticsVersion" in state) {
     fail("fieldTrashSemanticsVersion requires schemaVersion 10");
   }
-  if (version === 10 && state.fieldTrashSemanticsVersion !== 8 && state.fieldTrashSemanticsVersion !== 9) {
+  if ((version === 10 || version === 11) && state.fieldTrashSemanticsVersion !== 8 && state.fieldTrashSemanticsVersion !== 9) {
     fail("native10 requires explicit fieldTrashSemanticsVersion 8 or 9");
   }
 }

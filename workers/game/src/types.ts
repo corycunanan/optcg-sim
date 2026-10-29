@@ -108,7 +108,7 @@ export interface GameState extends Omit<
   | "effectStack"
 > {
   /** Retained native envelope: saves and later pauses may never downgrade. */
-  schemaVersion?: 6 | 7 | 8 | 9 | 10;
+  schemaVersion?: 6 | 7 | 8 | 9 | 10 | 11;
   /** Native10 retains field-trash rollout independently of cost semantics. */
   fieldTrashSemanticsVersion?: 8 | 9;
   /** Required for native8: recorded game-wide capability, never upgraded on load. */
@@ -196,6 +196,8 @@ export interface EndPhaseScheduledAction {
 }
 
 export interface PhaseBoundaryContinuation {
+  /** v11: the step owner must select the next already-resolved obligation. */
+  awaitingOrder?: true;
   kind: "END_PHASE";
   endingPlayerIndex: 0 | 1;
   /** Absent only on a version 1 object before conversion; absent means `LEGACY_SCHEDULED_ACTIONS`. */

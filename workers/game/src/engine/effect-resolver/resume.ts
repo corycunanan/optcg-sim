@@ -1,3 +1,4 @@
+import { selectEndOfTurnObligation } from "../phases.js";
 import { drainPendingWork } from "../pending-work-drain.js";
 import { isGameTerminated } from "../terminal.js";
 import {
@@ -151,6 +152,8 @@ export function resumeFromStackWork(
   action: GameAction,
   cardDb: Map<string, CardData>
 ): HandlerResult {
+  const endOfTurnChoice = selectEndOfTurnObligation(state, action, cardDb);
+  if (endOfTurnChoice) return endOfTurnChoice;
   const original = state;
   state = { ...state, pendingPrompt: null };
   state = ownLegacyResume(state);
