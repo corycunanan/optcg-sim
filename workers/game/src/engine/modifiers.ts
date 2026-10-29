@@ -260,12 +260,35 @@ export function modifierAppliesToCard(
  * `isEffectConditionMet` path on the negation effect itself to avoid recursion
  * (and to prevent an attacker mutually-negating their way out of a negation).
  */
+// Synchronous query scopes include keyword/filter/condition and effective-stat
+// callbacks, not just direct aura-source traversal. SET_POWER evaluates a
+// shallow state view with different activeEffects but the same field roots;
+// share that query's guard while isolating other games, snapshots and databases.
+interface NegationQueryContext {
+  gameId: string;
+  players: GameState["players"];
+  cardDb: Map<string, CardDataType> | undefined;
+  visiting: Set<string>;
+}
+const negationQueryContexts: NegationQueryContext[] = [];
+
 export function isCardNegated(
   card: CardInstance,
   state: GameState,
   cardDb?: Map<string, CardDataType>
 ): boolean {
-  return isCardNegatedWithGuard(card, state, cardDb, new Set());
+  const active = negationQueryContexts.find(context =>
+    context.gameId === state.id && context.players === state.players && context.cardDb === cardDb);
+  if (active) return isCardNegatedWithGuard(card, state, cardDb, active.visiting);
+  const context: NegationQueryContext = {
+    gameId: state.id, players: state.players, cardDb, visiting: new Set(),
+  };
+  negationQueryContexts.push(context);
+  try {
+    return isCardNegatedWithGuard(card, state, cardDb, context.visiting);
+  } finally {
+    negationQueryContexts.pop();
+  }
 }
 
 function isCardNegatedWithGuard(
@@ -292,6 +315,10 @@ function isCardNegatedWithGuard(
     }
     return true;
   }
+  // Accepted OPT-1008 apply-once policy: an in-progress card still exposes its
+  // pre-negation effects to the condition that is deciding that negation. This
+  // matches OPT-242 self-falsifying cost thresholds; it is not a general ordered
+  // solver for mutually dependent multi-source permanent effects.
   if (!cardDb || visiting.has(card.instanceId)) return false;
   visiting.add(card.instanceId);
   try {

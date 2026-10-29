@@ -1,108 +1,97 @@
-# OPT-1008 — conditional negation assessment (not an implementation)
+# OPT-1008 — bounded conditional negation contract
 
 Base: `main` at `0bc10b57dc227c5d6c25e66356e7adf8ecc5778a`.
-Assessed 2026-10-28. No gameplay behavior changed. The regression is deliberately
-red; this branch is not merge-ready and does not complete OPT-1008.
+The initial assessment/reproduction was committed as 265fde08. On 2026-10-28 the
+user accepted **apply-once semantics for self-falsifying conditional permanent
+negation, matching the existing OPT-242 cost precedent**, with mutually dependent
+multi-source conditional cycles deferred to an ordered permanent-effect processor.
+This document replaces the initial blocked assessment; it does not claim a new
+card-specific Bandai FAQ or a general fixed-point solution.
 
-## Reproduction and independent expectations
+## Independent expectations and scope
 
-`opt-1008-conditional-negation.test.ts` registers authored OP13-064 and one
-non-Roger-Pirates printed Rush Character. It then adds a **synthetic** runtime
-CARD_ON_FIELD condition requiring a Rush Character. The public `isCardNegated`
-query raises `RangeError: Maximum call stack size exceeded`.
+Rules 8-1-3-3 and8-1-3-3-2 require permanent effects to be valid and conditioned.
+Rule 8-1-3-3-5 specifies turn-player then non-turn-player processing, player choice
+within each group, and repetition if application changes the state. Its sequential
+processing is not a simultaneous Boolean fixed-point equation. The user-approved
+policy supplies the self-falsification interpretation: inspect the pre-negation
+state while that card's negation decision is in progress, and apply the resulting
+negation once in that query. This matches the engine's include-once treatment of
+self-falsifying cost thresholds in OPT-242. External changes remain independently
+observable on the next root query; no result or negation is cached across queries.
 
-The observed route is `isCardNegated` → permanent modifier gate → condition
-CARD_ON_FIELD → target filter effective keyword → `isCardNegated`. The last call
-creates a new visiting set, so the source-aura traversal guard does not bound it.
+The synthetic reproduction adds CARD_ON_FIELD requiring a printed Rush Character
+to Roger's aura, with exactly one nonexempt Rush ally. The condition initially
+holds; applying the aura removes its own witness. Expected public negation is
+true, effective Rush false, and same-turn attack eligibility false under the
+accepted policy. The test repeats these public entries to detect entry-order or
+stale-result errors. Additional tests cover target keyword filtering and effective
+power/cost conditions re-entering source-negation queries.
 
-Independent rule constraints, from `docs/rules/rule_comprehensive.md`:
+SET_POWER already evaluates its own eligibility against a shallow state view
+excluding its own setting. Its numeric read can therefore retain the setter when
+that exclusion removes a synthetic negation threshold witness. This change bounds
+that callback too but preserves the separate numeric self-exclusion contract;
+it does not claim a universal shared value across differently defined read views.
 
-- 8-1-3-3 and 8-1-3-3-2: permanent effects apply while valid; a conditional
-  permanent effect requires its condition to hold.
-- 8-1-3-3-5: permanent effects changing their own/other permanent effects' impact
-  are processed for the turn player, then the non-turn player, with each player
-  choosing order; repeat if the state changes.
-- 8-2-3: already-resolved auto/activate effects are not invalidated by later
-  effects. Resolved negation flags must retain that independence.
-- `docs/cards/OP-13.md` OP13-064: the actual aura is unconditional and excludes
-  Roger Pirates and the opponent's cards. The OP13-064 FAQ concerns its separate
-  resolved power action and does not decide conditional-negation cycles.
+Rule 8-2-3 preserves already-resolved effects. The existing resolved-flag loop still
+precedes the permanent-aura visiting guard. Authored OP13-064 remains unconditional
+and its Roger Pirates/opponent exemptions are unchanged. Source negation and source
+removal still disable its permanent aura. An independent opponent Rush witness
+activates a synthetic condition and removing that witness deactivates it.
 
-For the exact synthetic fixture, let N mean the Rush ally is negated. With no
-other Rush witness, the condition holds exactly when !N. The aura's source is
-exempt, so its negation applies exactly when the condition holds: N = !N. Neither
-Boolean assignment is stable. A recurrence fallback of false yields true for
-negation while destroying the only witness that justified true. Returning true
-on recurrence creates the converse problem. Neither is an independent rule
-expectation. The existing source-only fallback is not a specification.
+## Query context and lifetime
 
-Acyclic conditions (e.g. turn identity, printed trait, independent opponent
-witness) do have defensible Boolean expectations. They must remain supported if
-the chosen policy only rejects cyclic dependencies.
+Previously only direct source-aura traversal shared a visiting set. Effective
+keyword/filter/condition callbacks and effective power/cost readers re-entered
+public isCardNegated with fresh guards, reproducing RangeError.
 
-## Consumer inventory
+Each synchronous root negation query now owns one visiting set. Nested calls
+adopt it when game ID, players-array identity and cardDb identity match. A shallow
+SET_POWER eligibility view has different activeEffects but identical field roots,
+so it shares the guard. An independent structured-clone snapshot or different
+cardDb gets a separate scope even when card instance IDs match. A synchronous
+reentrant query can find its ancestor scope through an intervening independent
+scope. A finally block removes each root scope on success or error; the existing
+per-card finally removes visiting entries. No context survives a root call and
+there is no cache, persisted field, global cross-game result, or async lifetime.
 
-Loaded every exported schema from all 56 authored set modules using
-`collectExportedSchemas`, covering 2,474 schemas. Exactly one modifier producer
-uses NEGATE_EFFECTS: OP13-064 / OP13-064_negate_effects in `op13.ts`.
-It has no block condition, block duration, or modifier duration. Its target
-filter is only `traits_exclude: ["Roger Pirates"]`. **Zero authored conditional
-permanent negation producers** were found. NEGATE_EFFECTS action producers are
-resolved-flag writers and are a separate contract. No current-card reachability
-is claimed for the new regression.
+The exception-cleanup test checks fresh guard allocation after a nested exception,
+not merely a repeated Boolean result (a leaked empty set could mask retention).
+Three reentrancy controls independently inspect another snapshot/database during an
+active query and require its own true result. A broad module-global guard would
+incorrectly return false for those cases.
 
-## Boundary assessment and alternatives
+## Authored consumer inventory
 
-1. Share recursion context and return a Boolean on recurrence: bounds execution
-   but invents conditional gameplay semantics; rejected as an implementation
-   basis. Iterating a fixed point also oscillates for this fixture.
-2. Share context and throw a named diagnostic: useful internal detection, but
-   does not safely handle a supported action. `SessionCoordinator.executeAction`
-   only catches writer-ingress errors; execution errors propagate. Replacing a
-   RangeError with another uncaught exception is not acceptance completion.
-3. Reject a deliberately unsupported class at schema admission: can prevent
-   future authored/DB input from entering gameplay, but narrows today's schema
-   support. Rejecting all conditions is broader than the actual cyclic case and
-   loses safe turn/trait conditions. Target filters and WHILE_CONDITION gates
-   also need analysis; keyword-only rejection is not a complete graph proof.
-4. Add a structured dependency-query result and propagate it through all query,
-   action, prompt, and visible-state boundaries: can represent an engine limit
-   without claiming a gameplay Boolean. This requires an agreed product policy
-   for the game outcome and a larger boundary change.
-5. Implement ordered permanent-effect processing per 8-1-3-3-5, including player
-   choices and a policy for nonconvergence. This is wider than a query guard;
-   iteration order or arbitrary iteration limits are not a rules substitute.
+Loaded every exported schema from 56 authored set modules with
+collectExportedSchemas, covering 2,474 schemas. Exactly one modifier producer uses
+NEGATE_EFFECTS: OP13-064 / OP13-064_negate_effects in op13.ts. It has no block
+condition, block duration or modifier duration. Its target filter is only
+traits_exclude:["Roger Pirates"]. **Zero authored conditional permanent negation
+producers** were found. NEGATE_EFFECTS action producers write resolved flags and
+are a separate contract. All new conditional fixtures are explicitly synthetic;
+there is no claim of current-card conditional reachability. Registration already
+supports copying authored block conditions, so this is not mutation-only schema
+support even though tests use a runtime aura to isolate the query boundary.
 
-Existing `terminateForEngineLimit` returns GameState and handles effect-stack or
-resolved-action budgets. `terminateForEngineContract` likewise returns state;
-its contract enum supports ACTION_HANDLER and REPLACEMENT_DISPATCH only. Neither
-is a generic catch for pure Boolean queries, which also run for read-only views.
-`registerPermanentEffectsForCard` has the source CardData but no whole cardDb;
-it cannot evaluate a complete field dependency graph. Registration-only
-rejection also does not cover the reproduced post-registration runtime mutation.
+## Validation and limitations
 
-**Decision needed:** accept a specified unsupported-schema boundary, or authorize
-structured nonconvergence handling / ordered permanent-effect evaluation. Do not
-silently choose a Boolean or claim an exception rename is a safe gameplay fix.
+The initial public-query regression reproduced Maximum call stack size exceeded.
+Existing authored/source/exemption/resolved-flag baseline: 2 files, 61 tests passed.
+The final focused suite adds condition, target, numeric, independent-witness,
+exception-cleanup and isolated-root controls plus existing OPT-242 cost tests.
+The PR records exact final counts, decisive context-loss/cleanup mutations, and
+Large verification results.
 
-## Validation
+Mutual multi-source conditional negation remains a documented engine limitation:
+reentry-false can differ from player-chosen sequential processing. The existing
+source-only fallback already shares that limitation. This change does not build
+an ordered processor, add player choice, broaden schema admission, or emit a new
+runtime exception. Cyclic conditions on resolved NEGATE_EFFECTS_FLAG durations
+are outside this permanent-aura contract; their existing flag-first behavior is
+preserved, not claimed to be a general cycle solver.
 
-- Existing authored, source-negation/removal, exemption, and resolved-flag controls:
-  `pnpm --filter optcg-game exec vitest run src/__tests__/opt-994-permanent-negation.test.ts src/__tests__/opt-1004-resolved-modifiers.test.ts`
-  — 2 files, 61 tests passed on the unmodified runtime.
-- New public-boundary synthetic regression: 1 test failed with the exact
-  RangeError above. It asserts no exception and intentionally does not choose a
-  Boolean answer for an inconsistent hypothetical effect.
-- No green fix, mutation gate, or full `pnpm verify` run: implementation is
-  paused for the contract decision. No PR has been created.
-
-## Follow-ups
-
-- Resolve cyclic dependency policy with explicit acceptance expectations.
-- If implementing a query context, cover conditions, block/modifier durations,
-  target filters, effective power/cost/attributes/grants, resolved-flag duration
-  conditions, source traversal, and exception cleanup. Test query entry order
-  and separate state snapshots, and avoid leaking ambient context across games.
-- Preserve the 61 passing controls and add independent acyclic expected values.
-- Run a decisive context-loss mutation and the full Large verification gate only
-  once an accepted implementation exists.
+Follow-up: a separate ordered 8-1-3-3-5 processor must specify mutually dependent
+multi-source outcomes and choices. Any asynchronous query API must replace this
+synchronous scope lifetime explicitly rather than holding the context over await.
