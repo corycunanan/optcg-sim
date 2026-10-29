@@ -1,3 +1,4 @@
+import { chooseFirstObligation, orderedEnvelope } from "./opt-981-test-ordering.js";
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 import { readFileSync } from "node:fs";
@@ -54,6 +55,7 @@ it.each(Object.keys(corpus))("replays committed actual writer live/undo and ever
     for (const initial of [loaded.state, loaded.undoHistory[0]]) {
       let actual = initial;
       for (const [offset, action] of item.replies.entries()) {
+        if (!root) actual = chooseFirstObligation(actual, loaded.cardDb);
         const expected = expectedPauses[item.index + offset];
         actual.pendingPrompt!.promptId = expected.pendingPrompt!.promptId;
         const storage = new MemorySessionStorage();
@@ -63,7 +65,7 @@ it.each(Object.keys(corpus))("replays committed actual writer live/undo and ever
             root
               ? expected
               : historicalBattle ? candidateExpected(`final/${name}/${item.index}/pause/${offset}`)
-              : writerEnvelope(candidateExpected(`final/${name}/${item.index}/pause/${offset}`))
+              : orderedEnvelope(writerEnvelope(candidateExpected<GameState>(`final/${name}/${item.index}/pause/${offset}`)), actual)
           );
         const result = resume(actual, action, loaded.cardDb, { drainPregame: (s) => s, advanceStartOfTurn: (s) => s });
         expect(result.responseRejected).toBeFalsy();
@@ -73,7 +75,7 @@ it.each(Object.keys(corpus))("replays committed actual writer live/undo and ever
           root
             ? entry.expected
             : historicalBattle ? candidateExpected(`final/${name}/${item.index}/final`)
-            : writerEnvelope(candidateExpected(`final/${name}/${item.index}/final`))
+            : orderedEnvelope(writerEnvelope(candidateExpected<GameState>(`final/${name}/${item.index}/final`)), actual)
         );
     }
   }

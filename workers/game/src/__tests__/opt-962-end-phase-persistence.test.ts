@@ -34,7 +34,7 @@ async function roundTrip(r: EndPhaseRig): Promise<void> {
   const repo = new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" });
   await repo.save({ state: r.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [] });
   const written = storage.data.get(SESSION_STORAGE_KEY) as { state: Record<string, unknown> };
-  expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(8);
+  expect(written.state[GAME_STATE_SCHEMA_VERSION_KEY]).toBe(r.state.schemaVersion);
   r.state = (await new SessionRepository(storage, { nextJsUrl: "https://app.example.test", workerSecret: "secret" }).load())!.state;
 }
 

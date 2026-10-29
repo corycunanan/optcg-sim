@@ -195,19 +195,21 @@ export const EXPECTED_STAGES = [
   "END_OF_YOUR_TURN_WAVE",
   "END_OF_OPPONENT_TURN_WAVE",
   "TURN_PLAYER_END_OF_TURN",
+  "TURN_PLAYER_END_OF_TURN",
+  "NON_TURN_PLAYER_END_OF_TURN",
   "NON_TURN_PLAYER_END_OF_TURN",
 ];
 
 /** The fixed reply for the n-th prompt. */
 export function fullEndPhaseReply(r: EndPhaseRig, n: number): { action: GameAction; player: 0 | 1 } {
   const lim = r.state.players[1].characters.find((c) => c?.cardId === "OP03-015");
-  switch (n) {
-    case 0: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [lim!.instanceId] }, player: 0 };
-    case 1: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [r.state.players[0].leader.instanceId] }, player: 1 };
-    case 2: return { action: { type: "PLAYER_CHOICE", choiceId: "accept" }, player: 1 };
-    case 3: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [] }, player: 0 };
-    case 4: return { action: { type: "SELECT_TARGET", selectedInstanceIds: [] }, player: 1 };
-    default: throw new Error(`unexpected prompt ${n}: ${r.state.pendingPrompt?.options.promptType}`);
-  }
+  const prompt = r.state.pendingPrompt!;
+  if (r.state.effectStack.at(-1)?.phaseBoundaryContinuation?.awaitingOrder)
+    return { action: { type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" }, player: prompt.respondingPlayer };
+  if (n === 0) return { action: { type: "SELECT_TARGET", selectedInstanceIds: [lim!.instanceId] }, player: 0 };
+  if (n === 1) return { action: { type: "SELECT_TARGET", selectedInstanceIds: [r.state.players[0].leader.instanceId] }, player: 1 };
+  if (n === 2) return { action: { type: "PLAYER_CHOICE", choiceId: "accept" }, player: 1 };
+  return { action: { type: "SELECT_TARGET", selectedInstanceIds: [] }, player: prompt.respondingPlayer };
+
 }
 

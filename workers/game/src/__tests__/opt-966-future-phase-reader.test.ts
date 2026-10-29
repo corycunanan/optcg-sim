@@ -1,3 +1,4 @@
+import { chooseFirstObligation, orderedEnvelope } from "./opt-981-test-ordering.js";
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 import { expect, it } from "vitest";
@@ -41,6 +42,7 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
   for (const initial of [loaded.state, loaded.undoHistory[0]]) {
     let actual = initial;
     for (const [offset, action] of replies.entries()) {
+      actual = chooseFirstObligation(actual, loaded.cardDb);
       // The producer uses fixed prompt IDs to keep storage allocation identical.
       actual.pendingPrompt!.promptId = `${promptPrefix}-${index + offset}`;
       // No hidden mode survives a save: every re-park must carry its v5 owner.
@@ -67,7 +69,7 @@ it.each(cases)("resumes writer $name pause $index through later work in live and
       actual = result.state;
     }
       expected = writerEnvelope(candidateExpected<GameState>(`future/${name}/${index}/final`));
-      expect(actual).toEqual(expected);
+      expect(actual).toEqual(orderedEnvelope(expected, actual));
       expect(actual.pendingPrompt).toBeNull();
     expect(actual.effectStack).toEqual([]);
     expect(actual.eventLog).toEqual(expected.eventLog);

@@ -1,3 +1,4 @@
+import { chooseFirstObligation } from "./opt-981-test-ordering.js";
 import { describe, expect, it } from "vitest";
 import type { Action } from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
@@ -207,6 +208,7 @@ describe("OPT-735 phase-boundary prompts", () => {
 
   it("round-trips remaining end-phase work while the scheduled prompt is pending", async () => {
     const { cardDb, offered } = offerScheduledChoice(2);
+    offered.state = chooseFirstObligation(offered.state, cardDb);
     const storage = new MemoryStorage();
     const repository = new SessionRepository(storage, {
       nextJsUrl: "https://app.example.test",
