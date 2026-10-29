@@ -1,0 +1,59 @@
+{
+  "provenance": "captured",
+  "source": "read-only-existing-session-exports",
+  "capturedAt": "2026-10-29T05:08:46.630Z",
+  "deployedWorkerVersion": "96db2d07-540b-4d06-871c-f96b1def4a90",
+  "readerSha": "16275aa27cea54739255695a8c35038de6515d2c",
+  "attempted": 25,
+  "http404": 23,
+  "sanitizedCaptures": 2,
+  "rawReaderAcceptedCaptures": 0,
+  "gaps": [
+    "livePlusUndo",
+    "pausedCostTransaction",
+    "replacementSingle",
+    "replacementBatch",
+    "battleDamage",
+    "effectDamage",
+    "midEndPhase",
+    "exactHistoricalBattleTriggerLife",
+    "exactHistoricalBattleDamageContinuation",
+    "exactHistoricalEffectTrigger"
+  ],
+  "cases": [
+    {
+      "file": "capture-01.json",
+      "sha256": "94c05fd7c88e3b6cc350eb62305ddfd865126addfad63dda90b241e71daeb3a5",
+      "bytes": 20330,
+      "provenance": "captured",
+      "schemaVersion": "absent",
+      "assignedVersion": 1,
+      "costSemanticsVersion": "absent",
+      "status": "ABANDONED",
+      "phase": "REFRESH",
+      "hasPrompt": false,
+      "stackCount": 0,
+      "undoCount": 0,
+      "rawDisposition": "rejected",
+      "rawError": "Stored session state has an invalid core shape at executionContext: Invalid input: expected object, received undefined",
+      "scratchContextAdapterError": "Stored session state has an invalid core shape at pregame.startOfGameEffectsResolved: Invalid input: expected tuple, received undefined"
+    },
+    {
+      "file": "capture-06.json",
+      "sha256": "dfc26222d1e26e097b31702ef3905b12670800bd8d6dff1bab09c58aa353f734",
+      "bytes": 20068,
+      "provenance": "captured",
+      "schemaVersion": "absent",
+      "assignedVersion": 1,
+      "costSemanticsVersion": "absent",
+      "status": "FINISHED",
+      "phase": "MAIN",
+      "hasPrompt": false,
+      "stackCount": 0,
+      "undoCount": 0,
+      "rawDisposition": "rejected",
+      "rawError": "Stored session state has an invalid core shape at executionContext: Invalid input: expected object, received undefined",
+      "scratchContextAdapterError": "Stored session state has an invalid core shape at pregame: Invalid input: expected object, received undefined"
+    }
+  ]
+}
