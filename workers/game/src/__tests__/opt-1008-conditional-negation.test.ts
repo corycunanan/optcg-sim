@@ -136,10 +136,11 @@ describe("OPT-1008 bounded conditional permanent negation", () => {
     expect(isCardNegated(ally, r.state, r.db)).toBe(false);
   });
 
-  it.each(["snapshot", "database", "game"])("isolates a synchronously reentered independent %s", kind => {
+  it.each(["snapshot", "shallow snapshot", "database", "game"])("isolates a synchronously reentered independent %s", kind => {
     const { r, ally, aura } = fixture();
     aura.conditions = { type: "CARD_ON_FIELD", controller: "SELF", filter: rushFilter };
     const otherState = kind === "snapshot" ? structuredClone(r.state)
+      : kind === "shallow snapshot" ? { ...r.state }
       : kind === "game" ? { ...r.state, id: "independent-game" } : r.state;
     const otherDb = kind === "database" ? new Map(r.db) : r.db;
     const originalGet = r.db.get.bind(r.db);

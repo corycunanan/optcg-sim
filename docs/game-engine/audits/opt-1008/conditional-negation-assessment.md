@@ -47,9 +47,10 @@ keyword/filter/condition callbacks and effective power/cost readers re-entered
 public isCardNegated with fresh guards, reproducing RangeError.
 
 Each synchronous root negation query now owns one visiting set. Nested calls
-adopt it when game ID, players-array identity and cardDb identity match. A shallow
-SET_POWER eligibility view has different activeEffects but identical field roots,
-so it shares the guard. An independent structured-clone snapshot or different
+adopt it when exact state-root identity and cardDb identity match. Internally
+created SET_POWER eligibility views are explicitly aliased to their parent root
+in a WeakMap, so they share the guard without retaining the temporary view. An
+independent shallow or structured-clone snapshot, another game or a different
 cardDb gets a separate scope even when card instance IDs match. A synchronous
 reentrant query can find its ancestor scope through an intervening independent
 scope. A finally block removes each root scope on success or error; the existing
@@ -58,7 +59,7 @@ there is no cache, persisted field, global cross-game result, or async lifetime.
 
 The exception-cleanup test checks fresh guard allocation after a nested exception,
 not merely a repeated Boolean result (a leaked empty set could mask retention).
-Three reentrancy controls independently inspect another snapshot/database during an
+Four reentrancy controls independently inspect another snapshot/database during an
 active query and require its own true result. A broad module-global guard would
 incorrectly return false for those cases.
 

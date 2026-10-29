@@ -261,12 +261,12 @@ export function modifierAppliesToCard(
  * (and to prevent an attacker mutually-negating their way out of a negation).
  */
 // Synchronous query scopes include keyword/filter/condition and effective-stat
-// callbacks, not just direct aura-source traversal. SET_POWER evaluates a
-// shallow state view with different activeEffects but the same field roots;
-// share that query's guard while isolating other games, snapshots and databases.
+// callbacks, not just direct aura-source traversal. Only explicitly identified
+// internal SET_POWER views share their parent's root; even independent shallow
+// state snapshots and different databases retain their own guard.
+const negationEvaluationRoots = new WeakMap<GameState, GameState>();
 interface NegationQueryContext {
-  gameId: string;
-  players: GameState["players"];
+  state: GameState;
   cardDb: Map<string, CardDataType> | undefined;
   visiting: Set<string>;
 }
@@ -277,11 +277,12 @@ export function isCardNegated(
   state: GameState,
   cardDb?: Map<string, CardDataType>
 ): boolean {
+  const queryState = negationEvaluationRoots.get(state) ?? state;
   const active = negationQueryContexts.find(context =>
-    context.gameId === state.id && context.players === state.players && context.cardDb === cardDb);
+    context.state === queryState && context.cardDb === cardDb);
   if (active) return isCardNegatedWithGuard(card, state, cardDb, active.visiting);
   const context: NegationQueryContext = {
-    gameId: state.id, players: state.players, cardDb, visiting: new Set(),
+    state: queryState, cardDb, visiting: new Set(),
   };
   negationQueryContexts.push(context);
   try {
@@ -543,6 +544,10 @@ export function getEffectiveBasePower(
           ) };
         }),
       };
+      // This fresh eligibility-only view belongs to its parent's query. A
+      // WeakMap alias keeps unrelated shallow snapshots isolated and does not
+      // retain the temporary view after evaluation.
+      negationEvaluationRoots.set(evaluationState, negationEvaluationRoots.get(state) ?? state);
       if (!modifierAppliesToCard(effect, mod, card, evaluationState, cardDb)) continue;
       if (!isModifierConditionMet(effect, mod, evaluationState, cardDb)) continue;
       const value = permanentModifierParam(
