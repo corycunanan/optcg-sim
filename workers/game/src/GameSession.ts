@@ -38,6 +38,7 @@ import {
 import { createResultCallbackFetch } from "./session/result-callback.js";
 import { consumePlayerUpgradeBudget } from "./session/player-rate-limit-policy.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
+import { handleSessionExportRequest } from "./session/export.js";
 import { handleGameStatusRequest } from "./session/status.js";
 import {
   ACTION_RATE_LIMIT_CLOSE_REASON,
@@ -129,6 +130,11 @@ export class GameSession implements DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    // Export must bypass load/migration, in-memory state and all game actions.
+    if (/^\/game\/[^/]+\/export$/.test(url.pathname)) {
+      return handleSessionExportRequest(request, this.env.GAME_WORKER_SECRET, this.state.storage);
+    }
 
     // POST /init — called by Next.js on lobby start
     if (request.method === "POST" && url.pathname.endsWith("/init")) {

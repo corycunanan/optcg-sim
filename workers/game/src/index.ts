@@ -7,6 +7,7 @@
  *   GET  /game/:gameId/cards       — Card DB fetch
  *   POST /game/:gameId/notify-end  — Server-to-server result fallback
  *   POST /game/:gameId/revoke-spectators — Server-to-server socket revocation
+ *   GET  /game/:gameId/export      — Signed, sanitized persisted live + undo capture
  *   GET  /game/:gameId/status      — Server-to-server lifecycle probe
  *
  *   GET  /user/:userId/ws          — User-channel WebSocket upgrade (token in ?token=)
@@ -16,6 +17,7 @@
 
 export { GameSession } from "./GameSession.js";
 export { UserChannel } from "./UserChannel.js";
+import { authorizeSessionExport } from "./session/export.js";
 import type { Env } from "./types.js";
 
 const GAME_ROUTE_PATTERN =
@@ -25,6 +27,15 @@ const USER_ROUTE_PATTERN = /^\/user\/([^/]+)\/(ws|notify|health)$/;
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // Operator export is deliberately outside browser CORS and bearer routes.
+    const exportMatch = url.pathname.match(/^\/game\/([^/]+)\/export$/);
+    if (exportMatch) {
+      const rejected = await authorizeSessionExport(request, env.GAME_WORKER_SECRET);
+      if (rejected) return rejected;
+      const id = env.GAME_SESSION.idFromName(exportMatch[1]);
+      return env.GAME_SESSION.get(id).fetch(request);
+    }
 
     // CORS preflight
     if (request.method === "OPTIONS") {
