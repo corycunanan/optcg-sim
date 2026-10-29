@@ -17,6 +17,8 @@ const filters: TargetFilter[] = [
   { cost_min: { type: "GAME_STATE", source: "LIFE_COUNT", controller: "OPPONENT" } },
   { power_min: { type: "GAME_STATE", source: "DON_FIELD_COUNT", controller: "SELF" } },
   { don_given_count: { operator: "==", value: 0 } },
+  // Compatibility control: the shared matcher currently treats this nonnumeric value as 0.
+  // Actual DON dependence is covered by power_min: DON_FIELD_COUNT above and below.
   { don_given_count: { operator: ">=", value: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } } },
   { exclude_self: true, cost_min: 1 },
 ];
@@ -80,7 +82,7 @@ describe("OPT-992 exact two-removal solver", () => {
     const source = r.put("a", 0, "HAND"); r.put("b", 0, "HAND"); r.put("c", 0, "HAND");
     const costs: Cost[] = [{ type: "TRASH_FROM_HAND", amount: 1 }, { type: "TRASH_FROM_HAND", amount: 1, filter: { cost_max: 100 } }];
     if (reason === "attachments") source.attachedDon.push({ ...r.state.players[0].donCostArea.pop()!, attachedTo: source.instanceId });
-    if (reason === "hand schema") r.db.get("a")!.effectSchema = { card_id: "a", card_name: "a", card_type: "Character", effects: [] };
+    if (reason === "hand schema") r.db.get("a")!.effectSchema = { card_id: "a", card_name: "a", card_type: "Character", effects: [{ id: "self-cost", category: "permanent", zone: "HAND", modifiers: [{ type: "MODIFY_COST", params: { amount: -1 } }] }] };
     if (reason === "prohibition") r.state.prohibitions.push({ id: "p", controller: 0, sourceCardInstanceId: source.instanceId, sourceEffectBlockId: "p", prohibitionType: "CANNOT_BE_RESTED", scope: { cause: "ANY" }, duration: { type: "PERMANENT" }, appliesTo: [], usesRemaining: null });
     if (reason === "active effect") r.state.activeEffects.push({ id: "e", controller: 0, sourceCardInstanceId: source.instanceId, sourceEffectBlockId: "e", category: "auto", modifiers: [], expiresAt: { wave: "END_OF_TURN", turn: 1 }, duration: { type: "PERMANENT" }, appliesTo: [], timestamp: 0 });
     if (reason === "identity count") costs[1] = { type: "TRASH_FROM_HAND", amount: 1, filter: { cost_max: { type: "GAME_STATE", source: "MATCHING_CARD_COUNT" } } };
@@ -142,4 +144,78 @@ it("OPT-992 field suffix still honors the cost movement prohibition", () => {
   expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
   expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
   expect(solveTwoRemovalCosts(r.state, costs, 0, r.db, source.instanceId)).toBeUndefined();
+});
+
+it("OPT-992 ordinary injected authored schemas retain the exact hand solver", () => {
+  for (const mode of [6, 7, 8] as const) for (const filter of filters) {
+    const r = rig(); r.state.costSemanticsVersion = mode;
+    const source = r.put("OP01-025", 0, "HAND");
+    for (let i = 0; i < 3; i++) r.put("OP01-025", 0, "HAND");
+    expect(r.db.get("OP01-025")?.effectSchema?.effects.length).toBeGreaterThan(0);
+    const costs: Cost[] = [{ type: "TRASH_FROM_HAND", amount: 1 }, { type: "TRASH_FROM_HAND", amount: 2, filter }];
+    const oracle = isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId);
+    expect(solveTwoRemovalCosts(r.state, costs, 0, r.db, source.instanceId)).toBe(oracle);
+    expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(oracle);
+  }
+});
+
+it("OPT-992 hand self-reductions still require the complete choice search", () => {
+  const r = rig();
+  const source = r.put("reduced", 0, "HAND", { data: { cost: 5 }, schema: {
+    card_id: "reduced", card_name: "reduced", card_type: "Character", effects: [{
+      id: "hand-cost", category: "permanent", zone: "HAND",
+      modifiers: [{ type: "MODIFY_COST", params: { amount: -5 } }],
+    }],
+  } });
+  r.put("other", 0, "HAND", { data: { cost: 10 } });
+  const costs: Cost[] = [{ type: "TRASH_FROM_HAND", amount: 1 }, { type: "TRASH_FROM_HAND", amount: 1, filter: { cost_max: 0 } }];
+  expect(r.state.activeEffects).toHaveLength(0);
+  expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId)).toBe(true);
+  expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(true);
+  expect(solveTwoRemovalCosts(r.state, costs, 0, r.db, source.instanceId)).toBeUndefined();
+});
+
+it("OPT-992 exclude_self is required even when the source meets the numeric filter", () => {
+  const r = rig();
+  const source = r.put("source", 0, "HAND", { data: { cost: 5 } });
+  r.put("other", 0, "HAND", { data: { cost: 5 } });
+  const costs: Cost[] = [{ type: "TRASH_FROM_HAND", amount: 1, filter: { name: "other" } }, { type: "TRASH_FROM_HAND", amount: 1, filter: { exclude_self: true, cost_max: 10 } }];
+  expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
+  expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
+  expect(solveTwoRemovalCosts(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
+});
+
+it("OPT-992 stolen field ownership makes the hand threshold choice-dependent", () => {
+  const r = rig();
+  const stolen = r.put("stolen", 0, "CHARACTER", { data: { cost: 1 } });
+  stolen.owner = 1; // Controlled by payer0, returned to owner1's hand.
+  r.put("own", 0, "CHARACTER", { data: { cost: 9 } });
+  const costs: Cost[] = [{ type: "RETURN_OWN_CHARACTER_TO_HAND", amount: 1 }, { type: "TRASH_OWN_CHARACTER", amount: 1, filter: { cost_max: { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } } }];
+  expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, stolen.instanceId)).toBe(true);
+  expect(isCostSequencePayable(r.state, costs, 0, r.db, stolen.instanceId)).toBe(true);
+  expect(solveTwoRemovalCosts(r.state, costs, 0, r.db, stolen.instanceId)).toBeUndefined();
+});
+
+it.each(["EITHER", "OPPONENT"] as const)("OPT-992 %s field domains use the complete search", controller => {
+  const r = rig();
+  const source = r.put("own", 0, "CHARACTER");
+  r.put("opponent", 1, "CHARACTER");
+  const first: Cost = controller === "EITHER"
+    ? { type: "PLACE_OWN_CHARACTER_TO_DECK", amount: 1, controller }
+    : { type: "ADD_OWN_CHARACTER_TO_LIFE", amount: 1, controller };
+  const costs: Cost[] = [first, { type: "TRASH_OWN_CHARACTER", amount: 1 }];
+  expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId)).toBe(true);
+  expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(true);
+  expect(solveTwoRemovalCosts(r.state, costs, 0, r.db, source.instanceId)).toBeUndefined();
+});
+
+it.each([{ don: 3, expected: true }, { don: 4, expected: false }])("OPT-992 real DON-dependent power threshold at $don", ({ don, expected }) => {
+  const r = rig();
+  const source = r.put("a", 0, "HAND", { data: { power: 3 } });
+  r.put("b", 0, "HAND", { data: { power: 3 } });
+  r.state.players[0].donCostArea = r.state.players[0].donCostArea.slice(0, don);
+  const costs: Cost[] = [{ type: "TRASH_FROM_HAND", amount: 1 }, { type: "TRASH_FROM_HAND", amount: 1, filter: { power_min: { type: "GAME_STATE", source: "DON_FIELD_COUNT", controller: "SELF" } } }];
+  expect(isCostSequencePayableWithoutPrune(r.state, costs, 0, r.db, source.instanceId)).toBe(expected);
+  expect(solveTwoRemovalCosts(r.state, costs, 0, r.db, source.instanceId)).toBe(expected);
+  expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(expected);
 });

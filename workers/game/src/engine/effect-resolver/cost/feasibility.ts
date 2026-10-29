@@ -355,11 +355,12 @@ function hasCountOnlyFilter(filter: TargetFilter | undefined, field: boolean): b
  *
  * One real payment computes the counts; it is never used as a witness. This
  * avoids inventing transitions, destination ownership or mode semantics.
- * No modifiers/prohibitions may change survivor eligibility. Hand schemas are
- * excluded because while-in-hand self reductions need not be activeEffects.
+ * No modifiers/prohibitions may change survivor eligibility. Hand permanent
+ * HAND-zone MODIFY_COST blocks are excluded: getHandZoneSelfCostModifier reads
+ * exactly those blocks without requiring a registration in activeEffects.
  * No attachments may change DON counts. Unsupported shapes retain exhaustive
  * search, including replacement/choice producers and longer sequences.
- * Work is O(state copy + zone size * filter evaluation), independent of C(n,k).
+ * Work is O(state copy + zone size * (filter + schema inspection)), not C(n,k).
  */
 export function solveTwoRemovalCosts(
   state: GameState,
@@ -379,7 +380,9 @@ export function solveTwoRemovalCosts(
       typeof m !== "number" || !Number.isSafeInteger(m) || m < 1) return undefined;
   const cards = (state.players[controller][zone] as (CardInstance | null)[]).filter((card): card is CardInstance => card !== null);
   if (cards.some(card => card.owner !== controller || card.controller !== controller || card.attachedDon.length ||
-      (zone === "hand" && cardDb.get(card.cardId)?.effectSchema))) return undefined;
+      (zone === "hand" && cardDb.get(card.cardId)?.effectSchema?.effects.some(block =>
+        block.category === "permanent" && block.zone === "HAND" &&
+        block.modifiers?.some(modifier => modifier.type === "MODIFY_COST"))))) return undefined;
   const prefix = computeCostTargets(state, first, controller, cardDb, sourceCardInstanceId);
   if (prefix.length < k) return false;
   const after = applyCostSelection(state, first, prefix.slice(0, k), controller, cardDb, sourceCardInstanceId).state;

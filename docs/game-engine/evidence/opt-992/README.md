@@ -42,10 +42,17 @@ The filter-key/value-source allowlists are closed. Cost/power GAME_STATE
 values admit the existing filter interpreter's hand/deck/Life/DON scalar
 sources. RESTED_CARD_COUNT is allowed only outside field prefixes. Identity
 counts, nested alternatives, reference reads, keyword/effect queries and new
-keys fall back. DON-given nested values receive the same source check.
-Active effects and prohibitions must be empty. Hand cards with any effect
-schema fall back because while-in-hand self cost changes are not necessarily
-registered in activeEffects. No new interpretation of the filter interpreter's
+keys fall back. DON-given nested values receive the same source check, although the existing
+shared matcher treats a nonnumeric DON-given value as zero; that test row is
+a compatibility control, not proof of dynamic DON-given support. Actual
+DON-dependent power thresholds use the interpreter's `DON_FIELD_COUNT`.
+Active effects and prohibitions must be empty. Hand cards with permanent `zone: HAND` blocks containing `MODIFY_COST`
+fall back because these self cost changes are not necessarily registered in
+activeEffects. This is the exact block shape inspected by
+`getHandZoneSelfCostModifier`: other authored blocks cannot change that read.
+The guard deliberately ignores conditions and amount, conservatively retaining
+full search for every potentially relevant block. Ordinary injected authored
+schemas remain eligible; the paired harness uses actual OP01-025 definitions. No new interpretation of the filter interpreter's
 DON_FIELD_COUNT (cost-area count) is introduced.
 
 The actual admitted `applyCostSelection` cases directly call `transitionCards`;
@@ -97,10 +104,24 @@ filter/prohibition oracle comparisons, 500 resource samples, mode8 exact-DON
 suite, authored survey and four-consumer scale harness remain enabled.
 
 Supported two-cost families have O(state-copy + zone-size * filter-evaluation)
-work, independent of C(n,k). **There is no general hard runtime bound for
+work plus linear inspection of candidate schema blocks, independent of C(n,k). **There is no general hard runtime bound for
 arbitrary schemas.** Unsupported effects, protections, attachments, dynamic
 identity reads, heterogeneous zones and longer sequences still enumerate
 completely. The authored survey gate must remain in place; any new exposure
 requires its own scale scenario/proof before admitting it. Extending this
 closed family or adding a sound state-key quotient is follow-up work, not a
 claim made by this PR.
+
+## Review strengthening
+
+The paired harness uses twenty actual OP01-025 instances with injected authored
+schemas; a separate 33-case mode/filter oracle matrix proves ordinary schemas
+remain admitted. A hand permanent MODIFY_COST fixture demonstrates why the
+precise self-reduction guard remains necessary. Independent controls cover a
+numerically eligible excluded source, stolen Character destination ownership,
+EITHER/OPPONENT field domains, and a DON_FIELD_COUNT threshold whose result
+changes when the cost-area count changes from three to four. Mutations dropping
+exclude_self, ownership, field-domain and self-modifier guards all fail; restoring
+the former blanket schema guard also fails the authored-hand admission test.
+The OPPONENT-domain mutant still falls back via the post-payment count defense;
+the EITHER-domain counterexample is what kills the combined domain mutant.
