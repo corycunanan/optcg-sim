@@ -225,3 +225,25 @@ it("OPT-986 measures OP17-038 authored three-card prefix", () => {
   r.state.players[0].donCostArea = [];
   expect(isCostSequencePayable(r.state, costs, 0, r.db, source.instanceId)).toBe(false);
 });
+
+it("OPT-992 bounds paired 8-of-20 dynamic suffix failures in hand and trash", () => {
+  for (const zone of ["HAND", "TRASH"] as const) for (const dynamic of [false, true]) {
+    const r = rig();
+    for (let i = 0; i < 20; i++) r.put(`dynamic-${i}`, 0, zone, { data: { cost: 30 } });
+    const type = zone === "HAND" ? "TRASH_FROM_HAND" : "PLACE_FROM_TRASH_TO_DECK";
+    const costs: Cost[] = [{ type, amount: 8 }, { type, amount: 1, filter: { cost_max: dynamic
+      ? { type: "GAME_STATE", source: "HAND_COUNT", controller: "SELF" } : -1 } }];
+    const timed = (fn: () => unknown) => { const start = performance.now(); fn(); return performance.now() - start; };
+    const calibrate = () => { for (let i = 0; i < 20; i++) JSON.parse(JSON.stringify(r.state)); };
+    const ratios: number[] = [], times: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const before = timed(calibrate);
+      const ms = timed(() => expect(isCostSequencePayable(r.state, costs, 0, r.db, "source")).toBe(false));
+      const after = timed(calibrate);
+      times.push(ms); ratios.push(ms / ((before + after) / 2));
+    }
+    const ratio = ratios.sort((a, b) => a - b)[1];
+    process.stderr.write(`OPT992 ${zone} ${dynamic ? "GAME_STATE" : "numeric"} C(20,8)=125970 dynamic suffix ratio=${ratio.toFixed(3)} samplesMs=${times.map(ms => ms.toFixed(3)).join(",")}\n`);
+    expect(ratio, zone).toBeLessThan(60);
+  }
+}, 60_000);

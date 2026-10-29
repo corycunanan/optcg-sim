@@ -1,7 +1,8 @@
 /** Pure sequential feasibility search for cost suffixes and choice branches. */
 import { hasStructuralCostSemantics } from "../../native-cost-semantics.js";
-import type { Cost, SimpleCost } from "../../effect-types.js";
-import type { CardData, GameState } from "../../../types.js";
+import type { Cost, SimpleCost, TargetFilter } from "../../effect-types.js";
+import type { CardData, CardInstance, GameState } from "../../../types.js";
+import { matchesFilter } from "../../conditions.js";
 import { namedPlayCandidates, payNamedPlay } from "./named-play.js";
 import { trashCharacter } from "../card-mutations.js";
 import { payCosts } from "./payment.js";
@@ -299,6 +300,100 @@ export function sequenceFailsStableTargetCondition(
   return false;
 }
 
+/** The complete two-step solver admits only removals from one shrinking zone. */
+function removalZone(cost: Cost): "hand" | "trash" | "characters" | undefined {
+  switch (cost.type) {
+    case "TRASH_FROM_HAND":
+    case "PLACE_HAND_TO_DECK": return "hand";
+    case "PLACE_FROM_TRASH_TO_DECK": return "trash";
+    case "KO_OWN_CHARACTER":
+    case "TRASH_OWN_CHARACTER":
+    case "RETURN_OWN_CHARACTER_TO_HAND":
+    case "PLACE_OWN_CHARACTER_TO_DECK":
+    case "ADD_OWN_CHARACTER_TO_LIFE":
+      return !("controller" in cost) || !cost.controller || cost.controller === "SELF" ? "characters" : undefined;
+    default: return undefined;
+  }
+}
+
+/**
+ * Keep the dependency proof closed: new filter keys / value sources fall back.
+ * GAME_STATE values below depend only on fixed zone cardinalities, not WHICH
+ * cards moved. RESTED_CARD_COUNT is not invariant under a field removal.
+ * Other accepted predicates read the surviving card's unchanged own data.
+ */
+function hasCountOnlyFilter(filter: TargetFilter | undefined, field: boolean): boolean {
+  const local = new Set([
+    "name", "name_any_of", "name_includes", "exclude_name", "exclude_self", "card_type",
+    "base_cost_exact", "base_cost_min", "base_cost_max", "cost_range",
+    "base_power_exact", "base_power_min", "base_power_max", "power_range",
+    "color", "color_includes", "traits", "traits_any_of", "traits_contains", "traits_exclude",
+    "is_rested", "is_active", "state", "controller",
+  ]);
+  const numeric = new Set(["cost_exact", "cost_min", "cost_max", "power_exact", "power_min", "power_max"]);
+  const sources = new Set([
+    "HAND_COUNT", "DECK_COUNT", "LIFE_COUNT", "OPPONENT_LIFE_COUNT", "COMBINED_LIFE_COUNT",
+    "DON_FIELD_COUNT", "OPPONENT_DON_FIELD_COUNT", ...(!field ? ["RESTED_CARD_COUNT"] : []),
+  ]);
+  const countValue = (value: unknown): boolean => typeof value === "number" ||
+    Boolean(value && typeof value === "object" && "type" in value && value.type === "GAME_STATE" &&
+      "source" in value && typeof value.source === "string" && sources.has(value.source));
+  return Object.entries(filter ?? {}).every(([key, value]) => local.has(key) ||
+    (numeric.has(key) && countValue(value)) ||
+    (key === "don_given_count" && countValue(filter?.don_given_count?.value)));
+}
+
+/**
+ * OPT-992 exact overlap solver. Undefined means use the complete search.
+ *
+ * Let P be the first payment's candidates and S the second payment's candidates
+ * BEFORE removing the chosen subset of P, but with the post-payment counts.
+ * Under the guards, every k-subset of P produces those same counts and cannot
+ * change any surviving card's suffix eligibility. The best first payment uses
+ * P\S first, so precisely max(0, k - |P\S|) suffix candidates must disappear.
+ * Thus |S| - max(0, k - |P\S|) >= m iff a complete payment exists.
+ *
+ * One real payment computes the counts; it is never used as a witness. This
+ * avoids inventing transitions, destination ownership or mode semantics.
+ * No modifiers/prohibitions may change survivor eligibility. Hand schemas are
+ * excluded because while-in-hand self reductions need not be activeEffects.
+ * No attachments may change DON counts. Unsupported shapes retain exhaustive
+ * search, including replacement/choice producers and longer sequences.
+ * Work is O(state copy + zone size * filter evaluation), independent of C(n,k).
+ */
+export function solveTwoRemovalCosts(
+  state: GameState,
+  costs: readonly Cost[],
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId: string,
+): boolean | undefined {
+  if (costs.length !== 2 || state.activeEffects.length || state.prohibitions.length) return undefined;
+  const [first, second] = costs;
+  const zone = removalZone(first);
+  if (!zone || removalZone(second) !== zone || first.type === "CHOICE" || second.type === "CHOICE") return undefined;
+  if (!hasCountOnlyFilter(second.filter, zone === "characters")) return undefined;
+  const k = first.amount;
+  const m = second.amount;
+  if (typeof k !== "number" || !Number.isSafeInteger(k) || k < 1 ||
+      typeof m !== "number" || !Number.isSafeInteger(m) || m < 1) return undefined;
+  const cards = (state.players[controller][zone] as (CardInstance | null)[]).filter((card): card is CardInstance => card !== null);
+  if (cards.some(card => card.owner !== controller || card.controller !== controller || card.attachedDon.length ||
+      (zone === "hand" && cardDb.get(card.cardId)?.effectSchema))) return undefined;
+  const prefix = computeCostTargets(state, first, controller, cardDb, sourceCardInstanceId);
+  if (prefix.length < k) return false;
+  const after = applyCostSelection(state, first, prefix.slice(0, k), controller, cardDb, sourceCardInstanceId).state;
+  // If a future payment implementation refuses or replaces a movement, defer
+  // to the full search rather than assuming the requested cardinality.
+  if (after.players[controller][zone].filter(card => card !== null).length !== cards.length - k) return undefined;
+  const suffix = new Set(cards.filter(card =>
+    (!second.filter?.exclude_self || card.instanceId !== sourceCardInstanceId) &&
+    (!second.filter || matchesFilter(card, second.filter, cardDb, after, undefined, undefined, controller)),
+  ).map(card => card.instanceId));
+  const expendable = prefix.filter(id => !suffix.has(id)).length;
+  return suffix.size - Math.max(0, k - expendable) >= m;
+}
+
 /**
  * Explore costs in order, advancing each hypothetical state before testing the
  * next cost. Selection and choice costs branch over every valid payment.
@@ -340,7 +435,7 @@ export function isCostSequencePayable(
 }
 
 /**
- * Test oracle only: the same search without either necessary-condition prune,
+ * Test oracle only: the same search without pruning or the two-removal solver,
  * used to prove the prune never rejects a payable sequence.
  */
 export function isCostSequencePayableWithoutPrune(
@@ -383,6 +478,10 @@ function searchCostSequence(
   prune: boolean,
 ): boolean {
   if (costs.length === 0) return true;
+  if (prune) {
+    const solved = solveTwoRemovalCosts(state, costs, controller, cardDb, sourceCardInstanceId);
+    if (solved !== undefined) return solved;
+  }
   // OPT-961/986: reject before branching when a necessary condition fails;
   // each predicate documents its soundness argument above.
   if (prune && costs.length > 1 &&
