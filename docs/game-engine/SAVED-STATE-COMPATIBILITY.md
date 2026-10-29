@@ -225,7 +225,7 @@ Deploy verification: merging to `main` auto-deploys the game worker (`.github/wo
 
 A failed load surfaces as `SessionLoadError` from `SessionRepository.load()`. The Durable Object request that triggered the load fails (WebSocket upgrade, `/status`, `/cards`, `/notify-end`), and the three storage values are untouched. The message has the form `Stored session <location> <reason>`; `location` is `state` or `undoHistory[i]`; `reason` names the field or reference.
 
-1. **Capture first.** Dump the three keys (`session`, `session:card-db`, `session:undo-history`) before any repair. There is no sanitizing export route yet (see the unmet gate in the PR 1 body); use a wrangler-based dump until one exists.
+1. **Capture first.** Dump the three keys (`session`, `session:card-db`, `session:undo-history`) before any repair. The signed [session export route](./SESSION-CAPTURE-EXPORT.md) captures sanitized live + undo directly from persisted storage, without loading or repairing it. It deliberately excludes the card DB; any privileged full forensic dump remains separate from fixture publication.
 2. **Classify the failure** from `reason`:
    * `unsupported game-state schema version N` → a newer build wrote the session. Roll **forward** to a build that reads N. Do not edit the data.
    * `invalid core shape at …`, `unknown … variant` → the bytes are not a shape any supported build wrote. Treat as corruption. Recovery is manual (§5.3).
@@ -290,7 +290,7 @@ This is a degraded but loadable resume, limited to games paused inside an End Ph
 
 ## 7. Unmet rollout gate: captured sessions
 
-OPT-940 requires sanitized real Durable Object sessions as fixtures. None are available: wrangler is logged out on the coordinator's machine, no Cloudflare token exists, and `GameSession` exposes no export route. Every fixture in PR 1 is **synthetic**: real game states produced by the engine and serialized through the base-commit writer, plus constructed malformed states. None is a capture. The gate stays open until a capture covers live + undo, paused costs, paused replacements, paused damage, and a mid-End-Phase session. The PR body and the handoff entry carry the same statement.
+OPT-940 requires sanitized real Durable Object sessions as fixtures. The [signed sanitizing export route](./SESSION-CAPTURE-EXPORT.md) supplies the capture mechanism (OPT-971 option a). Adding this route does not supply real captures or close the rollout gate; deployment, capture inventory, leak scanning, and captured live/undo converter tests remain required. Every fixture in PR 1 is **synthetic**: real game states produced by the engine and serialized through the base-commit writer, plus constructed malformed states. None is a capture. The gate stays open until a capture covers live + undo, paused costs, paused replacements, paused damage, and a mid-End-Phase session. The PR body and the handoff entry carry the same statement.
 
 ## 8. Typed replacement and damage continuations (OPT-963: PR 5a reader, PR 5b writer)
 
