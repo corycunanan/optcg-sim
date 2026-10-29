@@ -299,6 +299,7 @@ const ReturnToDeckArrangement = z.strictObject({
  * game-state-schema.ts (`frameInvariantViolation`).
  */
 const PhaseBoundaryContinuation = z.strictObject({
+  awaitingOrder: z.literal(true).optional(),
   kind: z.literal("END_PHASE"),
   endingPlayerIndex: PlayerIndex,
   stage: z.enum(END_PHASE_STAGES),

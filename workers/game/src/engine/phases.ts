@@ -15,6 +15,7 @@ import type {
   EffectStackFrame,
   EndPhaseStep,
   ExecuteResult,
+  GameAction,
   GameEvent,
   GameState,
   PendingEvent,
@@ -239,13 +240,39 @@ export function advancePhaseBoundary(
   );
 }
 
+/** Consume one phase-owned choice; nested action prompts retain the parent queue. */
+export function selectEndOfTurnObligation(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+): import("./effect-resolver/types.js").HandlerResult | undefined {
+  const frame = state.effectStack.at(-1);
+  const continuation = frame?.phaseBoundaryContinuation;
+  if (!frame || !continuation?.awaitingOrder) return undefined;
+  const index = action.type === "PLAYER_CHOICE"
+    ? continuation.remainingScheduledActions.findIndex((_, i) => action.choiceId === `end-of-turn-obligation:${i}`)
+    : -1;
+  if (index < 0) return { kind: "waiting", state, events: [], resolved: false, rejected: true };
+  const queue = [...continuation.remainingScheduledActions];
+  const [chosen] = queue.splice(index, 1);
+  const next = { ...continuation };
+  delete next.awaitingOrder;
+  const result = continueEndPhase(
+    { ...popFrame(state), pendingPrompt: null },
+    { ...next, remainingScheduledActions: [chosen, ...queue] },
+    cardDb, [], frame, true,
+  );
+  return { ...result, kind: result.pendingPrompt ? "waiting" : "continued", resolved: !result.pendingPrompt };
+}
+
 /** Advance one End Phase rules stage; children return to the common drain. */
 function continueEndPhase(
   state: GameState,
   continuation: PhaseBoundaryContinuation,
   cardDb: Map<string, CardData>,
   events: PendingEvent[],
-  priorFrame?: EffectStackFrame
+  priorFrame?: EffectStackFrame,
+  selectedObligation = false,
 ): ExecuteResult {
   const pi = continuation.endingPlayerIndex;
   const depth = state.effectStack.length;
@@ -305,6 +332,36 @@ function continueEndPhase(
     const collected = collectEndOfTurnObligations(state, owner, step);
     state = collected.state;
     queue = collected.entries;
+  }
+  // Reader-first: only imported v11 states opt into obligation ordering.
+  // Already-resolved obligations must not pass through trigger activation gates.
+  if (!legacy && state.schemaVersion === 11 && queue.length > 1 && !selectedObligation) {
+    state = parkEndPhaseAt(state, {
+      ...continuation, stage, remainingScheduledActions: queue, awaitingOrder: true,
+    }, depth, priorFrame);
+    if (isGameTerminated(state)) return { state, events: [] };
+    const frame = state.effectStack.at(-1)!;
+    const pendingPrompt: NonNullable<GameState["pendingPrompt"]> = {
+      options: {
+        promptType: "PLAYER_CHOICE",
+        effectDescription: "Choose which end-of-turn effect to process next",
+        choices: queue.map((entry, index) => {
+          const source = entry.sourceCardSnapshot ?? state.players.flatMap(player =>
+            [player.leader, ...player.characters.filter(card => card !== null), ...player.trash, ...player.hand]
+          ).find(card => card.instanceId === entry.sourceEffectId);
+          return { id: `end-of-turn-obligation:${index}`,
+            label: `${source ? cardDb.get(source.cardId)?.name ?? source.cardId : "Resolved effect"}: end-of-turn effect ${index + 1}` };
+        }),
+      },
+      respondingPlayer: owner,
+      resumeContext: frame.id,
+    };
+    state = { ...state, pendingPrompt,
+      effectStack: state.effectStack.map(candidate => candidate.id === frame.id
+        ? { ...candidate, controller: owner, phase: "AWAITING_PLAYER_CHOICE" as const }
+        : candidate),
+    };
+    return { state, events: [], pendingPrompt };
   }
   const entry = queue.shift();
   if (entry) {

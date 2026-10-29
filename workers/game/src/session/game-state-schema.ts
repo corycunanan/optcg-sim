@@ -45,12 +45,12 @@ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
 /** The version this build's writer emits for state its own engine produces. */
 export const GAME_STATE_SCHEMA_VERSION = 8;
 /** The newest readable envelope; native8 carries exact battle completion and cost provenance. */
-export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 10;
+export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 11;
 /** The deployed runtime and default production writer use v8. */
 export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 8;
 export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
 /** Versions this build can read. Retiring one follows the support-window policy (§3). */
-export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+export const SUPPORTED_GAME_STATE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
 ];
 /** The version assigned to a persisted game-state object with no `schemaVersion` key. */
 export const LEGACY_GAME_STATE_SCHEMA_VERSION = 1;
@@ -517,6 +517,10 @@ export function convertToCurrentShape(
     throw new SessionLoadError(location, "must be an object");
   }
   const version = readGameStateSchemaVersion(raw, location);
+  if (version < 11 && Array.isArray(raw.effectStack) && raw.effectStack.some(frame =>
+    isRecord(frame) && isRecord(frame.phaseBoundaryContinuation) && "awaitingOrder" in frame.phaseBoundaryContinuation)) {
+    throw new SessionLoadError(location, "End Phase awaitingOrder requires schemaVersion 11");
+  }
   validateFieldTrashCapability(raw, version, reason => { throw new SessionLoadError(location, reason); });
   validateScheduledSourceSnapshots(raw, version, reason => { throw new SessionLoadError(location, reason); });
   validateFieldTrashDiscriminators(raw, fieldTrashSemanticsVersion(raw, version), reason => { throw new SessionLoadError(location, reason); });
@@ -594,6 +598,10 @@ export function convertToCurrentShape(
  * version 1 meaning.
  */
 export function toPersistedGameState(state: GameState): GameState {
+  if ((state.schemaVersion ?? GAME_STATE_SCHEMA_VERSION) < 11 && state.effectStack.some(frame =>
+    frame.phaseBoundaryContinuation && "awaitingOrder" in frame.phaseBoundaryContinuation)) {
+    throw new SessionLoadError("writer", "End Phase awaitingOrder requires schemaVersion 11");
+  }
   validateFieldTrashCapability(state, state.schemaVersion ?? GAME_STATE_SCHEMA_VERSION, reason => { throw new SessionLoadError("writer", reason); });
   validateFieldTrashDiscriminators(state, fieldTrashSemanticsVersion(state), reason => { throw new SessionLoadError("writer", reason); });
   validateScheduledSourceSnapshots(state, state.schemaVersion ?? GAME_STATE_SCHEMA_VERSION, reason => { throw new SessionLoadError("writer", reason); });
@@ -653,7 +661,7 @@ function frameInvariantViolation(
       return battleCompletionOwnerViolation(frame, state);
     case "PHASE_BOUNDARY": {
       const continuation = frame.phaseBoundaryContinuation!;
-      if (frame.phase !== "INTERRUPTED_BY_TRIGGERS") {
+      if (frame.phase !== (continuation.awaitingOrder ? "AWAITING_PLAYER_CHOICE" : "INTERRUPTED_BY_TRIGGERS")) {
         return `is PHASE_BOUNDARY but has phase ${frame.phase}`;
       }
       if (
@@ -671,6 +679,21 @@ function frameInvariantViolation(
       }
       if (continuation.endingPlayerIndex !== state.turn.activePlayerIndex) {
         return `has phaseBoundaryContinuation.endingPlayerIndex ${continuation.endingPlayerIndex} but turn.activePlayerIndex is ${state.turn.activePlayerIndex}`;
+      }
+      if (continuation.awaitingOrder) {
+        if (continuation.stage !== "TURN_PLAYER_END_OF_TURN" && continuation.stage !== "NON_TURN_PLAYER_END_OF_TURN") return "End Phase ordering requires an obligation step";
+        const queue = continuation.remainingScheduledActions;
+        const owner = continuation.stage === "TURN_PLAYER_END_OF_TURN"
+          ? continuation.endingPlayerIndex : continuation.endingPlayerIndex === 0 ? 1 : 0;
+        if (queue.length < 2) return "End Phase ordering requires at least two obligations";
+        if (frame !== state.effectStack.at(-1)) return "End Phase ordering must be the top frame";
+        if (frame.controller !== owner) return "End Phase ordering controller must be the step owner";
+        const prompt = state.pendingPrompt;
+        if (!prompt || prompt.resumeContext !== frame.id || prompt.respondingPlayer !== owner || prompt.options.promptType !== "PLAYER_CHOICE")
+          return "End Phase ordering requires its step owner's PLAYER_CHOICE prompt";
+        const choices = prompt.options.choices;
+        if (choices.length !== queue.length || choices.some((choice, index) => choice.id !== `end-of-turn-obligation:${index}` || choice.disabled))
+          return "End Phase ordering choices must exactly match its obligation queue";
       }
       return endPhaseStageViolation(continuation);
     }
@@ -984,7 +1007,7 @@ export function validateContinuationReferences(
       );
     }
     const kind = frameKindOf(target);
-    if (kind === "PHASE_BOUNDARY" || kind === "BATTLE_COMPLETION") {
+    if ((kind === "PHASE_BOUNDARY" && !target.phaseBoundaryContinuation?.awaitingOrder) || kind === "BATTLE_COMPLETION") {
       throw new SessionLoadError(
         location,
         `${ref} names frame ${JSON.stringify(prompt.resumeContext)}, a ${kind} frame that cannot own a prompt`
