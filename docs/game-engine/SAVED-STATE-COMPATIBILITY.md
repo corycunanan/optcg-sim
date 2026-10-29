@@ -1137,3 +1137,22 @@ Maria/Rayleigh reproduction, the17-producer inventory, nested/watcher/terminal
 coverage, and the independent rule6-6-1-3 invalidation assessment. Those are
 synthetic engine fixtures, not captured production sessions or a claim that all
 possible authored pairs have been exhaustively played.
+
+### Producer-only End Phase ordering writer11 (OPT-981)
+
+After verified deployment of reader8c8a80bd (active version
+e2f0e4b3-b460-4080-b745-cb6148b47784), the End Phase ordering producer may promote
+explicit8/9/10 with cost mode6|7|8 to11 immediately before its first two-or-more
+obligation choice. It preserves independent field-trash mode and scheduled
+origin; constructors remain8, historical ingress stays validated, and no load,
+zero/one-obligation or legacy-stage path invents11. Existing11 continues its
+reader-owned choices, nested work and undo behavior. An offered prompt clears
+undo under existing session policy; prior stored histories are not blanket retagged.
+
+The rollback floor after11 writes is the verified reader8c8 build or newer.
+Actual writer-produced live/nested/undo bytes replay locally against that exact
+clean deployed source; no remote saved-state import exists. See the
+[writer rollout and corpus proof](audits/opt-981/writer/rollout.md) for exact source,
+archive/runtime hashes, deployment receipts, source equivalence and limitations.
+The reader-only section above records its historical stage; this section enables
+the producer after that stage's external floor gate was met.
