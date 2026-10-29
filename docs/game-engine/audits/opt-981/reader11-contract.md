@@ -69,8 +69,9 @@ The existing until-end expiry after the owner's obligations remains unchanged.
 ## Reader-first rollout and writer plan
 
 1. Merge/deploy this reader PR only after its validation and review gates pass.
-   Record deployed worker version and commit; run11 live/undo round-trip probes
-   against that deployed reader. Do not infer deployment from merge status.
+   Record authoritative deployed worker version and commit. Replay11 live/undo
+   locally against that exact deployed reader source/build; there is no remote
+   saved-state import route. Do not infer deployment from merge status.
 2. A separate writer PR activates11 at the End Phase obligation-selection
    producer boundary, before the first new prompt is created or saved. Preserve
    existing cost semantics and use current field-trash mode when lifting8/9/10.
