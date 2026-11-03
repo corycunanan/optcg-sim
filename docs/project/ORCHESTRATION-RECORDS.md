@@ -8,6 +8,8 @@ Keep one readable current-state checkpoint at the top, aiming for roughly 500 wo
 
 The checkpoint names scope/permissions, workspaces and owners, current head/base, unresolved findings, completed evidence, active job IDs, and the exact next action. Raw logs belong in artifacts rather than repeated ledger entries.
 
+Scale the record to the run. A run of only Small and Medium tickets needs just the checkpoint, scope and permissions, and the tracks table; add the remaining sections when a Large ticket, a migration or a recovery makes them useful.
+
 Keep the run record as a local scratch file outside the repository (for example `<scratch>/runs/<date>-<scope-slug>.md`); never commit it. The coordinator owns this file; parallel implementers do not edit it. Record its absolute path in progress messages and preserve it until the run is closed out, then report its path. Anything a later session needs beyond this run belongs in Linear: post it as a comment on the affected issue or roll-up parent. `docs/project/handoffs/runs/` holds historical ledgers only.
 
 ```markdown
@@ -68,6 +70,20 @@ Chore replies use a short decision-relevant summary (aim for 300 words or less),
 
 Create one per PR and post it as a PR comment; keep a copy in the local run record. Every field must contain observed evidence, an explicit applicable/non-applicable disposition, or a blocker. Blank/unknown is not a pass.
 
+**Small and Medium** use the short receipt:
+
+```markdown
+### PR <number> — <ticket> (<tier>)
+- Result: merge-ready | blocked | incomplete | merged | verified-no-change
+- Head / base: <full SHAs>
+- Acceptance: <criterion → evidence>
+- Review: <reviewer model, head, outcome; findings and their resolution>
+- Checks: <local focused commands and results; required CI runs on this head>
+- Merge permission: <grant or off>; if merged: <merge SHA, post-merge checks>
+```
+
+**Large** uses the full receipt:
+
 ```markdown
 ### PR <number> — <ticket>
 - Result: stack-ready | merge-ready | blocked | incomplete | merged | verified-no-change
@@ -75,7 +91,7 @@ Create one per PR and post it as a PR comment; keep a copy in the local run reco
 - Assessed at: <timestamp>
 - Scope and acceptance: <criterion → hunk/behavior → evidence>
 - Coordinator review: <head, outcome, evidence location>
-- Models: <actual coordinator, implementer, spec/correctness reviewer models and efforts; provider diversity and fallback reasons>
+- Models: <actual coordinator, implementer, spec and correctness reviewer models; fallback reasons>
 - Independent review: <reviewer, head, required passes and each outcome>
 - Findings: <scenario/root cause, severity, evidence, resolution or blocker>
 - Baseline/final validation: <commands, exit/results, revisions, logs; carried-forward checks and why>
