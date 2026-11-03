@@ -8,7 +8,7 @@ Keep one readable current-state checkpoint at the top, aiming for roughly 500 wo
 
 The checkpoint names scope/permissions, workspaces and owners, current head/base, unresolved findings, completed evidence, active job IDs, and the exact next action. Raw logs belong in artifacts rather than repeated ledger entries.
 
-Create `docs/project/handoffs/runs/<date>-<scope-slug>.md` for each run. The coordinator owns this file; parallel implementers do not edit it. Record its absolute workspace path in progress/handoff messages. Keep it locally during the run; include a stable snapshot in an authorized ticket PR only when it can be reviewed before readiness. Do not append a post-review commit and reuse the old receipt. Preserve the live ledger during workspace cleanup even if its final snapshot is not committed; report its path.
+Keep the run record as a local scratch file outside the repository (for example `<scratch>/runs/<date>-<scope-slug>.md`); never commit it. The coordinator owns this file; parallel implementers do not edit it. Record its absolute path in progress messages and preserve it until the run is closed out, then report its path. Anything a later session needs beyond this run belongs in Linear: post it as a comment on the affected issue or roll-up parent. `docs/project/handoffs/runs/` holds historical ledgers only.
 
 ```markdown
 # Run: <date / scope>
@@ -58,7 +58,7 @@ Embed the full resolved ticket and necessary comments/requirements, rather than 
 - Relevant rules/scenario packet or design brief; name the one or two safety assumptions to prove.
 - Public testing boundary, exact commands and working directory, explicit test paths/selectors and expected collected files/cases, regression evidence and known environment limitations.
 - For broad execution-ownership refactors: short before/after reporting, advancement, wait/completion/terminal and cleanup contract, plus the representative handoff to prove before sweeping callers.
-- Deliverables: implementation commits, pushed PR, honest validation baseline/results, Follow-ups and next-ticket handoff; no merge, no Linear writes.
+- Deliverables: implementation commits, pushed PR whose body contains honest validation baseline/results, Follow-ups and a short handoff; no committed handoff docs, no merge, no Linear writes.
 
 Dispatches name the selected model/effort, bounded responsibility, stopping condition and expected output. Reviewers receive the same intent and source packet plus the actual head/base diff, with distinct spec and high-risk correctness hunt briefs when both are required. They independently examine the code and expected behavior; implementer conclusions are claims to check. Request `clean`, `findings`, or `incomplete`, with commands, results, scenarios, missing coverage, and full reviewed SHA.
 
@@ -66,7 +66,7 @@ Chore replies use a short decision-relevant summary (aim for 300 words or less),
 
 ## Readiness receipt
 
-Create one per PR. Every field must contain observed evidence, an explicit applicable/non-applicable disposition, or a blocker. Blank/unknown is not a pass.
+Create one per PR and post it as a PR comment; keep a copy in the local run record. Every field must contain observed evidence, an explicit applicable/non-applicable disposition, or a blocker. Blank/unknown is not a pass.
 
 ```markdown
 ### PR <number> — <ticket>
@@ -83,7 +83,7 @@ Create one per PR. Every field must contain observed evidence, an explicit appli
 - GitHub checks: <required check inventory, runs/SHAs, successful conclusions>
 - Review feedback / approvals: <all feedback dispositioned, unresolved threads, required approvals>
 - Integration: <prerequisites, current main, conflict/mergeability assessment>
-- Delivery: <handoff, accurate PR body, Follow-ups>
+- Delivery: <accurate PR body with handoff and Follow-ups>
 - Merge permission: <scope-matching user grant or off>
 - Final recheck: <timestamp, unchanged head/base/checks/reviews, freshness enforcement>
 - If merged: <merge SHA, ancestry/landed diff verification, post-merge CI/deploy results>
