@@ -1,6 +1,6 @@
 ---
 name: ticket-review
-description: Adversarial code review for an open ticket PR. Accepts a GitHub PR number or OPT ticket ID, loads Linear, handoff docs, project docs, PR metadata, git history, and diffs, then produces prioritized review findings tied to file/line references.
+description: Adversarial code review for an open ticket PR. Accepts a GitHub PR number or OPT ticket ID, loads Linear (including comments), the PR-body handoff, project docs, PR metadata, git history, and diffs, then produces prioritized review findings tied to file/line references.
 disable-model-invocation: true
 argument-hint: "OPT-XXX | PR #"
 allowed-tools: Bash Read Grep Glob Agent mcp__linear-server__get_issue mcp__linear-server__list_issue_statuses mcp__linear-server__get_project mcp__linear-server__list_projects
@@ -66,24 +66,22 @@ If Linear cannot be reached, stop and surface the error. Do not pretend the tick
 ### Handoff Docs
 
 If the ticket has a Linear project:
-1. Slugify the project name as `lowercase-kebab-case`.
-2. Read `docs/project/handoffs/<project-slug>.md` if it exists.
-3. Pull:
-   - the Action Plan row for this ticket
-   - inbound handoff entries targeting this ticket
-   - the handoff entry added by this PR, if present
-   - any next-ticket handoff that the PR claims to create
+Handoffs live in PR bodies and Linear comments; `docs/project/handoffs/` is a read-only archive. Pull:
+   - Linear comments on this ticket and its roll-up parent (inbound handoff points)
+   - the **Handoff** section of this PR's body
+   - handoff sections of the prerequisite PRs, when this ticket depends on them
+   - archived `docs/project/handoffs/` entries only when the ticket or engine docs link to them
 
 Flag as review risks:
-- Action Plan status/PR/date not updated for the reviewed ticket.
-- Handoff points at the wrong next ticket.
+- The PR commits new or edited files under `docs/project/handoffs/`.
+- The PR-body handoff points at the wrong next ticket or omits a prerequisite.
 - Handoff recaps the diff instead of preserving system-level context.
-- Latest relevant handoff is older than 7 days and the PR relies on it without re-verification.
+- The PR relies on an archived handoff or an old comment without re-verifying it against current code.
 
 ### Project Docs
 
 Read only docs that are directly relevant to the ticket or changed files:
-- paths explicitly referenced by Linear, PR body, handoff docs, or code comments
+- paths explicitly referenced by Linear, the PR body, or code comments
 - `docs/design/BRANDING-GUIDELINES.md` for UI/design changes
 - `docs/game-engine/` and `docs/rules/` for game engine or rules changes
 - `docs/architecture/` for system, API, data pipeline, auth, worker, or deployment changes
@@ -107,7 +105,7 @@ git log --oneline -- <path>
 git blame -L <start>,<end> -- <path>
 ```
 
-Use history to test assumptions from handoff docs and to identify whether the PR reintroduces recently fixed bugs.
+Use history to test assumptions from handoffs and to identify whether the PR reintroduces recently fixed bugs.
 
 ---
 
@@ -143,7 +141,7 @@ Review for defects, not style preferences. Findings must be actionable and groun
 - Did it implement behavior outside the ticket scope?
 - Are linked/blocking issues respected?
 - Does the PR body accurately describe the change and test plan?
-- Does the handoff doc reflect the ticket workflow contract?
+- Does the PR-body handoff reflect the ticket workflow contract?
 
 ### Correctness
 
@@ -230,7 +228,7 @@ Verification
 - <commands run and result, or why not run>
 
 Context Checked
-- PR #<number>, <ticket ID if known>, Linear issue, handoff doc, relevant docs, git diff/history
+- PR #<number>, <ticket ID if known>, Linear issue and comments, PR-body handoff, relevant docs, git diff/history
 ```
 
 If no issues:

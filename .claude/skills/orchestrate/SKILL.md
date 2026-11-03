@@ -22,6 +22,8 @@ codex exec -m <model-from-charter> -c model_reasoning_effort="<effort-from-chart
 
 Review briefs prohibit tracked edits and permit isolated scratch tests. Respect host test capacity even when reviews run concurrently. Use deterministic monitoring for mechanical checks; delegate bounded interpretation to Luna. Keep final readiness and merge decisions with the coordinator.
 
+Linear holds the plan and cross-session context: roll-up parents and `blockedBy` for order, issue comments for handoff points a later ticket needs. Handoffs go in PR bodies; `docs/project/handoffs/` is a read-only archive, and the run checkpoint is a local scratch file (see records). Do not commit action plans or run ledgers.
+
 Use `GOTCHAS.md` only for relevant historical environment evidence; it does not override the charter or current permissions. If independent review is unavailable, readiness is incomplete.
 
 For frontend work, use the design/VQA supplement in `.claude/skills/orchestrate-frontend/SKILL.md` under the same charter. Existing `.claude/workflows/pr-review.js` results are advisory inputs; complete the charter's gates directly when that runner cannot establish them.
