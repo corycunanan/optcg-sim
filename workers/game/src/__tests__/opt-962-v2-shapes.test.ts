@@ -1,3 +1,4 @@
+import { orderedEnvelope } from "./opt-981-test-ordering.js";
 import { writerEnvelope } from "./opt-1003-writer-expectations.js";
 import { candidateExpected } from "./fixtures/opt-968-candidate-expectations.js";
 /**
@@ -57,7 +58,7 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
     // shared historical promotion helper remain mode7 for their other users.
     const historicalExpected = writerEnvelope(candidateExpected<GameState>(`endphase/${name}`));
     expect(historicalExpected.costSemanticsVersion).toBe(7);
-    expect(persisted(state)).toEqual({ ...historicalExpected, costSemanticsVersion: 8 });
+    expect(persisted(state)).toEqual(orderedEnvelope({ ...historicalExpected, costSemanticsVersion: 8 }, state));
     // The v2 reader input is frozen, not rewritten to hide current scheduling.
     const historical = structuredClone(fixture.cases[name].state);
     expect(() => convertPersistedGameState(historical, "historical v2 state")).not.toThrow();
@@ -67,6 +68,14 @@ describe("OPT-962 writer shapes match the deployed reader's fixtures", () => {
     const covered = new Set(
       Object.values(fixture.cases).flatMap((c) => signatures(c.state as never))
     );
+    // Reader11 adds the explicit ordering owner; every other signature remains
+    // constrained by the immutable historical shape fixtures.
+    for (const sig of [...covered]) {
+      const shape = JSON.parse(sig);
+      if (["TURN_PLAYER_END_OF_TURN", "NON_TURN_PLAYER_END_OF_TURN"].includes(shape.stage)) {
+        shape.keys = [...shape.keys, "awaitingOrder"].sort(); covered.add(JSON.stringify(shape));
+      }
+    }
     const r = fullEndPhaseScenario();
     const seen: string[] = [];
     r.act({ type: "ADVANCE_PHASE" });

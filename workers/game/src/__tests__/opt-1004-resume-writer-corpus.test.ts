@@ -1,3 +1,4 @@
+import { orderedEnvelope } from "./opt-981-test-ordering.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
@@ -75,14 +76,53 @@ describe.each(Object.entries(corpus.cases))("OPT-1004 actual writer suffix %s", 
     const storage = memory(boundaries[boundary]);
     const durable = { storage, getWebSockets: () => [], getTags: () => [], acceptWebSocket() {} } as unknown as DurableObjectState;
     let loaded = (await new SessionRepository(storage, options).load())!;
+    let orderingDecisions = 0;
     for (const step of scenario.steps.slice(boundary)) {
       const session = new GameSession(durable, { GAME_WORKER_SECRET: "test", NEXTJS_URL: options.nextJsUrl } as Env) as unknown as Access;
       session.gameState = loaded.state; session.cardDb = loaded.cardDb; session.undoHistory = loaded.undoHistory;
       session.writeResultToDb = async () => undefined;
       const sent: string[] = [];
-      await session.handleAction({ send(value: string) { sent.push(value); }, close() {} } as unknown as WebSocket, step.player, step.action);
+      await session.handleAction({ send(value: string) { sent.push(value); }, close() {} } as unknown as WebSocket, step.player, loaded.state.pendingPrompt ? { ...step.action, promptId: loaded.state.pendingPrompt.promptId } as GameAction : step.action);
       expect(sent.map(s => JSON.parse(s)).filter(m => m.type === "action:rejected"), id).toEqual([]);
-      expect(Object.fromEntries(storage.data), `${id} ${step.action.type}`).toEqual(step.stored);
+      // OPT-981 inserts explicit owner decisions. Choose the former FIFO order
+      // through GameSession itself, preserving this archived suffix's gameplay.
+      while (session.gameState.effectStack.at(-1)?.phaseBoundaryContinuation?.awaitingOrder) {
+        const prompt = session.gameState.pendingPrompt!;
+        await session.handleAction({ send(value: string) { sent.push(value); }, close() {} } as unknown as WebSocket,
+          prompt.respondingPlayer, { type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0", promptId: prompt.promptId });
+        orderingDecisions++;
+      }
+      const actual = Object.fromEntries(storage.data) as Stored;
+      const expected = structuredClone(step.stored);
+      expected.session.state = orderedEnvelope(expected.session.state, actual.session.state);
+      if (orderingDecisions) {
+        expected.session.state.executionContext!.idCounter += orderingDecisions;
+        // A newly offered player choice invalidates phase-advance undo under
+        // the existing session policy, even when the old FIFO trace had no pause.
+        expect(actual["session:undo-history"]).toEqual([]);
+        expected["session:undo-history"] = [];
+        const oldActions = expected.session.state.turn.actionsPerformedThisTurn;
+        const newActions = actual.session.state.turn.actionsPerformedThisTurn;
+        if (oldActions.length === newActions.length + 1) {
+          // The old continuous ADVANCE_PHASE was logged after handoff. The new
+          // prompt continuation finishes the old turn without attributing that
+          // action to the next player, consuming one fewer logical timestamp.
+          const removed = oldActions.shift()!;
+          expect(removed.actionType).toBe("ADVANCE_PHASE");
+          for (const event of expected.session.state.eventLog) if (event.timestamp >= removed.timestamp) event.timestamp--;
+          for (const action of oldActions) if (action.timestamp >= removed.timestamp) action.timestamp--;
+          expected.session.state.executionContext!.clockCounter--;
+        }
+      }
+      // Each new saved ordering prompt allocates an ID. Compare generated IDs by
+      // occurrence; the exact counter delta above still guards extra allocation.
+      const normalizeIds = (value: unknown) => {
+        const ids = new Map<string, string>();
+        return JSON.stringify(value).replace(/(?:card|ef|prompt)_[0-9a-z]+/g, key => {
+          if (!ids.has(key)) ids.set(key, `engine-${ids.size}`); return ids.get(key)!;
+        });
+      };
+      expect(JSON.parse(normalizeIds(actual)), `${id} ${step.action.type}`).toEqual(JSON.parse(normalizeIds(expected)));
       loaded = (await new SessionRepository(storage, options).load())!;
     }
     expect(loaded.state.eventLog.filter(e => e.type === "DON_SET_ACTIVE")).toHaveLength(scenario.expectedDonEvents);

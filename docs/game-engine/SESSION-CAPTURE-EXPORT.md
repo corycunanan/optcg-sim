@@ -56,6 +56,8 @@ No schema version, capability, continuation, action, cost, source identity, arra
 
 ## Capture inventory still required
 
+The 2026-10-28 Pacific read-only campaign (2026-10-29 UTC) attempted 25 existing sessions: 23 returned HTTP 404 and two produced sanitized terminal records. Both raw records reject in the deployed reader; neither has undo or a pending decision. Their exact bytes and negative converter tests are retained in [the captured fixture inventory](../../workers/game/src/__tests__/fixtures/opt-971-captured/README.md), with the admission gap documented in [compatibility §4.2](./SAVED-STATE-COMPATIBILITY.md#42-captured-unversioned-admission-gaps-opt-971). All required classes below remain missing. This partial inventory does not complete OPT-971 or authorize production repair.
+
 After a reviewed PR is merged, CI passes and its deployed worker revision is verified, the coordinator may perform read-only exports of existing sessions. Keep candidate IDs and raw credentials private. Record the export's SHA-256, deployment revision, capture timestamp and observed schema/classifications, without original account/game identifiers. Do not run gameplay actions merely to manufacture a production pause.
 
 Required evidence remains:

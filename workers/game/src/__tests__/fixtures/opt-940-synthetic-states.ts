@@ -226,6 +226,8 @@ function battleTriggerWindow(cardDb: Map<string, CardData>): GameState {
 function endPhaseParked(cardDb: Map<string, CardData>): GameState {
   const state: GameState = {
     ...createBattleReadyState(cardDb),
+    // Reconstruct the archived pre-v8 producer, not a new ordering11 game.
+    schemaVersion: 7,
     scheduledActions: [
       {
         id: "sched-golden-1",
@@ -248,6 +250,7 @@ function endPhaseParked(cardDb: Map<string, CardData>): GameState {
       },
     ],
   };
+  delete state.costSemanticsVersion; // historical7 carries native costs implicitly
   const result = runPipeline(state, { type: "ADVANCE_PHASE" }, cardDb, 0);
   if (!result.valid) throw new Error(`golden: ADVANCE_PHASE rejected: ${result.error}`);
   const phaseFrame = result.state.effectStack.find((frame) => frame.phaseBoundaryContinuation);

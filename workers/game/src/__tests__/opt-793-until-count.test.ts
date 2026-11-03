@@ -600,6 +600,8 @@ describe("OPT-793 OP08-074 Black Maria — end-of-turn return until DON!! equal"
     f.state = { ...f.state, scheduledActions: [setActive("before"), scheduled, setActive("after")] };
     const logStart = f.state.eventLog.length;
     f.run({ type: "ADVANCE_PHASE" });
+    f.respond({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
+    f.respond({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
     expect(donChoicePrompt(f.state).options.donReturn?.count).toBe(3);
     expect(f.state.eventLog.slice(logStart).map((e) => e.type)).toEqual(["PHASE_CHANGED", "DON_SET_ACTIVE"]);
 

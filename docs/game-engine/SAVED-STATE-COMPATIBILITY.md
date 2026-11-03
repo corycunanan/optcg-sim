@@ -37,7 +37,7 @@ Order of operations, fixed by this contract:
 5. **Apply load-time legacy migrations** that are content rewrites rather than shape changes (today: `migrateLegacyTriggerRegistry`, OPT-796).
 6. **Classify legacy shapes** that are loadable but owned by a later ticket (§4), and log the classification. Classification never mutates state.
 
-After the hook, `SessionRepository.load()` applies two pure, write-free normalizations that predate it and are not part of the conversion contract: `ensureExecutionContext` (fills a missing execution context) and `restoreIdCounterInvariant` (OPT-891, raises a low id counter and logs). "One entry point" means one path from stored bytes to a validated runtime shape, not that nothing runs after it.
+After the hook, `SessionRepository.load()` retains two pure, write-free helpers that predate it: `ensureExecutionContext` and `restoreIdCounterInvariant` (OPT-891, raises a low id counter and logs). **The current strict converter requires `executionContext`, so a raw context-less save rejects before the repository can reach its context-hydration helper.** Calling that helper on a scratch copy is not evidence that the raw repository ingress accepts it. The captured cases in §4.2 expose this historical admission gap; no bypass or new defaults are introduced here. "One entry point" means one path from stored bytes to a validated runtime shape, not that nothing runs after it.
 
 A failure at any step throws `SessionLoadError` carrying `location` and `reason`. Storage is never written during a load, and the repository's in-memory bookkeeping is only updated after every snapshot converts, so a failed load leaves the three storage values byte-identical and the repository unchanged.
 
@@ -146,7 +146,7 @@ The error names the reference (`pendingPrompt.resumeContext`, `effectStack[2].tr
 
 ## 3. Support window
 
-**Supported input versions in this build: `{1, 2, 3, 4}`.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980). Version 3 adds the typed replacement and damage continuation frames (§8) and is read from PR 5a (OPT-963). Version 4 adds the PR6 ownership records and battle bookkeeping (§9), read from PR6a by lowering to the v3 runtime and executed natively from PR6b.
+**The current reader constant supports input versions `{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}`; the history below records earlier rollout sets.** Version 1 is the shape at `origin/main` `03071b6914c36349d0e81930a6f80bb530c713d9`, the base of PR 1. Version 2 adds the End Phase stage (§6) and is read from PR 4a (OPT-980). Version 3 adds the typed replacement and damage continuation frames (§8) and is read from PR 5a (OPT-963). Version 4 adds the PR6 ownership records and battle bookkeeping (§9), read from PR6a by lowering to the v3 runtime and executed natively from PR6b.
 
 Policy, not a date:
 
@@ -210,6 +210,19 @@ Duplicate drain owners the consolidation must merge (rev4 §7 Phase 2): `process
 A classification is logged as `session.legacy_shape` with `{ gameId, location, shape, frameId? }` and never changes state.
 
 ---
+
+### 4.2 Captured unversioned admission gaps (OPT-971)
+
+Two actual sanitized persisted terminal sessions were exported on 2026-10-28 Pacific (2026-10-29 UTC) from worker version `96db2d07-540b-4d06-871c-f96b1def4a90`, deployed reader `16275aa27cea54739255695a8c35038de6515d2c`. Exact exported bytes, hashes and safe provenance are retained in [`fixtures/opt-971-captured`](../../workers/game/src/__tests__/fixtures/opt-971-captured/README.md). These are **captured, known-rejected** records, not synthetic inputs or accepted compatibility evidence.
+
+| Captured file | Observed structure | Raw pure-converter disposition | Diagnostic using only the existing context adapter on a scratch clone |
+|---|---|---|---|
+| `capture-01.json` | ABANDONED, REFRESH; schema/cost mode absent; no execution context; pregame object lacks `startOfGameEffectsResolved`; no prompt, stack, or undo | Assigned v1, then rejects missing `executionContext` | Still rejects missing `pregame.startOfGameEffectsResolved` |
+| `capture-06.json` | FINISHED, MAIN; schema/cost mode absent; no execution context or pregame field; no prompt, stack, or undo | Assigned v1, then rejects missing `executionContext` | Still rejects missing `pregame` |
+
+No `classifyLegacyShapes` runtime classification is emitted because strict core validation fails first. `opt-971-captured-rejections.test.ts` pins the exact errors, immutable fixture hashes, absence of captured undo, scratch-only diagnostic, and a valid synthetic v1 positive control. The diagnostic does not assert that filling further fields would be sufficient or semantically justified. The raw captures are never adapted, reserialized, relabelled as accepted, or used to infer historical RNG outcomes.
+
+The required core fields already existed at the PR1 baseline `03071b69`; strict core admission was introduced earlier by `d244a3b3` (OPT-102). The observed shapes are structurally older than that baseline, but their original writer revisions were not captured. This is an inherited historical admission/documentation gap, not a new OPT-971 rejection. **Absent version still permanently means v1; no policy explicitly retires or excludes these older shapes.** Recording their current rejection is not approval to invent defaults or declare them out of support. [OPT-1013](https://linear.app/optcg-sim/issue/OPT-1013/resolve-captured-unversionedv1-admission-gaps-before-legacy-support) owns an explicit support disposition or justified reader adapter. No reader, writer, gameplay, or production-session behavior changes in this fixture delivery.
 
 ## 5. Rollback, repair, rejection runbook
 
@@ -290,7 +303,9 @@ This is a degraded but loadable resume, limited to games paused inside an End Ph
 
 ## 7. Unmet rollout gate: captured sessions
 
-OPT-940 requires sanitized real Durable Object sessions as fixtures. The [signed sanitizing export route](./SESSION-CAPTURE-EXPORT.md) supplies the capture mechanism (OPT-971 option a). Adding this route does not supply real captures or close the rollout gate; deployment, capture inventory, leak scanning, and captured live/undo converter tests remain required. Every fixture in PR 1 is **synthetic**: real game states produced by the engine and serialized through the base-commit writer, plus constructed malformed states. None is a capture. The gate stays open until a capture covers live + undo, paused costs, paused replacements, paused damage, and a mid-End-Phase session. The PR body and the handoff entry carry the same statement.
+OPT-940 requires sanitized real Durable Object sessions as fixtures. The [signed export route](./SESSION-CAPTURE-EXPORT.md) was deployed and 25 existing-session read-only exports were attempted: **23 returned HTTP 404; two yielded sanitized terminal records; neither raw record is accepted by the deployed reader** (§4.2). Both have empty undo, no prompt and no effect stack. These exact known-rejected captures now exist alongside the earlier synthetic goldens, which retain their original provenance.
+
+The capture gate remains **open**: no actual live-plus-undo pair, paused cost transaction, single/batch replacement, battle/effect damage pause, or mid-End-Phase frame below a prompt was captured. In particular, none of the three named historical damage continuation fields was observed. No gameplay actions, test workers, synthetic production sessions, repairs or storage writes were used to manufacture coverage. The [safe fixture manifest](../../workers/game/src/__tests__/fixtures/opt-971-captured/manifest.json) retains all missing classes; OPT-1013 separately owns the captured v1 admission gap. Two rejected terminal captures do not satisfy the requested acceptance inventory or permit reader retirement.
 
 ## 8. Typed replacement and damage continuations (OPT-963: PR 5a reader, PR 5b writer)
 
@@ -1137,3 +1152,22 @@ Maria/Rayleigh reproduction, the17-producer inventory, nested/watcher/terminal
 coverage, and the independent rule6-6-1-3 invalidation assessment. Those are
 synthetic engine fixtures, not captured production sessions or a claim that all
 possible authored pairs have been exhaustively played.
+
+### Producer-only End Phase ordering writer11 (OPT-981)
+
+After verified deployment of reader8c8a80bd (active version
+e2f0e4b3-b460-4080-b745-cb6148b47784), the End Phase ordering producer may promote
+explicit8/9/10 with cost mode6|7|8 to11 immediately before its first two-or-more
+obligation choice. It preserves independent field-trash mode and scheduled
+origin; constructors remain8, historical ingress stays validated, and no load,
+zero/one-obligation or legacy-stage path invents11. Existing11 continues its
+reader-owned choices, nested work and undo behavior. An offered prompt clears
+undo under existing session policy; prior stored histories are not blanket retagged.
+
+The rollback floor after11 writes is the verified reader8c8 build or newer.
+Actual writer-produced live/nested/undo bytes replay locally against that exact
+clean deployed source; no remote saved-state import exists. See the
+[writer rollout and corpus proof](audits/opt-981/writer/rollout.md) for exact source,
+archive/runtime hashes, deployment receipts, source equivalence and limitations.
+The reader-only section above records its historical stage; this section enables
+the producer after that stage's external floor gate was met.

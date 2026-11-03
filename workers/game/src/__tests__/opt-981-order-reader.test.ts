@@ -58,15 +58,15 @@ async function reload(r: EndPhaseRig, undo: GameState[] = []) {
 }
 
 describe("OPT-981 reader11 end-of-turn ordering", () => {
-  it.each([false, true])("reproduces authored insertion-order dependence, reverse=%s", reverse => {
+  it.each([false, true])("preserves authored order-dependent outcomes through the enabled writer, reverse=%s", reverse => {
     const r = pair();
-    if (reverse) r.state.scheduledActions.reverse();
     r.act({ type: "ADVANCE_PHASE" });
+    r.act({ type: "PLAYER_CHOICE", choiceId: `end-of-turn-obligation:${reverse ? 1 : 0}` });
     for (let n = 0; r.state.pendingPrompt && n < 8; n++) answerActionPrompt(r);
     expect(field(r.state, 0)).toBe(reverse ? 5 : 6);
     expect(field(r.state, 1)).toBe(5);
     expect(r.state.turn.activePlayerIndex).toBe(1);
-    expect(r.state.schemaVersion).toBe(10);
+    expect(r.state.schemaVersion).toBe(11);
     expect(GAME_STATE_SCHEMA_VERSION).toBe(8);
   });
 
@@ -222,7 +222,7 @@ describe("OPT-981 reader11 end-of-turn ordering", () => {
       const before = r.state.players[0].hand.length;
       const dons = field(r.state, 0);
       r.act({ type: "ADVANCE_PHASE" });
-      if (version === 11) {
+      if (r.state.schemaVersion === 11) {
         await reload(r);
         r.act({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
       }
