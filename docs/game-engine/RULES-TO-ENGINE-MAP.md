@@ -1,4 +1,6 @@
 # Comprehensive Rules → Game Engine Map
+**Scheduling contract (OPT-967):** scanners report occurrences and work; `pending-work-drain.ts` advances it. Domain helpers and session reply dispatch are work-only. See [implemented architecture](./08-ENGINE-ARCHITECTURE.md) and [acceptance/audit evidence](./OPT-967-DRAIN-EVIDENCE.md). Existing persisted fields carry a conditional battle notification; no schema version or supported reader is retired. Rollback to the pinned baseline preserves its earlier checkpoint defect.
+
 
 > Maps every gameplay-relevant rule from `docs/rules/rule_comprehensive.md` (v1.2.0) to the engine function that implements it, identifies gaps, and calls out rules that require new functions or architectural changes.
 
@@ -26,7 +28,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | First/second selection | **IMPL** | [`opt-366-pregame-flow.test.ts`](../../workers/game/src/__tests__/opt-366-pregame-flow.test.ts) — winner chooses either seat and first-turn rules follow the selected player | None in the engine pregame flow |
 | Player-selected Character overflow | **IMPL** | [`opt-171-rule-3-7-6-1.test.ts`](../../workers/game/src/__tests__/opt-171-rule-3-7-6-1.test.ts) and [`opt-114-mid-batch-overflow.test.ts`](../../workers/game/src/__tests__/opt-114-mid-batch-overflow.test.ts) — single and batched effect plays pause for the controller's choice and rule-trash without K.O. triggers | None for direct or effect-driven Character play |
 | Mid-battle combatant removal | **IMPL** | [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) — attacker/target removal aborts before damage and still emits end-of-battle cleanup | None for Attack, Block, or Counter removal before Damage Step |
-| Loop handling | **PARTIAL** | [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) — action-budget or stack-depth exhaustion ends atomically in a replay-visible draw | Repeated-state recognition and player-declared counts for stoppable loops (§11-1-1-2/3) are not modeled |
+| Loop handling | **PARTIAL** | [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) — action-budget or stack-depth exhaustion ends atomically with the replay-visible engine-limit outcome (`engineOutcome.type: "ENGINE_LIMIT"`, Decision 5), not a rules draw | Repeated-state recognition, the rule 11-1-1-1 draw, and player-declared counts for stoppable loops (§11-1-1-2/3, OPT-952) are not modeled |
 | Start-of-game effects | **IMPL** | [`opt-476-start-of-game-effects.test.ts`](../../workers/game/src/__tests__/opt-476-start-of-game-effects.test.ts) — both Leaders resolve in first-player order across play, decline, zero-match, shuffle, persistence, and resume paths | Only authored `START_OF_GAME_EFFECT` rule modifications execute; new mechanics still require schemas |
 | Hidden-zone confidentiality | **PARTIAL** | [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) — events, prompts, continuation data, faces, and instance IDs are redacted per viewer | Generic secret-to-secret reveal/order enforcement (§3-1-8, §11-2) is not universal |
 
@@ -34,15 +36,18 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | File | Purpose |
 |------|---------|
-| `pipeline.ts` | 7-step action pipeline — entry point for every mutation |
+| `pipeline.ts` | Player action entry; execution report and common drain boundary |
+| `pending-work-drain.ts` | Sole advancement loop across triggers, phase/damage boundaries and batch reentry |
+| `trigger-queue.ts` | Publish/scan/report occurrences; enqueue work without activation |
 | `validation.ts` | Step 1 — action legality checks |
 | `prohibitions.ts` | Step 2 — prohibition checking (12+ prohibition types) |
-| `replacements.ts` | Step 3 — replacement effect interception ("instead") |
+| `replacements.ts` | Consequence-site replacement checks; generic pipeline Step 3 remains a stub |
 | `execute.ts` | Step 4 — thin dispatcher to phases/battle/main actions |
 | `triggers.ts` | Step 5 — trigger registration, matching, and ordering |
 | `trigger-ordering.ts` | Per-player trigger ordering per rule §8-6 |
 | `modifiers.ts` | Step 6 — layered power/cost computation (3 layers) |
-| `defeat.ts` | Step 7 — win/loss condition checks |
+| `defeat.ts` | Rule processing: `runRuleProcessing` checkpoint (both players, once) — after each deck/Life move, damage determination, before a prompt, and at action end |
+| `terminal.ts` | The one terminal writer `terminateGame` (rules defeat, WIN_GAME, concession, abandonment, external result, engine limit, engine contract) |
 | `phases.ts` | Phase transitions: REFRESH → DRAW → DON → MAIN → END |
 | `battle.ts` | Attack → Block → Counter → Damage → End of Battle |
 | `setup.ts` | Game initialization, mulligan |
@@ -58,7 +63,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | `effect-resolver/target-resolver.ts` | Target validation and constraint checking |
 | `effect-resolver/cost-handler.ts` | Activation cost payment (DON rest, trash, etc.) |
 | `effect-resolver/card-mutations.ts` | Card state mutations during effect resolution |
-| `effect-resolver/resume.ts` | Resume paused effect chains after player input |
+| `effect-resolver/resume.ts` | Work-only reply dispatch plus external convenience drain boundary |
 | `effect-resolver/actions/*.ts` | Action handler modules (battle, choice, don, draw-search, effects, hand-deck, life, modifiers, play, removal) |
 | `schemas/*.ts` | 56 card schema set modules (OP01–OP17, ST01–ST32, EB01–EB04, PRB01–PRB02, P) |
 
@@ -78,25 +83,25 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **1-2-1.** Game ends when a player loses | **IMPL** | `defeat.ts → checkDefeat()` + `pipeline.ts:66–81` | Pipeline step 7 checks defeat after every action |
-| **1-2-1-1-1.** Defeat: 0 life + leader takes damage | **IMPL** | `defeat.ts:31–34` | `p0LifeOut` / `p1LifeOut` checks require `damagedPlayerIndex` context |
+| **1-2-1.** Game ends when a player loses | **IMPL** | `defeat.ts → runRuleProcessing()` → `terminal.ts → terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | Every checkpoint writes the result once through the common terminal writer (OPT-949) |
+| **1-2-1-1-1.** Defeat: 0 life + leader takes damage | **IMPL** | `defeat.ts → checkDefeat()` | Life-out requires a qualifying lethal determination in `RuleProcessingContext.lethalDamage`; the Life count alone never defeats |
 | **1-2-1-1-2.** Defeat: 0 cards in deck | **IMPL** | `defeat.ts:26–27` | `p0DeckOut` / `p1DeckOut` |
-| **1-2-2.** Defeat processed at next rule processing | **IMPL** | `pipeline.ts:61–81` | Step 7 runs after every action |
+| **1-2-2.** Defeat processed at next rule processing | **IMPL** | `defeat.ts → runRuleProcessing()` | Checkpoints run mid-resolution and at action end (see 9-1-2) |
 | **1-2-2-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts:31–34`, `battle.ts:306–309` | Battle checks life-out before moving life cards |
-| **1-2-2-2.** 0 deck cards = defeat | **IMPL** | `defeat.ts:26–27` | Checked every pipeline run |
+| **1-2-2-2.** 0 deck cards = defeat | **IMPL** | `defeat.ts:26–27` | Checked at defined move, pre-prompt and action-end rule-processing checkpoints |
 | **1-2-3.** Concession at any time | **IMPL** | `execute.ts → executeConcede()`, `validation.ts:52` | Always legal, immediate game end |
 | **1-2-4.** Concession unaffected by cards | **IMPL** | `executeConcede()` bypasses all effect logic | No card effect can block concession |
-| **1-2-5.** Card effects that cause win/loss | **PARTIAL** | `defeat.ts` | No card in the current OPTCG card pool uses a "you win/lose" effect; infrastructure exists but untested |
+| **1-2-5.** Card effects that cause win/loss | **PARTIAL** | `effect-resolver/actions/effects.ts → executeWinGame()` → `terminateGame()`; [`opt-949-rule-processing-checkpoint.test.ts`](../../workers/game/src/__tests__/opt-949-rule-processing-checkpoint.test.ts) | WIN_GAME ends play mid-chain (OPT-949). LOSS_CONDITION_MOD `DELAYED_LOSS` (OP15-022) and `WIN_INSTEAD` (OP03-040, P-117; [`opt-949-win-instead.test.ts`](../../workers/game/src/__tests__/opt-949-win-instead.test.ts)) are evaluated at the checkpoint; a negated Nami Leader loses on deck-out (qa_op09.md:204-206). Joint Nami checkpoints follow an assumed literal reading |
 
 ### 1-3. Fundamental Principles
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **1-3-1.** Card text overrides rules | **IMPL** | `prohibitions.ts`, `replacements.ts`, `effect-resolver/` | Pipeline steps 2 (prohibitions) and 3 (replacements) intercept base rules; effect resolver overrides via schemas |
+| **1-3-1.** Card text overrides rules | **IMPL** | `prohibitions.ts`, `replacements.ts`, `effect-resolver/` | Applicable prohibition checks and consequence-site replacements override base rules; generic pipeline Step 3 is a stub |
 | **1-3-2.** Impossible actions are skipped | **PARTIAL** | `state.ts:98` (`moveCard` returns state on not-found), `restDonForCost` returns null | Applied ad-hoc; no unified "attempt or skip" pattern |
 | **1-3-2-1.** Redundant state changes are no-ops | **PARTIAL** | `activateAllRested()` only touches RESTED cards | Not systematically enforced across all mutations |
 | **1-3-2-2.** 0 or negative repetitions = no action | **PARTIAL** | `battle.ts:312` loop breaks on no more life | No universal guard for effect-driven repetition counts |
-| **1-3-3.** Prohibiting effects take precedence | **IMPL** | `prohibitions.ts → checkProhibitions()` | 12+ prohibition types: CANNOT_ATTACK, CANNOT_BLOCK, CANNOT_PLAY_CHARACTER, etc. |
+| **1-3-3.** Prohibiting effects take precedence | **IMPL** | `prohibitions.ts → checkProhibitions()`, `activationProhibitionVeto()`; `effect-types.ts → PROHIBITION_FEASIBILITY_TIMING` | 12+ prohibition types: CANNOT_ATTACK, CANNOT_BLOCK, CANNOT_PLAY_CHARACTER, etc. OPT-864: each type is classified activation-time or resolution-time beside the union; availability and `ACTIVATE_EFFECT` validation consult the activation-time set before payment, and field-exit costs cannot move a protected card (`isCostMovementProhibited`). Life-to-hand costs (qa_op02.md:24-26), effect actions (qa_op02.md:30-32), and replacement substitute feasibility (rules 8-1-3-4-5/7) share `isLifeToHandProhibited`: own-effect moves are blocked while opponent effects ("using your own effects": docs/cards/OP-02.md:20,140; OP-06.md:134; ST-15.md:6) and damage processing (rules 4-6-2-1, 7-1-4-1-1-2, 10-1-5-2) remain allowed. [`opt-864-activation-prohibitions.test.ts`](../../workers/game/src/__tests__/opt-864-activation-prohibitions.test.ts), [`opt-961-protected-field-exit-costs.test.ts`](../../workers/game/src/__tests__/opt-961-protected-field-exit-costs.test.ts), [`opt-961-prohibition-timing-contract.test.ts`](../../workers/game/src/__tests__/opt-961-prohibition-timing-contract.test.ts) |
 | **1-3-4.** Turn player chooses first on simultaneous | **IMPL** | `trigger-ordering.ts → scanEventsForTriggers()` | Orders triggers per player priority; builds selection prompts |
 | **1-3-5.** Number choices ≥ 0 whole numbers | **PARTIAL** | `effect-resolver/actions/choice.ts` | Effect resolver handles player choices; no universal ≥0 guard |
 | **1-3-6.** Cost/power floor rules | **IMPL** | `modifiers.ts` clamps cost to ≥ 0; power has no floor per **1-3-6-1** | |
@@ -271,8 +276,8 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **6-1-1.** Turn = Refresh → Draw → DON → Main → End | **IMPL** | `Phase` type in `game-types.ts:69` | `"REFRESH" \| "DRAW" \| "DON" \| "MAIN" \| "END"` |
-| **6-2-1.** "Until start of your next turn" effects expire | **IMPL** | `duration-tracker.ts → expireEffects()` | Wave-based expiry at REFRESH_PHASE timing |
-| **6-2-2.** "At the start of your/opponent's turn" auto effects | **IMPL** | `triggers.ts → matchTriggersForEvent()` | Matches TURN_STARTED events; trigger-ordering handles player priority |
+| **6-2-1.** "Until start of your next turn" effects expire | **IMPL** | `phases.ts → completeTurnHandoff()`, `duration-tracker.ts → expireRefreshPhaseEffects()` | Incoming-turn expiry precedes TURN_STARTED scanning; REFRESH keeps an idempotent legacy-pause fallback (OPT-1003) |
+| **6-2-2.** "At the start of your/opponent's turn" auto effects | **IMPL** | `triggers.ts → matchTriggersForEvent()` | Matches TURN_STARTED events at the hand-off, before 6-2-3 / 6-2-4 run on the next ADVANCE_PHASE (OP11-040 FAQ order, guarded by [`opt-962-end-phase-order.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-order.test.ts) "Refresh order"). OPT-1003 expires6-2-1 first; prompted memory/live/undo tests retain the OP11-040 guard. |
 | **6-2-3.** Return DON!! to cost area, rest them | **IMPL** | `phases.ts:29`, `state.ts → returnAttachedDonToCostArea()` | Detaches all DON!! from Leader + Characters, returns to cost area rested |
 | **6-2-4.** Set all rested cards active | **IMPL** | `phases.ts:32`, `state.ts → activateAllRested()` | Activates Leader, Characters, Stage, and all cost area DON!! |
 
@@ -309,13 +314,13 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **6-6-1-1.** [End of Your Turn] effects activate | **IMPL** | `triggers.ts` | Matches END_OF_TURN trigger keyword on TURN_ENDED events |
-| **6-6-1-1-1.** [End of Your Turn] effects activate only once | **IMPL** | `triggers.ts` | Once-per-turn tracking in trigger registration |
-| **6-6-1-1-2.** Turn player's end-of-turn effects resolve first, then opponent's | **IMPL** | `trigger-ordering.ts → scanEventsForTriggers()` | Orders by active player first |
-| **6-6-1-1-3/4.** Multiple end-of-turn effects: player chooses order | **IMPL** | `trigger-ordering.ts → buildTriggerSelectionPrompt()` | Prompts player when multiple triggers fire simultaneously |
-| **6-6-1-2.** "At the end of this turn" / "until the end of the turn" effect expiry | **IMPL** | `duration-tracker.ts → expireEffects()` | END_OF_TURN wave expires matching effects |
-| **6-6-1-3.** "During this turn" effects expire | **IMPL** | `duration-tracker.ts` | Same END_OF_TURN wave |
-| **6-6-1-4.** Turn passes to opponent | **IMPL** | `phases.ts:97–113 → runEndPhase()` | Correctly swaps `activePlayerIndex`, resets turn state |
+| **6-6-1-1.** [End of Your Turn] effects activate | **IMPL** | `phases.ts → collectWaveTriggers()`, `pending-work-drain.ts` (stage `END_OF_YOUR_TURN_WAVE`) | OPT-924: the ending player's wave runs inside the End Phase while they are still the turn player. Collected by matching an unlogged `TURN_ENDED` for the ending player; reported by `processPlayerTriggerGroup()` and advanced by the common drain. Newly fulfilled effects activate in the same wave (8-6-1-1, Decision 9); the loop is bounded by the engine budget. [`end-phase-order.test.ts`](../../workers/game/src/__tests__/timing-baseline/end-phase-order.test.ts) F3a, F13; [`opt-962-end-phase-order.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-order.test.ts) |
+| **6-6-1-1-1.** [End of Your Turn] effects activate only once | **IMPL** | `phases.ts → collectWaveTriggers()`, `pending-work-drain.ts`, `PhaseBoundaryContinuation.activatedWaveEffects` | OPT-924: each `sourceCardInstanceId:effectBlockId` activates once per End Phase, across prompts and reloads; the hand-off `TURN_ENDED` is published already scanned, so it opens no second window. [`opt-962-end-phase-order.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-order.test.ts) |
+| **6-6-1-1-2.** Turn player's end-of-turn effects resolve first, then opponent's | **IMPL** | `phases.ts → continueEndPhase()` (stages `END_OF_YOUR_TURN_WAVE` → `END_OF_OPPONENT_TURN_WAVE`) | OPT-924: wave 1 finishes, including nested triggers, before wave 2 starts. Assumed: an [End of Your Turn] effect fulfilled during wave 2 does not reopen wave 1. [`end-phase-order.test.ts`](../../workers/game/src/__tests__/timing-baseline/end-phase-order.test.ts) F3a |
+| **6-6-1-1-3/4.** Multiple end-of-turn effects: player chooses order | **IMPL** | `trigger-ordering.ts → buildTriggerSelectionPrompt()` | Each wave is one group owned by its player; 2+ effects prompt that player. |
+| **6-6-1-2.** "At the end of this turn" / "until the end of the turn" effect expiry | **IMPL** | `phases.ts → continueEndPhase()`, `pending-work-drain.ts`, `duration-tracker.ts → collectEndOfTurnObligations()`, `expireUntilEndOfTurn()` | OPT-924, Decision 9: step 1 (stage `TURN_PLAYER_END_OF_TURN`) runs the turn player's `END_OF_THIS_TURN` obligations, each tagged `step: TURN_PLAYER`, then expires the turn player's "until the end of …" durations; step 2 does the same for the non-turn player. Mapping (`endPhaseExpiryClause`): `UNTIL_END_OF_OPPONENT_NEXT_TURN`, `UNTIL_END_OF_OPPONENT_NEXT_END_PHASE`, `UNTIL_END_OF_YOUR_NEXT_TURN` are this clause. Each effect expires in its owner's step (`prohibitionOwner` for prohibitions; NEGATE_TRIGGER_TYPE stores the owner in `ownerController`). An obligation created after its owner's step (by the other player's step) re-enters step 1 then step 2 ("any remaining effects"), bounded by the engine budget. [`end-phase-order.test.ts`](../../workers/game/src/__tests__/timing-baseline/end-phase-order.test.ts) F3b, F14; [`opt-962-end-phase-order.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-order.test.ts) |
+| **6-6-1-3.** "During this turn" effects expire | **IMPL** | `duration-tracker.ts → expireDuringThisTurn()` | OPT-924: after both steps, turn player then non-turn player. `THIS_TURN` and any other duration due at an End Phase wave are this clause (assumed for non-`THIS_TURN` legacy entries). [`opt-962-end-phase-order.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-order.test.ts) |
+| **6-6-1-4.** Turn passes to opponent | **IMPL** | `phases.ts → continueEndPhase()`, `pending-work-drain.ts`, `completeTurnHandoff()` | OPT-924: the end-of-turn rule checkpoint (OP15-022 Brook) runs once at this boundary; the hand-off runs only if the game is still in progress, and `TURN_ENDED` / `TURN_STARTED` are logged only after all End Phase work. [`end-phase-order.test.ts`](../../workers/game/src/__tests__/timing-baseline/end-phase-order.test.ts) F4; [`opt-962-end-phase-persistence.test.ts`](../../workers/game/src/__tests__/opt-962-end-phase-persistence.test.ts) |
 
 ---
 
@@ -334,7 +339,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **7-1-1-1.** Declare attack by resting attacker | **IMPL** | `battle.ts:33` | `setCardState(state, pi, attackerInstanceId, "RESTED")` |
 | **7-1-1-2.** Select target: opponent's Leader or rested Character | **IMPL** | `validation.ts:160–168` | Validates target is opponent's Leader or rested Character |
 | **7-1-1-3.** [When Attacking] / [On Your Opponent's Attack] / [When Attacked] activate | **IMPL** | `triggers.ts → matchTriggersForEvent()` | Matches WHEN_ATTACKING, ON_OPPONENTS_ATTACK, WHEN_ATTACKED trigger keywords |
-| **7-1-1-4.** Card moved areas during Attack Step → skip to End of Battle | **IMPL** | `battle.ts → executeDamageStep()`; [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) | Combatants are revalidated before Damage Step; removal emits `BATTLE_ABORTED` and `END_OF_BATTLE` without damage |
+| **7-1-1-4.** Card moved areas during Attack Step → skip to End of Battle | **IMPL** | `pending-work-drain.ts`, `battle.ts → checkpointBattleStepEnd()` | OPT-967: after Attack work and children quiesce, a combatant outside LEADER/CHARACTER aborts before Block notification; memory/live/undo in `opt-967-step-end.test.ts`, F11a in `timing-baseline/battle-step-end.test.ts` |
 
 ### 7-1-2. Block Step
 
@@ -342,7 +347,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 |------|--------|----------------|-------|
 | **7-1-2-1.** Defender can activate [Blocker] once per battle | **IMPL** | `executeDeclareBlocker()` + `validation.ts → validateDeclareBlocker()` | Rests blocker, replaces target. `blockerActivated` enforced |
 | **7-1-2-2.** [On Block] effects activate | **IMPL** | `triggers.ts` | ON_BLOCK trigger keyword matched on blocker declaration events |
-| **7-1-2-3.** Card moved areas during Block Step → skip to End of Battle | **IMPL** | `battle.ts → executeDamageStep()`; [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) | Same pre-damage combatant guard as 7-1-1-4 |
+| **7-1-2-3.** Card moved areas during Block Step → skip to End of Battle | **IMPL** | `pending-work-drain.ts`, `battle.ts → checkpointBattleStepEnd()` | OPT-967: prompted Block work completes before checkpoint; conditional Counter notification is cancelled on removal; F11b and attacker/target live+undo matrix |
 
 ### 7-1-3. Counter Step
 
@@ -352,7 +357,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **7-1-3-2.** Defender can use Symbol Counters and Counter Events | **IMPL** | `executeUseCounter()`, `executeUseCounterEvent()` in `battle.ts` | |
 | **7-1-3-2-1.** Symbol Counter: trash Character from hand, add power | **IMPL** | `battle.ts:140–182` | Trashes card, adds `counterValue` to `counterPowerAdded` |
 | **7-1-3-2-2.** Counter Event: pay cost, trash, activate [Counter] | **IMPL** | `battle.ts:186–211` + `effect-resolver/` | Cost paid, card trashed, effect resolved via schema |
-| **7-1-3-3.** Card moved areas during Counter Step → skip to End of Battle | **IMPL** | `battle.ts → executeDamageStep()`; [`opt-243-battle-termination.test.ts`](../../workers/game/src/__tests__/opt-243-battle-termination.test.ts) | Same pre-damage combatant guard as 7-1-1-4 |
+| **7-1-3-3.** Card moved areas during Counter Step → skip to End of Battle | **IMPL** | `pending-work-drain.ts`, `battle.ts → checkpointBattleStepEnd()` | OPT-967: Counter children complete before Damage entry; removal emits one aborted End of Battle with no damage/result events; `opt-967-step-end.test.ts` |
 
 ### 7-1-4. Damage Step
 
@@ -371,9 +376,9 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **7-1-5-1.** Battle ends | **IMPL** | `battle.ts → endBattle()` | Clears `battle` and `battleSubPhase` from turn state |
-| **7-1-5-2.** "At the end of battle" / "if this ... battles" effects | **IMPL** | `triggers.ts`, `duration-tracker.ts` | Trigger matching for battle-end events; END_OF_BATTLE duration wave |
-| **7-1-5-3/4.** "During this battle" effects expire (turn player then non-turn player) | **IMPL** | `duration-tracker.ts → expireEffects()` | END_OF_BATTLE wave expires battle-scoped effects |
-| **7-1-5-5.** Return to Main Phase (6-5-2) | **IMPL** | `endBattle()` emits `PHASE_CHANGED` from `DAMAGE_STEP` to `MAIN` | |
+| **7-1-5-2.** "At the end of battle" / "if this ... battles" effects | **IMPL** | `triggers.ts`, `battle-completion.ts` | Native8 waits for all EOB children before expiry (OPT-1007); OPT-1003 activates new and validated historical production sessions without changing cost mode. See [completion contract](./NATIVE8-BATTLE-COMPLETION.md). |
+| **7-1-5-3/4.** "During this battle" effects expire (turn player then non-turn player) | **IMPL** | `battle-completion.ts`, `duration-tracker.ts → expireBattleEffects()` | Native8 completes EOB work, then expires turn player followed by opponent. Production writer8 enabled by OPT-1003; old already-started EOB pauses retain their historical completion meaning. |
+| **7-1-5-5.** Return to Main Phase (6-5-2) | **IMPL** | `battle-completion.ts` reports `PHASE_CHANGED` from `DAMAGE_STEP` to `MAIN` | After children and exact-battle expiry; terminal cancels this uncommitted obligation. |
 
 ---
 
@@ -392,6 +397,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | **8-1-3-4.** Replacement effects ("instead") | **IMPL** | `replacements.ts → checkReplacements()` | Full replacement detection, matching, optional prompts |
 | **8-1-3-4-2.** Replacement effect priority (card owner → turn player → non-turn player) | **IMPL** | `replacements.ts` | Priority ordering implemented |
 | **8-1-3-4-3.** Same replacement can't apply twice to same process | **IMPL** | `replacements.ts` | Once-per-event tracking |
+| **8-1-3-4-5.** An impossible replacement cannot be applied | **IMPL** | `replacements.ts → canExecuteReplacementSubstitute()`, `stillFeasibleBatchTargets()` | OPT-922: the batch path re-checks feasibility before it offers and before it applies each replacement, so an earlier substitute cannot spend a later one's resource. [`opt-922-batch-replacement-recheck.test.ts`](../../workers/game/src/__tests__/opt-922-batch-replacement-recheck.test.ts) |
 | **8-1-4-1.** One-shot effects | **IMPL** | `effect-resolver/resolver.ts` | One-shot actions resolve immediately |
 | **8-1-4-2.** Continuous effects | **IMPL** | `duration-tracker.ts` | Duration tracking with wave-based expiry and while-conditions |
 
@@ -406,7 +412,8 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **8-3-1.** Activation cost (before the colon) | **IMPL** | `effect-resolver/cost-handler.ts → payCosts()` | Handles DON_MINUS, DON_REST, TRASH_FROM_HAND, CARD_RETURN |
-| **8-3-1-1 / 8-3-1-3.** Costs paid in printed order; an unpayable cost pays nothing | **IMPL** | `effect-resolver/cost/orchestrator.ts → payCostsWithSelection()`, `cost/feasibility.ts → isCostSequencePayable()` | The whole remaining cost sequence is checked before any selection prompt; a short deck cannot pay a `MILL` cost. [`opt-798-mill-and-either-deck-cost.test.ts`](../../workers/game/src/__tests__/opt-798-mill-and-either-deck-cost.test.ts) |
+| **8-3-1-1 / 8-3-1-3.** Costs paid in printed order; an unpayable cost pays nothing | **IMPL** | `effect-resolver/cost/orchestrator.ts → payCostsWithSelection()`, `cost/feasibility.ts → isCostSequencePayable()` | The whole remaining cost sequence is checked before any selection prompt; a short deck cannot pay a `MILL` cost. [`opt-798-mill-and-either-deck-cost.test.ts`](../../workers/game/src/__tests__/opt-798-mill-and-either-deck-cost.test.ts). OPT-864: availability, validation, the optional-effect prompt and the Life Trigger gate use the same sequential evaluator; an unpayable optional cost is skipped without a prompt. [`opt-864-sequential-cost-availability.test.ts`](../../workers/game/src/__tests__/opt-864-sequential-cost-availability.test.ts) |
+| **8-3-1-3-1 / 8-3-1-7 / 10-2-13-5.** Inability or replacement after payment starts | **PARTIAL** | `cost/orchestrator.ts → cannotPay()` | Known deviation (Decision 10, OPT-958): payment rolls back to the activation baseline and the [Once Per Turn] use stays unconsumed. A terminal checkpoint never rolls back. [`opt-864-decision-10-replaced-cost-rollback.test.ts`](../../workers/game/src/__tests__/opt-864-decision-10-replaced-cost-rollback.test.ts) |
 | **8-3-1-5.** ① symbol = rest N active DON!! | **IMPL** | `cost-handler.ts` | DON_REST cost type implemented |
 | **8-3-1-6.** "DON!! −X" = return DON!! to DON!! deck | **IMPL** | `state.ts → returnDonToDeck()` | Returns DON!! from cost area to DON!! deck, preferring rested |
 | **8-3-2-3.** [DON!! xX] condition | **IMPL** | `conditions.ts` | DON_FIELD_COUNT condition type evaluates attached DON!! count |
@@ -431,9 +438,9 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **8-6-1.** Turn player resolves first, then non-turn player | **IMPL** | `trigger-ordering.ts → scanEventsForTriggers()` | Orders triggers by active player priority |
-| **8-6-1-1.** Cascading triggers during resolution | **IMPL** | `effect-stack.ts`, `triggers.ts` | Re-entrant trigger detection via effect stack |
-| **8-6-2.** Effects triggered during damage processing wait until damage finishes | **IMPL** | `effect-stack.ts`, `battle.ts` | Effect stack pauses during damage; triggers queued |
+| **8-6-1.** Turn player resolves first, then non-turn player | **IMPL** | `pending-work-drain.ts`, `trigger-executor.ts` | FIFO closed generations; turn player selects first within each generation, then opponent. Event scans enqueue only |
+| **8-6-1-1.** Cascading triggers during resolution | **IMPL** | `pending-work-drain.ts`, `trigger-executor.ts → reportTriggerWork()` | Reports collect behind older siblings until that generation and children finish; independent A→X→C and A→B→C traces in `timing-baseline/nested-trigger-order.test.ts` |
+| **8-6-2.** Effects triggered during damage processing wait until damage finishes | **IMPL** | `pending-work-drain.ts`, `damage-frames.ts`, `battle.ts`, `effect-damage.ts` | Ordinary trigger debt releases at completed damage boundary; Life Trigger interrupts explicitly. Attacker effects finish before Life reveal. `timing-baseline/damage-window-order.test.ts`, `opt-872-battle-ko-replacement-continuation.test.ts` |
 | **8-6-3.** Effects triggered by card/effect activation wait for resolution | **IMPL** | `trigger-ordering.ts` | Post-resolution trigger queue via event scanning |
 
 ---
@@ -442,12 +449,12 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
-| **9-1-1.** Rule processing = automatic processing on specific events | **IMPL** | `pipeline.ts` step 7 calls `checkDefeat()` | |
-| **9-1-2.** Rule processing is immediate, even during other actions | **PARTIAL** | Runs after every pipeline call, but not mid-execution (e.g., not between individual damage points). A Leader damaged at 0 Life ends the game even when an auto effect from the same action suspends for input (`pipeline.ts → defeatAtSuspension()`, OPT-886) | |
-| **9-2-1.** Defeat judgment processing | **IMPL** | `defeat.ts → checkDefeat()` | |
-| **9-2-1-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts:31–34` | |
-| **9-2-1-2.** 0 deck = defeat | **IMPL** | `defeat.ts:26–27` | |
-| Simultaneous defeat → draw | **IMPL** | `defeat.ts:39–41` | Both players lose → `winner: null` |
+| **9-1-1.** Rule processing = automatic processing on specific events | **IMPL** | `defeat.ts → runRuleProcessing()` | |
+| **9-1-2.** Rule processing is immediate, even during other actions | **IMPL** | `runRuleProcessing` after each effect action that changes a deck or Life count or determines lethal damage (`resolver.ts → ruleProcessingAfterAction()`), after each committed cost payment (`cost/orchestrator.ts`), after a resumed card move before the remaining chain (`resume-core.ts → resumeEffectChain()`), after an executed game action and before a prompt surfaces (`pipeline.ts`, `prompt-lifecycle.ts`), and at action end; a battle or effect-damage [Trigger] and an End Phase scheduled action stop on a terminal result (`battle.ts`, `phases.ts`); [`opt-960-terminal-stops.test.ts`](../../workers/game/src/__tests__/opt-960-terminal-stops.test.ts), [`opt-862-mid-resolution-deck-out.test.ts`](../../workers/game/src/__tests__/opt-862-mid-resolution-deck-out.test.ts), [`opt-925-effect-damage-defeat.test.ts`](../../workers/game/src/__tests__/opt-925-effect-damage-defeat.test.ts) | After a terminal checkpoint no instruction, cost, prompt or trigger drain runs (OPT-862, OPT-925, OPT-949) |
+| **9-2-1.** Defeat judgment processing | **IMPL** | `defeat.ts → checkDefeat()` | Both players evaluated at one checkpoint; a later instruction never runs to manufacture a draw (Decision 3) |
+| **9-2-1-1.** Leader damage + 0 life = defeat | **IMPL** | `defeat.ts → checkDefeat()`; battle `battle.ts → dealOneLeaderDamage()`; effect damage `effect-damage.ts → continueEffectDamageSequence()`, `battle-actions.ts → executeSelfTakeDamage()` | Lethal when dealt at 0 Life, determined once per damage instruction (OPT-925; multi-damage reading assumed) |
+| **9-2-1-2.** 0 deck = defeat | **IMPL** | `defeat.ts → checkDefeat()` | Checked mid-cost and mid-action (OPT-862); OP15-022 delayed loss deferred to the end-of-turn window |
+| Simultaneous defeat → draw | **IMPL** | `defeat.ts → checkDefeat()` | Both players lose at the same checkpoint → `winner: null` |
 
 ---
 
@@ -497,7 +504,7 @@ drifted; **PARTIAL** identifies the tested guarantee and the remaining rule gap.
 | Rule | Status | Engine Location | Notes |
 |------|--------|----------------|-------|
 | **11-1-1.** Infinite loop detection | **PARTIAL** | `engine-limits.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Effect-stack depth and a persisted per-resolution action budget bound nested and sequential loops. State-hash recognition of player-stoppable loops remains future work. |
-| **11-1-1-1.** Unstoppable loop → draw | **IMPL** | `engine-limits.ts`; `effect-stack.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Exhaustion atomically clears prompts/continuations, records deterministic diagnostics in `GAME_OVER`, and finishes with no winner. |
+| **11-1-1-1.** Unstoppable loop → draw | **GAP** | `engine-limits.ts`; `effect-stack.ts`; [`opt-467-engine-limits.test.ts`](../../workers/game/src/__tests__/opt-467-engine-limits.test.ts) | Budget or stack exhaustion is the engine-limit outcome (`ENGINE_LIMIT`, Decision 5), not this rule's draw: it atomically clears prompts/continuations, records deterministic diagnostics in `GAME_OVER`, and finishes with no winner. `INFINITE_LOOP_DRAW` is reserved for this rule (OPT-952). |
 | **11-1-1-2/3.** Player can declare loop count | **GAP** | — | Need: prompt for loop count |
 | **11-2-1.** Cards moved secret→secret must be revealed | **GAP** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Viewer-specific redaction is enforced, but there is no generic zone-transition rule that publishes required reveals |
 | **11-2-2.** Revealed cards become unrevealed after effect resolves | **PARTIAL** | `visibility.ts`; [`opt-470-hidden-information-visibility.test.ts`](../../workers/game/src/__tests__/opt-470-hidden-information-visibility.test.ts) | Reveal visibility is event-scoped rather than stored on cards; current prompts/events do not leak after resolution, but no generic reveal lifecycle exists |
@@ -560,7 +567,7 @@ contracts above:
 
 ### Edge Cases & Misc
 
-1. **Player-Stoppable Loop Semantics** — Recognize repeated game states and prompt eligible players for loop counts. Unstoppable/budget-exhausting execution already terminates in a draw.
+1. **Player-Stoppable Loop Semantics** — Recognize repeated game states and prompt eligible players for loop counts. Budget-exhausting execution terminates with the distinct ENGINE_LIMIT outcome; it does not implement the rules draw.
    - Rules: 11-1-1 to 11-1-1-3
 
 2. **Secret-to-Secret Reveal Enforcement** — When a rule requires a card moving between secret areas to be revealed, publish that reveal without exposing unrelated order or stable identity.

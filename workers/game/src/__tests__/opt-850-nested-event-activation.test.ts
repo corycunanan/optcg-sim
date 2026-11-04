@@ -1,3 +1,6 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
+import { replayPauses } from "./fixtures/opt-966-replay.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { expect, it } from "vitest";
 import type {
   CardData,
@@ -192,6 +195,7 @@ function fixture() {
     get state() {
       return state;
     },
+    set state(next: GameState) { state = next; },
   };
 }
 it.each([0, 1] as const)(
@@ -239,7 +243,7 @@ it.each([false, true])(
     // DON_MINUS uses the engine's existing automatic payment. The attached DON
     // remains, and both costs must still be paid exactly once.
     if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-      f.choose("cost_area");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 1, f.state.players[0].donCostArea.slice(0, 1).map(d => d.instanceId));
     f.select([event.instanceId]);
     expect(f.state.pendingPrompt).not.toBeNull();
     expect(
@@ -247,7 +251,7 @@ it.each([false, true])(
     ).toHaveLength(0);
     await f.reload();
     if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-      f.choose("cost_area");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 2, f.state.players[0].donCostArea.slice(0, 2).map(d => d.instanceId));
     expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     await f.reload();
     f.select(zero ? [] : [target.instanceId]);
@@ -282,10 +286,10 @@ it("Page One waits until Lightning finishes, then cycles exactly once across rel
     effectId: "OP12-041_activate",
   });
   if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-    f.choose("cost_area");
+    f.state = scriptedDonPayment(f.state, f.db, 0, 1, f.state.players[0].donCostArea.slice(0, 1).map(d => d.instanceId));
   f.select([event.instanceId]);
   if (f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE")
-    f.choose("cost_area");
+    f.state = scriptedDonPayment(f.state, f.db, 0, 2, f.state.players[0].donCostArea.slice(0, 2).map(d => d.instanceId));
   expect(f.state.players[0].hand.length).toBe(hand - 1);
   expect(f.state.eventLog.filter((e) => e.type === "CARD_DRAWN")).toHaveLength(
     0
@@ -346,7 +350,9 @@ it("registered Reiju resolves nested Main from trash without changing Event iden
   const event = f.put("OP09-077", 0, "TRASH");
   const target = f.put(CARDS.VANILLA.id, 1);
   f.play("EB03-031");
+  f.state = scriptedDonPayment(f.state, f.db, 0, 1);
   f.select([event.instanceId]);
+  f.state = scriptedDonPayment(f.state, f.db, 0, 2);
   expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
   expect(
     f.state.eventLog.filter((e) => e.type === "EVENT_MAIN_RESOLVED_FROM_TRASH")
@@ -399,6 +405,7 @@ it.each([true, false])(
     const hand = f.state.players[0].hand.length;
     const payment = f.state.players[0].hand[0];
     f.play("EB03-031");
+    f.state = scriptedDonPayment(f.state, f.db, 0, 1);
     f.select([event.instanceId]);
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     await f.reload();
@@ -482,8 +489,12 @@ it("nested hand Main keeps its parent's source and suffix after a persisted prom
   expect(
     getEffectivePower(f.state.players[0].leader, f.db.get("OP12-041")!, f.state)
   ).toBe(5000);
-  await f.reload();
-  f.select([target.instanceId]);
+  if (process.env.OPT966_READER_ROOT) {
+    await replayPauses(f, () => ({ type: "SELECT_TARGET", selectedInstanceIds: [target.instanceId] }), "opt966-event-prefix-writer-corpus");
+  } else {
+    await f.reload();
+    f.select([target.instanceId]);
+  }
   expect(
     getEffectivePower(f.state.players[0].leader, f.db.get("OP12-041")!, f.state)
   ).toBe(6000);
@@ -595,24 +606,25 @@ it("persisted completion accepts legacy absence and rejects malformed notificati
     JSON.parse(
       JSON.stringify({
         formatVersion: 1,
-        state: f.state,
+        state: toPersistedGameState(f.state),
         cardDb: Object.fromEntries(f.db),
         undoHistory: [],
       })
     );
   const index = f.state.effectStack.findIndex(
-    (frame) => frame.eventActivationCompletion
+    (frame) => frame.eventActivation
   );
   expect(index).toBeGreaterThanOrEqual(0);
   expect(
     parseStoredSession(snapshot()).state.effectStack[index]
-      .eventActivationCompletion?.type
+      .eventActivation?.events[0]?.type
   ).toBe("EVENT_ACTIVATED_FROM_HAND");
   const legacy = snapshot();
-  delete legacy.state.effectStack[index].eventActivationCompletion;
+  delete legacy.state.effectStack[index].eventActivation;
+  legacy.state.effectStack[index].kind = "TRIGGER_DRAIN";
   expect(
     parseStoredSession(legacy).state.effectStack[index]
-      .eventActivationCompletion
+      .eventActivation
   ).toBeUndefined();
   for (const completion of [
     "bad",
@@ -630,7 +642,7 @@ it("persisted completion accepts legacy absence and rejects malformed notificati
     },
   ]) {
     const malformed = snapshot();
-    malformed.state.effectStack[index].eventActivationCompletion = completion;
+    malformed.state.effectStack[index].eventActivation.events = [completion];
     expect(() => parseStoredSession(malformed)).toThrow();
   }
 });
@@ -806,8 +818,10 @@ it.each(["SELECTED", "AUTOMATIC"])(
         frame.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" &&
         frame.phase === "INTERRUPTED_BY_TRIGGERS"
     )!;
-    expect(parent.pendingTriggers).toHaveLength(2);
-    expect(parent.triggerOrderingGroup?.resolvedTriggerIds).toEqual([
+    expect(parent.pendingTriggers).toHaveLength(0);
+    const generation = f.state.effectStack.find(frame => frame.triggerExecution)!.triggerExecution!.generations[0];
+    expect(generation.triggers).toHaveLength(2);
+    expect(generation.orderingGroup?.resolvedTriggerIds).toEqual([
       chosen.orderingId,
     ]);
     expect(f.state.effectStack.at(-1)?.pendingTriggers).toHaveLength(0);

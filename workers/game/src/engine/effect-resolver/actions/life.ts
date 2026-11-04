@@ -22,7 +22,7 @@ import {
   needsPlayerTargetSelection,
 } from "../target-resolver.js";
 import { findCardInstance } from "../../state.js";
-import { isRemovalProhibited } from "../../prohibitions.js";
+import { isLifeToHandProhibited, isRemovalProhibited } from "../../prohibitions.js";
 import { transitionCard, transitionCards } from "../../zone-transition.js";
 import type { ZoneTransitionResult } from "../../zone-transition.js";
 import { terminateForEngineContract } from "../../engine-limits.js";
@@ -120,9 +120,7 @@ export function executeTrashFromLife(
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
 
-  const removed = position === "TOP"
-    ? p.life.slice(0, count)
-    : p.life.slice(-count);
+  const removed = position === "TOP" ? p.life.slice(0, count) : p.life.slice(-count);
   const moved = transitionCards(
     state,
     removed.map((card) => card.instanceId),
@@ -151,7 +149,7 @@ export function executeTrashFromLife(
   return {
     state: moved.state,
     events,
-    succeeded: true,
+    fullyExecuted: moved.transitions.length === amount, succeeded: true,
   };
 }
 
@@ -171,6 +169,9 @@ export function executeTurnLifeFaceUp(
   const p = state.players[controller];
   if (p.life.length === 0) return { state, events, succeeded: false };
 
+  const required = position === "ALL" ? p.life.length : amount;
+  const selected = position === "ALL" ? p.life : position === "TOP" ? p.life.slice(0, amount) : p.life.slice(-amount);
+  const fullyExecuted = required > 0 && selected.filter((card) => card.face === "DOWN").length === required;
   let newLife = [...p.life];
   if (position === "ALL") {
     newLife = newLife.map((l) => ({ ...l, face: "UP" as const }));
@@ -191,7 +192,7 @@ export function executeTurnLifeFaceUp(
 
   events.push({ type: "LIFE_CARD_FACE_CHANGED", playerIndex: controller, payload: { face: "UP" } });
 
-  return { state: { ...state, players: newPlayers }, events, succeeded: true };
+  return { state: { ...state, players: newPlayers }, events, fullyExecuted, succeeded: true };
 }
 
 export function executeTurnLifeFaceDown(
@@ -262,6 +263,10 @@ export function executeLifeToHand(
         ? 1
         : 0
       : controller;
+  const causingController = effectSourceController(state, _sourceCardInstanceId, controller, _resultRefs);
+  if (isLifeToHandProhibited(state, targetController, causingController, _cardDb)) {
+    return { state, events, succeeded: false, result: { targetInstanceIds: [], count: 0 } };
+  }
   const p = state.players[targetController];
   const count = Math.min(amount, p.life.length);
   if (count === 0) return { state, events, succeeded: false };
@@ -291,7 +296,7 @@ export function executeLifeToHand(
   return {
     state: moved.state,
     events,
-    succeeded: true,
+    fullyExecuted: moved.transitions.length === amount, succeeded: true,
     result: {
       targetInstanceIds: moved.transitions.map((transition) => transition.fact.newInstanceId),
       count: moved.transitions.length,

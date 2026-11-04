@@ -165,6 +165,18 @@ describe("CardActionMenuContent", () => {
     ).toContain("cost unavailable");
   });
 
+  it("disables a blocked effect without a reason and renders no reason text", () => {
+    const renderer = renderMenu({
+      "card-1": [{ effectId: "activate-main-1", status: "blocked" }],
+    });
+    const [item] = actionItems(renderer);
+
+    expect(item.props.disabled).toBe(true);
+    expect(
+      item.findAllByType("span").map((span) => span.children.join(""))
+    ).toEqual(["\u26A1", "Activate [Main] effect"]);
+  });
+
   it("fails open when the server sent no availability entry", () => {
     const [item] = actionItems(renderMenu(undefined));
 

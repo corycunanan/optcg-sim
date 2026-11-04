@@ -2543,6 +2543,7 @@ export const OP10_074_PICA: EffectSchema = {
       replacement_actions: [
         {
           type: "REST_DON",
+          params: { amount: 2 },
           target: {
             type: "DON_IN_COST_AREA",
             controller: "SELF",

@@ -27,7 +27,7 @@
 
 import { describe, expect, it } from "vitest";
 import type {
-  BattleKOReplacementContinuation,
+  BattleDamageContinuation,
   CardData,
   CardInstance,
   GameAction,
@@ -39,9 +39,13 @@ import { registerCardEnteredField } from "../engine/triggers.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
-import { resumeBattleDamageContinuation } from "../engine/battle.js";
+import { MAX_EFFECT_STACK_DEPTH } from "../engine/engine-limits.js";
+import { continuePipelineFromExecution } from "../engine/pipeline.js";
+import { continueBattleDamageFrame, executePass } from "../engine/battle.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import {
   SessionRepository,
+  convertPersistedGameState,
   parseStoredSession,
   type SessionStorage,
 } from "../session/persistence.js";
@@ -52,6 +56,10 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { battleContinuation, patchBattleContinuation, withReplacementOffer } from "./trigger-window-helpers.js";
+
+/** OPT-963: the K.O. replacement stage of the BATTLE_DAMAGE frame (was `turn.pendingBattleDamageContinuation`). */
+type BattleKOReplacementContinuation = Extract<BattleDamageContinuation, { stage: "CHARACTER_KO_REPLACEMENT" }>;
 
 class MemoryStorage implements SessionStorage {
   readonly data = new Map<string, unknown>();
@@ -173,7 +181,7 @@ function fixture() {
     state.players[card.owner].trash.some((c) => c.cardId === card.cardId);
   const events = (type: string) => state.eventLog.filter((e) => e.type === type);
   const continuation = () =>
-    state.turn.pendingBattleDamageContinuation as BattleKOReplacementContinuation | null | undefined;
+    battleContinuation(state) as BattleKOReplacementContinuation | null | undefined;
 
   return {
     db,
@@ -366,27 +374,21 @@ describe("OP10-034 Franky — the Damage Step resumes after the replacement prom
     expect(f.state).toEqual(before);
   });
 
-  it("stale battleId: the continuation is discarded without touching the current battle", () => {
+  it("stale battleId: an otherwise stranded Damage Step is aborted", () => {
     const f = fixture();
     const target = franky(f);
     const attacker = f.attacker();
 
     f.battle(target, attacker);
-    const battleId = pendingBattleId(f);
-    f.state = {
-      ...f.state,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...f.continuation()!, battleId: "stale-battle" },
-      },
-    };
+    pendingBattleId(f);
+    f.state = patchBattleContinuation(f.state, { battleId: "stale-battle" });
     f.decline();
 
     expect(f.continuation() ?? null).toBeNull();
     expect(f.onField(target)).toBe(true);
     expect(f.events("CARD_KO")).toHaveLength(0);
-    expect(f.events("END_OF_BATTLE")).toHaveLength(0);
-    expect(f.state.turn.battle?.battleId).toBe(battleId);
+    expect(f.events("END_OF_BATTLE")).toHaveLength(1);
+    expect(f.state.turn.battle).toBeNull();
   });
 });
 
@@ -400,13 +402,7 @@ describe("an answered continuation is never re-answered", () => {
     f.battle(target, f.attacker());
     pendingBattleId(f);
     const lifeBefore = f.state.players[0].life.length;
-    f.state = {
-      ...f.state,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...f.continuation()!, resolution: "REPLACED" },
-      },
-    };
+    f.state = patchBattleContinuation(f.state, { resolution: "REPLACED" });
     f.decline();
 
     expect(f.onField(target)).toBe(true);
@@ -535,6 +531,91 @@ describe("a mandatory replacement whose substitute asks for input", () => {
   });
 });
 
+for (const ordering of [false, true]) it(`preserves the battle prefix when ${ordering ? "ordering" : "optional"} owner insertion hits the stack limit`, () => {
+  const f = fixture();
+  vivi(f);
+  const target = vanAugur(f);
+  handCards(f, 0, 2);
+  f.battle(target, f.attacker());
+  const template = f.state.effectStack.find(frame => frame.battleDamage)!;
+  if (ordering) {
+    const replacement = f.state.activeEffects.find(effect => effect.modifiers.some(modifier => modifier.type === "REPLACEMENT_EFFECT"))!;
+    f.state.activeEffects.push({ ...replacement, id: `${replacement.id}-ordering-boundary` });
+  }
+  const state: GameState = { ...f.state, pendingPrompt: null,
+    effectStack: Array.from({ length: MAX_EFFECT_STACK_DEPTH - 1 }, (_, index) => ({
+      ...template, id: `depth-owner-${index}`, kind: "TRIGGER_DRAIN", battleDamage: undefined,
+    })),
+    turn: { ...f.state.turn, battleSubPhase: "COUNTER_STEP", battle: { ...f.state.turn.battle!, step: "COUNTER_STEP" } },
+  };
+  const executed = executePass(state, f.db);
+  expect(executed.state.status).toBe("FINISHED");
+  expect(executed.events.map(event => event.type)).toEqual(["PHASE_CHANGED", "CHARACTER_BATTLES", "COMBAT_VICTORY"]);
+  const completed = continuePipelineFromExecution(executed.state, executed, f.db, 0);
+  expect(completed.state.effectStack).toEqual([]);
+  expect(completed.state.pendingPrompt).toBeNull();
+  const types = completed.state.eventLog.map(event => event.type);
+  expect(types.filter(type => type === "GAME_OVER")).toHaveLength(1);
+  expect(types.lastIndexOf("COMBAT_VICTORY")).toBeLessThan(types.indexOf("GAME_OVER"));
+});
+
+describe("OPT-965 mandatory substitute owner completion", () => {
+  for (const terminal of [false, true]) {
+    it(`cleans the synchronous owner once${terminal ? " on terminal outcome" : " without a prompt"}`, () => {
+      const f = fixture();
+      const schema = structuredClone(getEffectSchema("EB03-001")!);
+      const block = schema.effects[0];
+      if (block.category !== "replacement") throw new Error("shape");
+      block.flags = { ...block.flags, optional: false };
+      block.replacement_actions = terminal
+        ? [{ type: "DRAW", params: { amount: 1 } }]
+        : [
+          { type: "SET_REST", target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 }, filter: { cost_max: 1 } } },
+          { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+        ];
+      f.data("EB03-001", { type: "Leader", cost: null, power: 5000, counter: null, life: 4, effectSchema: schema });
+      f.put("EB03-001", 0, "LEADER");
+      const target = vanAugur(f);
+      handCards(f, 0, 1);
+      if (!terminal) {
+        f.data("SYNC-VICTIM", { cost: 1 });
+        f.put("SYNC-VICTIM", 0);
+        f.data("SYNC-WATCHER", { effectSchema: {
+          card_id: "SYNC-WATCHER", card_name: "Watcher", card_type: "Character",
+          effects: [{ id: "draw", category: "auto",
+            trigger: { event: "CHARACTER_BECOMES_RESTED", filter: { controller: "SELF" } },
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          }],
+        } as NonNullable<CardData["effectSchema"]> });
+        f.put("SYNC-WATCHER", 0);
+      }
+      if (terminal) f.state.players[0].deck = f.state.players[0].deck.slice(0, 1);
+      f.battle(target, f.attacker());
+      expect(f.onField(target)).toBe(true);
+      expect(f.state.pendingPrompt).toBeNull();
+      expect(f.state.effectStack).toEqual([]);
+      expect(f.state.turn.battle).toBeNull();
+      expect(f.events("CARD_KO")).toHaveLength(0);
+      if (terminal) {
+        expect(f.state.status).toBe("FINISHED");
+        expect(f.events("GAME_OVER")).toHaveLength(1);
+        expect(f.events("END_OF_BATTLE")).toHaveLength(0);
+        const types = f.state.eventLog.map(event => event.type);
+        for (const type of ["PHASE_CHANGED", "CHARACTER_BATTLES", "COMBAT_VICTORY", "CARD_DRAWN"]) {
+          expect(types).toContain(type);
+          expect(types.lastIndexOf(type as typeof types[number])).toBeLessThan(types.indexOf("GAME_OVER"));
+        }
+      } else {
+        expect(f.events("CARD_TRASHED")).toHaveLength(1);
+        expect(f.events("CARD_DRAWN")).toHaveLength(1);
+        const types = f.state.eventLog.map(event => event.type);
+        expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));
+        expectBattleClosedOnce(f);
+      }
+    });
+  }
+});
+
 // ─── Two replacements for one battle K.O. (Franky + EB03-001) ────────────────
 
 describe("two optional replacements cover the same battle K.O.", () => {
@@ -560,7 +641,7 @@ describe("two optional replacements cover the same battle K.O.", () => {
     expectBattleClosedOnce(f);
   });
 
-  it("declining the first K.O.s Franky and ends the battle exactly once (engine offers no second replacement)", () => {
+  it("declining every replacement K.O.s Franky and ends the battle exactly once", () => {
     const f = fixture();
     vivi(f);
     const target = franky(f);
@@ -569,6 +650,8 @@ describe("two optional replacements cover the same battle K.O.", () => {
 
     f.battle(target, attacker);
     pendingBattleId(f);
+    f.decline();
+    expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     f.decline();
 
     expect(f.inTrash(target)).toBe(true);
@@ -581,7 +664,7 @@ describe("two optional replacements cover the same battle K.O.", () => {
   // path (checkReplacementForKO) offers only the first match, so declining it
   // K.O.s Franky without offering the other. Changing that needs matching
   // changes in replacements.ts, outside OPT-872.
-  it.fails("declining the first offers the remaining replacement (§8-1-3-4-1/2)", () => {
+  it("declining the first offers the remaining replacement (§8-1-3-4-1/2)", () => {
     const f = fixture();
     vivi(f);
     const target = franky(f);
@@ -663,24 +746,19 @@ describe("CHARACTER_KO_REPLACEMENT continuation — schema and visibility", () =
     return f;
   }
 
+  /** The real writer's object (schema version 3), then the real reader. */
   function parse(state: GameState, db: Map<string, CardData>) {
     return parseStoredSession(
-      JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
+      JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })),
     ).state;
   }
 
   it("round-trips through the persisted-state schema, with and without a resolution", () => {
     const f = pendingState();
     const cont = f.continuation()!;
-    expect(parse(f.state, f.db).turn.pendingBattleDamageContinuation).toEqual(cont);
-    const resolved = {
-      ...f.state,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...cont, resolution: "NOT_REPLACED" as const },
-      },
-    };
-    expect(parse(resolved, f.db).turn.pendingBattleDamageContinuation).toMatchObject({
+    expect(battleContinuation(parse(f.state, f.db))).toEqual(cont);
+    const resolved = patchBattleContinuation(f.state, { resolution: "NOT_REPLACED" });
+    expect(battleContinuation(parse(resolved, f.db))).toMatchObject({
       resolution: "NOT_REPLACED",
     });
   });
@@ -698,19 +776,27 @@ describe("CHARACTER_KO_REPLACEMENT continuation — schema and visibility", () =
       const f = pendingState();
       const bad = {
         ...f.state,
-        turn: { ...f.state.turn, pendingBattleDamageContinuation: mutate(f.continuation()!) },
+        effectStack: f.state.effectStack.map((frame) =>
+          frame.battleDamage ? { ...frame, battleDamage: mutate(f.continuation()!) } : frame,
+        ),
       } as unknown as GameState;
       expect(() => parse(bad, f.db)).toThrow();
     });
   }
 
-  it("is visible to both players and spectators, with no Life identity added", () => {
+  it("names only public field cards; both player views and the spectator view share one turn", () => {
     const f = pendingState();
     const cont = f.continuation()!;
     expect(cont.stage).toBe("CHARACTER_KO_REPLACEMENT");
-    expect(filterStateForPlayer(f.state, 0).turn.pendingBattleDamageContinuation).toEqual(cont);
-    expect(filterStateForPlayer(f.state, 1).turn.pendingBattleDamageContinuation).toEqual(cont);
-    expect(visibleStateForSpectator(f.state, f.db).turn.pendingBattleDamageContinuation).toEqual(cont);
+    // OPT-963: the continuation lives on the effect stack, which is never
+    // sent; what reaches the clients (the turn, the prompt) is identical for
+    // both players and the spectator, with no Life identity in it.
+    expect(cont).not.toHaveProperty("lifeCardInstanceId");
+    const zero = filterStateForPlayer(f.state, 0);
+    const one = filterStateForPlayer(f.state, 1);
+    expect(zero.effectStack).toEqual([]);
+    expect(one.turn).toEqual(zero.turn);
+    expect(visibleStateForSpectator(f.state, f.db).turn).toEqual(zero.turn);
   });
 });
 
@@ -755,9 +841,9 @@ describe("published event order after the prompt", () => {
     expect(intoDamage()).toHaveLength(1);
   });
 
-  // The resumed batch is published only after the substitute's own prompt
-  // resolves, so a prompted substitute's events precede the Damage Step's.
-  it("EB03-001 accept with a hand choice: CARD_TRASHED, then PHASE_CHANGED, CHARACTER_BATTLES, COMBAT_VICTORY, END_OF_BATTLE", () => {
+  // Rule 8-6-2: the substitute remains inside damage processing. Its events
+  // and watchers join the same battle batch even when its action needs input.
+  it("EB03-001 accept with a hand choice retains the synchronous battle event order", () => {
     const f = fixture();
     vivi(f);
     const target = vanAugur(f);
@@ -769,10 +855,10 @@ describe("published event order after the prompt", () => {
     f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: [hand[0].instanceId] });
 
     expect(typesSince(f, before).slice(0, 5)).toEqual([
-      "CARD_TRASHED",
       "PHASE_CHANGED",
       "CHARACTER_BATTLES",
       "COMBAT_VICTORY",
+      "CARD_TRASHED",
       "END_OF_BATTLE",
     ]);
   });
@@ -800,29 +886,23 @@ describe("published event order after the prompt", () => {
     const after = typesSince(f, before);
     expect(after.filter((t) => t === "CARD_DRAWN")).toHaveLength(1);
     expect(after.indexOf("CARD_DRAWN")).toBeLessThan(after.indexOf("CARD_TRASHED"));
-    expect(after.indexOf("CARD_TRASHED")).toBeLessThan(after.indexOf("COMBAT_VICTORY"));
+    expect(after.indexOf("COMBAT_VICTORY")).toBeLessThan(after.indexOf("CARD_TRASHED"));
     expectBattleClosedOnce(f);
   });
 });
 
-describe("an unmatched or unanswered continuation never finishes the battle", () => {
+describe("an unmatched or unanswered continuation aborts the battle without a K.O.", () => {
   for (const [name, patch] of [
     ["effect id", { replacementEffectId: "some-other-effect" }],
     ["target", { targetInstanceId: "some-other-character" }],
   ] as const) {
-    it(`a REPLACEMENT answer for a different ${name} leaves the battle unresolved and discards the continuation`, () => {
+    it(`a REPLACEMENT answer for a different ${name} aborts the battle and discards the continuation`, () => {
       const f = fixture();
       const target = franky(f);
       f.battle(target, f.attacker());
-      const battleId = pendingBattleId(f);
+      pendingBattleId(f);
       const lifeBefore = f.state.players[0].life.length;
-      f.state = {
-        ...f.state,
-        turn: {
-          ...f.state.turn,
-          pendingBattleDamageContinuation: { ...f.continuation()!, ...patch },
-        },
-      };
+      f.state = patchBattleContinuation(f.state, patch);
       f.accept();
 
       // The replacement itself still resolves (Life → hand) …
@@ -831,13 +911,15 @@ describe("an unmatched or unanswered continuation never finishes the battle", ()
       expect(f.onField(target)).toBe(true);
       expect(f.events("CARD_KO")).toHaveLength(0);
       expect(f.events("COMBAT_VICTORY")).toHaveLength(0);
-      expect(f.events("END_OF_BATTLE")).toHaveLength(0);
+      expect(f.events("END_OF_BATTLE")).toHaveLength(1);
+      expect(f.events("END_OF_BATTLE")[0].payload).toMatchObject({ aborted: true });
       expect(f.continuation() ?? null).toBeNull();
-      expect(f.state.turn.battle?.battleId).toBe(battleId);
+      expect(f.state.turn.battle).toBeNull();
+      f.ok(1, { type: "DECLARE_ATTACK", attackerInstanceId: f.attacker().instanceId, targetInstanceId: target.instanceId });
     });
   }
 
-  it("an unanswered continuation with no prompt is discarded on the next resume, without K.O. or battle end", () => {
+  it("an unanswered continuation with no prompt is discarded on the next resume, without K.O., closing the battle", () => {
     // Constructed: the continuation's own prompt is replaced by an unrelated
     // one whose resume drains to an empty stack, so the end-of-resume
     // continuation loop meets the orphan with no resolution recorded.
@@ -845,29 +927,28 @@ describe("an unmatched or unanswered continuation never finishes the battle", ()
     const target = franky(f);
     f.battle(target, f.attacker());
     pendingBattleId(f);
-    f.state = {
-      ...f.state,
-      pendingPrompt: {
-        options: { promptType: "OPTIONAL_EFFECT", effectDescription: "x", cards: [] },
-        respondingPlayer: 0,
-        resumeContext: { type: "REPLACEMENT", effectId: "unrelated", targetInstanceId: "none", event: "WOULD_BE_KO" },
-      },
-    };
+    // OPT-963: the unrelated offer is a REPLACEMENT frame above the paused
+    // battle frame, replacing the offer the Damage Step raised.
+    f.state = withReplacementOffer(
+      { ...f.state, effectStack: f.state.effectStack.filter((frame) => frame.battleDamage) },
+      { effectId: "unrelated", targetInstanceId: "none", event: "WOULD_BE_KO" },
+      0,
+    );
     f.decline();
 
     expect(f.onField(target)).toBe(true);
     expect(f.events("CARD_KO")).toHaveLength(0);
-    expect(f.events("END_OF_BATTLE")).toHaveLength(0);
+    expect(f.events("END_OF_BATTLE")).toHaveLength(1);
+    expect(f.state.turn.battle).toBeNull();
     expect(f.continuation() ?? null).toBeNull();
   });
 });
 
 describe("a finished game never resumes the battle", () => {
-  it("a watcher drawing the last deck card during the substitute ends the game with one GAME_OVER and no battle resume", () => {
+  it("a substitute watcher waits until damage completes and then ends the game once", () => {
     // Constructed registered schema: "When a card is trashed from your hand,
     // draw 1 card." With a 1-card deck, EB03-001's hand-trash substitute makes
-    // the watcher draw the last card, so the controller loses before the
-    // paused Damage Step could resume.
+    // the watcher draw the last card after the substitute completes (§8-6-3).
     const f = fixture();
     vivi(f);
     f.data("WATCHER", {
@@ -902,12 +983,13 @@ describe("a finished game never resumes the battle", () => {
     expect(f.state.status).toBe("FINISHED");
     expect(f.state.winner).toBe(1);
     expect(f.events("GAME_OVER")).toHaveLength(1);
-    expect(f.events("COMBAT_VICTORY")).toHaveLength(0);
-    expect(f.events("END_OF_BATTLE")).toHaveLength(0);
+    expect(f.events("COMBAT_VICTORY")).toHaveLength(1);
+    expect(f.events("END_OF_BATTLE")).toHaveLength(1);
+    expect(f.state.turn.battle).toBeNull();
     expect(f.continuation() ?? null).toBeNull();
   });
 
-  it("resumeBattleDamageContinuation drops even an answered continuation on a finished game", () => {
+  it("continueBattleDamageFrame drops even an answered continuation on a finished game", () => {
     // Unit-level: the lifecycle loop already stops on a terminal state; this
     // pins the function's own guard for its direct caller in the REPLACEMENT
     // branch.
@@ -915,19 +997,17 @@ describe("a finished game never resumes the battle", () => {
     const target = franky(f);
     f.battle(target, f.attacker());
     pendingBattleId(f);
+    const answered = patchBattleContinuation(f.state, { resolution: "NOT_REPLACED" });
     const finished: GameState = {
-      ...f.state,
+      ...answered,
       status: "FINISHED",
       winner: 1,
       pendingPrompt: null,
-      turn: {
-        ...f.state.turn,
-        pendingBattleDamageContinuation: { ...f.continuation()!, resolution: "NOT_REPLACED" },
-      },
+      effectStack: answered.effectStack.filter((frame) => frame.battleDamage),
     };
-    const result = resumeBattleDamageContinuation(finished, f.db);
+    const result = continueBattleDamageFrame(finished, f.db);
     expect(result.events).toEqual([]);
-    expect(result.state.turn.pendingBattleDamageContinuation).toBeNull();
+    expect(battleContinuation(result.state)).toBeUndefined();
     expect(result.state.turn.battle).toEqual(finished.turn.battle);
     expect(result.state.players).toEqual(finished.players);
   });
@@ -946,4 +1026,143 @@ describe("a finished game never resumes the battle", () => {
     expect(f.continuation() ?? null).toBeNull();
     expect(f.events("GAME_OVER")).toHaveLength(1);
   });
+});
+
+describe("OPT-965 scoped battle recovery and substitute ordering", () => {
+  it("discarding a stale frame preserves a newer battle's live owner", () => {
+    const f = fixture();
+    f.battle(franky(f), f.attacker());
+    const owner = f.state.effectStack.find((frame) => frame.battleDamage)!;
+    const stale = { ...owner, id: "stale-frame", battleDamage: { ...owner.battleDamage!, battleId: "old-battle" } };
+    const state = { ...f.state, pendingPrompt: null, effectStack: [owner, stale] };
+    const result = continueBattleDamageFrame(state, f.db);
+    expect(result.state.turn).toEqual(state.turn);
+    expect(result.state.effectStack).toEqual([owner]);
+    expect(result.events).toEqual([]);
+  });
+
+  it("a matching id outside Damage Step is discarded without applying its recorded K.O.", () => {
+    const f = fixture();
+    const target = franky(f);
+    f.battle(target, f.attacker());
+    const patched = patchBattleContinuation(f.state, { resolution: "NOT_REPLACED" });
+    const state: GameState = {
+      ...patched, pendingPrompt: null,
+      turn: { ...patched.turn, battleSubPhase: "COUNTER_STEP", battle: { ...patched.turn.battle!, step: "COUNTER_STEP" } },
+      effectStack: patched.effectStack.filter(frame => frame.battleDamage),
+    };
+    const result = continueBattleDamageFrame(state, f.db);
+    expect(result.state.turn).toEqual(state.turn);
+    expect(result.state.players).toEqual(state.players);
+    expect(result.events).toEqual([]);
+    expect(result.state.effectStack).toEqual([]);
+  });
+
+  it("a stale prompt reference cannot execute the top frame", () => {
+    const f = fixture();
+    f.battle(franky(f), f.attacker());
+    const state = { ...f.state, pendingPrompt: { ...f.state.pendingPrompt!, resumeContext: "completed-frame" } };
+    const result = resumePromptLifecycle(state, { type: "PLAYER_CHOICE", choiceId: "skip" }, f.db, {
+      drainPregame: s => s, advanceStartOfTurn: s => s,
+    });
+    expect(result.responseRejected).toBe(true);
+    expect(result.state).toBe(state);
+  });
+
+  for (const mode of ["continuous", "live", "undo"] as const) {
+    it(`${mode}: EB03-001 substitute watchers wait for damage and turn-player watchers resolve first`, () => {
+      const f = fixture();
+      vivi(f);
+      const watcher = (id: string, event: string, controller: 0 | 1) => {
+        f.data(id, {
+          power: 7000,
+          effectSchema: {
+            card_id: id, card_name: id, card_type: "Character",
+            effects: [{ id: `${id}-draw`, category: "auto", trigger: { event, filter: { controller: "SELF" } }, actions: [{ type: "DRAW", params: { amount: 1 } }] }],
+          } as NonNullable<CardData["effectSchema"]>,
+        });
+        return f.put(id, controller);
+      };
+      const attacker = watcher("BATTLE-WATCHER", "COMBAT_VICTORY", 1);
+      watcher("SUBSTITUTE-WATCHER", "CARD_TRASHED_FROM_HAND", 0);
+      const target = vanAugur(f);
+      const hand = handCards(f, 0, 2);
+      f.battle(target, attacker);
+      f.accept();
+      expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+      const saved = toPersistedGameState(f.state);
+      if (mode !== "continuous") {
+        const location = mode === "live" ? "state" : "undoHistory[0]";
+        f.state = convertPersistedGameState(structuredClone(saved), location);
+        expect(f.state).toEqual(convertPersistedGameState(structuredClone(saved), location));
+      }
+      f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: [hand[0].instanceId] });
+      expect(f.events("CARD_DRAWN").map(event => event.playerIndex)).toEqual([1, 0]);
+      const types = f.state.eventLog.map(event => event.type);
+      expect(types.indexOf("END_OF_BATTLE")).toBeLessThan(types.indexOf("CARD_DRAWN"));
+      expect(f.onField(target)).toBe(true);
+      expect(f.state.pendingPrompt).toBeNull();
+      expect(f.state.effectStack).toEqual([]);
+    });
+  }
+});
+
+describe("OPT-965 deferred substitute scan propagation", () => {
+  for (const targetCount of [1, 2]) {
+  for (const mandatory of [false, true]) {
+  for (const actionType of ["KO", "SET_REST"] as const) {
+    for (const location of [null, "state", "undoHistory[0]"] as const) {
+      it(`${targetCount} targets ${mandatory ? "mandatory" : "optional"} ${actionType} ${location ?? "continuous"}: a surviving watcher fires exactly once after a later hand prompt`, () => {
+        const f = fixture();
+        const schema = structuredClone(getEffectSchema("EB03-001")!);
+        const block = schema.effects[0];
+        if (block.category !== "replacement") throw new Error("shape");
+        block.flags = { ...block.flags, optional: !mandatory };
+        block.replacement_actions = [
+          { type: actionType, target: { type: "CHARACTER", controller: "SELF", count: { exact: targetCount }, filter: { cost_max: 1 } } },
+          { type: "TRASH_FROM_HAND", params: { amount: 1 } },
+        ];
+        f.data("EB03-001", { type: "Leader", cost: null, power: 5000, counter: null, life: 4, effectSchema: schema });
+        f.put("EB03-001", 0, "LEADER");
+        f.data("VICTIM", { cost: 1 });
+        const victim = f.put("VICTIM", 0);
+        const victims = [victim];
+        if (targetCount === 2) victims.push(f.put("VICTIM", 0));
+        f.data("SURVIVING-WATCHER", { cost: 2, effectSchema: {
+          card_id: "SURVIVING-WATCHER", card_name: "Watcher", card_type: "Character",
+          effects: [{ id: "draw", category: "auto",
+            trigger: { event: actionType === "KO" ? "ANY_CHARACTER_KO" : "CHARACTER_BECOMES_RESTED", filter: { controller: "SELF" } },
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          }],
+        } as NonNullable<CardData["effectSchema"]> });
+        f.put("SURVIVING-WATCHER", 0);
+        const target = vanAugur(f);
+        const hand = handCards(f, 0, 3);
+        f.battle(target, f.attacker());
+        if (!mandatory) f.accept();
+        if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET" && f.state.pendingPrompt.options.validTargets.includes(victim.instanceId)) {
+          f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: victims.map(card => card.instanceId) });
+        }
+        expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+        const owner = f.state.effectStack.find(frame => frame.battleDamage)!;
+        expect(owner.pendingTriggers).toHaveLength(targetCount);
+        expect(f.events("CARD_DRAWN")).toHaveLength(0);
+        const childEvents = f.state.effectStack.flatMap(frame => frame.accumulatedEvents);
+        expect(childEvents.filter(event => event.type === (actionType === "KO" ? "CARD_KO" : "CARD_STATE_CHANGED")))
+          .toEqual(expect.arrayContaining([expect.objectContaining({ propagation: expect.objectContaining({ triggerScanned: true }) })]));
+        if (location) f.state = convertPersistedGameState(toPersistedGameState(f.state), location);
+        f.ok(0, { type: "SELECT_TARGET", selectedInstanceIds: [hand[0].instanceId] });
+        for (let remaining = targetCount; f.state.pendingPrompt?.options.promptType === "PLAYER_CHOICE" && remaining > 0; remaining--) {
+          const choice = f.state.pendingPrompt.options.choices.find(choice => !choice.disabled)!;
+          f.ok(0, { type: "PLAYER_CHOICE", choiceId: choice.id });
+        }
+        expect(f.state.pendingPrompt).toBeNull();
+        expect(f.events("CARD_DRAWN")).toHaveLength(targetCount);
+        expect(f.state.effectStack).toEqual([]);
+        expectBattleClosedOnce(f);
+      });
+    }
+  }
+  }
+  }
 });

@@ -28,7 +28,8 @@ import { runPipeline } from "../engine/pipeline.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
 import { handleArrangeDeckScry } from "../engine/effect-resolver/resume/deck.js";
-import { validatePersistedGameStateCore } from "../session/persisted-game-state.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
+import { convertPersistedGameState } from "../session/persistence.js";
 import { SessionCoordinator } from "../session/coordinator.js";
 import { GameActionSchema } from "../../../../shared/validators/client-message.js";
 import {
@@ -217,8 +218,8 @@ describe("OPT-839: OP17-050 Streusen scry-then-draw", () => {
   it("resolves identically after a persisted JSON round-trip of the pending prompt", () => {
     const s = setup("OP17-050", 5);
     const afterPlay = play(s);
-    const persisted = JSON.parse(JSON.stringify(afterPlay)) as GameState;
-    expect(validatePersistedGameStateCore(persisted)).toBeNull();
+    const persisted = convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(afterPlay))), "test reload");
+    expect(convertPersistedGameState(toPersistedGameState(persisted), "test reload")).toBeDefined();
     const fromPersisted = accept(persisted, s.db, arrange([deckId(1), deckId(0)], "bottom"));
     const live = accept(afterPlay, s.db, arrange([deckId(1), deckId(0)], "bottom"));
     expect(fromPersisted.players[0].deck).toEqual(live.players[0].deck);
@@ -395,8 +396,8 @@ describe("OPT-839: stale and legacy frames", () => {
       },
     };
     legacy.effectStack.at(-1)!.validTargets = [];
-    const persisted = JSON.parse(JSON.stringify(legacy)) as GameState;
-    expect(validatePersistedGameStateCore(persisted)).toBeNull();
+    const persisted = convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(legacy))), "test reload");
+    expect(convertPersistedGameState(toPersistedGameState(persisted), "test reload")).toBeDefined();
 
     const ordered = shown.map((c) => c.instanceId).reverse();
     const response = arrange(ordered, "bottom");

@@ -1,3 +1,10 @@
+import { generateCounter } from "./history-counter-producer.js";
+import { rig, synSchema } from "./opt-960-rig.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { evaluateCondition } from "../engine/conditions.js";
+import { getEffectivePower } from "../engine/modifiers.js";
+import { convertPersistedGameState } from "../session/persistence.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DISCONNECT_BROADCAST_DEBOUNCE_MS,
@@ -900,4 +907,206 @@ describe("OPT-578 production spectator admission protections", () => {
     expect(session.gameState.status).toBe("FINISHED");
     expect(session.gameState.winner).toBe(1);
   });
+});
+
+// Actual durable message/action path, including rehydration, prompt issuance,
+// persistence, and outbound acceptance/rejection. No coordinator routing mock.
+describe("OPT-969 native7 COST evidence through GameSession WebSocket", () => {
+  for (const firstDon of [false, true]) for (const staleRoot of [false, true])
+    it(`first-action ${firstDon ? "DON" : "rest-prefix DON"} reply ${staleRoot ? "rejects persisted root drift" : "pays and draws once"}`, async () => {
+      const r = rig();
+      r.state.schemaVersion = undefined; delete r.state.costSemanticsVersion;
+      r.deck(0, 5);
+      const donors = r.state.players[0].donCostArea;
+      donors[1].state = "RESTED";
+      const donorId = donors[0].instanceId;
+      const source = r.put("session-rest-prefix", 0, "CHARACTER", {
+        schema: synSchema("session-rest-prefix", [
+          {
+            id: "activate",
+            category: "activate",
+            trigger: { keyword: "ACTIVATE_MAIN" },
+            costs: firstDon ? [{ type: "DON_MINUS", amount: 1 }] : [
+              { type: "REST_DON", amount: 1 },
+              { type: "DON_MINUS", amount: 1, filter: { is_rested: true } },
+            ],
+            actions: [{ type: "DRAW", params: { amount: 1 } }],
+          },
+        ]),
+      });
+      r.state.prohibitions.push({
+        id: "session-held",
+        sourceCardInstanceId: source.instanceId,
+        sourceEffectBlockId: "activate",
+        prohibitionType: "CANNOT_REFRESH",
+        scope: {},
+        duration: { type: "SKIP_NEXT_REFRESH" },
+        controller: 0,
+        appliesTo: [donorId],
+        usesRemaining: null,
+      });
+      const durableState = new MockDurableObjectState();
+      const env = {
+        GAME_WORKER_SECRET: "test-secret",
+        NEXTJS_URL: "https://app.example.test",
+      } as Env;
+      const initial = new GameSession(
+        durableState as unknown as DurableObjectState,
+        env
+      ) as unknown as GameSessionTestAccess;
+      initial.gameState = r.state;
+      initial.cardDb = r.db;
+      await initial.persist();
+      expect(initial.gameState).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 7 });
+      const socket = new MockWebSocket();
+      const ws = socket as unknown as WebSocket;
+      initial.transport.accept(0, ws);
+      const activated = new GameSession(
+        durableState as unknown as DurableObjectState,
+        env
+      ) as unknown as GameSessionTestAccess;
+      await activated.webSocketMessage(
+        ws,
+        JSON.stringify({
+          type: "game:action",
+          action: {
+            type: "ACTIVATE_EFFECT",
+            cardInstanceId: source.instanceId,
+            effectId: "activate",
+          },
+        })
+      );
+      const stored = structuredClone(
+        (await durableState.storage.get<{ state: GameState }>("session"))!
+      );
+      const pending = stored.state.pendingPrompt!;
+      expect(pending.promptId).toBeTruthy();
+      if (pending.options.promptType !== "PLAYER_CHOICE")
+        throw Error("missing DON identity choice");
+      const choice = pending.options.choices.find((candidate) =>
+        candidate.id.includes(donorId)
+      )!;
+      expect(choice).toBeDefined();
+      expect(
+        stored.state.players[0].donCostArea.find(
+          (donor) => donor.instanceId === donorId
+        )!.state
+      ).toBe("ACTIVE");
+      expect(
+        stored.state.effectStack
+          .at(-1)!
+          .costTransactionState!.players[0].donCostArea.find(
+            (donor) => donor.instanceId === donorId
+          )!.state
+      ).toBe(firstDon ? "ACTIVE" : "RESTED");
+      expect(
+        stored.state.effectStack
+          .at(-1)!
+          .costExpectedRoot!.players[0].donCostArea.find(
+            (donor) => donor.instanceId === donorId
+          )!.state
+      ).toBe("ACTIVE");
+      if (staleRoot) {
+        stored.state.players[0].donCostArea.find(
+          (donor) => donor.instanceId === donorId
+        )!.state = "RESTED";
+        await durableState.storage.put("session", stored);
+      }
+      const before = structuredClone(stored.state);
+      const ReaderGameSession = process.env.OPT969_WRITER_READER_ROOT
+        ? (await import(`${process.env.OPT969_WRITER_READER_ROOT}/workers/game/src/GameSession.ts`) as { GameSession: typeof GameSession }).GameSession
+        : GameSession;
+      const resumed = new ReaderGameSession(
+        durableState as unknown as DurableObjectState,
+        env
+      ) as unknown as GameSessionTestAccess;
+      socket.sent.length = 0;
+      const payload = JSON.stringify({
+        type: "game:action",
+        action: {
+          type: "PLAYER_CHOICE",
+          choiceId: choice.id,
+          promptId: pending.promptId,
+        },
+      });
+      await resumed.webSocketMessage(ws, payload);
+      let persisted = convertPersistedGameState(
+        (await durableState.storage.get<{ state: GameState }>("session"))!
+          .state,
+        "state"
+      );
+      if (staleRoot) {
+        expect(persisted).toEqual(before);
+        expect(
+          messages(socket).some((message) => message.type === "action:rejected")
+        ).toBe(true);
+        expect(persisted.players[0].hand).toHaveLength(0);
+      } else {
+        expect(
+          messages(socket).some((message) => message.type === "action:rejected")
+        ).toBe(false);
+        expect(persisted.pendingPrompt).toBeNull();
+        expect(persisted.effectStack).toHaveLength(0);
+        expect(persisted.players[0].hand).toHaveLength(1);
+        expect(
+          persisted.players[0].donCostArea.some(
+            (donor) => donor.instanceId === donorId
+          )
+        ).toBe(false);
+        expect(
+          persisted.eventLog.filter((event) => event.type === "CARD_DRAWN")
+        ).toHaveLength(1);
+        await resumed.webSocketMessage(ws, payload);
+        persisted = convertPersistedGameState(
+          (await durableState.storage.get<{ state: GameState }>("session"))!
+            .state,
+          "state"
+        );
+        expect(persisted.players[0].hand).toHaveLength(1);
+        expect(
+          persisted.eventLog.filter((event) => event.type === "CARD_DRAWN")
+        ).toHaveLength(1);
+        expect(
+          messages(socket).some((message) => message.type === "action:rejected")
+        ).toBe(true);
+      }
+    });
+});
+
+for (const freshWriter of [false, true]) it(`OPT-969 ${freshWriter ? "ordinary mode8" : "actual f19"} Counter history survives deployed durable DON/target replies and recreation`, async () => {
+  const captured = freshWriter ? await generateCounter() : JSON.parse(readFileSync(resolve(__dirname, "fixtures/opt-969-history-reader/counter.json"), "utf8")) as Record<string, unknown>;
+  const durableState = new MockDurableObjectState();
+  await durableState.storage.put(captured);
+  const env = { GAME_WORKER_SECRET: "test-secret", NEXTJS_URL: "https://app.example.test" } as Env;
+  const ReaderGameSession = process.env.OPT969_WRITER_READER_ROOT
+    ? (await import(`${process.env.OPT969_WRITER_READER_ROOT}/workers/game/src/GameSession.ts`) as { GameSession: typeof GameSession }).GameSession
+    : GameSession;
+  const create = () => new ReaderGameSession(durableState as unknown as DurableObjectState, env) as unknown as GameSessionTestAccess;
+  const first = create();
+  const socket = new MockWebSocket();
+  const ws = socket as unknown as WebSocket;
+  first.transport.accept(1, ws);
+  const before = convertPersistedGameState((captured.session as { state: GameState }).state, "state");
+  const history = structuredClone(before.turn.actionsPerformedThisTurn);
+  const donor = before.players[1].donCostArea.find(d => d.state === "ACTIVE")!.instanceId;
+  const reply = JSON.stringify({ type: "game:action", action: { type: "PLAYER_CHOICE", choiceId: `don-return-ids:${JSON.stringify([donor])}`, promptId: before.pendingPrompt!.promptId } });
+  await first.webSocketMessage(ws, reply);
+  const between = convertPersistedGameState((await durableState.storage.get<{ state: GameState }>("session"))!.state, "state");
+  expect(between.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  expect(between.turn.actionsPerformedThisTurn).toEqual(history);
+  const second = create();
+  const targetReply = JSON.stringify({ type: "game:action", action: { type: "SELECT_TARGET", selectedInstanceIds: [between.players[1].leader.instanceId], promptId: between.pendingPrompt!.promptId } });
+  await second.webSocketMessage(ws, targetReply);
+  const done = convertPersistedGameState((await durableState.storage.get<{ state: GameState }>("session"))!.state, "state");
+  expect(messages(socket).some(m => m.type === "action:rejected")).toBe(false);
+  expect(done.pendingPrompt).toBeNull(); expect(done.effectStack).toEqual([]);
+  expect(done.turn.actionsPerformedThisTurn).toEqual(history);
+  expect(done.turn.actionsPerformedThisTurn.filter(a => a.actionType === "USE_COUNTER_EVENT")).toHaveLength(1);
+  expect(evaluateCondition(done, { type: "ACTION_PERFORMED_THIS_TURN", controller: "SELF", action: "ACTIVATED_EVENT", filter: { base_cost_min: 1 } }, { controller: 1, sourceCardInstanceId: done.players[1].leader.instanceId, cardDb: second.cardDb })).toBe(true);
+  expect(done.players[1].donDeck.filter(d => d.instanceId === donor)).toHaveLength(1);
+  expect(done.players[1].trash.filter(c => c.cardId === "ST04-016")).toHaveLength(1);
+  expect(getEffectivePower(done.players[1].leader, second.cardDb.get(done.players[1].leader.cardId)!, done, second.cardDb)).toBe(9000);
+  await second.webSocketMessage(ws, targetReply);
+  expect(messages(socket).some(m => m.type === "action:rejected")).toBe(true);
+  expect(convertPersistedGameState((await durableState.storage.get<{ state: GameState }>("session"))!.state, "state")).toEqual(done);
 });

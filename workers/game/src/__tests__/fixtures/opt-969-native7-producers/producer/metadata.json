@@ -1,0 +1,17 @@
+{
+  "base": "7ced33a0930886bac7fc3d16040486d48df774b1",
+  "commit": "ed6b264be4e38e2d52f4db49429f8efd976f5d45",
+  "patchSha256": "9d0cc4810e7cf9df01e979db4810429c62804fa830d7f994ef767716aa1e8858",
+  "productionHashes": {
+    "workers/game/src/GameSession.ts": "ed99ca2b2ab79486a82bb6f4692061d638036e8228e0bda9bc60136d852e0bde",
+    "workers/game/src/engine/effect-resolver/cost/orchestrator.ts": "2304746ba90311d2744735958aebb51cc50147f9df6d3ba9a78c3b03efa8f917",
+    "workers/game/src/engine/effect-resolver/cost/targets.ts": "7e072edef2b508f0cda4468ce078842ea17d9d79f3bede29ae66ee7947c68e23",
+    "workers/game/src/engine/effect-resolver/resume/cost.ts": "6ba0d4d015a81c2920b119a7c146cfd17276c9595bc446e3e340b4bb9bb07535",
+    "workers/game/src/engine/setup.ts": "c0210c84687eea11e61f39ccd4311b7e1c81768ec882d4c2e111c03be6722393",
+    "workers/game/src/session/game-state-schema.ts": "6e26de2f0143fcf9014608259259e8636f941cb9c3bf41696604a1d703081c4e",
+    "workers/game/src/session/persistence.ts": "76d0f63d0df8c9c454bd675518a425d445fcc8fe4386a4efa9c3e81891d6cf3e",
+    "workers/game/src/session/version7-promotion.ts": "e210da72a72f3bed23402a1f69ce9164741e571818f8d84d8eef6c076a472289"
+  },
+  "readerBase": "4858458abb4516c3085543f84c5b20e2364c8ec6",
+  "productionFromReaderBaseSha256": "7188d35925ab80aee755cd2b45a24b30b7c8cf50be74fa2485b6d319356cf003"
+}

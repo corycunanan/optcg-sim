@@ -24,6 +24,7 @@ import type { Cost, EffectBlock, RuntimeActiveEffect } from "../engine/effect-ty
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
 import { payCostsWithSelection } from "../engine/effect-resolver/cost-handler.js";
 import { resolveEffect } from "../engine/effect-resolver/index.js";
+import { batchOfferOf } from "./trigger-window-helpers.js";
 
 // ─── Minimal GameSession harness (pattern from opt-337) ─────────────────────
 
@@ -288,7 +289,7 @@ describe("OPT-438: prompt identity and ARRANGE payload validation", () => {
 describe("OPT-436: rejected responses restore the pending prompt", () => {
   it("an invalid same-type selection is rejected and the prompt is restored", async () => {
     const { session, ws } = sessionWithSelectPrompt();
-    const stackBefore = session.gameState.effectStack;
+    const stackBefore = structuredClone(session.gameState.effectStack);
 
     await session.handleAction(ws as unknown as WebSocket, 0, {
       type: "SELECT_TARGET",
@@ -465,8 +466,9 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     });
 
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type).toBe("REPLACEMENT_BATCH");
-    expect(session.gameState.effectStack.at(-1)?.phase).toBe("INTERRUPTED_BY_TRIGGERS");
+    expect(batchOfferOf(session.gameState).type).toBe("REPLACEMENT_BATCH");
+    // OPT-963: the offer frame sits on top of the chain's continuation.
+    expect(session.gameState.effectStack.at(-2)?.phase).toBe("INTERRUPTED_BY_TRIGGERS");
 
     await session.handleAction(player1 as unknown as WebSocket, 1, {
       type: "PLAYER_CHOICE",
@@ -555,6 +557,9 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     const [target, unmatchedTarget] = base.players[1].characters.filter(
       (card): card is CardInstance => card !== null,
     );
+    // Both substitute branches must be payable (Decision 8). An empty
+    // branch is pruned and would auto-execute the sole remaining branch.
+    base.players[1].donCostArea.push({ instanceId: "opt439-choice-don", state: "ACTIVE", attachedTo: null });
     const replacement: RuntimeActiveEffect = {
       id: "opt439-nested-replacement",
       sourceCardInstanceId: target.instanceId,
@@ -569,10 +574,10 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
           replacement_actions: [{
             type: "PLAYER_CHOICE",
             params: {
-              labels: ["Rest this card", "Do nothing"],
+              labels: ["Rest this card", "Rest 1 DON!!"],
               options: [
                 [{ type: "SET_REST", target: { type: "SELF" } }],
-                [],
+                [{ type: "REST_DON", params: { amount: 1 } }],
               ],
             },
           }],
@@ -653,9 +658,11 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     });
 
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect((session.gameState.effectStack.at(-1) as unknown as {
-      replacementBatchContinuation?: unknown;
-    }).replacementBatchContinuation).toBeDefined();
+    // Rule 8-6-3: finish the replacement batch and outer effect before
+    // the newly fulfilled ordinary watcher becomes eligible.
+    expect(session.gameState.effectStack.some((frame) => frame.replacementBatch)).toBe(false);
+    expect(session.gameState.effectStack.some((frame) => frame.triggerExecution)).toBe(true);
+    expect(session.gameState.effectStack.at(-1)?.replacementBatch).toBeUndefined();
 
     await session.handleAction(player1 as unknown as WebSocket, 1, {
       type: "PLAYER_CHOICE",
@@ -748,6 +755,15 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
       type: "SELECT_TARGET",
       selectedInstanceIds: [target.instanceId],
     });
+    // Two independently constructed effects share the affected source;
+    // Decision 7's assumed policy gives their owner an ordering choice.
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
+    await session.handleAction(player1 as unknown as WebSocket, 1, {
+      type: "PLAYER_CHOICE",
+      choiceId: outerReplacement.id,
+      promptId: session.gameState.pendingPrompt?.promptId,
+    });
+    expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     await session.handleAction(player1 as unknown as WebSocket, 1, {
       type: "PLAYER_CHOICE",
       choiceId: "accept",
@@ -755,7 +771,7 @@ describe("OPT-439: replacement prompts preserve effect continuations", () => {
     });
 
     expect(session.gameState.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect((session.gameState.pendingPrompt?.resumeContext as { type?: string }).type).toBe(
+    expect(batchOfferOf(session.gameState).type).toBe(
       "REPLACEMENT_BATCH",
     );
 

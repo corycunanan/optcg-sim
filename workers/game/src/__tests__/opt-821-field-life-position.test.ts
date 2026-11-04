@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -117,6 +118,7 @@ function selectLifeTarget(
       f.cardDb
     );
   }
+  if (kind === "linlin") state = scriptedDonPayment(state, f.cardDb, 0, 1);
   expect(state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
   state = act(
     state,

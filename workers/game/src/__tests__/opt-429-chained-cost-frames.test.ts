@@ -1,3 +1,4 @@
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 /**
  * OPT-429 — chaining two selectable costs must not orphan an effect-stack
@@ -113,7 +114,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
 
     const pay = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
     expect(pay.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    expect(pay.state.effectStack).toHaveLength(1);
+    expect(pay.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
 
     // First selection: bottom-deck char-0-b1. The consumed frame must be
     // replaced by the second cost's frame, not buried under it.
@@ -123,8 +124,8 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
       cardDb,
     );
     expect(second.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
-    expect(second.state.effectStack).toHaveLength(1);
-    expect(second.state.effectStack[0].currentCostIndex).toBe(1);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)[0].currentCostIndex).toBe(1);
 
     // Second selection: bottom-deck trash-a. Chain resolves; no stale frame.
     const handBefore = second.state.players[0].hand.length;
@@ -174,8 +175,9 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
       { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-b1"] } as GameAction,
       cardDb,
     );
-    expect(second.state.effectStack).toHaveLength(1);
-    expect(second.state.effectStack[0].pendingTriggers).toEqual([queuedTrigger]);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
+    expect(second.state.effectStack.filter(frame => !frame.triggerExecution)[0].pendingTriggers).toEqual([]);
+    expect(second.state.effectStack.find(frame => frame.triggerExecution)!.triggerExecution!.generations[0].triggers).toMatchObject([queuedTrigger]);
 
     // Effect draw + queued trigger draw both land once the chain resolves.
     const handBefore = second.state.players[0].hand.length;
@@ -189,7 +191,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     expect(done.state.players[0].hand).toHaveLength(handBefore + 2);
   });
 
-  it("cleans up the stack and still drains queued triggers when a later cost is unpayable", () => {
+  it.each([6, 7] as const)("version%s: legacy unpayable suffix drains, native7 root drift rejects unchanged", (version) => {
     const cardDb = createTestCardDb();
     // The trash empties between the first prompt and its response, so the
     // second cost (PLACE_FROM_TRASH_TO_DECK) becomes unpayable once the first
@@ -199,6 +201,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     // suffix no longer prompts at all (rule 8-3-1-3), so the trash starts
     // with a card and is emptied in both the live and staged cost state.
     const state = stateWithChoices(cardDb);
+    state.schemaVersion = version;
     const block = chainedCostBlock();
 
     const paid = payCostsWithSelection(state, block.costs!, 0, 0, cardDb, "char-0-v1", block, resolverExecutionServices);
@@ -231,6 +234,17 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
     const stacked = updateTopFrame(pay.state, { pendingTriggers: [queuedTrigger] });
     const handBefore = stacked.players[0].hand.length;
 
+    if (version === 7) {
+      // Public prompt prevalidation precedes any work-drain normalization.
+      // The cost helper returns its prompt separately; attach that real offer.
+      const publicState = { ...stacked, pendingPrompt: pay.pendingPrompt! };
+      const before = structuredClone(publicState);
+      const rejected = resumePromptLifecycle(publicState, { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-b1"] }, cardDb, { drainPregame: state => state, advanceStartOfTurn: state => state });
+      expect(rejected.responseRejected).toBe(true);
+      expect(rejected.state).toEqual(before); expect(publicState).toEqual(before);
+      expect(rejected.state.effectStack.find(frame => frame.costExpectedRoot)?.costExpectedRoot).toEqual(paid.state.effectStack.find(frame => frame.costExpectedRoot)?.costExpectedRoot);
+      return;
+    }
     const done = resumeFromStack(
       stacked,
       { type: "SELECT_TARGET", selectedInstanceIds: ["char-0-b1"] } as GameAction,
@@ -269,7 +283,7 @@ describe("OPT-429: chained selectable costs keep frame push/pop symmetric", () =
 
     const prompt2 = session.gameState.pendingPrompt;
     expect(prompt2?.options.promptType).toBe("SELECT_TARGET");
-    expect(session.gameState.effectStack).toHaveLength(1);
+    expect(session.gameState.effectStack.filter(frame => !frame.triggerExecution)).toHaveLength(1);
 
     await session.handleAction(ws as unknown as WebSocket, 0, {
       type: "SELECT_TARGET",

@@ -600,6 +600,8 @@ describe("OPT-793 OP08-074 Black Maria — end-of-turn return until DON!! equal"
     f.state = { ...f.state, scheduledActions: [setActive("before"), scheduled, setActive("after")] };
     const logStart = f.state.eventLog.length;
     f.run({ type: "ADVANCE_PHASE" });
+    f.respond({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
+    f.respond({ type: "PLAYER_CHOICE", choiceId: "end-of-turn-obligation:0" });
     expect(donChoicePrompt(f.state).options.donReturn?.count).toBe(3);
     expect(f.state.eventLog.slice(logStart).map((e) => e.type)).toEqual(["PHASE_CHANGED", "DON_SET_ACTIVE"]);
 
@@ -619,6 +621,8 @@ describe("OPT-793 OP08-074 Black Maria — end-of-turn return until DON!! equal"
     expect(restored).not.toBeNull();
     f.state = restored!.state;
     expect(f.state.effectStack[0]?.phaseBoundaryContinuation?.remainingScheduledActions).toHaveLength(1);
+    // OPT-924: parked in 6-6-1-2 step 1 and restored through the version 2 writer and reader.
+    expect(f.state.effectStack[0]?.phaseBoundaryContinuation?.stage).toBe("TURN_PLAYER_END_OF_TURN");
 
     expect(f.respond({ type: "PLAYER_CHOICE", choiceId: "don-return:1:3" })).toBe(false);
     expect(f.fieldDon(0)).toBe(5);

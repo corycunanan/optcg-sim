@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction, GameState } from "../types.js";
 import type { EffectResult } from "../engine/effect-types.js";
@@ -145,7 +146,7 @@ function fixture(
     /** Persist and reload through the durable stored-session parser. */
     persist() {
       state = parseStoredSession(
-        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
+        JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })),
       ).state;
     },
   };
@@ -224,8 +225,9 @@ describe("OPT-827 OP08-096 gates on the card actually milled", () => {
 
   it("empty deck (OP15-022 Brook Leader) → through the pipeline nothing is milled, no prompt, no buff", () => {
     // Brook delays deck-out defeat to end of turn, so a 0-card deck can reach
-    // the [Counter] step through the real pipeline. Deck-out timing is
-    // OPT-862; this asserts only the gate.
+    // the [Counter] step through the real pipeline. Immediate deck-out for an
+    // ordinary Leader is covered by OPT-862 (opt-960 tests); this asserts
+    // only the gate.
     const f = fixture([], { defenderLeaderId: "OP15-022" });
     const base = f.leaderPower();
     const trashBefore = f.state.players[DEFENDER].trash.length;
@@ -271,7 +273,9 @@ describe("OPT-827 OP08-096 gates on the card actually milled", () => {
   });
 
   it("the buff can go to a Character, and choosing none is allowed (up to 1)", () => {
-    const f = fixture([6]);
+    // A second deck card keeps the deck non-empty after the mill: a 1-card
+    // deck would empty and lose at once (rules 9-1-2, 9-2-1-2; OPT-862).
+    const f = fixture([6, 1]);
     f.state.players[DEFENDER].characters[0] = {
       instanceId: "ally",
       cardId: CARDS.VANILLA.id,
@@ -290,7 +294,7 @@ describe("OPT-827 OP08-096 gates on the card actually milled", () => {
       CARDS.VANILLA.power! + 5000,
     );
 
-    const g = fixture([6]);
+    const g = fixture([6, 1]);
     const base = g.leaderPower();
     g.attackAndCounter();
     g.act({ type: "SELECT_TARGET", selectedInstanceIds: [] }, DEFENDER);

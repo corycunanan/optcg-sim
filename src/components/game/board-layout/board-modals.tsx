@@ -119,6 +119,7 @@ export function BoardModals({
             actionLabel={activePrompt.actionLabel}
             choices={activePrompt.choices}
             donReturn={activePrompt.donReturn}
+            donIdentityReturn={activePrompt.donIdentityReturn}
             confirmOrSkip={activePrompt.confirmOrSkip}
             cardDb={cardDb}
             isHidden={isPromptHidden}
