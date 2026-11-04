@@ -1,3 +1,4 @@
+import { advanceTriggerExecution } from "../engine/trigger-executor.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction } from "../types.js";
 import type { Cost, EffectBlock } from "../engine/effect-types.js";
@@ -153,19 +154,10 @@ function expectReplacedOnce(f: Fixture, sourceCardId: string) {
   });
 }
 
-function expectSameBatch(f: Fixture) {
-  // The watcher waits beside the sibling and the turn player orders both
-  // (rule 8-6), instead of the sibling resolving alone first.
-  const ids = f.choices();
-  expect(ids).toHaveLength(2);
-  expect(ids.some((c) => c.includes(":sibling:"))).toBe(true);
-  expect(ids.some((c) => c.includes(KUROOBI_TRIGGER))).toBe(true);
-  expect(f.rush()).toBe(false);
-}
 
 describe("OPT-857 replaced Life cost admits hand-trash cost watchers", () => {
   for (const source of ["on-field", "departed"] as const) {
-    it(`Character source (${source}): Kuroobi joins the waiting sibling's batch with source attribution`, () => {
+    it(`Character source (${source}): the older sibling resolves before newly fulfilled Kuroobi with source attribution`, () => {
       const f = fixture();
       const keyword = source === "departed" ? "ON_KO" : "ON_PLAY";
       const effects: EffectBlock[] = [
@@ -223,10 +215,16 @@ describe("OPT-857 replaced Life cost admits hand-trash cost watchers", () => {
       f.choose(":paid:");
       f.selectHandCost(f.fodder.instanceId);
 
-      expectSameBatch(f);
+      // Rule 8-6-1-1: the sibling was already waiting when the cost
+      // fulfilled Kuroobi, so the two do not become one ordering choice.
+      expect(f.state.pendingPrompt).toBeNull();
+      const draw = f.state.eventLog.filter(event => event.type === "CARD_DRAWN");
+      expect(draw).toHaveLength(1);
+      const rush = f.state.activeEffects.find(effect => effect.modifiers.some(modifier => modifier.type === "GRANT_KEYWORD"));
+      expect(rush).toBeDefined();
+      expect(rush!.timestamp).toBeGreaterThan(draw[0].timestamp);
       expectReplacedOnce(f, "PARENT");
 
-      f.choose(KUROOBI_TRIGGER);
       expect(f.rush()).toBe(true);
       // Paid 1 hand card; the post-colon Draw 5 never resolved; sibling drew 1.
       expect(f.state.players[0].hand).toHaveLength(hand);
@@ -346,7 +344,11 @@ describe("OPT-857 replaced Life cost admits hand-trash cost watchers", () => {
       effectSourceController: 0,
     });
     expect(published?.propagation?.triggerScanned).toBe(true);
-    const kuroobi = result.state.players[0].characters.find(
+    expect(result.kind).toBe("queued");
+    const before = result.state.players[0].characters.find(card => card?.cardId === "OP14-045")!;
+    expect(hasEffectiveKeyword(before, f.db.get("OP14-045")!, "RUSH", result.state, f.db)).toBe(false);
+    const advanced = advanceTriggerExecution(result, f.db, resolverExecutionServices);
+    const kuroobi = advanced.state.players[0].characters.find(
       (c) => c?.cardId === "OP14-045"
     )!;
     expect(
@@ -354,7 +356,7 @@ describe("OPT-857 replaced Life cost admits hand-trash cost watchers", () => {
         kuroobi,
         f.db.get("OP14-045")!,
         "RUSH",
-        result.state,
+        advanced.state,
         f.db
       )
     ).toBe(true);

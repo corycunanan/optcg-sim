@@ -668,6 +668,12 @@ function matchesCustomTrigger(
     if (target?.zone !== "CHARACTER") return false;
   }
   if (trigger.event === "ATTACK_DEALS_DAMAGE" && !matchesAttackDamage(trigger, event, sourceCard)) return false;
+  // OPT-973: battle damage emits one event per point, but taking damage
+  // fulfills this timing once per attack. Match the first point; the existing
+  // damage frame / pipeline defers activation until all points finish (8-6-2).
+  // Check explicit false so legacy events without the marker keep their semantics.
+  if (trigger.event === "DAMAGE_TAKEN" && event.type === "DAMAGE_DEALT" &&
+      event.payload.firstDamageOfAttack === false) return false;
   if (trigger.filter?.target === "SELF") {
     const payload = event.payload as { targetInstanceId?: string; cardInstanceId?: string };
     if ((payload.targetInstanceId ?? payload.cardInstanceId) !== sourceCard.instanceId) return false;

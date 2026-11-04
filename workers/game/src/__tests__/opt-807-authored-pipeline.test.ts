@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -72,6 +73,7 @@ function fixture(id: string) {
     get state() {
       return state;
     },
+    set state(next: typeof state) { state = next; },
   };
 }
 
@@ -263,6 +265,7 @@ describe("OPT-807 non-position semantics", () => {
       f.act({ type: "PLAY_CARD", cardInstanceId: "source" });
       if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
         f.act({ type: "PLAYER_CHOICE", choiceId: "activate" });
+      f.state = scriptedDonPayment(f.state, f.cardDb, 0, 1);
       expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
       f.act({ type: "SELECT_TARGET", selectedInstanceIds: ["target"] });
       expect(f.state.players[1].characters[0] === null).toBe(power === 5000);

@@ -1,4 +1,10 @@
+import { prepareResumeProvenance, settleResumeProvenance } from "./resume-provenance.js";
+import { drainPendingWork } from "../pending-work-drain.js";
+import {
+  createEffectExecutionScope, createTriggerExecution, reportTriggerWork, triggerExecutionOwner } from "../trigger-executor.js";
 import { getBattleOpponentInstanceId } from "../events.js";
+import { isGameTerminated } from "../terminal.js";
+import { runRuleProcessingAfterMove } from "../defeat.js";
 import { releaseMovedDonEffects } from "../don-area-effects.js";
 import { finishReplacedLifeCost } from "./cost/replaced.js";
 import { completeHandTrashCostSources, isHandTrashByEffect, TRIGGERING_HAND_TRASH_REF } from "../hand-trash.js";
@@ -30,12 +36,13 @@ import { evaluateCondition, type ConditionContext } from "../conditions.js";
 import { postCostConditionsMet } from "./post-cost.js";
 import {
   CONTINUATION_EFFECT_BLOCK,
-  popFrame,
   pushFrame,
   generateFrameId,
   updateTopFrame,
 } from "../effect-stack.js";
 import { findCardInstance } from "../state.js";
+import { insertFrameAt } from "../damage-frames.js";
+import { isHandlerOwnedFrame } from "../frame-kinds.js";
 import type {
   EffectResolverResult,
   ActionResult,
@@ -51,11 +58,9 @@ import {
   resolveAmount,
   sourceTextForBlock,
 } from "./action-utils.js";
-import { payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
+import { isCostSequencePayable, payCostsWithSelection, promptTypeToPhase } from "./cost-handler.js";
 import {
   pushBatchResumeFrame,
-  processRemainingTriggers,
-  reenterBatchResume,
 } from "./resume-core.js";
 import { buildSelectTargetPrompt } from "./target-resolver.js";
 import {
@@ -85,7 +90,6 @@ import {
 import { log } from "../../lib/log.js";
 import {
   consumeResolutionAction,
-  isEngineTerminated,
   terminateForEngineContract,
 } from "../engine-limits.js";
 
@@ -304,21 +308,43 @@ function createResolverServices(
         targets,
         services
       ),
-    resolveEffect: (state, block, source, controller, db, triggering, event) =>
-      resolveEffect(state, block, source, controller, db, triggering, services, event),
+    resolveEffect: (
+      state,
+      block,
+      source,
+      controller,
+      db,
+      triggering,
+      event,
+      snapshot
+    ) =>
+      resolveEffectWork(
+        state,
+        block,
+        source,
+        controller,
+        db,
+        triggering,
+        services,
+        event,
+        snapshot
+      ),
     continueSimultaneousGroup: (...args) =>
       continueSimultaneousGroup(...args, services),
-    processRemainingTriggers: (state, triggers, cardDb, events, group) =>
-      processRemainingTriggers(
-        state,
-        triggers,
-        cardDb,
-        services,
-        events,
-        group
-      ),
-    reenterBatchResume: (state, cardDb, events) =>
-      reenterBatchResume(state, cardDb, services, events),
+    reportTriggers: (state, triggers, _cardDb, events = [], group) => {
+      if (isGameTerminated(state))
+        return { kind: "terminal", state, events, resolved: false };
+      if (!triggerExecutionOwner(state)) {
+        if (!triggers.length)
+          return { kind: "continued", state, events, resolved: true };
+        const queued = createTriggerExecution(state, triggers, group);
+        return { ...queued, events };
+      }
+      return reportTriggerWork(state, triggers, events, group);
+    },
+    continueHandler: (state, _cardDb, events = []) => ({
+      kind: isGameTerminated(state) ? "terminal" : "continued", state, events, resolved: true,
+    }),
   };
   return services;
 }
@@ -340,7 +366,66 @@ export function battleTargetRefFor(
   return opposing ? [BATTLE_TARGET_REF, { targetInstanceIds: [opposing], count: 1 }] : null;
 }
 
+/** Public convenience boundary; engine handlers use resolveEffectWork. */
 export function resolveEffect(
+  ...args: Parameters<typeof resolveEffectCore>
+): EffectResolverResult {
+  const owned = triggerExecutionOwner(args[0]);
+  const result = resolveEffectWork(...args);
+  if (
+    owned ||
+    (!result.resolved && !result.pendingPrompt && !result.events.length)
+  )
+    return result;
+  return drainPendingWork(
+    result,
+    args[4],
+    args[6] ?? resolverExecutionServices
+  );
+}
+
+/** Execute one effect body and report its children to the common drain. */
+export function resolveEffectWork(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
+  const before = args[0];
+  const prepared = prepareResumeProvenance(before, args[2], [], args[1].actions ?? []);
+  args[0] = prepared.state;
+  const result = resolveEffectWorkCore(...args);
+  const settled = settleResumeProvenance(before, prepared.state, { ...result,
+    kind: isGameTerminated(result.state) ? "terminal" : result.pendingPrompt ? "waiting" : "completed" });
+  return { ...result, state: settled.state };
+}
+
+function resolveEffectWorkCore(...args: Parameters<typeof resolveEffectCore>): EffectResolverResult {
+  if (triggerExecutionOwner(args[0])) return resolveEffectCore(...args);
+  const initialState = args[0];
+  args[0] = createEffectExecutionScope(initialState, args[2], args[3]);
+  const result = resolveEffectCore(...args);
+  if (!isGameTerminated(result.state) && !result.pendingPrompt &&
+      !result.resolved && result.events.length === 0) {
+    return { ...result, state: initialState };
+  }
+  return result;
+}
+
+/** Execute an obligation whose creating effect already activated. A departed
+ * origin is provenance, unlike a queued trigger's activation eligibility.
+ */
+export function resolveScheduledEffectWork(
+  state: GameState,
+  entry: import("../../types.js").EndPhaseScheduledAction,
+  cardDb: Map<string, CardData>,
+): EffectResolverResult {
+  return resolveEffectWork(state, {
+    id: "scheduled_" + entry.sourceEffectId,
+    category: "auto",
+    actions: [entry.action],
+  }, entry.sourceEffectId, entry.controller, cardDb,
+  undefined, undefined, undefined, undefined, entry.sourceCardSnapshot || entry.sourceIdentity
+    ? { ...(entry.sourceCardSnapshot ? { sourceCardSnapshot: entry.sourceCardSnapshot } : {}),
+      ...(entry.sourceIdentity ? { sourceIdentity: entry.sourceIdentity } : {}) } : undefined);
+}
+
+function resolveEffectCore(
   state: GameState,
   block: EffectBlock,
   sourceCardInstanceId: string,
@@ -349,6 +434,8 @@ export function resolveEffect(
   triggeringCardInstanceId?: string | null,
   services: EffectResolverServices = resolverExecutionServices,
   triggeringEvent?: PendingEvent,
+  sourceSnapshot?: import("../../types.js").QueuedSourceSnapshot,
+  activatedOrigin?: Pick<import("../../types.js").EndPhaseScheduledAction, "sourceCardSnapshot" | "sourceIdentity">
 ): EffectResolverResult {
   const events: PendingEvent[] = [];
   const logCtx = {
@@ -357,6 +444,16 @@ export function resolveEffect(
     sourceInstanceId: sourceCardInstanceId,
     controller,
   };
+
+  // OPT-960: nothing activates or resolves after a terminal outcome.
+  if (isGameTerminated(state)) return { state, events, resolved: false };
+
+  // Rule 8-1-3-1-3: this boundary starts queued activation, never resumes it.
+  // On K.O. matches already name the fresh Trash instance (10-2-17-2).
+  // Any subsequent zone change creates another ID and invalidates this queue.
+  if (sourceSnapshot && !findCardInstance(state, sourceSnapshot.instanceId)) {
+    return { state, events, resolved: false, effectNotActivated: true };
+  }
 
   // Guard: reject once-per-turn effects already used this turn
   if (isOncePerTurnBlock(block)) {
@@ -375,22 +472,51 @@ export function resolveEffect(
 
   // Extract block-specific effect description for prompts
   const sourceCard = findCardInstance(state, sourceCardInstanceId);
-  const sourceCardData = sourceCard ? cardDb.get(sourceCard.cardId) : undefined;
-  const sourceSnapshotRef: [string, EffectResult][] = sourceCard
-    ? [[EFFECT_SOURCE_SNAPSHOT_REF, {
-        targetInstanceIds: [],
-        count: 0,
-        sourceCardSnapshot: structuredClone(sourceCard),
-      }]]
+  const sourceCardData = cardDb.get(
+    activatedOrigin?.sourceCardSnapshot?.cardId ?? activatedOrigin?.sourceIdentity?.cardId ?? sourceSnapshot?.cardId ?? sourceCard?.cardId ?? ""
+  );
+  const sourceSnapshotRef: [string, EffectResult][] = activatedOrigin || sourceCard
+    ? [
+        [
+          EFFECT_SOURCE_SNAPSHOT_REF,
+          {
+            targetInstanceIds: [],
+            count: 0,
+            ...(activatedOrigin
+              ? { ...activatedOrigin }
+              : sourceSnapshot
+                ? {
+                    sourceIdentity: sourceSnapshot,
+                    ...((state.schemaVersion === 10 || state.schemaVersion === 11) && sourceCard!.cardId === sourceSnapshot.cardId && sourceCard!.controller === sourceSnapshot.controller ? {
+                      // Keep the proven original controller with the actual
+                      // pre-cost card snapshot, before TRASH_SELF can move it.
+                      sourceCardSnapshot: structuredClone(sourceCard!),
+                    } : {}),
+                  }
+                : { sourceCardSnapshot: structuredClone(sourceCard!) }),
+          },
+        ],
+      ]
     : [];
-  if (triggeringEvent && isHandTrashByEffect(triggeringEvent) && triggeringEvent.type === "CARD_TRASHED") {
-    sourceSnapshotRef.push([TRIGGERING_HAND_TRASH_REF, {
-      targetInstanceIds: [], count: triggeringEvent.payload?.count ?? 0,
-    }]);
+  if (
+    triggeringEvent &&
+    isHandTrashByEffect(triggeringEvent) &&
+    triggeringEvent.type === "CARD_TRASHED"
+  ) {
+    sourceSnapshotRef.push([
+      TRIGGERING_HAND_TRASH_REF,
+      {
+        targetInstanceIds: [],
+        count: triggeringEvent.payload?.count ?? 0,
+      },
+    ]);
   }
   // OPT-797: rides with the other context refs into the optional-prompt
   // frame, the cost-prompt frame and the action chain.
-  const battleTargetRef = battleTargetRefFor(triggeringEvent, sourceCardInstanceId);
+  const battleTargetRef = battleTargetRefFor(
+    triggeringEvent,
+    sourceCardInstanceId
+  );
   if (battleTargetRef) sourceSnapshotRef.push(battleTargetRef);
   const fullText = sourceTextForBlock(sourceCardData, block);
   const blockDescription = extractEffectDescription(fullText, block);
@@ -405,6 +531,25 @@ export function resolveEffect(
 
   // Step 2: Check optional flag — prompt the player before paying costs
   if (block.flags?.optional) {
+    // OPT-864: rule 8-3-1-3 — an activation cost that cannot be paid in full
+    // (in printed order, 8-3-1-1) cannot be paid at all, so the effect is not
+    // activated. Skip before offering the prompt: accepting would pay nothing
+    // and run nothing (OP07-079 Lucci, EB04-042 Alpha with a short deck).
+    // Same evaluator and same state as the payment's own upfront check.
+    if (
+      block.costs?.length &&
+      !isCostSequencePayable(
+        state,
+        block.costs,
+        controller,
+        cardDb,
+        sourceCardInstanceId
+      )
+    ) {
+      log("effect.skipped", { ...logCtx, reason: "cannot_pay_cost" });
+      return { state, events, resolved: false, effectNotActivated: true };
+    }
+
     const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
     const frameId = generateFrameId(state);
     state = frameId.state;
@@ -421,9 +566,15 @@ export function resolveEffect(
       resultRefs: [
         ...sourceSnapshotRef,
         ...(triggeringCardInstanceId
-          ? [[TRIGGERING_CARD_REF, {
-              targetInstanceIds: [triggeringCardInstanceId], count: 1,
-            }] as [string, EffectResult]]
+          ? [
+              [
+                TRIGGERING_CARD_REF,
+                {
+                  targetInstanceIds: [triggeringCardInstanceId],
+                  count: 1,
+                },
+              ] as [string, EffectResult],
+            ]
           : []),
       ],
       validTargets: [],
@@ -437,7 +588,7 @@ export function resolveEffect(
       accumulatedEvents: [],
     };
     state = pushFrame(state, frame);
-    if (isEngineTerminated(state)) {
+    if (isGameTerminated(state)) {
       return { state, events, resolved: false };
     }
 
@@ -479,7 +630,7 @@ export function resolveEffect(
         [],
         cardDb,
         services,
-        new Map(sourceSnapshotRef),
+        new Map(sourceSnapshotRef)
       );
     }
 
@@ -490,9 +641,17 @@ export function resolveEffect(
     }
 
     state = costPayResult.state;
-    completeHandTrashCostSources(costPayResult.events, state, sourceCardInstanceId, controller, new Map(sourceSnapshotRef));
+    completeHandTrashCostSources(
+      costPayResult.events,
+      state,
+      sourceCardInstanceId,
+      controller,
+      new Map(sourceSnapshotRef)
+    );
     events.push(...costPayResult.events);
     costResult = costPayResult.costResult;
+    // OPT-862: a cost that ended the game leaves no action to run.
+    if (isGameTerminated(state)) return { state, events, resolved: true };
 
     if (costPayResult.pendingPrompt) {
       // Seed the newly-created cost continuation with the pre-payment source.
@@ -502,7 +661,10 @@ export function resolveEffect(
           ...state,
           effectStack: [
             ...state.effectStack.slice(0, -1),
-            { ...frame, resultRefs: [...frame.resultRefs, ...sourceSnapshotRef] },
+            {
+              ...frame,
+              resultRefs: [...frame.resultRefs, ...sourceSnapshotRef],
+            },
           ],
         };
       }
@@ -586,6 +748,8 @@ export function resolveEffect(
 // ─── Action Chain ─────────────────────────────────────────────────────────────
 
 export interface ChainResult {
+  /** Internal dispatch progress, never serialized; skipped conditions/chains are false. */
+  bodyExecuted?: boolean;
   state: GameState;
   events: PendingEvent[];
   pendingPrompt?: PendingPromptState;
@@ -714,7 +878,7 @@ function promptForSimultaneousSelection(
     simultaneousGroup: plan,
   };
   const nextState = pushFrame(frameId.state, frame);
-  if (isEngineTerminated(nextState)) return { state: nextState, events: [] };
+  if (isGameTerminated(nextState)) return { state: nextState, events: [] };
 
   let prompt = { ...promptResult.pendingPrompt, resumeContext: frame.id };
   if (plan.effectDescription && prompt.options) {
@@ -741,6 +905,20 @@ export function continueSimultaneousGroup(
   controller: 0 | 1,
   cardDb: Map<string, CardData>,
   services: EffectResolverServices = resolverExecutionServices
+): ChainResult {
+  const progress = { executed: false };
+  const result = continueSimultaneousGroupCore(state, plan, sourceCardInstanceId, controller, cardDb, services, progress);
+  return { ...result, ...(progress.executed ? { bodyExecuted: true } : {}) };
+}
+
+function continueSimultaneousGroupCore(
+  state: GameState,
+  plan: SimultaneousGroupPlan,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  services: EffectResolverServices,
+  progress: { executed: boolean },
 ): ChainResult {
   const unsupportedAction = plan.actions.find(
     (action) =>
@@ -799,6 +977,7 @@ export function continueSimultaneousGroup(
     const action = planning.plan.actions[index];
     const lock = planning.plan.locks[index];
     if (!lock?.execute) continue;
+    progress.executed = true;
     const result = services
       .withCommittedEvents(events)
       .executeEffectAction(
@@ -812,7 +991,7 @@ export function continueSimultaneousGroup(
       );
     nextState = result.state;
     events.push(...result.events);
-    if (isEngineTerminated(nextState)) return { state: nextState, events };
+    if (isGameTerminated(nextState)) return { state: nextState, events };
     if (result.pendingPrompt || result.pendingBatchTriggers) {
       nextState = terminateForEngineContract(nextState, {
         kind: "ENGINE_CONTRACT",
@@ -840,6 +1019,7 @@ export function continueSimultaneousGroup(
       resultRefs,
       planning.plan.effectDescription
     );
+  progress.executed ||= Boolean(tail.bodyExecuted);
   return {
     state: tail.pendingPrompt
       ? retainEventsOnFrame(tail.state, nextState.effectStack.length, events)
@@ -860,9 +1040,28 @@ export function executeActionChain(
   priorActionSucceeded?: boolean,
   services: EffectResolverServices = resolverExecutionServices
 ): ChainResult {
+  const progress = { executed: false };
+  const result = executeActionChainCore(state, actions, sourceCardInstanceId, controller, cardDb, initialResultRefs, effectDescription, priorActionSucceeded, services, progress);
+  return { ...result, ...(progress.executed ? { bodyExecuted: true } : {}) };
+}
+
+function executeActionChainCore(
+  state: GameState,
+  actions: Action[],
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  initialResultRefs: Map<string, EffectResult> | undefined,
+  effectDescription: string | undefined,
+  priorActionSucceeded: boolean | undefined,
+  services: EffectResolverServices,
+  progress: { executed: boolean },
+): ChainResult {
   const events: PendingEvent[] = [];
   const resultRefs = initialResultRefs ?? new Map<string, EffectResult>();
   let lastActionSucceeded = priorActionSucceeded ?? true;
+  // OPT-960: a terminal checkpoint earlier in this resolution ends play.
+  if (isGameTerminated(state)) return { state, events };
 
   for (let i = 0; i < actions.length; i++) {
     const action = actions[i];
@@ -901,6 +1100,7 @@ export function executeActionChain(
           controller,
           cardDb
         );
+      progress.executed ||= Boolean(groupResult.bodyExecuted);
       return {
         state: groupResult.pendingPrompt
           ? retainEventsOnFrame(
@@ -967,6 +1167,7 @@ export function executeActionChain(
           effectDescription,
           lastActionSucceeded
         );
+      progress.executed ||= Boolean(continuation.bodyExecuted);
       return {
         state: continuation.pendingPrompt
           ? retainEventsOnFrame(
@@ -993,6 +1194,7 @@ export function executeActionChain(
 
     // Execute the action
     const stackDepthBeforeAction = state.effectStack.length;
+    progress.executed = true;
     const result = services
       .withCommittedEvents(events)
       .executeEffectAction(
@@ -1008,7 +1210,7 @@ export function executeActionChain(
     state = result.state;
     events.push(...result.events);
     lastActionSucceeded = result.succeeded;
-    if (isEngineTerminated(state)) return { state, events };
+    if (isGameTerminated(state)) return { state, events };
 
     if (result.pendingPrompt && result.nestedEventActivation) {
       return {
@@ -1058,6 +1260,38 @@ export function executeActionChain(
             pendingPrompt: result.pendingPrompt,
           };
         }
+        // OPT-963: when the branch paused on a frame its handler owns (an
+        // EFFECT_DAMAGE window, a REPLACEMENT_BATCH offer or substitute), the
+        // branch's chain continuation sits at the pre-action depth with the
+        // handler's frame directly above it. The actions after the choice
+        // outlive both: they get their own continuation under this chain's
+        // controller, inserted below the branch's continuation, so the branch
+        // (possibly the opponent's, under OPPONENT_ACTION) finishes first and
+        // the suffix then resumes as this chain's controller (PR #758 D-F1b).
+        const continuationBelow = result.state.effectStack[stackDepthBeforeAction];
+        const frameAbove = result.state.effectStack[stackDepthBeforeAction + 1];
+        const handlerOwnsPause =
+          continuationBelow !== undefined &&
+          continuationBelow !== nestedPromptFrame &&
+          frameAbove !== undefined &&
+          isHandlerOwnedFrame(frameAbove);
+        if (handlerOwnsPause) {
+          let parked = result.state;
+          if (remainingActions.length > 0) {
+            const outerId = generateFrameId(parked);
+            parked = insertFrameAt(
+              outerId.state,
+              stackDepthBeforeAction,
+              outerSuffixContinuation(outerId.id, sourceCardInstanceId, controller, effectDescription, action, remainingActions, resultRefs)
+            );
+          }
+          return {
+            state: retainEventsOnFrame(parked, stackDepthBeforeAction, events),
+            events,
+            // The nested prompt belongs to the handler's frame: its own description.
+            pendingPrompt: result.pendingPrompt,
+          };
+        }
         const nestedState =
           remainingActions.length > 0 || effectDescription
             ? updateTopFrame(result.state, {
@@ -1088,58 +1322,19 @@ export function executeActionChain(
           ),
         };
       }
-      if (nestedPromptFrame?.replacementBatchContinuation) {
-        // A non-optional replacement substitute opened its own prompt and
-        // already pushed that prompt's frame. Insert this action chain's
-        // continuation immediately below it so the substitute can finish the
-        // replacement batch before the original suffix resumes.
-        const frameId = generateFrameId(popFrame(result.state));
-        const continuationFrame: EffectStackFrame = {
-          id: frameId.id,
-          sourceCardInstanceId,
-          controller,
-          effectDescription,
-          effectBlock: CONTINUATION_EFFECT_BLOCK,
-          phase: "INTERRUPTED_BY_TRIGGERS",
-          pausedAction: action,
-          remainingActions: actions.slice(i + 1),
-          resultRefs: [...resultRefs.entries()],
-          validTargets: [],
-          priorActionSucceeded: false,
-          costs: [],
-          currentCostIndex: 0,
-          costsPaid: true,
-          oncePerTurnMarked: true,
-          costResultRefs: [],
-          pendingTriggers: [],
-          simultaneousTriggers: [],
-          accumulatedEvents: events,
-        };
-        const continuationState = pushFrame(frameId.state, continuationFrame);
-        if (isEngineTerminated(continuationState))
-          return { state: continuationState, events };
-        const restoredPromptState = pushFrame(
-          continuationState,
-          nestedPromptFrame
-        );
-        return isEngineTerminated(restoredPromptState)
-          ? { state: restoredPromptState, events }
-          : {
-              state: restoredPromptState,
-              events,
-              // The nested prompt belongs to the replacement substitute, so
-              // preserve its own description instead of the outer chain's.
-              pendingPrompt: result.pendingPrompt,
-            };
-      }
-
-      const rawContext = result.pendingPrompt.resumeContext as {
-        type?: unknown;
-      } | null;
-      const isReplacementPrompt =
-        rawContext?.type === "REPLACEMENT" ||
-        rawContext?.type === "REPLACEMENT_BATCH";
-      if (isReplacementPrompt) {
+      // OPT-963: the handler owns the pause on a frame it pushed itself (a
+      // REPLACEMENT_BATCH offer or substitute, an EFFECT_DAMAGE window). This
+      // action chain's continuation is inserted at the depth the action
+      // started from, below everything the handler pushed, so the handler's
+      // work finishes before the suffix resumes. An EFFECT_DAMAGE frame names
+      // the continuation as its parent so the instruction's final count
+      // reaches the chain (completeEffectDamageFrame).
+      // The handler's own frame is the first one it pushed (an offer or a
+      // window on top, or a batch frame inserted below its substitute's
+      // prompt frames).
+      const handlerFrame = result.state.effectStack[stackDepthBeforeAction];
+      const ownsPause = handlerFrame !== undefined && isHandlerOwnedFrame(handlerFrame);
+      if (ownsPause) {
         const frameId = generateFrameId(result.state);
         const continuationFrame: EffectStackFrame = {
           id: frameId.id,
@@ -1162,14 +1357,15 @@ export function executeActionChain(
           simultaneousTriggers: [],
           accumulatedEvents: events,
         };
-        const continuationState = pushFrame(frameId.state, continuationFrame);
-        return isEngineTerminated(continuationState)
-          ? { state: continuationState, events }
-          : {
-              state: continuationState,
-              events,
-              pendingPrompt: result.pendingPrompt,
-            };
+        const continuationState = insertFrameAt(frameId.state, stackDepthBeforeAction, continuationFrame);
+        if (isGameTerminated(continuationState)) return { state: continuationState, events };
+        return {
+          state: linkDamageParent(continuationState, stackDepthBeforeAction + 1, frameId.id),
+          events,
+          // The nested prompt belongs to the handler's own frame, so
+          // preserve its own description instead of the outer chain's.
+          pendingPrompt: result.pendingPrompt,
+        };
       }
 
       const ctx = result.pendingPrompt
@@ -1205,11 +1401,11 @@ export function executeActionChain(
         pendingTriggers: [],
         simultaneousTriggers: [],
         accumulatedEvents: events,
-        ruleTrashForPlay: ctx.ruleTrashForPlay,
+        playOverflow: ctx.ruleTrashForPlay,
         stateDistributionForPlay: ctx.stateDistributionForPlay,
       };
       const updatedState = pushFrame(frameId.state, frame);
-      if (isEngineTerminated(updatedState))
+      if (isGameTerminated(updatedState))
         return { state: updatedState, events };
       // Override with block-specific description so prompts show the triggered
       // effect text rather than the full card text
@@ -1222,9 +1418,9 @@ export function executeActionChain(
 
     // OPT-172: rule 6-2 — handler paused mid-batch because a frame's events
     // queued ON_PLAY (or sibling) triggers. Push an AWAITING_BATCH_RESUME
-    // frame carrying the marker + remaining chain actions, then drain the
-    // triggers; reenterBatchResume re-invokes the handler with the
-    // remaining-batch state once the drain completes.
+    // frame carrying the marker + remaining chain actions, then report fresh
+    // triggers to their owner. The shared executor resumes this same-effect
+    // batch and suffix before releasing the newly fulfilled ordinary work.
     if (result.pendingBatchTriggers) {
       const { triggers, marker } = result.pendingBatchTriggers;
       const stateWithFrame = pushBatchResumeFrame(
@@ -1238,13 +1434,12 @@ export function executeActionChain(
         resultRefs,
         effectDescription
       );
-      if (isEngineTerminated(stateWithFrame))
+      if (isGameTerminated(stateWithFrame))
         return { state: stateWithFrame, events };
-      const drain = processRemainingTriggers(
+      const drain = services.reportTriggers(
         stateWithFrame,
         triggers,
         cardDb,
-        services,
         events
       );
       return {
@@ -1261,6 +1456,59 @@ export function executeActionChain(
   }
 
   return { state, events };
+}
+
+/**
+ * The continuation of the actions after a choice whose branch paused on a
+ * handler-owned frame (PR #758 D-F1b). It runs as the choosing chain's
+ * controller once the branch's own continuation (which may be the opponent's,
+ * under OPPONENT_ACTION) has finished; the choice itself counts as succeeded,
+ * as it does when its branch completes without pausing.
+ */
+export function outerSuffixContinuation(
+  id: string,
+  sourceCardInstanceId: string,
+  controller: 0 | 1,
+  effectDescription: string | undefined,
+  choice: Action,
+  remainingActions: Action[],
+  resultRefs: Map<string, EffectResult>
+): EffectStackFrame {
+  return {
+    id,
+    sourceCardInstanceId,
+    controller,
+    effectDescription,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "INTERRUPTED_BY_TRIGGERS",
+    pausedAction: choice,
+    remainingActions,
+    resultRefs: [...resultRefs.entries()],
+    validTargets: [],
+    priorActionSucceeded: true,
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+  };
+}
+
+/** Name the chain continuation as the parent of the EFFECT_DAMAGE frame directly above it. */
+function linkDamageParent(state: GameState, damageIndex: number, parentFrameId: string): GameState {
+  const frame = state.effectStack[damageIndex];
+  if (!frame?.effectDamage) return state;
+  return {
+    ...state,
+    effectStack: [
+      ...state.effectStack.slice(0, damageIndex),
+      { ...frame, effectDamage: { ...frame.effectDamage, parentFrameId } },
+      ...state.effectStack.slice(damageIndex + 1),
+    ],
+  };
 }
 
 /**
@@ -1304,7 +1552,7 @@ function pauseForOptionalAction(
     accumulatedEvents: events,
   };
   const nextState = pushFrame(frameId.state, frame);
-  if (isEngineTerminated(nextState)) return { state: nextState, events };
+  if (isGameTerminated(nextState)) return { state: nextState, events };
   const sourceCard = findCardInstance(nextState, sourceCardInstanceId);
   log("effect.prompt", {
     sourceInstanceId: sourceCardInstanceId,
@@ -1380,6 +1628,48 @@ function costResultToRefs(
 
 // ─── Single Action Dispatcher ─────────────────────────────────────────────────
 
+/**
+ * Rule-processing checkpoint after one effect action (OPT-949 acceptance 3,
+ * OPT-862, OPT-925). Runs when the action changed a deck or Life count or
+ * made a lethal damage determination. A multi-card draw or mill moves one
+ * player's cards from one deck, so that deck can reach 0 only on its last
+ * moved card (rule 3-2-3): checking after the move is the between-cards check.
+ * When the checkpoint ends the game the terminal writer has cleared every
+ * continuation, and the result drops any prompt or batch continuation the
+ * handler returned so no caller can resurrect it.
+ */
+function ruleProcessingAfterAction(
+  before: GameState,
+  result: ActionResult,
+  cardDb: Map<string, CardData>,
+): ActionResult {
+  if (isGameTerminated(result.state)) return withoutContinuation(result, result.state);
+  const lethal = result.lethalDamagePlayerIndex;
+  const checked = runRuleProcessingAfterMove(
+    before,
+    result.state,
+    lethal !== undefined ? { lethalDamage: [lethal] } : {},
+    cardDb,
+  );
+  if (!isGameTerminated(checked)) {
+    return checked === result.state ? result : { ...result, state: checked };
+  }
+  return withoutContinuation(result, checked);
+}
+
+/** A terminal action result: no prompt, batch continuation or nested Event boundary survives. */
+function withoutContinuation(result: ActionResult, state: GameState): ActionResult {
+  return {
+    state,
+    events: result.events,
+    succeeded: result.succeeded,
+    ...(result.result ? { result: result.result } : {}),
+    ...(result.lethalDamagePlayerIndex !== undefined
+      ? { lethalDamagePlayerIndex: result.lethalDamagePlayerIndex }
+      : {}),
+  };
+}
+
 export function executeEffectAction<K extends ActionType>(
   state: GameState,
   action: ActionOf<K>,
@@ -1391,7 +1681,7 @@ export function executeEffectAction<K extends ActionType>(
   services: EffectResolverServices = resolverExecutionServices
 ): ActionResult {
   state = consumeResolutionAction(state, action.type, sourceCardInstanceId);
-  if (isEngineTerminated(state)) {
+  if (isGameTerminated(state)) {
     return { state, events: [], succeeded: false };
   }
   const handler = getActionHandler(action);
@@ -1408,7 +1698,8 @@ export function executeEffectAction<K extends ActionType>(
     );
     // Rule 3-1-6-1: a DON!! this action moved sheds its effects.
     const released = releaseMovedDonEffects(state, result.state);
-    return released === result.state ? result : { ...result, state: released };
+    const settled = released === result.state ? result : { ...result, state: released };
+    return ruleProcessingAfterAction(state, settled, cardDb);
   }
   // Boot validation makes this unreachable for authored schemas. Treat any
   // untrusted/runtime drift as a rules-visible terminal engine contract fault.

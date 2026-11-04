@@ -21,6 +21,7 @@ import type {
 import { prepareDecksAndLeaders } from "./engine/setup.js";
 import { advancePregame, startPregame } from "./engine/pregame.js";
 import { createProductionExecutionContext } from "./engine/execution-context.js";
+import { terminateGame } from "./engine/terminal.js";
 import {
   readDiscriminant,
   validateGameInitPayload,
@@ -37,6 +38,7 @@ import {
 import { createResultCallbackFetch } from "./session/result-callback.js";
 import { consumePlayerUpgradeBudget } from "./session/player-rate-limit-policy.js";
 import { resumePromptLifecycle } from "./session/prompt-lifecycle.js";
+import { handleSessionExportRequest } from "./session/export.js";
 import { handleGameStatusRequest } from "./session/status.js";
 import {
   ACTION_RATE_LIMIT_CLOSE_REASON,
@@ -128,6 +130,11 @@ export class GameSession implements DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    // Export must bypass load/migration, in-memory state and all game actions.
+    if (/^\/game\/[^/]+\/export$/.test(url.pathname)) {
+      return handleSessionExportRequest(request, this.env.GAME_WORKER_SECRET, this.state.storage);
+    }
 
     // POST /init — called by Next.js on lobby start
     if (request.method === "POST" && url.pathname.endsWith("/init")) {
@@ -253,14 +260,11 @@ export class GameSession implements DurableObject {
       });
     }
 
-    this.gameState = {
-      ...this.gameState!,
-      status: "FINISHED",
+    this.gameState = terminateGame(this.gameState!, {
+      kind: "EXTERNAL_RESULT",
       winner: winnerIndex as 0 | 1,
-      winReason: reason,
-      pendingPrompt: null,
-      effectStack: [],
-    };
+      reason,
+    });
     await this.persist();
 
     this.filteredState.broadcastState();
@@ -619,14 +623,12 @@ export class GameSession implements DurableObject {
       }
     }
 
-    this.gameState = {
-      ...this.gameState,
+    this.gameState = terminateGame(this.gameState, {
+      kind: "ABANDONMENT",
       status,
       winner,
-      winReason: reason,
-      pendingPrompt: null,
-      effectStack: [],
-    };
+      reason,
+    });
 
     await this.persist();
     await this.writeResultToDb();
@@ -811,12 +813,11 @@ export class GameSession implements DurableObject {
   }
 
   /**
-   * If the effect stack is empty and no prompt is pending, check whether a
-   * [Trigger] Life card reveal is awaiting a decision — either on the active
-   * battle (battle damage, battle.pendingTriggerLifeCard) or on the turn
-   * (effect damage, turn.pendingTriggerFromEffect / OPT-259 F6). Surfacing it
-   * as a durable pendingPrompt on the game state makes it survive reconnections
-   * and prevents a race between game:update (clears activePrompt) and
+   * If no prompt is pending, check whether a [Trigger] Life card reveal is
+   * awaiting a decision on the top BATTLE_DAMAGE or EFFECT_DAMAGE frame
+   * (OPT-963; effect damage was OPT-259 F6). Surfacing it as a durable
+   * pendingPrompt on the game state makes it survive reconnections and
+   * prevents a race between game:update (clears activePrompt) and
    * game:prompt (sets it again).
    */
   private surfaceRevealTriggerIfNeeded(): void {
@@ -849,6 +850,7 @@ export class GameSession implements DurableObject {
       undoHistory: this.undoHistory,
     });
     this.gameState = saved.state;
+    this.undoHistory = saved.undoHistory;
   }
 
   private async loadFromStorage(): Promise<boolean> {
@@ -969,14 +971,13 @@ export class GameSession implements DurableObject {
     if (!this.gameState) return;
     const winner: 0 | 1 = playerIndex === 0 ? 1 : 0;
     const reason = `Player ${playerIndex + 1} left during pre-game`;
-    this.gameState = {
-      ...this.gameState,
+    this.gameState = terminateGame(this.gameState, {
+      kind: "ABANDONMENT",
       status: "FINISHED",
       winner,
-      winReason: reason,
-      pendingPrompt: null,
-      pregame: null,
-    };
+      reason,
+      clearPregame: true,
+    });
     this.undoHistory = [];
     await this.persist();
     await this.writeResultToDb();

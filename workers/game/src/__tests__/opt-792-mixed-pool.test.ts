@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 /**
  * OPT-792 — Target.mixed_pool: one selection pool spanning Characters,
  * Leaders, Stages and cost-area DON!! with a shared total count.
@@ -727,6 +728,7 @@ describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
         f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
       } else break;
     }
+    f.state = scriptedDonPayment(f.state, f.db, 0, 1);
     const options = f.state.pendingPrompt?.options;
     expect(options?.promptType).toBe("PLAYER_CHOICE");
     const rested =
@@ -823,8 +825,8 @@ describe("OPT-792 DON!! refresh hold across area moves (rule 3-1-6-1)", () => {
       new Map(),
       []
     );
-    expect(result?.kind).toBe("fallthrough");
-    const next = result?.kind === "fallthrough" ? result.state : f.state;
+    expect(result?.kind).toBe("continued");
+    const next = result?.kind === "continued" ? result.state : f.state;
     expect(char({ ...f, state: next } as Fixture, c)?.attachedDon.map((d) => d.instanceId)).toContain(
       moving.instanceId
     );
@@ -1015,7 +1017,7 @@ describe("OPT-792 DON!! areas follow the rules areas (review C)", () => {
       new Map(),
       []
     );
-    const next = result?.kind === "fallthrough" ? result.state : f.state;
+    const next = result?.kind === "continued" ? result.state : f.state;
     expect(char({ ...f, state: next } as Fixture, b)?.attachedDon.map((d) => d.instanceId)).toEqual([
       "moving-don",
     ]);
@@ -1263,6 +1265,7 @@ describe("OPT-792 release scope and cleanup (review round 3)", () => {
     for (let i = 0; i < 4 && f.state.pendingPrompt; i++) {
       const o = f.state.pendingPrompt.options;
       if (o.promptType === "OPTIONAL_EFFECT") f.act({ type: "PLAYER_CHOICE", choiceId: "accept" });
+      else if (o.promptType === "PLAYER_CHOICE" && o.donIdentityReturn) f.state = scriptedDonPayment(f.state, f.db, 0, 1, ["held-don"]);
       else if (o.promptType === "PLAYER_CHOICE") f.act({ type: "PLAYER_CHOICE", choiceId: o.choices[0].id }, 1);
       else break;
     }
