@@ -6,24 +6,28 @@ argument-hint: "OPT-501 OPT-502 [allow merges for this run]"
 
 # Orchestrate ticket tracks
 
-Read and execute `docs/project/ORCHESTRATION-CHARTER.md`, the single lifecycle and authority policy. Read `docs/project/ORCHESTRATION-RECORDS.md` for the run ledger and readiness receipt. For engine, card-schema, protocol or board changes also read `docs/project/ORCHESTRATION-OPTCG.md`.
+Execute `docs/project/ORCHESTRATION-CHARTER.md`; it is the only source of policy (authority, tiers, review, readiness, merge). Use `docs/project/ORCHESTRATION-RECORDS.md` for the run checkpoint and readiness receipt. For engine, card-schema, protocol or board changes, also read `docs/project/ORCHESTRATION-OPTCG.md`. For frontend work, add `.claude/skills/orchestrate-frontend/SKILL.md`.
 
-Accept issue IDs/URLs separated by spaces or commas, a single issue, or a project resolved to an explicit issue list. Publish scope, tracks, readiness blockers and effective permissions, then proceed with determinate work. Missing scope requires a concise question; unrelated PRs do not block the run.
+Accept issue IDs or URLs separated by spaces or commas, or a project resolved to an explicit issue list. With no scope, ask for it; do not infer a backlog to work.
 
-The coordinator declares a risk tier per issue (charter §3), delegates isolated implementation and fresh independent reviews, reads reviewer reports and spot-checks one decisive claim (every hunk only for Large), and owns PR readiness. Implementation agents never merge or write Linear. Merge permission defaults off and requires an explicit scope-matching user grant; historical Claude merge permissions and shell allow rules do not supply that grant. Codex and Claude coordinators may update issues and create relevant tickets under standing user authorization. Document every update in a comment on the affected issue, and implementation-discovered tickets in a linked explanatory comment on the original ticket. Follow the charter for audit recovery and scope boundaries. No repeated approval exchange is needed for already granted work.
+## Models
 
-Model roles and effort follow charter §4: Sol 6.1 for ordinary coordination and implementation, Luna 6 for bounded chores, and Astra for high-risk correctness review. Keep the current Claude coordinator when its runtime cannot switch; record that fact and route workers explicitly. Use native tools when they support the selected model, otherwise an available Codex CLI backend. Do not silently substitute Opus/Sonnet or inherit session defaults. Save one bounded packet per stage with scope, workspace, pinned revisions, evidence references and expected result. Continue fixes in the same implementer and deltas in the same reviewer; use separate spec/correctness briefs for Large work.
+Dispatch every agent with an explicit `model`; never let a child inherit the coordinator's model by default. Current choices (update here when models change, not in the charter):
 
-For a CLI worker, select the model and effort from the charter and use an isolated writable workspace:
+| Role | Model | Notes |
+| --- | --- | --- |
+| Implementer, Small | `sonnet` | |
+| Implementer, Medium/Large | `opus` | Continue fixes in the same agent |
+| Reviewer, Small/Medium | `opus`, fresh agent | One combined pass for Small |
+| Reviewers, Large | `opus` for spec; `fable` for correctness | Separate briefs; at most two concurrent |
+| Chores (inventories, log triage, overlap reports) | `haiku` | Facts and uncertainty only; never adjudicates |
 
-```sh
-codex exec -m <model-from-charter> -c model_reasoning_effort="<effort-from-charter>" -C <workspace> --sandbox workspace-write -o <out.md> - < <brief.md>
-```
+Explicit user model choices override this table. With one provider, review independence comes from a fresh context and a distinct hunt brief, not a different vendor.
 
-Review briefs prohibit tracked edits and permit isolated scratch tests. Respect host test capacity even when reviews run concurrently. Use deterministic monitoring for mechanical checks; delegate bounded interpretation to Luna. Keep final readiness and merge decisions with the coordinator.
+## Dispatch
 
-Linear holds the plan and cross-session context: roll-up parents and `blockedBy` for order, issue comments for handoff points a later ticket needs. Handoffs go in PR bodies; `docs/project/handoffs/` is a read-only archive, and the run checkpoint is a local scratch file (see records). Do not commit action plans or run ledgers.
+Use the native Agent tool with a fresh, bounded brief (never a full-history fork), an isolated worktree or clone, and the deliverables the charter requires. Review briefs forbid tracked edits and allow scratch tests. Keep host test capacity in mind when reviews run concurrently. Keep readiness and merge decisions with the coordinator.
 
-Use `GOTCHAS.md` only for relevant historical environment evidence; it does not override the charter or current permissions. If independent review is unavailable, readiness is incomplete.
+Linear holds the plan and cross-session context: roll-up parents and `blockedBy` for order, issue comments for handoff points a later ticket needs. Handoffs go in PR bodies; `docs/project/handoffs/` is a read-only archive, and the run checkpoint is a local scratch file. Do not commit action plans or run ledgers.
 
-For frontend work, use the design/VQA supplement in `.claude/skills/orchestrate-frontend/SKILL.md` under the same charter. Existing `.claude/workflows/pr-review.js` results are advisory inputs; complete the charter's gates directly when that runner cannot establish them.
+Read the relevant section of `GOTCHAS.md` before a step it covers (worktrees, validation, CI, merge, environments). It records past environment failures; it does not override the charter or current permissions.

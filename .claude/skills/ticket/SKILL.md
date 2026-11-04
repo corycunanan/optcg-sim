@@ -7,7 +7,7 @@ argument-hint: "OPT-XXX"
 
 # Work a Linear ticket
 
-A dispatched implementer works from its coordinator's brief, which is its complete policy: do not read `docs/project/ORCHESTRATION-CHARTER.md` or the run ledger unless the brief points at a section. Deliver the implementation, validation evidence at a stated rung, a pushed PR and a handoff; never merge or write Linear. A standalone ticket with no coordinator is a one-issue run: read the charter for lifecycle, authority, preflight, review and readiness gates, and declare the ticket's tier. A coordinating agent may merge only under an explicit issue-scoped grant and the full charter gate. Codex and Claude coordinators may update issues and create relevant tickets. Document every update in a comment on that issue; document implementation-discovered tickets in a linked explanatory comment on the original ticket. Follow the charter for audit recovery and scope boundaries.
+A dispatched implementer works from its coordinator's brief, which is its complete policy: do not read `docs/project/ORCHESTRATION-CHARTER.md` or the run record unless the brief points at a section. Deliver the implementation, validation evidence at a stated rung, and a pushed PR with its handoff; never merge or write Linear. A standalone ticket with no coordinator is a one-issue run: follow the charter for authority, tier, review and readiness.
 
 Use `orchestrate` for multi-issue scheduling. Do not block isolated work because unrelated PRs or dirty files exist. Inspect matching in-flight branches/PRs before creating duplicates. Fetch the real issue and necessary context; missing consequential requirements block that issue, not independent work.
 
