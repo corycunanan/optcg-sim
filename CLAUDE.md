@@ -223,4 +223,4 @@ These rules exist to prevent "AI slop" — arbitrary decisions that look reasona
 
 ## Track orchestration
 
-For 1–N Linear issues, use `.claude/skills/orchestrate/SKILL.md` and the canonical `docs/project/ORCHESTRATION-CHARTER.md`. It supersedes legacy ticket lifecycle and standing merge assumptions. Merge mode defaults off; only a coordinator with explicit run-scoped user authorization may merge fully assessed PRs. Implementation agents never merge or write Linear. Codex and Claude coordinators may update Linear issues and create relevant tickets. Every update requires a documenting comment on that issue; implementation-discovered tickets also require a linked explanatory comment on the original ticket. Follow the charter audit-trail and recovery requirements.
+For 1–N Linear issues, use the `orchestrate` skill. `docs/project/ORCHESTRATION-CHARTER.md` is the single source of orchestration policy, including merge authority and Linear rules; merging is off unless the user grants it for named issues in the current run.

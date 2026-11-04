@@ -1,3 +1,4 @@
+import { chooseFirstObligation } from "./opt-981-test-ordering.js";
 import { describe, expect, it } from "vitest";
 import type { Action } from "../engine/effect-types.js";
 import { runPipeline } from "../engine/pipeline.js";
@@ -207,6 +208,7 @@ describe("OPT-735 phase-boundary prompts", () => {
 
   it("round-trips remaining end-phase work while the scheduled prompt is pending", async () => {
     const { cardDb, offered } = offerScheduledChoice(2);
+    offered.state = chooseFirstObligation(offered.state, cardDb);
     const storage = new MemoryStorage();
     const repository = new SessionRepository(storage, {
       nextJsUrl: "https://app.example.test",
@@ -231,7 +233,9 @@ describe("OPT-735 phase-boundary prompts", () => {
     ).toMatchObject({
       kind: "END_PHASE",
       endingPlayerIndex: 0,
-      remainingScheduledActions: [{ controller: 0 }],
+      // OPT-924: parked in 6-6-1-2 step 1, the remaining entry tagged with its step.
+      stage: "TURN_PLAYER_END_OF_TURN",
+      remainingScheduledActions: [{ controller: 0, step: "TURN_PLAYER" }],
     });
 
     const firstChoice = resumePromptLifecycle(

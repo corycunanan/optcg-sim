@@ -85,7 +85,7 @@ describe("pushFrame", () => {
     expect(s1.effectStack).not.toBe(s0.effectStack);
   });
 
-  it("terminates in a rules-visible draw at MAX_EFFECT_STACK_DEPTH (100)", () => {
+  it("terminates with the engine-limit outcome at MAX_EFFECT_STACK_DEPTH (100) (Decision 5, OPT-960)", () => {
     let s = emptyState();
     for (let i = 0; i < 100; i++) s = pushFrame(s, makeFrame(`f${i}`));
     expect(s.effectStack).toHaveLength(100);
@@ -95,7 +95,7 @@ describe("pushFrame", () => {
     expect(s2.status).toBe("FINISHED");
     expect(s2.winner).toBeNull();
     expect(s2.engineOutcome).toEqual({
-      type: "INFINITE_LOOP_DRAW",
+      type: "ENGINE_LIMIT",
       diagnostic: {
         kind: "EFFECT_STACK_DEPTH",
         limit: 100,

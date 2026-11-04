@@ -155,21 +155,9 @@ function stateWithEveryViewerDivergence(state: GameState): GameState {
         defenderPower: 5000,
         counterPowerAdded: 0,
         blockerActivated: false,
-        pendingTriggerLifeCard: lifeCard,
       },
-      pendingTriggerFromEffect: {
-        lifeCard,
-        damagedPlayerIndex: 1,
-        remainingDamages: 1,
-        sourceCardInstanceId: state.players[0].leader.instanceId,
-        controllerIndex: 0,
-      },
-      pendingBattleDamageContinuation: {
-        battleId: "pending-trigger-battle",
-        lifeCardInstanceId: lifeCard.instanceId,
-        damagedPlayerIndex: 1,
-        stage: "LIFE_REMOVAL",
-      },
+      // OPT-963: Trigger windows and damage continuations are effect-stack
+      // frames, never sent to any viewer; the turn is viewer-invariant.
     },
   };
 }
@@ -315,7 +303,6 @@ describe("OPT-549 spectator per-viewer merge", () => {
     );
     expect(divergentFields).toEqual([
       "players",
-      "turn",
       "eventLog",
       "pendingPrompt",
     ]);
@@ -379,29 +366,9 @@ describe("OPT-549 spectator per-viewer merge", () => {
       expect(JSON.stringify(spectator.eventLog)).not.toContain(secret);
     }
 
-    expect(spectator.turn.battle).toEqual({
-      ...source.turn.battle,
-      pendingTriggerLifeCard: {
-        ...source.turn.battle!.pendingTriggerLifeCard!,
-        cardId: "hidden",
-        instanceId: "hidden",
-      },
-    });
-    expect(spectator.turn.pendingTriggerFromEffect).toEqual({
-      ...source.turn.pendingTriggerFromEffect,
-      lifeCard: {
-        ...source.turn.pendingTriggerFromEffect!.lifeCard,
-        cardId: "hidden",
-        instanceId: "hidden",
-      },
-    });
-    expect(spectator.turn.pendingBattleDamageContinuation).toEqual({
-      ...source.turn.pendingBattleDamageContinuation,
-      lifeCardInstanceId: "hidden",
-    });
-    expect(spectatorStrings).not.toContain(
-      source.turn.pendingTriggerFromEffect!.lifeCard.instanceId
-    );
+    expect(spectator.turn).toEqual(playerZeroView.turn);
+    expect(spectator.turn).toEqual(source.turn);
+    expect(spectator.effectStack).toEqual([]);
   });
 
   it("preserves blind-selection redaction in the unioned prompt", () => {
@@ -567,110 +534,24 @@ describe("OPT-549 spectator per-viewer merge", () => {
       playerZeroView,
       divergentPlayerOne,
     )).toThrow(
-      "Spectator visibility invariant violated: turn (excluding spectator-union fields) differs between player views",
+      "Spectator visibility invariant violated: turn differs between player views",
     );
   });
 
-  it("throws when both views retain different battle Trigger Life cards", () => {
+  it("throws when the views disagree on the turn (OPT-963: no turn field is viewer-dependent any more)", () => {
     const { state } = getMainPhaseState();
     const source = stateWithEveryViewerDivergence(state);
     const { playerZeroView, playerOneView } = filteredViews(source);
-    const playerZeroLifeCard = source.players[0].life[0]!;
-    const playerZeroBattle = playerZeroView.turn.battle!;
 
     expect(mergeDirectly(
       source,
       {
         ...playerZeroView,
-        turn: {
-          ...playerZeroView.turn,
-          battle: {
-            ...playerZeroBattle,
-            pendingTriggerLifeCard: playerZeroLifeCard,
-          },
-        },
+        turn: { ...playerZeroView.turn, battle: { ...playerZeroView.turn.battle!, attackerPower: 9999 } },
       },
       playerOneView,
     )).toThrow(
-      "Spectator visibility invariant violated: turn.battle.pendingTriggerLifeCard differs between player views",
-    );
-  });
-
-  it("throws when both views retain different effect Trigger continuations", () => {
-    const { state } = getMainPhaseState();
-    const source = stateWithEveryViewerDivergence(state);
-    const { playerZeroView, playerOneView } = filteredViews(source);
-    const retainedForZero = {
-      ...source.turn.pendingTriggerFromEffect!,
-      lifeCard: source.players[0].life[0]!,
-      damagedPlayerIndex: 0 as const,
-    };
-
-    expect(mergeDirectly(
-      source,
-      {
-        ...playerZeroView,
-        turn: {
-          ...playerZeroView.turn,
-          pendingTriggerFromEffect: retainedForZero,
-        },
-      },
-      playerOneView,
-    )).toThrow(
-      "Spectator visibility invariant violated: turn.pendingTriggerFromEffect differs between player views",
-    );
-  });
-
-  it("throws when both views retain different battle damage continuations", () => {
-    const { state } = getMainPhaseState();
-    const source = stateWithEveryViewerDivergence(state);
-    const { playerZeroView, playerOneView } = filteredViews(source);
-    const retainedForZero = {
-      ...source.turn.pendingBattleDamageContinuation!,
-      battleId: "different-battle",
-      damagedPlayerIndex: 0 as const,
-    };
-
-    expect(mergeDirectly(
-      source,
-      {
-        ...playerZeroView,
-        turn: {
-          ...playerZeroView.turn,
-          pendingBattleDamageContinuation: retainedForZero,
-        },
-      },
-      playerOneView,
-    )).toThrow(
-      "Spectator visibility invariant violated: turn.pendingBattleDamageContinuation differs between player views",
-    );
-  });
-
-  it("preserves a battle shape with no pendingTriggerLifeCard property", () => {
-    const { state } = getMainPhaseState();
-    const sourceWithTrigger = stateWithEveryViewerDivergence(state);
-    const {
-      pendingTriggerLifeCard: _pendingTriggerLifeCard,
-      ...battleWithoutPendingTrigger
-    } = sourceWithTrigger.turn.battle!;
-    const source: GameState = {
-      ...sourceWithTrigger,
-      turn: {
-        ...sourceWithTrigger.turn,
-        battle: battleWithoutPendingTrigger,
-      },
-    };
-    const { playerZeroView, playerOneView } = filteredViews(source);
-
-    const spectator = mergePlayerViewsForSpectator(
-      source,
-      playerZeroView,
-      playerOneView,
-    );
-
-    expect(spectator.turn.battle).not.toBeNull();
-    expect(spectator.turn.battle).not.toHaveProperty(
-      "pendingTriggerLifeCard",
+      "Spectator visibility invariant violated: turn differs between player views",
     );
   });
 });

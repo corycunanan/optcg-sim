@@ -245,6 +245,9 @@ function runKoProgressReplacement(
     cardInstance(CARDS.VANILLA.id, "progress-draw-1", 1, "DECK"),
     cardInstance(CARDS.BLOCKER.id, "progress-draw-2", 1, "DECK"),
     cardInstance(CARDS.VANILLA.id, "progress-draw-3", 1, "DECK"),
+    // Keeps p1's deck non-empty after the three draws: an emptied deck ends
+    // the game mid-resolution (rules 9-1-2, 9-2-1-2; OPT-862).
+    cardInstance(CARDS.VANILLA.id, "progress-draw-4", 1, "DECK"),
   ];
   const replacement: RuntimeActiveEffect = {
     id: "progress-replacement",
@@ -372,16 +375,18 @@ describe("OPT-739: nested prompts re-enter batch resume", () => {
     expect(result.state.players[0].trash).toHaveLength(2);
   });
 
-  it("keeps the tagged Mars trigger in a batch frame until it resolves", () => {
+  it("finishes the Five Elders batch before resolving its tagged Mars trigger", () => {
     const scenario = selectFiveElders(false);
     expect(scenario.result.pendingPrompt?.options.promptType).toBe(
       "OPTIONAL_EFFECT"
     );
-    expect(
-      scenario.result.state.effectStack.some(
-        (frame) => frame.phase === "AWAITING_BATCH_RESUME"
-      )
-    ).toBe(true);
+    // OPT-966 / rule 8-6-1: the current effect completes before the On Play
+    // effects it fulfilled. The trigger owner, not an unfinished play batch,
+    // now retains ordering while Mars waits for its optional response.
+    expect(scenario.result.state.players[0].characters.filter(Boolean)).toHaveLength(5);
+    expect(scenario.result.state.effectStack.some((frame) =>
+      frame.triggerExecution !== undefined
+    )).toBe(true);
 
     const result = resumeFromStack(
       scenario.result.state,

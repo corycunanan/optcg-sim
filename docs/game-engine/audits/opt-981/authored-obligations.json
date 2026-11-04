@@ -1,0 +1,234 @@
+{
+  "modules": 56,
+  "schemas": 2474,
+  "rows": [
+    {
+      "id": "EB02-015",
+      "block": "on_play_prohibit_refresh_schedule_don",
+      "action": {
+        "type": "SET_DON_ACTIVE",
+        "params": {
+          "amount": 1,
+          "up_to": true
+        }
+      }
+    },
+    {
+      "id": "OP03-005",
+      "block": "activate_boost_then_trash",
+      "action": {
+        "type": "TRASH_CARD",
+        "target": {
+          "type": "SELF"
+        }
+      }
+    },
+    {
+      "id": "OP04-009",
+      "block": "when_attacking_bounce_self_eot",
+      "action": {
+        "type": "RETURN_TO_HAND",
+        "target": {
+          "type": "SELF"
+        }
+      }
+    },
+    {
+      "id": "OP04-026",
+      "block": "when_attacking_rest_then_don",
+      "action": {
+        "type": "SET_DON_ACTIVE",
+        "params": {
+          "amount": 1,
+          "up_to": true
+        }
+      }
+    },
+    {
+      "id": "OP04-033",
+      "block": "on_play_rest_then_don",
+      "action": {
+        "type": "SET_DON_ACTIVE",
+        "params": {
+          "amount": 1,
+          "up_to": true
+        }
+      }
+    },
+    {
+      "id": "OP06-006",
+      "block": "OP06-006_effect_1",
+      "action": {
+        "type": "TRASH_CARD",
+        "target": {
+          "type": "CHARACTER",
+          "controller": "SELF",
+          "count": {
+            "exact": 1
+          },
+          "filter": {
+            "traits": [
+              "FILM"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "OP08-074",
+      "block": "activate_add_don",
+      "action": {
+        "type": "RETURN_DON_TO_DECK",
+        "params": {
+          "until_count": {
+            "type": "GAME_STATE",
+            "source": "DON_FIELD_COUNT",
+            "controller": "OPPONENT"
+          }
+        }
+      }
+    },
+    {
+      "id": "OP08-101",
+      "block": "activate_life_swap",
+      "action": {
+        "type": "ADD_TO_LIFE_FROM_DECK",
+        "params": {
+          "amount": 1,
+          "position": "TOP",
+          "face": "DOWN"
+        }
+      }
+    },
+    {
+      "id": "OP11-092",
+      "block": "on_play_draw_and_play_from_trash",
+      "action": {
+        "type": "RETURN_TO_DECK",
+        "target_ref": "played_character",
+        "params": {
+          "position": "BOTTOM"
+        }
+      }
+    },
+    {
+      "id": "OP11-107",
+      "block": "activate_set_active_at_eot",
+      "action": {
+        "type": "SET_ACTIVE",
+        "target": {
+          "type": "SELF"
+        }
+      }
+    },
+    {
+      "id": "OP13-024",
+      "block": "OP13-024_on_play",
+      "action": {
+        "type": "SET_DON_ACTIVE",
+        "params": {
+          "amount": 2,
+          "up_to": true
+        }
+      }
+    },
+    {
+      "id": "OP13-038",
+      "block": "OP13-038_main",
+      "action": {
+        "type": "SET_DON_ACTIVE",
+        "params": {
+          "amount": 2,
+          "up_to": true
+        }
+      }
+    },
+    {
+      "id": "OP13-066",
+      "block": "OP13-066_on_play",
+      "action": {
+        "type": "ADD_DON_FROM_DECK",
+        "params": {
+          "amount": 1,
+          "target_state": "ACTIVE",
+          "up_to": true
+        }
+      }
+    },
+    {
+      "id": "OP14-031",
+      "block": "OP14-031_on_play",
+      "action": {
+        "type": "SET_DON_ACTIVE",
+        "target": {
+          "type": "DON_IN_COST_AREA",
+          "controller": "SELF",
+          "count": {
+            "up_to": 5
+          }
+        },
+        "params": {
+          "amount": 5,
+          "up_to": true
+        }
+      }
+    },
+    {
+      "id": "OP15-025",
+      "block": "OP15-025_on_play",
+      "action": {
+        "type": "APPLY_PROHIBITION",
+        "target": {
+          "type": "CHARACTER",
+          "controller": "OPPONENT",
+          "count": {
+            "up_to": 1
+          },
+          "filter": {
+            "is_rested": true,
+            "don_given_count": {
+              "operator": ">=",
+              "value": 3
+            }
+          }
+        },
+        "params": {
+          "prohibition_type": "CANNOT_REFRESH"
+        },
+        "duration": {
+          "type": "SKIP_NEXT_REFRESH"
+        }
+      }
+    },
+    {
+      "id": "P-058",
+      "block": "main_schedule_set_active",
+      "action": {
+        "type": "SET_ACTIVE",
+        "target": {
+          "type": "CHARACTER",
+          "controller": "SELF",
+          "count": {
+            "all": true
+          },
+          "filter": {
+            "traits": [
+              "FILM"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ST24-005",
+      "block": "on_play_rest_and_don",
+      "action": {
+        "type": "SET_DON_ACTIVE",
+        "params": {
+          "amount": 1,
+          "up_to": true
+        }
+      }
+    }
+  ]
+}

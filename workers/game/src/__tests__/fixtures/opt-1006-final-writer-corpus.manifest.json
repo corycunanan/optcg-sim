@@ -1,0 +1,69 @@
+{
+  "synthetic": true,
+  "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+  "rollbackFloor": "d8309e70fef64a133ce19d8a2bd327bb625e56fb",
+  "sha256": "4b88df5f6f4dbcb37912896c7af6cffbe214bc39012556cdde04a31598d54b06",
+  "generatorSha256": "8e564b9cf047e25b67f4eed3b8ef7f7c2d698454db1aadcf1b1b0ebe3eaf35c4",
+  "provenance": "Separate final writer source8 setup; canonical authoritative Repository/Coordinator/save/load/reply chain. Historical corpus unchanged. Minimal synthetic sessions under user-approved exception; not production captures.",
+  "reproduction": [
+    "OPT1001_WRITE_CORPUS=CAPTURE_DIRECTORY OPT1001_PRODUCER_SHA=a529eebceb5b6a933734403d695829335ebb7653 pnpm --filter optcg-game exec vitest run src/__tests__/opt-1001-field-trash.test.ts",
+    "pnpm --filter optcg-game exec node --import tsx scripts/package-opt1006-final-corpus.ts CAPTURE_DIRECTORY a529eebceb5b6a933734403d695829335ebb7653"
+  ],
+  "families": {
+    "OPT-1001-authored-Beckman-Koby-accept-mode6-reload.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 3,
+      "native9Starts": 2
+    },
+    "OPT-1001-authored-Beckman-Koby-accept-mode7-reload.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 3,
+      "native9Starts": 2
+    },
+    "OPT-1001-authored-Beckman-Koby-accept-mode8-reload.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 3,
+      "native9Starts": 2
+    },
+    "OPT-1001-authored-Beckman-Koby-decline-mode6-reload.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 2,
+      "native9Starts": 1
+    },
+    "OPT-1001-authored-Beckman-Koby-decline-mode7-reload.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 2,
+      "native9Starts": 1
+    },
+    "OPT-1001-authored-Beckman-Koby-decline-mode8-reload.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 2,
+      "native9Starts": 1
+    },
+    "OPT-1001-native9-downstream-battle-completion-retains-protection-through-EOB-prompt.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 1,
+      "native9Starts": 1
+    },
+    "OPT-1001-native9-downstream-mode8-COST-keeps-Decision10-debt-accept-false.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 3,
+      "native9Starts": 3
+    },
+    "OPT-1001-native9-downstream-mode8-COST-keeps-Decision10-debt-accept-true.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 4,
+      "native9Starts": 4
+    },
+    "OPT-1001-native9-successor-trash-after-stable-save-still-offers-Ganzui.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 3,
+      "native9Starts": 3
+    },
+    "OPT-1001-one-payment-protects-simultaneous-group-and-all-members-stay-field-during-payment.json": {
+      "producer": "a529eebceb5b6a933734403d695829335ebb7653",
+      "starts": 2,
+      "native9Starts": 2
+    }
+  }
+}

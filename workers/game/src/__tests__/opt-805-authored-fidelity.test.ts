@@ -1,3 +1,5 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
+import { replayPauses } from "./fixtures/opt-966-replay.js";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -201,6 +203,7 @@ function fixture() {
     get state() {
       return state;
     },
+    set state(next: GameState) { state = next; },
   };
 }
 function attach(f: ReturnType<typeof fixture>, c: CardInstance) {
@@ -496,6 +499,7 @@ describe("OPT805 Magellan verified broad FAQ behavior", () => {
     for (let i = 0; i < 2; i++) {
       f.play("OP01-117");
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 1);
       if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
         f.select([]);
       expect(f.state.pendingPrompt).toBeNull();
@@ -533,6 +537,7 @@ describe("OPT805 Magellan verified broad FAQ behavior", () => {
       );
       if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
         f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
       if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
         f.select([]);
       expect(f.state.pendingPrompt).toBeNull();
@@ -564,6 +569,7 @@ describe("OPT805 authored trash-Event publication", () => {
     f.play("EB03-031");
     if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 0, 1);
     expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
     f.select([event.instanceId]);
     expect(f.state.pendingPrompt).toBeNull();
@@ -602,13 +608,15 @@ describe("OPT805 Event activation lifecycle regressions", () => {
       1
     );
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    f.choose("accept"); // Event DON -2 cost, not Crocodile
+    f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2); // Event DON -2 cost, not Crocodile
     if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
       f.select([]);
     expect(f.state.players[1].hand).toHaveLength(3); // Event draw resolved
     expect(f.state.players[1].leader.attachedDon).toHaveLength(1);
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     expect(f.state.players[1].hand).toHaveLength(4);
   });
   it.each([0, 1])(
@@ -632,7 +640,7 @@ describe("OPT805 Event activation lifecycle regressions", () => {
       };
       f.play("OP01-116");
       expect(
-        f.state.pendingEventActivationEvents?.some(
+        f.state.effectStack.find(frame => frame.eventActivation?.publication === "AFTER_STACK")?.eventActivation?.events.some(
           (e) => e.type === "EVENT_ACTIVATED_FROM_HAND"
         )
       ).toBe(true);
@@ -689,6 +697,7 @@ describe("OPT805 Event activation lifecycle regressions", () => {
       expect(f.state.pendingEventActivationEvents).toBeUndefined();
       await f.reload();
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
       expect(f.state.players[0].hand).toHaveLength(3);
       expect(f.state.pendingPrompt).toBeNull();
       expect(
@@ -744,6 +753,7 @@ describe("OPT805 persisted Counter Event ordering", () => {
       expect(f.state.players[0].hand).toHaveLength(attackerHand); // Usopp waits for the Counter.
       await f.reload();
       f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
       expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
       expect(f.state.players[0].hand).toHaveLength(attackerHand);
       await f.reload();
@@ -757,6 +767,7 @@ describe("OPT805 persisted Counter Event ordering", () => {
         expect(f.state.pendingEventActivationEvents).toBeUndefined();
         await f.reload();
         f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
         expect(f.state.players[1].hand).toHaveLength(4);
       }
       expect(f.state.pendingPrompt).toBeNull();
@@ -863,6 +874,7 @@ describe("OPT805 activation barrier edge cases", () => {
     expect(f.state.players[1].hand).toHaveLength(2);
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     expect(f.state.players[1].hand).toHaveLength(3);
     expect(f.state.pendingPrompt).toBeNull();
   });
@@ -879,6 +891,7 @@ describe("OPT805 activation barrier edge cases", () => {
       1
     );
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     f.select([]);
     expect(f.state.players[1].hand).toHaveLength(3);
     expect(f.state.pendingEventActivationEvents).toBeUndefined();
@@ -895,6 +908,7 @@ describe("OPT805 activation barrier edge cases", () => {
     expect(f.state.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
     await f.reload();
     f.choose("accept");
+      f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     expect(f.state.players[1].hand).toHaveLength(4);
     expect(
       f.state.eventLog.filter((e) => e.type === "EVENT_ACTIVATED_FROM_HAND")
@@ -1058,6 +1072,16 @@ it("persists authored Punk Gibson Counter rest and Mr.3's trigger across the int
     1
   );
   expect(f.state.pendingPrompt?.options.promptType).toBe("SELECT_TARGET");
+  if (process.env.OPT966_READER_ROOT) {
+    const pauses = await replayPauses(f, state => {
+      const options = state.pendingPrompt!.options;
+      if (options.promptType === "OPTIONAL_EFFECT") return { type: "PLAYER_CHOICE", choiceId: "accept" };
+      if (options.promptType !== "SELECT_TARGET") throw Error("Punk Gibson target expected");
+      return { type: "SELECT_TARGET", selectedInstanceIds: [options.validTargets.includes(defender.instanceId) ? defender.instanceId : host.instanceId] };
+    }, "opt966-counter-prefix-writer-corpus");
+    expect(pauses.map(state => state.pendingPrompt!.options.promptType)).toEqual(["SELECT_TARGET", "SELECT_TARGET", "OPTIONAL_EFFECT"]);
+    expect(pauses.map(state => state.pendingPrompt!.respondingPlayer)).toEqual([1, 1, 0]);
+  } else {
   await f.reload();
   f.select([defender.instanceId]);
   await f.reload();
@@ -1072,6 +1096,7 @@ it("persists authored Punk Gibson Counter rest and Mr.3's trigger across the int
   expect(f.state.players[0].hand).toHaveLength(handBefore);
   await f.reload();
   f.choose("accept");
+  }
   expect(
     f.state.players[0].characters.some((c) => c?.cardId === "PRB02-009")
   ).toBe(false);

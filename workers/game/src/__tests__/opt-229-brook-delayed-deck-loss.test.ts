@@ -134,7 +134,7 @@ describe("OPT-229: Brook Leader delayed deck-out loss", () => {
     players[0] = { ...players[0], life: [] };
     const state: GameState = { ...s1, players };
 
-    const result = checkDefeat(state, { damagedPlayerIndex: 0 }, cardDb);
+    const result = checkDefeat(state, { lethalDamage: [0] }, cardDb);
     expect(result).toBeTruthy();
     expect(result!.winner).toBe(1);
   });

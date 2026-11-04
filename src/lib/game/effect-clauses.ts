@@ -1,3 +1,5 @@
+import type { EffectBlockedReason } from "@shared/game-types";
+
 export interface EffectClause {
   text: string;
   blockId: string | null;
@@ -11,12 +13,13 @@ export interface EffectBlockView {
   triggerKeywords?: string[];
 }
 
-export const BLOCKED_REASON_COPY: Record<string, string> = {
+export const BLOCKED_REASON_COPY: Record<EffectBlockedReason, string> = {
   COST: "cost unavailable",
   CONDITION: "condition not met",
   PHASE: "not this phase",
   ONCE_PER_TURN: "used this turn",
   NO_TARGET: "no valid target",
+  PROHIBITED: "activation prohibited",
 };
 
 const TIMING_KEYWORDS: Record<string, readonly string[]> = {

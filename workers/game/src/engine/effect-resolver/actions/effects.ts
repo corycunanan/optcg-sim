@@ -1,3 +1,5 @@
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
+import { findCardInstance } from "../../state.js";
 /**
  * Action handlers: APPLY_PROHIBITION, APPLY_ONE_TIME_MODIFIER, SCHEDULE_ACTION,
  * SET_COST, WIN_GAME, NEGATE_TRIGGER_TYPE, EXTRA_TURN
@@ -14,6 +16,7 @@ import type {
 } from "../../effect-types.js";
 import type { CardData, GameState, PendingEvent } from "../../../types.js";
 import type { ActionResult } from "../types.js";
+import { terminateGame } from "../../terminal.js";
 import {
   resolveAmount,
   computeExpiry,
@@ -120,11 +123,21 @@ export function executeScheduleAction(
   sourceCardInstanceId: string,
   controller: 0 | 1,
   _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  resultRefs: Map<string, EffectResult>,
 ): ActionResult {
   const events: PendingEvent[] = [];
   const params = getActionParams(action, "SCHEDULE_ACTION");
 
+  // Loaded10 must preserve future work on rollback; ordinary8/9 remains
+  // metadata-free until the scheduling writer's producer boundaries activate10.
+  const provenance = resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF);
+  const identity = (state.schemaVersion === 10 || state.schemaVersion === 11) && provenance?.sourceIdentity?.instanceId === sourceCardInstanceId
+    ? provenance.sourceIdentity : undefined;
+  const reference = provenance?.sourceCardSnapshot;
+  const candidate = reference?.instanceId === sourceCardInstanceId ? reference : findCardInstance(state, sourceCardInstanceId);
+  const source = (state.schemaVersion === 10 || state.schemaVersion === 11) && candidate && (!identity ||
+    candidate.cardId === identity.cardId && candidate.controller === identity.controller)
+    ? candidate : undefined;
   const allocated = allocateEngineId(state, "scheduled-action");
   const entry: RuntimeScheduledAction = {
     id: allocated.id,
@@ -133,6 +146,8 @@ export function executeScheduleAction(
     boundToInstanceId: params.bound_to ?? null,
     sourceEffectId: sourceCardInstanceId,
     controller,
+    ...(source ? { sourceCardSnapshot: structuredClone(source) } : {}),
+    ...(identity ? { sourceIdentity: { ...identity } } : {}),
   };
 
   return {
@@ -244,12 +259,11 @@ export function executeWinGame(
   _cardDb: Map<string, CardData>,
   _resultRefs: Map<string, EffectResult>,
 ): ActionResult {
-  const events: PendingEvent[] = [];
-  events.push({ type: "GAME_OVER", playerIndex: controller, payload: { reason: "card_effect" } });
-
+  // Card text over rules (1-3-1): the controller wins now. The common
+  // terminal writer ends play, so no later instruction runs.
   return {
-    state: { ...state, status: "FINISHED", winner: controller },
-    events,
+    state: terminateGame(state, { kind: "WIN_GAME", winner: controller }, controller),
+    events: [],
     succeeded: true,
   };
 }
@@ -295,6 +309,9 @@ export function executeNegateTriggerType(
     // affected player stored in `controller`.
     expiresAt: computeProhibitionExpiry(duration, state, controller),
     controller: targetController,
+    // OPT-924: the caster owns the effect; its End Phase expiry runs in the
+    // caster's 6-6-1-2 step, not the affected player's.
+    ownerController: controller,
     appliesTo: [],
     usesRemaining: null,
   };

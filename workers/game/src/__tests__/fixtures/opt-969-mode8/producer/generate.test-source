@@ -1,0 +1,213 @@
+/** Reproduce only with explicit output directory and immutable producer root. */
+import { expect, it } from "vitest";
+import { writeFileSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { runtime, memory, save, command } from "./native7-producer-support.js";
+import type { Cost } from "../engine/effect-types.js";
+import type { GameAction, GameState } from "../types.js";
+
+it("captures immutable forward producer boundaries", async () => {
+  const root = process.env.OPT969_MODE8_PRODUCER_ROOT!;
+  const output = process.env.OPT969_MODE8_CORPUS_OUT!;
+  if (!root || !output) throw Error("explicit producer/output required");
+  const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  expect(sha).toBe("d9a92467049c1c36b195f2808d867a7e7398f337");
+  const { rig, synSchema } = await import(`${root}/workers/game/src/__tests__/opt-960-rig.ts`) as typeof import("./opt-960-rig.js");
+  const rt = await runtime(root);
+  const ids: string[] = [];
+  const life: Cost = { type: "LIFE_TO_HAND", amount: 1 };
+  const trash: Cost = { type: "TRASH_FROM_HAND", amount: 1 };
+  type Setup = { id: string; costs: Cost[]; face?: "UP" | "DOWN"; decline?: boolean; don?: boolean; restCard?: boolean };
+  const setups: Setup[] = [
+    { id: "life-fixed-accept", costs: [life, trash] },
+    { id: "life-fixed-decline", costs: [life, trash], decline: true },
+    { id: "life-bottom-accept", costs: [{ ...life, position: "BOTTOM" }, trash] },
+    { id: "life-top-bottom", costs: [{ ...life, position: "TOP_OR_BOTTOM" }, trash] },
+    { id: "life-face-down", costs: [life, trash], face: "DOWN" },
+    { id: "life-choice", costs: [{ type: "CHOICE", options: [[life, trash], [{ type: "REST_DON", amount: 1 }]] }] },
+    { id: "life-choose-one", costs: [{ type: "CHOOSE_ONE_COST", options: [life, { ...life, position: "BOTTOM" }] }, trash] },
+    { id: "life-any-rest", costs: [{ type: "REST_DON", amount: "ANY_NUMBER" }, life, trash] },
+    { id: "life-earlier-selection", costs: [{ type: "REST_CARDS", amount: 1 }, life, trash], restCard: true },
+    { id: "don-optional", costs: [{ type: "DON_MINUS", amount: 1 }, { type: "REST_DON", amount: 1 }], don: true },
+    { id: "don-later-selection", costs: [{ type: "DON_MINUS", amount: 1 }, { type: "REST_DON", amount: 1 }, trash], don: true },
+    { id: "don-variable", costs: [{ type: "VARIABLE_DON_RETURN" }, { type: "REST_DON", amount: 1 }], don: true },
+    { id: "don-choice", costs: [{ type: "CHOICE", options: [[{ type: "DON_MINUS", amount: 1 }, { type: "REST_DON", amount: 1 }], [{ type: "REST_DON", amount: 1 }]] }], don: true },
+    { id: "don-active-only", costs: [{ type: "DON_MINUS", amount: 1, filter: { is_active: true } }, trash] },
+    { id: "don-explicit-negative", costs: [{ type: "DON_MINUS", amount: -2 }, { type: "REST_DON", amount: 1 }] },
+    { id: "variable-explicit-negative", costs: [{ type: "VARIABLE_DON_RETURN", amount: -2 }, { type: "REST_DON", amount: 1 }] },
+    { id: "don-explicit-zero", costs: [{ type: "DON_MINUS", amount: 0 }, { type: "REST_DON", amount: 1 }] },
+    { id: "variable-explicit-zero", costs: [{ type: "VARIABLE_DON_RETURN", amount: 0 }, { type: "REST_DON", amount: 1 }] },
+    { id: "terminal-before-life", costs: [{ type: "MILL", amount: 5 }, life, trash] },
+  ];
+  const payloads: Record<string, string> = {};
+  function nextAction(state: GameState, decline = false): GameAction {
+    const prompt = state.pendingPrompt!.options;
+    if (prompt.promptType === "REVEAL_TRIGGER") return { type: "REVEAL_TRIGGER", reveal: true };
+    if (prompt.promptType === "OPTIONAL_EFFECT") return { type: "PLAYER_CHOICE", choiceId: decline ? "skip" : "accept" };
+    if (prompt.promptType === "PLAYER_CHOICE") {
+      if (prompt.donIdentityReturn) {
+        const attached = prompt.donIdentityReturn.groups.find(g => g.label.startsWith("Attached"));
+        const choice = attached && prompt.choices.find(c => c.id.includes(attached.donIds[0]));
+        return { type: "PLAYER_CHOICE", choiceId: (choice ?? prompt.choices.find(c => !c.disabled))!.id };
+      }
+      return { type: "PLAYER_CHOICE", choiceId: prompt.choices.find(c => !c.disabled)!.id };
+    }
+    if (prompt.promptType === "SELECT_TARGET") return { type: "SELECT_TARGET", selectedInstanceIds: prompt.validTargets.slice(0, prompt.countMin) };
+    throw Error(`unsupported capture prompt ${prompt.promptType}`);
+  }
+  async function record(id: string, r: ReturnType<typeof rig>, activation: GameAction, decline = false, warmup: GameAction[] = [], declineReplacement = false) {
+    const origin = await save(rt, r.state, r.db);
+    let loaded = (await memory(rt, origin).repo.load())!;
+    loaded.state = command(rt, loaded.state, loaded.cardDb, activation);
+    for (const action of warmup) {
+      expect(loaded.state.pendingPrompt, id).toBeNull();
+      loaded.state = command(rt, loaded.state, loaded.cardDb, action, loaded.state.turn.activePlayerIndex === 0 ? 1 : 0);
+    }
+    expect(loaded.state.pendingPrompt, id).not.toBeNull();
+    const initial = await save(rt, loaded.state, loaded.cardDb);
+    loaded = (await memory(rt, initial).repo.load())!;
+    const steps: { action: GameAction; stored: Record<string, unknown> }[] = [];
+    let count = 0;
+    while (loaded.state.pendingPrompt) {
+      expect(count++, id).toBeLessThan(12);
+      const action = nextAction(loaded.state, (decline && count === 1) || (declineReplacement && count === 3));
+      loaded.state = command(rt, loaded.state, loaded.cardDb, action);
+      const stored = await save(rt, loaded.state, loaded.cardDb);
+      steps.push({ action, stored });
+      loaded = (await memory(rt, stored).repo.load())!;
+    }
+    expect(loaded.state.effectStack, id).toHaveLength(0);
+    const bytes = JSON.stringify({ id, producer: sha, inputSchemaVersion: r.state.schemaVersion, inputCostSemanticsVersion: r.state.costSemanticsVersion, origin, activation, warmup, initial, steps }, null, 2) + "\n";
+    writeFileSync(`${output}/${id}.json`, bytes); ids.push(id);
+    payloads[`${id}.json`] = createHash("sha256").update(bytes).digest("hex");
+  }
+  for (const setup of setups) {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.leader(0, "ST13-003"); r.life(0, 1); r.state.players[0].life[0].face = setup.face ?? "UP";
+    const p = r.state.players[0];
+    if (setup.don) {
+      const [active, donor, ...reserve] = p.donCostArea; p.donCostArea = [active]; p.donDeck.push(...reserve);
+      p.leader.attachedDon = [{ ...donor, attachedTo: p.leader.instanceId }];
+    }
+    if (setup.id === "don-later-selection" || setup.id === "don-active-only") r.put("capture-hand", 0, "HAND");
+    if (setup.restCard) r.put("capture-rest", 0, "CHARACTER");
+    const source = r.put(`capture-${setup.id}`, 0, "CHARACTER", { schema: synSchema(`capture-${setup.id}`, [{
+      id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { optional: true },
+      costs: setup.costs, actions: [{ type: "DRAW", params: { amount: 1 } }],
+    }]) });
+    await record(setup.id, r, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" }, setup.decline);
+  }
+  {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.leader(0, "ST13-003"); r.life(0, 1); r.state.players[0].life[0].face = "UP";
+    const p = r.state.players[0]; const [active, donor, ...reserve] = p.donCostArea;
+    p.donCostArea = [active]; p.donDeck.push(...reserve); p.leader.attachedDon = [{ ...donor, attachedTo: p.leader.instanceId }];
+    r.put("fresh-watcher", 0, "CHARACTER", { schema: synSchema("fresh-watcher", [{
+      id: "fresh-watch", category: "auto", trigger: { event: "DON_RETURNED_TO_DON_DECK" }, flags: { optional: true },
+      costs: [life, trash], actions: [{ type: "DRAW", params: { amount: 1 } }],
+    }]) });
+    const source = r.put("offered-don", 0, "CHARACTER", { schema: synSchema("offered-don", [{
+      id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { optional: true },
+      costs: [{ type: "DON_MINUS", amount: 1 }, { type: "REST_DON", amount: 1 }],
+      actions: [{ type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: 1000 }, duration: { type: "THIS_TURN" } }],
+    }]) });
+    await record("fresh-don-life-watcher", r, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
+  }
+  for (const cardId of ["OP12-070", "OP15-069"]) {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 }); r.deck(0, 5); r.deck(1, 5);
+    r.put(cardId, 0, "CHARACTER");
+    const p = r.state.players[0]; const [donor, active, ...reserve] = p.donCostArea; p.donCostArea = [active]; p.donDeck.push(...reserve);
+    p.leader.attachedDon = [{ ...donor, attachedTo: p.leader.instanceId }];
+    const source = r.put(`remove-${cardId}`, 1, "CHARACTER", { schema: synSchema(`remove-${cardId}`, [{
+      id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" },
+      actions: [{ type: "RETURN_TO_HAND", target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } } }],
+    }]) });
+    r.state.turn.activePlayerIndex = 1;
+    await record(`${cardId}-saved-field-domain`, r, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
+  }
+  {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.life(0, 1);
+    const source = r.put("EB02-061", 0, "CHARACTER");
+    const p = r.state.players[0]; const [a, b, donor, ...reserve] = p.donCostArea;
+    p.donCostArea = [a, b]; p.donDeck.push(...reserve);
+    p.leader.attachedDon = [{ ...donor, attachedTo: p.leader.instanceId }];
+    await record("EB02-061-authored-active-trigger", r, { type: "DECLARE_ATTACK", attackerInstanceId: source.instanceId, targetInstanceId: r.state.players[1].leader.instanceId });
+  }
+  {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.leader(0, "OP01-060");
+    const target = r.put("OP17-043", 0, "CHARACTER");
+    const p = r.state.players[0]; const [active, donor, ...reserve] = p.donCostArea;
+    p.donCostArea = [active]; p.donDeck.push(...reserve);
+    p.leader.attachedDon = [{ ...donor, attachedTo: p.leader.instanceId }];
+    const source = r.put("replacement-don-cost-owner", 0, "CHARACTER", { schema: synSchema("replacement-don-cost-owner", [{
+      id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { optional: true },
+      costs: [{ type: "DON_MINUS", amount: 1 }, { type: "RETURN_OWN_CHARACTER_TO_HAND", amount: 1, filter: { exclude_self: true } }],
+      actions: [{ type: "DRAW", params: { amount: 1 } }],
+    }]) });
+    // Saved Ganzui parameters use a supported DON substitute instead of its
+    // printed hand cost: synthetic replacement→DON→retained COST ownership.
+    const effect = r.state.activeEffects.find(e => e.sourceCardInstanceId === target.instanceId)!;
+    const modifier = effect.modifiers.find(m => m.type === "REPLACEMENT_EFFECT")!;
+    modifier.params = { ...modifier.params, replacement_actions: [{ type: "RETURN_DON_TO_DECK", params: { amount: 1 } }] } as typeof modifier.params;
+    await record("synthetic-replacement-don-cost-owner", r, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
+  }
+  for (const family of ["phase", "scheduled", "end-of-battle", "effect-damage"] as const) {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.leader(0, "ST13-003"); r.life(0, 1); r.life(1, 1);
+    r.state.players[0].life[0].face = "UP";
+    const trigger = family === "phase" ? { keyword: "END_OF_YOUR_TURN" as const }
+      : family === "end-of-battle" ? { event: "END_OF_BATTLE" as const }
+        : family === "effect-damage" ? { keyword: "TRIGGER" as const }
+          : { event: "DON_RETURNED_TO_DON_DECK" as const };
+    r.put(`graph-${family}-watch`, 0, family === "effect-damage" ? "LIFE" : "CHARACTER", {
+      ...(family === "effect-damage" ? { data: { keywords: { ...r.db.get("CHAR-VANILLA")!.keywords, trigger: true } } } : {}),
+      schema: synSchema(`graph-${family}-watch`, [{ id: "graph-watch", category: "auto", trigger, flags: { optional: true }, costs: [life, trash], actions: [{ type: "DRAW", params: { amount: 1 } }] }]),
+    });
+    if (family === "phase") await record("graph-phase", r, { type: "ADVANCE_PHASE" });
+    if (family === "end-of-battle") await record("graph-end-of-battle", r, { type: "DECLARE_ATTACK", attackerInstanceId: r.state.players[0].leader.instanceId, targetInstanceId: r.state.players[1].leader.instanceId }, false, [{ type: "PASS" }, { type: "PASS" }]);
+    if (family === "effect-damage") {
+      const source = r.put("damage-start", 0, "CHARACTER", { schema: synSchema("damage-start", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SELF_TAKE_DAMAGE", params: { amount: 1 } }] }]) });
+      await record("graph-effect-damage-trigger", r, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
+    }
+    if (family === "scheduled") {
+      const source = r.put("schedule-start", 0, "CHARACTER", { schema: synSchema("schedule-start", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "SCHEDULE_ACTION", params: { timing: "END_OF_THIS_TURN", action: { type: "RETURN_DON_TO_DECK", params: { amount: 1 } } } }] }]) });
+      r.state = command(rt, r.state, r.db, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
+      await record("graph-scheduled-don-watcher", r, { type: "ADVANCE_PHASE" });
+    }
+  }
+  for (const declineReplacement of [false, true]) {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.leader(0, "OP01-060");
+    const source = r.put("ST22-005", 0, "CHARACTER", { state: "RESTED" });
+    r.put("OP17-043", 0, "CHARACTER");
+    for (let i = 0; i < 3; i++) r.put(`oden-hand-${i}`, 0, "HAND");
+    await record(`authored-oden-ganzui-${declineReplacement ? "decline" : "accept"}`, r, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate_set_active" }, false, [], declineReplacement);
+  }
+  {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.life(1, 1);
+    const source = r.put("OP05-087", 0, "CHARACTER"); r.put("OP04-082", 0, "CHARACTER");
+    r.put("hakuba-opponent", 1, "CHARACTER", { data: { cost: 6 } });
+    const p = r.state.players[0]; const donor = p.donCostArea.shift()!;
+    source.attachedDon = [{ ...donor, attachedTo: source.instanceId }];
+    await record("authored-hakuba-kyros-replaced-ko", r, { type: "DECLARE_ATTACK", attackerInstanceId: source.instanceId, targetInstanceId: r.state.players[1].leader.instanceId });
+  }
+  for (const domain of ["attached", "mixed"] as const) {
+    const r = rig(); expect(r.state).toMatchObject({ schemaVersion: 8, costSemanticsVersion: 8 });
+    r.deck(0, 5); r.deck(1, 5); r.put("EB04-030", 0, "CHARACTER");
+    const p = r.state.players[0]; const [donor, active, ...reserve] = p.donCostArea;
+    p.donCostArea = domain === "mixed" ? [active] : [];
+    p.donDeck.push(...reserve, ...(domain === "mixed" ? [] : [active]), ...(domain === "insufficient" ? [donor] : []));
+    p.leader.attachedDon = domain === "insufficient" ? [] : [{ ...donor, attachedTo: p.leader.instanceId }];
+    const source = r.put(`kaido-remove-${domain}`, 1, "CHARACTER", { schema: synSchema(`kaido-remove-${domain}`, [{
+      id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, actions: [{ type: "KO", target: { type: "CHARACTER", controller: "OPPONENT", count: { exact: 1 } } }],
+    }]) });
+    r.state.turn.activePlayerIndex = 1;
+    await record(`authored-kaido-${domain}`, r, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" });
+  }
+  const generator = readFileSync(new URL(import.meta.url), "utf8");
+  writeFileSync(`${output}/manifest.json`, JSON.stringify({ producer: sha, producerSourceTrees: Object.fromEntries(["workers/game/src/engine", "workers/game/src/session", "shared"].map(path => [path, execFileSync("git", ["rev-parse", `HEAD:${path}`], { cwd: root, encoding: "utf8" }).trim()])), scenarios: ids, payloads, generatorSha256: createHash("sha256").update(generator).digest("hex") }, null, 2) + "\n");
+});

@@ -24,13 +24,11 @@ import { describe, it, expect } from "vitest";
 import type { CardData, DonInstance, GameState, PlayerState } from "../types.js";
 import type { Cost, EffectSchema } from "../engine/effect-types.js";
 import { createTestCardDb, createBattleReadyState, CARDS } from "./helpers.js";
-import {
-  canOfferTrigger,
-  continueEffectDamageSequence,
-  executeRevealTrigger,
-} from "../engine/battle.js";
+import { canOfferTrigger } from "../engine/battle.js";
+import { continueEffectDamageSequence } from "../engine/effect-damage.js";
 import { payCosts, isCostPayable } from "../engine/effect-resolver/cost-handler.js";
 import { getEffectivePower } from "../engine/modifiers.js";
+import { effectTriggerWindow, revealTrigger } from "./trigger-window-helpers.js";
 
 function withPlayer(state: GameState, idx: 0 | 1, patch: Partial<PlayerState>): GameState {
   const newPlayers = [...state.players] as [PlayerState, PlayerState];
@@ -139,9 +137,10 @@ describe("OPT-440 (a): 0 cost-area DON!! + attached DON!! — offered AND payabl
     const handBefore = state.players[0].hand.length;
 
     const damage = continueEffectDamageSequence(state, cardDb, 0, 1, "damage-source", 1);
-    expect(damage.state.turn.pendingTriggerFromEffect?.lifeCard.instanceId).toBe("life-donminus");
+    expect(effectTriggerWindow(damage.state)?.lifeCard.instanceId).toBe("life-donminus");
 
-    const reveal = executeRevealTrigger(damage.state, true, cardDb);
+    const reveal = revealTrigger(damage.state, true, cardDb);
+    expect(reveal.valid).toBe(true);
     const p0 = reveal.state.players[0];
     // Life card trashed (trigger activated), NOT lost for nothing:
     expect(p0.trash.some((c) => c.instanceId === "life-donminus")).toBe(false);

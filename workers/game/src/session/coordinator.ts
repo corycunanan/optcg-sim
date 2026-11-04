@@ -1,9 +1,15 @@
+import { promoteGameStateForWriter } from "./persistence.js";
+import { hasNativeCostSemantics } from "../engine/native-cost-semantics.js";
+import {
+  publishCostOwnerRoots,
+  costRootMatches,
+} from "../engine/effect-resolver/cost/transaction.js";
+import { drainPendingWork } from "../engine/pending-work-drain.js";
+import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js";
 import type {
   CardData,
-  CardInstance,
   GameAction,
   GameState,
-  LifeCard,
   PendingPromptState,
   PromptType,
 } from "../types.js";
@@ -150,13 +156,41 @@ export class SessionCoordinator {
 
     const reason = validatePromptPayload(prompt, action);
     if (reason) return { kind: "reject", reason, state };
-    if (action.type === "REVEAL_TRIGGER") {
-      return { kind: "pipeline", state: { ...state, pendingPrompt: null } };
-    }
+    // OPT-963: a REVEAL_TRIGGER prompt names the damage frame that owns it and
+    // is answered through the prompt lifecycle like every other prompt.
     return { kind: "resume", state };
   }
 
   executeAction(
+    initialState: GameState,
+    initialUndoHistory: readonly GameState[],
+    playerIndex: 0 | 1,
+    action: GameAction,
+    cardDb: Map<string, CardData>
+  ): SessionActionResult {
+    // Loaded/new-game sessions are already v8. Typed historical callers use the
+    // same validated ingress; a rejected action must retain its original bytes.
+    let state: GameState;
+    let history: readonly GameState[];
+    try {
+      const promote = promoteGameStateForWriter;
+      state = promote(initialState, "state");
+      history = initialUndoHistory.map((value, index) => promote(value, `undoHistory[${index}]`));
+    } catch (error) {
+      // Failed ingress has not proved any retention or normalization safe.
+      // Return the original history entries even when an invalid oldest input
+      // would otherwise fall outside the normal undo window.
+      return { kind: "reject", state: initialState, undoHistory: [...initialUndoHistory],
+        reason: error instanceof Error ? error.message : "Invalid game state" };
+    }
+    const result = this.executeWriterAction(state, history, playerIndex, action, cardDb);
+    return result.kind === "reject"
+      ? { ...result, state: initialState, undoHistory: result.undoHistory.length === initialUndoHistory.length
+          ? [...initialUndoHistory] : boundUndoHistory(initialUndoHistory) }
+      : result;
+  }
+
+  private executeWriterAction(
     initialState: GameState,
     initialUndoHistory: readonly GameState[],
     playerIndex: 0 | 1,
@@ -223,18 +257,11 @@ export class SessionCoordinator {
 
     const stateBeforePipeline = promptRoute.state;
     if (action.type !== "CONCEDE") {
-      let expectedPlayer: 0 | 1 = INACTIVE_PLAYER_ACTIONS.has(action.type)
+      const expectedPlayer: 0 | 1 = INACTIVE_PLAYER_ACTIONS.has(action.type)
         ? stateBeforePipeline.turn.activePlayerIndex === 0
           ? 1
           : 0
         : stateBeforePipeline.turn.activePlayerIndex;
-      if (
-        action.type === "REVEAL_TRIGGER" &&
-        stateBeforePipeline.turn.pendingTriggerFromEffect
-      ) {
-        expectedPlayer =
-          stateBeforePipeline.turn.pendingTriggerFromEffect.damagedPlayerIndex;
-      }
       if (playerIndex !== expectedPlayer) {
         return {
           kind: "reject",
@@ -258,7 +285,7 @@ export class SessionCoordinator {
       return {
         kind: "reject",
         state: stateBeforePipeline,
-        undoHistory: [],
+        undoHistory: [...initialUndoHistory],
         reason: pipeline.error ?? "Invalid action",
       };
     }
@@ -273,6 +300,12 @@ export class SessionCoordinator {
     if (state.pendingPrompt || state.effectStack.length > 0)
       nextUndoHistory = [];
     state = this.surfaceRevealTrigger(state, cardDb);
+    // Final session cleanup may append history after pipeline publication.
+    const priorIds = new Set(stateBeforePipeline.effectStack.map(frame => frame.id));
+    const published = publishCostOwnerRoots(state, frame => !priorIds.has(frame.id));
+    if (!published) return { kind: "reject", state: stateBeforePipeline,
+      undoHistory: [...initialUndoHistory], reason: "Ambiguous cost history publication" };
+    state = published;
     if (pipeline.gameOver) nextUndoHistory = [];
     return {
       kind: "applied",
@@ -308,53 +341,25 @@ export class SessionCoordinator {
     return current;
   }
 
+  /**
+   * OPT-963: a damage frame at its Trigger window owns its REVEAL_TRIGGER
+   * prompt; the engine attaches it when the frame pauses or when the frames
+   * above it unwind. This keeps the session's call sites and reads only the
+   * top frame, never a turn or battle side channel.
+   */
   surfaceRevealTrigger(
     state: GameState,
     cardDb: Map<string, CardData>
   ): GameState {
-    if (state.pendingPrompt || state.effectStack.length > 0) return state;
-    const { battleSubPhase, battle, pendingTriggerFromEffect } = state.turn;
-    let lifeCard: LifeCard | undefined;
-    let respondingPlayer: 0 | 1 | undefined;
-
-    if (battleSubPhase === "DAMAGE_STEP" && battle) {
-      lifeCard = battle.pendingTriggerLifeCard;
-      if (lifeCard)
-        respondingPlayer = state.turn.activePlayerIndex === 0 ? 1 : 0;
-    } else if (pendingTriggerFromEffect) {
-      lifeCard = pendingTriggerFromEffect.lifeCard;
-      respondingPlayer = pendingTriggerFromEffect.damagedPlayerIndex;
-    }
-    if (!lifeCard || respondingPlayer === undefined) return state;
-
-    const cardData = cardDb.get(lifeCard.cardId);
-    const promptCard: CardInstance = {
-      instanceId: lifeCard.instanceId,
-      cardId: lifeCard.cardId,
-      zone: "LIFE",
-      state: "ACTIVE",
-      attachedDon: [],
-      turnPlayed: null,
-      controller: respondingPlayer,
-      owner: respondingPlayer,
-    };
-    return {
-      ...state,
-      pendingPrompt: {
-        options: {
-          promptType: "REVEAL_TRIGGER",
-          cards: [promptCard],
-          effectDescription:
-            cardData?.triggerText ??
-            cardData?.effectText ??
-            "You may reveal this Trigger card to activate its effect",
-          optional: false,
-          timeoutMs: 30_000,
-        },
-        respondingPlayer,
-        resumeContext: null,
-      },
-    };
+    if (state.pendingPrompt) return state;
+    const result = drainPendingWork(
+      { state, events: [], resolved: true },
+      cardDb,
+      resolverExecutionServices
+    );
+    return result.pendingPrompt
+      ? { ...result.state, pendingPrompt: result.pendingPrompt }
+      : result.state;
   }
 
   setPlayerPresence(
@@ -368,7 +373,42 @@ export class SessionCoordinator {
       connected.players[1],
     ];
     players[playerIndex] = { ...players[playerIndex], ...update };
-    return { ...connected, players };
+    const published = { ...connected, players };
+    // Presence is a sanctioned exact transport delta, including under a cost
+    // replacement child. Never bless an unrelated gameplay divergence.
+    if (
+      !hasNativeCostSemantics(state) ||
+      state.effectStack.some(
+        (frame) =>
+          frame.costExpectedRoot &&
+          !costRootMatches(state, frame.costExpectedRoot)
+      )
+    )
+      return published;
+    const presence = {
+      connected: update.connected,
+      awayReason: update.awayReason,
+      rejoinDeadlineAt: update.rejoinDeadlineAt,
+    };
+    return {
+      ...published,
+      effectStack: published.effectStack.map((frame) => {
+        if (!frame.costExpectedRoot || !frame.costTransactionState)
+          return frame;
+        const patch = (
+          snapshot: NonNullable<typeof frame.costExpectedRoot>
+        ) => {
+          const patched: GameState["players"] = [...snapshot.players];
+          patched[playerIndex] = { ...patched[playerIndex], ...presence };
+          return { ...snapshot, players: patched };
+        };
+        return {
+          ...frame,
+          costExpectedRoot: patch(frame.costExpectedRoot),
+          costTransactionState: patch(frame.costTransactionState),
+        };
+      }),
+    };
   }
 
   canUndo(

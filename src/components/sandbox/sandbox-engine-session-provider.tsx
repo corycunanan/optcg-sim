@@ -35,6 +35,8 @@ import type {
   PartialPlayerState,
 } from "@/lib/sandbox/scenarios/types";
 import { runPipeline } from "@engine/engine/pipeline";
+import { surfaceDamageFramePrompt } from "@engine/engine/damage-frames";
+import { resumePromptLifecycle } from "@engine/session/prompt-lifecycle";
 import { reconcileExecutionContextIdCounter } from "@engine/engine/execution-context";
 import { createSandboxExecutionContext } from "@/lib/sandbox/execution-context";
 import type {
@@ -89,6 +91,44 @@ export function hydrateToGameState(partial: PartialGameState): GameState {
     winner: null,
     winReason: null,
   });
+}
+
+const SANDBOX_LIFECYCLE_SERVICES = {
+  drainPregame: (state: GameState) => state,
+  advanceStartOfTurn: (state: GameState) => state,
+};
+
+/**
+ * One sandbox action, routed as GameSession does (OPT-963): a reply to the
+ * pending prompt (a Trigger window's Reveal/Skip, a target selection, a
+ * choice) goes through the prompt lifecycle; everything else through the
+ * pipeline, which rejects prompt replies. A rejected reply leaves the state
+ * as it was. The next Trigger window's prompt is surfaced afterwards, as the
+ * coordinator does after every action.
+ */
+export function applySandboxAction(
+  gameState: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  myIndex: 0 | 1
+): GameState {
+  if (gameState.pendingPrompt && action.type !== "CONCEDE") {
+    // A stale reply names another prompt (the coordinator's own check).
+    const expected = gameState.pendingPrompt.promptId;
+    const given = "promptId" in action ? action.promptId : undefined;
+    if (expected && given !== expected) return gameState;
+    const resumed = resumePromptLifecycle(
+      gameState,
+      action,
+      cardDb,
+      SANDBOX_LIFECYCLE_SERVICES
+    );
+    return resumed.responseRejected
+      ? gameState
+      : surfaceDamageFramePrompt(resumed.state, cardDb);
+  }
+  const next = runPipeline(gameState, action, cardDb, myIndex);
+  return next.valid ? surfaceDamageFramePrompt(next.state, cardDb) : next.state;
 }
 
 export function withSandboxPromptIdentity(
@@ -178,12 +218,12 @@ export function useSandboxEngineSession(
   const dispatch = useCallback(
     (action: GameAction) => {
       setEngineState((previous) => {
-        const next = runPipeline(
+        const next = applySandboxAction(
           previous.gameState,
           action,
           cardDb,
           myIndex
-        ).state;
+        );
         return withSandboxPromptIdentity(next, previous.promptSequence);
       });
     },

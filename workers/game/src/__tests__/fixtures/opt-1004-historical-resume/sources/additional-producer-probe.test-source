@@ -1,0 +1,28 @@
+import { expect, it } from '/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/optcg-sim/node_modules/vitest/dist/index.js';
+import { writeFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
+import { rig, synSchema } from './opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/opt-960-rig.ts';
+import { GameSession } from './opt1004-historical67cbb-diagnostic/workers/game/src/GameSession.ts';
+import { SessionRepository } from './opt1004-historical67cbb-diagnostic/workers/game/src/session/persistence.ts';
+import { MemorySessionStorage } from './opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/fixtures/opt-940-synthetic-states.ts';
+const directory = '/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/optcg-sim/workers/game/src/__tests__/fixtures/opt-1004-historical-resume/';
+const number = (ref: string) => ({ type: 'CHOOSE_VALUE' as const, result_ref: ref, params: { domain: 'NUMBER' as const, constraints: { min: 0, max: 1 } } });
+const draw = (ref: string) => ({ type: 'DRAW' as const, params: { amount: { type: 'CHOSEN_VALUE' as const, ref } } });
+const schedule = { type: 'SCHEDULE_ACTION' as const, params: { timing: 'END_OF_THIS_TURN' as const, action: { type: 'SET_DON_ACTIVE' as const, params: { amount: 1 } } } };
+it.each(['cost-next', 'action-next', 'action-terminal'])('captures actual67cbb %s storage', async name => {
+ const r=rig(); r.state.schemaVersion=8; r.state.costSemanticsVersion=8;
+ r.deck(0,name==='action-terminal'?1:10);
+ const costs=name==='cost-next'?[{type:'TRASH_SELF' as const},{type:'TRASH_FROM_HAND' as const,amount:1},{type:'TRASH_FROM_HAND' as const,amount:1}]:[{type:'TRASH_SELF' as const}];
+ const actions=name==='cost-next'?[schedule]:name==='action-next'?[number('first'),draw('first'),number('second'),draw('second'),schedule]:[number('first'),schedule,draw('first')];
+ const source=r.put('SYN-old-'+name,0,'HAND',{data:{cost:0},schema:synSchema('SYN-old-'+name,[{id:'onplay',category:'auto',trigger:{keyword:'ON_PLAY'},costs,actions}])});
+ r.put('CHAR-VANILLA',0,'HAND');r.put('CHAR-RUSH',0,'HAND');r.put('SYN-old-payment',0,'HAND');
+ const storage=new MemorySessionStorage();const options={nextJsUrl:'https://app.example.test',workerSecret:'test'};
+ await new SessionRepository(storage,options).save({state:r.state,cardDb:r.db,undoHistory:[],mode:'PVP',pregameMode:'PRIORITY_ROLL',testPriorityRolls:null});
+ const loaded=(await new SessionRepository(storage,options).load())!;
+ const session=new GameSession({storage,getWebSockets:()=>[],getTags:()=>[],acceptWebSocket() {}} as any,{GAME_WORKER_SECRET:'test',NEXTJS_URL:options.nextJsUrl} as any) as any;
+ session.gameState=loaded.state;session.cardDb=loaded.cardDb;session.undoHistory=loaded.undoHistory;
+ const messages:any[]=[];await session.handleAction({send(v:string){messages.push(JSON.parse(v));},close(){}},0,{type:'PLAY_CARD',cardInstanceId:source.instanceId});
+ expect(messages.filter(m=>m.type==='action:rejected')).toEqual([]);
+ const after=(await new SessionRepository(storage,options).load())!;expect(after.state.pendingPrompt).not.toBeNull();expect(after.state.schemaVersion).toBe(8);
+ writeFileSync(directory+name+'-mode8.json.gz',gzipSync(JSON.stringify(Object.fromEntries(storage.data))));
+});

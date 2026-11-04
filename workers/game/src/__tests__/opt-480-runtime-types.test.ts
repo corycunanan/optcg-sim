@@ -39,8 +39,10 @@ void actionUnionIsExhaustive;
 
 function storedFixture() {
   const cardDb = createTestCardDb();
+  // This source fixture deliberately exercises the historical v1 boundary.
+  const { schemaVersion: _schemaVersion, costSemanticsVersion: _costSemanticsVersion, ...state } = createBattleReadyState(cardDb);
   return {
-    state: createBattleReadyState(cardDb),
+    state,
     cardDb: Object.fromEntries(cardDb),
     mode: "PVP",
     testPriorityRolls: null,
@@ -83,6 +85,7 @@ describe("OPT-480 runtime type boundaries", () => {
     }));
     stored.state.effectStack = [{
       id: "ordering-frame",
+      kind: "TRIGGER_ORDER",
       sourceCardInstanceId: "elder-1",
       controller: 0,
       effectBlock: triggers[1].effectBlock,
@@ -207,7 +210,7 @@ describe("OPT-480 runtime type boundaries", () => {
     };
 
     expect(() => parseStoredSession(malformed)).toThrow(
-      "unknown scheduled action variant"
+      "contains an unknown scheduled action variant"
     );
   });
 
@@ -418,3 +421,43 @@ function readTypeScriptTree(
 function stripTypeScriptComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 }
+
+it("OPT-967 conditional step notification uses the existing frame/event shape in live and undo", async () => {
+  const { createEffectExecutionScope } =
+    await import("../engine/trigger-executor.js");
+  const { toPersistedGameState } =
+    await import("../session/game-state-schema.js");
+  const stored = storedFixture();
+  const state = createEffectExecutionScope(
+    stored.state,
+    stored.state.players[0].leader.instanceId,
+    0
+  );
+  const before = state.effectStack[0];
+  const frame = {
+    ...before,
+    accumulatedEvents: [
+      {
+        type: "PHASE_CHANGED" as const,
+        playerIndex: 0 as const,
+        payload: { from: "ATTACK_STEP", to: "BLOCK_STEP" },
+      },
+    ],
+  };
+  expect(Object.keys(frame)).toEqual(Object.keys(before));
+  state.effectStack = [frame];
+  const raw = JSON.parse(JSON.stringify(toPersistedGameState(state)));
+  const parsed = parseStoredSession({
+    ...stored,
+    state: raw,
+    undoHistory: [raw],
+  });
+  for (const loaded of [parsed.state, parsed.undoHistory[0]]) {
+    expect(loaded.effectStack[0].accumulatedEvents).toEqual(
+      frame.accumulatedEvents
+    );
+    expect(
+      loaded.effectStack[0].accumulatedEvents[0].propagation
+    ).toBeUndefined();
+  }
+});

@@ -1,0 +1,124 @@
+OPT-966 / OPT-944 independent handler and advancement inventory
+Pinned commit: 077808aa9e82dfcd6c9dbe47b8f3e2cdc302d73e
+Prepared read-only. No product edits or test execution for this inventory.
+
+MEASURED SCOPE
+resume/*.ts: 4,880 lines in seven files. resume-core.ts:739; resume.ts facade:63. Core+seven=5,619; including facade=5,682. This is the comparable replacement for the approximate 6k-line baseline.
+The older approximate 37 calls is not one uniquely defined measure. Literal AST call counts: processRemainingTriggers34 + processPlayerTriggerGroup5 + processTriggerQueuePipeline1 + reenterBatchResume5 =45 scheduling/reentry calls. Include processRemainingTriggersCore facade delegation =>46. Resume-family-only processRemainingTriggers=31 (batch3, choice12, cost10, target2, core4), plus reenterBatchResume3 =>34. These counts exclude declarations/interface signatures/comments.
+Pinned PR7 inventory documented 34/5/1/4; new reader adds one direct batch reentry in trigger-executor, producing34/5/1/5. Trigger scans now20 versus documented baseline18, due two reader executor scans.
+
+HANDLER/HELPER DEFINITIONS (every named function in resume files; declarations counted separately from call sites)
+batch.ts (404 lines): reenterBatchResume:43, recordBatchResult:274, batchProgressTargetIds:294, isResumeContext:305, dispatchBatchResume:319, pushBatchResumeFrame:370
+choice.ts (1180 lines): handlePlayerChoiceStateDistribution:96, handlePlayerChoiceDonReturn:220, handleFieldToLifePosition:268, handleFieldToLifeArrangement:321, handleChooseValue:384, handlePlayerChoiceBranch:425, popFrameById:533, handleAwaitingOptionalResponse:545, handleAwaitingOptionalActionResponse:785, handleAwaitingTriggerOrderSelection:887
+cost.ts (1545 lines): lifeDestinationChoiceId:69, isLifeDestinationChoiceId:73, parseLifeDestinationChoiceId:77, isLegacyCostTransactionFrame:115, eventsForCostAbandon:123, abortReplacedCost:132, mergeCostRefs:157, finishCostsAndRunActions:187, resumeAfterBranchPick:336, handleAwaitingCostSelection:426
+deck.ts (661 lines): computeArrangeContext:36, placeArrangedInDeck:63, resolveRestDestination:73, pushSearchPickReveal:89, moveSearchPicksToDestination:113, handleArrangeReturnToDeck:179, handleArrangeSearchDeck:232, handleArrangeSearchTrashTheRest:280, handleArrangeSearchAndPlay:353, handleArrangeReorderLife:486, handleArrangeLifeScry:528, handleArrangeDeckScry:602, legacyDeckScryGroupSize:656
+events.ts (138 lines): pendingPropagationEvents:13, retainEventsOnFrame:28, takeInterruptedEvents:55, publishCommittedEvents:71, retainPropagationBeforePrompt:88
+target.ts (691 lines): handleRedistributeDon:70, handleGiveDonIdentity:142, handleSelectTargetRuleTrashForPlay:193, handleSelectTarget:418, isSelectionReprompt:644, canonicalJson:681
+triggers.ts (261 lines): processRemainingTriggers:26
+resume-core.ts: resumeEffectChain:92; resumeFromStack:382. Dispatcher plus interrupted/suffix and batch branches.
+resume.ts: resumeEffectChain:17; resumeFromStack:32; processRemainingTriggers:46. Facade switches on presence of loaded v5 owner; it is not the domain dispatcher.
+
+RESPONSIBILITY CLASSIFICATION (source observations, not migration-policy decisions)
+SAME-EFFECT CONTINUATION: cost payment/branch/arrangement and abort; target/overflow/Don identity; deck/search/Life arrangement; optional/action/value/branch choices; executeActionChain and batch suffix reentry. These own action-local progress/resultRefs/payment and may return prompts. Their calls to processRemainingTriggers currently cross into scheduling; replacing a handler name alone does not remove that ownership.
+CROSS-EFFECT SCHEDULING: resume/triggers.processRemainingTriggers groups by controller, invokes resolveEffect, prompts for order, then reenters batches; trigger-queue.processPlayerTriggerGroup and processTriggerQueuePipeline maintain alternate pipeline execution. choice.handleAwaitingTriggerOrderSelection both consumes ordering and executes selected/nested effects. The new trigger-executor advances generations and reports newly fulfilled work into the collector; its Life helper stops at an exact damage boundary.
+PUBLICATION/SCANNING: resume/events helpers transfer event ownership and publication flags (not independent executable queues). scanEventsForTriggers matches work but also updates registrations/timestamps/propagation; retain this distinction from activation. The facade services in resolver.ts336/345 convert cross-effect drains to reports only when a v5 owner already exists. Normal producers remain old behavior.
+
+DOMAIN ADVANCEMENT OUTSIDE resume/*
+replacements.ts: resumeReplacement995 -> applyReplacement; applyBatchReplacement425; processBatchReplacements1278 -> stepBatch; resumeReplacementBatch1326; continueReplacementBatchAfterSubstitute1389 -> finishReplacementBatch1414. Rechecks, substitute execution, target finalization are domain work; choosing/draining later substitutes and returning nested prompts are advancement boundaries. session/prompt-lifecycle.ts594 has a DIFFERENT finishReplacementBatch (session integration).
+battle.ts: resumeBattleDamageFrame486; continueLeaderDamageSequence812; continueBattleDamageFrame942 (including recursive replacement path1209); Life accepted block resolveEffect548 then advanceLifeTriggerExecution555. Battle owns point sequencing/ATTACK_DEALS_DAMAGE/Life exception and end-battle checkpoints; ordinary trigger release uses damage-frames.processPlayerTriggerGroup297. executeUseCounterEvent412 also resolves an effect directly and can prompt.
+effect-damage.ts: continueEffectDamageSequence209; resumeEffectDamageFrame332; continueEffectDamageFrame440; finishEffectDamagePoints455; completeEffectDamageFrame489. Accepted Life block resolveEffect391 then advanceLifeTriggerExecution392. Same-effect DEAL_DAMAGE results/result_ref/parentFrameId transfer is distinct from ordinary trigger scheduling.
+phases.ts: resumePhaseBoundary226 -> continueEndPhase255; runStagesFrom307/runWave362 loop waves; processPlayerTriggerGroup380; runEndOfTurnStep443 and continueLegacyScheduledActions508 directly resolve scheduled blocks, park prompts, retain staged expiry/handoff order. Phase progression is an outer advancement owner, not a simple trigger queue.
+session/prompt-lifecycle.ts: resumePromptLifecycle78/resumePromptLifecycleUnreleased100 dispatch responses; resumeContinuations325 loops frame kinds, including phase, damage, replacement, interrupted chains; applyDamageResult and finishReplacementBatch integrate events/pipeline. This loop stays a separately visible owner for PR9 scope decisions.
+pipeline.ts: runPipeline45; continuePipelineFromExecution218; finishPipeline349, plus trigger-queue and damage-frames entry paths. Pipeline scanning/rule checkpoints can cross effect boundaries even though not every call is named resume.
+
+EXACT AST CALL INVENTORY (symbol: total; file:lines with enclosing function)
+AST output includes selected aliases explicitly. Full machine-readable rows: opt966-handler-ast.json.
+advanceLifeTriggerExecution: 2
+  engine/battle.ts: 555(resumeBattleDamageFrame)
+  engine/effect-damage.ts: 392(resumeEffectDamageFrame)
+advanceTriggerExecution: 2
+  engine/effect-resolver/resume.ts: 43(resumeFromStack)
+  engine/trigger-executor.ts: 405(advanceLifeTriggerExecution)
+continueBattleDamageFrame: 3
+  engine/battle.ts: 1209(executeDamageStep)
+  session/prompt-lifecycle.ts: 370(resumeContinuations), 479(answerReplacementOffer)
+continueEffectDamageFrame: 1
+  session/prompt-lifecycle.ts: 371(resumeContinuations)
+continueEffectDamageSequence: 2
+  engine/effect-damage.ts: 463(finishEffectDamagePoints)
+  engine/effect-resolver/actions/battle-actions.ts: 129(executeDealDamage)
+continueEndPhase: 2
+  engine/phases.ts: 211(runEndPhase), 232(resumePhaseBoundary)
+continueLeaderDamageSequence: 3
+  engine/battle.ts: 653(resumeBattleDamageFrame), 988(continueBattleDamageFrame), 1157(executeDamageStep)
+continueLegacyScheduledActions: 1
+  engine/phases.ts: 263(continueEndPhase)
+continueReplacementBatchAfterSubstitute: 1
+  session/prompt-lifecycle.ts: 382(resumeContinuations)
+processBatchReplacements: 4
+  engine/effect-resolver/actions/play.ts: 473(executeSetRest)
+  engine/effect-resolver/actions/removal.ts: 96(executeKO), 166(executeReturnToHand), 331(executeReturnToDeck)
+processPlayerTriggerGroup: 5
+  engine/damage-frames.ts: 297(openBattleTriggerWindow)
+  engine/phases.ts: 380(runWave)
+  engine/trigger-queue.ts: 101(fireEventsAndTriggers), 286(processPlayerTriggerGroup), 300(processPlayerTriggerGroup)
+processRemainingTriggers: 34
+  engine/effect-resolver/cost/replaced.ts: 60(finishReplacedLifeCost)
+  engine/effect-resolver/resolver.ts: 336(createResolverServices), 1330(executeActionChain)
+  engine/effect-resolver/resume-core.ts: 646(resumeFromStack), 655(resumeFromStack), 705(resumeFromStack), 715(resumeFromStack)
+  engine/effect-resolver/resume/batch.ts: 188(reenterBatchResume), 209(reenterBatchResume), 255(reenterBatchResume)
+  engine/effect-resolver/resume/choice.ts: 193(handlePlayerChoiceStateDistribution), 569(handleAwaitingOptionalResponse), 613(handleAwaitingOptionalResponse), 698(handleAwaitingOptionalResponse), 752(handleAwaitingOptionalResponse), 763(handleAwaitingOptionalResponse), 863(handleAwaitingOptionalActionResponse), 873(handleAwaitingOptionalActionResponse), 903(handleAwaitingTriggerOrderSelection), 1045(handleAwaitingTriggerOrderSelection), 1149(handleAwaitingTriggerOrderSelection), 1174(handleAwaitingTriggerOrderSelection)
+  engine/effect-resolver/resume/cost.ts: 144(abortReplacedCost), 261(finishCostsAndRunActions), 312(finishCostsAndRunActions), 322(finishCostsAndRunActions), 381(resumeAfterBranchPick), 477(handleAwaitingCostSelection), 499(handleAwaitingCostSelection), 554(handleAwaitingCostSelection), 752(handleAwaitingCostSelection), 1497(handleAwaitingCostSelection)
+  engine/effect-resolver/resume/target.ts: 363(handleSelectTargetRuleTrashForPlay), 588(handleSelectTarget)
+processRemainingTriggersCore: 1
+  engine/effect-resolver/resume.ts: 53(processRemainingTriggers)
+processTriggerQueuePipeline: 1
+  engine/trigger-queue.ts: 291(processPlayerTriggerGroup)
+reenterBatchResume: 5
+  engine/effect-resolver/resolver.ts: 345(createResolverServices)
+  engine/effect-resolver/resume-core.ts: 734(resumeFromStack)
+  engine/effect-resolver/resume/triggers.ts: 81(processRemainingTriggers), 260(processRemainingTriggers)
+  engine/trigger-executor.ts: 272(advanceTriggerExecution)
+reportTriggerWork: 4
+  engine/effect-resolver/resolver.ts: 336(createResolverServices), 345(createResolverServices)
+  engine/trigger-executor.ts: 262(advanceTriggerExecution), 388(advanceTriggerExecution)
+resumeBattleDamageFrame: 1
+  session/prompt-lifecycle.ts: 197(resumePromptLifecycleUnreleased)
+resumeEffectChain: 1
+  engine/effect-resolver/resume-core.ts: 526(resumeFromStack)
+resumeEffectChainCore: 1
+  engine/effect-resolver/resume.ts: 23(resumeEffectChain)
+resumeEffectDamageFrame: 1
+  session/prompt-lifecycle.ts: 198(resumePromptLifecycleUnreleased)
+resumeFromStack: 3
+  session/prompt-lifecycle.ts: 203(resumePromptLifecycleUnreleased), 395(resumeContinuations), 493(answerReplacementOffer)
+resumeFromStackCore: 2
+  engine/effect-resolver/resume.ts: 38(resumeFromStack), 42(resumeFromStack)
+resumePhaseBoundary: 1
+  session/prompt-lifecycle.ts: 343(resumeContinuations)
+resumeReplacement: 1
+  session/prompt-lifecycle.ts: 454(answerReplacementOffer)
+resumeReplacementBatch: 1
+  session/prompt-lifecycle.ts: 526(answerReplacementBatchOffer)
+scanEventsForTriggers: 20
+  engine/effect-resolver/actions/play.ts: 336(executePlayCard), 504(executeSetRest)
+  engine/effect-resolver/actions/removal.ts: 117(executeKO)
+  engine/effect-resolver/cost/replaced.ts: 58(finishReplacedLifeCost)
+  engine/effect-resolver/resume-core.ts: 633(resumeFromStack), 701(resumeFromStack)
+  engine/effect-resolver/resume/batch.ts: 200(reenterBatchResume), 242(reenterBatchResume)
+  engine/effect-resolver/resume/choice.ts: 672(handleAwaitingOptionalResponse), 738(handleAwaitingOptionalResponse), 859(handleAwaitingOptionalActionResponse), 1034(handleAwaitingTriggerOrderSelection), 1135(handleAwaitingTriggerOrderSelection)
+  engine/effect-resolver/resume/cost.ts: 236(finishCostsAndRunActions), 298(finishCostsAndRunActions)
+  engine/effect-resolver/resume/target.ts: 265(handleSelectTargetRuleTrashForPlay), 369(handleSelectTargetRuleTrashForPlay)
+  engine/trigger-executor.ts: 253(advanceTriggerExecution), 379(advanceTriggerExecution)
+  engine/trigger-queue.ts: 183(processTriggerQueuePipeline)
+
+REPRODUCIBLE COMMANDS
+From isolated checkout:
+rg -n 'export (async )?function|function (resume|handle|process|continue|reenter)|services\.(processRemainingTriggers|reenterBatchResume)|processPlayerTriggerGroup\(|processTriggerQueuePipeline\(|resumeEffectChain\(' workers/game/src/engine/effect-resolver/resume workers/game/src/engine/effect-resolver/resume-core.ts workers/game/src/engine/effect-resolver/resume.ts > ../opt966-handler-rg-raw.txt
+rg -n 'processPlayerTriggerGroup\(|processTriggerQueuePipeline\(|processRemainingTriggers\(|reenterBatchResume\(|resumeFromStack\(|continueEffectDamageFrame\(|continueBattleDamageFrame\(|resumeEffectDamageFrame\(|resumeBattleDamageFrame\(|resumePhaseBoundary\(' workers/game/src --glob '*.ts' --glob '!**/__tests__/**' --glob '!**/schemas/**' --glob '!**/*.generated.ts' > ../opt966-drain-rg-raw.txt
+wc -l workers/game/src/engine/effect-resolver/resume/*.ts workers/game/src/engine/effect-resolver/resume-core.ts workers/game/src/engine/effect-resolver/resume.ts
+From parent work directory: node opt966-handler-inventory.cjs > opt966-handler-ast.json
+The saved cjs script uses TypeScript createSourceFile and isCallExpression, recording identifier/property final name, file, line and nearest FunctionDeclaration. It walks workers/game/src excluding __tests__, schemas, node_modules and *.generated.ts.
+
+CAVEATS
+AST counting is syntactic, not whole-program alias analysis. Selected known Core aliases are counted explicitly; arbitrary reassigned callbacks/computed calls are not resolved. Arrow service wrappers inherit their outer named function label. rg output includes definitions and interfaces and is navigation evidence only; use AST counts for calls. Generated schemas/tests are intentionally outside runtime call counts. Named helper listings include pure helpers, not all are continuation handlers. Some comments describe prior drain behavior; classifications above rely on control flow. No assertion that these sites should all be consolidated in PR8: PR9 drain-loop boundary remains separate.

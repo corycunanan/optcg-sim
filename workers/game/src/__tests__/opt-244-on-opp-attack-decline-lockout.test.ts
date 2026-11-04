@@ -190,7 +190,7 @@ describe("OPT-244 — [On Opp Attack] per-card once-per-turn lockout", () => {
     // Mandatory activation directly asks the up-to quantity.
     const prompted = resolveEffect(state, block, bonney.instanceId, 1, cardDb);
     expect(prompted.pendingPrompt?.options.promptType).toBe("PLAYER_CHOICE");
-    expect(prompted.state.effectStack.length).toBe(1);
+    expect(prompted.state.effectStack.filter(frame => !frame.triggerExecution).length).toBe(1);
 
     // Choose zero under rule1-3-5-1.
     const postState = { ...prompted.state, pendingPrompt: null };

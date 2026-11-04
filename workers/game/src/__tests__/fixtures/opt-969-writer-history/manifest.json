@@ -1,0 +1,22 @@
+{
+  "sourceHead": "e14af35bad3a7189a40294f5d4ab3db5b5602f0e",
+  "sourceTree": "29d53132b06c2ac0aad8b4ab56415531f645d186",
+  "generatorSha256": "9911608e38b5aa2923eb17fbffcf131eb0d15a2fbb541c77273688c870284797",
+  "lockSha256": "080bf6130ab2656ff730fd2ca775051bca59c74a835f610d2525cf3c869c9ffe",
+  "versions": {
+    "node": "24.16.0",
+    "pnpm": "10.28.2"
+  },
+  "files": {
+    "actual-default7-init-input.json": "785c7f1d63f074db68fa79d69ff5a654325f17dac4f145125f606abd4ff5e8c5",
+    "actual-default7-setup-output.json": "20c3f2eb708315776306aeadb2ed946f30fab20e46d8fb39b7b91488424b33ab",
+    "synthetic-mode6-raw-seed.json": "a66b20067b06101cd70d4f8d5d189ad0aa4e5ba2dff8cb7801e57a09bb4be040",
+    "synthetic-recorded-mode6-separate.json": "b12f8ad2df9e315ad88806d8b34afed818d7dd359a931805626f772f6d4041f2",
+    "synthetic-recorded-mode6-embedded.json": "161265c683a1a210b494fac00086849c67e5ef8f799a1ea02a3319d3b6b285d9",
+    "synthetic-mode7-raw-seed.json": "41b3545f9eb5b14242d0adc8cab04fa642fa63f8573396470a1b0eda2ff057b5",
+    "synthetic-recorded-mode7-separate.json": "ce050a521530bfcd26ca3efa9e886a158df1f13e1cdf9dce6117cba6348336dd",
+    "synthetic-recorded-mode7-embedded.json": "b6782f9b361cf77f24d86a6368211f75ca0b970852fa34d57421c807c351dd8c",
+    "historical-authored-definitions.json": "983d60d96a7c7acaac9c4e2aaf6f381b5e13dfcad4c146b1f316382a71811316"
+  },
+  "provenance": "Synthetic inputs only. actual-default7 is untouched buildInitialState output; mode6 and stable mode7 gameplay fixtures are explicitly seeded recorded inputs, not production captures or an actual new-default6 game. All definitions saved by actual merged reader runtime before future writer changes."
+}
