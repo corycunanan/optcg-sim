@@ -1062,6 +1062,12 @@ export function getNestedActions(action: Action): Action[] {
     case "OPPONENT_ACTION":
     case "SCHEDULE_ACTION":
       return action.params?.action ? [action.params.action] : [];
+    case "APPLY_PROHIBITION": {
+      const override = action.params?.conditional_override;
+      return override && "action" in override && typeof override.action === "object"
+        ? [override.action]
+        : [];
+    }
     default:
       return [];
   }

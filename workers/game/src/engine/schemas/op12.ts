@@ -1738,6 +1738,7 @@ export const OP12_048_DONQUIXOTE_ROSINANTE: EffectSchema = {
     {
       id: "OP12-048_replacement",
       category: "replacement",
+      conditions: { type: "IS_MY_TURN", controller: "OPPONENT" },
       replaces: {
         event: "WOULD_BE_REMOVED_FROM_FIELD",
         target_filter: {
