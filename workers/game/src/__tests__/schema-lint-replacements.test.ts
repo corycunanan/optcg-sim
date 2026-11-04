@@ -1,6 +1,7 @@
 /**
  * Schema lint: when a replacement effect's card text says "other than
- * [<self>]", the schema's target_filter must explicitly exclude the source
+ * [<self>]", "other than this Character", or "other than this card",
+ * the schema's target_filter must explicitly exclude the source
  * card. Without the exclusion, the source will match its own filter and
  * self-protect — a silent rule violation.
  *
@@ -69,11 +70,8 @@ function replacementSentences(text: string): string[] {
   return sentences.filter((s) => /\bwould be\b|\bwould leave\b|\bwould lose\b/i.test(s));
 }
 
-function textRequiresSelfExclusion(cardText: string, cardName: string): boolean {
-  const needle = `other than [${cardName}]`.toLowerCase();
-  return replacementSentences(cardText).some((s) => s.toLowerCase().includes(needle));
-}
-
+// Text is scoped per card, not per replacement block. No current card has
+// multiple targeted replacement blocks; revisit if such a card is added.
 function textPrintsSelfExclusion(cardText: string, cardName: string): boolean {
   const name = cardName.toLowerCase();
   return replacementSentences(cardText).some((s) => {
@@ -129,13 +127,13 @@ function lintSchema(schema: EffectSchema, cardText: string): LintFailure[] {
         reason: `target_filter excludes the source (exclude_self / exclude_name) but the printed replacement text has no "other than this Character" / "other than [${cardName}]" clause.`,
       });
     }
-    if (!textRequiresSelfExclusion(cardText, cardName)) continue;
+    if (!textPrintsSelfExclusion(cardText, cardName)) continue;
     if (filterExcludesSelf(filter, cardName)) continue;
     failures.push({
       cardId,
       cardName,
       blockId: block.id,
-      reason: `Card text says "other than [${cardName}]" but target_filter omits exclude_self / exclude_name.`,
+      reason: `Printed replacement text excludes the source ("other than this Character/card" or "other than [${cardName}]") but target_filter omits exclude_self / exclude_name.`,
     });
   }
   return failures;
@@ -145,7 +143,7 @@ describe("schema lint: replacement self-exclusion", () => {
   const cardEffects = parseCardEffects();
   const schemas = getAllAuthoredSchemas();
 
-  it("every replacement whose text says 'other than [<self>]' excludes self in its target_filter", () => {
+  it("every replacement whose printed text excludes self does so in its target_filter", () => {
     const failures: LintFailure[] = [];
     for (const [cardId, schema] of Object.entries(schemas)) {
       const text = cardEffects.get(cardId);
@@ -168,6 +166,18 @@ describe("schema lint: replacement self-exclusion", () => {
     const schema = schemas["OP12-027"];
     expect(schema.effects.some((e) => e.replaces?.target_filter?.exclude_self === true)).toBe(true);
     expect(lintSchema(schema, text)).toEqual([]);
+  });
+
+  it("regression: removing OP15-094's printed self-exclusion fails the lint", () => {
+    const text = cardEffects.get("OP15-094");
+    if (!text) throw new Error("OP15-094 card text missing from docs");
+    const broken = structuredClone(schemas["OP15-094"]);
+    expect(lintSchema(broken, text)).toEqual([]);
+    const replacement = broken.effects.find((effect) => effect.category === "replacement");
+    delete replacement!.replaces!.target_filter!.exclude_self;
+    expect(lintSchema(broken, text)).toMatchObject([
+      { cardId: "OP15-094", blockId: replacement!.id },
+    ]);
   });
 
   it("regression: exclude_self without printed 'other than' text fails the lint", () => {
