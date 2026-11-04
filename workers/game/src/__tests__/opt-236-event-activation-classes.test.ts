@@ -20,7 +20,6 @@ import { resolverExecutionServices } from "../engine/effect-resolver/resolver.js
 import { describe, it, expect } from "vitest";
 import { runPipeline } from "../engine/pipeline.js";
 import { executeActivateEventFromTrash } from "../engine/effect-resolver/actions/play.js";
-import { executeRevealTrigger } from "../engine/battle.js";
 import { matchTriggersForEvent, registerTriggersForCard } from "../engine/triggers.js";
 import type { EffectResult, EffectSchema } from "../engine/effect-types.js";
 import type {
@@ -32,6 +31,7 @@ import type {
   PlayerState,
 } from "../types.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { revealTrigger, withBattleTriggerWindow } from "./trigger-window-helpers.js";
 
 // ─── Card / state helpers ───────────────────────────────────────────────────
 
@@ -259,14 +259,14 @@ describe("OPT-236 — event class emission", () => {
           defenderPower: 5000,
           counterPowerAdded: 0,
           blockerActivated: false,
-          pendingTriggerLifeCard: lifeCard,
         },
       },
     };
 
-    const result = executeRevealTrigger(withLife, true, cardDb);
+    const result = revealTrigger(withBattleTriggerWindow(withLife, lifeCard, cardDb), true, cardDb);
+    expect(result.valid).toBe(true);
 
-    const emitted = result.events.map((e) => e.type);
+    const emitted = result.state.eventLog.slice(withLife.eventLog.length).map((e) => e.type);
     expect(emitted).toContain("TRIGGER_ACTIVATED");
     expect(emitted).toContain("EVENT_TRIGGER_RESOLVED");
     expect(emitted).not.toContain("EVENT_ACTIVATED_FROM_HAND");
@@ -298,13 +298,13 @@ describe("OPT-236 — event class emission", () => {
           defenderPower: 5000,
           counterPowerAdded: 0,
           blockerActivated: false,
-          pendingTriggerLifeCard: lifeCard,
         },
       },
     };
 
-    const result = executeRevealTrigger(withLife, true, cardDb);
-    const emitted = result.events.map((e) => e.type);
+    const result = revealTrigger(withBattleTriggerWindow(withLife, lifeCard, cardDb), true, cardDb);
+    expect(result.valid).toBe(true);
+    const emitted = result.state.eventLog.slice(withLife.eventLog.length).map((e) => e.type);
     expect(emitted).toContain("TRIGGER_ACTIVATED");
     expect(emitted).not.toContain("EVENT_TRIGGER_RESOLVED");
   });

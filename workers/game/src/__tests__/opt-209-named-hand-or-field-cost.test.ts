@@ -512,7 +512,8 @@ describe("OPT-510: OP06-033 printed two-branch cost", () => {
 
     const neither = op06033State({});
     expect(isCostPayable(neither.state, block.costs![0], 0, neither.cardDb, "char-0-v1")).toBe(false);
-    const unpayable = acceptEffect(neither.state, neither.cardDb);
+    // OPT-864: neither branch is payable, so the optional prompt is skipped.
+    const unpayable = resolveEffect(neither.state, block, "char-0-v1", 0, neither.cardDb);
     expect(unpayable.pendingPrompt).toBeUndefined();
     expect(unpayable.state.effectStack).toHaveLength(0);
   });

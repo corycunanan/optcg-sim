@@ -1,0 +1,11 @@
+{
+  "files": {
+    "sources/game-state-schema.ts.txt": "d9d1f7a12e976f953378bda9351e8336faa3ca426419d09de71b9a3a41375e88",
+    "sources/modifiers.ts.txt": "3e072d94b1fdce2ad4d62eed750921718e63d915c47f9144a39cc711c9473b2e",
+    "sources/opt-1004-writer-producer.test-source": "d8cf3ffee066460d0da9fb856569c27976104c3a1f86171ccfa50e866340acf7",
+    "sources/removal.ts.txt": "24a68cc64eb4e99c794924f926445922f10806f484a877b0db07d2b6e8be59a4",
+    "sources/resolver.ts.txt": "670963c34f858cc58e717b51c82519f00845fcbc812e8f8172b08476f9531060",
+    "sources/setup.ts.txt": "663ba715631381a6bbbcc68095ede72aa3c7791e764a0c93c5f3671442b25587",
+    "candidate.patch": "42dbc8155c57b1bfba7d5e02cfc5af56f6d93c5d1cbcb3a2c9f7b43ceaf0dacc"
+  }
+}

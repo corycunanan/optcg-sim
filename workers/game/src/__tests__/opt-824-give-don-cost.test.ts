@@ -14,6 +14,7 @@ import { validateCost } from "../engine/schema-registry.js";
 import { transitionCard } from "../engine/zone-transition.js";
 import { getEffectivePower } from "../engine/modifiers.js";
 import { CARDS, createBattleReadyState, createTestCardDb, padChars } from "./helpers.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
 
 // Printed costs (canonical docs/cards text):
 // - OP13-007 (OP-13.md:51): "[Activate: Main] You may give 1 of your active
@@ -120,9 +121,7 @@ function fixture() {
     decline,
     select,
     persist() {
-      state = parseStoredSession(
-        JSON.parse(JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })),
-      ).state;
+      state = parseStoredSession(JSON.parse(JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" }))).state;
     },
     get state() {
       return state;
@@ -344,7 +343,7 @@ describe("OPT-824 GIVE_DON cost — OP13-007", () => {
     f.persist();
     expect(selectPrompt(f).validTargets).not.toContain(ally.instanceId);
     f.select([ally.instanceId], true);
-    expect(f.state).toEqual(JSON.parse(JSON.stringify(afterPay)));
+    expect(JSON.parse(JSON.stringify(toPersistedGameState(f.state)))).toEqual(JSON.parse(JSON.stringify(toPersistedGameState(afterPay))));
     f.select([foe.instanceId]);
     expect(donGivenEvents(f)).toHaveLength(1);
     expect(activeCostDon(f)).toBe(2);
@@ -439,13 +438,12 @@ describe("OPT-824 GIVE_DON cost — Silvers Rayleigh Events", () => {
   });
 
   for (const eventId of ["EB04-009", "OP12-016", "OP12-017", "OP12-019"]) {
-    // The engine offers an optional block before checking its cost (shared
-    // with OPT-798's MILL cost); accepting an unpayable cost pays and resolves
-    // nothing — no recipient prompt, no DON!! moved (8-3-1-3).
+    // OPT-864: an optional block whose cost cannot be paid is skipped
+    // before its prompt (8-3-1-3) — no optional prompt, no recipient prompt,
+    // no DON!! moved.
     it(`${eventId} is unavailable without a [Silvers Rayleigh] recipient`, () => {
       const { f, event } = setupRayleigh(eventId, { rayleigh: "NONE" });
       play(f, event);
-      f.accept();
       expect(f.state.pendingPrompt).toBeNull();
       expect(activeCostDon(f)).toBe(3);
       expect(donGivenEvents(f)).toHaveLength(0);
@@ -460,7 +458,6 @@ describe("OPT-824 GIVE_DON cost — Silvers Rayleigh Events", () => {
       p.donCostArea = [...p.donCostArea, ...p.donDeck.slice(0, 3).map((d) => ({ ...d, state: "RESTED" as const, attachedTo: null }))];
       p.donDeck = p.donDeck.slice(3);
       play(f, event);
-      f.accept();
       expect(f.state.pendingPrompt).toBeNull();
       expect(activeCostDon(f)).toBe(need - 1);
       expect(donGivenEvents(f)).toHaveLength(0);

@@ -1,3 +1,4 @@
+import { isPendingBattleStepTransition } from "./battle-step-boundary.js";
 /**
  * Simultaneous trigger ordering — helpers shared by pipeline.ts and resume.ts.
  *
@@ -18,7 +19,7 @@ import {
   registerCardEnteredField,
 } from "./triggers.js";
 import { pushFrame, generateFrameId } from "./effect-stack.js";
-import { isEngineTerminated } from "./engine-limits.js";
+import { isGameTerminated } from "./terminal.js";
 import { findCardInstance } from "./state.js";
 import { extractEffectDescription } from "./effect-resolver/action-utils.js";
 import { withTriggerScanned } from "./events.js";
@@ -39,7 +40,9 @@ export function scanEventsForTriggers(
 ): { triggers: QueuedTrigger[]; state: GameState; events: PendingEvent[] } {
   const triggers: QueuedTrigger[] = [];
   let nextState = state;
-  const scannedEvents = events.map(withTriggerScanned);
+  const scannedEvents = events.map((event) =>
+    isPendingBattleStepTransition(event) ? event : withTriggerScanned(event)
+  );
 
   // Register every field-entry effect before matching simultaneous triggers.
   for (let index = 0; index < events.length; index++) {
@@ -64,7 +67,9 @@ export function scanEventsForTriggers(
     // scanned via its `pendingBatchTriggers` drain. Without this guard, the
     // pipeline's outer LIFO scan re-matches the same events and queues the
     // same triggers a second time.
-    if (event.propagation?.triggerScanned) continue;
+    if (event.propagation?.triggerScanned ||
+      isPendingBattleStepTransition(event)
+    ) continue;
 
     const timed = takeEngineTimestamp(nextState);
     nextState = timed.state;
@@ -85,6 +90,12 @@ export function scanEventsForTriggers(
     for (const match of ordered) {
       triggers.push({
         sourceCardInstanceId: match.trigger.sourceCardInstanceId,
+        sourceSnapshot: queuedSourceSnapshot(
+          nextState,
+          match.trigger.sourceCardInstanceId,
+          match.trigger.controller,
+          match.effectBlock.id
+        ),
         ...(groupSourceInstanceId ? { groupSourceInstanceId } : {}),
         controller: match.trigger.controller,
         effectBlock: match.effectBlock,
@@ -94,6 +105,22 @@ export function scanEventsForTriggers(
   }
 
   nextState = deregisterDepartedSources(nextState, events);
+  // A battle K.O. substitute is still inside damage processing (§8-6-2).
+  // Match now (before sources can move), but let the owning damage frame
+  // release these watchers with CHARACTER_BATTLES / COMBAT_VICTORY.
+  const battleOwner = nextState.effectStack.find((frame) =>
+    frame.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" &&
+    frame.battleDamage.battleId === nextState.turn.battle?.battleId
+  );
+  if (battleOwner && triggers.length > 0) {
+    nextState = {
+      ...nextState,
+      effectStack: nextState.effectStack.map((frame) => frame.id === battleOwner.id
+        ? { ...frame, pendingTriggers: [...frame.pendingTriggers, ...triggers] }
+        : frame),
+    };
+    return { triggers: [], state: nextState, events: scannedEvents };
+  }
   return { triggers, state: nextState, events: scannedEvents };
 }
 
@@ -174,7 +201,7 @@ export function buildTriggerSelectionPrompt(
   };
 
   const nextState = pushFrame(frameId.state, frame);
-  if (isEngineTerminated(nextState)) return { state: nextState };
+  if (isGameTerminated(nextState)) return { state: nextState };
 
   const pendingPrompt: PendingPromptState = {
     options: {
@@ -243,4 +270,10 @@ export function withStableOrderingIds(triggers: QueuedTrigger[]): QueuedTrigger[
       orderingId: `${pair}:${occurrence}`,
     };
   });
+}
+
+/** Identity only; zone transitions allocate a new instance ID. */
+export function queuedSourceSnapshot(state: GameState, sourceId: string, controller: 0 | 1, effectBlockId: string): import("../types.js").QueuedSourceSnapshot | undefined {
+  const source = findCardInstance(state, sourceId);
+  return source ? { instanceId: sourceId, cardId: source.cardId, controller, effectBlockId } : undefined;
 }

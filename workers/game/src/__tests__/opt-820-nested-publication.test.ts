@@ -271,6 +271,8 @@ it.each([
     ).toEqual([
       ["CARD_DRAWN", 0],
       ["CARD_PLAYED", 1],
+      // Rule 8-6-3: finish the outer effect before the new On Play.
+      ["CARD_DRAWN", 0],
       ...(pay
         ? [
             ["CARD_TRASHED", 1],
@@ -283,7 +285,6 @@ it.each([
             ["CARD_DRAWN", 1],
           ]
         : []),
-      ["CARD_DRAWN", 0],
     ]);
   }
 );
@@ -399,15 +400,17 @@ it.each([false, true])(
       pendingPrompt: result.pendingPrompt ?? null,
     };
     if (!optional) {
-      // Prefix propagation does not eagerly publish when no nested drain exists.
+      // The shared executor publishes the completed scope once. Passing its
+      // returned events into the pipeline must not publish them a second time.
       expect(next.pendingPrompt).toBeNull();
-      expect(next.eventLog).toEqual(state.eventLog);
+      const published = next.eventLog;
       next = continuePipelineFromExecution(
         next,
         { state: next, events: result.events },
         db,
         0
       ).state;
+      expect(next.eventLog).toEqual(published);
     }
     for (let i = 0; next.pendingPrompt && i < 5; i++) {
       const p = next.pendingPrompt.options;
@@ -553,10 +556,11 @@ it("two-level replacement plays publish outer and both On Play prefixes once", (
   ).toEqual([
     ["CARD_DRAWN", 0],
     ["CARD_PLAYED", 1],
+    // Rule 8-6-3 applies at both nested activation boundaries.
+    ["CARD_DRAWN", 0],
     ["CARD_DRAWN", 1],
     ["CARD_PLAYED", 1],
     ["CARD_DRAWN", 1],
-    ["CARD_DRAWN", 0],
   ]);
 });
 

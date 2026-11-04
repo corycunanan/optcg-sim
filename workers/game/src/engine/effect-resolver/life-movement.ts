@@ -9,7 +9,8 @@ export function moveLifeToHand(
   state: GameState,
   cards: LifeCard[],
   owner: 0 | 1,
-  cardDb: Map<string, CardData>
+  cardDb: Map<string, CardData>,
+  destinationPolicy: "ACTUAL" | "PRINTED_COST_PROBE" = "ACTUAL",
 ) {
   const transitions: {
     fact: ZoneTransitionFact;
@@ -17,7 +18,8 @@ export function moveLifeToHand(
   }[] = [];
   let replaced = false;
   for (const card of cards) {
-    const destination = lifeToHandDestination(state, owner, card, cardDb);
+    const destination = destinationPolicy === "PRINTED_COST_PROBE"
+      ? "HAND" : lifeToHandDestination(state, owner, card, cardDb);
     const moved = transitionCard(
       state,
       card.instanceId,

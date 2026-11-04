@@ -1,0 +1,10 @@
+{
+  "files": {
+    "sources/opt-1004-writer-producer.test-source": "08466a39d4d4754e6f683784c9e698d245200a7b93133ff1f947bd3500ab6ec6",
+    "sources/resolver.ts.txt": "962713dcd6485ed464ac82fe24321b18705b18ef179369d7e6d9772ea590506c",
+    "sources/setup.ts.txt": "42ef932e8c2f7feb8c9b580c6727f045f46aea62adee817246e7151f314a582c",
+    "sources/effects.ts.txt": "1b844c247790e5be7b6a166e8193b584050304b50390b5eb4fec6aa0e43afccd",
+    "sources/game-state-schema.ts.txt": "1009dd9123639fb0efcddfd7d7c7c5dd814a83088da3e9cf875d1e1ff267b695",
+    "candidate.patch": "985afea869d7c753ab02ac45a99eb27bddccb5ae0a546524d2e35456bbad8319"
+  }
+}

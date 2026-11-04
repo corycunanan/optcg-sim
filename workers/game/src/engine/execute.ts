@@ -7,6 +7,7 @@ import { getPlayEntryState } from "./play-entry-state.js";
  */
 
 import { meetsAttachedDonRequirement } from "./attached-don.js";
+import { terminateGame } from "./terminal.js";
 import { publishCommittedEvents } from "./effect-resolver/resume/events.js";
 import type { CardData, GameAction, GameState, PendingEvent, ExecuteResult } from "../types.js";
 import {
@@ -16,16 +17,15 @@ import {
   attachDon,
 } from "./state.js";
 import { getEffectiveCost, consumeOneTimeModifiers } from "./modifiers.js";
-import { executeAdvancePhase } from "./phases.js";
+import { executeAdvancePhaseWork as executeAdvancePhase } from "./phases.js";
 import {
   executeDeclareAttack,
   executeDeclareBlocker,
-  executePass,
+  executePassWork as executePass,
   executeUseCounter,
   executeUseCounterEvent,
-  executeRevealTrigger,
 } from "./battle.js";
-import { resolveEffect } from "./effect-resolver/index.js";
+import { resolveEffectWork } from "./effect-resolver/resolver.js";
 import { isOncePerTurnBlock } from "./effect-types.js";
 import { transitionCard } from "./zone-transition.js";
 
@@ -50,8 +50,6 @@ export function execute(
       return executeUseCounter(state, action.cardInstanceId, action.counterTargetInstanceId, cardDb);
     case "USE_COUNTER_EVENT":
       return executeUseCounterEvent(state, action.cardInstanceId, cardDb);
-    case "REVEAL_TRIGGER":
-      return executeRevealTrigger(state, action.reveal, cardDb);
     case "PASS":
       return executePass(state, cardDb);
     case "CONCEDE":
@@ -61,6 +59,7 @@ export function execute(
     case "ACTIVATE_EFFECT":
       return executeActivateEffect(state, action.cardInstanceId, action.effectId, cardDb, actingPlayerIndex);
     // Prompt responses and UNDO — handled by GameSession before reaching the pipeline
+    case "REVEAL_TRIGGER":
     case "SELECT_TARGET":
     case "REDISTRIBUTE_DON":
     case "PLAYER_CHOICE":
@@ -145,7 +144,7 @@ function executePlayCard(
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
       );
       if (mainBlock) {
-        const result = resolveEffect(nextState, mainBlock, newEventInstanceId, pi, cardDb);
+        const result = resolveEffectWork(nextState, mainBlock, newEventInstanceId, pi, cardDb);
         nextState = result.state;
         events.push(...result.events);
         if (result.pendingPrompt) {
@@ -200,28 +199,11 @@ function executeAttachDon(
 // ─── Concede ──────────────────────────────────────────────────────────────────
 
 function executeConcede(state: GameState, concedingPlayer: 0 | 1): ExecuteResult {
-  const winner: 0 | 1 = concedingPlayer === 0 ? 1 : 0;
-  // OPT-366: clear any pendingPrompt — without this the pipeline's
-  // post-execute pendingPrompt early-return (pipeline.ts step-5 boundary)
-  // would skip finishPipeline and never surface `gameOver`. The game is
-  // ending; no UI prompt is meaningful anymore.
-  const nextState: GameState = {
-    ...state,
-    status: "FINISHED",
-    winner,
-    winReason: `Player ${concedingPlayer + 1} conceded`,
-    pendingPrompt: null,
-    pendingEventActivationEvents: undefined,
-    // OPT-872: a paused battle never resumes after a concession.
-    turn: { ...state.turn, pendingBattleDamageContinuation: null },
-  };
+  // The common terminal writer clears the prompt (OPT-366), the stack and a
+  // paused battle (OPT-872) and logs the one GAME_OVER event.
   return {
-    state: nextState,
-    events: [{
-      type: "GAME_OVER",
-      playerIndex: concedingPlayer,
-      payload: { winner, reason: "concede" },
-    }],
+    state: terminateGame(state, { kind: "CONCESSION", concedingPlayer }, concedingPlayer),
+    events: [],
   };
 }
 
@@ -262,7 +244,8 @@ function executeActivateEffect(
 
   // Verify it has ACTIVATE_MAIN trigger
   if (!block.trigger || !("keyword" in block.trigger) ||
-      (block.trigger.keyword !== "ACTIVATE_MAIN")) {
+    block.trigger.keyword !== "ACTIVATE_MAIN"
+  ) {
     return { state, events };
   }
 
@@ -277,7 +260,7 @@ function executeActivateEffect(
   }
 
   // Resolve the effect through the effect resolver
-  const result = resolveEffect(state, block, cardInstanceId, actingPlayerIndex, cardDb);
+  const result = resolveEffectWork(state, block, cardInstanceId, actingPlayerIndex, cardDb);
 
   return {
     state: result.state,

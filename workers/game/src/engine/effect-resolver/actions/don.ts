@@ -1,3 +1,5 @@
+import { hasNativeCostSemantics } from "../../native-cost-semantics.js";
+import { buildDonIdentityPlans } from "../don-identity-plans.js";
 /**
  * Action handlers: GIVE_DON, ADD_DON_FROM_DECK, FORCE_OPPONENT_DON_RETURN,
  * SET_DON_ACTIVE, REST_OPPONENT_DON, RETURN_DON_TO_DECK,
@@ -26,7 +28,9 @@ import {
 } from "../target-resolver.js";
 import { promptEffectDescription, resolveAmount, tryResolveAmount } from "../action-utils.js";
 import { donIdentityChoiceMatters } from "../cost/targets.js";
-import { isDonAttachProhibited } from "../../prohibitions.js";
+import { effectSourceIdentity } from "../../effect-source.js";
+import { EFFECT_SOURCE_SNAPSHOT_REF } from "../../effect-types.js";
+import { isDonActivationProhibitedByEffect, isDonAttachProhibited } from "../../prohibitions.js";
 
 export function executeGiveDon(
   state: GameState,
@@ -331,6 +335,40 @@ export function applyFieldDonReturn(
   return { state: { ...state, players: newPlayers }, events, returned: returned.length };
 }
 
+/** OPT-969 reader-first identity choice. Existing bucket plans keep their
+ * historical meaning; this separate grammar preserves DON-specific effects. */
+export function decodeDonReturnIds(choiceId: string): string[] | null {
+  if (!choiceId.startsWith("don-return-ids:")) return null;
+  try {
+    const ids: unknown = JSON.parse(choiceId.slice("don-return-ids:".length));
+    return Array.isArray(ids) && ids.length > 0 && ids.every(id => typeof id === "string") &&
+      new Set(ids).size === ids.length ? ids : null;
+  } catch { return null; }
+}
+
+/** Exact identities, shared by action-choice and cost readers. No prompting,
+ * advancement or publication: the existing caller owns those boundaries. */
+export function applyDonReturnIds(
+  state: GameState,
+  owner: 0 | 1,
+  ids: readonly string[],
+): { state: GameState; events: PendingEvent[]; returned: number } | null {
+  const p = state.players[owner];
+  const selected = new Set(ids);
+  const hosts = [p.leader, ...p.characters.filter((c): c is NonNullable<typeof c> => c !== null)];
+  const pool = [...p.donCostArea, ...hosts.flatMap(c => c.attachedDon)];
+  if (ids.length === 0 || selected.size !== ids.length || ids.some(id => !pool.some(d => d.instanceId === id))) return null;
+  const returned = pool.filter(d => selected.has(d.instanceId)).map(d => ({ ...d, state: "ACTIVE" as const, attachedTo: null }));
+  const detach = (card: typeof p.leader) => ({ ...card, attachedDon: card.attachedDon.filter(d => !selected.has(d.instanceId)) });
+  const players = [...state.players] as GameState["players"];
+  players[owner] = {
+    ...p, leader: detach(p.leader), characters: p.characters.map(c => c ? detach(c) : null),
+    donCostArea: p.donCostArea.filter(d => !selected.has(d.instanceId)),
+    donDeck: [...p.donDeck, ...returned],
+  };
+  return { state: { ...state, players }, events: [{ type: "DON_DETACHED", playerIndex: owner, payload: { count: ids.length } }], returned: ids.length };
+}
+
 /** Cards whose attached DON!! can be returned, in a stable order (Leader first). */
 function attachedDonSources(
   p: GameState["players"][0],
@@ -513,14 +551,20 @@ function buildFieldDonReturnPrompt(
 export function executeSetDonActive(
   state: GameState,
   action: ActionOf<"SET_DON_ACTIVE">,
-  _sourceCardInstanceId: string,
+  sourceCardInstanceId: string,
   controller: 0 | 1,
-  _cardDb: Map<string, CardData>,
-  _resultRefs: Map<string, EffectResult>,
+  cardDb: Map<string, CardData>,
+  resultRefs: Map<string, EffectResult>,
 ): ActionResult {
+  const source = effectSourceIdentity(state, sourceCardInstanceId, cardDb,
+    resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceIdentity ??
+      resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot);
+  if (isDonActivationProhibitedByEffect(state, controller, source, cardDb)) {
+    return { state, events: [], succeeded: false };
+  }
   const events: PendingEvent[] = [];
   const params = action.params ?? {};
-  const amount = resolveAmount(params.amount ?? 1, _resultRefs, state, controller, _cardDb);
+  const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
   const p = state.players[controller];
   const restedDon = p.donCostArea.filter((d) => d.state === "RESTED");
   const count = Math.min(amount, restedDon.length);
@@ -652,6 +696,32 @@ export function executeReturnDonToDeck(
   if (params.until_count !== undefined) {
     return returnDonUntilCount(state, action, params.until_count, sourceCardInstanceId, controller, cardDb, resultRefs);
   }
+  if (hasNativeCostSemantics(state)) {
+    const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
+    const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? controller === 0 ? 1 : 0 : controller;
+    const p = state.players[owner];
+    const filter = action.target?.filter;
+    // Match the shared target-state contract: positive flags and exact state
+    // intersect; false flags add no restriction. State-restricted returns use
+    // unattached cost-area DON!!, as the active-only domain already did.
+    const stateRestricted = filter?.is_active === true || filter?.is_rested === true || !!filter?.state;
+    const pool = [...p.donCostArea.filter(d => !d.attachedTo
+      && (filter?.is_active !== true || d.state === "ACTIVE")
+      && (filter?.is_rested !== true || d.state === "RESTED")
+      && (!filter?.state || d.state === filter.state)), ...(action.target?.type === "DON_IN_COST_AREA" || stateRestricted ? [] : [p.leader, ...p.characters.filter(c => c !== null)].flatMap(c => c.attachedDon))];
+    const count = Math.min(amount, pool.length);
+    if (count <= 0) return { state, events, succeeded: false, fullyExecuted: false };
+    const plan = buildDonIdentityPlans(state, owner, pool.map(d => d.instanceId), count, count, cardDb);
+    if (plan.choices.length === 1) {
+      const applied = applyDonReturnIds(state, owner, decodeDonReturnIds(plan.choices[0].id)!)!;
+      return { ...applied, succeeded: true, fullyExecuted: count === amount, result: { targetInstanceIds: [], count } };
+    }
+    return { state, events, succeeded: false, pendingPrompt: {
+      options: { promptType: "PLAYER_CHOICE", effectDescription: `Choose which ${count} DON!! to return`, ...plan },
+      respondingPlayer: owner,
+      resumeContext: { effectSourceInstanceId: sourceCardInstanceId, controller, pausedAction: action, remainingActions: [], resultRefs: [...resultRefs], validTargets: plan.choices.map(c => c.id) },
+    } };
+  }
   const amount = resolveAmount(
     params.amount ?? 1,
     resultRefs,
@@ -720,7 +790,7 @@ export function executeRestDon(
 
   events.push({ type: "DON_RESTED", playerIndex: controller, payload: { count } });
 
-  return { state: { ...state, players: newPlayers }, events, succeeded: true, result: { targetInstanceIds: [], count } };
+  return { state: { ...state, players: newPlayers }, events, fullyExecuted: count === amount, succeeded: true, result: { targetInstanceIds: [], count } };
 }
 
 // ─── DISTRIBUTE_DON ──────────────────────────────────────────────────────────

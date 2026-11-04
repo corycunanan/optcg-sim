@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 /**
  * OPT-861: a paused action that declines a stale reply and asks the SAME
  * selection again must surface as a rejected response at the
@@ -105,7 +106,7 @@ function fixture() {
     persist() {
       state = parseStoredSession(
         JSON.parse(
-          JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+          JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })
         )
       ).state;
     },
@@ -334,7 +335,7 @@ describe("OPT-861 valid replies that lead to another prompt stay accepted", () =
       board.map((c) => c.instanceId).sort()
     );
     expect(
-      f.state.effectStack.at(-1)?.ruleTrashForPlay?.playTargetId
+      f.state.effectStack.at(-1)?.playOverflow?.playTargetId
     ).toBe(candidates[1].instanceId);
 
     f.persist();

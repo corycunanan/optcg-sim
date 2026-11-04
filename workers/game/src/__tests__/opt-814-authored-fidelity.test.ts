@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -167,6 +168,7 @@ function fixture() {
     get state() {
       return state;
     },
+    set state(next: typeof state) { state = next; },
   };
 }
 
@@ -352,6 +354,7 @@ describe("OPT-814 registered authored-card pipeline", () => {
     f.put(CARDS.VANILLA.id, 1);
     f.play("OP01-117");
     f.choose("accept");
+    f.state = scriptedDonPayment(f.state, f.db, 0, 1);
     // Mandatory DON-minus cost is paid before the target selection.
     if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
       f.select([]);
@@ -387,6 +390,7 @@ describe("OPT-814 registered authored-card pipeline", () => {
     );
     if (f.state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
       f.choose("accept");
+    f.state = scriptedDonPayment(f.state, f.db, 1, 2);
     if (f.state.pendingPrompt?.options.promptType === "SELECT_TARGET")
       f.select([]);
     expect(f.state.pendingPrompt).toBeNull();

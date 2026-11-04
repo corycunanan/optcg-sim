@@ -6,6 +6,7 @@ import { derivePrintedKeywords } from "../engine/printed-keywords.js";
 import { runPipeline } from "../engine/pipeline.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { createBattleReadyState, createTestCardDb } from "./helpers.js";
+import { effectTriggerWindow } from "./trigger-window-helpers.js";
 
 const CHARLOTTE_OVEN_ID = "OP03-105";
 
@@ -90,7 +91,7 @@ describe("OPT-591 referenced [Trigger] text does not open a Life trigger window"
 
     expect(result.valid).toBe(true);
     expect(result.state.turn.battle).toBeNull();
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     expect(result.state.players[1].life).toHaveLength(0);
     expect(result.state.players[1].hand).toHaveLength(handBefore + 1);
     expect(
@@ -131,7 +132,7 @@ describe("OPT-591 referenced [Trigger] text does not open a Life trigger window"
     );
 
     expect(result.succeeded).toBe(true);
-    expect(result.state.turn.pendingTriggerFromEffect ?? null).toBeNull();
+    expect(effectTriggerWindow(result.state) ?? null).toBeNull();
     expect(
       result.events.some((event) => event.type === "TRIGGER_ACTIVATED")
     ).toBe(false);

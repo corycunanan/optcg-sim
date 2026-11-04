@@ -227,7 +227,7 @@ describe("OPT-822 Life replacement", () => {
           selectedInstanceIds: ["nested-event"],
         });
       expect(
-        f.state.effectStack.some((frame) => frame.eventActivationCompletion)
+        f.state.effectStack.some((frame) => frame.eventActivation)
       ).toBe(true);
       f.choice("accept");
       expect(
@@ -480,7 +480,7 @@ describe("OPT-822 Life replacement", () => {
   it("empty Life cannot perform a replacement payment", () => {
     const f = fixture([]);
     f.play("ST13-012");
-    f.choice("accept");
+    // OPT-864: the unpayable optional cost is skipped without a prompt.
     expect(f.state.pendingPrompt).toBeNull();
     expect(
       f.state.eventLog.filter((e) => e.type === "CARD_REMOVED_FROM_LIFE")

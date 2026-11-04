@@ -1,10 +1,11 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { CardData, CardInstance, GameAction } from "../types.js";
 import { getEffectSchema } from "../engine/schema-registry.js";
 import { registerCardEnteredField } from "../engine/triggers.js";
 import { executeTrashFromHand } from "../engine/effect-resolver/actions/removal.js";
 import { runPipeline } from "../engine/pipeline.js";
-import { parseStoredSession } from "../session/persistence.js";
+import { convertPersistedGameState, parseStoredSession } from "../session/persistence.js";
 import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import {
   visibleStateForPlayer,
@@ -123,7 +124,7 @@ function fixture() {
     persist() {
       state = parseStoredSession(
         JSON.parse(
-          JSON.stringify({ state, cardDb: Object.fromEntries(db), mode: "PVP" })
+          JSON.stringify({ state: toPersistedGameState(state), cardDb: Object.fromEntries(db), mode: "PVP" })
         )
       ).state;
     },
@@ -355,7 +356,7 @@ describe("blind choice lifecycle shared consumers", () => {
       countMin: 0,
     });
     const resumed = resumePromptLifecycle(
-      { ...result.state, pendingPrompt: result.pendingPrompt! },
+      convertPersistedGameState(toPersistedGameState({ ...result.state, pendingPrompt: result.pendingPrompt! }), "state"),
       { type: "SELECT_TARGET", selectedInstanceIds: [] },
       f.db,
       { drainPregame: (s) => s, advanceStartOfTurn: (s) => s }

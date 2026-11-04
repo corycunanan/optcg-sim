@@ -16,6 +16,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 type PromptResult = {
   state: GameState;
@@ -72,14 +73,9 @@ function driveToMaserSaberTrigger(opponentHandSize: number) {
   );
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
   result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
-  expect(result.state.turn.battle?.pendingTriggerLifeCard?.cardId).toBe(maserSaber.id);
+  expect(battleTriggerLifeCard(result.state)?.cardId).toBe(maserSaber.id);
 
-  result = runPipeline(
-    result.state,
-    { type: "REVEAL_TRIGGER", reveal: true },
-    cardDb,
-    1,
-  );
+  result = revealTrigger(result.state, true, cardDb);
   expect(result.valid).toBe(true);
   return { result, cardDb, opponentTarget };
 }

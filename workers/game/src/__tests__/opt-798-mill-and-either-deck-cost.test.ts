@@ -113,6 +113,15 @@ function fixture() {
     expect(promptType()).toBe("OPTIONAL_EFFECT");
     act({ type: "PLAYER_CHOICE", choiceId: "skip" });
   }
+  /**
+   * OPT-864: an optional effect whose cost sequence cannot be paid is skipped
+   * without a prompt (rule 8-3-1-3); formerly the prompt surfaced and
+   * accepting it paid nothing.
+   */
+  function expectNoOptionalPrompt() {
+    expect(promptType()).not.toBe("OPTIONAL_EFFECT");
+    expect(state.effectStack.some((f) => f.phase === "AWAITING_OPTIONAL_RESPONSE")).toBe(false);
+  }
   function select(ids: string[]) {
     act({ type: "SELECT_TARGET", selectedInstanceIds: ids });
   }
@@ -126,7 +135,7 @@ function fixture() {
     );
   }
   return {
-    db, put, deck, act, respond, accept, decline, select, validTargets, promptType, millEvents,
+    db, put, deck, act, respond, accept, decline, expectNoOptionalPrompt, select, validTargets, promptType, millEvents,
     roundTrip() {
       state = JSON.parse(JSON.stringify(state));
     },
@@ -170,7 +179,7 @@ describe.each(["EB01-051", "EB04-049"])("OPT-798 %s — MILL is an activation co
     f.deck(0, 1);
     const victim = f.put("victim", 1, "CHARACTER", { cost: 2 });
     f.act({ type: "PLAY_CARD", cardInstanceId: putEvent(f, id).instanceId });
-    f.accept();
+    f.expectNoOptionalPrompt();
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.state.effectStack).toHaveLength(0);
     expect(f.state.players[0].deck).toHaveLength(1);
@@ -202,10 +211,9 @@ describe.each(["EB01-051", "EB04-049"])("OPT-798 %s — MILL is an activation co
   // OPT-798 review: rule 9-1-2 (rule processing is immediate) + 9-2-1-2 (a
   // player with 0 cards in deck loses). Paying the cost with exactly N cards
   // empties the deck, so the game must end before the post-colon K.O. prompt.
-  // Pre-existing shared defect (the MILL action behaves the same way): defeat
-  // is only checked at the pipeline boundary. Tracked as a follow-up; this
-  // ratchet fails loudly once immediate deck-out processing lands.
-  it.fails("an exactly-2-card deck pays, then loses immediately before any K.O. prompt (rule 9-1-2)", () => {
+  // Formerly an it.fails ratchet; OPT-862 (OPT-960) checks rule processing
+  // after each committed cost payment.
+  it("an exactly-2-card deck pays, then loses immediately before any K.O. prompt (rule 9-1-2)", () => {
     const f = fixture();
     f.deck(0, 2);
     f.put("victim", 1, "CHARACTER", { cost: 2 });
@@ -255,9 +263,10 @@ describe.each(["EB01-051", "EB04-049"])("OPT-798 %s — MILL is an activation co
         (b) => b.trigger && "keyword" in b.trigger && b.trigger.keyword === "MAIN_EVENT",
       )!;
       const reused = resolveEffect(f.state, main, source.instanceId, 1, f.db);
-      expect(reused.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-      f.state = { ...reused.state, pendingPrompt: reused.pendingPrompt! };
-      f.accept();
+      // OPT-864: an unpayable sequence is skipped before the prompt.
+      expect(reused.pendingPrompt?.options.promptType).toBe(paid ? "OPTIONAL_EFFECT" : undefined);
+      f.state = { ...reused.state, pendingPrompt: reused.pendingPrompt ?? null };
+      if (paid) f.accept();
       if (!paid) {
         expect(f.state.pendingPrompt).toBeNull();
         expect(f.state.effectStack).toHaveLength(0);
@@ -302,12 +311,12 @@ function lucciAttack(f: Fixture) {
 }
 
 describe("OPT-798 OP07-079 Rob Lucci [When Attacking] MILL cost", () => {
-  it("unpayable (1-card deck): accepting pays nothing and resolves no cost reduction", () => {
+  it("unpayable (1-card deck): no prompt, pays nothing, resolves no cost reduction (OPT-864)", () => {
     const f = fixture();
     f.deck(0, 1);
     const target = f.put("target", 1, "CHARACTER", { cost: 3 });
     lucciAttack(f);
-    f.accept();
+    f.expectNoOptionalPrompt();
     expect(f.state.players[0].deck).toHaveLength(1);
     expect(f.millEvents()).toHaveLength(0);
     expect(f.validTargets()).not.toContain(target.instanceId);
@@ -344,7 +353,7 @@ describe("OPT-798 EB04-042 Alpha [On Play] MILL cost", () => {
     f.deck(0, 2);
     const target = f.put("target", 1, "CHARACTER", { cost: 3 });
     f.act({ type: "PLAY_CARD", cardInstanceId: f.put("EB04-042", 0, "HAND", { cost: 2 }).instanceId });
-    f.accept();
+    f.expectNoOptionalPrompt();
     expect(f.state.players[0].deck).toHaveLength(2);
     expect(f.millEvents()).toHaveLength(0);
     expect(f.validTargets()).not.toContain(target.instanceId);
@@ -364,9 +373,9 @@ describe("OPT-798 EB04-042 Alpha [On Play] MILL cost", () => {
     expect(f.millEvents()[0].payload).toMatchObject({ count: 3 });
   });
 
-  // Same rule 9-1-2 ratchet as the Event case: emptying the deck with the
-  // cost must end the game before the −1 cost target prompt.
-  it.fails("an exactly-3-card deck pays, then loses immediately before the −1 cost prompt (rule 9-1-2)", () => {
+  // Same rule 9-1-2 case as the Event: emptying the deck with the cost ends
+  // the game before the −1 cost target prompt (formerly a ratchet, OPT-862).
+  it("an exactly-3-card deck pays, then loses immediately before the −1 cost prompt (rule 9-1-2)", () => {
     const f = fixture();
     f.deck(0, 3);
     f.put("target", 1, "CHARACTER", { cost: 3 });
@@ -407,7 +416,7 @@ describe("OPT-798 OP15-088 Pirates Docking Six", () => {
     const { f } = setup(2);
     f.put("shc-in-trash", 0, "TRASH", { cost: 2, types: ["Straw Hat Crew"] });
     f.act({ type: "PLAY_CARD", cardInstanceId: f.state.players[0].hand.at(-1)!.instanceId });
-    f.accept();
+    f.expectNoOptionalPrompt();
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.state.players[0].hand).toHaveLength(3);
     expect(f.state.players[0].deck).toHaveLength(2);
@@ -622,7 +631,7 @@ describe("OPT-798 OP04-055 Plague Rounds — both costs in printed order", () =>
     const { f, oni } = setup();
     f.put("opp-cost-5", 1, "CHARACTER", { cost: 5 });
     f.act({ type: "PLAY_CARD", cardInstanceId: putEvent(f, "OP04-055").instanceId });
-    f.accept();
+    f.expectNoOptionalPrompt();
     expect(f.state.pendingPrompt).toBeNull();
     expect(f.state.players[0].hand.map((c) => c.instanceId)).toContain(oni.instanceId);
     expect(f.state.players[0].characters.every((c) => c === null)).toBe(true);
@@ -633,7 +642,7 @@ describe("OPT-798 OP04-055 Plague Rounds — both costs in printed order", () =>
     f.put("oni-in-trash", 0, "TRASH", { name: "Ice Oni", cost: 5 });
     const opp4 = f.put("opp-cost-4", 1, "CHARACTER", { cost: 4 });
     f.act({ type: "PLAY_CARD", cardInstanceId: putEvent(f, "OP04-055").instanceId });
-    f.accept();
+    f.expectNoOptionalPrompt();
     expect(f.state.pendingPrompt).toBeNull();
     expect(onField(f.state, opp4.instanceId)).toBe(true);
   });
