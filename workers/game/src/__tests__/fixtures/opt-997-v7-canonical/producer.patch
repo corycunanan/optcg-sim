@@ -1,0 +1,1077 @@
+diff --git a/workers/game/src/__tests__/opt-960-rig.ts b/workers/game/src/__tests__/opt-960-rig.ts
+index 8a1dfb3..6cb1d19 100644
+--- a/workers/game/src/__tests__/opt-960-rig.ts
++++ b/workers/game/src/__tests__/opt-960-rig.ts
+@@ -111,8 +111,9 @@ export function rig(): Rig {
+       else if (zone === "HAND") p.hand.push(card);
+       else if (zone === "TRASH") p.trash.unshift(card);
+       else if (zone === "LEADER") p.leader = card;
++      else if (zone === "STAGE") p.stage = card;
+       else p.characters[p.characters.findIndex((slot) => !slot)] = card;
+-      if (zone === "LEADER" || zone === "CHARACTER") {
++      if (zone === "LEADER" || zone === "CHARACTER" || zone === "STAGE") {
+         state = registerCardEnteredField(state, card, db.get(id)!);
+       }
+       return card;
+diff --git a/workers/game/src/__tests__/opt-997-canonical-producer.test.ts b/workers/game/src/__tests__/opt-997-canonical-producer.test.ts
+new file mode 100644
+index 0000000..c3ebb16
+--- /dev/null
++++ b/workers/game/src/__tests__/opt-997-canonical-producer.test.ts
+@@ -0,0 +1,72 @@
++/** Actual isolated writer only. Reader CI replays captured bytes, never flips ordinary writers. */
++import { describe, expect, it } from "vitest";
++import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
++import { resolve } from "node:path";
++import { rig, synSchema } from "./opt-960-rig.js";
++import { capture, command, memoryRepository, type CostCorpus } from "./opt-997-corpus-support.js";
++import type { Cost } from "../engine/effect-types.js";
++import type { GameAction, GameState } from "../types.js";
++const variants = ["arrange-top", "arrange-bottom", "fixed-stage-trash", "fixed-stage-deck", "self-hand", "named-stage", "life-top", "life-bottom", "life-fixed-top", "life-fixed-bottom"];
++describe.runIf(Boolean(process.env.OPT997_REGENERATE))("OPT997 canonical actual producer", () => {
++  for (const variant of variants) for (const decline of [false, true]) it(`${variant}-${decline ? "decline" : "accept"}`, async () => {
++    const r = rig(); r.deck(0, 5); r.deck(1, 5);
++    for (const p of [0, 1] as const) for (let n = 0; n < 3; n++) r.put(`canonical-hand-${n}`, p, "HAND");
++    const life = variant.startsWith("life-"); const stage = variant.includes("stage") || variant === "self-hand";
++    const cost: Cost = variant.startsWith("arrange-") ? { type: "PLACE_SELF_AND_TRASH_TO_DECK", amount: 1, position: variant.endsWith("top") ? "TOP" : "BOTTOM" } as Cost
++      : variant === "fixed-stage-trash" ? { type: "TRASH_OWN_STAGE" }
++      : variant === "fixed-stage-deck" ? { type: "PLACE_STAGE_TO_DECK" }
++      : variant === "self-hand" ? { type: "PLACE_SELF_AND_HAND_TO_DECK", amount: 1 } as Cost
++      : variant === "named-stage" ? { type: "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE", card_name: "canonical-source", amount: 1 } as Cost
++      : { type: "ADD_OWN_CHARACTER_TO_LIFE", amount: 1, controller: "OPPONENT", position: variant.includes("fixed") ? variant.endsWith("top") ? "TOP" : "BOTTOM" : "TOP_OR_BOTTOM" } as Cost;
++    const owner = life ? 1 : 0;
++    const source = r.put("canonical-source", owner, stage ? "STAGE" : "CHARACTER", { ...(stage ? { data: { type: "Stage" } } : {}), schema: synSchema("canonical-source", [
++      { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true, once_per_turn: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 } }] },
++      ...(!life && (!stage || variant === "self-hand") ? [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [cost], actions: [{ type: "DRAW", params: { amount: 1 } }] }] as never[] : []),
++    ], stage ? "Stage" : "Character") });
++    const activator = life || (stage && variant !== "self-hand") ? r.put("canonical-activator", 0, "CHARACTER", { schema: synSchema("canonical-activator", [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [cost], actions: [{ type: "DRAW", params: { amount: 1 } }] }]) }) : source;
++    r.put("canonical-trash-a", 0, "TRASH"); r.put("canonical-trash-b", 0, "TRASH");
++    await capture(r);
++    r.state = command(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: activator.instanceId, effectId: "activate" }, r.db);
++    const initial = await capture(r); const steps: CostCorpus["steps"] = [];
++    for (let n = 0; r.state.pendingPrompt && n < 10; n++) {
++      const p = r.state.pendingPrompt.options; let action: GameAction;
++      if (p.promptType === "OPTIONAL_EFFECT") action = { type: "PLAYER_CHOICE", choiceId: decline ? "skip" : "accept" };
++      else if (p.promptType === "SELECT_TARGET") action = { type: "SELECT_TARGET", selectedInstanceIds: p.validTargets.slice(0, p.countMin) };
++      else if (p.promptType === "ARRANGE_TOP_CARDS") action = { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: p.cards.map(c => c.instanceId).reverse(), destination: variant.endsWith("top") ? "bottom" : "top" };
++      else if (p.promptType === "PLAYER_CHOICE") { const choice = p.choices.find(c => c.id.endsWith(variant.endsWith("bottom") ? ":BOTTOM" : ":TOP")); if (!choice) throw new Error("missing Life endpoint"); action = { type: "PLAYER_CHOICE", choiceId: choice.id }; }
++      else throw new Error(`unexpected ${p.promptType}`);
++      r.state = command(r.state, action, r.db); const stored = await capture(r);
++      steps.push({ action, expected: structuredClone(r.state), stored });
++    }
++    expect(r.state.effectStack).toHaveLength(0); expect(r.state.pendingPrompt).toBeNull();
++    expect(r.state.players[owner].hand).toHaveLength(decline ? variant === "self-hand" ? 3 : life ? 3 : 4 : 3);
++    expect(r.state.activeEffects.some(e => e.sourceCardInstanceId === source.instanceId && e.modifiers.some(m => m.params?.usedOnTurn === r.state.turn.number))).toBe(!decline);
++    const family = `canonical-${variant}-${decline ? "decline" : "accept"}`;
++    const dir = resolve(process.env.OPT997_REGENERATE!); mkdirSync(dir, { recursive: true });
++    writeFileSync(resolve(dir, `${family}.json`), JSON.stringify({ family, initial, steps, sourceId: source.instanceId, activationSourceId: activator.instanceId, owner, decline, terminal: false } satisfies CostCorpus, null, 2) + "\n");
++  });
++  it("reoffer preserves absent outcome until final answer", async () => {
++    const r = rig(); r.deck(0, 5); r.deck(1, 5);
++    for (let n = 0; n < 3; n++) r.put(`reoffer-hand-${n}`, 0, "HAND");
++    const source = r.put("reoffer-source", 0, "CHARACTER", { schema: synSchema("reoffer-source", [
++      ...["first", "second"].map(id => ({ id, category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true }, replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }] })) as never[],
++      { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] },
++    ]) });
++    await capture(r); r.state = command(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" }, r.db);
++    const initial = await capture(r); const steps: CostCorpus["steps"] = []; let declines = 0;
++    while (r.state.pendingPrompt) {
++      const p = r.state.pendingPrompt.options;
++      const owner = r.state.effectStack.find(f => f.kind === "COST")!;
++      if (p.promptType === "OPTIONAL_EFFECT" || p.promptType === "PLAYER_CHOICE") expect(owner.costReplacementResolution).toBeUndefined();
++      const action: GameAction = p.promptType === "PLAYER_CHOICE" ? { type: "PLAYER_CHOICE", choiceId: p.choices[0].id }
++        : p.promptType === "OPTIONAL_EFFECT" ? { type: "PLAYER_CHOICE", choiceId: declines++ === 0 ? "skip" : "accept" }
++        : p.promptType === "SELECT_TARGET" ? { type: "SELECT_TARGET", selectedInstanceIds: p.validTargets.slice(0, p.countMin) } : (() => { throw new Error("unexpected reoffer prompt"); })();
++      r.state = command(r.state, action, r.db); const stored = await capture(r); steps.push({ action, expected: structuredClone(r.state), stored });
++    }
++    expect(declines).toBe(2); expect(r.state.effectStack).toHaveLength(0); expect(r.state.players[0].hand).toHaveLength(2);
++    expect(r.state.eventLog.map(e => e.type)).toEqual(["CARD_TRASHED"]);
++    const family = "canonical-reoffer"; const dir = resolve(process.env.OPT997_REGENERATE!); mkdirSync(dir, { recursive: true });
++    writeFileSync(resolve(dir, `${family}.json`), JSON.stringify({ family, initial, steps, sourceId: source.instanceId, owner: 0, decline: false, terminal: false } satisfies CostCorpus, null, 2) + "\n");
++  });
++
++});
+diff --git a/workers/game/src/__tests__/opt-997-corpus-support.ts b/workers/game/src/__tests__/opt-997-corpus-support.ts
+new file mode 100644
+index 0000000..4d41c85
+--- /dev/null
++++ b/workers/game/src/__tests__/opt-997-corpus-support.ts
+@@ -0,0 +1,50 @@
++/** Exact synthetic capture/replay boundary; no engine implementation or state repair. */
++import { expect } from "vitest";
++import { SessionCoordinator } from "../session/coordinator.js";
++import { SessionRepository, type SessionStorage } from "../session/persistence.js";
++import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
++import { toPersistedGameState } from "../session/game-state-schema.js";
++import type { GameAction, GameState } from "../types.js";
++import type { Rig } from "./opt-960-rig.js";
++export function memoryRepository(initial: Record<string, unknown> = {}) {
++  const values = structuredClone(initial);
++  const storage: SessionStorage = {
++    async get<T>(key: string) { return values[key] as T | undefined; },
++    async put(keyOrEntries: string | Record<string, unknown>, value?: unknown) {
++      Object.assign(values, structuredClone(typeof keyOrEntries === "string" ? { [keyOrEntries]: value } : keyOrEntries));
++    }, async setAlarm() {}, async deleteAlarm() {},
++  };
++  return { values, repo: new SessionRepository(storage, { nextJsUrl: "https://example.test", workerSecret: "secret" }) };
++}
++export async function capture(r: Rig) {
++  const { repo, values } = memoryRepository();
++  const saved = await repo.save({ state: r.state, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [] });
++  // Candidate load promotion happens before any action; then persist the complete promoted pair.
++  const promoted = (await repo.load())!;
++  const stable = await repo.save({ ...promoted, undoHistory: [promoted.state] });
++  const loaded = (await repo.load())!;
++  expect(loaded.state).toEqual(toPersistedGameState(stable.state));
++  expect(loaded.undoHistory).toEqual([loaded.state]);
++  r.state = loaded.state;
++  return values;
++}
++export function command(state: GameState, action: GameAction, db: Rig["db"], actor = state.pendingPrompt?.respondingPlayer ?? state.turn.activePlayerIndex) {
++  const bound = { ...action, ...(state.pendingPrompt?.promptId ? { promptId: state.pendingPrompt.promptId } : {}) } as GameAction;
++  const result = new SessionCoordinator().executeAction(state, [], actor, bound, db);
++  expect(result.kind, result.kind === "reject" ? result.reason : "").not.toBe("reject");
++  if (result.kind !== "resume") return result.state;
++  const resumed = resumePromptLifecycle(result.state, bound, db, { drainPregame: s => s, advanceStartOfTurn: s => s });
++  expect(resumed.responseRejected).toBe(false);
++  return resumed.state;
++}
++export interface CostCorpus {
++  family: string;
++  initial: Record<string, unknown>;
++  steps: { action: GameAction; expected: GameState; stored: Record<string, unknown> }[];
++  sourceId: string;
++  activationSourceId?: string;
++  owner: 0 | 1;
++  decline: boolean;
++  terminal: boolean;
++  knownDebt?: boolean;
++}
+diff --git a/workers/game/src/__tests__/opt-997-producer-corpus.test.ts b/workers/game/src/__tests__/opt-997-producer-corpus.test.ts
+new file mode 100644
+index 0000000..d89731d
+--- /dev/null
++++ b/workers/game/src/__tests__/opt-997-producer-corpus.test.ts
+@@ -0,0 +1,124 @@
++/** Regenerate only in the pinned isolated writer. Default CI replays captures. */
++import { describe, expect, it } from "vitest";
++import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
++import { resolve } from "node:path";
++import { rig, synSchema } from "./opt-960-rig.js";
++import { capture, command, memoryRepository, type CostCorpus } from "./opt-997-corpus-support.js";
++import type { Cost, Action } from "../engine/effect-types.js";
++import type { GameAction } from "../types.js";
++
++const families = ["fixed-accept", "fixed-decline", "fixed-mandatory", "selected-accept", "selected-mandatory", "compound-select", "compound-arrange", "opponent-life", "two-child-result-ref", "terminal-immediate", "terminal-after-child", "nested-replacement", "upgrade-pending6", "picker-fixed", "picker-variable", "picker-action", "picker-replacement", "later-cost-replacement", "fixed-mandatory-prefix", "selected-mandatory-prefix", "compound-select-prefix", "compound-arrange-prefix", "opponent-life-prefix", "fixed-accept-prefix", "selected-accept-prefix", "terminal-after-child-prefix", "picker-duplicate-hosts", "picker-hold-durations"] as const;
++describe.runIf(Boolean(process.env.OPT997_REGENERATE))("OPT-997 actual v7 producer", () => {
++  it("legacy-accepted6-unknown", async () => {
++    const historical = JSON.parse(readFileSync(new URL("./fixtures/opt-969/cost-child-replacement.json", import.meta.url), "utf8"));
++    const loaded = (await memoryRepository(historical.initial).repo.load())!;
++    expect(loaded.state.schemaVersion).toBe(7);
++    const r = rig(); r.state = loaded.state; r.db = loaded.cardDb;
++    const initial = await capture(r);
++    expect(r.state.schemaVersion).toBe(7);
++    expect(r.state.effectStack.find(f => f.kind === "COST")!.costReplacementResolution).toBeUndefined();
++    const action = historical.steps[0].action as GameAction;
++    r.state = command(r.state, action, r.db);
++    const stored = await capture(r);
++    expect(r.state.pendingPrompt).toBeNull();
++    expect(r.state.effectStack.some(f => f.kind === "COST" && !f.costReplacementResolution)).toBe(true);
++    const dir = resolve(process.env.OPT997_REGENERATE!); mkdirSync(dir, { recursive: true });
++    writeFileSync(resolve(dir, "legacy-accepted6-unknown.json"), JSON.stringify({ family: "legacy-accepted6-unknown", initial, steps: [{ action, expected: r.state, stored }], sourceId: "", owner: 0, decline: false, terminal: false, knownDebt: true } satisfies CostCorpus, null, 2) + "\n");
++  });
++  for (const family of families) it(family, async () => {
++    const scenario = family.replace(/-prefix$/, "").replace(/^picker-(duplicate-hosts|hold-durations)$/, "picker-action");
++    const prefix = family.endsWith("-prefix");
++    const r = rig(); r.deck(0, 5); r.deck(1, 5);
++    for (const owner of [0, 1] as const) for (let n = 0; n < 4; n++) r.put(`OPT997-hand-${n}`, owner, "HAND");
++    const owner = scenario === "opponent-life" ? 1 : 0;
++    const picker = scenario.startsWith("picker-");
++    const decline = scenario === "fixed-decline";
++    const terminal = scenario.startsWith("terminal-");
++    const actions: Action[] = prefix ? [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 } }, ...(scenario === "terminal-after-child" ? [{ type: "MILL", params: { amount: 4 } }] as Action[] : [])] : scenario === "nested-replacement" ? [{ type: "KO", target: { type: "CHARACTER", controller: "SELF", count: { exact: 1 } } }, { type: "TRASH_FROM_HAND", params: { amount: 1 } }] : scenario === "terminal-immediate" ? [{ type: "MILL", params: { amount: 5 } }] : [
++      { type: "TRASH_FROM_HAND", params: { amount: scenario === "two-child-result-ref" ? 1 : 2 }, ...(scenario === "two-child-result-ref" ? { result_ref: "first" } : {}) },
++      ...(scenario === "two-child-result-ref" ? [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }, { type: "MODIFY_POWER", target: { type: "SELF" }, params: { amount: { type: "PER_COUNT", source: "CARDS_TRASHED_THIS_WAY", ref: "first", multiplier: 1000 }, duration: "THIS_TURN" } }] as Action[] : []),
++      ...(scenario === "terminal-after-child" ? [{ type: "MILL", params: { amount: 5 } }] as Action[] : []),
++    ];
++    let costs: Cost[] = [{ type: "REST_DON", amount: 1 }, { type: "TRASH_SELF" }];
++    if (scenario === "picker-fixed") costs = [{ type: "DON_MINUS", amount: 2 }, { type: "TRASH_FROM_HAND", amount: 1 }];
++    if (scenario === "picker-variable") costs = [{ type: "VARIABLE_DON_RETURN" }, { type: "TRASH_FROM_HAND", amount: 1 }];
++    if (scenario.startsWith("selected")) costs = [{ type: "REST_DON", amount: 1 }, { type: "TRASH_OWN_CHARACTER", amount: 1 }];
++    if (scenario.startsWith("compound")) costs = [{ type: "REST_DON", amount: 1 }, { type: "PLACE_SELF_AND_TRASH_TO_DECK", amount: 1, position: "BOTTOM" } as Cost];
++    if (scenario === "opponent-life") costs = [{ type: "REST_DON", amount: 1 }, { type: "ADD_OWN_CHARACTER_TO_LIFE", amount: 1, controller: "OPPONENT", position: "TOP_OR_BOTTOM" } as Cost];
++    const source = r.put("OPT997-source", owner, "CHARACTER", { ...(family === "picker-duplicate-hosts" || family === "picker-hold-durations" ? { data: { name: "Roronoa Zoro" } } : {}), schema: synSchema("OPT997-source", [{ id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: scenario === "picker-replacement" ? [{ type: "RETURN_DON_TO_DECK", params: { amount: 1 } }] : actions, flags: { optional: !(scenario.endsWith("mandatory") || (prefix && !scenario.endsWith("accept"))), ...(prefix ? { once_per_turn: true } : {}) } }, ...(owner === 0 ? [{ id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, flags: { once_per_turn: true }, costs, actions: scenario === "picker-action" ? [{ type: "RETURN_DON_TO_DECK", params: { amount: 1 } }, { type: "DRAW", params: { amount: 1 } }] : [{ type: "DRAW", params: { amount: 1 } }, ...(scenario === "compound-select" ? [{ type: "SHUFFLE_DECK" }] : [])] }] as never[] : [])]) });
++    const activator = owner === 0 ? source : r.put("OPT997-activator", 0, "CHARACTER", { schema: synSchema("OPT997-activator", [{ id: "activate", category: "activate", ...(prefix ? { flags: { once_per_turn: true } } : {}), trigger: { keyword: "ACTIVATE_MAIN" }, costs, actions: [{ type: "DRAW", params: { amount: 1 } }] }]) });
++    if (picker) {
++      const attached = r.state.players[0].donCostArea.pop()!;
++      source.attachedDon = [{ ...attached, attachedTo: source.instanceId }];
++      r.state.prohibitions.push({ id: "opt997-hold", sourceCardInstanceId: source.instanceId, sourceEffectBlockId: "replacement", prohibitionType: "CANNOT_REFRESH", scope: {}, duration: { type: "SKIP_NEXT_REFRESH" }, controller: 0, appliesTo: [r.state.players[0].donCostArea[0].instanceId], usesRemaining: null } as never);
++    }
++    if (family === "picker-duplicate-hosts") {
++      const duplicate = r.put("OPT997-source", 0, "CHARACTER");
++      const attached = r.state.players[0].donCostArea.pop()!;
++      duplicate.attachedDon = [{ ...attached, attachedTo: duplicate.instanceId }];
++    }
++    if (family === "picker-hold-durations") r.state.prohibitions.push({ id: "opt997-second-hold", sourceCardInstanceId: source.instanceId, sourceEffectBlockId: "replacement", prohibitionType: "CANNOT_REFRESH", scope: {}, duration: { type: "THIS_TURN" }, controller: 0, appliesTo: [r.state.players[0].donCostArea[1].instanceId], usesRemaining: null } as never);
++    if (scenario === "picker-action") { const block = r.db.get(source.cardId)!.effectSchema!.effects.find(e => e.id === "activate")!; block.costs = []; }
++    if (scenario.startsWith("compound")) r.put("OPT997-trash", 0, "TRASH");
++    if (scenario === "compound-select") r.put("OPT997-trash-2", 0, "TRASH");
++    if (scenario === "later-cost-replacement") r.put("OPT997-watcher", 0, "CHARACTER", { schema: synSchema("OPT997-watcher", [
++      { id: "watcher-replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }], flags: { optional: true, once_per_turn: true } },
++      { id: "watcher", category: "auto", trigger: { event: "CARD_TRASHED_FROM_HAND" }, flags: { once_per_turn: true }, costs: [{ type: "TRASH_SELF" }], actions: [{ type: "DRAW", params: { amount: 1 } }] },
++    ]) });
++    if (scenario === "nested-replacement") r.put("OPT997-nested", 0, "CHARACTER", { schema: synSchema("OPT997-nested", [{ id: "nested", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, replacement_actions: [{ type: "TRASH_FROM_HAND", params: { amount: 1 } }], flags: { optional: true } }]) });
++    // The candidate's actual writer supplies native7 before any offer is made.
++    await capture(r); expect(r.state.schemaVersion).toBe(7);
++    if (scenario === "upgrade-pending6") r.state.schemaVersion = 6;
++    r.state = command(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: activator.instanceId, effectId: "activate" }, r.db);
++    const initial = await capture(r);
++    if (prefix && r.promptType() === "SELECT_TARGET" && r.state.effectStack.some(f => f.costReplacementResolution === "REPLACED")) { expect(r.state.players[owner].deck).toHaveLength(4); expect(r.state.players[owner].hand).toHaveLength(5); expect(r.state.activeEffects.some(e => e.sourceCardInstanceId === source.instanceId && e.modifiers.some(m => m.params?.usedOnTurn === r.state.turn.number))).toBe(true); }
++    if (family === "picker-duplicate-hosts" || family === "picker-hold-durations") {
++      const prompt = r.state.pendingPrompt!.options;
++      if (prompt.promptType !== "PLAYER_CHOICE") throw new Error("missing picker");
++      const labels = prompt.donIdentityReturn!.groups.map(g => g.label);
++      expect(new Set(labels).size).toBe(labels.length);
++      expect(new Set(prompt.choices.map(c => c.label)).size).toBe(prompt.choices.length);
++      if (family === "picker-duplicate-hosts") { expect(labels.some(l => l.includes("Character slot 1"))).toBe(true); expect(labels.some(l => l.includes("Character slot 2"))).toBe(true); }
++      else { expect(labels.some(l => l.includes("next refresh"))).toBe(true); expect(labels.some(l => l.includes("this turn"))).toBe(true); }
++    }
++    const steps: CostCorpus["steps"] = [];
++    for (let n = 0; r.state.pendingPrompt && n < 12; n++) {
++      const p = r.state.pendingPrompt.options;
++      let action: GameAction;
++      if (p.promptType === "OPTIONAL_EFFECT") action = { type: "PLAYER_CHOICE", choiceId: decline ? "skip" : "accept" };
++      else if (p.promptType === "SELECT_TARGET") action = { type: "SELECT_TARGET", selectedInstanceIds: p.validTargets.some(id => id.startsWith("OPT997-nested#")) ? p.validTargets.filter(id => id.startsWith("OPT997-nested#")) : p.validTargets.slice(0, p.countMin) };
++      else if (p.promptType === "ARRANGE_TOP_CARDS") action = { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: p.cards.map(c => c.instanceId), destination: "bottom" };
++      else if (p.promptType === "PLAYER_CHOICE") {
++        const wanted = scenario === "picker-fixed" ? r.state.players[0].donCostArea.slice(0, 2).map(d => d.instanceId) : scenario === "picker-variable" ? [r.state.players[0].donCostArea[0].instanceId] : null;
++        const choice = wanted ? p.choices.find(c => { const ids: string[] = JSON.parse(c.id.slice("don-return-ids:".length)); return ids.length === wanted.length && wanted.every(id => ids.includes(id)); }) : p.choices.find(c => !c.disabled);
++        if (!choice) throw new Error("missing requested offered plan");
++        action = { type: "PLAYER_CHOICE", choiceId: choice.id };
++      }
++      else throw new Error(`Unsupported ${p.promptType}`);
++      r.state = command(r.state, action, r.db);
++      const stored = await capture(r);
++      if (prefix && r.state.pendingPrompt?.options.promptType === "SELECT_TARGET" && r.state.effectStack.some(f => f.costReplacementResolution === "REPLACED")) { expect(r.state.players[owner].deck).toHaveLength(4); expect(r.state.players[owner].hand).toHaveLength(5); expect(r.state.activeEffects.some(e => e.sourceCardInstanceId === source.instanceId && e.modifiers.some(m => m.params?.usedOnTurn === r.state.turn.number))).toBe(true); }
++      steps.push({ action, expected: structuredClone(r.state), stored });
++    }
++    expect(r.state.pendingPrompt).toBeNull(); expect(r.state.effectStack).toHaveLength(0);
++    if (prefix && !terminal) {
++      expect(r.state.players[owner].deck).toHaveLength(4);
++      expect(r.state.players[owner].hand).toHaveLength(4);
++      expect(r.state.activeEffects.some(e => e.sourceCardInstanceId === source.instanceId && e.modifiers.some(m => m.params?.usedOnTurn === r.state.turn.number))).toBe(true);
++      expect(r.state.eventLog.map(e => e.type)).toEqual(["CARD_DRAWN", "DRAW_OUTSIDE_DRAW_PHASE", "CARD_TRASHED"]);
++    }
++    if (picker) { expect(r.state.schemaVersion).toBe(7); }
++    else if (terminal) expect(r.state.status).toBe("FINISHED");
++    else {
++      expect(steps.length).toBeGreaterThan(0);
++      expect(r.state.players[owner].characters.some(c => c?.instanceId === source.instanceId)).toBe(!decline);
++      expect(r.state.players[0].donCostArea.filter(d => d.state === "RESTED")).toHaveLength(decline ? 1 : 0);
++      expect(r.state.turn.oncePerTurnUsed.activate?.includes(activator.instanceId) ?? false).toBe(decline);
++      const legal = command(r.state, { type: "ATTACH_DON", targetInstanceId: r.state.players[0].leader.instanceId, count: 1 }, r.db);
++      const battle = command(legal, { type: "DECLARE_ATTACK", attackerInstanceId: legal.players[0].leader.instanceId, targetInstanceId: legal.players[1].leader.instanceId }, r.db);
++      command(battle, { type: "PASS" }, r.db, 1);
++    }
++    const dir = resolve(process.env.OPT997_REGENERATE!); mkdirSync(dir, { recursive: true });
++    writeFileSync(resolve(dir, `${family}.json`), JSON.stringify({ family, initial, steps, sourceId: source.instanceId, activationSourceId: activator.instanceId, owner, decline, terminal } satisfies CostCorpus, null, 2) + "\n");
++  });
++});
+diff --git a/workers/game/src/__tests__/opt-997-promotion-producer.test.ts b/workers/game/src/__tests__/opt-997-promotion-producer.test.ts
+new file mode 100644
+index 0000000..d2caeb0
+--- /dev/null
++++ b/workers/game/src/__tests__/opt-997-promotion-producer.test.ts
+@@ -0,0 +1,79 @@
++/** ISOLATED writer first-load conversion evidence, deliberately disabled in reader CI. */
++import { describe, expect, it } from "vitest";
++import { mkdirSync, writeFileSync } from "node:fs";
++import { resolve } from "node:path";
++import { rig, synSchema } from "./opt-960-rig.js";
++import { capture, command, memoryRepository, type CostCorpus } from "./opt-997-corpus-support.js";
++import { toPersistedGameState } from "../session/game-state-schema.js";
++import type { Cost } from "../engine/effect-types.js";
++import type { GameState } from "../types.js";
++async function pending6(position: "TOP" | "BOTTOM") {
++  const r = rig(); r.state.schemaVersion = 6; r.deck(0, 5); r.deck(1, 5);
++  for (let n = 0; n < 3; n++) r.put(`promotion-hand-${n}`, 0, "HAND");
++  const source = r.put("promotion-source", 0, "CHARACTER", { schema: synSchema("promotion-source", [
++    { id: "replacement", category: "replacement", replaces: { event: "WOULD_BE_REMOVED_FROM_FIELD" }, flags: { optional: true, once_per_turn: true }, replacement_actions: [{ type: "DRAW", params: { amount: 1 } }, { type: "TRASH_FROM_HAND", params: { amount: 1 } }] },
++    { id: "activate", category: "activate", trigger: { keyword: "ACTIVATE_MAIN" }, costs: [{ type: "PLACE_SELF_AND_TRASH_TO_DECK", amount: 1, position } as Cost], actions: [{ type: "DRAW", params: { amount: 1 } }] },
++  ]) });
++  r.put("promotion-trash-a", 0, "TRASH"); r.put("promotion-trash-b", 0, "TRASH");
++  r.state = command(r.state, { type: "ACTIVATE_EFFECT", cardInstanceId: source.instanceId, effectId: "activate" }, r.db);
++  const p = r.state.pendingPrompt!.options; if (p.promptType !== "SELECT_TARGET") throw new Error("missing selection");
++  r.state = command(r.state, { type: "SELECT_TARGET", selectedInstanceIds: p.validTargets.slice(0, 1) }, r.db);
++  const arrange = r.state.pendingPrompt!.options; if (arrange.promptType !== "ARRANGE_TOP_CARDS") throw new Error("missing arrangement");
++  r.state = command(r.state, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: arrange.cards.map(c => c.instanceId), destination: position === "TOP" ? "bottom" : "top" }, r.db);
++  const { repo, values } = memoryRepository();
++  const raw = toPersistedGameState(r.state); expect(raw.schemaVersion).toBe(6);
++  const valid7 = structuredClone(raw); valid7.schemaVersion = 7;
++  const owner7 = valid7.effectStack.find(f => f.kind === "COST")!;
++  if (owner7.costReplacementAction!.type !== "ARRANGE_TOP_CARDS") throw new Error("missing parked arrange");
++  owner7.costReplacementAction!.destination = position === "TOP" ? "top" : "bottom";
++  await repo.save({ state: raw, cardDb: r.db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [valid7, raw, valid7, raw] });
++  // Storage ingress corpus includes entries beyond runtime retention; all must validate before bounding.
++  values["session:undo-history"] = structuredClone([valid7, raw, valid7, raw]);
++  return { r, source, repo, values };
++}
++describe.runIf(Boolean(process.env.OPT997_REGENERATE))("OPT997 actual first-load promotion", () => {
++  for (const position of ["TOP", "BOTTOM"] as const) for (const decline of [false, true]) it(`${position} ${decline ? "decline" : "accept"}`, async () => {
++    const { r, source, repo, values } = await pending6(position);
++    const promotionSource = structuredClone(values);
++    const loaded = (await repo.load())!;
++    // Before the very first answer, every old and native undo entry is canonical7.
++    for (const state of [loaded.state, ...loaded.undoHistory]) {
++      expect(state.schemaVersion).toBe(7);
++      const owner = state.effectStack.find(f => f.kind === "COST")!;
++      expect(owner.costReplacementResolution).toBeUndefined();
++      expect(owner.costReplacementAction!.type === "ARRANGE_TOP_CARDS" && owner.costReplacementAction!.destination).toBe(position.toLowerCase());
++    }
++    expect(values).toEqual(promotionSource); // load is not a storage repair.
++    r.state = loaded.state;
++    const initial = await capture(r); const steps: CostCorpus["steps"] = [];
++    while (r.state.pendingPrompt) {
++      const p = r.state.pendingPrompt.options;
++      const action = p.promptType === "OPTIONAL_EFFECT" ? { type: "PLAYER_CHOICE" as const, choiceId: decline ? "skip" : "accept" }
++        : p.promptType === "SELECT_TARGET" ? { type: "SELECT_TARGET" as const, selectedInstanceIds: p.validTargets.slice(0, p.countMin) } : null;
++      if (!action) throw new Error("unexpected later prompt");
++      r.state = command(r.state, action, r.db); const stored = await capture(r); steps.push({ action, expected: structuredClone(r.state), stored });
++    }
++    expect(r.state.effectStack).toHaveLength(0);
++    expect(r.state.players[0].characters.some(c => c?.instanceId === source.instanceId)).toBe(!decline);
++    expect(r.state.players[0].hand).toHaveLength(decline ? 4 : 3);
++    const family = `promotion-${position.toLowerCase()}-${decline ? "decline" : "accept"}`;
++    const dir = resolve(process.env.OPT997_REGENERATE!); mkdirSync(dir, { recursive: true });
++    writeFileSync(resolve(dir, `${family}.json`), JSON.stringify({ family, promotionSource, initial, steps, sourceId: source.instanceId, owner: 0, decline, terminal: false }, null, 2) + "\n");
++  });
++  it("unprovable undo rejects atomically without dropping entries or mutating storage", async () => {
++    const cases: { defect: string; original: Record<string, unknown>; expectedStorage: Record<string, unknown> }[] = [];
++    for (const defect of ["foreign", "absent"]) {
++      const { values } = await pending6("BOTTOM");
++      const undo = values["session:undo-history"] as GameState[];
++      const owner = undo[3].effectStack.find(f => f.kind === "COST")!;
++      if (defect === "absent") delete owner.costReplacementAction;
++      else owner.costReplacementAction = { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ["foreign"], destination: "top" };
++      const { repo, values: storage } = memoryRepository(values); const before = structuredClone(storage);
++      await expect(repo.load()).rejects.toThrow(/legacy-debt.*unprovable/);
++      expect(storage).toEqual(before); expect((storage["session:undo-history"] as GameState[])).toHaveLength(4);
++      cases.push({ defect, original: before, expectedStorage: storage });
++    }
++    const dir = resolve(process.env.OPT997_REGENERATE!); mkdirSync(dir, { recursive: true });
++    writeFileSync(resolve(dir, "promotion-unprovable-diagnostic.json"), JSON.stringify({ disposition: "atomic-legacy-debt-rejection", ...cases[0], cases }, null, 2) + "\n");
++  });
++});
+diff --git a/workers/game/src/engine/effect-resolver/actions/don.ts b/workers/game/src/engine/effect-resolver/actions/don.ts
+index c21c45d..cc132d8 100644
+--- a/workers/game/src/engine/effect-resolver/actions/don.ts
++++ b/workers/game/src/engine/effect-resolver/actions/don.ts
+@@ -1,3 +1,4 @@
++import { buildDonIdentityPlans } from "../don-identity-plans.js";
+ /**
+  * Action handlers: GIVE_DON, ADD_DON_FROM_DECK, FORCE_OPPONENT_DON_RETURN,
+  * SET_DON_ACTIVE, REST_OPPONENT_DON, RETURN_DON_TO_DECK,
+@@ -686,6 +687,25 @@ export function executeReturnDonToDeck(
+   if (params.until_count !== undefined) {
+     return returnDonUntilCount(state, action, params.until_count, sourceCardInstanceId, controller, cardDb, resultRefs);
+   }
++  if (state.schemaVersion === 7) {
++    const amount = resolveAmount(params.amount ?? 1, resultRefs, state, controller, cardDb);
++    const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? controller === 0 ? 1 : 0 : controller;
++    const p = state.players[owner];
++    const activeOnly = action.target?.filter?.is_active === true || action.target?.filter?.state === "ACTIVE";
++    const pool = [...p.donCostArea.filter(d => !d.attachedTo && (!activeOnly || d.state === "ACTIVE")), ...(action.target?.type === "DON_IN_COST_AREA" || activeOnly ? [] : [p.leader, ...p.characters.filter(c => c !== null)].flatMap(c => c.attachedDon))];
++    const count = Math.min(amount, pool.length);
++    if (count <= 0) return { state, events, succeeded: false, fullyExecuted: false };
++    const plan = buildDonIdentityPlans(state, owner, pool.map(d => d.instanceId), count, count, cardDb);
++    if (plan.choices.length === 1) {
++      const applied = applyDonReturnIds(state, owner, decodeDonReturnIds(plan.choices[0].id)!)!;
++      return { ...applied, succeeded: true, fullyExecuted: count === amount, result: { targetInstanceIds: [], count } };
++    }
++    return { state, events, succeeded: false, pendingPrompt: {
++      options: { promptType: "PLAYER_CHOICE", effectDescription: `Choose which ${count} DON!! to return`, ...plan },
++      respondingPlayer: owner,
++      resumeContext: { effectSourceInstanceId: sourceCardInstanceId, controller, pausedAction: action, remainingActions: [], resultRefs: [...resultRefs], validTargets: plan.choices.map(c => c.id) },
++    } };
++  }
+   const amount = resolveAmount(
+     params.amount ?? 1,
+     resultRefs,
+diff --git a/workers/game/src/engine/effect-resolver/cost/orchestrator.ts b/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
+index e0eefc6..f369f10 100644
+--- a/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
++++ b/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
+@@ -1,3 +1,5 @@
++import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
++import { buildDonIdentityPlans } from "../don-identity-plans.js";
+ import { insertFrameAt } from "../../damage-frames.js";
+ /** Iterative cost payment orchestration and suspension. */
+ import type { Cost, CostResult, EffectBlock } from "../../effect-types.js";
+@@ -95,12 +97,12 @@ export function payCostsWithSelection(
+     };
+     nextState = ownerIndex === undefined ? pushFrame(nextState, owned) : insertFrameAt(nextState, ownerIndex, owned);
+   };
+-  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer): CostSelectionResult => {
++  const suspend = (pendingPrompt: PendingPromptState, offer?: ReplacementOffer, committedReplacement = false): CostSelectionResult => {
+     if (isGameTerminated(nextState)) return terminated();
+     // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
+     // frame on top of the cost frame pushed just before.
+     const offered = materializeReplacementOffer(
+-      applyCostTransactionState(nextState, baseline),
++      nextState.schemaVersion === 7 && committedReplacement ? nextState : applyCostTransactionState(nextState, baseline),
+       pendingPrompt,
+       offer,
+     );
+@@ -616,6 +618,12 @@ export function payCostsWithSelection(
+         return cannotPay();
+       }
+ 
++      // Isolated ordinary writer uses the same native7 planner for readable
++      // generic fallback choices and optional picker metadata.
++      const donPlan = cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN"
++        ? buildDonIdentityPlans(nextState, controller, validTargets, amount, cost.type === "VARIABLE_DON_RETURN" && cost.amount === undefined ? validTargets.length : amount, cardDb)
++        : null;
++      const donChoices = donPlan?.choices ?? [];
+       // Push stack frame for cost selection
+       const frameId = generateFrameId(nextState);
+       nextState = frameId.state;
+@@ -628,7 +636,7 @@ export function payCostsWithSelection(
+         pausedAction: null,
+         remainingActions: effectBlock.actions ?? [],
+         resultRefs: [],
+-        validTargets,
++        validTargets: [...validTargets, ...donChoices.map(c => c.id)],
+         costs: workingCosts,
+         currentCostIndex: i,
+         costsPaid: false,
+@@ -643,7 +651,7 @@ export function payCostsWithSelection(
+ 
+       const costLabel = getCostLabel(cost);
+       const pendingPrompt: PendingPromptState = {
+-        options: {
++        options: donChoices.length ? { promptType: "PLAYER_CHOICE", effectDescription: "Choose which DON!! to return", choices: donChoices, donIdentityReturn: donPlan!.donIdentityReturn } : {
+           promptType: "SELECT_TARGET",
+           validTargets,
+           countMin: amount,
+@@ -661,16 +669,11 @@ export function payCostsWithSelection(
+     // Fixed-source field exits have no selection prompt, but replacement
+     // effects may still suspend their payment (Rule 8-3-1-7). Park the same
+     // cost frame used by selectable payments so decline can resume exactly.
+-    const fixedExitTarget = (() => {
+-      if (["TRASH_SELF", "PLACE_SELF_TO_DECK", "PLACE_SELF_AND_HAND_TO_DECK"].includes(cost.type)) {
+-        return sourceCardInstanceId;
+-      }
+-      if (["PLACE_STAGE_TO_DECK", "TRASH_OWN_STAGE"].includes(cost.type)) {
+-        return nextState.players[controller].stage?.instanceId;
+-      }
+-      return undefined;
+-    })();
++    const fixedExitTarget = fixedCostExitTarget(nextState, cost, controller, sourceCardInstanceId);
+     if (fixedExitTarget) {
++      const replay = nextState.schemaVersion === 7 ? canonicalCostReplacementReplay({
++        costs: workingCosts, currentCostIndex: i, validTargets: [], sourceCardInstanceId,
++      }, { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacement = checkReplacementForRemoval(
+         applyCostTransactionState(nextState, baseline),
+@@ -691,13 +694,13 @@ export function payCostsWithSelection(
+           costs: workingCosts, currentCostIndex: i, costsPaid: false,
+           oncePerTurnMarked: false, costResultRefs: [...costResultToEntries(costResult)],
+           pendingTriggers: [], simultaneousTriggers: [], accumulatedEvents: events,
+-          costReplacementAction: { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
++          costReplacementAction: replay ?? { type: "PLAYER_CHOICE", choiceId: "__PAY_FIXED_COST__" },
+           costReplacementChecked: true,
+           ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+         };
+         pushCostFrame(frame, stagedBeforeReplacement, nextState.schemaVersion === 7 ? stagedBeforeReplacement.effectStack.length : undefined);
+         if (isGameTerminated(nextState)) return cannotPay();
+-        return suspend(replacement.pendingPrompt, replacement.offer);
++        return suspend(replacement.pendingPrompt, replacement.offer, replacement.replaced);
+       }
+       if (replacement.replaced) {
+         return { state: nextState, events: replacement.events, cannotPay: true };
+diff --git a/workers/game/src/engine/effect-resolver/cost/payability.ts b/workers/game/src/engine/effect-resolver/cost/payability.ts
+index 9bca731..bab7ea3 100644
+--- a/workers/game/src/engine/effect-resolver/cost/payability.ts
++++ b/workers/game/src/engine/effect-resolver/cost/payability.ts
+@@ -7,6 +7,7 @@ import { computeCostTargets, costSelectionCount, isFixedCostMovementProhibited,
+ 
+ /** True when paying the cost requires a player prompt. */
+ export function costNeedsPlayerSelection(cost: Cost): boolean {
++  if (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") return true;
+   switch (cost.type) {
+     // Life is an ordered hidden zone — the only choice a life cost can offer
+     // is top-vs-bottom (OP03-109). Fixed positions auto-pay in payCosts.
+@@ -37,9 +38,7 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
+       return true;
+     // OPT-798: the top N cards of the deck are fixed — no choice to prompt.
+     case "MILL":
+-    case "DON_MINUS":
+     case "DON_REST":
+-    case "VARIABLE_DON_RETURN":
+     case "REST_SELF":
+     case "TRASH_SELF":
+     case "PLACE_SELF_TO_DECK":
+diff --git a/workers/game/src/engine/effect-resolver/cost/replacement-replay.ts b/workers/game/src/engine/effect-resolver/cost/replacement-replay.ts
+new file mode 100644
+index 0000000..e481bd6
+--- /dev/null
++++ b/workers/game/src/engine/effect-resolver/cost/replacement-replay.ts
+@@ -0,0 +1,111 @@
++/** Shared cost replay grammar and native7 executable-continuation validation. */
++import { GameActionSchema } from "../../../../../../shared/validators/client-message.js";
++import type { Cost, SimpleCost } from "../../effect-types.js";
++import type { EffectStackFrame, GameState, GameAction } from "../../../types.js";
++import { costSelectionCount, isOpponentLifePlacement } from "./targets.js";
++const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
++/** OPT-828: a Life-end choice id bound to the Characters chosen to pay the cost. */
++export function lifeDestinationChoiceId(ids: string[], end: "TOP" | "BOTTOM"): string {
++  return `${LIFE_DESTINATION_CHOICE_PREFIX}${JSON.stringify(ids)}:${end}`;
++}
++
++export function isLifeDestinationChoiceId(id: string): boolean {
++  return id.startsWith(LIFE_DESTINATION_CHOICE_PREFIX);
++}
++
++export function parseLifeDestinationChoiceId(
++  id: string,
++): { ids: string[]; position: "TOP" | "BOTTOM" } | null {
++  if (!isLifeDestinationChoiceId(id)) return null;
++  const split = id.lastIndexOf(":");
++  const end = id.slice(split + 1);
++  if (end !== "TOP" && end !== "BOTTOM") return null;
++  try {
++    const ids: unknown = JSON.parse(id.slice(LIFE_DESTINATION_CHOICE_PREFIX.length, split));
++    if (!Array.isArray(ids) || !ids.every((value) => typeof value === "string")) return null;
++    return { ids, position: end };
++  } catch {
++    return null;
++  }
++}
++
++export const FIELD_EXIT_COSTS: ReadonlySet<Cost["type"]> = new Set([
++  "KO_OWN_CHARACTER", "TRASH_OWN_CHARACTER", "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE",
++  "RETURN_OWN_CHARACTER_TO_HAND", "PLACE_OWN_CHARACTER_TO_DECK", "ADD_OWN_CHARACTER_TO_LIFE",
++]);
++const FIXED_SOURCE_EXIT_COSTS = ["TRASH_SELF", "PLACE_SELF_TO_DECK", "PLACE_SELF_AND_HAND_TO_DECK"];
++const FIXED_STAGE_EXIT_COSTS = ["PLACE_STAGE_TO_DECK", "TRASH_OWN_STAGE"];
++export const FIXED_EXIT_COSTS: ReadonlySet<string> = new Set([...FIXED_SOURCE_EXIT_COSTS, ...FIXED_STAGE_EXIT_COSTS]);
++export function fixedCostExitTarget(state: GameState, cost: Cost, controller: 0 | 1, source: string): string | undefined {
++  if (FIXED_SOURCE_EXIT_COSTS.includes(cost.type)) return source;
++  if (FIXED_STAGE_EXIT_COSTS.includes(cost.type)) return state.players[controller].stage?.instanceId;
++  return undefined;
++}
++type ReplayContext = Pick<EffectStackFrame, "costs" | "currentCostIndex" | "validTargets" | "costArrangeStage" | "sourceCardInstanceId">;
++
++/** Strict parked grammar; never consults a board changed by substitute execution. */
++function replayViolation(frame: ReplayContext, input: unknown): string | null {
++  const parsed = GameActionSchema.safeParse(input);
++  if (!parsed.success) return "malformed replacement replay action";
++  const action = parsed.data;
++  const cost = frame.costs[frame.currentCostIndex];
++  if (!cost) return "replacement replay has no current cost";
++  const unique = (ids: string[]) => ids.length > 0 && ids.every(id => id.length > 0) && new Set(ids).size === ids.length;
++  const compound = cost.type === "PLACE_SELF_AND_TRASH_TO_DECK" || cost.type === "PLACE_SELF_AND_HAND_TO_DECK";
++  const amount = costSelectionCount(cost as SimpleCost);
++  if (action.type === "PLAYER_CHOICE") {
++    if (action.choiceId === "__PAY_FIXED_COST__") return FIXED_EXIT_COSTS.has(cost.type) ? null : "fixed replay sentinel does not match current cost";
++    if (cost.type !== "ADD_OWN_CHARACTER_TO_LIFE" || !isOpponentLifePlacement(cost) || cost.position !== "TOP_OR_BOTTOM") return "destination replay does not match current cost";
++    const destination = parseLifeDestinationChoiceId(action.choiceId);
++    return destination && unique(destination.ids) && destination.ids.length === amount && frame.validTargets.includes(action.choiceId)
++      ? null : "invalid replacement Life destination replay";
++  }
++  if (action.type === "SELECT_TARGET") {
++    if ((!compound && !FIELD_EXIT_COSTS.has(cost.type)) || frame.costArrangeStage ||
++        (cost.type === "ADD_OWN_CHARACTER_TO_LIFE" && isOpponentLifePlacement(cost) && cost.position === "TOP_OR_BOTTOM")) return "selection replay does not match current cost stage";
++    return unique(action.selectedInstanceIds) && action.selectedInstanceIds.length === amount && action.selectedInstanceIds.every(id => frame.validTargets.includes(id))
++      ? null : "invalid replacement selection replay";
++  }
++  if (action.type === "ARRANGE_TOP_CARDS") {
++    const ids = action.orderedInstanceIds;
++    const destination = (cost as SimpleCost).position === "TOP" ? "top" : "bottom";
++    return compound && frame.costArrangeStage && action.keptCardInstanceId === "" && !action.keptCardInstanceIds && action.destination === destination &&
++      unique(ids) && ids.length === amount + 1 && ids.length === frame.validTargets.length && ids.includes(frame.sourceCardInstanceId) && ids.every(id => frame.validTargets.includes(id))
++      ? null : "invalid replacement arrangement replay";
++  }
++  return "unsupported replacement replay action";
++}
++
++/** One parser for captured semantic actions and strict native7 ingress. */
++export function parseCostReplacementReplay(frame: ReplayContext, input: unknown):
++  { action: GameAction; violation: null } | { action: null; violation: string } {
++  const violation = replayViolation(frame, input);
++  if (violation) return { action: null, violation };
++  return { action: GameActionSchema.parse(input) as GameAction, violation: null };
++}
++
++/** Construct only semantics already validated/computed by the payment handler.
++ * Historical unanswered offers may use this at explicit writer promotion, never at native7 ingress.
++ * No identities are removed, invented, deduplicated or reordered here.
++ */
++export function canonicalCostReplacementReplay(frame: ReplayContext, input: GameAction): GameAction {
++  const cost = frame.costs[frame.currentCostIndex];
++  let semantic = input;
++  if (input.type === "ARRANGE_TOP_CARDS" && cost) {
++    semantic = { ...input, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" };
++  } else if (input.type === "PLAYER_CHOICE" && cost?.type === "ADD_OWN_CHARACTER_TO_LIFE") {
++    const destination = parseLifeDestinationChoiceId(input.choiceId);
++    if (destination) semantic = { ...input, choiceId: lifeDestinationChoiceId(destination.ids, destination.position) };
++  }
++  const parsed = parseCostReplacementReplay(frame, semantic);
++  if (parsed.violation) throw new Error(`Invalid canonical COST replay: ${parsed.violation}`);
++  return parsed.action!;
++}
++
++/** Ownership is checked before an optional answer can execute any substitute. */
++export function costReplacementReplayViolation(_state: GameState, frame: EffectStackFrame): string | null {
++  if ((frame.kind !== undefined && frame.kind !== "COST") || frame.phase !== "AWAITING_COST_SELECTION" || frame.costReplacementChecked !== true || !frame.costReplacementAction) {
++    return "replacement replay lacks a checked COST owner";
++  }
++  return parseCostReplacementReplay(frame, frame.costReplacementAction).violation;
++}
+diff --git a/workers/game/src/engine/effect-resolver/don-identity-picker.ts b/workers/game/src/engine/effect-resolver/don-identity-picker.ts
+new file mode 100644
+index 0000000..75b6347
+--- /dev/null
++++ b/workers/game/src/engine/effect-resolver/don-identity-picker.ts
+@@ -0,0 +1,2 @@
++import { buildDonIdentityPlans } from "./don-identity-plans.js";
++export const identityPicker = (...args: Parameters<typeof buildDonIdentityPlans>) => buildDonIdentityPlans(...args).donIdentityReturn;
+diff --git a/workers/game/src/engine/effect-resolver/don-identity-plans.ts b/workers/game/src/engine/effect-resolver/don-identity-plans.ts
+new file mode 100644
+index 0000000..03f005a
+--- /dev/null
++++ b/workers/game/src/engine/effect-resolver/don-identity-plans.ts
+@@ -0,0 +1,58 @@
++/** Native-v7 identity plans. Generic choices remain the authority and old-client fallback. */
++import type { CardData, GameState } from "../../types.js";
++import type { Duration } from "../effect-types.js";
++import { donEffectSignature } from "./cost/targets.js";
++const durationLabels: Record<Duration["type"], string> = {
++  THIS_TURN: "this turn", THIS_BATTLE: "this battle", SKIP_NEXT_REFRESH: "through its next refresh",
++  UNTIL_END_OF_OPPONENT_NEXT_END_PHASE: "until the end of opponent’s next End Phase",
++  UNTIL_END_OF_OPPONENT_NEXT_TURN: "until the end of opponent’s next turn",
++  UNTIL_END_OF_YOUR_NEXT_TURN: "until the end of your next turn",
++  UNTIL_START_OF_YOUR_NEXT_TURN: "until the start of your next turn",
++  PERMANENT: "while the effect remains", WHILE_CONDITION: "while its condition holds",
++};
++function sourceLabel(state: GameState, id: string, db: Map<string, CardData>): string {
++  for (const [playerIndex, player] of state.players.entries()) {
++    const prefix = `Player ${playerIndex + 1} `;
++    if (player.leader.instanceId === id) return `${prefix}${db.get(player.leader.cardId)?.name ?? "Leader"} (Leader)`;
++    const slot = player.characters.findIndex(card => card?.instanceId === id);
++    if (slot >= 0) return `${prefix}${db.get(player.characters[slot]!.cardId)?.name ?? "Character"} (Character slot ${slot + 1})`;
++    if (player.stage?.instanceId === id) return `${prefix}${db.get(player.stage.cardId)?.name ?? "Stage"} (Stage)`;
++    const moved = player.trash.find(card => card.instanceId === id);
++    if (moved) return `${prefix}${db.get(moved.cardId)?.name ?? "card"}`;
++  }
++  return "a prior card effect";
++}
++function donorEffectsLabel(state: GameState, id: string, db: Map<string, CardData>): string {
++  const describe = (name: string, source: string, duration: Duration) => `${name} from ${sourceLabel(state, source, db)} (${durationLabels[duration.type]})`;
++  return [
++    ...state.prohibitions.filter(effect => effect.appliesTo.includes(id)).map(effect => describe(effect.prohibitionType === "CANNOT_REFRESH" ? "Cannot become active" : effect.prohibitionType.toLowerCase().replaceAll("_", " "), effect.sourceCardInstanceId, effect.duration)),
++    ...state.activeEffects.filter(effect => effect.appliesTo.includes(id)).map(effect => describe(effect.modifiers.map(modifier => modifier.type.toLowerCase().replaceAll("_", " ")).join(", "), effect.sourceCardInstanceId, effect.duration)),
++  ].join("; ");
++}
++export function buildDonIdentityPlans(state: GameState, owner: 0 | 1, valid: string[], countMin: number, countMax: number, db: Map<string, CardData>) {
++  const p = state.players[owner];
++  const hosts = [p.leader, ...p.characters.filter(c => c !== null)];
++  const donors = [...p.donCostArea, ...hosts.flatMap(c => c.attachedDon)].filter(d => valid.includes(d.instanceId));
++  const byKey = new Map<string, { donIds: string[]; label: string }>();
++  for (const d of donors) {
++    const signature = donEffectSignature(state, d.instanceId);
++    const key = `${d.attachedTo ?? d.state}|${signature}`;
++    const host = hosts.find(c => c.instanceId === d.attachedTo);
++    const label = `${host ? `Attached to ${db.get(host.cardId)?.name ?? "Character"} (${host === p.leader ? "Leader" : `Character slot ${p.characters.findIndex(card => card?.instanceId === host.instanceId) + 1}`})` : `${d.state === "ACTIVE" ? "Active" : "Rested"} in cost area`}${signature ? ` — ${donorEffectsLabel(state, d.instanceId, db)}` : ""}`;
++    const group = byKey.get(key) ?? { donIds: [], label };
++    group.donIds.push(d.instanceId); byKey.set(key, group);
++  }
++  const groups = [...byKey.values()];
++  const choices: { id: string; label: string }[] = [];
++  // Enumerate group counts, not individual subsets of equivalent donors.
++  const visit = (index: number, ids: string[], labels: string[]): void => {
++    if (index === groups.length) {
++      if (ids.length >= countMin && ids.length <= countMax) choices.push({ id: `don-return-ids:${JSON.stringify(ids)}`, label: `Return ${labels.join(" + ")} DON!!` });
++      return;
++    }
++    const group = groups[index];
++    for (let n = 0; n <= Math.min(group.donIds.length, countMax - ids.length); n++) visit(index + 1, [...ids, ...group.donIds.slice(0, n)], n ? [...labels, `${n} ${group.label}`] : labels);
++  };
++  visit(0, [], []);
++  return { choices, donIdentityReturn: { countMin, countMax, groups } };
++}
+diff --git a/workers/game/src/engine/effect-resolver/resume/cost.ts b/workers/game/src/engine/effect-resolver/resume/cost.ts
+index 6f1a43a..6ce12e6 100644
+--- a/workers/game/src/engine/effect-resolver/resume/cost.ts
++++ b/workers/game/src/engine/effect-resolver/resume/cost.ts
+@@ -1,3 +1,4 @@
++import { canonicalCostReplacementReplay, lifeDestinationChoiceId, isLifeDestinationChoiceId, parseLifeDestinationChoiceId, FIELD_EXIT_COSTS } from "../cost/replacement-replay.js";
+ import { updateFrameById } from "../../damage-frames.js";
+ import { decodeDonReturnIds } from "../actions/don.js";
+ import { finishReplacedLifeCost } from "../cost/replaced.js";
+@@ -56,8 +57,6 @@ import {
+   opponentRestedCostDon,
+ } from "../cost/targets.js";
+ 
+-const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
+-
+ /**
+  * OPT-868: marker kept in a GIVE_OPPONENT_DON_TO_OPPONENT frame's
+  * validTargets while the payer picks which rested DON!! to give. It binds the
+@@ -67,30 +66,6 @@ const LIFE_DESTINATION_CHOICE_PREFIX = "cost-life:";
+ const OPPONENT_DON_RECIPIENT_PREFIX = "cost-opp-don-recipient:";
+ import { getCostCtaLabel } from "../cost/prompts.js";
+ 
+-/** OPT-828: a Life-end choice id bound to the Characters chosen to pay the cost. */
+-function lifeDestinationChoiceId(ids: string[], end: "TOP" | "BOTTOM"): string {
+-  return `${LIFE_DESTINATION_CHOICE_PREFIX}${JSON.stringify(ids)}:${end}`;
+-}
+-
+-function isLifeDestinationChoiceId(id: string): boolean {
+-  return id.startsWith(LIFE_DESTINATION_CHOICE_PREFIX);
+-}
+-
+-function parseLifeDestinationChoiceId(
+-  id: string,
+-): { ids: string[]; position: "TOP" | "BOTTOM" } | null {
+-  if (!isLifeDestinationChoiceId(id)) return null;
+-  const split = id.lastIndexOf(":");
+-  const end = id.slice(split + 1);
+-  if (end !== "TOP" && end !== "BOTTOM") return null;
+-  try {
+-    const ids: unknown = JSON.parse(id.slice(LIFE_DESTINATION_CHOICE_PREFIX.length, split));
+-    if (!Array.isArray(ids) || !ids.every((value) => typeof value === "string")) return null;
+-    return { ids, position: end };
+-  } catch {
+-    return null;
+-  }
+-}
+ import { postCostConditionsMet } from "../post-cost.js";
+ import type { HandlerResult, EffectResolverServices } from "../types.js";
+ import {
+@@ -482,6 +457,7 @@ export function handleAwaitingCostSelection(
+     pendingPrompt: NonNullable<HandlerResult["pendingPrompt"]>,
+     stagedState: GameState = stateWithFrame,
+     offer?: ReplacementOffer,
++    committedReplacement = false,
+   ): HandlerResult => {
+     const withTransaction = updateCostOwner(stateWithFrame, {
+       accumulatedEvents: [...stagedEvents],
+@@ -489,8 +465,10 @@ export function handleAwaitingCostSelection(
+     });
+     // OPT-963: an optional cost-exit replacement offer gets its REPLACEMENT
+     // frame on top of this cost frame once the frame's bookkeeping is done.
++    // Accepted mandatory substitutes already execute on the root baseline.
++    // Their prefix and use marker are committed; staged payment stays on COST.
+     const offered = materializeReplacementOffer(
+-      applyCostTransactionState(withTransaction, transactionBaseline),
++      withTransaction.schemaVersion === 7 && committedReplacement ? withTransaction : applyCostTransactionState(withTransaction, transactionBaseline),
+       pendingPrompt,
+       offer,
+     );
+@@ -916,6 +894,8 @@ export function handleAwaitingCostSelection(
+     }
+ 
+     if (!topFrame.costReplacementChecked) {
++      const replay = nextState.schemaVersion === 7
++        ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacement = checkReplacementForRemoval(
+         applyCostTransactionState(nextState, transactionBaseline),
+@@ -928,7 +908,7 @@ export function handleAwaitingCostSelection(
+       nextState = replacement.state;
+       if (replacement.pendingPrompt) {
+         nextState = updateCostOwner(nextState, {
+-          costReplacementAction: {
++          costReplacementAction: replay ?? {
+             type: "SELECT_TARGET",
+             selectedInstanceIds: selected,
+           },
+@@ -941,6 +921,7 @@ export function handleAwaitingCostSelection(
+           replacement.pendingPrompt,
+           stagedBeforeReplacement,
+           replacement.offer,
++          replacement.replaced,
+         );
+       }
+       if (replacement.replaced)
+@@ -989,6 +970,8 @@ export function handleAwaitingCostSelection(
+     }
+ 
+     if (!topFrame.costReplacementChecked) {
++      const replay = nextState.schemaVersion === 7
++        ? canonicalCostReplacementReplay(topFrame, { type: "ARRANGE_TOP_CARDS", keptCardInstanceId: "", orderedInstanceIds: ordered, destination: (cost as SimpleCost).position === "TOP" ? "top" : "bottom" }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacement = checkReplacementForRemoval(
+         applyCostTransactionState(nextState, transactionBaseline),
+@@ -1001,7 +984,7 @@ export function handleAwaitingCostSelection(
+       nextState = replacement.state;
+       if (replacement.pendingPrompt) {
+         nextState = updateCostOwner(nextState, {
+-          costReplacementAction: {
++          costReplacementAction: replay ?? {
+             type: "ARRANGE_TOP_CARDS",
+             keptCardInstanceId: "",
+             orderedInstanceIds: action.orderedInstanceIds,
+@@ -1016,6 +999,7 @@ export function handleAwaitingCostSelection(
+           replacement.pendingPrompt,
+           stagedBeforeReplacement,
+           replacement.offer,
++          replacement.replaced,
+         );
+       }
+       if (replacement.replaced)
+@@ -1153,6 +1137,8 @@ export function handleAwaitingCostSelection(
+     if (!topFrame.costReplacementChecked) {
+       // Placing the Character is an effect-caused removal; a replacement means
+       // the printed cost was not paid (rules 8-3-1-3-1 / 8-3-1-7).
++      const replay = nextState.schemaVersion === 7
++        ? canonicalCostReplacementReplay(topFrame, cost.position === "TOP_OR_BOTTOM" ? { ...action, type: "PLAYER_CHOICE", choiceId: lifeDestinationChoiceId(placedIds, position) } : { type: "SELECT_TARGET", selectedInstanceIds: placedIds }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacement = checkReplacementForRemoval(
+         applyCostTransactionState(nextState, transactionBaseline),
+@@ -1165,11 +1151,11 @@ export function handleAwaitingCostSelection(
+       nextState = replacement.state;
+       if (replacement.pendingPrompt) {
+         nextState = updateCostOwner(nextState, {
+-          costReplacementAction: action,
++          costReplacementAction: replay ?? action,
+           costReplacementChecked: true,
+           ...(nextState.schemaVersion === 7 && replacement.replaced ? { costReplacementResolution: "REPLACED" as const } : {}),
+         });
+-        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer);
++        return suspendCurrentFrame(nextState, events, replacement.pendingPrompt, stagedBeforeReplacement, replacement.offer, replacement.replaced);
+       }
+       if (replacement.replaced) {
+         return abortReplacedCost(nextState, topFrame, replacement.events, cardDb, services);
+@@ -1336,20 +1322,14 @@ export function handleAwaitingCostSelection(
+         return { kind: "waiting", state, events: [], resolved: false };
+       }
+     }
+-    const fieldExitCosts = new Set<Cost["type"]>([
+-      "KO_OWN_CHARACTER",
+-      "TRASH_OWN_CHARACTER",
+-      "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE",
+-      "RETURN_OWN_CHARACTER_TO_HAND",
+-      "PLACE_OWN_CHARACTER_TO_DECK",
+-      "ADD_OWN_CHARACTER_TO_LIFE",
+-    ]);
+     const selectedStage = state.players[controller].stage?.instanceId === selected[0];
+     const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
+-    if (fieldExitCosts.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
++    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
+       // Cost exits are still effect-caused removal events, but a replacement
+       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
+       // Park the already-validated selection on the existing cost frame.
++      const replay = nextState.schemaVersion === 7
++        ? canonicalCostReplacementReplay(topFrame, { type: "SELECT_TARGET", selectedInstanceIds: selected }) : null;
+       const stagedBeforeReplacement = nextState;
+       const replacementInput = applyCostTransactionState(
+         nextState,
+@@ -1391,7 +1371,7 @@ export function handleAwaitingCostSelection(
+       nextState = replacement.state;
+       if (replacement.pendingPrompt) {
+         nextState = updateCostOwner(nextState, {
+-          costReplacementAction: {
++          costReplacementAction: replay ?? {
+             type: "SELECT_TARGET",
+             selectedInstanceIds: selected,
+           },
+@@ -1404,6 +1384,7 @@ export function handleAwaitingCostSelection(
+           replacement.pendingPrompt,
+           stagedBeforeReplacement,
+           replacement.offer,
++          replacement.replaced,
+         );
+       }
+       if (replacement.replaced) {
+diff --git a/workers/game/src/engine/replacements.ts b/workers/game/src/engine/replacements.ts
+index 0084a60..e07197b 100644
+--- a/workers/game/src/engine/replacements.ts
++++ b/workers/game/src/engine/replacements.ts
+@@ -1,3 +1,4 @@
++import { applyDonReturnIds, decodeDonReturnIds } from "./effect-resolver/actions/don.js";
+ import { replacementEventsFor } from "./replacement-events.js";
+ import { expandReplacementVisits, replacementAbilitySiblings } from "./replacement-ability-identity.js";
+ import { isGameTerminated } from "./terminal.js";
+@@ -729,7 +730,7 @@ function probeSubstituteChain(
+   }
+   if (!isActionFeasible(state, action, effect.sourceCardInstanceId, effect.controller, cardDb, refs)) return null;
+   // Attached DON!! retains the established printed-domain gate until OPT-969.
+-  if (action.type === "RETURN_DON_TO_DECK") {
++  if (state.schemaVersion !== 7 && action.type === "RETURN_DON_TO_DECK") {
+     if (!canReturnDonToDeckSucceed(state, action, effect.controller, cardDb, refs)) return null;
+   }
+   const probeState = {
+@@ -812,7 +813,21 @@ function probeSubstituteChain(
+       continue;
+     if (needed !== undefined && pool && pool.length < needed) continue;
+     let result = selection ? invoke(selection) : initial;
+-    if (action.type === "RETURN_DON_TO_DECK" && !result.pendingPrompt && action.params?.until_count === undefined) {
++    if (state.schemaVersion === 7 && action.type === "RETURN_DON_TO_DECK" && result.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
++      const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? effect.controller === 0 ? 1 : 0 : effect.controller;
++      for (const choice of result.pendingPrompt.options.choices) {
++        if (choice.disabled) continue;
++        const ids = decodeDonReturnIds(choice.id);
++        const requested = substituteAmount(action.params?.amount, state, effect.controller, cardDb, refs);
++        const applied = ids && ids.length === requested ? applyDonReturnIds(probeState, owner, ids) : null;
++        if (!applied) continue;
++        const nextRefs = new Map(refs);
++        if (action.result_ref) nextRefs.set(action.result_ref, { targetInstanceIds: [], count: applied.returned });
++        const next = probeSubstituteChain(applied.state, rest, effect, cardDb, nextRefs, services);
++        if (next) return next;
++      }
++    }
++    if (state.schemaVersion !== 7 && action.type === "RETURN_DON_TO_DECK" && !result.pendingPrompt && action.params?.until_count === undefined) {
+       // Preserve only OPT-969's printed-field/attached-DON underpayment exception.
+       // The real executor's intermediate cost-area mutation still feeds later actions.
+       result = { ...result, succeeded: true, fullyExecuted: true };
+@@ -1095,7 +1110,16 @@ export function materializeReplacementOffer(
+     pendingTriggers: [],
+     simultaneousTriggers: [],
+     accumulatedEvents: [],
+-    replacement: { ...offer, effectId, targetInstanceId, event },
++    // Native7 persists only the offer grammar, never transient resume-context
++    // discriminators carried through ordering/reoffer progress. Reader6 keeps
++    // its historical byte path for the staged rollout.
++    replacement: state.schemaVersion === 7 ? {
++      effectId, targetInstanceId, event,
++      ...(offer.visitedEffectIds !== undefined ? { visitedEffectIds: offer.visitedEffectIds } : {}),
++      ...(offer.cause !== undefined ? { cause: offer.cause } : {}),
++      ...(offer.causingController !== undefined ? { causingController: offer.causingController } : {}),
++      ...(offer.orderingEffectIds !== undefined ? { orderingEffectIds: offer.orderingEffectIds } : {}),
++    } : { ...offer, effectId, targetInstanceId, event },
+   };
+   const nextState = pushFrame(generated.state, frame);
+   return { state: nextState, pendingPrompt: { ...pendingPrompt, resumeContext: frame.id } };
+diff --git a/workers/game/src/session/candidate-version7-promotion.ts b/workers/game/src/session/candidate-version7-promotion.ts
+new file mode 100644
+index 0000000..9bb6979
+--- /dev/null
++++ b/workers/game/src/session/candidate-version7-promotion.ts
+@@ -0,0 +1,32 @@
++/** ISOLATED PRODUCER ONLY: explicit atomic load promotion, never imported by reader6. */
++import type { StoredSession } from "./persistence.js";
++import { SessionLoadError } from "./game-state-schema.js";
++import { canonicalCostReplacementReplay, costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
++import type { GameState } from "../types.js";
++
++export function promoteCandidateSession(stored: StoredSession, validate: (raw: unknown, location: string) => GameState): StoredSession {
++  function promote(original: GameState, location: string): GameState {
++    if (original.schemaVersion === 7) return original;
++    const state = structuredClone(original);
++    for (let index = 0; index < state.effectStack.length; index++) {
++      const frame = state.effectStack[index];
++      if (!frame.costReplacementAction) continue;
++      const offer = state.effectStack[index + 1];
++      const unanswered = frame.costReplacementResolution === undefined && offer?.kind === "REPLACEMENT" &&
++        offer.replacement && state.pendingPrompt?.resumeContext === offer.id;
++      if (unanswered) {
++        try { frame.costReplacementAction = canonicalCostReplacementReplay(frame, frame.costReplacementAction); }
++        catch (error) { throw new SessionLoadError(location, `legacy-debt: unprovable unanswered COST replay (${(error as Error).message})`); }
++      }
++      const violation = costReplacementReplayViolation(state, frame);
++      if (violation) throw new SessionLoadError(location, `legacy-debt: unprovable COST replay (${violation}); retain original reader6 storage`);
++      // No outcome is inferred, including valid accepted/orphan legacy debt.
++    }
++    try { return validate({ ...state, schemaVersion: 7 }, location); }
++    catch (error) { throw new SessionLoadError(location, `legacy-debt: unprovable native7 continuation (${(error as Error).message}); retain original reader6 storage`); }
++  }
++  // Evaluate every entry before returning anything. No mutation, writes or undo dropping.
++  const state = promote(stored.state, "state");
++  const undoHistory = stored.undoHistory.map((snapshot, index) => promote(snapshot, `undoHistory[${index}]`));
++  return { ...stored, state, undoHistory };
++}
+diff --git a/workers/game/src/session/game-state-schema.ts b/workers/game/src/session/game-state-schema.ts
+index c9cb23a..49ee99b 100644
+--- a/workers/game/src/session/game-state-schema.ts
++++ b/workers/game/src/session/game-state-schema.ts
+@@ -1,3 +1,4 @@
++import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
+ import { replacementEventsFor } from "../engine/replacement-events.js";
+ import { projectVersion5, triggerExecutionOwnerViolation } from "./version5-reader.js";
+ /**
+@@ -37,10 +38,10 @@ import { log } from "../lib/log.js";
+ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
+ 
+ /** The version this build's writer emits for state its own engine produces. */
+-export const GAME_STATE_SCHEMA_VERSION = 6;
+-/** The newest persisted version this build can read; v6 retains replacement scan progress. */
++export const GAME_STATE_SCHEMA_VERSION = 7;
++/** The newest persisted version this build can read; v7 carries explicit cost outcomes. */
+ export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
+-/** The newest runtime shape this build executes; all producers emit v6. */
++/** The newest runtime shape this build executes; ordinary writers remain v6. */
+ export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
+ export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
+ /** Versions this build can read. Retiring one follows the support-window policy (§3). */
+@@ -567,8 +568,8 @@ export function convertToCurrentShape(
+ 
+ /**
+  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
+- * OPT-968 every live state and undo snapshot is written as version 6:
+- * `schemaVersion: 6` first, every frame with its discriminant, every
++ * Ordinary producers remain version 6; native version 7 is retained per
++ * live state and undo snapshot. Every frame has its discriminant, every
+  * End Phase frame with its stage. A runtime frame without a stage can only be
+  * a version 1 frame, so it is written with the legacy stage, which is its
+  * version 1 meaning.
+@@ -588,7 +589,7 @@ export function toPersistedGameState(state: GameState): GameState {
+   return {
+     // Reader preserves a native-v7 session/undo entry; ordinary engine inputs
+     // still write v6 until the separately gated producer flips its version.
+-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
++    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? 7 : state.schemaVersion === 6 ? 6 : GAME_STATE_SCHEMA_VERSION,
+     ...rest,
+     effectStack: effectStack.map((frame) => ({
+       ...frame,
+@@ -879,6 +880,10 @@ export function validateContinuationReferences(
+     )) {
+       throw new SessionLoadError(location, `${ref} has costReplacementResolution without a checked COST replay owner`);
+     }
++    if (state.schemaVersion === 7 && (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true)) {
++      const replayViolation = costReplacementReplayViolation(state, frame);
++      if (replayViolation) throw new SessionLoadError(location, `${ref} ${replayViolation}`);
++    }
+     const violation = frameInvariantViolation(frame, derived, state);
+     if (violation) {
+       throw new SessionLoadError(location, `${ref} (frame ${JSON.stringify(frame.id)}) ${violation}`);
+diff --git a/workers/game/src/session/persistence.ts b/workers/game/src/session/persistence.ts
+index 40df906..95613bc 100644
+--- a/workers/game/src/session/persistence.ts
++++ b/workers/game/src/session/persistence.ts
+@@ -1,3 +1,4 @@
++import { promoteCandidateSession } from "./candidate-version7-promotion.js";
+ import { projectVersion5 } from "./version5-reader.js";
+ import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
+ import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
+@@ -250,7 +251,7 @@ export class SessionRepository {
+         ? Promise.resolve(undefined)
+         : this.storage.get<unknown>(SESSION_UNDO_HISTORY_STORAGE_KEY),
+     ]);
+-    const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
++    const stored = promoteCandidateSession(parseStoredSession(raw, separateCardDb, separateUndoHistory), convertPersistedGameState);
+     const restoredState = restoreIdCounterInvariant(
+       ensureExecutionContext(stored.state),
+       "state"
+diff --git a/workers/game/src/session/prompt-lifecycle.ts b/workers/game/src/session/prompt-lifecycle.ts
+index 60b80a2..7c2568b 100644
+--- a/workers/game/src/session/prompt-lifecycle.ts
++++ b/workers/game/src/session/prompt-lifecycle.ts
+@@ -1,3 +1,4 @@
++import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
+ import { abortReplacedCost } from "../engine/effect-resolver/resume/cost.js";
+ import { drainPendingWork } from "../engine/pending-work-drain.js";
+ import { takeInterruptedEvents } from "../engine/effect-resolver/resume/events.js";
+@@ -375,6 +376,10 @@ function answerReplacementOffer(
+   let state = popFrame(initialState);
+   const caller = state.effectStack.at(-1);
+   const callerKind = caller ? frameKindOf(caller) : null;
++  if (state.schemaVersion === 7 && caller && callerKind === "COST") {
++    const violation = costReplacementReplayViolation(state, caller);
++    if (violation) throw new Error(`Invalid replacement caller: ${violation}`);
++  }
+   // OPT-872: only the unanswered continuation for this exact effect and
+   // target is resumed (rules §7-1-4-1-2).
+   const pausedBattle =

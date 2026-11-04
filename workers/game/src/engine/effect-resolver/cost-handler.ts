@@ -6,6 +6,7 @@
  */
 export { payCosts } from "./cost/payment.js";
 export { costNeedsPlayerSelection, isCostPayable } from "./cost/payability.js";
+export { isCostSequencePayable } from "./cost/feasibility.js";
 export { computeCostTargets, getCostCards, resolveAmount } from "./cost/targets.js";
 export {
   blockShufflesDeck,

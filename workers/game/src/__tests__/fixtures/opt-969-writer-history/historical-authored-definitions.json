@@ -1,0 +1,247 @@
+{
+  "EB02-061": {
+    "id": "EB02-061",
+    "name": "EB02-061",
+    "type": "Character",
+    "color": [
+      "Red"
+    ],
+    "cost": 3,
+    "power": 4000,
+    "counter": 1000,
+    "life": null,
+    "attribute": [],
+    "types": [],
+    "effectText": "",
+    "triggerText": null,
+    "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+    },
+    "effectSchema": {
+      "card_id": "EB02-061",
+      "card_name": "Monkey.D.Luffy",
+      "card_type": "Character",
+      "effects": [
+        {
+          "id": "conditional_rush",
+          "category": "permanent",
+          "conditions": {
+            "all_of": [
+              {
+                "type": "LEADER_PROPERTY",
+                "controller": "SELF",
+                "property": {
+                  "multicolored": true
+                }
+              },
+              {
+                "type": "DON_FIELD_COUNT",
+                "controller": "OPPONENT",
+                "operator": ">=",
+                "value": 5
+              }
+            ]
+          },
+          "modifiers": [
+            {
+              "type": "GRANT_KEYWORD",
+              "target": {
+                "type": "SELF"
+              },
+              "params": {
+                "keyword": "RUSH"
+              }
+            }
+          ]
+        },
+        {
+          "id": "when_attacking_untap_life",
+          "category": "auto",
+          "trigger": {
+            "keyword": "WHEN_ATTACKING"
+          },
+          "costs": [
+            {
+              "type": "DON_MINUS",
+              "amount": 2
+            }
+          ],
+          "flags": {
+            "optional": true,
+            "once_per_turn": true
+          },
+          "actions": [
+            {
+              "type": "SET_ACTIVE",
+              "target": {
+                "type": "SELF"
+              }
+            },
+            {
+              "type": "LIFE_TO_HAND",
+              "params": {
+                "amount": 1,
+                "position": "TOP"
+              },
+              "chain": "THEN"
+            }
+          ]
+        }
+      ]
+    },
+    "imageUrl": null
+  },
+  "OP12-070": {
+    "id": "OP12-070",
+    "name": "OP12-070",
+    "type": "Character",
+    "color": [
+      "Red"
+    ],
+    "cost": 3,
+    "power": 4000,
+    "counter": 1000,
+    "life": null,
+    "attribute": [],
+    "types": [],
+    "effectText": "",
+    "triggerText": null,
+    "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+    },
+    "effectSchema": {
+      "card_id": "OP12-070",
+      "card_name": "Sanji",
+      "card_type": "Character",
+      "effects": [
+        {
+          "id": "OP12-070_permanent_power",
+          "category": "permanent",
+          "modifiers": [
+            {
+              "type": "MODIFY_POWER",
+              "target": {
+                "type": "SELF"
+              },
+              "params": {
+                "amount": {
+                  "type": "PER_COUNT",
+                  "source": "EVENTS_IN_TRASH",
+                  "multiplier": 1000,
+                  "divisor": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "OP12-070_replacement",
+          "category": "replacement",
+          "flags": {
+            "optional": true
+          },
+          "replaces": {
+            "event": "WOULD_BE_REMOVED_FROM_FIELD",
+            "cause_filter": {
+              "by": "OPPONENT_EFFECT"
+            }
+          },
+          "replacement_actions": [
+            {
+              "type": "RETURN_DON_TO_DECK",
+              "target": {
+                "type": "DON_IN_COST_AREA",
+                "controller": "SELF",
+                "count": {
+                  "exact": 1
+                }
+              },
+              "params": {
+                "amount": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "imageUrl": null
+  },
+  "OP15-069": {
+    "id": "OP15-069",
+    "name": "OP15-069",
+    "type": "Character",
+    "color": [
+      "Red"
+    ],
+    "cost": 3,
+    "power": 4000,
+    "counter": 1000,
+    "life": null,
+    "attribute": [],
+    "types": [],
+    "effectText": "",
+    "triggerText": null,
+    "keywords": {
+      "rush": false,
+      "rushCharacter": false,
+      "doubleAttack": false,
+      "banish": false,
+      "blocker": false,
+      "trigger": false,
+      "unblockable": false
+    },
+    "effectSchema": {
+      "card_id": "OP15-069",
+      "card_name": "Nola",
+      "card_type": "Character",
+      "effects": [
+        {
+          "id": "OP15-069_replacement",
+          "category": "replacement",
+          "replaces": {
+            "event": "WOULD_BE_REMOVED_FROM_FIELD",
+            "target_filter": {
+              "controller": "SELF",
+              "card_type": "CHARACTER",
+              "base_power_max": 7000
+            },
+            "cause_filter": {
+              "by": "OPPONENT_EFFECT"
+            }
+          },
+          "replacement_actions": [
+            {
+              "type": "RETURN_DON_TO_DECK",
+              "target": {
+                "type": "DON_IN_COST_AREA",
+                "controller": "SELF",
+                "count": {
+                  "exact": 1
+                }
+              },
+              "params": {
+                "amount": 1
+              }
+            }
+          ],
+          "flags": {
+            "optional": true
+          }
+        }
+      ]
+    },
+    "imageUrl": null
+  }
+}

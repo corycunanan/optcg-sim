@@ -412,9 +412,13 @@ export function useGameSession(
 
   /* ── End-of-match display values ──────────────────────────────────── */
 
+  // An engine-limit ending (OPT-960) has no winner but is not a rules draw.
+  const engineLimitEnded = gameState?.engineOutcome?.type === "ENGINE_LIMIT";
   const endTitle = gameOver
     ? gameOver.winner === null
-      ? "DRAW"
+      ? engineLimitEnded
+        ? "MATCH ENDED"
+        : "DRAW"
       : gameOver.winner === myIndex
         ? "VICTORY"
         : "DEFEAT"

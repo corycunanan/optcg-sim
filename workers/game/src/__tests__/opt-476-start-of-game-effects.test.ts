@@ -9,7 +9,7 @@ import type {
 } from "../types.js";
 import { GameSession } from "../GameSession.js";
 import { advancePregame, resumePregameFromPrompt, startPregame } from "../engine/pregame.js";
-import { resumeFromStack } from "../engine/effect-resolver/resume.js";
+import { resumePromptLifecycle } from "../session/prompt-lifecycle.js";
 import { prepareDecksAndLeaders } from "../engine/setup.js";
 import { filterStateForPlayer } from "../engine/state.js";
 import { CARDS, createTestPayload } from "./helpers.js";
@@ -117,8 +117,8 @@ function answerSearch(
   }
   const revealedIds = prompt.options.cards.map((card) => card.instanceId);
   const keptCardInstanceId = accept ? revealedIds[0] : "";
-  const resumed = resumeFromStack(
-    { ...state, pendingPrompt: null },
+  const resumed = resumePromptLifecycle(
+    state,
     {
       type: "ARRANGE_TOP_CARDS",
       keptCardInstanceId,
@@ -126,11 +126,9 @@ function answerSearch(
       destination: "bottom",
     },
     cardDb,
+    { drainPregame: current => current, advanceStartOfTurn: current => current },
   );
-  return {
-    ...resumed.state,
-    pendingPrompt: resumed.pendingPrompt ?? null,
-  };
+  return resumed.state;
 }
 
 describe("OPT-476 start-of-game effects", () => {

@@ -1,0 +1,2591 @@
+{
+  "producerCommit": "ed6b264be4e38e2d52f4db49429f8efd976f5d45",
+  "productionPatchSha256": "9d0cc4810e7cf9df01e979db4810429c62804fa830d7f994ef767716aa1e8858",
+  "generators": {
+    "opt-969-native7-producers.test.ts": "5c9eee08284103b826af9fc65e841be8bf295b2c8448bc948f4397c72b2c5ae9",
+    "opt-969-native7-producer-matrix.test.ts": "07d3ea67277aff2b8c3e08e75c9d3770444df26670132c9f15c4b83b0350d37b",
+    "native7-producer-cases.ts": "78c0650165cf29a852024baabe169e0e4b294e97684ec4aa7994da03ec8ffa59",
+    "native7-producer-pairs.ts": "2baaaf4e04937e883e2298bd5037e98a4d5824776283ad15504f44555bd4b972",
+    "native7-producer-support.ts": "f4c2d62a3ecf5d257e7fbf935d3b45588096b86e2054862744f0569c043a9127"
+  },
+  "producerSource": {
+    "base": "7ced33a0930886bac7fc3d16040486d48df774b1",
+    "commit": "ed6b264be4e38e2d52f4db49429f8efd976f5d45",
+    "patchSha256": "9d0cc4810e7cf9df01e979db4810429c62804fa830d7f994ef767716aa1e8858",
+    "productionHashes": {
+      "workers/game/src/GameSession.ts": "ed99ca2b2ab79486a82bb6f4692061d638036e8228e0bda9bc60136d852e0bde",
+      "workers/game/src/engine/effect-resolver/cost/orchestrator.ts": "2304746ba90311d2744735958aebb51cc50147f9df6d3ba9a78c3b03efa8f917",
+      "workers/game/src/engine/effect-resolver/cost/targets.ts": "7e072edef2b508f0cda4468ce078842ea17d9d79f3bede29ae66ee7947c68e23",
+      "workers/game/src/engine/effect-resolver/resume/cost.ts": "6ba0d4d015a81c2920b119a7c146cfd17276c9595bc446e3e340b4bb9bb07535",
+      "workers/game/src/engine/setup.ts": "c0210c84687eea11e61f39ccd4311b7e1c81768ec882d4c2e111c03be6722393",
+      "workers/game/src/session/game-state-schema.ts": "6e26de2f0143fcf9014608259259e8636f941cb9c3bf41696604a1d703081c4e",
+      "workers/game/src/session/persistence.ts": "76d0f63d0df8c9c454bd675518a425d445fcc8fe4386a4efa9c3e81891d6cf3e",
+      "workers/game/src/session/version7-promotion.ts": "e210da72a72f3bed23402a1f69ce9164741e571818f8d84d8eef6c076a472289"
+    },
+    "readerBase": "4858458abb4516c3085543f84c5b20e2364c8ec6",
+    "productionFromReaderBaseSha256": "7188d35925ab80aee755cd2b45a24b30b7c8cf50be74fa2485b6d319356cf003"
+  },
+  "scenarios": 82,
+  "startingBoundaries": 253,
+  "storageContexts": [
+    "live",
+    "undo-first",
+    "undo-later",
+    "embedded"
+  ],
+  "continuationExecutions": 2264,
+  "acceptance": {
+    "DON_MINUS-DON_MINUS-active": {
+      "sourceId": "DON_MINUS-DON_MINUS-active#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "e60c4278e4b2c03ed07a42cefe07e94397971d7f10508c384ee92d80fc9fb4cc",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "DON_MINUS-DON_MINUS-active#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "DON_MINUS-DON_MINUS-rested": {
+      "sourceId": "DON_MINUS-DON_MINUS-rested#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "96c003e2ae3ca71dc401f445330fd8c738f19b5a3d39bd1c4c4904146f1cabfe",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "DON_MINUS-DON_MINUS-rested#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-0\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-VARIABLE_DON_RETURN-active": {
+      "sourceId": "DON_MINUS-VARIABLE_DON_RETURN-active#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "3a036b90c5b682cf390236eacbc703c5332a333795e67d2e927cf6b357cb7f24",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "DON_MINUS-VARIABLE_DON_RETURN-active#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "DON_MINUS-VARIABLE_DON_RETURN-rested": {
+      "sourceId": "DON_MINUS-VARIABLE_DON_RETURN-rested#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "3dc97b5461155982f2d35dd8123c990b24af47b51b0a275d94f1b2205af9b65e",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "DON_MINUS-VARIABLE_DON_RETURN-rested#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-0\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-filter-active": {
+      "sourceId": "matrix-DON_MINUS-filter-active#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "aa2937618f462e0902b516e013ff90dc3636dc228100a008c4ca844314a054fc",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-active#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-filter-both-false": {
+      "sourceId": "matrix-DON_MINUS-filter-both-false#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "5909c1979f1692670f93956bbc0d17458a0c8da92023d9eaeb3a468242e37ac4",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-both-false#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "DON_MINUS-filter-contradiction": {
+      "sourceId": "matrix-DON_MINUS-filter-contradiction#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "bc96d9dc292d1274ad50b9f431eb1425dd78f767bc63e4184fafb2c3b15bac01",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-contradiction#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-filter-exact-active": {
+      "sourceId": "matrix-DON_MINUS-filter-exact-active#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "22ba5fa35f0be69929a8fd49e5d8e285846594b8d7a07729311a88331e8e042a",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-exact-active#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-filter-exact-conjunction": {
+      "sourceId": "matrix-DON_MINUS-filter-exact-conjunction#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "940d8dab97fb3552c6306c889ce3a393daae0807b326e7d20a186770b5e82764",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-exact-conjunction#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-filter-exact-contradiction": {
+      "sourceId": "matrix-DON_MINUS-filter-exact-contradiction#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "2ee5c42e06206531acc95589d1a86c7d662d928b8d2653371cb5d481cb03e312",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-exact-contradiction#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-filter-exact-rested": {
+      "sourceId": "matrix-DON_MINUS-filter-exact-rested#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "2d2b67a9de2dc81b6eccddf3034513e6dbf4b8fe8781ad9fdbd2ba8445f26a06",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-exact-rested#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "DON_MINUS-filter-false-active": {
+      "sourceId": "matrix-DON_MINUS-filter-false-active#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "74ffef7a4edbbf20ada74fc147bb5a84c925d06cacb7f6595c6ddbd61ecc40af",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-false-active#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "DON_MINUS-filter-false-rested": {
+      "sourceId": "matrix-DON_MINUS-filter-false-rested#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "43492009630c4d7b3f4a7119e62c8581eb71d7d0b2e3191cbd83eb01b70739e4",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-false-rested#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "DON_MINUS-filter-rested": {
+      "sourceId": "matrix-DON_MINUS-filter-rested#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "bb7fc289a4058d3d9c00ceee10104713e8b92b2ad55f8ebe6648cd1383cbd3f0",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-DON_MINUS-filter-rested#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "KO_OWN_CHARACTER-zero-after-plain": {
+      "sourceId": "matrix-KO_OWN_CHARACTER-zero-after-plain#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "cf1dd69b1a626798af17d6241d42d058eec9bd0710fe5e20e442b49abdac1b78",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-KO_OWN_CHARACTER-zero-after-plain#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "KO_OWN_CHARACTER-zero-after-replacement": {
+      "sourceId": "matrix-KO_OWN_CHARACTER-zero-after-replacement#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "5fd51d372fe280f5db9c05c0d82e5b66e434fd40dfa1e4a9409f2cf6c184b09f",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-KO_OWN_CHARACTER-zero-after-replacement#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "KO_OWN_CHARACTER-zero-initial-plain": {
+      "sourceId": "matrix-KO_OWN_CHARACTER-zero-initial-plain#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "7c0f53a1de491b0f2d370fd2aa51a1f6f1f1aa6bccda8ef8272e7856de566039",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-KO_OWN_CHARACTER-zero-initial-plain#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "KO_OWN_CHARACTER-zero-initial-replacement": {
+      "sourceId": "matrix-KO_OWN_CHARACTER-zero-initial-replacement#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "83bb54b82a17f044f2d38b6f919f82dc63523a371653745c0959238ffa6d2a7f",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-KO_OWN_CHARACTER-zero-initial-replacement#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "TRASH_OWN_CHARACTER-zero-after-plain": {
+      "sourceId": "matrix-TRASH_OWN_CHARACTER-zero-after-plain#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "00b7aa7ed11ff0d9331ca5b94dd64b43922e48e442e6ec1e42e48b3e55f2dbd1",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-TRASH_OWN_CHARACTER-zero-after-plain#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "TRASH_OWN_CHARACTER-zero-after-replacement": {
+      "sourceId": "matrix-TRASH_OWN_CHARACTER-zero-after-replacement#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "e31a46d0c8ac3cf6becc679e211c441efa7e4d03fa38856abc69c4e88c52b397",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-TRASH_OWN_CHARACTER-zero-after-replacement#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "TRASH_OWN_CHARACTER-zero-initial-plain": {
+      "sourceId": "matrix-TRASH_OWN_CHARACTER-zero-initial-plain#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "c86a4b35ceaedcceb2e0eec06323f2618cea5a73ef731c18bd69281e0354ab03",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-TRASH_OWN_CHARACTER-zero-initial-plain#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "TRASH_OWN_CHARACTER-zero-initial-replacement": {
+      "sourceId": "matrix-TRASH_OWN_CHARACTER-zero-initial-replacement#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "ed215db04f70c4db342e1676a135e5a58f0c31451459c8a53bdc79b187d61dbd",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-TRASH_OWN_CHARACTER-zero-initial-replacement#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-DON_MINUS-active": {
+      "sourceId": "VARIABLE_DON_RETURN-DON_MINUS-active#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "8879b9ec625cf9e6d97fe7981463ede4d03ba5364d465000ce41ec9c56520fc2",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "VARIABLE_DON_RETURN-DON_MINUS-active#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-DON_MINUS-rested": {
+      "sourceId": "VARIABLE_DON_RETURN-DON_MINUS-rested#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "6f4066c2a8725c3ac3117136a09490bb75dee613effb32262603592882482202",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "VARIABLE_DON_RETURN-DON_MINUS-rested#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-0\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-active": {
+      "sourceId": "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-active#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "25d9426e071ad06721d7a2af81b311e1d8868ece4eaa1238c7e5502e6172bc94",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-active#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-rested": {
+      "sourceId": "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-rested#0#5",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 1,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "a71362fd8fb9c177e3d3ba4f3a22212867bcd6985cf6b00a8783b15ae65f7385",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-rested#0#5",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-0\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-active": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-active#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "a51cc511a1c164fe99e010531539eab9ef370912482df8e5d46b94dca667882b",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-active#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-both-false": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-both-false#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "8a6a0a9f7904f2aff973b8257922efe9375b6d277b3511647ad297f9f1aaa7e4",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-both-false#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p1-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-contradiction": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-contradiction#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "89b1f9a021f319098e76c432312066f79bc4a9d60b43911967872c76b4dc8f8d",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-contradiction#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-exact-active": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-exact-active#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "1075e2f8f0d8bce52717e8142e28e6fe4864f063d761e93fd80b09e287a1e8d8",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-exact-active#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-exact-conjunction": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-exact-conjunction#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "eea8359334f04b02063381809b3dda746da22bbe1104f2621187f93aabe19be2",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-exact-conjunction#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-exact-contradiction": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-exact-contradiction#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "fe6f20da9fa9e30f317a928c6455b755036b5dbd88b3094ee911a653832a6563",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-exact-contradiction#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-exact-rested": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-exact-rested#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "96990bc02ad3d7348139c749c635d436d48da64162f45fe31287861468c29300",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-exact-rested#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-false-active": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-false-active#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "ecb84c93ca48723e229c278b517160dacad114833137d23cfc22fb0385d7b745",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-false-active#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p1-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-false-rested": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-false-rested#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "dc58888395890d6af18cc8a930b92c543f8bd3460d0473bb1c85e0f8223bfd90",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-false-rested#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p1-1\"]",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "VARIABLE_DON_RETURN-filter-rested": {
+      "sourceId": "matrix-VARIABLE_DON_RETURN-filter-rested#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "7307c48d26a473255aaa45023f8b9a2ab0c21a28272909492ef208a886ddb932",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-VARIABLE_DON_RETURN-filter-rested#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#1#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "accepted-fixed-don-prefix-rollback": {
+      "sourceId": "matrix-accepted-fixed-don-prefix-rollback#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "3037359135bab5b387b8772d266580723a4fb6e2ac24288f42812695a8bc0449",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-accepted-fixed-don-prefix-rollback#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "action-after-don": {
+      "sourceId": "matrix-action-after-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "72d2c3faca241652bf27e2a85958a3a4823ec991c9513ca93dff021d924de1f9",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-action-after-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "active-held-filter": {
+      "sourceId": "matrix-active-held-filter#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "95da76c26a4e5547c0dc8a4daa34622f5a6899c0acf19004e59e12a889461a73",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-active-held-filter#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "any-rest-before-don": {
+      "sourceId": "matrix-any-rest-before-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "e1df82e936c7639a23e8e83276a6e5b41c4da7f4f98f65f3e42ece100d32589d",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-any-rest-before-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-rest:1",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "arrange-accept-then-don": {
+      "sourceId": "matrix-arrange-accept-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "65e69ad2d6c18d650a68ae1af8e1389d155a12d34be22a4873653aacd63f7b2d",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-arrange-accept-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "trash-1#0#14"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "ARRANGE_TOP_CARDS",
+          "orderedInstanceIds": [
+            "matrix-arrange-accept-then-don#0#12",
+            "trash-1#0#14"
+          ],
+          "keptCardInstanceId": "",
+          "destination": "bottom",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "arrange-decline-then-don": {
+      "sourceId": "matrix-arrange-decline-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "f735944124fe67e6c712ba759146e1de4c51f60c531a215b8faf96e1e6e14b41",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-arrange-decline-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "trash-1#0#14"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "ARRANGE_TOP_CARDS",
+          "orderedInstanceIds": [
+            "matrix-arrange-decline-then-don#0#12",
+            "trash-1#0#14"
+          ],
+          "keptCardInstanceId": "",
+          "destination": "bottom",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_0000004a"
+        }
+      ]
+    },
+    "arrange-terminal-then-don": {
+      "sourceId": "matrix-arrange-terminal-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "534caf1ac0bedbc4a300d34884427b47624a86e48f75d43a697252bc966b0089",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-arrange-terminal-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "trash-1#0#14"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "ARRANGE_TOP_CARDS",
+          "orderedInstanceIds": [
+            "matrix-arrange-terminal-then-don#0#12",
+            "trash-1#0#14"
+          ],
+          "keptCardInstanceId": "",
+          "destination": "bottom",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "attached-hosts": {
+      "sourceId": "matrix-attached-hosts#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "7c1e73823901b1bac5ef41d682cb793ba720d0f60970d38607acde0d598946ff",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-attached-hosts#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p1-5\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p1-4\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "branch-don": {
+      "sourceId": "matrix-branch-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "1749595967bccaf9541d733eb072c672322912dbe7769b9ac59d635251930bd8",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-branch-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "0",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000046"
+        }
+      ]
+    },
+    "choose-one-don": {
+      "sourceId": "matrix-choose-one-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "b5b7db95e86097a91fed0f5d1ed8ec11de89cb7306fecd2da8729e9383a2b6a7",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-choose-one-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "0",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000046"
+        }
+      ]
+    },
+    "compound-HAND-zero-arrange": {
+      "sourceId": "matrix-compound-HAND-zero-arrange#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "5b92c6f4a02a94b164824873b04d9ff5b2ea02b88a67b46cd1b12601e2ab5edf",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-compound-HAND-zero-arrange#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "ARRANGE_TOP_CARDS",
+          "orderedInstanceIds": [
+            "matrix-compound-HAND-zero-arrange#0#12"
+          ],
+          "keptCardInstanceId": "",
+          "destination": "bottom",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000049"
+        }
+      ]
+    },
+    "compound-HAND-zero-shuffle": {
+      "sourceId": "matrix-compound-HAND-zero-shuffle#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "958b5ec946b002580f04c51c042fb0d2d9a87ffe2ff3e29fed53a5d960216f83",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-compound-HAND-zero-shuffle#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "compound-TRASH-zero-arrange": {
+      "sourceId": "matrix-compound-TRASH-zero-arrange#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "31ad33ee6410a073b20fb83ef5c9336fb6d6ee26c84a2600d8c51e4cfbc9e896",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-compound-TRASH-zero-arrange#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "ARRANGE_TOP_CARDS",
+          "orderedInstanceIds": [
+            "matrix-compound-TRASH-zero-arrange#0#12"
+          ],
+          "keptCardInstanceId": "",
+          "destination": "bottom",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000049"
+        }
+      ]
+    },
+    "compound-TRASH-zero-shuffle": {
+      "sourceId": "matrix-compound-TRASH-zero-shuffle#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "3d7be678f4a8fe07756df4b84fce40ed7011e834773ac79d1dcd20e13a843b0f",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-compound-TRASH-zero-shuffle#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "declined-field-don-prefix": {
+      "sourceId": "matrix-declined-field-don-prefix#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "627a574c90569a277671d3f337d59bc8e0d328085068d263035c4889942fc574",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-declined-field-don-prefix#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-declined-field-don-prefix#0#12"
+          ],
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000047"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_0000004a"
+        }
+      ]
+    },
+    "field-accept-then-don": {
+      "sourceId": "matrix-field-accept-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "36d65a3c1adcb0c2be29ef9d33c6b61be3d8522aa073e66f4cc3b642d88c5d02",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-field-accept-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-field-accept-then-don#0#12"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "field-decline-then-don": {
+      "sourceId": "matrix-field-decline-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "af48cb458bbced2c9f83c7803be5a499fbede5467057cd229f3539ecf4e7157e",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-field-decline-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-field-decline-then-don#0#12"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "field-terminal-then-don": {
+      "sourceId": "matrix-field-terminal-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "f42d76344242276a7f7fc11c7e114d4a00037c1e420bb40e6bd19c2e90e59301",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-field-terminal-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-field-terminal-then-don#0#12"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "fixed-accept-then-don": {
+      "sourceId": "matrix-fixed-accept-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "5ec9875a8bb7c01c5147f1b128c5c2da9a35d04dc7311f67594ab9021d60d9f7",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-fixed-accept-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000046"
+        }
+      ]
+    },
+    "fixed-count2-payer1": {
+      "sourceId": "matrix-fixed-count2-payer1#1#12",
+      "payer": 1,
+      "independentExpected": {
+        "returned": 4,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "0ad079fb8a0f7c718317d329873a0967536e6af42cd3b795f2485b68b4727319",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-fixed-count2-payer1#1#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p1-1\",\"don-p1-2\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p1-3\",\"don-p1-4\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "fixed-decline-then-don": {
+      "sourceId": "matrix-fixed-decline-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "ee0cb528f250b254e2b49f6532c850970c3b09a5268c70ef41fb9e89afce362a",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-fixed-decline-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "fixed-prefix": {
+      "sourceId": "matrix-fixed-prefix#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "1868d565f2f2eb03bb384fb47f504f9b355e095a7ca15b67d018016b4c8312f9",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-fixed-prefix#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "fixed-terminal-then-don": {
+      "sourceId": "matrix-fixed-terminal-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "12abb38ebb300fbb392873a521d964ed96c86259b0c8fbb1440b5c95120f5875",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-fixed-terminal-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000046"
+        }
+      ]
+    },
+    "forced-all": {
+      "sourceId": "matrix-forced-all#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 8,
+        "hand": 3,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "92475796abb3a006849fe4701e1b78858bd5bf57c5bbe7b49bae14ebdfdb2fa4",
+      "startingBoundaries": 1,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-forced-all#0#12",
+          "effectId": "activate"
+        }
+      ]
+    },
+    "held-duration-groups": {
+      "sourceId": "matrix-held-duration-groups#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "8095b5d3e856c4e0996024943c967f111b8fb888ecfc55406c19fd10ae9dae51",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-held-duration-groups#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "insufficient-replacement-amount": {
+      "sourceId": "matrix-insufficient-replacement-amount#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "4c7859d3de63afcb3e42f90bfb8f6b1d6ba92928604c653116ddb77fe7102090",
+      "startingBoundaries": 1,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-insufficient-replacement-amount#0#12",
+          "effectId": "activate"
+        }
+      ]
+    },
+    "later-index2": {
+      "sourceId": "matrix-later-index2#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 2,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "5b31e5a57c55bae117d9a6eb419ae9076a9e5c03deaffb3343cc7c260d87b423",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-later-index2#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "life-accept-then-don": {
+      "sourceId": "matrix-life-accept-then-don#1#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "177794f970efecc76f4188a1a5c3863f8996de29f75ffa6109588d40f129a5ca",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "activator-life-accept-then-don#0#13",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-life-accept-then-don#1#12"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "cost-life:[\"matrix-life-accept-then-don#1#12\"]:TOP",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "opponent-hand-0#1#14"
+          ],
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "life-decline-then-don": {
+      "sourceId": "matrix-life-decline-then-don#1#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "6e13644feef7a2262095c4aafddb6e8489c7b1a957add6e633b2128d1a9a11c7",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "activator-life-decline-then-don#0#13",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-life-decline-then-don#1#12"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "cost-life:[\"matrix-life-decline-then-don#1#12\"]:TOP",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000049"
+        }
+      ]
+    },
+    "life-terminal-then-don": {
+      "sourceId": "matrix-life-terminal-then-don#1#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "1c4963a1a64daf9bf4a374808f507628726cc90c94c6596288361bf6c58a2697",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "activator-life-terminal-then-don#0#13",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-life-terminal-then-don#1#12"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "cost-life:[\"matrix-life-terminal-then-don#1#12\"]:TOP",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "opponent-hand-0#1#14"
+          ],
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "nested-trigger-parent": {
+      "sourceId": "matrix-nested-trigger-parent#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 3,
+        "hand": 3,
+        "meaningfulPauses": 3
+      },
+      "sourceCardDbSha256": "3cf75ea359052df198aef8723a2379a3f70c5208a99faf31890b0850631c25d6",
+      "startingBoundaries": 5,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-nested-trigger-parent#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000048"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-3\"]",
+          "promptId": "prompt_0000004c"
+        }
+      ]
+    },
+    "opponent-action-after-pause": {
+      "sourceId": "matrix-opponent-action-after-pause#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 2,
+        "meaningfulPauses": 0,
+        "opponentReturned": 1
+      },
+      "sourceCardDbSha256": "d462c19d681e44e97b0ad2aca4ab4209ef80161155ec94123b7025ff5d189bee",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-opponent-action-after-pause#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "positive-ko-decline": {
+      "sourceId": "matrix-positive-ko-decline#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "1956f09e1af2b91470801fcb573bac6b6b94c60176ab0721a1c4b3494d60952d",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-positive-ko-decline#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "matrix-positive-ko-decline#0#12"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "replacement-action-amount": {
+      "sourceId": "matrix-replacement-action-amount#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 1,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "fce3699dff9abf922bcda14ea23f2d584b639debf0418145b45d9beaa79c623b",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-replacement-action-amount#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000044"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000048"
+        }
+      ]
+    },
+    "selected-prefix-trigger-don": {
+      "sourceId": "matrix-selected-prefix-trigger-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "d59dd5d7c79464c00d9a66d7eca7230433b28f11866b152d292dff775f4b470f",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-selected-prefix-trigger-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000046"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\"]",
+          "promptId": "prompt_00000049"
+        }
+      ]
+    },
+    "shuffle-accept-then-don": {
+      "sourceId": "matrix-shuffle-accept-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "f0a4148fab6b2b31003b25ce4d77c0c6c31a6239b66d18e1be2f62419a11ac35",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-shuffle-accept-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "trash-1#0#14"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "shuffle-decline-then-don": {
+      "sourceId": "matrix-shuffle-decline-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "6698f46c1784f6ca5eccdf38199423f01bb8b2158d2f3d8e4335a308820c0801",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-shuffle-decline-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "trash-1#0#14"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "skip",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000049"
+        }
+      ]
+    },
+    "shuffle-terminal-then-don": {
+      "sourceId": "matrix-shuffle-terminal-then-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "5dfccb82c1b7ebbbee9b050e8c849eae2bcdfe0e66b83cd34c065c0154caf8f0",
+      "startingBoundaries": 4,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-shuffle-terminal-then-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "trash-1#0#14"
+          ],
+          "promptId": "prompt_00000043"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "accept",
+          "promptId": "prompt_00000045"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000047"
+        }
+      ]
+    },
+    "sole-equivalent": {
+      "sourceId": "matrix-sole-equivalent#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 2,
+        "hand": 3,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "739c5b0d3dce8aee856b624f5eb43ed1d1a87a0b8d72202a5225b64ccb47a618",
+      "startingBoundaries": 1,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-sole-equivalent#0#12",
+          "effectId": "activate"
+        }
+      ]
+    },
+    "terminal-cost-suppresses-don": {
+      "sourceId": "matrix-terminal-cost-suppresses-don#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 1,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "f866987247766249bcf4e11f828317b62debaf1b36e6967e68fcd26382418db6",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-terminal-cost-suppresses-don#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "until-count-after-pause": {
+      "sourceId": "matrix-until-count-after-pause#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 2,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "9d45b0936ae773922ef8fffb6d31035cc2f3c86e97a1487abdcb37cd13e5ff9f",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-until-count-after-pause#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "SELECT_TARGET",
+          "selectedInstanceIds": [
+            "hand-0#0#10"
+          ],
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return:0:1",
+          "promptId": "prompt_00000045"
+        }
+      ]
+    },
+    "variable-count-after-fixed": {
+      "sourceId": "matrix-variable-count-after-fixed#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 3,
+        "hand": 3,
+        "meaningfulPauses": 2
+      },
+      "sourceCardDbSha256": "4acbb90692ace59f05e307380e9464b0dab48a13a3cd962bd0f1d76d76a19804",
+      "startingBoundaries": 3,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-variable-count-after-fixed#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-2\",\"don-p0-3\"]",
+          "promptId": "prompt_00000044"
+        }
+      ]
+    },
+    "zero-don-fixed": {
+      "sourceId": "matrix-zero-don-fixed#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "102c42df7a3da303197afcf92698a963c4ca735f12b5246aa37c5de36a1bf608",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-zero-don-fixed#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "zero-don-variable-suffix": {
+      "sourceId": "matrix-zero-don-variable-suffix#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "0736fd1f3ea01ce6b7af945778697e3dfd61bba1c352648acd7e3b85901dee87",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-zero-don-variable-suffix#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "zero-fixed-suffix": {
+      "sourceId": "matrix-zero-fixed-suffix#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 1,
+        "hand": 3,
+        "meaningfulPauses": 1
+      },
+      "sourceCardDbSha256": "a2b5eae4a7560ed872190490957a50872bf5452abd9c2073328f80ca9844c60d",
+      "startingBoundaries": 2,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-zero-fixed-suffix#0#12",
+          "effectId": "activate"
+        },
+        {
+          "type": "PLAYER_CHOICE",
+          "choiceId": "don-return-ids:[\"don-p0-1\"]",
+          "promptId": "prompt_00000042"
+        }
+      ]
+    },
+    "zero-variable-initial": {
+      "sourceId": "matrix-zero-variable-initial#0#12",
+      "payer": 0,
+      "independentExpected": {
+        "returned": 0,
+        "hand": 3,
+        "meaningfulPauses": 0
+      },
+      "sourceCardDbSha256": "d18f5bb4a6fef0d3bcf476b9da23a3d81a3a36edba2489cad833726022aafb1b",
+      "startingBoundaries": 1,
+      "replies": [
+        {
+          "type": "ACTIVATE_EFFECT",
+          "cardInstanceId": "matrix-zero-variable-initial#0#12",
+          "effectId": "activate"
+        }
+      ]
+    }
+  },
+  "laterPauses": 171,
+  "payloads": {
+    "DON_MINUS-DON_MINUS-active.json": "f6110b304d614cc9d3d188f5e4e8d0f0094687908eca50159beb1255a92c9a08",
+    "DON_MINUS-DON_MINUS-rested.json": "aa0fa95ff2d6b01d5d5ec3860f9d2c7665d355d4aca4c91f1fe60e73a033fb0e",
+    "DON_MINUS-VARIABLE_DON_RETURN-active.json": "2d66e8397b87cccc8af331990a715cf68dff9e72613f037c81a871fdb94ff95a",
+    "DON_MINUS-VARIABLE_DON_RETURN-rested.json": "2cb7540641266c48e8bec423ab680ef69a9159031e586b5aacd88899115b2510",
+    "DON_MINUS-filter-active.json": "38dad58f4fca05837c9f33bf170dbe836e117f3a608d133a085650681f05c8bf",
+    "DON_MINUS-filter-both-false.json": "412b5a150711dc31df199a9ae4fde2f351f52b871f1b09776c998a02fb82f355",
+    "DON_MINUS-filter-contradiction.json": "52ef327ec9bd73a6874c070f4ce6941625f73673486610a0ce953f7c5e4f4b24",
+    "DON_MINUS-filter-exact-active.json": "057b639a409cfbd2bc8e3cbd19e38aa19474555bb598c68102599dc2f19f3453",
+    "DON_MINUS-filter-exact-conjunction.json": "e5c93ff665a20c2b93b9edb75b17d42732d01865fa36550ee2a4e37223d74cc6",
+    "DON_MINUS-filter-exact-contradiction.json": "8d258cd8fe502e2b3640013638def72dc8e92d3be34e588879a0f3f269b0b02e",
+    "DON_MINUS-filter-exact-rested.json": "c93eb6733c34c28e48fcb686841289ee8c44b830104a27050fedc76f17773afd",
+    "DON_MINUS-filter-false-active.json": "596fba6dfe2caf6b6f6baf315288478297d08f53c395c083eed75cb0d1afd3b2",
+    "DON_MINUS-filter-false-rested.json": "f9c5262e3df3be6d8cc410c5c4919a7e2dcbd00e7bf7503198e2d5162416936b",
+    "DON_MINUS-filter-rested.json": "78c8ae464e9082dc91d1ebbde4e20f272198cecf3213dd7567a97d665c7cd68c",
+    "KO_OWN_CHARACTER-zero-after-plain.json": "fdcca1104bb5fa9138a823f25a0167fddad64fb07b9ce2573dd2dbd193ca0ff1",
+    "KO_OWN_CHARACTER-zero-after-replacement.json": "35a9153adf0b59904bf909c695134d1fb675eb36161ce81504d742a54643840e",
+    "KO_OWN_CHARACTER-zero-initial-plain.json": "51726270db965d10f8e0932c6b78b581c8ce4782fc7248c60e5fb5b2019d48bf",
+    "KO_OWN_CHARACTER-zero-initial-replacement.json": "819f3693eecfa794d40f14f8694f2e071ab6b8f55febccbd491b988674032e2b",
+    "TRASH_OWN_CHARACTER-zero-after-plain.json": "72905aaa8f034654eaef828faaecde6e2c2d06114b9ee75f57bf386edf91238c",
+    "TRASH_OWN_CHARACTER-zero-after-replacement.json": "e37e9a8cf4f6c04f906c11ae49039d477a78174d68c571495ded6703c037cc74",
+    "TRASH_OWN_CHARACTER-zero-initial-plain.json": "1d7c0d4f0c2d7bd05f9856cabf976b3c2bc78454c767bcea048838f593d17650",
+    "TRASH_OWN_CHARACTER-zero-initial-replacement.json": "f85812ef54f11802d9186fceb6d82432a16081db702fa0bcd7f16b40af2b91cc",
+    "VARIABLE_DON_RETURN-DON_MINUS-active.json": "7394cb66a7fffef0e36011de51b4bf1ec0a4d06eb868769db2c4f2226c200747",
+    "VARIABLE_DON_RETURN-DON_MINUS-rested.json": "9c5c696f4bf8457d010ee25450acbad7f3155ba11d84f1d58398548f2e325e52",
+    "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-active.json": "74f583eb9f62289064f4440ff52a8ab09f4fc2985a62cec9fe4c2b6004b93764",
+    "VARIABLE_DON_RETURN-VARIABLE_DON_RETURN-rested.json": "6c5383c205b0f8a8a1bbce26a0c531083cc34f3f234558a0f40fca446e82bf14",
+    "VARIABLE_DON_RETURN-filter-active.json": "21be13b4608c09559ab59f9531467f0b9241ae8ca9914311abe8feb5233c57bc",
+    "VARIABLE_DON_RETURN-filter-both-false.json": "cd895eea8ee7915761b1a5c88bdb758ebab6f9d7470b30ffd210b531f2342b51",
+    "VARIABLE_DON_RETURN-filter-contradiction.json": "f9c610b25d4c988b2a2b6d986a6b819f2d5c023d55ae6a60f63c2ff7b8256057",
+    "VARIABLE_DON_RETURN-filter-exact-active.json": "eb0aacf00d720ee17b3a1db9a37601a2bef3ba03148e047f90c254b77415e251",
+    "VARIABLE_DON_RETURN-filter-exact-conjunction.json": "1c468bcded6d64b30f7c508ec94cd969430aa71788c8c0554fc8e5b3ce186471",
+    "VARIABLE_DON_RETURN-filter-exact-contradiction.json": "4ebe29130a1d9100daddd504c29cafd416781660d4b4fc69b775c1239edd3511",
+    "VARIABLE_DON_RETURN-filter-exact-rested.json": "02e7de002b5fcf3209c69ad8ee6e0dd758b30d98f614aa7baa649e71a7754fe0",
+    "VARIABLE_DON_RETURN-filter-false-active.json": "8fc74b8a1d4ce011f9124d2343afd9b29882b8d0e0b517588a0b7c8edd150193",
+    "VARIABLE_DON_RETURN-filter-false-rested.json": "33283af86f81138c6ffdba6a9b05818bbeddb44bf312f74d506ee89d21e6854d",
+    "VARIABLE_DON_RETURN-filter-rested.json": "38f9571dccf8607b545c1daa63f14b98b3886751cb6f2a592db6e0660782bc67",
+    "accepted-fixed-don-prefix-rollback.json": "7ecda9907961c73bdff8b0e91693b3f7ccf1abbf44768019109100725da66e01",
+    "action-after-don.json": "e74970ed47821f7070302296db085e9d2ff4247a6c49ecb931c362ba7acdad2f",
+    "active-held-filter.json": "2acfbb27723f42b1a4bcc7cb7b65524211303a85733c0d6ca49b6371844923ec",
+    "any-rest-before-don.json": "c05131efdea9453d30f6f426c6d35f71e9d7c28220ba8222423db7ac007c09db",
+    "arrange-accept-then-don.json": "4b7b9a47a5e7f62192156c17541e8a32b331eda929a97663cd0e285ce3b6164d",
+    "arrange-decline-then-don.json": "aabeedf0135fcbf44c61a37e97b4075b11a20cd461b4e5a8700f25127ff514b3",
+    "arrange-terminal-then-don.json": "d4b4ad74e11bc76d835f307f22f3cf9731c706b2b81669b721e12fc13dc2c3af",
+    "attached-hosts.json": "9da7459b1a6bbf594033291988161d56132f53653bd890db923c1ec277c7814a",
+    "branch-don.json": "0580ccbed00bf81b8ebeb39c9e35340345f405abeec88ddfef47d07a18ddee84",
+    "choose-one-don.json": "5908c5d41d5df18dbbca9a225d03741d1051bffa7e750a6f1d2d064f4464c993",
+    "compound-HAND-zero-arrange.json": "1e8b34f932cec744f45fb0c079e847fc6c63e68ff38f36e9a1151b913a793ae5",
+    "compound-HAND-zero-shuffle.json": "a076578c9fd80caf2caeb2ea88ba6daa436aad062fa19faaed35b0375afeeba3",
+    "compound-TRASH-zero-arrange.json": "e8ae1fc007727c678920022938176d72ed98ffbf5e3df881f7b8db9ca4d7f291",
+    "compound-TRASH-zero-shuffle.json": "0d2ec0de55851edde734e4ddfb7574c6ea270c11c8f347e65f5d4e0fd19ef624",
+    "declined-field-don-prefix.json": "cb5ab8bd5716d076cdd713cc9f84ab8949fb467226529d5ca221d83015733e94",
+    "field-accept-then-don.json": "211cdb5959dba5cc539d2640adb50bae311c75e5406acb5c4c90cda6adaa3604",
+    "field-decline-then-don.json": "f9e88fbbe973c938a37dbc784effa26f71abb14da2db8c2d2136855b502fa23f",
+    "field-terminal-then-don.json": "b2d3036d5781d8a438402d1a68264de2ed8ddcdd817a2b75e45ab18c5aee16f1",
+    "fixed-accept-then-don.json": "8c26ab570266e0b8d496a98f9b56737fe3a95d29324be87736ea947aaaefba43",
+    "fixed-count2-payer1.json": "cb0a1b07cc9904d1312abfc1db982ebd99c1dcf16d10aa2ad1c5c5c0ce9cfb1a",
+    "fixed-decline-then-don.json": "ab88aceedd658f99d4a816ade7d208844f841e340edddcc6ddcaae52f341f79b",
+    "fixed-prefix.json": "8ef52a0474f62aa9d525c86174f91c71bf196a5ecee7b9912bb536c2a23c69c1",
+    "fixed-terminal-then-don.json": "450bedd8664cbefc995aaf82edea2527e58a5056959fa744ecae5a92e401a213",
+    "forced-all.json": "cb7c01b21865e546ff2df88ee00d6d0e7306bca0ed92e0a85a2677920e63ad12",
+    "held-duration-groups.json": "f6a0b40bd3344236eee3e1c1adb9976a2a222b1595bc64760d3a342bb1dd866d",
+    "insufficient-replacement-amount.json": "555c34916a1f1347f621056d6496b8fe4a86ef7bc1f147ca0b87ccde20a6cef9",
+    "later-index2.json": "2b0047d73a0fb6f82b5295dd04296ae4e0458e64f698dc28350af1017653eda9",
+    "life-accept-then-don.json": "61f9d220d131ec603109e4cf79634e3460b42f55ab6263e5a4f5fb80e5c7c0e1",
+    "life-decline-then-don.json": "b689cd320a84963b3feae59837ffbde8cef45a312878197e3ddfa7e87c1f5f16",
+    "life-terminal-then-don.json": "afa76d8a12798b7431f5afc4efabfd47d96718c1f56d0568b24ff89cb5b7acd0",
+    "nested-trigger-parent.json": "5e33718ce7834834d4933956272a8e6ee41da3946eacf73cbba1103ea54d3e8d",
+    "opponent-action-after-pause.json": "6fc86a609646ae82af9351c0c9851c3b0223c187873d812863ecb4cde4f58862",
+    "positive-ko-decline.json": "fdaac331fe66173826e27615ab46027a1dede92223f880ce6f67189c5105fdb6",
+    "replacement-action-amount.json": "f9e1ec96d6e9864ee348c72a3abc61e2fb27d7368143f83127feba8b524b390d",
+    "selected-prefix-trigger-don.json": "a111dabe269ecea26f092db1a6d3fcf4d5a4739a8a82c8b2cd407614f36b948d",
+    "shuffle-accept-then-don.json": "0cdb905545a503439c7f10591ba540e9044bb29ed61b52994145b481c4f7ecbf",
+    "shuffle-decline-then-don.json": "d716edec7f4f9db570c7738b8b85e5c527794c20ce729c7c00a31beb7fcd4387",
+    "shuffle-terminal-then-don.json": "1571b678c8e3c67c5fae15f76bd75870a8e55f3ee7df2d2335cced1949f60f2f",
+    "sole-equivalent.json": "fb928eeb240776ccae1ed313bb8b7cb80fb43280c83d87812dd76381d9312bb5",
+    "terminal-cost-suppresses-don.json": "811fa2dc8786d4c57c3a70141c6ba1d8567b72980362e0d428d0a318d8b8c0bf",
+    "until-count-after-pause.json": "fed6a63c3fd3e54c9d15db14ba0acfb20ebac34bb8df46ac28d0d2b1755d3a3f",
+    "variable-count-after-fixed.json": "e94b5fea0269d1edf9118c3081d7a286433a49ed7f7e99809325a868846c92f7",
+    "zero-don-fixed.json": "99f8187719fd4fa2e1a253203eed7bc8d7c10a5410152dde9638a0d006846226",
+    "zero-don-variable-suffix.json": "a981b8d83f7308adab9ab71c941ab79414eb96f69a13f91353a10787f0c22bb9",
+    "zero-fixed-suffix.json": "175a90ad6433c404279d052fffc273fee95174de0d978cc04b982da28e704d76",
+    "zero-variable-initial.json": "736c099c0b51340bf75757d03917f8f51d84858bb8bf2a1222605919fa5d7e3d"
+  }
+}

@@ -1,3 +1,8 @@
+import { hasNativeCostSemantics } from "./native-cost-semantics.js";
+import { applyDonReturnIds, decodeDonReturnIds } from "./effect-resolver/actions/don.js";
+import { replacementEventsFor } from "./replacement-events.js";
+import { expandReplacementVisits, replacementAbilitySiblings } from "./replacement-ability-identity.js";
+import { isGameTerminated } from "./terminal.js";
 import { restFieldTarget } from "./field-rest.js";
 import type { EffectSourceIdentity } from "../../../../shared/game-types.js";
 /**
@@ -8,7 +13,7 @@ import type { EffectSourceIdentity } from "../../../../shared/game-types.js";
  *
  * Key rules:
  * - A replacement effect can only apply once per original event (§6-6-3-5)
- * - If multiple replacements match, the affected player chooses which applies
+ * - Precedence is isolated in replacementPrecedence (Decision 7, assumed).
  * - Replacement effects are consumed (removed) once they apply (if one-time)
  *
  * Replacement effects are registered as RuntimeActiveEffects with
@@ -21,29 +26,32 @@ import type {
   CauseFilter,
   EffectResult,
   RuntimeActiveEffect,
-  Target,
   TargetFilter,
 } from "./effect-types.js";
 import { ALL_ACTION_TYPES, ALL_CAUSE_FILTER_BY, REPLACED_CARD_REF } from "./effect-types.js";
 import type {
   CardData,
   CardInstance,
+  EffectStackFrame,
   GameAction,
   GameState,
   PendingEvent,
   PendingPromptState,
 } from "../types.js";
 import { findCardInstance } from "./state.js";
-import { updateTopFrame } from "./effect-stack.js";
-import { matchesFilter } from "./conditions.js";
+import { CONTINUATION_EFFECT_BLOCK, generateFrameId, pushFrame } from "./effect-stack.js";
+import { insertFrameAt } from "./damage-frames.js";
+import { evaluateCondition, matchesFilter } from "./conditions.js";
 import { isEffectConditionMet } from "./modifiers.js";
-import { isProhibitedForCard } from "./prohibitions.js";
 import { koCharacter, returnToHand, returnToDeck } from "./effect-resolver/card-mutations.js";
 import { isActionFeasible } from "./effect-resolver/feasibility.js";
 import type { ReplacementExecutionServices } from "./effect-resolver/services.js";
 import { extractEffectDescription, resolveAmount } from "./effect-resolver/action-utils.js";
-import { computeAllValidTargets } from "./effect-resolver/target-resolver.js";
-import { trashFromLifeOwner } from "./effect-resolver/actions/life.js";
+import { executeReturnToDeck, finalizeTrashCards } from "./effect-resolver/actions/removal.js";
+import {
+  validateTargetConstraints,
+  computeAllValidTargets,
+} from "./effect-resolver/target-resolver.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -64,7 +72,23 @@ export interface ReplacementResult {
   events: PendingEvent[];
 }
 
+/** An optional replacement offer awaiting its REPLACEMENT frame (OPT-963); never persisted. */
+export interface ReplacementScanProgress {
+  visitedEffectIds?: string[];
+  cause?: "battle" | "effect";
+  causingController?: 0 | 1;
+  orderingEffectIds?: string[];
+}
+
+export interface ReplacementOffer extends ReplacementScanProgress {
+  effectId: string;
+  targetInstanceId: string;
+  event: ReplacementEvent;
+}
+
 export interface ReplacementCheckResult {
+  /** Set with `pendingPrompt` when the prompt is an optional replacement offer. */
+  offer?: ReplacementOffer;
   /** A matching replacement was found and applied (non-optional) */
   replaced: boolean;
   state: GameState;
@@ -122,7 +146,9 @@ function isReplacementAction(value: unknown): value is Action {
 const CAUSE_FILTER_BY = new Set<string>(ALL_CAUSE_FILTER_BY);
 
 function isCauseFilter(value: unknown): value is CauseFilter {
-  return isRecord(value) && typeof value.by === "string" && CAUSE_FILTER_BY.has(value.by);
+  return (
+    isRecord(value) && typeof value.by === "string" && CAUSE_FILTER_BY.has(value.by)
+  );
 }
 
 function isTargetFilter(value: unknown): value is TargetFilter {
@@ -184,7 +210,7 @@ export function checkReplacementForKO(
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
-  services: ReplacementExecutionServices,
+  services: ReplacementExecutionServices
 ): ReplacementCheckResult {
   return checkReplacementForEvent(
     state,
@@ -207,7 +233,7 @@ export function checkReplacementForRemoval(
   targetInstanceId: string,
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
-  services: ReplacementExecutionServices,
+  services: ReplacementExecutionServices
 ): ReplacementCheckResult {
   // Check both specific WOULD_BE_REMOVED_FROM_FIELD and general WOULD_LEAVE_FIELD
   const result = checkReplacementForEvent(
@@ -296,47 +322,39 @@ function checkReplacementForEvent(
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
+  progress: ReplacementScanProgress = {}
 ): ReplacementCheckResult {
-  const effects = state.activeEffects;
-
-  for (const effect of effects) {
-    const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
-    if (!mod) continue;
-
-    const params = mod.params;
-    if (!isReplacementParams(params)) continue;
-
-    if (!replacementMatchesTarget(state, effect, params, targetInstanceId, event, cause, causingController, cardDb)) {
-      continue;
+  const matches = scanReplacementCandidates(
+    state,
+    [targetInstanceId],
+    [event],
+    cause,
+    causingController,
+    cardDb,
+    services,
+    undefined,
+    progress.visitedEffectIds
+  );
+  const first = matches[0];
+  if (!first) return { replaced: false, state, events: [] };
+  const effect = state.activeEffects.find(
+    (candidate) => candidate.id === first.effectId
+  )!;
+  const params = effect.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
+  if (!isReplacementParams(params)) return { replaced: false, state, events: [] };
+  const nextProgress = { ...progress, cause, causingController };
+  const orderingEffectIds = replacementOrderingGroup(state, matches);
+    if (orderingEffectIds.length > 1) {
+    return buildReplacementOrderingPrompt(state,
+      first.effectId, targetInstanceId, event,
+      orderingEffectIds,
+      nextProgress, cardDb);
     }
-
-    // Check once-per-turn
-    if (params.once_per_turn && hasUsedThisTurn(state, effect)) continue;
-
-    // Check if replacement actions can be paid
-    if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) {
-      continue;
-    }
-
-    // OPT-232: replacement-action feasibility gate. If the substitute action
-    // cannot legally execute in the current state (e.g. SET_REST on a source
-    // already rested, or with no valid targets), decline the replacement and
-    // fall through to the original consequence. Checked at match time, before
-    // prompting — an infeasible replacement should not surface a prompt.
-    if (!canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, [targetInstanceId])) {
-      continue;
-    }
-
-    // Match found — if optional, prompt the player
-    if (params.optional) {
-      return buildReplacementPrompt(state, effect, targetInstanceId, event, cardDb);
-    }
-
-    // Non-optional: apply immediately
-    return applyReplacement(state, effect, params, [targetInstanceId], cardDb, services);
+  if (params.optional) {
+    const offer = buildReplacementPrompt(state, effect, targetInstanceId, event, cardDb);
+    return { ...offer, offer: { ...offer.offer!, ...nextProgress } };
   }
-
-  return { replaced: false, state, events: [] };
+  return applyReplacement(state, effect, params, [targetInstanceId], cardDb, services);
 }
 
 // ─── Batch Replacement Scan (OPT-219) ────────────────────────────────────────
@@ -359,9 +377,147 @@ export interface ReplacementBatchMatch {
  * Scan every active replacement against a batch of targets and return one
  * match per eligible replacement effect, collecting the subset of targets it
  * covers. Skips replacements already consumed this turn or that can't pay
- * their cost. Preserves registration order so downstream resolution is
- * deterministic.
+ * their cost. The shared scanner applies the isolated precedence policy.
  */
+/** Decision 7: assumed literal reading of 8-1-3-4-2, no official ruling.
+ * Kept separate from discovery so a future ruling changes only this policy. */
+export function replacementPrecedence(
+  state: GameState,
+  effect: RuntimeActiveEffect,
+  affectedIds: string[]
+): number {
+  if (affectedIds.includes(effect.sourceCardInstanceId)) return 0;
+  return effect.controller === state.turn.activePlayerIndex ? 1 : 2;
+}
+
+function replacementOrderingGroup(
+  state: GameState,
+  matches: ReplacementBatchMatch[]
+): string[] {
+  if (!matches.length) return [];
+  const effects = new Map(
+    state.activeEffects.map((effect) => [effect.id, effect])
+  );
+  const priority = replacementPrecedence(
+    state,
+    effects.get(matches[0].effectId)!,
+    matches[0].matchedTargetIds
+  );
+  return matches
+    .filter(
+      (match) =>
+        replacementPrecedence(
+          state,
+          effects.get(match.effectId)!,
+          match.matchedTargetIds
+        ) === priority && effects.get(match.effectId)!.controller === effects.get(matches[0].effectId)!.controller
+    )
+    .map((match) => match.effectId);
+}
+
+/** Common discovery/recheck boundary for single consequences and batches. */
+function scanReplacementCandidates(
+  state: GameState,
+  ids: string[],
+  events: ReplacementEvent[],
+  cause: "battle" | "effect",
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
+  source?: EffectSourceIdentity,
+  visited: string[] = [],
+  groupCandidates = true
+): ReplacementBatchMatch[] {
+  const excluded = new Set(expandReplacementVisits(state, visited, cardDb));
+  const rawMatches = events
+    .flatMap((event) =>
+      scanReplacementsForBatch(
+        state,
+        ids,
+        event,
+        cause,
+        causingController,
+        cardDb,
+        services,
+        source
+      )
+    )
+    .filter((match) => !excluded.has(match.effectId));
+  // Acceptance uses raw concrete IDs; only next-candidate discovery coalesces
+  // declared alternative predicates. Coverage is the union of matching branches.
+  const matches: ReplacementBatchMatch[] = [];
+  for (const match of rawMatches) {
+    const siblings = groupCandidates ? replacementAbilitySiblings(state, match.effectId, cardDb) : [match.effectId];
+    const existing = matches.find((candidate) => siblings.includes(candidate.effectId));
+    if (existing) existing.matchedTargetIds = [...new Set([...existing.matchedTargetIds, ...match.matchedTargetIds])];
+    else matches.push({ ...match, matchedTargetIds: [...match.matchedTargetIds] });
+  }
+  const effects = new Map(
+    state.activeEffects.map((effect) => [effect.id, effect])
+  );
+  return matches.sort(
+    (a, b) =>
+      replacementPrecedence(
+        state,
+        effects.get(a.effectId)!,
+        a.matchedTargetIds
+      ) -
+      replacementPrecedence(state, effects.get(b.effectId)!, b.matchedTargetIds) ||
+      Number(effects.get(a.effectId)!.controller !== state.turn.activePlayerIndex) -
+      Number(effects.get(b.effectId)!.controller !== state.turn.activePlayerIndex)
+  );
+}
+
+function orderingPrompt(
+  state: GameState,
+  ids: string[],
+  cardDb: Map<string, CardData>
+): PendingPromptState {
+  const first = state.activeEffects.find((effect) => effect.id === ids[0])!;
+  return {
+    options: {
+      promptType: "PLAYER_CHOICE",
+      effectDescription: "Choose the next replacement to consider",
+      choices: ids.map((id) => {
+        const effect = state.activeEffects.find(
+          (candidate) => candidate.id === id
+        )!;
+        const card = findCardInstance(state, effect.sourceCardInstanceId);
+        return {
+          id,
+          label: card ? (cardDb.get(card.cardId)?.name ?? card.cardId) : id,
+        };
+      }),
+    },
+    respondingPlayer: first.controller,
+    resumeContext: null,
+  };
+}
+
+function buildReplacementOrderingPrompt(
+  state: GameState,
+  effectId: string,
+  targetInstanceId: string,
+  event: ReplacementEvent,
+  ids: string[],
+  progress: ReplacementScanProgress,
+  cardDb: Map<string, CardData>
+): ReplacementCheckResult {
+  return {
+    state,
+    events: [],
+    replaced: false,
+    pendingPrompt: orderingPrompt(state, ids, cardDb),
+    offer: {
+      ...progress,
+      effectId,
+      targetInstanceId,
+      event,
+      orderingEffectIds: ids,
+    },
+  };
+}
+
 export function scanReplacementsForBatch(
   state: GameState,
   targetInstanceIds: string[],
@@ -369,7 +525,8 @@ export function scanReplacementsForBatch(
   cause: "battle" | "effect",
   causingController: 0 | 1,
   cardDb: Map<string, CardData>,
-  causingSource?: EffectSourceIdentity,
+  services: ReplacementExecutionServices,
+  causingSource?: EffectSourceIdentity
 ): ReplacementBatchMatch[] {
   const effects = state.activeEffects;
   const matches: ReplacementBatchMatch[] = [];
@@ -381,7 +538,6 @@ export function scanReplacementsForBatch(
     if (!isReplacementParams(params)) continue;
     if (params.trigger !== event) continue;
     if (params.once_per_turn && hasUsedThisTurn(state, effect)) continue;
-    if (!canPayReplacementCost(state, effect.controller, params.replacement_actions, cardDb)) continue;
 
     const matchedIds = targetInstanceIds.filter((id) =>
       replacementMatchesTarget(state, effect, params, id, event, cause, causingController, cardDb, causingSource),
@@ -392,7 +548,9 @@ export function scanReplacementsForBatch(
     // a member whose substitute cannot resolve is not covered, so its event
     // proceeds (§8-1-3-4-5), while the feasible members stay protected.
     const feasibleIds = matchedIds.filter((id) =>
-      canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, [id]),
+      canExecuteReplacementSubstitute(state, effect, params.replacement_actions, cardDb, [id],
+        services
+      )
     );
     if (feasibleIds.length === 0) continue;
 
@@ -416,7 +574,7 @@ export function applyBatchReplacement(
   effectId: string,
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
-  replacedInstanceIds: string[] = [],
+  replacedInstanceIds: string[] = []
 ): ReplacementCheckResult {
   const effects = state.activeEffects;
   const effect = effects.find((e) => e.id === effectId);
@@ -429,15 +587,13 @@ export function applyBatchReplacement(
 }
 
 /**
- * Build the opt-in prompt for a batch match. The resume context carries the
- * information the batch-aware resume handler needs to continue the event after
- * the player accepts or declines.
+ * Build the opt-in prompt for a batch match. The REPLACEMENT_BATCH frame the
+ * caller opens carries the state machine; the prompt is player-facing only.
  */
 export function buildBatchReplacementPrompt(
   state: GameState,
   effectId: string,
   event: ReplacementEvent,
-  resumeContext: ReplacementBatchResumeContext,
   cardDb: Map<string, CardData>,
 ): PendingPromptState {
   const effects = state.activeEffects;
@@ -454,7 +610,7 @@ export function buildBatchReplacementPrompt(
   return {
     options: { promptType: "OPTIONAL_EFFECT", effectDescription, cards },
     respondingPlayer: effect?.controller ?? 0,
-    resumeContext,
+    resumeContext: null,
   };
 }
 
@@ -492,37 +648,6 @@ function hasUsedThisTurn(state: GameState, effect: RuntimeActiveEffect): boolean
   return isReplacementParams(params) && params.usedOnTurn === state.turn.number;
 }
 
-// ─── Cost Validation ─────────────────────────────────────────────────────────
-
-function canPayReplacementCost(
-  state: GameState,
-  controller: 0 | 1,
-  actions: Action[],
-  cardDb: Map<string, CardData>,
-): boolean {
-  const player = state.players[controller];
-
-  for (const action of actions) {
-    if (action.type === "TRASH_FROM_HAND") {
-      const amount =
-        typeof action.params?.amount === "number" ? action.params.amount : 1;
-      const filter = action.target?.filter ?? action.params?.filter;
-
-      if (filter) {
-        const matching = player.hand.filter((c) =>
-          matchesFilter(c, filter, cardDb, state, undefined, undefined, controller),
-        );
-        if (matching.length < amount) return false;
-      } else {
-        if (player.hand.length < amount) return false;
-      }
-    }
-    // Add more cost types as needed
-  }
-
-  return true;
-}
-
 // ─── Substitute-Action Feasibility (OPT-232) ─────────────────────────────────
 //
 // Rules §6-6-3: a replacement is a choice that applies only if its substitute
@@ -539,68 +664,230 @@ function canExecuteReplacementSubstitute(
   effect: RuntimeActiveEffect,
   actions: Action[],
   cardDb: Map<string, CardData>,
-  replacedInstanceIds: string[] = [],
+  replacedInstanceIds: string[],
+  services: ReplacementExecutionServices,
 ): boolean {
-  const refs = replacedCardRefs(replacedInstanceIds);
-  for (const action of actions) {
-    if (!isActionFeasible(
-      state,
+  return probeSubstituteChain(structuredClone(state), actions, effect, cardDb,
+    replacedCardRefs(replacedInstanceIds), services) !== null;
+}
+
+/** Shared by matching and the real PLAYER_CHOICE offer/answer boundaries. */
+export function isReplacementSubstituteBranchFeasible(state: GameState, actions: Action[],
+  sourceCardInstanceId: string, controller: 0 | 1, cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>, services: ReplacementExecutionServices): boolean {
+  return actions.length > 0 && probeSubstituteChain(structuredClone(state), actions,
+    { sourceCardInstanceId, controller }, cardDb, new Map(refs), services) !== null;
+}
+
+/** Execute hypothetical substitutes on private state. Actual handlers own
+ * prohibitions, target selection and mutation; returned prompts/events never
+ * escape. Replacements are suppressed inside the probe to prevent speculative
+ * replacement search (OPT-948), not immunity or other card rules. */
+function probeSubstituteChain(
+  state: GameState,
+  actions: Action[],
+  effect: Pick<RuntimeActiveEffect, "sourceCardInstanceId" | "controller">,
+  cardDb: Map<string, CardData>,
+  refs: Map<string, EffectResult>,
+  services: ReplacementExecutionServices
+): GameState | null {
+  if (!actions.length || isGameTerminated(state)) return state;
+  const [action, ...rest] = actions;
+  if (action.type === "ADD_TO_LIFE_FROM_FIELD" && action.params?.position === "TOP_OR_BOTTOM") {
+    // Existence of a legal destination is hypothetical; committed execution
+    // retains the handler's real destination and owner-arrangement prompts.
+    for (const position of ["TOP", "BOTTOM"] as const) {
+      const result = probeSubstituteChain(structuredClone(state), [{ ...action, params: { ...action.params, position } }, ...rest],
+        effect, cardDb, new Map(refs), services);
+      if (result) return result;
+    }
+    return null;
+  }
+  if (action.type === "PLAYER_CHOICE" || action.type === "OPPONENT_CHOICE") {
+    for (const [index, branch] of (action.params?.options ?? []).entries()) {
+      if (!branch.length) continue;
+      const condition = action.params?.option_conditions?.[index];
+      if (
+        condition &&
+        !evaluateCondition(state, condition, {
+          sourceCardInstanceId: effect.sourceCardInstanceId,
+          controller: effect.controller,
+          cardDb,
+          resultRefs: refs,
+        })
+      )
+        continue;
+      const result = probeSubstituteChain(
+        structuredClone(state),
+        [...branch, ...rest],
+        effect,
+        cardDb,
+        new Map(refs),
+        services
+      );
+      if (result) return result;
+    }
+    return null;
+  }
+  if (!isActionFeasible(state, action, effect.sourceCardInstanceId, effect.controller, cardDb, refs)) return null;
+  // Attached DON!! retains the established printed-domain gate until OPT-969.
+  if (!hasNativeCostSemantics(state) && action.type === "RETURN_DON_TO_DECK") {
+    if (!canReturnDonToDeckSucceed(state, action, effect.controller, cardDb, refs)) return null;
+  }
+  const probeState = {
+    ...state,
+    activeEffects: state.activeEffects.filter(
+      (candidate) =>
+        !candidate.modifiers.some(
+          (modifier) => modifier.type === "REPLACEMENT_EFFECT"
+        )
+    ),
+  };
+  const invoke = (targets?: string[]) =>
+    services.executeEffectAction(
+      structuredClone(probeState),
       action,
       effect.sourceCardInstanceId,
       effect.controller,
       cardDb,
-      refs,
-    )) return false;
-
-    if (action.type === "SET_REST") {
-      if (!canSetRestSucceed(state, action, effect, cardDb, replacedInstanceIds)) return false;
-    } else if (action.type === "TURN_LIFE_FACE_UP") {
-      // OPT-234: Shirahoshi / Bonney "flip 1 Life instead of removal". Per
-      // Bandai rulings, if every Life is already face-up (or Life is empty)
-      // the replacement is infeasible — the removal proceeds as written.
-      if (!canTurnLifeFaceUpSucceed(state, effect)) return false;
-    } else if (action.type === "REST_DON") {
-      const amount = action.params?.amount ?? 1;
-      const activeDon = state.players[effect.controller].donCostArea.filter(
-        (d) => d.state === "ACTIVE"
-      ).length;
-      if (activeDon < amount) return false;
-    } else if (action.type === "PLAYER_CHOICE") {
-      // Choice-of-payments substitute (e.g. OP16-033 Morley "rest 2 of your
-      // cards" = field cards and/or DON). Feasible if at least one non-empty
-      // branch is fully feasible.
-      const options = action.params?.options ?? [];
-      const anyFeasible = options.some(
-        (branch) => branch.length > 0 && canExecuteReplacementSubstitute(state, effect, branch, cardDb, replacedInstanceIds),
-      );
-      if (!anyFeasible) return false;
-    } else if (action.type === "LIFE_TO_HAND") {
-      // OPT-873: OP10-034 Franky et al. "add 1 card from the top of your Life
-      // cards to your hand instead" — infeasible with fewer Life than printed.
-      if (!canLifeToHandSucceed(state, action, effect.controller, cardDb, refs)) return false;
-    } else if (action.type === "TRASH_FROM_LIFE") {
-      // OPT-873: ST09-010 / ST20-002 FAQ — with no Life cards the replacement
-      // cannot be used.
-      if (!canTrashFromLifeSucceed(state, action, effect.controller, cardDb, refs)) return false;
-    } else if (action.type === "RETURN_DON_TO_DECK") {
-      if (!canReturnDonToDeckSucceed(state, action, effect.controller, cardDb, refs)) return false;
-    } else if (action.type === "RETURN_TO_DECK") {
-      // OPT-873: OP11-001 Koby FAQ (2 or fewer trash cards) and OP07-042
-      // Gecko Moria FAQ (no other Character) — the printed number of cards
-      // must be available to place.
-      if (!hasRequiredSubstituteTargets(state, action.target, effect, cardDb, refs)) return false;
-    } else if (action.type === "PLACE_HAND_TO_DECK") {
-      if (!canPlaceHandToDeckSucceed(state, action, effect.controller, cardDb, refs)) return false;
+      new Map(refs),
+      targets
+    );
+  const initial = invoke();
+  const prompt = initial.pendingPrompt?.options;
+  const pool =
+    prompt?.promptType === "SELECT_TARGET"
+      ? prompt.validTargets
+      : action.target
+        ? computeAllValidTargets(
+            state,
+            action.target,
+            effect.controller,
+            cardDb,
+            effect.sourceCardInstanceId,
+            refs
+          )
+        : undefined;
+  const needed =
+    action.target?.count && "exact" in action.target.count
+      ? action.target.count.exact
+      : undefined;
+  const count =
+    prompt?.promptType === "SELECT_TARGET"
+      ? (needed ?? Math.max(1, prompt.countMin))
+      : undefined;
+  if (count !== undefined && pool && pool.length < count) return null;
+  // Existence search is lazy: Koby's required-three payment from a large
+  // trash stops at the first legal selection instead of materializing nC3.
+  function* selections(
+    from = 0,
+    selected: string[] = []
+  ): Generator<string[] | undefined> {
+    if (count === undefined || !pool) {
+      yield undefined;
+      return;
     }
-    // Remaining authored substitute types need no zone/resource check — see
-    // the OPT-873 PR inventory: TRASH_CARD / KO / RETURN_TO_HAND on SELF (the
-    // source is on the field while its replacement is registered), DRAW
-    // (bonus after a SELF trash), MODIFY_POWER (no payment), and
-    // ADD_TO_LIFE_FROM_FIELD on REPLACED_CARD (the replaced card is on the
-    // field when the event is checked). TRASH_FROM_HAND is gated by
-    // canPayReplacementCost.
+    if (selected.length === count) {
+      yield selected;
+      return;
+    }
+    for (let i = from; i <= pool.length - (count - selected.length); i++) {
+      yield* selections(i + 1, [...selected, pool[i]]);
+    }
   }
-  return true;
+  for (const selection of selections()) {
+    if (
+      selection &&
+      action.target &&
+      !validateTargetConstraints(
+        selection,
+        action.target,
+        state,
+        cardDb,
+        refs,
+        {
+          controller: effect.controller,
+          sourceCardInstanceId: effect.sourceCardInstanceId,
+        }
+      )
+    )
+      continue;
+    if (needed !== undefined && pool && pool.length < needed) continue;
+    let result = selection ? invoke(selection) : initial;
+    if (hasNativeCostSemantics(state) && action.type === "RETURN_DON_TO_DECK" && result.pendingPrompt?.options.promptType === "PLAYER_CHOICE") {
+      const owner: 0 | 1 = action.target?.controller === "OPPONENT" ? effect.controller === 0 ? 1 : 0 : effect.controller;
+      for (const choice of result.pendingPrompt.options.choices) {
+        if (choice.disabled) continue;
+        const ids = decodeDonReturnIds(choice.id);
+        const requested = substituteAmount(action.params?.amount, state, effect.controller, cardDb, refs);
+        const applied = ids && ids.length === requested ? applyDonReturnIds(probeState, owner, ids) : null;
+        if (!applied) continue;
+        const nextRefs = new Map(refs);
+        if (action.result_ref) nextRefs.set(action.result_ref, { targetInstanceIds: [], count: applied.returned });
+        const next = probeSubstituteChain(applied.state, rest, effect, cardDb, nextRefs, services);
+        if (next) return next;
+      }
+    }
+    if (!hasNativeCostSemantics(state) && action.type === "RETURN_DON_TO_DECK" && !result.pendingPrompt && action.params?.until_count === undefined) {
+      // Preserve only OPT-969's printed-field/attached-DON underpayment exception.
+      // The real executor's intermediate cost-area mutation still feeds later actions.
+      result = { ...result, succeeded: true, fullyExecuted: true };
+    }
+    if (
+      action.type === "RETURN_TO_DECK" &&
+      result.pendingPrompt?.options.promptType === "ARRANGE_TOP_CARDS"
+    ) {
+      const context = result.pendingPrompt.resumeContext;
+      const arrangement =
+        typeof context === "object" &&
+        context &&
+        "returnToDeckArrangement" in context
+          ? context.returnToDeckArrangement
+          : undefined;
+      if (arrangement)
+        result = executeReturnToDeck(
+          structuredClone(probeState),
+          action,
+          effect.sourceCardInstanceId,
+          effect.controller,
+          cardDb,
+          refs,
+          arrangement.targetIds,
+          services,
+          {
+            ...arrangement,
+            remainingOwners: [],
+            orderedOwnerGroups: arrangement.remainingOwners.map((owner) => ({
+              owner,
+              targetIds: arrangement.targetIds.filter(
+                (id) => findCardInstance(probeState, id)?.owner === owner
+              ),
+            })),
+          }
+        );
+    }
+    if (
+      !result.succeeded ||
+      result.fullyExecuted === false ||
+      result.pendingPrompt
+    )
+      continue;
+    if (needed !== undefined && result.result && result.result.count < needed)
+      continue;
+    const nextRefs = new Map(refs);
+    if (action.result_ref && result.result)
+      nextRefs.set(action.result_ref, result.result);
+    const next = probeSubstituteChain(
+      result.state,
+      rest,
+      effect,
+      cardDb,
+      nextRefs,
+      services
+    );
+    if (next) return next;
+  }
+  return null;
 }
 
 // ─── Zone/resource substitutes (OPT-873) ─────────────────────────────────────
@@ -619,34 +906,6 @@ function substituteAmount(
   refs: Map<string, EffectResult>,
 ): number {
   return resolveAmount(amount ?? 1, refs, state, controller, cardDb);
-}
-
-/** Payer mirrors executeLifeToHand: OPPONENT_LIFE / controller OPPONENT → opponent. */
-function canLifeToHandSucceed(
-  state: GameState,
-  action: import("./effect-types.js").ActionOf<"LIFE_TO_HAND">,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  refs: Map<string, EffectResult>,
-): boolean {
-  const opponent: 0 | 1 = controller === 0 ? 1 : 0;
-  const owner = action.target?.type === "OPPONENT_LIFE" || action.target?.controller === "OPPONENT"
-    ? opponent
-    : controller;
-  const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
-  return amount > 0 && state.players[owner].life.length >= amount;
-}
-
-function canTrashFromLifeSucceed(
-  state: GameState,
-  action: import("./effect-types.js").ActionOf<"TRASH_FROM_LIFE">,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  refs: Map<string, EffectResult>,
-): boolean {
-  const owner = trashFromLifeOwner(action, controller);
-  const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
-  return amount > 0 && state.players[owner].life.length >= amount;
 }
 
 /**
@@ -677,121 +936,6 @@ function canReturnDonToDeckSucceed(
   return amount > 0 && onField >= amount;
 }
 
-/** Mirrors executePlaceHandToDeck: the controller's hand, `amount` cards. */
-function canPlaceHandToDeckSucceed(
-  state: GameState,
-  action: import("./effect-types.js").ActionOf<"PLACE_HAND_TO_DECK">,
-  controller: 0 | 1,
-  cardDb: Map<string, CardData>,
-  refs: Map<string, EffectResult>,
-): boolean {
-  const amount = substituteAmount(action.params?.amount, state, controller, cardDb, refs);
-  return amount > 0 && state.players[controller].hand.length >= amount;
-}
-
-/**
- * A targeted substitute needs its printed number of valid targets, resolved
- * exactly as the handler resolves them (same controller, source and
- * REPLACED_CARD refs). "Up to" / "any number" / "all" allow fewer.
- */
-function hasRequiredSubstituteTargets(
-  state: GameState,
-  target: Target | undefined,
-  effect: RuntimeActiveEffect,
-  cardDb: Map<string, CardData>,
-  refs: Map<string, EffectResult>,
-): boolean {
-  if (!target) return true; // malformed schemas flow through to the dispatcher.
-  const count = target.count;
-  const needed = !count ? 1 : "exact" in count ? count.exact : 0;
-  if (needed <= 0) return true;
-  const valid = computeAllValidTargets(
-    state,
-    target,
-    effect.controller,
-    cardDb,
-    effect.sourceCardInstanceId,
-    refs,
-  );
-  return valid.length >= needed;
-}
-
-function canSetRestSucceed(
-  state: GameState,
-  action: import("./effect-types.js").ActionOf<"SET_REST">,
-  effect: RuntimeActiveEffect,
-  cardDb: Map<string, CardData>,
-  replacedInstanceIds: string[],
-): boolean {
-  const target = action.target;
-  if (!target) return true; // malformed schemas flow through to the dispatcher.
-
-  if (target.type === "REPLACED_CARD") {
-    return replacedInstanceIds.some((id) => {
-      const card = findCardInstance(state, id);
-      return card?.state === "ACTIVE" &&
-        !isProhibitedForCard(state, id, "CANNOT_BE_RESTED", cardDb, { causingController: effect.controller, sourceCardInstanceId: effect.sourceCardInstanceId });
-    });
-  }
-
-  if (target.type === "SELF") {
-    const source = findCardInstance(state, effect.sourceCardInstanceId);
-    if (!source) return false;
-    if (source.state !== "ACTIVE") return false;
-    if (isProhibitedForCard(state, source.instanceId, "CANNOT_BE_RESTED", cardDb, { causingController: effect.controller, sourceCardInstanceId: effect.sourceCardInstanceId })) return false;
-    return true;
-  }
-
-  // Filter path (e.g. Pica: rest another cost-3+ character instead).
-  // `exact: N` payments (e.g. Morley's rest-2) need N usable candidates.
-  const needed = target.count && "exact" in target.count ? target.count.exact : 1;
-  const candidates = collectSubstituteCandidates(state, target, effect.controller);
-  let usable = 0;
-  for (const candidate of candidates) {
-    if (candidate.state !== "ACTIVE") continue;
-    if (target.filter?.exclude_self && candidate.instanceId === effect.sourceCardInstanceId) continue;
-    if (isProhibitedForCard(state, candidate.instanceId, "CANNOT_BE_RESTED", cardDb, { causingController: effect.controller, sourceCardInstanceId: effect.sourceCardInstanceId })) continue;
-    if (target.filter && !matchesFilter(candidate, target.filter, cardDb, state)) continue;
-    usable++;
-    if (usable >= needed) return true;
-  }
-  return false;
-}
-
-function canTurnLifeFaceUpSucceed(
-  state: GameState,
-  effect: RuntimeActiveEffect,
-): boolean {
-  return state.players[effect.controller].life.some((l) => l.face === "DOWN");
-}
-
-function collectSubstituteCandidates(
-  state: GameState,
-  target: Target,
-  replacementController: 0 | 1,
-): CardInstance[] {
-  const scope = target.controller ?? "SELF";
-  const opp = replacementController === 0 ? 1 : 0;
-  const pickChars = (pi: 0 | 1) =>
-    state.players[pi].characters.filter(
-      (card): card is CardInstance => card !== null
-    );
-  const pickLeader = (pi: 0 | 1) => state.players[pi].leader;
-  const includeLeader = target.type === "LEADER_OR_CHARACTER" || target.type === "FIELD_CARD";
-
-  const gather = (pi: 0 | 1): CardInstance[] => {
-    const chars = pickChars(pi);
-    const base = includeLeader ? [pickLeader(pi), ...chars] : chars;
-    return target.type === "FIELD_CARD" && state.players[pi].stage
-      ? [...base, state.players[pi].stage]
-      : base;
-  };
-
-  if (scope === "OPPONENT") return gather(opp);
-  if (scope === "EITHER" || scope === "ANY") return [...gather(0), ...gather(1)];
-  return gather(replacementController);
-}
-
 // ─── Apply Replacement ───────────────────────────────────────────────────────
 
 /**
@@ -811,7 +955,7 @@ function applyReplacement(
   params: ReplacementParams,
   replacedInstanceIds: string[],
   cardDb: Map<string, CardData>,
-  services: ReplacementExecutionServices,
+  services: ReplacementExecutionServices
 ): ReplacementCheckResult {
   const events: PendingEvent[] = [];
   let nextState = state;
@@ -834,7 +978,7 @@ function applyReplacement(
     effect.sourceCardInstanceId,
     effect.controller,
     cardDb,
-    replacedCardRefs(replacedInstanceIds),
+    replacedCardRefs(replacedInstanceIds)
   );
   nextState = result.state;
   events.push(...result.events);
@@ -883,6 +1027,9 @@ function buildReplacementPrompt(
 
   const cards: CardInstance[] = sourceCard ? [sourceCard] : [];
 
+  // The offer is materialized as a REPLACEMENT frame by the caller that owns
+  // the stack layout (materializeReplacementOffer); until then the prompt
+  // names no frame.
   const pendingPrompt: PendingPromptState = {
     options: {
       promptType: "OPTIONAL_EFFECT",
@@ -890,15 +1037,16 @@ function buildReplacementPrompt(
       cards,
     },
     respondingPlayer: effect.controller,
-    resumeContext: {
-      type: "REPLACEMENT",
-      effectId: effect.id,
-      targetInstanceId,
-      event,
-    },
+    resumeContext: null,
   };
 
-  return { replaced: false, state, events: [], pendingPrompt };
+  return {
+    replaced: false,
+    state,
+    events: [],
+    pendingPrompt,
+    offer: { effectId: effect.id, targetInstanceId, event },
+  };
 }
 
 function describeReplacementEvent(event: ReplacementEvent): string {
@@ -918,7 +1066,8 @@ function describeReplacementEvent(event: ReplacementEvent): string {
 
 // ─── Resume from Optional Replacement Prompt ─────────────────────────────────
 
-export interface ReplacementResumeContext {
+/** The answered offer as `resumeReplacement` consumes it (in memory; the REPLACEMENT frame persists it). */
+export interface ReplacementResumeContext extends ReplacementScanProgress {
   type: "REPLACEMENT";
   effectId: string;
   targetInstanceId: string;
@@ -926,43 +1075,161 @@ export interface ReplacementResumeContext {
 }
 
 /**
+ * OPT-963: give a pending optional replacement offer its REPLACEMENT frame.
+ * `buildReplacementPrompt` describes the offer on the prompt; the caller that
+ * owns the stack layout (the Damage Step, a cost frame, an action chain)
+ * materializes it on top once its own frames are in place, and the prompt
+ * then names the frame. A prompt that is not an offer is returned as is.
+ */
+export function materializeReplacementOffer(
+  state: GameState,
+  pendingPrompt: PendingPromptState,
+  offer: ReplacementOffer | undefined
+): { state: GameState; pendingPrompt: PendingPromptState } {
+  if (!offer) return { state, pendingPrompt };
+  const { effectId, targetInstanceId, event } = offer;
+  const effect = state.activeEffects.find((candidate) => candidate.id === effectId);
+  const generated = generateFrameId(state);
+  const frame: EffectStackFrame = {
+    id: generated.id,
+    sourceCardInstanceId: effect?.sourceCardInstanceId ?? targetInstanceId,
+    controller: pendingPrompt.respondingPlayer,
+    ...("effectDescription" in pendingPrompt.options
+      ? { effectDescription: pendingPrompt.options.effectDescription }
+      : {}),
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase: "AWAITING_OPTIONAL_RESPONSE",
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: [],
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+    // Native7 persists only the offer grammar, never transient resume-context
+    // discriminators carried through ordering/reoffer progress. Reader6 keeps
+    // its historical byte path for the staged rollout.
+    replacement: hasNativeCostSemantics(state) ? {
+      effectId, targetInstanceId, event,
+      ...(offer.visitedEffectIds !== undefined ? { visitedEffectIds: offer.visitedEffectIds } : {}),
+      ...(offer.cause !== undefined ? { cause: offer.cause } : {}),
+      ...(offer.causingController !== undefined ? { causingController: offer.causingController } : {}),
+      ...(offer.orderingEffectIds !== undefined ? { orderingEffectIds: offer.orderingEffectIds } : {}),
+    } : { ...offer, effectId, targetInstanceId, event },
+  };
+  const nextState = pushFrame(generated.state, frame);
+  return { state: nextState, pendingPrompt: { ...pendingPrompt, resumeContext: frame.id } };
+}
+
+/**
  * Resume after the player has accepted or declined an optional replacement.
- * Called from GameSession.resumeFromPrompt when the resume context is a
- * replacement type.
+ * Called from the prompt lifecycle when the answered REPLACEMENT frame is
+ * popped (OPT-963).
  *
  * @returns replaced=true if the replacement was applied (original event should be skipped)
  */
+function singleReplacementCause(state: GameState, ctx: ReplacementResumeContext): { cause: "battle" | "effect"; controller: 0 | 1 } {
+  const caller = state.effectStack.at(-1);
+  const battle = caller?.battleDamage?.stage === "CHARACTER_KO_REPLACEMENT" && caller.battleDamage.targetInstanceId === ctx.targetInstanceId
+    ? caller.battleDamage : undefined;
+  return { cause: ctx.cause ?? (battle || (!caller && state.turn.battle) ? "battle" : "effect"),
+    controller: ctx.causingController ?? battle?.causingPlayerIndex ?? caller?.controller ?? state.turn.activePlayerIndex };
+}
+
 export function resumeReplacement(
   state: GameState,
   ctx: ReplacementResumeContext,
   accepted: boolean,
   cardDb: Map<string, CardData>,
-  services: ReplacementExecutionServices,
+  services: ReplacementExecutionServices
 ): ReplacementCheckResult {
-  if (!accepted) {
-    return { replaced: false, state, events: [] };
-  }
+  const { cause, controller: causingController } = singleReplacementCause(state, ctx);
+  const visitedEffectIds = expandReplacementVisits(state, [...(ctx.visitedEffectIds ?? []), ctx.effectId], cardDb);
+  const effect = state.activeEffects.find((candidate) => candidate.id === ctx.effectId);
+  const eligible = scanReplacementCandidates(
+    state,
+    [ctx.targetInstanceId],
+    [ctx.event],
+    cause,
+    causingController,
+    cardDb,
+    services,
+    undefined,
+    ctx.visitedEffectIds,
+    false
+  ).some((match) => match.effectId === ctx.effectId);
+  const params = effect?.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
+  if (accepted && effect && eligible && isReplacementParams(params)) {
+    return applyReplacement(state, effect, params, [ctx.targetInstanceId], cardDb, services);
+}
+  return checkReplacementForEvent(
+    state,
+    ctx.targetInstanceId,
+    ctx.event,
+    cause,
+    causingController,
+    cardDb,
+    services,
+    { visitedEffectIds }
+  );
+}
 
-  const effects = state.activeEffects;
-  const effect = effects.find((e) => e.id === ctx.effectId);
-  if (!effect) {
-    return { replaced: false, state, events: [] };
+/** A choice of ordering selects a candidate; it does not accept its optional substitute. */
+export function chooseReplacementOrder(
+  state: GameState,
+  ctx: ReplacementResumeContext,
+  effectId: string,
+  cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices
+): ReplacementCheckResult {
+  const effect = state.activeEffects.find((candidate) => candidate.id === effectId);
+  if (!ctx.orderingEffectIds?.includes(effectId)) return { state, events: [], replaced: false };
+  const { orderingEffectIds: _order, ...progress } = ctx;
+  const { cause, controller } = singleReplacementCause(state, ctx);
+  const eligible = scanReplacementCandidates(state, [ctx.targetInstanceId], [ctx.event], cause, controller, cardDb, services,
+    undefined, ctx.visitedEffectIds, false).some((match) => match.effectId === effectId);
+  const params = effect?.modifiers.find((m) => m.type === "REPLACEMENT_EFFECT")?.params;
+  if (!effect || !eligible || !isReplacementParams(params)) return checkReplacementForEvent(state, ctx.targetInstanceId, ctx.event, cause, controller,
+    cardDb, services, { visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] });
+  if (params.optional) {
+    const result = buildReplacementPrompt(
+      state,
+      effect,
+      ctx.targetInstanceId,
+      ctx.event,
+      cardDb
+    );
+    return { ...result, offer: { ...progress, ...result.offer! } };
   }
-
-  const mod = effect.modifiers?.find((m) => m.type === "REPLACEMENT_EFFECT");
-  const params = mod?.params;
-  if (!isReplacementParams(params)) {
-    return { replaced: false, state, events: [] };
-  }
-
-  return applyReplacement(state, effect, params, [ctx.targetInstanceId], cardDb, services);
+  return resumeReplacement(
+    state,
+    { ...progress, effectId },
+    true,
+    cardDb,
+    services
+  );
 }
 
 // ─── Batch Resume (OPT-219) ──────────────────────────────────────────────────
 
-export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "SET_REST";
+export type BatchActionKind = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "SET_REST" | "TRASH_CARD";
 
+/**
+ * The batch state machine as the batch functions pass it around. From
+ * OPT-963 it is persisted only as a REPLACEMENT_BATCH frame
+ * (`frame.replacementBatch`, the same fields without `type`), never as a
+ * prompt context.
+ */
 export interface ReplacementBatchResumeContext {
+  visitedEffectIds?: string[];
+  events?: ReplacementEvent[];
+  cause?: "battle" | "effect";
+  orderingEffectIds?: string[];
   type: "REPLACEMENT_BATCH";
   actionKind: BatchActionKind;
   event: ReplacementEvent;
@@ -970,7 +1237,7 @@ export interface ReplacementBatchResumeContext {
   allTargetIds: string[];
   /** Targets already saved by earlier replacements. */
   protectedIds: string[];
-  /** Pending matches to resolve, in registration order. */
+  /** Current candidate scan; visitedEffectIds persists the completed history. */
   pendingMatches: ReplacementBatchMatch[];
   /** Index into pendingMatches of the match this prompt belongs to. */
   currentMatchIndex: number;
@@ -995,16 +1262,92 @@ export interface BatchResumeResult {
   /**
    * Targets still eligible for KO / return after all replacements resolved.
    * Populated when the caller is responsible for finalization (so the action
-   * handler can run its own per-frame trigger drain loop).
+   * handler can report this work to the common pending-work drain).
    */
   unprotectedIds: string[];
   pendingPrompt?: PendingPromptState;
+  /**
+   * OPT-922: the batch context with the current match narrowed to the cards
+   * the apply-time re-check kept. Set when an accepted substitute raised its
+   * own prompt, so the attached continuation protects only those cards.
+   */
+  continuationContext?: ReplacementBatchResumeContext;
 }
 
 /**
- * Drive the batch state machine: iterate `pendingMatches` from
- * `startMatchIndex`, prompting on optional matches and applying non-optional
- * matches. Does NOT finalize targets — returns `unprotectedIds` and lets the
+ * OPT-963: push a REPLACEMENT_BATCH frame holding `batch`, on top or (with
+ * `insertAt`) below everything pushed since that depth. Returns the frame id.
+ */
+export function openReplacementBatchFrame(
+  state: GameState,
+  batch: ReplacementBatchResumeContext,
+  phase: "AWAITING_OPTIONAL_RESPONSE" | "INTERRUPTED_BY_TRIGGERS",
+  controller: 0 | 1,
+  insertAt?: number
+): { state: GameState; frameId: string } {
+  const { type: _type, ...replacementBatch } = batch;
+  const generated = generateFrameId(state);
+  const frame: EffectStackFrame = {
+    id: generated.id,
+    sourceCardInstanceId: batch.causingSource?.instanceId ?? batch.allTargetIds[0] ?? "",
+    controller,
+    effectBlock: CONTINUATION_EFFECT_BLOCK,
+    phase,
+    pausedAction: null,
+    remainingActions: [],
+    resultRefs: [],
+    validTargets: [],
+    costs: [],
+    currentCostIndex: 0,
+    costsPaid: true,
+    oncePerTurnMarked: true,
+    costResultRefs: [],
+    pendingTriggers: [],
+    simultaneousTriggers: [],
+    accumulatedEvents: [],
+    replacementBatch,
+  };
+  const nextState = insertAt === undefined
+    ? pushFrame(generated.state, frame)
+    : insertFrameAt(generated.state, insertAt, frame);
+  return { state: nextState, frameId: frame.id };
+}
+
+/** The batch state machine as a REPLACEMENT_BATCH frame carries it. */
+export function batchContextOf(frame: EffectStackFrame): ReplacementBatchResumeContext {
+  return { type: "REPLACEMENT_BATCH", ...frame.replacementBatch! };
+}
+
+/**
+ * OPT-922: the subset of `ids` the replacement can still save in `state`.
+ *
+ * `scanReplacementsForBatch` checks feasibility once, before the first
+ * prompt. An earlier accepted substitute can then spend the resource a later
+ * one needs (two "add 1 Life card to hand instead" replacements with one
+ * Life card). Rule 8-1-3-4-5: a replacement that cannot be carried out
+ * cannot be applied, so the batch re-runs the scan's own gates (once per
+ * turn, replacement cost, per-card substitute feasibility) against the
+ * current state before it offers and before it applies each match. A card
+ * this drops stays in the event and receives the original consequence.
+ * Uses the same candidate scan as battle K.O., including conditions and causes.
+ */
+function stillFeasibleBatchTargets(
+  state: GameState,
+  effectId: string,
+  ids: string[],
+  cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices,
+  context: ReplacementBatchResumeContext,
+): string[] {
+  return scanReplacementCandidates(state, ids, replacementEventsFor(context.actionKind, context.events),
+    context.cause ?? "effect", context.causingController, cardDb, services,
+    context.causingSource, context.visitedEffectIds, false)
+    .find((match) => match.effectId === effectId)?.matchedTargetIds ?? [];
+}
+
+/**
+ * Drive the batch state machine: rescan unprotected targets after each
+ * substitute, retaining visited effects across ordering and optional prompts. Does NOT finalize targets — returns `unprotectedIds` and lets the
  * caller run its own finalization loop (executeKO needs a per-frame ON_KO
  * drain per rule 6-2, so it can't delegate finalization). Reused by
  * `processBatchReplacements` and `resumeReplacementBatch`.
@@ -1014,55 +1357,83 @@ function stepBatch(
   ctx: ReplacementBatchResumeContext,
   startMatchIndex: number,
   cardDb: Map<string, CardData>,
-  services: ReplacementExecutionServices,
+  services: ReplacementExecutionServices
 ): BatchResumeResult {
   let nextState = state;
   const events: PendingEvent[] = [];
   const protectedIds = new Set<string>(ctx.protectedIds);
 
-  for (let i = startMatchIndex; i < ctx.pendingMatches.length; i++) {
-    const match = ctx.pendingMatches[i];
-    // Skip matches whose targets are all already protected by an earlier match
-    const applicable = match.matchedTargetIds.filter((id) => !protectedIds.has(id));
-    if (applicable.length === 0) continue;
+  const visitedEffectIds = expandReplacementVisits(state, ctx.visitedEffectIds ??
+      ctx.pendingMatches.slice(0, startMatchIndex).map((match) => match.effectId), cardDb);
+  while (true) {
+    const pendingMatches = scanReplacementCandidates(
+      nextState,
+      ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
+      replacementEventsFor(ctx.actionKind, ctx.events),
+      ctx.cause ?? "effect",
+      ctx.causingController,
+      cardDb,
+      services,
+      ctx.causingSource,
+      visitedEffectIds
+    );
+    const match = pendingMatches[0];
+    if (!match) break;
+    const i = 0;
+    const applicable = match.matchedTargetIds;
+    const orderingEffectIds = replacementOrderingGroup(
+      nextState,
+      pendingMatches
+    );
 
-    if (match.optional) {
-      const prompt = buildBatchReplacementPrompt(
-        nextState,
-        match.effectId,
-        ctx.event,
-        {
-          ...ctx,
-          protectedIds: [...protectedIds],
-          currentMatchIndex: i,
-        },
-        cardDb,
-      );
+    if (match.optional || orderingEffectIds.length > 1) {
+      const offer = {
+        ...ctx,
+        pendingMatches,
+        visitedEffectIds,
+        protectedIds: [...protectedIds],
+        currentMatchIndex: i,
+        ...(orderingEffectIds.length > 1
+          ? { orderingEffectIds }
+          : { orderingEffectIds: undefined }),
+      };
+      const prompt =
+        orderingEffectIds.length > 1
+          ? orderingPrompt(nextState, orderingEffectIds, cardDb)
+          : buildBatchReplacementPrompt(nextState, match.effectId, ctx.event, cardDb);
+      const opened = openReplacementBatchFrame(nextState, offer, "AWAITING_OPTIONAL_RESPONSE", prompt.respondingPlayer);
       return {
-        state: nextState,
+        state: opened.state,
         events,
         protectedIds: [...protectedIds],
         finalizedIds: [],
         unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
-        pendingPrompt: prompt,
+        pendingPrompt: { ...prompt, resumeContext: opened.frameId },
       };
     }
 
     // Non-optional: apply once, mark covered targets as protected.
+    // Capture all concrete siblings before the substitute can remove its source.
+    const completedIds = expandReplacementVisits(nextState, [match.effectId], cardDb);
+    const depthBefore = nextState.effectStack.length;
     const applied = applyBatchReplacement(nextState, match.effectId, cardDb, services, applicable);
     nextState = applied.state;
     events.push(...applied.events);
     if (applied.pendingPrompt) {
-      // executeActionChain has already pushed the substitute prompt's frame.
-      // Park this batch on that frame so the prompt lifecycle can finish the
-      // replacement before the original action continuation resumes.
-      nextState = updateTopFrame(nextState, {
-        replacementBatchContinuation: {
-          ...ctx,
-          protectedIds: [...protectedIds],
-          currentMatchIndex: i,
+      // executeActionChain has already pushed the substitute prompt's frames.
+      // Park this batch on a REPLACEMENT_BATCH frame directly below them so
+      // the prompt lifecycle finishes the replacement before the original
+      // action continuation (inserted lower still) resumes (OPT-963).
+      nextState = openReplacementBatchFrame(
+        nextState,
+        { ...ctx, pendingMatches,
+          visitedEffectIds: expandReplacementVisits(state, [...visitedEffectIds, ...(completedIds.length > 1 ? completedIds : [])], cardDb),
+          protectedIds: [...protectedIds], currentMatchIndex: i,
         },
-      });
+        "INTERRUPTED_BY_TRIGGERS",
+        ctx.causingController,
+        depthBefore
+      ).state;
       return {
         state: nextState,
         events,
@@ -1073,6 +1444,7 @@ function stepBatch(
       };
     }
     applicable.forEach((id) => protectedIds.add(id));
+    visitedEffectIds.push(...completedIds);
   }
 
   return {
@@ -1105,6 +1477,10 @@ function finalizeTarget(
       return returnToHand(state, targetId, causingController);
     case "RETURN_TO_DECK":
       return returnToDeck(state, targetId, returnToDeckPosition ?? "BOTTOM", causingController);
+    case "TRASH_CARD": {
+      const result = finalizeTrashCards(state, [targetId], causingController, cardDb, causingSource);
+      return result.result?.targetInstanceIds?.length ? { state: result.state, events: result.events, transition: { newInstanceId: result.result.targetInstanceIds[0] } } : null;
+    }
     case "SET_REST":
       return restFieldTarget(state, targetId, causingController, causingSource);
   }
@@ -1127,19 +1503,24 @@ export function processBatchReplacements(
   cardDb: Map<string, CardData>,
   services: ReplacementExecutionServices,
   returnToDeckPosition?: "TOP" | "BOTTOM",
-  causingSource?: EffectSourceIdentity,
+  causingSource?: EffectSourceIdentity
 ): BatchResumeResult {
   // Multiple events: scan each in order (specific first, e.g. WOULD_BE_KO
   // before WOULD_BE_REMOVED_FROM_FIELD / WOULD_LEAVE_FIELD). A replacement
   // effect registers for exactly one trigger, so no match can duplicate.
   const eventList = Array.isArray(event) ? event : [event];
-  const matches = eventList.flatMap((e) =>
-    scanReplacementsForBatch(state, targetIds, e, cause, causingController, cardDb, causingSource),
+  const matches = scanReplacementCandidates(state, targetIds,
+    eventList, cause, causingController, cardDb,
+    services,
+    causingSource
   );
   const ctx: ReplacementBatchResumeContext = {
     type: "REPLACEMENT_BATCH",
     actionKind,
     event: eventList[0],
+    events: eventList,
+    cause,
+    visitedEffectIds: [],
     allTargetIds: targetIds,
     protectedIds: [],
     pendingMatches: matches,
@@ -1158,35 +1539,96 @@ export function processBatchReplacements(
  * current match without protecting its targets. After all replacements are
  * resolved and no prompt is pending, finalizes the unprotected targets inline.
  *
- * NOTE: the resume path does NOT run the per-frame ON_KO drain. Callers that
+ * NOTE: the resume path does NOT run the ON_KO work report. Callers that
  * need drain semantics (executeKO for non-resume flows) call
  * `processBatchReplacements` directly and loop over `unprotectedIds`
  * themselves. In practice, the resume path is only reached when the player
  * interacted with an optional replacement prompt, which is rare enough that
  * mid-resume ON_KO interleave is acceptable as a future refinement.
  */
+export function chooseBatchReplacementOrder(
+  state: GameState,
+  ctx: ReplacementBatchResumeContext,
+  effectId: string,
+  cardDb: Map<string, CardData>,
+  services: ReplacementExecutionServices
+): BatchResumeResult {
+  const index = ctx.pendingMatches.findIndex(
+    (match) => match.effectId === effectId
+  );
+  // This is a resume boundary: an exhausted rescan must also finalize.
+  if (!ctx.orderingEffectIds?.includes(effectId) || index < 0)
+    return finishReplacementBatch(state, ctx, 0, [], cardDb, services);
+  const { orderingEffectIds: _order, ...rest } = ctx;
+  const eligible = scanReplacementCandidates(state, ctx.allTargetIds.filter((id) => !ctx.protectedIds.includes(id)),
+    replacementEventsFor(ctx.actionKind, ctx.events), ctx.cause ?? "effect", ctx.causingController, cardDb, services, ctx.causingSource,
+    ctx.visitedEffectIds, false).some((match) => match.effectId === effectId);
+  if (!eligible) return finishReplacementBatch(state, { ...rest, visitedEffectIds: [...(ctx.visitedEffectIds ?? []), effectId] }, 0, [], cardDb, services);
+  const selected = { ...rest, currentMatchIndex: index };
+  const match = selected.pendingMatches[index];
+  if (!match.optional)
+    return resumeReplacementBatch(state, selected, true, cardDb, services);
+  const prompt = buildBatchReplacementPrompt(
+    state,
+    effectId,
+    ctx.event,
+    cardDb
+  );
+  const opened = openReplacementBatchFrame(
+    state,
+    selected,
+    "AWAITING_OPTIONAL_RESPONSE",
+    prompt.respondingPlayer
+  );
+  return {
+    state: opened.state,
+    events: [],
+    protectedIds: ctx.protectedIds,
+    finalizedIds: [],
+    unprotectedIds: ctx.allTargetIds.filter(
+      (id) => !ctx.protectedIds.includes(id)
+    ),
+    pendingPrompt: { ...prompt, resumeContext: opened.frameId },
+  };
+}
+
 export function resumeReplacementBatch(
   state: GameState,
   ctx: ReplacementBatchResumeContext,
   accepted: boolean,
   cardDb: Map<string, CardData>,
-  services: ReplacementExecutionServices,
+  services: ReplacementExecutionServices
 ): BatchResumeResult {
   let nextState = state;
   const events: PendingEvent[] = [];
   const protectedIds = new Set<string>(ctx.protectedIds);
 
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
-  if (accepted && currentMatch) {
-    const applicable = currentMatch.matchedTargetIds.filter((id) => !protectedIds.has(id));
+  const completedIds = expandReplacementVisits(state, currentMatch ? [currentMatch.effectId] : [], cardDb);
+  // OPT-922: re-check before applying an accepted offer. A card whose
+  // substitute is no longer feasible receives the original consequence, as
+  // if the replacement had been declined (rule 8-1-3-4-5).
+  const applicable = accepted && currentMatch
+    ? stillFeasibleBatchTargets(
+        nextState,
+        currentMatch.effectId,
+        currentMatch.matchedTargetIds.filter((id) => !protectedIds.has(id)),
+        cardDb,
+          services,
+          ctx
+        )
+    : [];
+  if (applicable.length > 0) {
     const applied = applyBatchReplacement(nextState, currentMatch.effectId, cardDb, services, applicable);
     nextState = applied.state;
     events.push(...applied.events);
     if (applied.pendingPrompt) {
       // A substitute action raised its own target prompt — surface it and stop.
       // The outer resume system will chain: when this inner prompt resolves,
-      // the caller is responsible for re-entering the batch with the same
-      // ctx, which will continue from currentMatchIndex + 1.
+      // the caller is responsible for re-entering the batch with
+      // `continuationContext`, which will continue from currentMatchIndex + 1.
+      const pendingMatches = [...ctx.pendingMatches];
+      pendingMatches[ctx.currentMatchIndex] = { ...currentMatch, matchedTargetIds: applicable };
       return {
         state: nextState,
         events,
@@ -1194,6 +1636,9 @@ export function resumeReplacementBatch(
         finalizedIds: [],
         unprotectedIds: ctx.allTargetIds.filter((id) => !protectedIds.has(id)),
         pendingPrompt: applied.pendingPrompt,
+        continuationContext: { ...ctx, pendingMatches, ...(completedIds.length > 1
+          ? { visitedEffectIds: expandReplacementVisits(state, [...(ctx.visitedEffectIds ?? []), ...completedIds], cardDb) }
+          : {}) },
       };
     }
     applicable.forEach((id) => protectedIds.add(id));
@@ -1203,6 +1648,13 @@ export function resumeReplacementBatch(
   const nextCtx: ReplacementBatchResumeContext = {
     ...ctx,
     protectedIds: [...protectedIds],
+    visitedEffectIds: expandReplacementVisits(state, [
+      ...(ctx.visitedEffectIds ??
+        ctx.pendingMatches
+          .slice(0, ctx.currentMatchIndex)
+          .map((match) => match.effectId)),
+      ...completedIds,
+    ], cardDb),
   };
   return finishReplacementBatch(
     nextState,
@@ -1219,7 +1671,7 @@ export function continueReplacementBatchAfterSubstitute(
   state: GameState,
   ctx: ReplacementBatchResumeContext,
   cardDb: Map<string, CardData>,
-  services: ReplacementExecutionServices,
+  services: ReplacementExecutionServices
 ): BatchResumeResult {
   const protectedIds = new Set(ctx.protectedIds);
   const currentMatch = ctx.pendingMatches[ctx.currentMatchIndex];
@@ -1229,6 +1681,13 @@ export function continueReplacementBatchAfterSubstitute(
   const nextCtx: ReplacementBatchResumeContext = {
     ...ctx,
     protectedIds: [...protectedIds],
+    visitedEffectIds: expandReplacementVisits(state, [
+      ...(ctx.visitedEffectIds ??
+        ctx.pendingMatches
+          .slice(0, ctx.currentMatchIndex)
+          .map((match) => match.effectId)),
+      ...expandReplacementVisits(state, currentMatch ? [currentMatch.effectId] : [], cardDb),
+    ], cardDb),
   };
   return finishReplacementBatch(
     state,
@@ -1263,6 +1722,13 @@ function finishReplacementBatch(
     };
   }
 
+  // Keep one simultaneous hand-discard event and one action-scoped result,
+  // including mixed-zone target groups, when a field-trash batch resumes.
+  if (ctx.actionKind === "TRASH_CARD") {
+    const trash = finalizeTrashCards(resumeState, rest.unprotectedIds, ctx.causingController, cardDb, ctx.causingSource);
+    return { state: trash.state, events: [...resumeEvents, ...trash.events], protectedIds: rest.protectedIds,
+      finalizedIds: trash.result?.targetInstanceIds ?? [], unprotectedIds: rest.unprotectedIds };
+  }
   // All replacements resolved — finalize unprotected targets inline.
   const finalizedIds: string[] = [];
   for (const id of rest.unprotectedIds) {

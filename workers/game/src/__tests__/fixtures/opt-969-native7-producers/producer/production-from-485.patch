@@ -1,0 +1,278 @@
+diff --git a/workers/game/src/GameSession.ts b/workers/game/src/GameSession.ts
+index d59f92f..07574f3 100644
+--- a/workers/game/src/GameSession.ts
++++ b/workers/game/src/GameSession.ts
+@@ -844,6 +844,7 @@ export class GameSession implements DurableObject {
+       undoHistory: this.undoHistory,
+     });
+     this.gameState = saved.state;
++    this.undoHistory = saved.undoHistory;
+   }
+ 
+   private async loadFromStorage(): Promise<boolean> {
+diff --git a/workers/game/src/engine/effect-resolver/cost/orchestrator.ts b/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
+index f99b875..4488a51 100644
+--- a/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
++++ b/workers/game/src/engine/effect-resolver/cost/orchestrator.ts
+@@ -1,3 +1,5 @@
++import { buildDonIdentityPlans } from "../don-identity-plans.js";
++import { decodeDonReturnIds } from "../actions/don.js";
+ import { canonicalCostReplacementReplay, fixedCostExitTarget } from "./replacement-replay.js";
+ import { insertFrameAt } from "../../damage-frames.js";
+ /** Iterative cost payment orchestration and suspension. */
+@@ -560,7 +562,10 @@ export function payCostsWithSelection(
+       continue;
+     }
+ 
+-    if (!autoPayTrashToDeck && costNeedsPlayerSelection(cost)) {
++    const nativeDonSelection = nextState.schemaVersion === 7 &&
++      (cost.type === "DON_MINUS" || cost.type === "VARIABLE_DON_RETURN") &&
++      !(typeof cost.amount === "number" && cost.amount <= 0);
++    if (!autoPayTrashToDeck && (costNeedsPlayerSelection(cost) || nativeDonSelection)) {
+       // Special handling for life costs with TOP_OR_BOTTOM — use PLAYER_CHOICE
+       if ((cost.type === "LIFE_TO_HAND" || cost.type === "TRASH_FROM_LIFE") &&
+           cost.position === "TOP_OR_BOTTOM") {
+@@ -619,6 +624,23 @@ export function payCostsWithSelection(
+         return cannotPay();
+       }
+ 
++      // Positive native7 DON payments offer exact identity plans. Numeric zero
++      // stays on the no-action fixed path and never emits positive-bound metadata.
++      const donPlan = nativeDonSelection ? buildDonIdentityPlans(nextState, controller, validTargets, amount,
++        cost.type === "VARIABLE_DON_RETURN" && cost.amount === undefined ? validTargets.length : amount, cardDb) : null;
++      const donChoices = donPlan?.choices ?? [];
++      if (donChoices.length === 1) {
++        // The grouped planner proved a single semantic payment. Execute that
++        // exact plan; equivalent donor multiplicity alone is not a choice.
++        const beforePayment = nextState;
++        const ids = decodeDonReturnIds(donChoices[0].id)!;
++        const applied = applyCostSelection(nextState, cost, ids, controller, cardDb, sourceCardInstanceId);
++        if (applied.events.length === 0) return cannotPay();
++        nextState = applied.state;
++        events.push(...applied.events);
++        if (ruleProcessingAfterPayment(beforePayment)) return terminated();
++        continue;
++      }
+       // Push stack frame for cost selection
+       const frameId = generateFrameId(nextState);
+       nextState = frameId.state;
+@@ -631,7 +653,7 @@ export function payCostsWithSelection(
+         pausedAction: null,
+         remainingActions: effectBlock.actions ?? [],
+         resultRefs: [],
+-        validTargets,
++        validTargets: [...validTargets, ...donChoices.map(choice => choice.id)],
+         costs: workingCosts,
+         currentCostIndex: i,
+         costsPaid: false,
+@@ -646,7 +668,7 @@ export function payCostsWithSelection(
+ 
+       const costLabel = getCostLabel(cost);
+       const pendingPrompt: PendingPromptState = {
+-        options: {
++        options: donPlan ? { promptType: "PLAYER_CHOICE", effectDescription: "Choose which DON!! to return", ...donPlan } : {
+           promptType: "SELECT_TARGET",
+           validTargets,
+           countMin: amount,
+diff --git a/workers/game/src/engine/effect-resolver/cost/targets.ts b/workers/game/src/engine/effect-resolver/cost/targets.ts
+index d6f846b..4965ca4 100644
+--- a/workers/game/src/engine/effect-resolver/cost/targets.ts
++++ b/workers/game/src/engine/effect-resolver/cost/targets.ts
+@@ -267,6 +267,17 @@ export function computeCostTargets(
+   switch (cost.type) {
+     case "DON_MINUS":
+     case "VARIABLE_DON_RETURN": {
++      if (state.schemaVersion === 7) {
++        const filter = cost.filter;
++        const restricted = filter?.is_active === true || filter?.is_rested === true || !!filter?.state;
++        return [
++          ...player.donCostArea.filter(don => !don.attachedTo &&
++            (filter?.is_active !== true || don.state === "ACTIVE") &&
++            (filter?.is_rested !== true || don.state === "RESTED") &&
++            (!filter?.state || don.state === filter.state)),
++          ...(!restricted ? [player.leader, ...player.characters.filter(isPresent)].flatMap(card => card.attachedDon) : []),
++        ].map(don => don.instanceId);
++      }
+       const activeOnly = cost.filter?.is_active === true || cost.filter?.state === "ACTIVE";
+       const costArea = player.donCostArea.filter(d => !d.attachedTo && (!activeOnly || d.state === "ACTIVE"));
+       return [
+diff --git a/workers/game/src/engine/effect-resolver/resume/cost.ts b/workers/game/src/engine/effect-resolver/resume/cost.ts
+index 6ce12e6..d2587c0 100644
+--- a/workers/game/src/engine/effect-resolver/resume/cost.ts
++++ b/workers/game/src/engine/effect-resolver/resume/cost.ts
+@@ -1324,7 +1324,10 @@ export function handleAwaitingCostSelection(
+     }
+     const selectedStage = state.players[controller].stage?.instanceId === selected[0];
+     const selectedCardLeavesField = cost.type !== "TRASH_NAMED_CARD_FROM_HAND_OR_STAGE" || selectedStage;
+-    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !topFrame.costReplacementChecked) {
++    // Rule 1-3-2-2: zero repetitions perform no removal. There is no target
++    // for a replacement scan or canonical replay; keep the closed reader grammar.
++    const zeroFieldPayment = nextState.schemaVersion === 7 && amount === 0 && selected.length === 0;
++    if (FIELD_EXIT_COSTS.has(cost.type) && selectedCardLeavesField && !zeroFieldPayment && !topFrame.costReplacementChecked) {
+       // Cost exits are still effect-caused removal events, but a replacement
+       // means the printed payment did not occur (Rules 8-3-1-3-1/8-3-1-7).
+       // Park the already-validated selection on the existing cost frame.
+diff --git a/workers/game/src/engine/setup.ts b/workers/game/src/engine/setup.ts
+index 18d21be..bb4ca93 100644
+--- a/workers/game/src/engine/setup.ts
++++ b/workers/game/src/engine/setup.ts
+@@ -132,6 +132,7 @@ export function prepareDecksAndLeaders(
+ 
+   let state: GameState = {
+     id: payload.gameId,
++    schemaVersion: 7,
+     executionContext,
+     players: [player0, player1],
+     turn,
+diff --git a/workers/game/src/session/game-state-schema.ts b/workers/game/src/session/game-state-schema.ts
+index 2766c7e..c878d5d 100644
+--- a/workers/game/src/session/game-state-schema.ts
++++ b/workers/game/src/session/game-state-schema.ts
+@@ -38,10 +38,10 @@ import { log } from "../lib/log.js";
+ import { lowerVersion4, rememberVersion4Lowering } from "./version4-reader.js";
+ 
+ /** The version this build's writer emits for state its own engine produces. */
+-export const GAME_STATE_SCHEMA_VERSION = 6;
++export const GAME_STATE_SCHEMA_VERSION = 7;
+ /** The newest persisted version this build can read; v7 carries explicit cost outcomes. */
+ export const LATEST_READABLE_GAME_STATE_SCHEMA_VERSION = 7;
+-/** The newest runtime shape this build executes; ordinary writers remain v6. */
++/** The newest runtime shape this build executes and ordinary producers emit. */
+ export const RUNTIME_GAME_STATE_SCHEMA_VERSION = 7;
+ export const GAME_STATE_SCHEMA_VERSION_KEY = "schemaVersion";
+ /** Versions this build can read. Retiring one follows the support-window policy (§3). */
+@@ -568,8 +568,8 @@ export function convertToCurrentShape(
+ 
+ /**
+  * Writer side of the contract (SAVED-STATE-COMPATIBILITY.md §1.6, §1.8). From
+- * Ordinary producers remain version 6; native version 7 is retained per
+- * live state and undo snapshot. Every frame has its discriminant, every
++ * Repository save proves/promotes ordinary inputs to version7 before this
++ * shape encoder. Explicit legacy runtime provenance is retained here. Every
+  * End Phase frame with its stage. A runtime frame without a stage can only be
+  * a version 1 frame, so it is written with the legacy stage, which is its
+  * version 1 meaning.
+@@ -587,9 +587,9 @@ export function toPersistedGameState(state: GameState): GameState {
+     : state.effectStack;
+   const { schemaVersion: _schemaVersion, ...rest } = state;
+   return {
+-    // Reader preserves a native-v7 session/undo entry; ordinary engine inputs
+-    // still write v6 until the separately gated producer flips its version.
+-    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? 7 : GAME_STATE_SCHEMA_VERSION,
++    // Shape encoding preserves explicit legacy provenance; repository save
++    // proves/promotes every runtime snapshot before calling this encoder.
++    [GAME_STATE_SCHEMA_VERSION_KEY]: state.schemaVersion === 7 ? GAME_STATE_SCHEMA_VERSION : 6,
+     ...rest,
+     effectStack: effectStack.map((frame) => ({
+       ...frame,
+diff --git a/workers/game/src/session/persistence.ts b/workers/game/src/session/persistence.ts
+index 40df906..169a97d 100644
+--- a/workers/game/src/session/persistence.ts
++++ b/workers/game/src/session/persistence.ts
+@@ -1,3 +1,5 @@
++import { costReplacementReplayViolation } from "../engine/effect-resolver/cost/replacement-replay.js";
++import { promoteSessionToVersion7 } from "./version7-promotion.js";
+ import { projectVersion5 } from "./version5-reader.js";
+ import { clearTerminalPendingWork, isGameTerminated } from "../engine/terminal.js";
+ import { liftLegacyPrompt } from "./legacy-prompt-lift.js";
+@@ -167,10 +169,35 @@ export class SessionRepository {
+   }
+ 
+   async save(snapshot: SessionSnapshot): Promise<SessionSnapshot> {
+-    const promptedState = ensurePromptId(snapshot.state);
++    // Runtime objects without provenance are old runtime6 inputs, not stored
++    // version1 bytes. Validate them before promotion; new setup is explicit7.
++    const validateRuntime = (state: GameState, location: string): GameState => {
++      // Runtime kind tags may lag phase transitions. The established encoder
++      // derives those tags, but cannot authorize changing native7 COST evidence
++      // or supplying a legacy End Phase stage to a native7 producer.
++      if (state.schemaVersion === 7) {
++        for (const [index, frame] of state.effectStack.entries()) {
++          if (frame.costReplacementAction !== undefined || frame.costReplacementResolution !== undefined || frame.costReplacementChecked === true) {
++            const violation = costReplacementReplayViolation(state, frame);
++            if (violation) throw new SessionLoadError(location, `effectStack[${index}] ${violation}`);
++          }
++          if (frame.phaseBoundaryContinuation && frame.phaseBoundaryContinuation.stage === undefined) {
++            throw new SessionLoadError(location, `effectStack[${index}] native7 End Phase continuation lacks stage`);
++          }
++        }
++      }
++      return convertPersistedGameState(toPersistedGameState(state), location);
++    };
++    const validated = {
++      ...snapshot,
++      state: validateRuntime(snapshot.state, "state"),
++      undoHistory: snapshot.undoHistory.map((state, index) => validateRuntime(state, `undoHistory[${index}]`)),
++    };
++    const promoted = promoteSessionToVersion7(validated, convertPersistedGameState);
++    const promptedState = ensurePromptId(promoted.state);
+     const compacted = compactSessionHistory(
+       promptedState,
+-      snapshot.undoHistory,
++      promoted.undoHistory,
+       this.historySummary
+     );
+     const stored: PersistedSession = {
+@@ -250,7 +277,7 @@ export class SessionRepository {
+         ? Promise.resolve(undefined)
+         : this.storage.get<unknown>(SESSION_UNDO_HISTORY_STORAGE_KEY),
+     ]);
+-    const stored = parseStoredSession(raw, separateCardDb, separateUndoHistory);
++    const stored = promoteSessionToVersion7(parseStoredSession(raw, separateCardDb, separateUndoHistory), convertPersistedGameState);
+     const restoredState = restoreIdCounterInvariant(
+       ensureExecutionContext(stored.state),
+       "state"
+diff --git a/workers/game/src/session/version7-promotion.ts b/workers/game/src/session/version7-promotion.ts
+new file mode 100644
+index 0000000..195ca57
+--- /dev/null
++++ b/workers/game/src/session/version7-promotion.ts
+@@ -0,0 +1,48 @@
++/** Atomic writer boundary: prove legacy replay semantics before emitting native7. */
++import type { GameState, EffectStackFrame } from "../types.js";
++import { SessionLoadError, toPersistedGameState } from "./game-state-schema.js";
++import { canonicalCostReplacementReplay, costReplacementReplayViolation, fixedCostExitTarget, parseLifeDestinationChoiceId } from "../engine/effect-resolver/cost/replacement-replay.js";
++import { replacementEventsFor } from "../engine/replacement-events.js";
++
++type ValidateState = (raw: unknown, location: string) => GameState;
++function unansweredOfferMatches(state: GameState, frame: EffectStackFrame, index: number): boolean {
++  const offer = state.effectStack[index + 1];
++  const prompt = state.pendingPrompt;
++  if (frame.costReplacementResolution !== undefined || offer?.kind !== "REPLACEMENT" || !offer.replacement ||
++      prompt?.resumeContext !== offer.id || (prompt.options.promptType !== "OPTIONAL_EFFECT" && prompt.options.promptType !== "PLAYER_CHOICE")) return false;
++  const cost = frame.costs[frame.currentCostIndex];
++  const action = frame.costReplacementAction;
++  if (!cost || !action) return false;
++  const staged = frame.costTransactionState ? { ...state, ...frame.costTransactionState } : state;
++  const compound = cost.type === "PLACE_SELF_AND_HAND_TO_DECK" || cost.type === "PLACE_SELF_AND_TRASH_TO_DECK";
++  const target = compound || action.type === "ARRANGE_TOP_CARDS" ? frame.sourceCardInstanceId
++    : action.type === "SELECT_TARGET" ? action.selectedInstanceIds[0]
++    : action.type === "PLAYER_CHOICE" && action.choiceId === "__PAY_FIXED_COST__" ? fixedCostExitTarget(staged, cost, frame.controller, frame.sourceCardInstanceId)
++    : action.type === "PLAYER_CHOICE" ? parseLifeDestinationChoiceId(action.choiceId)?.ids[0] : undefined;
++  return target !== undefined && offer.replacement.targetInstanceId === target &&
++    replacementEventsFor(cost.type === "KO_OWN_CHARACTER" ? "KO" : "RETURN_TO_HAND").includes(offer.replacement.event);
++}
++
++export function promoteStateToVersion7(original: GameState, location: string, validate: ValidateState): GameState {
++  if (original.schemaVersion === 7) return validate(original, location);
++  const state = structuredClone(original);
++  for (const [index, frame] of state.effectStack.entries()) {
++    if (frame.costReplacementAction === undefined && frame.costReplacementChecked !== true && frame.costReplacementResolution === undefined) continue;
++    if (unansweredOfferMatches(state, frame, index)) {
++      try { frame.costReplacementAction = canonicalCostReplacementReplay(frame, frame.costReplacementAction!); }
++      catch (error) { throw new SessionLoadError(location, `legacy-debt: unprovable unanswered COST replay (${String(error)})`); }
++    }
++    const violation = costReplacementReplayViolation(state, frame);
++    if (violation) throw new SessionLoadError(location, `legacy-debt: unprovable COST replay (${violation}); preserve original reader6 storage`);
++    // Valid accepted/orphan debt stays unresolved. No outcome is inferred.
++  }
++  try { return validate(toPersistedGameState({ ...state, schemaVersion: 7 }), location); }
++  catch (error) { throw new SessionLoadError(location, `legacy-debt: unprovable native7 continuation (${String(error)}); preserve original reader6 storage`); }
++}
++
++export function promoteSessionToVersion7<T extends { state: GameState; undoHistory: GameState[] }>(session: T, validate: ValidateState): T {
++  // Evaluate all entries before any return, storage write or retention compaction.
++  const state = promoteStateToVersion7(session.state, "state", validate);
++  const undoHistory = session.undoHistory.map((snapshot, index) => promoteStateToVersion7(snapshot, `undoHistory[${index}]`, validate));
++  return { ...session, state, undoHistory };
++}

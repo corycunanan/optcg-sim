@@ -19,6 +19,7 @@ import {
   ALL_TARGET_TYPES,
   DON_POOL_FILTER_KEYS,
   MIXED_POOL_TYPES,
+  REMOVAL_PROHIBITION_CAUSES,
   getNestedActions,
   type EffectSchema,
   type EffectBlock,
@@ -38,6 +39,7 @@ import {
   targetPromptCountMin,
 } from "./effect-resolver/target-resolver.js";
 import { promptsFromTargetCount } from "./effect-resolver/target-prompt-actions.js";
+import { validateReplacementAbilityGroups } from "./replacement-ability-identity.js";
 import { AUTHORED_SCHEMAS } from "./authored-schemas.generated.js";
 import { TARGET_FILTER_KEYS } from "../../../../shared/target-filter.js";
 import { derivePrintedKeywords } from "./printed-keywords.js";
@@ -239,6 +241,35 @@ const TARGET_CONTROLLER_MODES = {
 
 const CAUSE_FILTER_BY_VALUES = new Set<string>(ALL_CAUSE_FILTER_BY);
 
+// Walk nested action params as well as permanent prohibition entries. Other
+// prohibition families have their own cause vocabulary; DON activation
+// accepts Character effects only, in either existing authored spelling.
+function validateProhibitionScopes(value: unknown, path: string): string[] {
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const type = record.prohibition_type ?? record.type;
+  const scope = record.scope as Record<string, unknown> | undefined;
+  const errors: string[] = [];
+  if (["CANNOT_BE_KO", "CANNOT_BE_REMOVED_FROM_FIELD", "CANNOT_BE_RETURNED_TO_HAND",
+    "CANNOT_BE_RETURNED_TO_DECK", "CANNOT_LEAVE_FIELD", "CANNOT_BE_RESTED"].includes(type as string)
+    && scope?.cause !== undefined
+    && !(REMOVAL_PROHIBITION_CAUSES as readonly unknown[]).includes(scope.cause)) {
+    errors.push(`${path}: unsupported removal scope.cause ${JSON.stringify(scope.cause)}`);
+  }
+  if (type === "CANNOT_SET_DON_ACTIVE") {
+    if (scope?.cause !== undefined && scope.cause !== "BY_CHARACTER_EFFECT") {
+      errors.push(`${path}: unsupported CANNOT_SET_DON_ACTIVE scope.cause ${JSON.stringify(scope.cause)}`);
+    }
+    if (scope?.card_type_filter !== undefined && scope.card_type_filter !== "CHARACTER") {
+      errors.push(`${path}: CANNOT_SET_DON_ACTIVE card_type_filter must be CHARACTER`);
+    }
+  }
+  for (const [key, child] of Object.entries(record)) {
+    errors.push(...validateProhibitionScopes(child, `${path}.${key}`));
+  }
+  return errors;
+}
+
 /**
  * Validate an effect schema and return a list of error messages.
  * Returns an empty array if the schema is valid.
@@ -250,6 +281,7 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
     return [`${prefix} Schema must be an object`];
   }
+  errors.push(...validateProhibitionScopes(schema, prefix));
   const candidate = schema as Partial<EffectSchema>;
 
   if (!candidate.effects || !Array.isArray(candidate.effects)) {
@@ -269,6 +301,7 @@ export function validateEffectSchema(schema: unknown, cardId?: string): string[]
     );
   }
 
+  if (candidate.card_id) errors.push(...validateReplacementAbilityGroups(candidate as EffectSchema));
   const blockIds = new Set<string>();
 
   for (let i = 0; i < candidate.effects.length; i++) {

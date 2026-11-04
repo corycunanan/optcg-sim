@@ -1,3 +1,4 @@
+import { scriptedDonPayment } from "./scripted-don-payment.js";
 import { describe, expect, it } from "vitest";
 import type {
   CardData,
@@ -350,6 +351,7 @@ describe("OPT-808 authored pipeline", () => {
     "Thatch replaces %s K.O. exactly once, without a K.O. event",
     (cause) => {
       const f = fixture("OP08-045", { cost: 4, power: 6000 });
+      f.state.schemaVersion = 6; // Native-v6 reader path; one printed OR ability.
       const thatch = {
         ...card(f.data.id, "thatch", 0),
         state: "RESTED" as const,
@@ -474,6 +476,7 @@ describe("OPT-808 authored pipeline", () => {
       state = play(state, f.data, f.db);
       if (state.pendingPrompt?.options.promptType === "OPTIONAL_EFFECT")
         state = choose(state, "activate", f.db);
+      state = scriptedDonPayment(state, f.db, 0, 1);
       state = select(state, ["ch"], f.db);
       expect(power(state, "chessmarimo", f.db)).toBe(6000);
       state = choose(state, "choose-value:1", f.db);

@@ -8,13 +8,14 @@
  * Characters with cost 2 or less", "Cannot be K.O.'d by effects"
  */
 
-import type {
-  ConditionalOverride,
-  Condition,
-  RuntimeProhibition,
-  ProhibitionType,
-  Target,
-  TargetFilter,
+import {
+  PROHIBITION_FEASIBILITY_TIMING,
+  type ConditionalOverride,
+  type Condition,
+  type RuntimeProhibition,
+  type ProhibitionType,
+  type Target,
+  type TargetFilter,
 } from "./effect-types.js";
 import type {
   CardData,
@@ -83,21 +84,33 @@ export function isProhibitionOverridden(
  * Re-evaluate a prohibition's carried block/prohibition conditions and any
  * WHILE_CONDITION duration. Prohibitions without either gate are always active.
  *
- * Also honors the OPT-253 negation contract: while the prohibition's source
- * card is effect-negated on the field, its schema-sourced prohibitions pause —
- * mirroring isEffectConditionMet's isEffectSourceNegated gate for modifiers.
- * Sources that already left the field (e.g. a resolved Event in the trash)
- * are never in a NEGATE_EFFECTS_FLAG's appliesTo, so one-shot prohibitions
- * written by resolved effects are unaffected.
+ * APPLY_PROHIBITION and NEGATE_TRIGGER_TYPE write the exact empty block id
+ * for resolved action output. Later source negation cannot retract that result
+ * (rule 8-2-3). Registered continuous prohibitions carry their authored block
+ * id; those and unproven historical metadata retain the source-negation gate.
+ * Duration is independent of this provenance distinction.
  */
 export function isProhibitionConditionMet(
   prohibition: RuntimeProhibition,
   state: GameState,
   cardDb: Map<string, CardData>,
 ): boolean {
-  const source = findCardInstance(state, prohibition.sourceCardInstanceId);
-  if (source && isCardNegated(source, state, cardDb)) return false;
+  if (prohibition.sourceEffectBlockId !== "") {
+    const source = findCardInstance(state, prohibition.sourceCardInstanceId);
+    if (source && isCardNegated(source, state, cardDb)) return false;
+  }
 
+  return isProhibitionConditionAndDurationMet(prohibition, state, cardDb);
+}
+
+/** Conditions on an already-resolved restriction still apply, but later source
+ * negation cannot invalidate that resolved effect (rule 8-2-3).
+ */
+function isProhibitionConditionAndDurationMet(
+  prohibition: RuntimeProhibition,
+  state: GameState,
+  cardDb: Map<string, CardData>,
+): boolean {
   const ctx: ConditionContext = {
     sourceCardInstanceId: prohibition.sourceCardInstanceId,
     controller: prohibition.controller,
@@ -229,6 +242,85 @@ export function checkProhibitions(
   }
 
   return null;
+}
+
+/**
+ * OPT-864 (Decision 11, rule 1-3-3): the activation-time prohibition veto
+ * shared by availability and validation.
+ *
+ * It runs the same evaluation as pipeline step 2 (`checkProhibitions`), but
+ * only over prohibitions classified "ACTIVATION" in
+ * PROHIBITION_FEASIBILITY_TIMING. A resolution-time restriction never vetoes
+ * an offer here.
+ */
+/** OPT-961: prohibitions the table classifies as feasibility gates. */
+function activationTimeProhibitions(state: GameState): RuntimeProhibition[] {
+  return state.prohibitions.filter(
+    (p) => PROHIBITION_FEASIBILITY_TIMING[p.prohibitionType] === "ACTIVATION",
+  );
+}
+
+/**
+ * OPT-961 (rule 1-3-3, 8-3-1-3): may an activation cost move this field card
+ * this way? A cost that would K.O., return, trash, or otherwise remove a card
+ * that an activation-time prohibition protects cannot be paid with that card.
+ *
+ * Uses the removal taxonomy and scope semantics of `isRemovalProhibited`
+ * with cause "COST", over the activation-time prohibitions only. So
+ * "cannot be K.O.'d" (cause ANY) protects against a K.O. cost, while
+ * "cannot be removed by your opponent's effects" does not stop your own cost.
+ * Whether "cannot be K.O.'d by effects" covers a cost is not settled by a
+ * ruling; this reads it as not covering (assumed).
+ */
+export function isCostMovementProhibited(
+  state: GameState,
+  targetInstanceId: string,
+  action: RemovalAction,
+  controller: 0 | 1,
+  cardDb: Map<string, CardData>,
+  sourceCardInstanceId?: string,
+): boolean {
+  const gating = activationTimeProhibitions(state);
+  if (gating.length === 0) return false;
+  return isRemovalProhibited(
+    { ...state, prohibitions: gating },
+    targetInstanceId,
+    { action, cause: "COST", causingController: controller, sourceCardInstanceId },
+    cardDb,
+  );
+}
+
+/**
+ * "Using your own effects" covers both Life-to-hand costs and effect actions
+ * (OP02-004/023 FAQ), but not damage processing or an opponent's effects.
+ * Keep the Life owner separate from the effect controller.
+ */
+export function isLifeToHandProhibited(
+  state: GameState,
+  lifeOwner: 0 | 1,
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (lifeOwner !== causingController) return false;
+  for (const p of activationTimeProhibitions(state)) {
+    if (p.prohibitionType !== "CANNOT_ADD_LIFE_TO_HAND") continue;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
+    if (isProhibitionOverridden(p, state, cardDb)) continue;
+    if (matchesController(p.controller, lifeOwner, p.scope?.controller)) return true;
+  }
+  return false;
+}
+
+export function activationProhibitionVeto(
+  state: GameState,
+  action: GameAction,
+  cardDb: Map<string, CardData>,
+  actingPlayerIndex: 0 | 1,
+): string | null {
+  const gating = activationTimeProhibitions(state);
+  if (gating.length === 0) return null;
+  return checkProhibitions({ ...state, prohibitions: gating }, action, cardDb, actingPlayerIndex);
 }
 
 /**
@@ -523,7 +615,8 @@ export function isProhibitedForCard(
     causingController: 0 | 1;
     sourceCardInstanceId?: string;
     sourceCardSnapshot?: CardInstance;
-  },
+    sourceIdentity?: import("../types.js").QueuedSourceSnapshot;
+  }
 ): boolean {
   const prohibitions = state.prohibitions;
 
@@ -537,17 +630,62 @@ export function isProhibitedForCard(
     if (prohibitionType === "CANNOT_BE_RESTED" && restEffectContext) {
       const target = findCardOnField(state, targetInstanceId);
       if (!target) continue;
-      if (!scopeControllerMatches(p.controller, target.controller, p.scope?.controller)) continue;
-      if (!causeMatches(p.scope?.cause ?? "ANY", { ...restEffectContext, cause: restEffectContext.cause ?? "EFFECT" }, target.controller)) continue;
+      if (
+        !scopeControllerMatches(
+          p.controller,
+          target.controller,
+          p.scope?.controller
+        )
+      )
+        continue;
+      if (
+        !causeMatches(
+          p.scope?.cause ?? "ANY",
+          { ...restEffectContext, cause: restEffectContext.cause ?? "EFFECT" },
+          target.controller
+        )
+      )
+        continue;
       if (p.scope?.source_filter) {
-        if (restEffectContext.cause === "COST" || !restEffectContext.sourceCardInstanceId) continue;
+        if (
+          restEffectContext.cause === "COST" ||
+          !restEffectContext.sourceCardInstanceId
+        )
+          continue;
         const snapshot = restEffectContext.sourceCardSnapshot;
-        const source = findCardInState(state, restEffectContext.sourceCardInstanceId)?.card ??
-          (snapshot?.instanceId === restEffectContext.sourceCardInstanceId ? snapshot : undefined);
-        if (!source || !matchesFilter(source, p.scope.source_filter, cardDb, state)) continue;
+        const source =
+          findCardInState(state, restEffectContext.sourceCardInstanceId)
+            ?.card ??
+          (snapshot?.instanceId === restEffectContext.sourceCardInstanceId
+            ? snapshot
+            : undefined);
+        if (source) {
+          if (!matchesFilter(source, p.scope.source_filter, cardDb, state))
+            continue;
+        } else {
+          // The authored departed-source protection (OP15-024) asks only for
+          // printed card class. Identity is sufficient; do not invent live
+          // power/cost/attached DON or revive a departed card for queries.
+          const identity = restEffectContext.sourceIdentity;
+          const filter = p.scope.source_filter;
+          const data =
+            identity?.instanceId === restEffectContext.sourceCardInstanceId
+              ? cardDb.get(identity.cardId)
+              : undefined;
+          const classes = Array.isArray(filter.card_type)
+            ? filter.card_type
+            : [filter.card_type];
+          if (
+            !data ||
+            Object.keys(filter).some((key) => key !== "card_type") ||
+            !classes.some(
+              (type) => type?.toUpperCase() === data.type.toUpperCase()
+            )
+          )
+            continue;
+        }
       }
     }
-
 
     // Check if this prohibition applies to the target
     if (p.appliesTo && p.appliesTo.length > 0) {
@@ -555,7 +693,16 @@ export function isProhibitedForCard(
     } else if (p.target) {
       // Dynamic population target (OPT-451)
       const card = findCardOnField(state, targetInstanceId);
-      if (card && prohibitionTargetMatchesCard(p.target, card, p.controller, state, cardDb)) {
+      if (
+        card &&
+        prohibitionTargetMatchesCard(
+          p.target,
+          card,
+          p.controller,
+          state,
+          cardDb
+        )
+      ) {
         return true;
       }
     }
@@ -595,8 +742,12 @@ export type RemovalAction = "KO" | "RETURN_TO_HAND" | "RETURN_TO_DECK" | "TRASH"
 export interface RemovalContext {
   /** Which removal action is being attempted. */
   action: RemovalAction;
-  /** Whether this removal stems from battle damage or an effect. */
-  cause: "BATTLE" | "EFFECT";
+  /**
+   * Whether this removal stems from battle damage, an effect, or (OPT-961)
+   * the payment of an activation cost. A cost never matches an "EFFECT" or
+   * "by your opponent's effects" cause scope; it matches "ANY".
+   */
+  cause: "BATTLE" | "EFFECT" | "COST";
   /** The player whose action/effect caused the removal. */
   causingController: 0 | 1;
   /**
@@ -788,18 +939,26 @@ function causeMatches(
   context: { cause: "EFFECT" | "BATTLE" | "COST"; causingController: 0 | 1 },
   targetController: 0 | 1,
 ): boolean {
+  // OP02-118: "during this battle" is the THIS_BATTLE duration, not a
+  // cause restriction. Its IN_BATTLE scope blocks every KO, including costs.
+  if (declaredCause === "IN_BATTLE") declaredCause = "ANY";
+  // OPT-961: a cost is neither an effect nor a battle; only ANY stops it.
+  if (context.cause === "COST") return declaredCause === "ANY";
   switch (declaredCause) {
     case "ANY":
       return true;
     case "BATTLE":
       return context.cause === "BATTLE";
+    case "BY_EFFECT":
     case "EFFECT":
       return context.cause === "EFFECT";
     case "OPPONENT_EFFECT":
     case "BY_OPPONENT_EFFECT":
       return context.cause === "EFFECT" && context.causingController !== targetController;
     default:
-      return true;
+      // Schema validation rejects unknown causes before a game starts.
+      // Runtime drift must not silently grant unconditional protection.
+      return false;
   }
 }
 
@@ -855,4 +1014,102 @@ function findCardOnField(state: GameState, instanceId: string): CardInstance | n
     if (player.stage?.instanceId === instanceId) return player.stage;
   }
   return null;
+}
+
+// ─── Draw Prohibition (OPT-876, CANNOT_DRAW) ─────────────────────────────────
+//
+// Frame (OP12-099 Kalgara: "you cannot draw cards using your own effects
+// during this turn"):
+//   - The prohibited player is the DRAWER: the prohibition applies only when
+//     `prohibition.controller` (the player the effect bound it to via
+//     target SELF) equals the drawer.
+//   - The CAUSING controller is the controller of the effect that makes the
+//     player draw, derived statelessly from the effect's source card with
+//     `effectSourceController(state, sourceCardInstanceId, controller, refs)`
+//     (action-utils.ts, shared with the OPT-794/795 removal and hand-trash
+//     causes). An OPPONENT_ACTION wrapper flips the acting `controller` but
+//     not the source card, so OP06-047 "your opponent draws 5 cards" is caused
+//     by OP06-047's controller, and every continuation (batch re-entry,
+//     simultaneous groups, choice/target/optional resumes, trigger queue,
+//     serialized resume) already carries the source id: nothing is threaded.
+//     A new effect resolved mid-chain has its own source, hence its own cause.
+//   - The Draw Phase draw (§6-2-1) and setup draws never consult this helper.
+//
+// Accepted `scope.cause` values (CANNOT_DRAW_CAUSES; any other value is a
+// schema-lint error, see schema-draw-prohibition-lint.ts, and never blocks):
+//   - omitted / BY_YOUR_EFFECT: causing controller === drawer.
+//   - BY_OPPONENT_EFFECT: causing controller !== drawer.
+//   - BY_EFFECT / ANY: every effect draw (still never the Draw Phase draw).
+//
+// Every effect-caused draw (DRAW, HAND_WHEEL's draw half) must call this
+// before moving cards or emitting CARD_DRAWN / DRAW_OUTSIDE_DRAW_PHASE.
+
+export const CANNOT_DRAW_CAUSES = [
+  "BY_YOUR_EFFECT",
+  "BY_OPPONENT_EFFECT",
+  "BY_EFFECT",
+  "ANY",
+] as const;
+export type CannotDrawCause = (typeof CANNOT_DRAW_CAUSES)[number];
+
+export function isCannotDrawCause(cause: unknown): cause is CannotDrawCause {
+  return (CANNOT_DRAW_CAUSES as readonly unknown[]).includes(cause);
+}
+
+function drawCauseMatches(
+  cause: CannotDrawCause,
+  drawer: 0 | 1,
+  causingController: 0 | 1,
+): boolean {
+  switch (cause) {
+    case "BY_YOUR_EFFECT":
+      return causingController === drawer;
+    case "BY_OPPONENT_EFFECT":
+      return causingController !== drawer;
+    case "BY_EFFECT":
+    case "ANY":
+      return true;
+  }
+}
+
+export function isDrawProhibitedByEffect(
+  state: GameState,
+  drawer: 0 | 1,
+  causingController: 0 | 1,
+  cardDb: Map<string, CardData>,
+): boolean {
+  for (const p of state.prohibitions) {
+    if (p.prohibitionType !== "CANNOT_DRAW") continue;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) continue;
+    if (!isProhibitionConditionMet(p, state, cardDb)) continue;
+    if (isProhibitionOverridden(p, state, cardDb)) continue;
+    if (p.controller !== drawer) continue;
+    const cause = p.scope?.cause ?? "BY_YOUR_EFFECT";
+    if (!isCannotDrawCause(cause)) continue;
+    if (!drawCauseMatches(cause, drawer, causingController)) continue;
+    return true;
+  }
+  return false;
+}
+
+/** Character effects cannot activate existing rested DON under EB04-016 /
+ * OP10-030. Leader, Event, Stage and phase procedures are outside this cause.
+ * The source identity is captured before costs and survives a zone change.
+ */
+export function isDonActivationProhibitedByEffect(
+  state: GameState,
+  player: 0 | 1,
+  source: import("../../../../shared/game-types.js").EffectSourceIdentity | undefined,
+  cardDb: Map<string, CardData>,
+): boolean {
+  if (source?.cardType.toUpperCase() !== "CHARACTER") return false;
+  return state.prohibitions.some((p) => {
+    if (p.prohibitionType !== "CANNOT_SET_DON_ACTIVE" || p.controller !== player) return false;
+    if (p.usesRemaining !== null && p.usesRemaining <= 0) return false;
+    if (!isProhibitionConditionMet(p, state, cardDb) || isProhibitionOverridden(p, state, cardDb)) return false;
+    // Both existing authored spellings describe the causing card category.
+    if (p.scope?.cause !== undefined && p.scope.cause !== "BY_CHARACTER_EFFECT") return false;
+    if (p.scope?.card_type_filter !== undefined && p.scope.card_type_filter !== "CHARACTER") return false;
+    return true;
+  });
 }

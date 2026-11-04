@@ -326,3 +326,8 @@ describe("schema lint: replacement target_filter controller (OPT-800)", () => {
     expect(findReplacementControllerViolations(broken)).toHaveLength(1);
   });
 });
+
+it("declared alternative-predicate groups preserve identical replacement body/usage semantics", async () => {
+  const { validateReplacementAbilityGroups } = await import("../engine/replacement-ability-identity.js");
+  expect(Object.values(getAllAuthoredSchemas()).flatMap((schema) => validateReplacementAbilityGroups(schema))).toEqual([]);
+});

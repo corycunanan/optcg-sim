@@ -11,7 +11,7 @@ import {
   pushFrame,
   popFrame,
 } from "../effect-stack.js";
-import { isEngineTerminated } from "../engine-limits.js";
+import { isGameTerminated } from "../terminal.js";
 import type { ActionResult, EffectResolverServices } from "./types.js";
 
 /** A notification is future work, not a committed accumulator: nested costs and
@@ -44,9 +44,18 @@ export function resolveActivatedEvent(
     pendingTriggers: [],
     simultaneousTriggers: [],
     accumulatedEvents: [],
-    eventActivationCompletion: notification,
+    kind: "EVENT_ACTIVATION",
+    eventActivation: {
+      publication: "AFTER_EFFECT",
+      sourceZone:
+        notification.type === "EVENT_MAIN_RESOLVED_FROM_TRASH"
+          ? "TRASH"
+          : "HAND",
+      sourceClass: "EVENT",
+      events: [notification],
+    },
   });
-  if (isEngineTerminated(withCompletion))
+  if (isGameTerminated(withCompletion))
     return { state: withCompletion, events: [], succeeded: false };
   const resolved = services.resolveEffect(
     withCompletion,
@@ -70,7 +79,7 @@ export function resolveActivatedEvent(
       pendingPrompt: resolved.pendingPrompt,
       nestedEventActivation: true,
     };
-  if (isEngineTerminated(resolved.state))
+  if (isGameTerminated(resolved.state))
     return { state: resolved.state, events: resolved.events, succeeded: false };
   return {
     state: popFrame(resolved.state),
@@ -96,7 +105,8 @@ export function withdrawUnactivatedTrashMain(
   const top = state.effectStack.at(-1);
   const trigger = abandoned.effectBlock.trigger;
   if (
-    top?.eventActivationCompletion?.type !== "EVENT_MAIN_RESOLVED_FROM_TRASH" ||
+    top?.eventActivation?.events[0]?.type !==
+      "EVENT_MAIN_RESOLVED_FROM_TRASH" ||
     top.sourceCardInstanceId !== abandoned.sourceCardInstanceId ||
     !trigger ||
     !("keyword" in trigger) ||
@@ -104,7 +114,8 @@ export function withdrawUnactivatedTrashMain(
   )
     return state;
   const boundary: EffectStackFrame = { ...top };
-  delete boundary.eventActivationCompletion;
+  delete boundary.eventActivation;
+  delete boundary.kind;
   return {
     ...state,
     effectStack: [...state.effectStack.slice(0, -1), boundary],
@@ -149,7 +160,7 @@ export function retainEventParent(
     simultaneousTriggers: [],
     accumulatedEvents: [],
   });
-  if (isEngineTerminated(pushed)) return pushed;
+  if (isGameTerminated(pushed)) return pushed;
   const parent = pushed.effectStack.at(-1)!;
   const childEvents = new Set(
     state.effectStack
@@ -179,8 +190,7 @@ export function updateEffectContinuation(
     candidate?.phase === "INTERRUPTED_BY_TRIGGERS" &&
     (candidate.pausedAction?.type === "ACTIVATE_EVENT_FROM_HAND" ||
       candidate.pausedAction?.type === "ACTIVATE_EVENT_FROM_TRASH") &&
-    state.effectStack[firstNewFrame + 1]?.eventActivationCompletion !==
-      undefined;
+    state.effectStack[firstNewFrame + 1]?.eventActivation !== undefined;
   const index = isEventParent ? firstNewFrame : state.effectStack.length - 1;
   const frame = state.effectStack[index];
   if (!frame) return state;

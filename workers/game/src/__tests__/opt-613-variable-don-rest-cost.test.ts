@@ -157,13 +157,8 @@ describe("OPT-613 — variable DON!! rest costs", () => {
       1,
       cardDb,
     );
-    expect(offered.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-
-    const activated = resumeFromStack(
-      offered.state,
-      { type: "PLAYER_CHOICE", choiceId: "activate" },
-      cardDb,
-    );
+    // OPT-864: the unpayable optional cost is skipped before the prompt.
+    const activated = offered;
     expect(activated.pendingPrompt).toBeUndefined();
     expect(activated.state.effectStack).toHaveLength(0);
     expect(activated.state.players).toEqual(state.players);

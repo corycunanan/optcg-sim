@@ -1,9 +1,10 @@
 /** Pure cost payability predicates. */
+import { hasStructuralCostSemantics } from "../../native-cost-semantics.js";
 import type { Cost } from "../../effect-types.js";
 import type { CardData, GameState } from "../../../types.js";
 import { matchesFilter } from "../../conditions.js";
 import { isProhibitedForCard } from "../../prohibitions.js";
-import { computeCostTargets, costSelectionCount, resolveAmount } from "./targets.js";
+import { computeCostTargets, costSelectionCount, isFixedCostMovementProhibited, resolveAmount } from "./targets.js";
 
 /** True when paying the cost requires a player prompt. */
 export function costNeedsPlayerSelection(cost: Cost): boolean {
@@ -59,7 +60,10 @@ export function costNeedsPlayerSelection(cost: Cost): boolean {
 }
 
 /**
- * Determine whether a single cost is payable in the current state.
+ * Single-cost resource oracle for the current state, not an initial-state
+ * sequence veto. Earlier printed payments can supply later resources or end
+ * prohibitions: use isCostSequencePayable for every multi-cost gate. This
+ * predicate cannot establish whether a replacement pays the printed cost.
  * Pure predicate — no state mutation.
  */
 export function isCostPayable(
@@ -79,6 +83,10 @@ export function isCostPayable(
     const opts = cost.options ?? [];
     return opts.some((o) => isCostPayable(state, o, controller, cardDb, sourceCardInstanceId));
   }
+
+  // OPT-961: a fixed movement an activation-time prohibition forbids makes
+  // the cost unpayable (rules 1-3-3, 8-3-1-3).
+  if (isFixedCostMovementProhibited(state, cost, controller, cardDb, sourceCardInstanceId)) return false;
 
   // OPT-431: the self half of the compound cost is fixed to the source card —
   // payable only when the source is on the field AND enough matching trash
@@ -112,6 +120,9 @@ export function isCostPayable(
   const player = state.players[controller];
   switch (cost.type) {
     case "DON_MINUS": {
+      if (hasStructuralCostSemantics(state)) {
+        return computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).length >= resolveAmount(cost);
+      }
       const amt = resolveAmount(cost, 0);
       if (cost.filter?.is_active === true || cost.filter?.state === "ACTIVE") {
         return player.donCostArea.filter((d) => d.state === "ACTIVE").length >= amt;
@@ -133,6 +144,9 @@ export function isCostPayable(
     }
 
     case "VARIABLE_DON_RETURN": {
+      if (hasStructuralCostSemantics(state)) {
+        return computeCostTargets(state, cost, controller, cardDb, sourceCardInstanceId).length >= resolveAmount(cost);
+      }
       const amt = resolveAmount(cost, 0);
       if (amt === 0) return true;
       return player.donCostArea.filter((d) => !d.attachedTo).length >= amt;

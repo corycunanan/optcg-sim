@@ -1,0 +1,26 @@
+import { expect, it } from '/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/optcg-sim/node_modules/vitest/dist/index.js';
+import { writeFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
+import { rig, synSchema } from './opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/opt-960-rig.ts';
+import { GameSession } from './opt1004-historical67cbb-diagnostic/workers/game/src/GameSession.ts';
+import { SessionRepository } from './opt1004-historical67cbb-diagnostic/workers/game/src/session/persistence.ts';
+import { MemorySessionStorage } from './opt1004-historical67cbb-diagnostic/workers/game/src/__tests__/fixtures/opt-940-synthetic-states.ts';
+const directory='/Users/corycunanan/Documents/Codex/2026-10-24/x20-x20/work/optcg-sim/workers/game/src/__tests__/fixtures/opt-1004-historical-resume/';
+const cases=[...[6,7,8].flatMap(mode=>['OP10-030','EB04-016'].map(restriction=>({phase:'cost',mode,restriction}))),...['OP10-030','EB04-016'].map(restriction=>({phase:'action',mode:8,restriction}))];
+it.each(cases)('captures actual old $phase/$mode/$restriction after pre-imposed restriction',async ({phase,mode,restriction})=>{
+ const r=rig();r.state.schemaVersion=8;r.state.costSemanticsVersion=mode as 6|7|8;r.state.players[0].donCostArea.forEach(d=>d.state='RESTED');
+ const blocker=r.put(restriction,0,'CHARACTER');const block=r.db.get(restriction)!.effectSchema!.effects.find(b=>b.category==='activate')!;
+ const costs=phase==='cost'?[{type:'TRASH_SELF' as const},{type:'TRASH_FROM_HAND' as const,amount:1}]:[{type:'TRASH_SELF' as const}];
+ const schedule={type:'SCHEDULE_ACTION' as const,params:{timing:'END_OF_THIS_TURN' as const,action:{type:'SET_DON_ACTIVE' as const,params:{amount:1}}}};
+ const actions=phase==='cost'?[schedule]:[{type:'CHOOSE_VALUE' as const,result_ref:'choice',params:{domain:'NUMBER' as const,constraints:{min:0,max:1}}},{type:'DRAW' as const,params:{amount:{type:'CHOSEN_VALUE' as const,ref:'choice'}}},schedule];
+ const id=`SYN-old-restricted-${phase}-${mode}-${restriction}`;
+ const source=r.put(id,0,'HAND',{data:{cost:0},schema:synSchema(id,[{id:'onplay',category:'auto',trigger:{keyword:'ON_PLAY'},costs,actions}])});
+ r.put('CHAR-VANILLA',0,'HAND');r.put('CHAR-RUSH',0,'HAND');
+ const storage=new MemorySessionStorage();const options={nextJsUrl:'https://app.example.test',workerSecret:'test'};
+ await new SessionRepository(storage,options).save({state:r.state,cardDb:r.db,undoHistory:[],mode:'PVP',pregameMode:'PRIORITY_ROLL',testPriorityRolls:null});
+ async function act(action:any){const loaded=(await new SessionRepository(storage,options).load())!;const s=new GameSession({storage,getWebSockets:()=>[],getTags:()=>[],acceptWebSocket(){}} as any,{GAME_WORKER_SECRET:'test',NEXTJS_URL:options.nextJsUrl} as any) as any;s.gameState=loaded.state;s.cardDb=loaded.cardDb;s.undoHistory=loaded.undoHistory;const messages:any[]=[];await s.handleAction({send(v:string){messages.push(JSON.parse(v));},close(){}},0,{...action,...(loaded.state.pendingPrompt?.promptId?{promptId:loaded.state.pendingPrompt.promptId}:{})});expect(messages.filter(m=>m.type==='action:rejected')).toEqual([]);}
+ await act({type:'ACTIVATE_EFFECT',cardInstanceId:blocker.instanceId,effectId:block.id});await act({type:'PLAYER_CHOICE',choiceId:'choose-value:0'});await act({type:'PLAY_CARD',cardInstanceId:source.instanceId});
+ const loaded=(await new SessionRepository(storage,options).load())!;expect(loaded.state.schemaVersion).toBe(8);expect(loaded.state.pendingPrompt).not.toBeNull();expect(loaded.state.prohibitions.some(p=>p.prohibitionType==='CANNOT_SET_DON_ACTIVE')).toBe(true);
+ const refs=loaded.state.effectStack.flatMap(f=>f.resultRefs).filter(([,v])=>v.sourceIdentity||v.sourceCardSnapshot);expect(refs.some(([,v])=>v.sourceIdentity?.cardId===id)).toBe(true);expect(refs.some(([,v])=>v.sourceCardSnapshot)).toBe(false);
+ writeFileSync(directory+`restricted-${phase}-mode${mode}-${restriction}.json.gz`,gzipSync(JSON.stringify(Object.fromEntries(storage.data))));
+});

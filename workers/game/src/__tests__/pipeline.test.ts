@@ -1425,19 +1425,11 @@ describe("ON_KO effect stack resume flow", () => {
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
     result = runPipeline(result.state, { type: "PASS" }, cardDb, 0);
 
-    // Should still get optional prompt
-    expect(result.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-
-    // Accept the optional effect
-    const resumeState = { ...result.state, pendingPrompt: null };
-    const acceptResult = resumeFromStack(
-      resumeState,
-      { type: "PLAYER_CHOICE", choiceId: "accept" },
-      cardDb,
-    );
-
-    // Cannot pay cost (empty hand) — effect should fail, no further prompt
-    expect(acceptResult.pendingPrompt).toBeUndefined();
+    // OPT-864: the cost cannot be paid (empty hand), so the optional effect
+    // is skipped without a prompt.
+    expect(result.pendingPrompt?.options.promptType).not.toBe("OPTIONAL_EFFECT");
+    const acceptResult = result;
+    expect(acceptResult.pendingPrompt ?? undefined).toBeUndefined();
     // P1 hand should still be empty (no draw happened)
     expect(acceptResult.state.players[1].hand.length).toBe(0);
   });

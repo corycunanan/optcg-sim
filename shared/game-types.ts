@@ -59,20 +59,24 @@ export interface DonInstance {
 // ─── Battle ───────────────────────────────────────────────────────────────────
 
 export interface BattleContext {
+  /** Explicit battle bookkeeping (v4); historical runtime constructors may omit it before conversion. */
+  step?: BattleSubPhase;
+  redirectWindow?: boolean;
+  blockerLocked?: boolean;
+  targetLocked?: boolean;
   battleId: string;
   attackerInstanceId: string;
   targetInstanceId: string;
-  attackerPower: number;    // computed at attack declaration
-  defenderPower: number;    // recomputed after counters are applied
+  attackerPower: number; // computed at attack declaration
+  defenderPower: number; // recomputed after counters are applied
   counterPowerAdded: number;
   blockerActivated: boolean;
   // OPT-239: damage count locked at Damage Step entry. 2 for [Double Attack],
   // 1 otherwise. Decremented each time a damage is dealt to Leader life, so
   // the [Trigger] resume path knows whether another damage is still owed.
+  // (A revealed [Trigger] Life card pauses the battle on a BATTLE_DAMAGE
+  // effect-stack frame, OPT-963; it is no longer stored here.)
   damagesRemaining?: number;
-  // Battle damage that reveals a Life card with [Trigger] pauses the battle
-  // until the damaged player accepts or declines that trigger.
-  pendingTriggerLifeCard?: LifeCard;
 }
 
 export type BattleSubPhase =
@@ -123,38 +127,6 @@ export interface PerformedAction {
 }
 
 
-/** OPT-441: Leader damage paused by a battle-damage Life [Trigger] prompt. */
-export interface LeaderDamageContinuation {
-  battleId: string;
-  lifeCardInstanceId: string;
-  damagedPlayerIndex: 0 | 1;
-  stage: "LIFE_REMOVAL" | "DAMAGE";
-}
-
-/**
- * OPT-872: the Damage Step paused on an optional replacement for the losing
- * Character's K.O. (rules §7-1-4-1-2, §8-1-3-4-1). Everything here is public:
- * the target Character and the replacement source are both on the field.
- */
-export interface BattleKOReplacementContinuation {
-  battleId: string;
-  stage: "CHARACTER_KO_REPLACEMENT";
-  /** The Character that lost the battle. */
-  targetInstanceId: string;
-  /**
-   * The optional replacement whose OPTIONAL_EFFECT prompt paused the Damage
-   * Step. Absent when a mandatory replacement's substitute paused it instead
-   * (resolution is then already REPLACED).
-   */
-  replacementEffectId?: string;
-  /** Controller of the attacking card (the player causing the battle K.O.). */
-  causingPlayerIndex: 0 | 1;
-  /** Whether CHARACTER_BATTLES belongs in the resumed Damage Step batch. */
-  attackerIsCharacter: boolean;
-  /** Set when the prompt is answered; absent while it is pending. */
-  resolution?: "REPLACED" | "NOT_REPLACED";
-}
-
 export interface TurnState {
   number: number;
   activePlayerIndex: 0 | 1;
@@ -172,28 +144,10 @@ export interface TurnState {
   oncePerTurnUsed: Record<string, string[]>; // effectId → instanceIds used this turn
   actionsPerformedThisTurn: PerformedAction[];
   extraTurnsPending?: number;
-  // OPT-259 (F6): effect-sourced damage (DEAL_DAMAGE) reveals a Life card
-  // with [Trigger]. The damaged player must decide to activate or decline,
-  // after which the damage loop resumes for any remaining iterations.
-  // Battle damage uses `battle.pendingTriggerLifeCard` instead — effect damage
-  // is decoupled so it can happen outside the battle phase.
-  pendingTriggerFromEffect?: {
-    lifeCard: LifeCard;
-    damagedPlayerIndex: 0 | 1;
-    remainingDamages: number;  // damages still to deal AFTER the current one resolves
-    sourceCardInstanceId: string;
-    controllerIndex: 0 | 1;    // controller of the effect that dealt the damage
-  } | null;
-  // OPT-441: a battle-damage [Trigger] effect may pause on the effect stack.
-  // Keep the completed Life damage's battle identity until that stack (and any
-  // CARD_REMOVED_FROM_LIFE auto effects queued behind it) fully unwinds, then
-  // resume the remaining Double Attack damage through the normal pipeline.
-  // OPT-872: an optional replacement for the losing Character's battle K.O.
-  // pauses the Damage Step the same way; see BattleKOReplacementContinuation.
-  pendingBattleDamageContinuation?:
-    | LeaderDamageContinuation
-    | BattleKOReplacementContinuation
-    | null;
+  // Damage and replacement continuations (a revealed [Trigger] Life card, a
+  // paused Double Attack, a battle-K.O. replacement, a DEAL_DAMAGE paused on
+  // a Trigger window) are typed effect-stack frames since OPT-963 (game-state
+  // schema version 3); the turn carries none of them.
   // Per-turn sticky flag: set to true the first time a player's deck transitions
   // to 0 cards during the current turn. Consumed by the end-of-turn defeat check
   // for Leaders with LOSS_CONDITION_MOD/DELAYED_LOSS (e.g., OP15-022 Brook).
@@ -298,7 +252,14 @@ export type EngineLimitDiagnostic =
     };
 
 export interface EngineTerminalOutcome {
-  type: "INFINITE_LOOP_DRAW" | "ENGINE_ERROR_DRAW";
+  /**
+   * ENGINE_LIMIT: a bounded engine guard (effect stack depth or action budget)
+   * stopped resolution. It is not a rules draw (Decision 5).
+   * INFINITE_LOOP_DRAW: reserved for rule 11-1-1-1 (neither player can stop a
+   * loop); no writer emits it until the declared-count protocol (OPT-952).
+   * ENGINE_ERROR_DRAW: an engine contract failure.
+   */
+  type: "ENGINE_LIMIT" | "INFINITE_LOOP_DRAW" | "ENGINE_ERROR_DRAW";
   diagnostic: EngineLimitDiagnostic;
 }
 
@@ -504,7 +465,10 @@ export type EffectStackPhase =
   // frame N can fully resolve before frame N+1 begins (rule 6-2). Frame carries
   // a BatchResumeMarker identifying which action to re-invoke and with what
   // remaining-batch state once pendingTriggers drain.
-  | "AWAITING_BATCH_RESUME";
+  | "AWAITING_BATCH_RESUME"
+  // OPT-963 (game-state schema version 3): a damage frame waiting for the
+  // damaged player's Life [Trigger] choice (rule 8-6-2-1).
+  | "AWAITING_TRIGGER_REVEAL";
 
 export interface EffectStackFrame {
   /** Notify activation watchers only after the nested Event Main finishes. */
@@ -523,8 +487,15 @@ export interface EffectStackFrame {
   validTargets: string[];
   /** Result of the action that paused before this continuation. */
   priorActionSucceeded?: boolean;
-  /** Outer replacement batch to continue after a nested substitute prompt. */
-  replacementBatchContinuation?: unknown;
+  /**
+   * OPT-963 typed continuations (game-state schema version 3), one per frame
+   * kind; typed in the worker, opaque here. Never sent to clients (frames are
+   * engine-only).
+   */
+  replacement?: unknown;
+  replacementBatch?: unknown;
+  battleDamage?: unknown;
+  effectDamage?: unknown;
 
   // Cost tracking
   costs: unknown[];
@@ -624,7 +595,7 @@ export interface EngineExecutionContext {
 // ─── Game State ───────────────────────────────────────────────────────────────
 
 export type EffectAvailabilityStatus = "active" | "usable" | "used" | "blocked";
-export type EffectBlockedReason = "COST" | "CONDITION" | "PHASE" | "ONCE_PER_TURN" | "NO_TARGET";
+export type EffectBlockedReason = "COST" | "CONDITION" | "PHASE" | "ONCE_PER_TURN" | "NO_TARGET" | "PROHIBITED";
 export interface EffectAvailability {
   effectId: string;
   status: EffectAvailabilityStatus;
@@ -657,7 +628,7 @@ export interface GameState {
   status: "IN_PROGRESS" | "FINISHED" | "ABANDONED";
   winner: 0 | 1 | null;
   winReason: string | null;
-  /** Present when a bounded engine guard terminates resolution under Rule 11-1-1-1. */
+  /** Present when the engine, not a rule, ended the game (engine limit or contract failure). */
   engineOutcome?: EngineTerminalOutcome | null;
   /** Actions executed in the current resolver sequence, persisted across prompts. */
   engineActionCount?: number;
@@ -859,6 +830,13 @@ export interface PlayerChoicePrompt {
   source?: "PREGAME" | "EFFECT";
   /** Select a row first, then submit it from a Confirm/Skip footer. */
   confirmOrSkip?: boolean;
+  /** v7 optional enhancement. Old clients retain the generic choices below;
+   * old donReturn bucket metadata/grammar is never repurposed. */
+  donIdentityReturn?: {
+    countMin: number;
+    countMax: number;
+    groups: { donIds: string[]; label: string }[];
+  };
   donReturn?: {
     count: number;
     sources: Array<{

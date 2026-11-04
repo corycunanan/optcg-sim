@@ -1,0 +1,1388 @@
+{
+  "golden-decoded/fresh-setup": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/pregame-priority-roll": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/battle-ready-with-undo": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    },
+    {
+      "path": "undoHistoryJson/0/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/effect-frame-prompt": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/structural-resume-context": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/legacy-cost-transaction-frame": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/trigger-order-prompt": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/batch-resume-frame": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/end-phase-parked": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "golden-decoded/battle-trigger-window": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/both-trigger-windows": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "golden-decoded/effect-damage-trigger-window": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/replacement-prompt": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/replacement-batch-prompt": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    },
+    {
+      "path": "sessionJson/state/effectStack/0/replacementBatch/events",
+      "after": [
+        "WOULD_BE_KO",
+        "WOULD_BE_REMOVED_FROM_FIELD",
+        "WOULD_LEAVE_FIELD"
+      ]
+    }
+  ],
+  "golden-decoded/stuck-damage-step": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "golden-decoded/finished": [
+    {
+      "path": "sessionJson/state/schemaVersion",
+      "before": 4,
+      "after": 6
+    },
+    {
+      "path": "undoHistoryJson/0/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "endphase/wave1-select-target": [
+    {
+      "path": "/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "endphase/wave1-nested-opponent-prompt": [
+    {
+      "path": "/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "endphase/wave1-trigger-order": [
+    {
+      "path": "/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "endphase/wave2-optional": [
+    {
+      "path": "/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "endphase/step1-scheduled-prompt": [
+    {
+      "path": "/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "endphase/step2-scheduled-prompt": [
+    {
+      "path": "/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "endphase/legacy-reparked": [
+    {
+      "path": "/schemaVersion",
+      "before": 5,
+      "after": 6
+    }
+  ],
+  "endphase/turn-completed": [
+    {
+      "path": "/schemaVersion",
+      "before": 4,
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-debt-writer-corpus.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-immediate-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-immediate-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-immediate-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-immediate-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-immediate-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/0/pause/3": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/0/pause/4": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/1/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/1/pause/3": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/2/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/2/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/3/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/3/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/3/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/4/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-rest-writer-corpus.json/4/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-battle-terminal-writer-corpus.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-counter-prefix-writer-corpus.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/3": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/0/pause/4": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/1/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/1/pause/3": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/2/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/2/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/3/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/3/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/3/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/4/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-endphase.json/4/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-event-prefix-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-event-prefix-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-handoff-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-handoff-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-handoff-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-handoff-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-handoff-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-absent-writer-corpus.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-legacy-explicit-writer-corpus.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-immediate-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-immediate-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-immediate-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-immediate-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-immediate-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-life-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_COST_SELECTION.json/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_TARGET_SELECTION.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_TARGET_SELECTION.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_TRIGGER_ORDER_SELECTION.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_TRIGGER_ORDER_SELECTION.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_TRIGGER_ORDER_SELECTION.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_TRIGGER_ORDER_SELECTION.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-order-cost-AWAITING_TRIGGER_ORDER_SELECTION.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-replacement-prefix-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/effectStack/2/replacementBatch/events",
+      "after": [
+        "WOULD_BE_KO",
+        "WOULD_BE_REMOVED_FROM_FIELD",
+        "WOULD_LEAVE_FIELD"
+      ]
+    },
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-replacement-prefix-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-replacement-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/effectStack/2/replacementBatch/events",
+      "after": [
+        "WOULD_BE_KO",
+        "WOULD_BE_REMOVED_FROM_FIELD",
+        "WOULD_LEAVE_FIELD"
+      ]
+    },
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-replacement-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-scheduled-watcher-writer-corpus.json/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-scheduled-watcher-writer-corpus.json/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-scheduled-watcher-writer-corpus.json/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-scheduled-watcher-writer-corpus.json/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "final/opt966-scheduled-watcher-writer-corpus.json/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/absent legacy stage/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/explicit legacy stage/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/turn handoff/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/turn handoff/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/turn handoff/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/turn handoff/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/turn handoff/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/0/pause/3": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/0/pause/4": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/1/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/1/pause/3": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/2/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/2/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/3/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/3/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/3/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/4/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/phase/4/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/Life/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/Life/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/Life/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/Life/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/Life/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/replacement/0/pause/0": [
+    {
+      "path": "/effectStack/2/replacementBatch/events",
+      "after": [
+        "WOULD_BE_KO",
+        "WOULD_BE_REMOVED_FROM_FIELD",
+        "WOULD_LEAVE_FIELD"
+      ]
+    },
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/replacement/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/scheduled watcher/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/scheduled watcher/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/scheduled watcher/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/scheduled watcher/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "future/scheduled watcher/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/0/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/0/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/0/pause/2": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/0/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/1/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/1/pause/1": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/1/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/2/pause/0": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ],
+  "event-owner/2/final": [
+    {
+      "path": "/schemaVersion",
+      "after": 6
+    }
+  ]
+}

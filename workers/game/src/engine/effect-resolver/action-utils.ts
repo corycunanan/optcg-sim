@@ -1,3 +1,4 @@
+import { battleDurationContext } from "../battle-context.js";
 import { effectSourceCard } from "../effect-source.js";
 /**
  * Pure utility functions for action handlers.
@@ -33,7 +34,14 @@ export function effectSourceController(
   fallbackController: 0 | 1,
   resultRefs: Map<string, EffectResult>,
 ): 0 | 1 {
-  return effectSourceCard(state, sourceCardInstanceId, resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot)?.controller ?? fallbackController;
+  return (
+    effectSourceCard(
+      state,
+      sourceCardInstanceId,
+      resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceIdentity ??
+        resultRefs.get(EFFECT_SOURCE_SNAPSHOT_REF)?.sourceCardSnapshot
+    )?.controller ?? fallbackController
+  );
 }
 
 export function getSearchAndPlayPickLimit(
@@ -178,7 +186,7 @@ export function computeExpiry(duration: Duration, state: GameState, controller: 
     case "THIS_TURN":
       return { wave: "END_OF_TURN", turn: state.turn.number };
     case "THIS_BATTLE":
-      return { wave: "END_OF_BATTLE", battleId: state.turn.battle?.battleId ?? "" };
+      return { wave: "END_OF_BATTLE", battleId: battleDurationContext(state) };
     case "UNTIL_END_OF_OPPONENT_NEXT_END_PHASE":
     case "UNTIL_END_OF_OPPONENT_NEXT_TURN": {
       // Both mean "until the end of the controller's opponent's next turn"
