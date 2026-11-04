@@ -191,8 +191,7 @@ export type CustomEventType =
   | "CHARACTER_RETURNED_TO_HAND"
   | "DAMAGE_TAKEN"
   | "BLOCKER_ACTIVATED"
-  | "ATTACK_DEALS_DAMAGE"
-  | "END_OF_YOUR_TURN";
+  | "ATTACK_DEALS_DAMAGE";
 
 export type KOCause = "ANY" | "BATTLE" | "EFFECT" | "OPPONENT_EFFECT";
 
