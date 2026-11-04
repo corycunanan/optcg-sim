@@ -2468,11 +2468,6 @@ export const OP12_070_SANJI: EffectSchema = {
       replacement_actions: [
         {
           type: "RETURN_DON_TO_DECK",
-          target: {
-            type: "DON_IN_COST_AREA",
-            controller: "SELF",
-            count: { exact: 1 },
-          },
           params: { amount: 1 },
         },
       ],

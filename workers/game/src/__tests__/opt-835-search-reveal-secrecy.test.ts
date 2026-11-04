@@ -43,7 +43,8 @@ import {
   visibleStateForPlayer,
   visibleStateForSpectator,
 } from "../session/visibility.js";
-import { validatePersistedGameStateCore } from "../session/persisted-game-state.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
+import { convertPersistedGameState } from "../session/persistence.js";
 import {
   CARDS,
   createBattleReadyState,
@@ -157,8 +158,8 @@ function revealEvents(state: GameState): Extract<GameEvent, { type: "CARDS_REVEA
 
 /** Every client-bound projection a non-owner can receive. */
 function nonOwnerProjections(state: GameState, db: Map<string, CardData>): Record<string, GameState> {
-  const persisted = JSON.parse(JSON.stringify(state)) as GameState;
-  expect(validatePersistedGameStateCore(persisted)).toBeNull();
+  const persisted = convertPersistedGameState(JSON.parse(JSON.stringify(toPersistedGameState(state))), "test reload");
+  expect(convertPersistedGameState(toPersistedGameState(persisted), "test reload")).toBeDefined();
   return {
     opponent: visibleStateForPlayer(state, db, 1),
     spectator: visibleStateForSpectator(state, db),

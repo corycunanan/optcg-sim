@@ -17,6 +17,7 @@ import {
   OP17_116_FULGORA,
 } from "../engine/schemas/op17.js";
 import { OP05_030_DONQUIXOTE_ROSINANTE } from "../engine/schemas/op05.js";
+import { batchOfferOf } from "./trigger-window-helpers.js";
 
 function withPlayer(
   state: GameState,
@@ -358,7 +359,7 @@ describe("OPT-723 Stage K.O.", () => {
     );
 
     expect(replacementOffered.pendingPrompt?.options.promptType).toBe("OPTIONAL_EFFECT");
-    expect(replacementOffered.pendingPrompt?.resumeContext).toMatchObject({
+    expect(batchOfferOf(replacementOffered)).toMatchObject({
       type: "REPLACEMENT_BATCH",
       event: "WOULD_BE_KO",
     });

@@ -206,7 +206,7 @@ describe("OPT-408: UNTIL_START_OF_YOUR_NEXT_TURN expires at the caster's next re
     expect(count(s)).toBe(1);
 
     s = endTurn(s, db); // → P0 REFRESH (round 2)
-    expect(count(s)).toBe(1); // still alive until refresh step 1 runs
+    expect(count(s)).toBe(0); // incoming Refresh expiry precedes TURN_STARTED scanning
     s = runRefresh(s, db);
     expect(count(s)).toBe(0);
   });

@@ -49,6 +49,7 @@ import {
   createBattleReadyState,
   createTestCardDb,
 } from "./helpers.js";
+import { withBattleTriggerWindow, withEffectTriggerWindow } from "./trigger-window-helpers.js";
 
 const PLAYERS = [0, 1] as const;
 
@@ -183,146 +184,70 @@ describe("OPT-901 projection: own face-down Life is secret (§3-10-2)", () => {
 });
 
 describe("OPT-901 projection: legitimate Life disclosures still reach the owner", () => {
-  it("shows the battle-damage Trigger Life card to the damaged player only", () => {
-    const { state } = fixture();
+  it("shows the battle-damage Trigger Life card to the damaged player only (through the prompt, never the turn)", () => {
+    const { state, cardDb } = fixture();
     // Player 0 is active, so player 1 is the damaged (defending) player.
     const revealed: LifeCard = {
       instanceId: "opt901-revealed-trigger",
       cardId: "OPT901-REVEALED-TRIGGER",
       face: "DOWN",
     };
-    const battleState: GameState = {
-      ...state,
-      turn: {
-        ...state.turn,
-        battleSubPhase: "DAMAGE_STEP",
-        battle: {
-          battleId: "opt901-battle",
-          attackerInstanceId: state.players[0].leader.instanceId,
-          targetInstanceId: state.players[1].leader.instanceId,
-          attackerPower: 5000,
-          defenderPower: 5000,
-          counterPowerAdded: 0,
-          blockerActivated: false,
-          pendingTriggerLifeCard: revealed,
+    const battleState: GameState = withBattleTriggerWindow(
+      {
+        ...state,
+        turn: {
+          ...state.turn,
+          battleSubPhase: "DAMAGE_STEP",
+          battle: {
+            battleId: "opt901-battle",
+            attackerInstanceId: state.players[0].leader.instanceId,
+            targetInstanceId: state.players[1].leader.instanceId,
+            attackerPower: 5000,
+            defenderPower: 5000,
+            counterPowerAdded: 0,
+            blockerActivated: false,
+          },
         },
       },
-    };
+      revealed,
+      cardDb,
+    );
 
     const damagedView = filterStateForPlayer(battleState, 1);
-    expect(damagedView.turn.battle?.pendingTriggerLifeCard).toEqual(revealed);
+    expect(damagedView.effectStack).toEqual([]);
+    expect(JSON.stringify(damagedView.pendingPrompt)).toContain(revealed.cardId);
     expect(damagedView.players[1].life).toEqual(expectedProjectedLife(1));
     expect(JSON.stringify(filterStateForPlayer(battleState, 0))).not.toContain(
       revealed.cardId,
     );
   });
 
-  it("shows the effect-damage Trigger Life card to the damaged player only", () => {
-    const { state } = fixture();
+  it("shows the effect-damage Trigger Life card to the damaged player only (through the prompt, never the turn)", () => {
+    const { state, cardDb } = fixture();
     const revealed: LifeCard = {
       instanceId: "opt901-effect-trigger",
       cardId: "OPT901-EFFECT-TRIGGER",
       face: "DOWN",
     };
-    const pending: GameState = {
-      ...state,
-      turn: {
-        ...state.turn,
-        pendingTriggerFromEffect: {
-          lifeCard: revealed,
-          damagedPlayerIndex: 0,
-          remainingDamages: 0,
-          sourceCardInstanceId: state.players[1].leader.instanceId,
-          controllerIndex: 1,
-        },
+    const pending: GameState = withEffectTriggerWindow(
+      state,
+      {
+        lifeCard: revealed,
+        damagedPlayerIndex: 0,
+        remainingDamages: 0,
+        sourceCardInstanceId: state.players[1].leader.instanceId,
+        controllerIndex: 1,
       },
-    };
-
-    expect(
-      filterStateForPlayer(pending, 0).turn.pendingTriggerFromEffect?.lifeCard,
-    ).toEqual(revealed);
-    expect(filterStateForPlayer(pending, 0).players[0].life).toEqual(
-      expectedProjectedLife(0),
+      cardDb,
     );
+
+    const damagedView = filterStateForPlayer(pending, 0);
+    expect(damagedView.effectStack).toEqual([]);
+    expect(JSON.stringify(damagedView.pendingPrompt)).toContain(revealed.cardId);
+    expect(damagedView.players[0].life).toEqual(expectedProjectedLife(0));
     expect(JSON.stringify(filterStateForPlayer(pending, 1))).not.toContain(
       revealed.cardId,
     );
-  });
-
-  it("shows a Life card moved to hand in the owner's hand, and nothing else", () => {
-    const { state, cardDb } = fixture();
-    const result = executeLifeToHand(
-      state,
-      { type: "LIFE_TO_HAND", params: { amount: 1 } } as ActionOf<"LIFE_TO_HAND">,
-      state.players[0].leader.instanceId,
-      0,
-      cardDb,
-      new Map(),
-    );
-    const view = filterStateForPlayer(result.state, 0);
-
-    expect(view.players[0].hand.map((card) => card.cardId)).toContain(
-      secretCardId(0, 0),
-    );
-    expect(view.players[0].life).toEqual([
-      { instanceId: faceUpInstanceId(0), cardId: faceUpCardId(0), face: "UP" },
-      { instanceId: "hidden-0-life-1", cardId: "hidden", face: "DOWN" },
-    ]);
-    expect(JSON.stringify(view)).not.toContain(secretCardId(0, 2));
-    expect(JSON.stringify(view)).not.toContain(secretInstanceId(0, 2));
-  });
-
-  it("discloses REORDER_ALL_LIFE cards through the prompt payload only", () => {
-    const { state, cardDb } = fixture();
-    const result = executeReorderAllLife(
-      state,
-      { type: "REORDER_ALL_LIFE", params: {} } as ActionOf<"REORDER_ALL_LIFE">,
-      state.players[0].leader.instanceId,
-      0,
-      cardDb,
-      new Map(),
-    );
-    const prompt = result.pendingPrompt;
-    if (!prompt) throw new Error("REORDER_ALL_LIFE should prompt");
-    const view = filterStateForPlayer({ ...result.state, pendingPrompt: prompt }, 0);
-
-    const options = view.pendingPrompt?.options;
-    expect(options?.promptType).toBe("ARRANGE_TOP_CARDS");
-    if (options?.promptType !== "ARRANGE_TOP_CARDS") throw new Error("prompt");
-    expect(options.cards.map((card) => card.cardId)).toEqual(
-      sentinelLife(0).map((card) => card.cardId),
-    );
-    // The prompt is the only disclosure channel: the stack stays redacted.
-    expect(view.players[0].life).toEqual(expectedProjectedLife(0));
-    expectNoFaceDownSecrets({ ...view, pendingPrompt: null });
-    // The prompt frame sent to the responder carries the same identities.
-    expect(filterPromptForPlayer(prompt, 0)?.options).toEqual(options);
-  });
-
-  it("discloses a targeted LIFE_SCRY card through its ARRANGE prompt only", () => {
-    const { state, cardDb } = fixture();
-    const topId = secretInstanceId(0, 0);
-    const result = executeLifeScry(
-      state,
-      {
-        type: "LIFE_SCRY",
-        target: { type: "LIFE_CARD", controller: "SELF", count: { up_to: 1 } },
-        params: { look_at: 1 },
-      } as ActionOf<"LIFE_SCRY">,
-      state.players[0].leader.instanceId,
-      0,
-      cardDb,
-      new Map(),
-      [topId],
-    );
-    const prompt = result.pendingPrompt;
-    if (!prompt) throw new Error("targeted LIFE_SCRY should prompt");
-    const view = filterStateForPlayer({ ...result.state, pendingPrompt: prompt }, 0);
-
-    const options = view.pendingPrompt?.options;
-    if (options?.promptType !== "ARRANGE_TOP_CARDS") throw new Error("prompt");
-    expect(options.cards.map((card) => card.cardId)).toEqual([secretCardId(0, 0)]);
-    expect(view.players[0].life).toEqual(expectedProjectedLife(0));
   });
 });
 

@@ -1,0 +1,173 @@
+{
+  "producerCommit": "67cbbde3622fb13600084e1f73edc67e15dff910",
+  "provenance": "Unchanged actual old GameSession/Repository storage; synthetic-only evidence exception, no production capture",
+  "cases": {
+    "cost-mode6": {
+      "file": "cost-mode6.json.gz",
+      "costMode": 6,
+      "phase": "COST"
+    },
+    "cost-mode7": {
+      "file": "cost-mode7.json.gz",
+      "costMode": 7,
+      "phase": "COST"
+    },
+    "cost-mode8": {
+      "file": "cost-mode8.json.gz",
+      "costMode": 8,
+      "phase": "COST"
+    },
+    "action-mode8": {
+      "file": "action-mode8.json.gz",
+      "costMode": 8,
+      "phase": "ACTION"
+    }
+  },
+  "files": {
+    "action-mode8.json.gz": "176975d1f98394481a7a91caa5c97294e4988b7f1a2a616997731da9d33c9637",
+    "cost-mode8.json.gz": "8adaf59b2c41010b4fbfec85068fe8b4e3767b9e6def4c2e5f4cd26f60b6082c",
+    "cost-mode7.json.gz": "802043c6c7d6e60df6d6c573d99c668fc47c8a3798b3666120e4c19cd6565c62",
+    "cost-mode6.json.gz": "37c0f5a6a7df22c5a54f94e6347993c85c41c4ea32390467b90c31d3fad06cd2",
+    "sources/action-producer-probe.test-source": "9a984e25180f81c0d6bee17e07c28fce245be522af104d9ac34d50da9b7b344e",
+    "sources/cost-producer-probe.test-source": "fe5302bf695ae6c3b34d657eb196e7e61f1423359161766499ccf846b02c57d2",
+    "cost-next-mode8.json.gz": "67066da6ee5498af43560fc34361fe73bf4b336db1310d70ddc27939291daf41",
+    "action-terminal-mode8.json.gz": "d9c0420b3819eef21b664ac049dd49549d843508e299f9b8527e4d72eeda4ac8",
+    "action-next-mode8.json.gz": "a901559fd5ee70c3f5b839bfb609a712d9545d7b2cff749bb700ab3596287079",
+    "sources/additional-producer-probe.test-source": "214000b7e2fe66bbad54df7984ef54409b12e12534e904b55747f15c45017d9d",
+    "restricted-cost-mode6-OP10-030.json.gz": "de46b2be785a830e021cce74e18d9446a9d25738ded36e6b0e8b0538b530b398",
+    "restricted-action-mode8-EB04-016.json.gz": "5be0b18520d79ee319abd3f7fe20b6eeaa6ed5bc7b0e36beecb5e65b194df4cf",
+    "c3-optional-ifdo-skip.json.gz": "dbbb78c411d1ed0c5eae0a2a798e24e23ce5f9096f206ebf778d6bc765e7cd16",
+    "restricted-cost-mode8-OP10-030.json.gz": "67acf66630fa83e536c802fa3c8b11485212c62c7bb85c2bc0b1e3502c2f200f",
+    "c3-optional-then-schedule.json.gz": "c29959ebc2194f3cf2ae8bb05d1d6938ab75511378984c7293d99e816a634da9",
+    "c3-optional-then-draw.json.gz": "3956a9c9570e6acc006ae1e89dd2a2b6b3611726c81dd5e38794f5fea4fa133d",
+    "restricted-cost-mode7-OP10-030.json.gz": "c8e150f72391b12dd92dc57514acca6dcb9613880b30c4204922d3695eaa4147",
+    "restricted-cost-mode7-EB04-016.json.gz": "a505b9db259facd2334cceb8dd9472736c8aba4a521dcb9f5284c5597a3db43a",
+    "restricted-action-mode8-OP10-030.json.gz": "9253bf9252d2a1b502f2590bcaefbd14847d61676e90d61c5efbf872341b7223",
+    "c3-optional-empty-skip.json.gz": "f6789e49222b133cfcbccffc511a7fc7296412de11af0dad1724349ff60247f5",
+    "c3-any-number-skip.json.gz": "1b7000f1a278f3ff38bc0c6575dc83ec242931294eb7df46cdf3b6b3412513d9",
+    "restricted-cost-mode8-EB04-016.json.gz": "99a932e502e6fd22bf5806106721888614760cad7a5b18d74aa5f562f0a7c970",
+    "restricted-cost-mode6-EB04-016.json.gz": "45738a9cd24ac853a03252900a4c01546ce1ba624f19289d2df67f18b21ae662",
+    "sources/c3-reviewer-old-producer.test-source": "fd095c3509ab2b4de86ca45b6b58ecbe4b7f4e199143275e9810c14089b92a8d",
+    "sources/restricted-producer-probe.test-source": "3d62f46808cd2d017ee97a3ad10c6c60383563c3301b9e6076905f8fcc5d0571"
+  },
+  "sourceHashes": {
+    "workers/game/src/GameSession.ts": "ed99ca2b2ab79486a82bb6f4692061d638036e8228e0bda9bc60136d852e0bde",
+    "workers/game/src/engine/effect-resolver/resolver.ts": "a8581c933656eee2c7518bc604a4045c264eb99320db9909e2182ec24851829a",
+    "workers/game/src/engine/effect-resolver/resume/cost.ts": "ec27c577f2be3fd0adb6059ac829f9add7a71d8f82dd76674a3f69f01d9795ff",
+    "workers/game/src/engine/effect-resolver/cost/orchestrator.ts": "0590882d47ce4da9016c349480acf184ec7d4f459fdd26fe5bfdf9c70109eb37",
+    "workers/game/src/session/persistence.ts": "c7bc4228112eb842d142ebba26f35ec6db13a2355985d7917a23e0f354fb1d3f",
+    "pnpm-lock.yaml": "080bf6130ab2656ff730fd2ca775051bca59c74a835f610d2525cf3c869c9ffe"
+  },
+  "additionalCases": {
+    "cost-next": {
+      "file": "cost-next-mode8.json.gz",
+      "costMode": 8,
+      "phase": "COST"
+    },
+    "action-next": {
+      "file": "action-next-mode8.json.gz",
+      "costMode": 8,
+      "phase": "ACTION"
+    },
+    "action-terminal": {
+      "file": "action-terminal-mode8.json.gz",
+      "costMode": 8,
+      "phase": "ACTION"
+    }
+  },
+  "restrictedCases": {
+    "restricted-cost-mode6-OP10-030": {
+      "file": "restricted-cost-mode6-OP10-030.json.gz",
+      "phase": "COST",
+      "costMode": 6,
+      "restriction": "OP10-030",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    },
+    "restricted-action-mode8-EB04-016": {
+      "file": "restricted-action-mode8-EB04-016.json.gz",
+      "phase": "ACTION",
+      "costMode": 8,
+      "restriction": "EB04-016",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    },
+    "restricted-cost-mode8-OP10-030": {
+      "file": "restricted-cost-mode8-OP10-030.json.gz",
+      "phase": "COST",
+      "costMode": 8,
+      "restriction": "OP10-030",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    },
+    "restricted-cost-mode7-OP10-030": {
+      "file": "restricted-cost-mode7-OP10-030.json.gz",
+      "phase": "COST",
+      "costMode": 7,
+      "restriction": "OP10-030",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    },
+    "restricted-cost-mode7-EB04-016": {
+      "file": "restricted-cost-mode7-EB04-016.json.gz",
+      "phase": "COST",
+      "costMode": 7,
+      "restriction": "EB04-016",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    },
+    "restricted-action-mode8-OP10-030": {
+      "file": "restricted-action-mode8-OP10-030.json.gz",
+      "phase": "ACTION",
+      "costMode": 8,
+      "restriction": "OP10-030",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    },
+    "restricted-cost-mode8-EB04-016": {
+      "file": "restricted-cost-mode8-EB04-016.json.gz",
+      "phase": "COST",
+      "costMode": 8,
+      "restriction": "EB04-016",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    },
+    "restricted-cost-mode6-EB04-016": {
+      "file": "restricted-cost-mode6-EB04-016.json.gz",
+      "phase": "COST",
+      "costMode": 6,
+      "restriction": "EB04-016",
+      "provenance": "Actual67cbb restriction before source PLAY; untouched old storage"
+    }
+  },
+  "c3Cases": {
+    "any-number-skip": {
+      "file": "c3-any-number-skip.json.gz",
+      "expectedVersion": 8,
+      "draws": 0,
+      "schedules": 0,
+      "sourceEvidenceSHA256": "33783b7b6c7228dd2bd8154c58626761835fc1b1ddb3a61617368a0032ba59e4"
+    },
+    "optional-empty-skip": {
+      "file": "c3-optional-empty-skip.json.gz",
+      "expectedVersion": 8,
+      "draws": 0,
+      "schedules": 0,
+      "sourceEvidenceSHA256": "73c02d83de8cf059ec1a12d446240af0628c783130cad4d35d0804a76d73f42e"
+    },
+    "optional-ifdo-skip": {
+      "file": "c3-optional-ifdo-skip.json.gz",
+      "expectedVersion": 8,
+      "draws": 0,
+      "schedules": 0,
+      "sourceEvidenceSHA256": "ef4da7f12a9ab1a6b610d5fee56847a3630fdc3c41216c15fbea0a6b54de7d77"
+    },
+    "optional-then-draw": {
+      "file": "c3-optional-then-draw.json.gz",
+      "expectedVersion": 10,
+      "draws": 1,
+      "schedules": 0,
+      "sourceEvidenceSHA256": "af90463d73a7a8538511470435bf0df495e2bca191f2743aa732c769a1c6e5e2"
+    },
+    "optional-then-schedule": {
+      "file": "c3-optional-then-schedule.json.gz",
+      "expectedVersion": 10,
+      "draws": 0,
+      "schedules": 1,
+      "sourceEvidenceSHA256": "6389304ec7db58404b746bbdef56a9ecefe89efc35bd242bb1102c2a3b325110"
+    }
+  }
+}

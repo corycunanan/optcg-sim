@@ -36,6 +36,7 @@ import {
   createTestCardDb,
   padChars,
 } from "./helpers.js";
+import { battleTriggerLifeCard, revealTrigger } from "./trigger-window-helpers.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     expect(paused.turn.battle?.damagesRemaining).toBe(2);
 
     // Decline the trigger — defender sends REVEAL_TRIGGER.
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const after = revealTrigger(paused, false, cardDb);
     expect(after.valid).toBe(true);
 
     // Battle fully resolved; both Life cards gone.
@@ -163,17 +164,17 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot);
 
     const paused1 = declareThroughCounter(state, attackerId, targetId, cardDb);
-    expect(paused1.turn.battle?.pendingTriggerLifeCard?.instanceId).toBe(top.instanceId);
+    expect(battleTriggerLifeCard(paused1)?.instanceId).toBe(top.instanceId);
 
     // Decline #1 — battle must pause again on the 2nd Life.
-    const paused2 = runPipeline(paused1, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const paused2 = revealTrigger(paused1, false, cardDb);
     expect(paused2.valid).toBe(true);
     expect(paused2.state.turn.battleSubPhase).toBe("DAMAGE_STEP");
     expect(paused2.state.turn.battle?.damagesRemaining).toBe(1);
-    expect(paused2.state.turn.battle?.pendingTriggerLifeCard?.instanceId).toBe(bot.instanceId);
+    expect(battleTriggerLifeCard(paused2.state)?.instanceId).toBe(bot.instanceId);
 
     // Decline #2 — battle now fully resolves.
-    const done = runPipeline(paused2.state, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const done = revealTrigger(paused2.state, false, cardDb);
     expect(done.valid).toBe(true);
     expect(done.state.turn.battleSubPhase).toBeNull();
     expect(done.state.players[1].life.length).toBe(0);
@@ -189,7 +190,7 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     const paused = declareThroughCounter(state, attackerId, targetId, cardDb);
     expect(paused.turn.battle?.damagesRemaining).toBe(2);
 
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: true }, cardDb, 1);
+    const after = revealTrigger(paused, true, cardDb);
     expect(after.valid).toBe(true);
     expect(after.state.turn.battleSubPhase).toBeNull();
     expect(after.state.players[1].life.length).toBe(0);
@@ -208,7 +209,7 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     const { state, attackerId, targetId } = setupDADefender(cardDb, top, bot);
 
     const paused = declareThroughCounter(state, attackerId, targetId, cardDb);
-    expect(paused.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
+    expect(battleTriggerLifeCard(paused)).toBeTruthy();
 
     // Yank the attacker off the field mid-window (stand-in for a Trigger KO).
     const newChars = paused.players[0].characters.map((c) =>
@@ -222,7 +223,7 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
       ] as [PlayerState, PlayerState],
     };
 
-    const after = runPipeline(yanked, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const after = revealTrigger(yanked, false, cardDb);
     expect(after.valid).toBe(true);
     expect(after.state.turn.battleSubPhase).toBeNull();
     // 1st Life went to hand (decline) and the 2nd damage took the 2nd Life.
@@ -362,10 +363,10 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     // battle-ready state already provides (attacker base 5000 vs leader 5000
     // ties to attacker).
     const paused = declareThroughCounter(state, attackerId, targetId, cardDb);
-    expect(paused.turn.battle?.pendingTriggerLifeCard).toBeTruthy();
+    expect(battleTriggerLifeCard(paused)).toBeTruthy();
     expect(paused.turn.battle?.damagesRemaining).toBe(2);
 
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const after = revealTrigger(paused, false, cardDb);
     expect(after.valid).toBe(true);
     expect(after.state.players[1].life.length).toBe(0);
     expect(after.state.turn.battle).toBeNull();
@@ -424,7 +425,7 @@ describe("OPT-239 — [Trigger] resolution between [Double Attack] damages", () 
     );
     expect(paused.turn.battle?.damagesRemaining).toBe(1);
 
-    const after = runPipeline(paused, { type: "REVEAL_TRIGGER", reveal: false }, cardDb, 1);
+    const after = revealTrigger(paused, false, cardDb);
     expect(after.valid).toBe(true);
     expect(after.state.turn.battleSubPhase).toBeNull();
     // Exactly 1 Life removed.

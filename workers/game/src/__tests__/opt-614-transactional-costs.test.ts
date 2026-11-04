@@ -1,3 +1,6 @@
+import { convertPersistedGameState } from "../session/persistence.js";
+import { toPersistedGameState } from "../session/game-state-schema.js";
+import { memoryRepository } from "./opt-997-corpus-support.js";
 import { describe, expect, it } from "vitest";
 import type { Cost, EffectBlock, EffectSchema } from "../engine/effect-types.js";
 import { resolveEffect, resumeFromStack } from "../engine/effect-resolver/index.js";
@@ -129,11 +132,15 @@ describe("OPT-614 — transactional multi-cost payment", () => {
     expect(declined.state.turn.oncePerTurnUsed).toEqual(state.turn.oncePerTurnUsed);
     expect(declined.events).toEqual([]);
 
-    const currentFrame = prompted.state.effectStack.at(-1)!;
+    // Build an actual legacy producer before removing its historical optional
+    // transaction field; never retain native7 expected evidence on this owner.
+    const legacyPrompted = offer({ ...state, schemaVersion: 6 }, block, cardDb);
+    const currentFrame = legacyPrompted.state.effectStack.at(-1)!;
+    expect(currentFrame.costExpectedRoot).toBeUndefined();
     expect(currentFrame.costTransactionState).toBeDefined();
     const { costTransactionState, ...legacyFrame } = currentFrame;
     const legacyRoot = applyCostTransactionState(
-      prompted.state,
+      legacyPrompted.state,
       costTransactionState!,
     );
     const legacyPersisted = JSON.parse(JSON.stringify({
@@ -293,4 +300,20 @@ describe("OPT-614 — transactional multi-cost payment", () => {
       "ST25-004",
     ]);
   });
+});
+
+it("native7 expected-root evidence without staged payment rejects at repository ingress without mutation", async () => {
+  const db = createTestCardDb();
+  const state = withActiveDon(createBattleReadyState(db), 3);
+  const block: EffectBlock = { id: "malformed-modern", category: "activate", costs: [{ type: "REST_DON", amount: 1 }, { type: "REST_DON", amount: "ANY_NUMBER" }], actions: [] };
+  const prompted = offer(state, block, db);
+  const bad = structuredClone(prompted.state);
+  const owner = bad.effectStack.find(frame => frame.costExpectedRoot)!;
+  expect(owner.costExpectedRoot).toBeDefined(); delete owner.costTransactionState;
+  const before = structuredClone(bad);
+  expect(() => convertPersistedGameState(toPersistedGameState(bad), "state")).toThrow();
+  const { repo, values } = memoryRepository({ sentinel: "preserve" });
+  await expect(repo.save({ state: bad, cardDb: db, mode: "PVP", pregameMode: "PRIORITY_ROLL", testPriorityRolls: null, undoHistory: [] })).rejects.toThrow();
+  expect(bad).toEqual(before); expect(values).toEqual({ sentinel: "preserve" });
+  expect(repo.getLastMetrics()).toBeNull();
 });

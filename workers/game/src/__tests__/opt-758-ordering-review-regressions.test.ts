@@ -1,3 +1,4 @@
+import { toPersistedGameState } from "../session/game-state-schema.js";
 import { describe, expect, it } from "vitest";
 import type { EffectBlock } from "../engine/effect-types.js";
 import { resumeFromStack } from "../engine/effect-resolver/resume.js";
@@ -244,7 +245,7 @@ describe("OPT-758 ordering review regressions", () => {
     expect(normalizedFrame.triggerOrderingGroup?.triggers).toHaveLength(2);
 
     const restored = parseStoredSession({
-      state: { ...rejected.state, pendingPrompt: rejected.pendingPrompt },
+      state: toPersistedGameState({ ...rejected.state, pendingPrompt: rejected.pendingPrompt }),
       cardDb: Object.fromEntries(cardDb),
       mode: "PVP",
       testPriorityRolls: null,

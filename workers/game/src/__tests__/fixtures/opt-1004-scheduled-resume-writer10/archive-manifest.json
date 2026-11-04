@@ -1,0 +1,8 @@
+{
+  "files": {
+    "sources/opt-1004-writer-producer.test-source": "99c2654ddd1001f40c042bccc433d74565266d4023a8a1dce516e37006d51414",
+    "sources/resolver.ts.txt": "a6b4f6cb65f802161117c09887b5d133bb91db9ff7464d10a356a4ecd22d79b8",
+    "sources/resume-provenance.ts.txt": "7340b879c5df4ac51233ffdfb9d50dc212ec5d385f6c853d938d06f21fc9edc0",
+    "candidate.patch": "35d69405fd31f5d4c400e3d656f70a8e836ba481c3db4f709f38a98dad125c6b"
+  }
+}

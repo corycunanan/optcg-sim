@@ -10,13 +10,15 @@ import type { CardData, GameAction, GameState } from "../types.js";
 import { getActivePlayer, findCardInState } from "./state.js";
 import {
   getEffectiveCost,
+  isCardNegated,
   hasGrantedKeyword,
   hasRemovedKeyword,
 } from "./modifiers.js";
 import { getEffectiveCounterValue } from "./counter-value.js";
 import { canAttackThisTurn, canAttackLeader, hasEffectiveKeyword } from "./keywords.js";
-import { isCostPayable } from "./effect-resolver/cost-handler.js";
-import type { Cost } from "./effect-types.js";
+import { isCostSequencePayable } from "./effect-resolver/cost-handler.js";
+import { activationProhibitionVeto } from "./prohibitions.js";
+import { isOncePerTurnBlock, type Cost } from "./effect-types.js";
 import { evaluateCondition } from "./conditions.js";
 
 export function validate(
@@ -26,6 +28,13 @@ export function validate(
   actingPlayerIndex: 0 | 1,
 ): string | null {
   if (state.status === "FINISHED") return "Game is already over";
+  if (
+    state.pendingPrompt &&
+    ["DECLARE_BLOCKER", "USE_COUNTER", "USE_COUNTER_EVENT", "PASS"].includes(
+      action.type
+    )
+  )
+    return "A player decision must finish before another game action";
 
   switch (action.type) {
     case "ADVANCE_PHASE":
@@ -50,7 +59,7 @@ export function validate(
       return validateUseCounterEvent(state, action.cardInstanceId, cardDb);
 
     case "REVEAL_TRIGGER":
-      return validateRevealTrigger(state);
+      return validateRevealTrigger();
 
     case "PASS":
       return validatePass(state);
@@ -224,7 +233,8 @@ function validateDeclareBlocker(
   if (state.turn.battleSubPhase !== "BLOCK_STEP") return "Blocker can only be declared during Block Step";
 
   // §7-1-2-1: Only one Blocker can be declared per battle
-  if (state.turn.battle?.blockerActivated) return "Only one Blocker can be declared per battle (§7-1-2-1)";
+  if (state.turn.battle?.blockerActivated || state.turn.battle?.blockerLocked)
+    return "Only one Blocker can be declared per battle (§7-1-2-1)";
 
   const inactiveIdx = state.turn.activePlayerIndex === 0 ? 1 : 0;
   const found = findCardInState(state, blockerInstanceId);
@@ -329,12 +339,10 @@ function validateUseCounterEvent(
   return null;
 }
 
-function validateRevealTrigger(state: GameState): string | null {
-  // OPT-259 (F6): effect-sourced damage can open a [Trigger] window outside a
-  // battle. Allow REVEAL_TRIGGER whenever either path has a pending Life card.
-  if (state.turn.pendingTriggerFromEffect) return null;
-  if (state.turn.battleSubPhase !== "DAMAGE_STEP") return "Trigger reveal only during Damage Step";
-  return null;
+function validateRevealTrigger(): string | null {
+  // OPT-963: a Trigger window is a damage frame that owns its REVEAL_TRIGGER
+  // prompt; the reply is a prompt response, not a pipeline action.
+  return "Trigger reveals answer the pending prompt";
 }
 
 function validatePass(state: GameState): string | null {
@@ -351,6 +359,20 @@ export function getActivateEffectTimingError(state: GameState): string | null {
   return null;
 }
 
+/**
+ * OPT-864: may the activation cost be paid in full, in printed order?
+ *
+ * Rule 8-3-1-1 pays the costs top to bottom, and rule 8-3-1-3 makes the cost
+ * all-or-nothing, so a later cost is judged on the state after the earlier
+ * ones. Checking each cost alone against the pre-cost state falsely rejects a
+ * sequence in which an earlier cost enables a later one (for example, a hand
+ * trash that fills the trash a later trash-to-deck cost needs).
+ *
+ * No `isCostPayable` pre-filter runs here. The sequential evaluator already
+ * rejects on its first unpayable step, and a per-cost check on the initial
+ * state is sound only for index 0. Errors propagate (see
+ * `isCostSequencePayable`).
+ */
 export function areEffectCostsPayable(
   state: GameState,
   costs: readonly Cost[],
@@ -358,9 +380,7 @@ export function areEffectCostsPayable(
   cardDb: Map<string, CardData>,
   sourceCardInstanceId: string,
 ): boolean {
-  return costs.every((cost) =>
-    isCostPayable(state, cost, controller, cardDb, sourceCardInstanceId),
-  );
+  return isCostSequencePayable(state, costs, controller, cardDb, sourceCardInstanceId);
 }
 
 function validateActivateEffect(
@@ -380,10 +400,50 @@ function validateActivateEffect(
   const cardData = cardDb.get(found.card.cardId);
   const schema = cardData?.effectSchema;
   const block = schema?.effects.find((b) => b.id === effectId);
-  if (!block || block.category !== "activate") return null;
+  if (!block) return "Effect not found on this card";
+
+  // Match executeActivateEffect: Main/Counter Events use separate paths
+  // (rules 10-2-3/10-2-4), including Events with combined Main/Counter triggers.
+  if (
+    block.category !== "activate" ||
+    !block.trigger || !("keyword" in block.trigger) ||
+    block.trigger.keyword !== "ACTIVATE_MAIN"
+  ) {
+    return "Only Activate: Main effects can be activated with this action";
+  }
+
+  // Rules 2-8-2 and 10-2-2: Activate: Main uses a source on the field.
+  if (
+    found.card.zone !== "LEADER" &&
+    found.card.zone !== "CHARACTER" &&
+    found.card.zone !== "STAGE"
+  ) {
+    return "Card must be on the field to activate this effect";
+  }
+
+  // Rule 8-2-1-1: an invalid effect cannot activate or pay its cost.
+  if (isCardNegated(found.card, state, cardDb)) return "Card effects are negated";
 
   if (!meetsAttachedDonRequirement(found.card, block.trigger)) {
     return "Attached DON!! requirement is not met";
+  }
+
+  // OPT-864 (Decision 11, rule 1-3-3): an activation-time prohibition vetoes
+  // the activation before any cost is judged or paid.
+  const prohibited = activationProhibitionVeto(
+    state,
+    { type: "ACTIVATE_EFFECT", cardInstanceId, effectId },
+    cardDb,
+    actingPlayerIndex,
+  );
+  if (prohibited) return prohibited;
+
+  // Rule 10-2-13-3: a used block cannot activate or pay its cost again.
+  if (
+    isOncePerTurnBlock(block) &&
+    state.turn.oncePerTurnUsed[block.id]?.includes(cardInstanceId)
+  ) {
+    return "Effect has already been used this turn";
   }
 
   const controller = found.playerIndex;

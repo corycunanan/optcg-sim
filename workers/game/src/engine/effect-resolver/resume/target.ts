@@ -40,24 +40,24 @@ import { releaseMovedDonEffects } from "../../don-area-effects.js";
 import { trashFromHandSelection } from "../actions/removal.js";
 import type {
   ActionResult,
-  EffectResolverResult,
+  HandlerResult,
   EffectResolverServices,
 } from "../types.js";
 import { pushBatchResumeFrame } from "./batch.js";
-import { isEngineTerminated } from "../../engine-limits.js";
+import { isGameTerminated } from "../../terminal.js";
 import { replacePendingEventReferences } from "../../events.js";
 import { CONTINUATION_EFFECT_BLOCK } from "../../effect-stack.js";
 import { withChainDescription } from "../resolver.js";
 
 export interface TargetFallthrough {
-  kind: "fallthrough";
+  kind: "continued";
   state: GameState;
   succeeded?: boolean;
 }
 
 export interface TargetTerminal {
-  kind: "terminal";
-  result: EffectResolverResult;
+  kind: "handled";
+  result: HandlerResult;
 }
 
 export type TargetBranchResult = TargetFallthrough | TargetTerminal | null;
@@ -107,8 +107,8 @@ export function handleRedistributeDon(
 
   if (!allValid) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
 
@@ -127,7 +127,7 @@ export function handleRedistributeDon(
     }
   }
 
-  return { kind: "fallthrough", state: nextState };
+  return { kind: "continued", state: nextState };
 }
 
 /**
@@ -157,8 +157,8 @@ export function handleGiveDonIdentity(
     resumeCtx.giveDonIdentity ?? parseGiveDonIdentityMarker(validTargets);
   if (!binding) return null;
   const reject: TargetBranchResult = {
-    kind: "terminal",
-    result: { state, events: [], resolved: false, rejected: true },
+    kind: "handled",
+    result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
   };
   const selected = action.selectedInstanceIds ?? [];
   const donId = selected.length === 1 ? selected[0] : undefined;
@@ -177,7 +177,7 @@ export function handleGiveDonIdentity(
   // Rule 3-1-6-1: the moved DON!! sheds the effects applied to it.
   const nextState = releaseMovedDonEffects(state, given);
   events.push({ type: "DON_GIVEN_TO_CARD", playerIndex: controller, payload: { count: 1 } });
-  return { kind: "fallthrough", state: nextState, succeeded: true };
+  return { kind: "continued", state: nextState, succeeded: true };
 }
 
 /**
@@ -222,8 +222,8 @@ export function handleSelectTargetRuleTrashForPlay(
   const selected = action.selectedInstanceIds ?? [];
   if (selected.length !== 1 || !validTargets.includes(selected[0])) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   const victimId = selected[0];
@@ -231,8 +231,8 @@ export function handleSelectTargetRuleTrashForPlay(
   const trashResult = trashCharacter(nextState, victimId, controller);
   if (!trashResult) {
     return {
-      kind: "terminal",
-      result: { state, events: [], resolved: false, rejected: true },
+      kind: "handled",
+      result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
     };
   }
   nextState = trashResult.state;
@@ -279,7 +279,20 @@ export function handleSelectTargetRuleTrashForPlay(
         ? { ...trigger, triggeringEvent: scannedEvents[eventIndex] }
         : trigger;
     });
-    nextState = { ...nextState, executionContext: scan.state.executionContext };
+    nextState = {
+      ...nextState,
+      executionContext: scan.state.executionContext,
+      // Matching used the pre-trash board, but a battle deferral is live
+      // continuation state. Preserve that queue on the post-trash board.
+      effectStack: nextState.effectStack.map(frame => {
+        const scanned = scan.state.effectStack.find(candidate => candidate.id === frame.id);
+        if (!frame.battleDamage || !scanned) return frame;
+        return { ...frame, pendingTriggers: scanned.pendingTriggers.map(trigger => {
+          const eventIndex = scan.events.indexOf(trigger.triggeringEvent);
+          return eventIndex < 0 ? trigger : { ...trigger, triggeringEvent: scannedEvents[eventIndex] };
+        }) };
+      }),
+    };
     replacePendingEventReferences(events, [...events], scannedEvents);
     queuedTriggers = [...queuedTriggers, ...scannedTriggers];
   }
@@ -311,17 +324,17 @@ export function handleSelectTargetRuleTrashForPlay(
       );
   nextState = actionResult.state;
   events.push(...actionResult.events);
-  if (isEngineTerminated(nextState)) {
+  if (isGameTerminated(nextState)) {
     return {
-      kind: "terminal",
-      result: { state: nextState, events, resolved: false },
+      kind: "handled",
+      result: { kind: "terminal", state: nextState, events, resolved: false },
     };
   }
 
   if (actionResult.pendingPrompt) {
     return {
-      kind: "terminal",
-      result: {
+      kind: "handled",
+      result: { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -346,8 +359,8 @@ export function handleSelectTargetRuleTrashForPlay(
       effectDescription,
     );
     return {
-      kind: "terminal",
-      result: services.processRemainingTriggers(nextState, triggers, cardDb, events),
+      kind: "handled",
+      result: services.reportTriggers(nextState, triggers, cardDb, events),
     };
   }
 
@@ -379,8 +392,8 @@ export function handleSelectTargetRuleTrashForPlay(
     events.push(...chainResult.events);
     if (chainResult.pendingPrompt) {
       return {
-        kind: "terminal",
-        result: {
+        kind: "handled",
+        result: { kind: "waiting",
           state: nextState,
           events,
           resolved: false,
@@ -390,8 +403,8 @@ export function handleSelectTargetRuleTrashForPlay(
     }
   }
   return {
-    kind: "terminal",
-    result: { state: nextState, events, resolved: true },
+    kind: "handled",
+    result: { kind: isGameTerminated(nextState) ? "terminal" : "completed", state: nextState, events, resolved: true },
   };
 }
 
@@ -437,8 +450,8 @@ export function handleSelectTarget(
       selected.length > bounds.max
     ) {
       return {
-        kind: "terminal",
-        result: { state, events: [], resolved: false, rejected: true },
+        kind: "handled",
+        result: { kind: "waiting", state, events: [], resolved: false, rejected: true },
       };
     }
   }
@@ -454,8 +467,8 @@ export function handleSelectTarget(
       resultRefs
     );
     return {
-      kind: "terminal",
-      result: {
+      kind: "handled",
+      result: { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -488,8 +501,8 @@ export function handleSelectTarget(
       resultRefs
     );
     return {
-      kind: "terminal",
-      result: {
+      kind: "handled",
+      result: { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -513,10 +526,10 @@ export function handleSelectTarget(
   );
   nextState = actionResult.state;
   events.push(...actionResult.events);
-  if (isEngineTerminated(nextState)) {
+  if (isGameTerminated(nextState)) {
     return {
-      kind: "terminal",
-      result: { state: nextState, events, resolved: false },
+      kind: "handled",
+      result: { kind: "terminal", state: nextState, events, resolved: false },
     };
   }
 
@@ -536,8 +549,8 @@ export function handleSelectTarget(
   }
   if (actionResult.pendingPrompt) {
     return {
-      kind: "terminal",
-      result: {
+      kind: "handled",
+      result: { kind: "waiting",
         state: nextState,
         events,
         resolved: false,
@@ -566,21 +579,21 @@ export function handleSelectTarget(
       resultRefs,
       effectDescription,
     );
-    if (isEngineTerminated(nextState)) {
+    if (isGameTerminated(nextState)) {
       return {
-        kind: "terminal",
-        result: { state: nextState, events, resolved: false },
+        kind: "handled",
+        result: { kind: "terminal", state: nextState, events, resolved: false },
       };
     }
-    const drain = services.processRemainingTriggers(
+    const drain = services.reportTriggers(
       nextState,
       triggers,
       cardDb,
       events
     );
     return {
-      kind: "terminal",
-      result: {
+      kind: "handled",
+      result: { kind: drain.kind,
         state: drain.state,
         events: drain.events,
         resolved: drain.resolved,
@@ -593,7 +606,7 @@ export function handleSelectTarget(
   }
 
   return {
-    kind: "fallthrough",
+    kind: "continued",
     state: nextState,
     succeeded: actionResult.succeeded,
   };
